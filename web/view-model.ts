@@ -30,31 +30,88 @@ export function settingsFromHash(hash: string): SettingsRoute | null {
 export const hashForSettings = (cwd: string | null): string =>
 	cwd === null ? `#${SETTINGS}` : `#${SETTINGS}/${encodeURIComponent(cwd)}`;
 
-/**
- * `#<instanceId>` selects a live session, `#<instanceId>/<agentId>` one of its subagents,
- * and `#past/<sessionId>` a past session. Instance ids are hex, so none reads as `past` or `settings`.
- */
-export function viewFromHash(hash: string): View | null {
-	const raw = hash.replace(/^#/, "");
-	if (!raw || settingsFromHash(hash)) return null;
-	if (raw.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(raw.slice(PAST_PREFIX.length)) };
-	const slash = raw.indexOf("/");
-	if (slash < 0) return { kind: "live", instanceId: decodeURIComponent(raw), agentId: null };
+/** Panes the page splits into at most, as a 2x2 grid. */
+export const MAX_PANES = 4;
+
+/** The views on screen in grid order, and the focused one that plain clicks, new sessions, and forks open into. */
+export interface Layout {
+	/** Distinct views, at most {@link MAX_PANES}. */
+	panes: View[];
+	/** Index into `panes`; 0 when there are none. */
+	focus: number;
+}
+
+export const EMPTY_LAYOUT: Layout = { panes: [], focus: 0 };
+
+export const focusedView = (layout: Layout): View | null => layout.panes[layout.focus] ?? null;
+
+/** `<instanceId>` for a live session, `<instanceId>/<agentId>` for one of its subagents, `past/<sessionId>` for a past session. */
+function paneForView(view: View): string {
+	if (view.kind === "past") return `${PAST_PREFIX}${encodeURIComponent(view.sessionId)}`;
+	const session = encodeURIComponent(view.instanceId);
+	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
+}
+
+/** Instance ids are hex, so none reads as `past` or `settings`. */
+function viewFromPane(pane: string): View {
+	if (pane.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(pane.slice(PAST_PREFIX.length)) };
+	const slash = pane.indexOf("/");
+	if (slash < 0) return { kind: "live", instanceId: decodeURIComponent(pane), agentId: null };
 	return {
 		kind: "live",
-		instanceId: decodeURIComponent(raw.slice(0, slash)),
-		agentId: decodeURIComponent(raw.slice(slash + 1)),
+		instanceId: decodeURIComponent(pane.slice(0, slash)),
+		agentId: decodeURIComponent(pane.slice(slash + 1)),
 	};
 }
 
-export function hashForView(view: View): string {
-	if (view.kind === "past") return `#${PAST_PREFIX}${encodeURIComponent(view.sessionId)}`;
-	const session = encodeURIComponent(view.instanceId);
-	return view.agentId === null ? `#${session}` : `#${session}/${encodeURIComponent(view.agentId)}`;
-}
+export const hashForView = (view: View): string => `#${paneForView(view)}`;
 
 export const sameView = (a: View | null, b: View | null): boolean =>
-	(a && hashForView(a)) === (b && hashForView(b));
+	(a && paneForView(a)) === (b && paneForView(b));
+
+/**
+ * `#<pane>` for one pane, so single-view links from before split screen still open; `#<pane>,<pane>…@<focus>`
+ * for more, with `@<focus>` left out when the first pane has focus. Encoded ids hold no `,` or `@`.
+ */
+export function hashForLayout({ panes, focus }: Layout): string {
+	if (panes.length === 0) return "";
+	return `#${panes.map(paneForView).join(",")}${focus > 0 ? `@${focus}` : ""}`;
+}
+
+/**
+ * The layout a hash names, keeping the first {@link MAX_PANES} distinct views and focus on the view it named.
+ * `null` for the settings page, which leaves the panes behind it alone.
+ */
+export function layoutFromHash(hash: string): Layout | null {
+	if (settingsFromHash(hash)) return null;
+	const raw = hash.replace(/^#/, "");
+	const at = raw.lastIndexOf("@");
+	const named = (at < 0 ? raw : raw.slice(0, at)).split(",").filter(Boolean).map(viewFromPane);
+	const focused = named[at < 0 ? 0 : Number(raw.slice(at + 1))] ?? named[0];
+	const panes = named.filter((view, index) => named.findIndex(other => sameView(other, view)) === index).slice(0, MAX_PANES);
+	return { panes, focus: Math.max(0, panes.findIndex(view => sameView(view, focused ?? null))) };
+}
+
+export type OpenMode = "replace" | "split";
+
+/**
+ * `view` in the focused pane, or in a new pane for `split`. A view already open gets focus instead of a second pane;
+ * a split with {@link MAX_PANES} open replaces the focused pane.
+ */
+export function openView(layout: Layout, view: View, mode: OpenMode): Layout {
+	const { panes, focus } = layout;
+	const open = panes.findIndex(pane => sameView(pane, view));
+	if (open >= 0) return { panes, focus: open };
+	if (panes.length === 0) return { panes: [view], focus: 0 };
+	if (mode === "split" && panes.length < MAX_PANES) return { panes: [...panes, view], focus: panes.length };
+	return { panes: panes.with(focus, view), focus };
+}
+
+/** The layout without pane `index`. Focus stays on its view, or moves to the pane taking the closed one's place. */
+export function closePane({ panes, focus }: Layout, index: number): Layout {
+	const rest = panes.filter((_, i) => i !== index);
+	return { panes: rest, focus: index < focus ? focus - 1 : Math.max(0, Math.min(focus, rest.length - 1)) };
+}
 
 /**
  * Where a new session starts unless the user types another directory: the open session's,

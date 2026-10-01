@@ -11,7 +11,7 @@ export function CompletionPopup({ id, items, active, onPick, error }: {
 	error: string | null;
 }) {
 	return (
-		<div className="absolute bottom-full z-30 mb-2 w-full overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl" aria-label="Completions">
+		<div className="absolute inset-x-6 bottom-full z-30 mb-2 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl" aria-label="Completions">
 		<div id={id} role="listbox" aria-label="Suggestions" className="max-h-64 overflow-y-auto p-1">
 			{items.map((item, index) => {
 				const Icon = ICON[item.kind];

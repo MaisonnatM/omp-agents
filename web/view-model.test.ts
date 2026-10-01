@@ -3,17 +3,21 @@ import type { AgentRow, CatalogModel, Item, PastSession, RosterHost } from "../s
 import {
 	agentTree,
 	applyItems,
+	closePane,
 	defaultCwd,
 	forkPoints,
+	hashForLayout,
 	hashForSettings,
 	hashForView,
+	type Layout,
+	layoutFromHash,
 	matchesFilter,
 	modelName,
 	modelOrg,
+	openView,
 	settingsFromHash,
 	splitSelector,
 	toBlocks,
-	viewFromHash,
 } from "./view-model";
 
 const agent = (id: string, parentId: string | null): AgentRow => ({
@@ -57,27 +61,78 @@ describe("agentTree", () => {
 	});
 });
 
-describe("view hash", () => {
-	test("round-trips session and subagent views, including ids that need escaping", () => {
-		const view = { kind: "live", instanceId: "7c51f77b2a1bf7ba", agentId: "Parent/Child #2" } as const;
-		expect(viewFromHash(hashForView(view))).toEqual(view);
-		expect(viewFromHash("#7c51f77b2a1bf7ba")).toEqual({ kind: "live", instanceId: "7c51f77b2a1bf7ba", agentId: null });
-		expect(viewFromHash("")).toBeNull();
+describe("layout hash", () => {
+	const live = (instanceId: string, agentId: string | null = null) => ({ kind: "live", instanceId, agentId }) as const;
+	const past = (sessionId: string) => ({ kind: "past", sessionId }) as const;
+
+	test("one pane keeps the single-view hash, so links from before split screen still open", () => {
+		const view = live("7c51f77b2a1bf7ba", "Parent/Child #2");
+		expect(hashForLayout({ panes: [view], focus: 0 })).toBe("#7c51f77b2a1bf7ba/Parent%2FChild%20%232");
+		expect(hashForLayout({ panes: [view], focus: 0 })).toBe(hashForView(view));
+		expect(layoutFromHash("#7c51f77b2a1bf7ba/Parent%2FChild%20%232")).toEqual({ panes: [view], focus: 0 });
+		expect(layoutFromHash("#7c51f77b2a1bf7ba")).toEqual({ panes: [live("7c51f77b2a1bf7ba")], focus: 0 });
+		expect(layoutFromHash("")).toEqual({ panes: [], focus: 0 });
+		expect(hashForLayout({ panes: [], focus: 0 })).toBe("");
 	});
 
 	test("a past session is not read as a subagent of an instance named `past`", () => {
-		expect(hashForView({ kind: "past", sessionId: "01a0f6a5-181e" })).toBe("#past/01a0f6a5-181e");
-		expect(viewFromHash("#past/01a0f6a5-181e")).toEqual({ kind: "past", sessionId: "01a0f6a5-181e" });
+		expect(hashForView(past("01a0f6a5-181e"))).toBe("#past/01a0f6a5-181e");
+		expect(layoutFromHash("#past/01a0f6a5-181e")).toEqual({ panes: [past("01a0f6a5-181e")], focus: 0 });
 	});
 
-	test("the settings page is not read as a session, and its workspace keeps its slashes", () => {
+	test("several panes round-trip in order with the focused one, ids with commas and @ included", () => {
+		const layout: Layout = { panes: [live("a1"), live("a1", "x,y@z"), past("s,1"), live("b2")], focus: 2 };
+		const hash = hashForLayout(layout);
+		expect(hash).toBe("#a1,a1/x%2Cy%40z,past/s%2C1,b2@2");
+		expect(layoutFromHash(hash)).toEqual(layout);
+		expect(hashForLayout({ panes: [live("a1"), live("b2")], focus: 0 })).toBe("#a1,b2");
+	});
+
+	test("keeps the first four distinct views and focus on the view the hash named", () => {
+		expect(layoutFromHash("#a,b,c,d,e")).toEqual({ panes: [live("a"), live("b"), live("c"), live("d")], focus: 0 });
+		expect(layoutFromHash("#a,b,a,c@2")).toEqual({ panes: [live("a"), live("b"), live("c")], focus: 0 });
+		expect(layoutFromHash("#a,b,a,c@3")).toEqual({ panes: [live("a"), live("b"), live("c")], focus: 2 });
+		expect(layoutFromHash("#a,b,c,d,e@4")).toEqual({ panes: [live("a"), live("b"), live("c"), live("d")], focus: 0 });
+		expect(layoutFromHash("#a,b@9")).toEqual({ panes: [live("a"), live("b")], focus: 0 });
+		expect(layoutFromHash("#a,b@x")).toEqual({ panes: [live("a"), live("b")], focus: 0 });
+	});
+
+	test("the settings page is not read as a layout, and its workspace keeps its slashes", () => {
 		const hash = hashForSettings("/Users/me/code/my app");
 		expect(hash).toBe("#settings/%2FUsers%2Fme%2Fcode%2Fmy%20app");
 		expect(settingsFromHash(hash)).toEqual({ cwd: "/Users/me/code/my app" });
-		expect(viewFromHash(hash)).toBeNull();
+		expect(layoutFromHash(hash)).toBeNull();
 		expect(settingsFromHash("#settings")).toEqual({ cwd: null });
-		expect(viewFromHash("#settings")).toBeNull();
+		expect(layoutFromHash("#settings")).toBeNull();
 		expect(settingsFromHash("#7c51f77b2a1bf7ba")).toBeNull();
+	});
+});
+
+describe("opening and closing panes", () => {
+	const view = (instanceId: string) => ({ kind: "live", instanceId, agentId: null }) as const;
+	const [a, b, c, d, e] = ["a", "b", "c", "d", "e"].map(view);
+
+	test("a plain open replaces the focused pane; a split adds a focused pane", () => {
+		expect(openView({ panes: [], focus: 0 }, a, "split")).toEqual({ panes: [a], focus: 0 });
+		expect(openView({ panes: [a, b], focus: 1 }, c, "replace")).toEqual({ panes: [a, c], focus: 1 });
+		expect(openView({ panes: [a, b], focus: 0 }, c, "split")).toEqual({ panes: [a, b, c], focus: 2 });
+	});
+
+	test("a split with four panes open replaces the focused one", () => {
+		expect(openView({ panes: [a, b, c, d], focus: 1 }, e, "split")).toEqual({ panes: [a, e, c, d], focus: 1 });
+	});
+
+	test("a view already open gets focus instead of a second pane", () => {
+		expect(openView({ panes: [a, b, c], focus: 0 }, c, "split")).toEqual({ panes: [a, b, c], focus: 2 });
+		expect(openView({ panes: [a, b, c], focus: 0 }, b, "replace")).toEqual({ panes: [a, b, c], focus: 1 });
+	});
+
+	test("closing keeps focus on its view, or moves it to the pane taking the closed one's place", () => {
+		expect(closePane({ panes: [a, b, c], focus: 2 }, 0)).toEqual({ panes: [b, c], focus: 1 });
+		expect(closePane({ panes: [a, b, c], focus: 1 }, 1)).toEqual({ panes: [a, c], focus: 1 });
+		expect(closePane({ panes: [a, b, c], focus: 2 }, 2)).toEqual({ panes: [a, b], focus: 1 });
+		expect(closePane({ panes: [a, b], focus: 0 }, 1)).toEqual({ panes: [a], focus: 0 });
+		expect(closePane({ panes: [a], focus: 0 }, 0)).toEqual({ panes: [], focus: 0 });
 	});
 });
 

@@ -273,14 +273,16 @@ export type ServerMsg =
 	| { t: "created"; result: LaunchResult }
 	/** Answers this socket's `fork` once the forked session is ready, or once forking failed. */
 	| { t: "forked"; result: ForkResult }
-	| { t: "completions"; reqId: number; items: CompletionItem[]; error: string | null }
+	/** Answers this socket's `complete` for `view`; `reqId` counts per view. */
+	| { t: "completions"; view: LiveView; reqId: number; items: CompletionItem[]; error: string | null }
 	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */
 	| { t: "usage"; plans: PlanUsage[]; error: string | null }
 	/** Answers `list-models`. `error` is set when the session cannot list or switch models. */
 	| { t: "models"; instanceId: string; models: ModelOption[]; error: string | null };
 
 export type ClientMsg =
-	| { t: "watch"; view: View | null }
+	/** The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming. */
+	| { t: "watch"; views: View[] }
 	/** A prompt to the session, or chat to the subagent (steer if running, prompt if idle, revive if parked). */
 	| { t: "prompt"; view: LiveView; text: string }
 	| { t: "abort"; instanceId: string }

@@ -1,5 +1,5 @@
-import { Check, ChevronsUpDown, Folder, Plus, Settings } from "lucide-react";
-import { useState } from "react";
+import { Check, ChevronsUpDown, Columns2, Folder, Plus, Settings } from "lucide-react";
+import { type MouseEvent, useState } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -12,6 +12,7 @@ import {
 	SidebarHeader,
 	SidebarInput,
 	SidebarMenu,
+	SidebarMenuAction,
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarMenuSub,
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import type { Launch } from "../use-dashboard";
-import { agentTree, hashForView, matchesFilter, workspaces } from "../view-model";
+import { agentTree, hashForView, MAX_PANES, matchesFilter, type OpenMode, sameView, workspaces } from "../view-model";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** Pixels of extra indent per nesting level below the first subagent level. */
@@ -28,6 +29,9 @@ const NEST_INDENT = 12;
 
 /** The project the sidebar is scoped to, by `cwd`; absent for all projects. */
 const PROJECT_KEY = "omp-agents.sidebar-project";
+
+/** Cmd-click on macOS, Ctrl-click elsewhere, opens a row in a new pane. */
+const modeOf = (event: MouseEvent): OpenMode => (event.metaKey || event.ctrlKey ? "split" : "replace");
 
 export function age(startedAt: number): string {
 	const minutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60_000));
@@ -155,7 +159,8 @@ function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 interface RosterProps {
 	hosts: RosterHost[];
 	past: PastSession[];
-	view: View | null;
+	/** Views on screen, highlighted in the list. */
+	open: View[];
 	ompVersion: string | null;
 	connected: boolean;
 	launch: Launch;
@@ -163,7 +168,7 @@ interface RosterProps {
 	/** The settings page, for the open session's workspace. */
 	settingsHref: string;
 	settingsOpen: boolean;
-	onSelect: (view: View) => void;
+	onOpen: (view: View, mode: OpenMode) => void;
 	onLaunchOpen: (open: boolean) => void;
 	onCreate: (cwd: string) => void;
 }
@@ -171,14 +176,14 @@ interface RosterProps {
 export function Roster({
 	hosts,
 	past,
-	view,
+	open,
 	ompVersion,
 	connected,
 	launch,
 	defaultCwd,
 	settingsHref,
 	settingsOpen,
-	onSelect,
+	onOpen,
 	onLaunchOpen,
 	onCreate,
 }: RosterProps) {
@@ -196,6 +201,18 @@ export function Roster({
 	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
 	const shownHosts = hosts.filter(inProject);
 	const shownPast = past.filter(session => inProject(session) && matchesFilter(session, pastLabel(session), filter));
+	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
+	const splitAction = (view: View, name: string) =>
+		!isOpen(view) && (
+			<SidebarMenuAction
+				showOnHover
+				aria-label={`Open ${name} in split`}
+				title={open.length < MAX_PANES ? "Open in split (⌘-click)" : `Open in the focused pane: ${MAX_PANES} panes is the most`}
+				onClick={() => onOpen(view, "split")}
+			>
+				<Columns2 />
+			</SidebarMenuAction>
+		);
 	return (
 		<>
 			<SidebarHeader className="flex-row items-center justify-between px-4 pt-4">
@@ -249,66 +266,77 @@ export function Roster({
 						/>
 					)}
 					<SidebarMenu aria-label="Running omp sessions">
-						{shownHosts.map(host => (
-							<SidebarMenuItem key={host.instanceId}>
-								<SidebarMenuButton
-									size="lg"
-									isActive={view?.kind === "live" && view.instanceId === host.instanceId && view.agentId === null}
-									onClick={() => onSelect({ kind: "live", instanceId: host.instanceId, agentId: null })}
-									title={`${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-								>
-									<StatusDot status={host.status} />
-									<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-										<span className="flex items-baseline gap-2">
-											<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
-											<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
+						{shownHosts.map(host => {
+							const hostView: View = { kind: "live", instanceId: host.instanceId, agentId: null };
+							return (
+								<SidebarMenuItem key={host.instanceId}>
+									<SidebarMenuButton
+										size="lg"
+										isActive={isOpen(hostView)}
+										onClick={event => onOpen(hostView, modeOf(event))}
+										title={`${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
+									>
+										<StatusDot status={host.status} />
+										<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+											<span className="flex items-baseline gap-2">
+												<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
+												<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
+											</span>
+											<span className="truncate text-xs text-muted-foreground">
+												{[
+													host.cwdDisplay,
+													host.model ?? "no model",
+													statusLabel(host.status),
+													host.source === "terminal" && !host.relayConnected && "relay offline",
+													host.pullRequests.map(pr => `#${pr.number}`).join(" "),
+												]
+													.filter(Boolean)
+													.join(" · ")}
+											</span>
 										</span>
-										<span className="truncate text-xs text-muted-foreground">
-											{[
-												host.cwdDisplay,
-												host.model ?? "no model",
-												statusLabel(host.status),
-												host.source === "terminal" && !host.relayConnected && "relay offline",
-												host.pullRequests.map(pr => `#${pr.number}`).join(" "),
-											]
-												.filter(Boolean)
-												.join(" · ")}
-										</span>
-									</span>
-								</SidebarMenuButton>
-								{host.agents.length > 0 && (
-									<SidebarMenuSub aria-label={`Subagents of ${hostLabel(host)}`}>
-										{agentTree(host.agents).map(({ agent, depth }) => {
-											const agentView: View = { kind: "live", instanceId: host.instanceId, agentId: agent.id };
-											return (
-												<SidebarMenuSubItem key={agent.id}>
-													<SidebarMenuSubButton
-														href={hashForView(agentView)}
-														isActive={view?.kind === "live" && view.instanceId === host.instanceId && view.agentId === agent.id}
-														className="h-auto min-h-7 py-1"
-														style={{ marginInlineStart: depth * NEST_INDENT }}
-														title={agent.activity ?? undefined}
-													>
-														<StatusDot status={agent.status} />
-														<span className="flex min-w-0 flex-1 flex-col">
-															<span className="flex items-baseline gap-1.5">
-																<span className="truncate text-foreground">{agent.id}</span>
-																<span className="shrink-0 text-xs text-muted-foreground">
-																	{agent.kind} · {statusLabel(agent.status)}
+									</SidebarMenuButton>
+									{splitAction(hostView, hostLabel(host))}
+									{host.agents.length > 0 && (
+										<SidebarMenuSub aria-label={`Subagents of ${hostLabel(host)}`}>
+											{agentTree(host.agents).map(({ agent, depth }) => {
+												const agentView: View = { kind: "live", instanceId: host.instanceId, agentId: agent.id };
+												return (
+													<SidebarMenuSubItem key={agent.id}>
+														<SidebarMenuSubButton
+															href={hashForView(agentView)}
+															onClick={event => {
+																// Shift- and middle-clicks keep the link's own new-window behavior.
+																if (event.button !== 0 || event.shiftKey || event.altKey) return;
+																event.preventDefault();
+																onOpen(agentView, modeOf(event));
+															}}
+															isActive={isOpen(agentView)}
+															className="h-auto min-h-7 py-1"
+															style={{ marginInlineStart: depth * NEST_INDENT }}
+															title={agent.activity ?? undefined}
+														>
+															<StatusDot status={agent.status} />
+															<span className="flex min-w-0 flex-1 flex-col">
+																<span className="flex items-baseline gap-1.5">
+																	<span className="truncate text-foreground">{agent.id}</span>
+																	<span className="shrink-0 text-xs text-muted-foreground">
+																		{agent.kind} · {statusLabel(agent.status)}
+																	</span>
 																</span>
+																{agent.activity && (
+																	<span className="truncate text-xs text-muted-foreground">{agent.activity}</span>
+																)}
 															</span>
-															{agent.activity && (
-																<span className="truncate text-xs text-muted-foreground">{agent.activity}</span>
-															)}
-														</span>
-													</SidebarMenuSubButton>
-												</SidebarMenuSubItem>
-											);
-										})}
-									</SidebarMenuSub>
-								)}
-							</SidebarMenuItem>
-						))}
+														</SidebarMenuSubButton>
+														{splitAction(agentView, agent.id)}
+													</SidebarMenuSubItem>
+												);
+											})}
+										</SidebarMenuSub>
+									)}
+								</SidebarMenuItem>
+							);
+						})}
 					</SidebarMenu>
 				</SidebarGroup>
 				<SidebarGroup collapsible>
@@ -333,31 +361,35 @@ export function Roster({
 						</div>
 					)}
 					<SidebarMenu aria-label="Past omp sessions">
-						{shownPast.map(session => (
-							<SidebarMenuItem key={session.sessionId}>
-								<SidebarMenuButton
-									size="lg"
-									isActive={view?.kind === "past" && view.sessionId === session.sessionId}
-									onClick={() => onSelect({ kind: "past", sessionId: session.sessionId })}
-									title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-								>
-									<span className="size-4 shrink-0" aria-hidden />
-									<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-										<span className="flex items-baseline gap-2">
-											<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
-											<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
-												{age(session.modifiedAt)}
+						{shownPast.map(session => {
+							const pastView: View = { kind: "past", sessionId: session.sessionId };
+							return (
+								<SidebarMenuItem key={session.sessionId}>
+									<SidebarMenuButton
+										size="lg"
+										isActive={isOpen(pastView)}
+										onClick={event => onOpen(pastView, modeOf(event))}
+										title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
+									>
+										<span className="size-4 shrink-0" aria-hidden />
+										<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+											<span className="flex items-baseline gap-2">
+												<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
+												<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
+													{age(session.modifiedAt)}
+												</span>
+											</span>
+											<span className="truncate text-xs text-muted-foreground">
+												{[session.cwdDisplay || "unknown directory", session.pullRequests.map(pr => `#${pr.number}`).join(" ")]
+													.filter(Boolean)
+													.join(" · ")}
 											</span>
 										</span>
-										<span className="truncate text-xs text-muted-foreground">
-											{[session.cwdDisplay || "unknown directory", session.pullRequests.map(pr => `#${pr.number}`).join(" ")]
-												.filter(Boolean)
-												.join(" · ")}
-										</span>
-									</span>
-								</SidebarMenuButton>
-							</SidebarMenuItem>
-						))}
+									</SidebarMenuButton>
+									{splitAction(pastView, pastLabel(session))}
+								</SidebarMenuItem>
+							);
+						})}
 					</SidebarMenu>
 				</SidebarGroup>
 			</SidebarContent>

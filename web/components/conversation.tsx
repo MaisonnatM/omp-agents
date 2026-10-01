@@ -11,6 +11,7 @@ import type {
 	PullRequest,
 	RosterHost,
 	UserAnswer,
+	View,
 } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
@@ -29,7 +30,7 @@ import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader 
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import type { Fork } from "../use-dashboard";
-import { type ForkPoint, forkPoints, modelName, modelOrg, pullRequestUrl, type ToolItem, toBlocks } from "../view-model";
+import { type ForkPoint, forkPoints, modelName, modelOrg, pullRequestUrl, sameView, type ToolItem, toBlocks } from "../view-model";
 import { completionTrigger } from "../completion-trigger";
 import { CompletionPopup } from "./completion-popup";
 import { ContextRing } from "./context-ring";
@@ -132,6 +133,7 @@ function ForkButton({ point, forking, disabled, onFork }: { point: ForkPoint; fo
 }
 
 interface TranscriptProps {
+	view: View;
 	items: Item[];
 	working: boolean;
 	fork: Fork;
@@ -197,10 +199,12 @@ function PullRequests({ pullRequests }: { pullRequests: PullRequest[] }) {
 }
 
 /** The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end. */
-function Transcript({ items, working, fork, onFork }: TranscriptProps) {
+function Transcript({ view, items, working, fork, onFork }: TranscriptProps) {
 	const last = items.at(-1);
 	const streaming = last?.kind === "assistant" && last.streaming;
 	const forks = forkPoints(items);
+	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
+	const here = fork.phase !== "idle" && sameView(fork.view, view) ? fork : null;
 
 	return (
 		<MessageScroller className="flex-1">
@@ -226,7 +230,7 @@ function Transcript({ items, working, fork, onFork }: TranscriptProps) {
 						}
 						const copyable = !(item.kind === "assistant" && item.streaming) && item.text.trim() !== "";
 						const point = forks.get(item.id);
-						const failed = fork.phase === "failed" && fork.itemId === item.id ? fork.error : null;
+						const failed = here?.phase === "failed" && here.itemId === item.id ? here.error : null;
 						return (
 							<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
 								<ChatMessage
@@ -239,7 +243,7 @@ function Transcript({ items, working, fork, onFork }: TranscriptProps) {
 												{point && (
 													<ForkButton
 														point={point}
-														forking={fork.phase === "forking" && fork.itemId === item.id}
+														forking={here?.phase === "forking" && here.itemId === item.id}
 														disabled={fork.phase === "forking"}
 														onFork={() => onFork(item.id, point)}
 													/>
@@ -279,10 +283,12 @@ interface PastConversationProps {
 	items: Item[];
 	fork: Fork;
 	onFork: (itemId: string, point: ForkPoint) => void;
+	/** Header controls the page adds, such as closing a split pane. */
+	actions?: ReactNode;
 }
 
 /** A past session's saved transcript. It follows the file, but nothing on this page can write to it. */
-export function PastConversation({ sessionId, session, items, fork, onFork }: PastConversationProps) {
+export function PastConversation({ sessionId, session, items, fork, onFork, actions }: PastConversationProps) {
 	const meta = session ? (
 		<>
 			<Project cwdDisplay={session.cwdDisplay} /> · last active {new Date(session.modifiedAt).toLocaleString()}
@@ -293,9 +299,11 @@ export function PastConversation({ sessionId, session, items, fork, onFork }: Pa
 	);
 	return (
 		<MessageScrollerProvider autoScroll>
-			<div className="flex h-svh min-h-0 flex-1 flex-col">
-				<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Read-only" alert={false} />
-				<Transcript items={items} working={false} fork={fork} onFork={onFork} />
+			<div className="flex h-full min-h-0 flex-1 flex-col">
+				<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Read-only" alert={false}>
+					{actions}
+				</Header>
+				<Transcript view={{ kind: "past", sessionId }} items={items} working={false} fork={fork} onFork={onFork} />
 			</div>
 		</MessageScrollerProvider>
 	);
@@ -323,6 +331,8 @@ interface ConversationProps {
 	onAbort: () => void;
 	onEnd: () => void;
 	onAnswer: (requestId: string, answer: UserAnswer) => void;
+	/** Header controls the page adds, such as closing a split pane. */
+	actions?: ReactNode;
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts, queues, and scroll reset per view. */
@@ -352,6 +362,7 @@ function LiveConversation({
 	onAbort,
 	onEnd,
 	onAnswer,
+	actions,
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const [draft, setDraft] = useState(initialDraft);
@@ -452,7 +463,7 @@ function LiveConversation({
 		) : null;
 	const contextSlot = view.agentId === null && shown?.context ? <ContextRing context={shown.context} /> : null;
 	return (
-		<div className="flex h-svh min-h-0 flex-1 flex-col">
+		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
 				{view.agentId === null && host?.source === "dashboard" && (
 					<Button
@@ -464,8 +475,9 @@ function LiveConversation({
 						End session
 					</Button>
 				)}
+				{actions}
 			</Header>
-			<Transcript items={items} working={working === true} fork={fork} onFork={onFork} />
+			<Transcript view={view} items={items} working={working === true} fork={fork} onFork={onFork} />
 			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
 				{requests[0] && (
 					<UserRequestCard

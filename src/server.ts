@@ -36,7 +36,8 @@ const allowedHost = (req: Request): boolean => ALLOWED_HOSTS.has(req.headers.get
 const sameOrigin = (req: Request): boolean => allowedHost(req) && req.headers.get("origin") === `http://${req.headers.get("host")}`;
 
 interface SocketData {
-	view: View | null;
+	/** The views this socket shows, by {@link viewKey}. */
+	views: Map<string, View>;
 }
 type Socket = ServerWebSocket<SocketData>;
 
@@ -332,33 +333,37 @@ async function fork(ws: Socket, view: View, entryId: string): Promise<void> {
 	send(ws, { t: "forked", result: { ok: true, instanceId: forked.session.instanceId, prompt: forked.prompt } });
 }
 
-function unwatch(ws: Socket): void {
-	const view = ws.data.view;
-	ws.data.view = null;
-	if (!view) return;
-	const key = viewKey(view);
-	ws.unsubscribe(itemsTopic(key));
-	const entry = watched.get(key);
-	if (entry && --entry.sockets === 0) {
-		watched.delete(key);
-		tails.delete(key);
-	}
-}
+const watching = (ws: Socket, instanceId: string): boolean =>
+	[...ws.data.views.values()].some(view => view.kind === "live" && view.instanceId === instanceId);
 
-function watch(ws: Socket, view: View | null): void {
-	unwatch(ws);
-	if (!view) return;
-	ws.data.view = view;
-	const key = viewKey(view);
-	ws.subscribe(itemsTopic(key));
-	const entry = watched.get(key);
-	if (entry) entry.sockets++;
-	else watched.set(key, { view, sockets: 1 });
+/** Make `views` the socket's whole watch set. Views it already shows keep streaming without a fresh transcript. */
+function watch(ws: Socket, views: View[]): void {
+	const next = new Map(views.map(view => [viewKey(view), view]));
+	const prev = ws.data.views;
+	ws.data.views = next;
+	for (const key of prev.keys()) {
+		if (next.has(key)) continue;
+		ws.unsubscribe(itemsTopic(key));
+		const entry = watched.get(key);
+		if (entry && --entry.sockets === 0) {
+			watched.delete(key);
+			tails.delete(key);
+		}
+	}
+	const added = [...next].filter(([key]) => !prev.has(key));
+	for (const [key, view] of added) {
+		ws.subscribe(itemsTopic(key));
+		const entry = watched.get(key);
+		if (entry) entry.sockets++;
+		else watched.set(key, { view, sockets: 1 });
+	}
 	syncTails();
-	const tail = tails.get(key);
-	// A tail still loading publishes its first read to every subscriber, this socket included.
-	if (tail?.loaded) send(ws, { t: "items", view, reset: true, items: tail.transcript.items() });
-	else if (!tail) send(ws, { t: "items", view, reset: true, items: [] });
+	for (const [key, view] of added) {
+		const tail = tails.get(key);
+		// A tail still loading publishes its first read to every subscriber, this socket included.
+		if (tail?.loaded) send(ws, { t: "items", view, reset: true, items: tail.transcript.items() });
+		else if (!tail) send(ws, { t: "items", view, reset: true, items: [] });
+	}
 }
 
 function parseLiveView(value: unknown): LiveView | null {
@@ -393,9 +398,9 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 	if (!isObject(value)) return null;
 	switch (value.t) {
 		case "watch": {
-			if (value.view === null) return { t: "watch", view: null };
-			const view = parseView(value.view);
-			return view ? { t: "watch", view } : null;
+			if (!Array.isArray(value.views)) return null;
+			const views = value.views.map(parseView);
+			return views.every(view => view !== null) ? { t: "watch", views } : null;
 		}
 		case "prompt": {
 			const view = parseLiveView(value.view);
@@ -448,16 +453,16 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 	switch (msg.t) {
 		case "watch":
-			watch(ws, msg.view);
+			watch(ws, msg.views);
 			return;
 		case "complete": {
 			const host = hosts.find(row => row.instanceId === msg.view.instanceId) ?? dashboards.get(msg.view.instanceId);
-			if (!host || ws.data.view?.kind !== "live" || ws.data.view.instanceId !== msg.view.instanceId) return;
+			if (!host || !watching(ws, msg.view.instanceId)) return;
 			try {
 				const items = await complete(host.instanceId, host.cwd, msg.text, msg.cursor);
-				if (ws.data.view?.kind === "live" && ws.data.view.instanceId === host.instanceId) send(ws, { t: "completions", reqId: msg.reqId, items, error: null });
+				if (watching(ws, host.instanceId)) send(ws, { t: "completions", view: msg.view, reqId: msg.reqId, items, error: null });
 			} catch (error) {
-				send(ws, { t: "completions", reqId: msg.reqId, items: [], error: String(error) });
+				send(ws, { t: "completions", view: msg.view, reqId: msg.reqId, items: [], error: String(error) });
 			}
 			return;
 		}
@@ -470,7 +475,7 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			}
 			const host = hosts.find(row => row.instanceId === msg.view.instanceId);
 			const guest = guests.get(msg.view.instanceId);
-			if (!host || !guest || ws.data.view?.kind !== "live" || ws.data.view.instanceId !== msg.view.instanceId) return;
+			if (!host || !guest || !watching(ws, msg.view.instanceId)) return;
 			try {
 				const text = await expandPrompt(host.instanceId, host.cwd, msg.text, msg.view.agentId ? "subagent" : "session");
 				if (msg.view.agentId) guest.chat(msg.view.agentId, text);
@@ -525,7 +530,7 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 
 function upgrade(req: Request, srv: Server<SocketData>): Response | undefined {
 	if (!sameOrigin(req)) return new Response("forbidden origin", { status: 403 });
-	if (srv.upgrade(req, { data: { view: null } })) return undefined;
+	if (srv.upgrade(req, { data: { views: new Map() } })) return undefined;
 	return new Response("expected a websocket", { status: 426 });
 }
 
@@ -622,7 +627,7 @@ try {
 				if (msg) void onClientMsg(ws, msg);
 			},
 			close(ws) {
-				unwatch(ws);
+				watch(ws, []);
 			},
 		},
 	});
