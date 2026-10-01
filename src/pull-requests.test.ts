@@ -9,8 +9,19 @@ const bashCall = (id: string, command: string) =>
 		type: "message",
 		message: { role: "assistant", content: [{ type: "toolCall", id, name: "bash", arguments: { command } }] },
 	});
-const result = (toolCallId: string, text: string, toolName = "bash") =>
-	JSON.stringify({ type: "message", message: { role: "toolResult", toolCallId, toolName, content: [{ type: "text", text }] } });
+const result = (toolCallId: string, text: string, details?: object) =>
+	JSON.stringify({
+		type: "message",
+		message: { role: "toolResult", toolCallId, toolName: "bash", content: [{ type: "text", text }], details },
+	});
+const waited = (jobs: { id: string; type: string; resultText: string }[]) =>
+	JSON.stringify({
+		type: "message",
+		message: { role: "toolResult", toolCallId: "w", toolName: "wait", content: [{ type: "text", text: "## Completed" }], details: { jobs } },
+	});
+const delivered = (jobId: string, content: string) =>
+	JSON.stringify({ type: "custom_message", customType: "async-result", content, details: { jobs: [{ jobId, type: "bash" }] } });
+const gtLine = (n: number) => `me/b${n}: https://app.graphite.com/github/pr/o/r/${n} (created)`;
 
 const scanned = (lines: string[]) => {
 	const scan = new SubmissionScan();
@@ -43,9 +54,26 @@ describe("SubmissionScan", () => {
 		).toEqual([{ owner: "acme", repo: "webapp", number: 6600 }]);
 	});
 
-	test("a gt submit line quoted outside bash output is a mention, not a submission", () => {
-		const quoted = "e.g. me/a: https://app.graphite.com/github/pr/acme/webapp/6596 (updated)\nme/a: https://app.graphite.com/github/pr/acme/webapp/6596 (updated)";
-		expect(scanned([result("w1", quoted, "wait")])).toEqual([]);
+	test("a background gt submit's output, whether delivered or waited for", () => {
+		expect(scanned([delivered("bg_1", `Background job bg_1 has completed.\n${gtLine(1)}`), waited([{ id: "bg_2", type: "bash", resultText: gtLine(2) }])])).toEqual([
+			{ owner: "o", repo: "r", number: 1 },
+			{ owner: "o", repo: "r", number: 2 },
+		]);
+	});
+
+	test("a background gh pr create's URL arrives with its job", () => {
+		expect(
+			scanned([
+				bashCall("create", "gh pr create --fill"),
+				result("create", "Backgrounded as job bg_3", { async: { state: "running", jobId: "bg_3", type: "bash" } }),
+				delivered("bg_9", "https://github.com/o/r/pull/9"),
+				delivered("bg_3", "https://github.com/o/r/pull/3"),
+			]),
+		).toEqual([{ owner: "o", repo: "r", number: 3 }]);
+	});
+
+	test("a gt submit line a subagent's report quotes is a mention, not a submission", () => {
+		expect(scanned([waited([{ id: "Reviewer", type: "task", resultText: `e.g.\n${gtLine(4)}` }])])).toEqual([]);
 	});
 });
 
@@ -59,16 +87,16 @@ describe("PullRequestIndex", () => {
 		const dir = mkdtempSync(join(tmpdir(), "omp-agents-prs-"));
 		dirs.push(dir);
 		const session = join(dir, "2026-10-01T00-00-00-000Z_s1.jsonl");
-		const gtLine = (n: number) => result(`r${n}`, `me/b${n}: https://app.graphite.com/github/pr/o/r/${n} (created)`);
-		writeFileSync(session, `${gtLine(1)}\n`);
+		const submitted = (n: number) => result(`r${n}`, gtLine(n));
+		writeFileSync(session, `${submitted(1)}\n`);
 		mkdirSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child"), { recursive: true });
-		writeFileSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child", "Grandchild.jsonl"), `${gtLine(2)}\n`);
+		writeFileSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child", "Grandchild.jsonl"), `${submitted(2)}\n`);
 
 		const index = new PullRequestIndex();
 		expect(await index.refresh([{ path: session, modifiedAt: 1 }])).toBe(true);
 		expect(index.of(session).map(pr => pr.number)).toEqual([1, 2]);
 
-		appendFileSync(session, `${gtLine(3)}\n${gtLine(4).slice(0, 20)}`);
+		appendFileSync(session, `${submitted(3)}\n${submitted(4).slice(0, 20)}`);
 		expect(await index.refresh([{ path: session, modifiedAt: 1 }])).toBe(false);
 		expect(index.of(session).map(pr => pr.number)).toEqual([1, 2]);
 		expect(await index.refresh([{ path: session, modifiedAt: 2 }])).toBe(true);

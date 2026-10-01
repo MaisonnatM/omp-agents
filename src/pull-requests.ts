@@ -21,20 +21,30 @@ const keyOf = (pr: PullRequest): string => `${pr.owner}/${pr.repo}#${pr.number}`
 
 /** Folds one transcript's lines, in order, into the pull requests it submitted. */
 export class SubmissionScan {
-	/** `gh pr create` bash calls whose result has not been read yet. */
+	/** `gh pr create` bash calls, then their background jobs, whose output has not been read yet. */
 	readonly #creating = new Set<string>();
 	readonly found = new Map<string, PullRequest>();
 
 	applyLine(line: string): void {
 		// Nearly every line names neither; skipping them before JSON.parse is most of the startup scan.
-		if (!line.includes("github") && !line.includes("pr create")) return;
+		const backgrounding = this.#creating.size > 0 && line.includes('"jobId"');
+		if (!backgrounding && !line.includes("github") && !line.includes("pr create")) return;
 		let entry: unknown;
 		try {
 			entry = JSON.parse(line);
 		} catch {
 			return;
 		}
-		if (!isObject(entry) || entry.type !== "message" || !isObject(entry.message)) return;
+		if (!isObject(entry)) return;
+		if (entry.type === "custom_message" && entry.customType === "async-result" && typeof entry.content === "string") {
+			// One notice carries the output of every job it delivers; only a bash job's is what `gt` or `gh` printed.
+			const jobs = isObject(entry.details) && Array.isArray(entry.details.jobs) ? entry.details.jobs : [];
+			if (jobs.length === 0 || !jobs.every(job => isObject(job) && job.type === "bash")) return;
+			const created = jobs.filter(job => this.#creating.delete(String(job.jobId))).length > 0;
+			this.#output(entry.content, created);
+			return;
+		}
+		if (entry.type !== "message" || !isObject(entry.message)) return;
 		const message = entry.message;
 		if (message.role === "assistant" && Array.isArray(message.content)) {
 			for (const block of message.content) {
@@ -44,12 +54,25 @@ export class SubmissionScan {
 			}
 			return;
 		}
-		if (message.role !== "toolResult" || message.toolName !== "bash") return;
-		const text = textOf(message.content);
-		this.#add(text.matchAll(GT_SUBMITTED));
-		if (typeof message.toolCallId === "string" && this.#creating.delete(message.toolCallId)) {
-			this.#add(text.matchAll(GH_CREATED));
+		if (message.role !== "toolResult") return;
+		const details = isObject(message.details) ? message.details : {};
+		if (message.toolName === "bash") {
+			const created = typeof message.toolCallId === "string" && this.#creating.delete(message.toolCallId);
+			const job = isObject(details.async) ? details.async.jobId : undefined;
+			if (created && typeof job === "string") this.#creating.add(job);
+			this.#output(textOf(message.content), created);
+		} else if (message.toolName === "wait" && Array.isArray(details.jobs)) {
+			for (const job of details.jobs) {
+				if (!isObject(job) || job.type !== "bash" || typeof job.resultText !== "string") continue;
+				this.#output(job.resultText, this.#creating.delete(String(job.id)));
+			}
 		}
+	}
+
+	/** What a bash command printed; `created` when the command ran `gh pr create`. */
+	#output(text: string, created: boolean): void {
+		this.#add(text.matchAll(GT_SUBMITTED));
+		if (created) this.#add(text.matchAll(GH_CREATED));
 	}
 
 	#add(matches: Iterable<RegExpMatchArray>): void {
@@ -68,7 +91,8 @@ class TranscriptScan {
 
 	constructor(readonly path: string) {}
 
-	async read(): Promise<void> {
+	/** Resolves `false` when the file could not be read; it reads again on the next call. */
+	async read(): Promise<boolean> {
 		const file = Bun.file(this.path);
 		const size = await file.stat().then(
 			stat => stat.size,
@@ -78,11 +102,16 @@ class TranscriptScan {
 			this.scan = new SubmissionScan();
 			this.#offset = 0;
 		}
-		if (size === this.#offset) return;
-		const bytes = await file.slice(this.#offset, size).bytes();
+		if (size === this.#offset) return true;
+		const bytes = await file
+			.slice(this.#offset, size)
+			.bytes()
+			.catch(() => null);
+		if (!bytes) return false;
 		const end = bytes.lastIndexOf(NEWLINE) + 1;
 		this.#offset += end;
 		for (const line of decoder.decode(bytes.subarray(0, end)).split("\n")) this.scan.applyLine(line);
+		return true;
 	}
 }
 
@@ -130,17 +159,18 @@ export class PullRequestIndex {
 			let session = this.#sessions.get(path);
 			// A subagent's writes do not touch the session file, but its result does once it finishes.
 			if (session?.modifiedAt === modifiedAt) continue;
-			session ??= { modifiedAt, transcripts: new Map([[path, new TranscriptScan(path)]]), pullRequests: [] };
-			session.modifiedAt = modifiedAt;
+			session ??= { modifiedAt: Number.NaN, transcripts: new Map([[path, new TranscriptScan(path)]]), pullRequests: [] };
 			this.#sessions.set(path, session);
 			for (const file of await subagentFiles(path)) {
 				if (!session.transcripts.has(file)) session.transcripts.set(file, new TranscriptScan(file));
 			}
 			const merged = new Map<string, PullRequest>();
+			let complete = true;
 			for (const transcript of session.transcripts.values()) {
-				await transcript.read();
+				if (!(await transcript.read())) complete = false;
 				for (const [key, pr] of transcript.scan.found) if (!merged.has(key)) merged.set(key, pr);
 			}
+			if (complete) session.modifiedAt = modifiedAt;
 			if ([...merged.keys()].join() !== session.pullRequests.map(keyOf).join()) {
 				session.pullRequests = [...merged.values()];
 				changed = true;
