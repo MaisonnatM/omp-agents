@@ -1,5 +1,5 @@
 /** Pure transforms from server messages to what the page renders. */
-import type { AgentRow, Item, PastSession, RosterHost, View } from "../src/shared";
+import type { AgentRow, Item, PastSession, PullRequest, RosterHost, View } from "../src/shared";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
 
@@ -53,6 +53,31 @@ export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSes
 	// Sessions from old omp versions recorded no directory.
 	const candidates = [open, newestHost, ...past].map(row => row?.cwdDisplay).filter(Boolean);
 	return candidates[0] ?? "~";
+}
+
+export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
+
+/** A pull request link from GitHub or Graphite: `owner`, `repo`, `number`. */
+const PR_LINK = /(?:github\.com\/([\w.-]+)\/([\w.-]+)\/pull|app\.graphite\.com\/github\/pr\/([\w.-]+)\/([\w.-]+))\/(\d+)/;
+
+/**
+ * Whether a past session matches the sidebar filter. A pasted PR link matches the sessions that
+ * submitted that PR; `#6596` or `6596` also matches any PR with that number; any other text
+ * matches the title or directory.
+ */
+export function matchesFilter(session: PastSession, label: string, query: string): boolean {
+	const text = query.trim().toLowerCase();
+	if (!text) return true;
+	const link = PR_LINK.exec(text);
+	if (link) {
+		const [owner, repo] = link[1] ? [link[1], link[2]] : [link[3], link[4]];
+		return session.pullRequests.some(
+			pr => pr.number === Number(link[5]) && pr.owner.toLowerCase() === owner && pr.repo.toLowerCase() === repo,
+		);
+	}
+	const number = /^#?(\d+)$/.exec(text)?.[1];
+	if (number && session.pullRequests.some(pr => pr.number === Number(number))) return true;
+	return label.toLowerCase().includes(text) || session.cwdDisplay.toLowerCase().includes(text);
 }
 
 /** A model selector without its provider, router org, or the `claude-` prefix: `anthropic/claude-opus-5-5` reads `opus-5-5`. */
