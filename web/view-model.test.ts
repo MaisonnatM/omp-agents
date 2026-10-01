@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentRow, Item, PastSession, RosterHost } from "../src/shared";
-import { agentTree, applyItems, defaultCwd, forkPoints, hashForView, toBlocks, viewFromHash } from "./view-model";
+import { agentTree, applyItems, defaultCwd, forkPoints, hashForView, modelName, modelOrg, toBlocks, viewFromHash } from "./view-model";
 
 const agent = (id: string, parentId: string | null): AgentRow => ({
 	id,
@@ -9,6 +9,27 @@ const agent = (id: string, parentId: string | null): AgentRow => ({
 	status: "running",
 	activity: null,
 	canMessage: true,
+});
+
+describe("model labels", () => {
+	test("a direct provider's model drops the provider and the claude- prefix", () => {
+		expect(modelName("anthropic/claude-opus-5-5")).toBe("opus-5-5");
+		expect(modelOrg("anthropic/claude-opus-5-5")).toBe("anthropic");
+		expect(modelName("openai-codex/gpt-5.5")).toBe("gpt-5.5");
+		expect(modelOrg("openai-codex/gpt-5.5")).toBe("openai");
+	});
+
+	test("a reseller's model belongs to the family's org", () => {
+		expect(modelOrg("cursor/claude-opus-4-7")).toBe("anthropic");
+		expect(modelOrg("cursor/composer-2")).toBe("cursor");
+	});
+
+	test("a router's org/model id names the org", () => {
+		expect(modelName("openrouter/~anthropic/claude-opus-latest")).toBe("opus-latest");
+		expect(modelOrg("openrouter/~anthropic/claude-opus-latest")).toBe("anthropic");
+		expect(modelName("openrouter/moonshotai/kimi-k3")).toBe("kimi-k3");
+		expect(modelOrg("openrouter/z-ai/glm-5.3")).toBe("z-ai");
+	});
 });
 
 describe("agentTree", () => {

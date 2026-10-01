@@ -30,11 +30,12 @@ export function age(startedAt: number): string {
 	return `${Math.floor(minutes / 1440)}d`;
 }
 
-const lastSegment = (cwdDisplay: string): string | undefined => cwdDisplay.split("/").filter(Boolean).pop();
+/** The project a directory holds, its last segment: `~/code/webapp` reads `webapp`. */
+export const projectName = (cwdDisplay: string): string | undefined => cwdDisplay.split("/").filter(Boolean).pop();
 
-export const hostLabel = (host: RosterHost): string => host.sessionName ?? lastSegment(host.cwdDisplay) ?? host.cwdDisplay;
+export const hostLabel = (host: RosterHost): string => host.sessionName ?? projectName(host.cwdDisplay) ?? host.cwdDisplay;
 
-export const pastLabel = (session: PastSession): string => session.title ?? lastSegment(session.cwdDisplay) ?? "Untitled session";
+export const pastLabel = (session: PastSession): string => session.title ?? projectName(session.cwdDisplay) ?? "Untitled session";
 
 interface NewSessionFormProps {
 	launch: Exclude<Launch, { phase: "closed" }>;

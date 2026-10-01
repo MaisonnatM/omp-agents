@@ -17,12 +17,13 @@ import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader 
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import type { Fork } from "../use-dashboard";
-import { type ForkPoint, forkPoints, type ToolItem, toBlocks } from "../view-model";
+import { type ForkPoint, forkPoints, modelName, modelOrg, type ToolItem, toBlocks } from "../view-model";
 import { completionTrigger } from "../completion-trigger";
 import { CompletionPopup } from "./completion-popup";
 import { MessageMarkdown } from "./message-markdown";
 import { ModelPicker } from "./model-picker";
-import { hostLabel, pastLabel } from "./roster";
+import { OrgIcon } from "./org-icon";
+import { hostLabel, pastLabel, projectName } from "./roster";
 import { statusLabel } from "./status-dot";
 
 const CONTROL_LABEL: Record<ControlPhase["phase"], string> = {
@@ -124,7 +125,7 @@ interface TranscriptProps {
 
 interface HeaderProps {
 	title: string;
-	meta: string;
+	meta: ReactNode;
 	status: string;
 	alert: boolean;
 	children?: ReactNode;
@@ -144,6 +145,19 @@ function Header({ title, meta, status, alert, children }: HeaderProps) {
 				{children}
 			</div>
 		</header>
+	);
+}
+
+/** The project a session runs in, with its full directory on hover. */
+const Project = ({ cwdDisplay }: { cwdDisplay: string }) => <span title={cwdDisplay}>{projectName(cwdDisplay) ?? cwdDisplay}</span>;
+
+/** `anthropic/claude-opus-5-5` as the Anthropic logo and `opus-5-5`, with the full selector on hover. */
+function Model({ selector }: { selector: string }) {
+	return (
+		<span title={selector}>
+			<OrgIcon org={modelOrg(selector)} label className="mr-1 inline-block align-[-0.125em]" />
+			{modelName(selector)}
+		</span>
 	);
 }
 
@@ -234,7 +248,13 @@ interface PastConversationProps {
 
 /** A past session's saved transcript. It follows the file, but nothing on this page can write to it. */
 export function PastConversation({ sessionId, session, items, fork, onFork }: PastConversationProps) {
-	const meta = session ? `${session.cwdDisplay} · last active ${new Date(session.modifiedAt).toLocaleString()}` : sessionId;
+	const meta = session ? (
+		<>
+			<Project cwdDisplay={session.cwdDisplay} /> · last active {new Date(session.modifiedAt).toLocaleString()}
+		</>
+	) : (
+		sessionId
+	);
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-svh min-h-0 flex-1 flex-col">
@@ -346,9 +366,11 @@ function LiveConversation({
 	const title = agent ? agent.id : shown ? hostLabel(shown) : view.instanceId;
 	const meta = agent
 		? [`${agent.kind} subagent of ${shown ? hostLabel(shown) : "a session"}`, agent.activity].filter(Boolean).join(" · ")
-		: shown
-			? `${shown.cwdDisplay} · ${shown.model ?? "no model"} · pid ${shown.pid}`
-			: "";
+		: shown && (
+				<>
+					<Project cwdDisplay={shown.cwdDisplay} /> · {shown.model ? <Model selector={shown.model} /> : "no model"} · pid {shown.pid}
+				</>
+			);
 
 	const placeholder = !writable
 		? phase.phase === "live" && agent && !agent.canMessage
