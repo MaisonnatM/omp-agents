@@ -7,8 +7,9 @@ import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
 import { activityOf, contextOf, type LiveUpdate, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
 import { endsMidTurn, type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp";
-import type { AgentRow, AgentStatus, ContextUsage, HostStatus, ModelOption } from "./shared";
+import type { AgentRow, AgentStatus, ContextUsage, HostStatus, ModelOption, UserAnswer, UserRequest } from "./shared";
 import { isObject } from "./transcript";
+import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
 /** omp's subagent lifecycle and progress statuses, as the roster's agent statuses. */
 const RPC_AGENT_STATUSES: Record<string, AgentStatus> = {
@@ -72,16 +73,25 @@ export class DashboardSession {
 	/** Levels the current model accepts, `off` first. */
 	thinkingLevels: string[] = [];
 	context: ContextUsage | null = null;
-	status: HostStatus = "idle";
+	/** Whether a turn runs; {@link status} reports `needs-input` over it while a question waits. */
+	#activity: "working" | "idle" = "idle";
 	readonly #child: RpcChild;
+	readonly #requests: PendingRequests;
 	#agents = new Map<string, RpcAgent>();
 	readonly #emit: (update: DashboardUpdate) => void;
 	#refreshing = false;
 	#refreshAgain = false;
 
-	private constructor(cwd: string, child: RpcChild, state: RpcState, emit: (update: DashboardUpdate) => void) {
+	private constructor(
+		cwd: string,
+		child: RpcChild,
+		requests: PendingRequests,
+		state: RpcState,
+		emit: (update: DashboardUpdate) => void,
+	) {
 		this.cwd = cwd;
 		this.#child = child;
+		this.#requests = requests;
 		this.pid = child.pid;
 		this.#emit = emit;
 		this.sessionId = state.sessionId;
@@ -92,7 +102,10 @@ export class DashboardSession {
 		client.onSessionEvent(event => this.#onEvent(event));
 		client.onSubagentLifecycle(payload => this.#onSubagent(SUBAGENT_LIFECYCLE, payload));
 		client.onSubagentProgress(payload => this.#onSubagent(SUBAGENT_PROGRESS, payload));
-		void child.exited.then(() => emit({ kind: "exited" }));
+		void child.exited.then(() => {
+			requests.clear();
+			emit({ kind: "exited" });
+		});
 	}
 
 	/** Spawn omp in `cwd` and wait until it accepts commands. */
@@ -123,22 +136,46 @@ export class DashboardSession {
 		return { session, prompt };
 	}
 
-	/** Listens only once `prepare` is done, so the session reports the state `prepare` left it in. */
+	/** Listens only once `prepare` is done, so the session reports the state `prepare` left it in. Questions count from spawn. */
 	static async #spawn(
 		cwd: string,
 		emit: (update: DashboardUpdate) => void,
 		prepare: (client: RpcClient) => Promise<void>,
 	): Promise<DashboardSession> {
-		const child = await startRpc(cwd);
+		const requests = new PendingRequests(() => emit({ kind: "roster" }));
+		const child = await startRpc(cwd, frame => {
+			const change = parseRpcRequest(frame, Date.now());
+			if (change?.kind === "add") requests.add(change.request);
+			else if (change?.kind === "cancel") requests.remove(change.id);
+		});
 		try {
 			await child.client.setSubagentSubscription("progress");
 			await prepare(child.client);
-			const session = new DashboardSession(cwd, child, await child.client.getState(), emit);
+			const session = new DashboardSession(cwd, child, requests, await child.client.getState(), emit);
 			session.thinkingLevels = await child.client.getAvailableThinkingLevels();
 			return session;
 		} catch (err) {
+			requests.clear();
 			await child.client.stop();
 			throw err;
+		}
+	}
+
+	get status(): HostStatus {
+		return this.#requests.list().length > 0 ? "needs-input" : this.#activity;
+	}
+
+	requests(): UserRequest[] {
+		return this.#requests.list();
+	}
+
+	/** Reply to a pending question; an answer the question cannot take, or one for a question already gone, is dropped. */
+	answer(requestId: string, answer: UserAnswer): void {
+		if (!this.#requests.take(requestId, answer)) return;
+		try {
+			this.#child.write(rpcResponse(requestId, answer));
+		} catch (err) {
+			this.#fail("Answer failed", err);
 		}
 	}
 
@@ -197,10 +234,10 @@ export class DashboardSession {
 	#onEvent(event: unknown): void {
 		this.#emit({ kind: "event", event });
 		if (!isObject(event)) return;
-		if (event.type === "agent_start") this.#setStatus("working");
+		if (event.type === "agent_start") this.#setActivity("working");
 		// A non-terminal end hands over to a queued follow-up.
 		else if (event.type === "agent_end" && event.isTerminal !== false) {
-			this.#setStatus("idle");
+			this.#setActivity("idle");
 			this.#refresh();
 		} else if (typeof event.type === "string" && STATE_EVENTS.has(event.type)) this.#refresh();
 	}
@@ -238,9 +275,9 @@ export class DashboardSession {
 			});
 	}
 
-	#setStatus(status: HostStatus): void {
-		if (this.status === status) return;
-		this.status = status;
+	#setActivity(activity: "working" | "idle"): void {
+		if (this.#activity === activity) return;
+		this.#activity = activity;
 		this.#emit({ kind: "roster" });
 	}
 

@@ -8,7 +8,7 @@ import { DashboardSession, type DashboardUpdate, type ForkedSession } from "./da
 import { type LiveUpdate, SessionGuest } from "./guest";
 import { FileTail } from "./tail";
 import { type HostSnapshot, listHosts, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
-import type { ClientMsg, HostStatus, Item, LiveView, RosterHost, ServerMsg, View } from "./shared";
+import type { ClientMsg, HostStatus, Item, LiveView, RosterHost, ServerMsg, UserAnswer, View } from "./shared";
 import { isObject } from "./transcript";
 import { fetchPlanUsage } from "./usage";
 
@@ -88,6 +88,7 @@ function rosterHosts(): RosterHost[] {
 			status: statusOf(host),
 			control: guest?.control ?? { phase: "connecting" },
 			agents: guest?.agents() ?? [],
+			requests: guest?.requests() ?? [],
 		};
 	});
 	const started = [...dashboards.values()].map(
@@ -107,6 +108,7 @@ function rosterHosts(): RosterHost[] {
 			status: session.status,
 			control: { phase: "live", readOnly: false },
 			agents: session.agents(),
+			requests: session.requests(),
 		}),
 	);
 	return [...terminal, ...started];
@@ -353,6 +355,14 @@ function parseView(value: unknown): View | null {
 	return parseLiveView(value);
 }
 
+function parseAnswer(value: unknown): UserAnswer | null {
+	if (!isObject(value)) return null;
+	if (value.kind === "cancel") return { kind: "cancel" };
+	if (value.kind === "value" && typeof value.value === "string") return { kind: "value", value: value.value };
+	if (value.kind === "confirm" && typeof value.confirmed === "boolean") return { kind: "confirm", confirmed: value.confirmed };
+	return null;
+}
+
 function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 	let value: unknown;
 	try {
@@ -403,6 +413,12 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 		case "set-thinking": {
 			const { instanceId, level } = value;
 			return typeof instanceId === "string" && typeof level === "string" ? { t: "set-thinking", instanceId, level } : null;
+		}
+		case "answer": {
+			const { instanceId, requestId } = value;
+			const answer = parseAnswer(value.answer);
+			return typeof instanceId === "string" && typeof requestId === "string" && answer
+				? { t: "answer", instanceId, requestId, answer } : null;
 		}
 		default:
 			return null;
@@ -480,6 +496,10 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			if (dashboard?.thinkingLevels.includes(msg.level)) dashboard.setThinkingLevel(msg.level);
 			return;
 		}
+		case "answer":
+			dashboards.get(msg.instanceId)?.answer(msg.requestId, msg.answer);
+			guests.get(msg.instanceId)?.answer(msg.requestId, msg.answer);
+			return;
 	}
 }
 

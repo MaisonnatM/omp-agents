@@ -9,8 +9,9 @@ import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp";
-import type { AgentRow, AgentStatus, ContextUsage, ControlPhase } from "./shared";
+import type { AgentRow, AgentStatus, ContextUsage, ControlPhase, UserAnswer, UserRequest } from "./shared";
 import { isObject, oneLine } from "./transcript";
+import { PendingRequests, parseCollabRequest } from "./user-requests";
 
 export type LiveUpdate =
 	/** Its roster row changed: control phase, subagents, or what a subagent is doing. */
@@ -141,6 +142,8 @@ export class SessionGuest {
 	#foundFiles = new Map<string, string>();
 	#searched = new Set<string>();
 	readonly #emit: (update: LiveUpdate) => void;
+	/** The host's `ui-request`s; the host sends them to writable guests only. */
+	readonly #requests = new PendingRequests(() => this.#emit({ kind: "roster" }));
 
 	constructor(host: HostSnapshot, emit: (update: LiveUpdate) => void) {
 		this.instanceId = host.instanceId;
@@ -163,6 +166,10 @@ export class SessionGuest {
 			activity: this.#activity.get(agent.id) ?? null,
 			canMessage: !this.#readOnly && agent.status !== "aborted",
 		}));
+	}
+
+	requests(): UserRequest[] {
+		return this.#requests.list();
 	}
 
 	/**
@@ -219,6 +226,13 @@ export class SessionGuest {
 		}
 	}
 
+	/** Reply to a host `ui-request`. The host takes the first answer from any writer or its own terminal. */
+	answer(requestId: string, answer: UserAnswer): void {
+		if (!this.canWrite || !this.#requests.take(requestId, answer)) return;
+		// A missing value is the host's cancel.
+		this.#socket?.send({ t: "ui-response", reqId: Number(requestId), value: answer.kind === "value" ? answer.value : undefined });
+	}
+
 	/** Terminal: the host vanished or rotated rooms, the relay gave up, or the dashboard shut down. */
 	end(reason: string): void {
 		if (this.#closed) return;
@@ -226,6 +240,7 @@ export class SessionGuest {
 		this.endedAt = Date.now();
 		this.#socket?.close();
 		this.#socket = null;
+		this.#requests.clear();
 		this.#setControl({ phase: "ended", reason });
 	}
 
@@ -260,6 +275,8 @@ export class SessionGuest {
 				this.#readOnly = this.#readOnly || frame.readOnly === true;
 				this.#agents = parseAgents(frame.agents);
 				this.state = parseState(frame.state);
+				// The host replays its pending questions after every welcome.
+				this.#requests.clear();
 				// Rows carry `canMessage`, which depends on the welcome's read-only verdict.
 				this.#setControl({ phase: "live", readOnly: this.#readOnly });
 				return;
@@ -286,16 +303,13 @@ export class SessionGuest {
 				return;
 			}
 			case "ui-request": {
-				const request = frame.request;
-				const title = isObject(request) ? request.title : undefined;
-				this.#emit({
-					kind: "note",
-					agentId: null,
-					level: "warning",
-					text: `The session is asking: ${String(title ?? "a question")}. Answer it in the omp terminal.`,
-				});
+				const request = parseCollabRequest(frame.request);
+				if (request) this.#requests.add(request);
 				return;
 			}
+			case "ui-request-end":
+				this.#requests.remove(String(frame.reqId));
+				return;
 			case "error": {
 				const message = String(frame.message);
 				// Agent-command failures name their agent ("agent <id>: …"); show them where the user sent the message.

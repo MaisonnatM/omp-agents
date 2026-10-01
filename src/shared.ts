@@ -36,6 +36,8 @@ interface RosterHostBase {
 	status: HostStatus;
 	control: ControlPhase;
 	agents: AgentRow[];
+	/** Questions the session waits on, oldest first. */
+	requests: UserRequest[];
 }
 
 export type RosterHost = RosterHostBase &
@@ -82,6 +84,32 @@ export type Item =
 	| { id: string; kind: "assistant"; text: string; streaming: boolean }
 	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error" }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
+
+/** One row of a select request. */
+export interface RequestOption {
+	label: string;
+	description: string | null;
+}
+
+/**
+ * A question a live session waits on: one step of omp's `ask` tool or an extension dialog.
+ * omp drives an `ask` as a chain of these. Picking `Other (type your own)` brings a text request,
+ * and each pick in a multi-select question brings the same select back with that row checked.
+ */
+export type UserRequest = {
+	id: string;
+	title: string;
+	/** When omp stops waiting and takes its default, in ms since the epoch; `null` when it waits for good. */
+	deadline: number | null;
+} & (
+	/** `checked`: rows a multi-select question has ticked so far; omp's RPC frames never report them. */
+	| { kind: "select"; options: RequestOption[]; checked: number[] }
+	| { kind: "confirm"; message: string }
+	| { kind: "text"; multiline: boolean; placeholder: string | null; prefill: string }
+);
+
+/** A reply to a {@link UserRequest}: a row label or typed text, a yes or no, or a dismissal. */
+export type UserAnswer = { kind: "value"; value: string } | { kind: "confirm"; confirmed: boolean } | { kind: "cancel" };
 
 /**
  * Whether the dashboard can prompt and stop the session right now. Transcripts are read from disk
@@ -176,4 +204,6 @@ export type ClientMsg =
 	/** Switch a session this dashboard started to another thinking level, one of its `thinkingLevels`. */
 	| { t: "set-thinking"; instanceId: string; level: string }
 	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
-	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number };
+	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number }
+	/** Reply to one of a live session's pending `requests`. */
+	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer };
