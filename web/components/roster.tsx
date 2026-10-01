@@ -123,8 +123,9 @@ function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 					title={selected?.cwdDisplay}
 					aria-label={`Show sessions from: ${label}`}
 					active={open}
+					className="min-w-0 font-semibold"
 				>
-					<span className="max-w-56 truncate">{label}</span>
+					<span className="truncate">{label}</span>
 				</Button>
 			</PopoverTrigger>
 			<PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] p-0">
@@ -161,7 +162,6 @@ interface RosterProps {
 	past: PastSession[];
 	/** Views on screen, highlighted in the list. */
 	open: View[];
-	ompVersion: string | null;
 	connected: boolean;
 	launch: Launch;
 	defaultCwd: string;
@@ -177,7 +177,6 @@ export function Roster({
 	hosts,
 	past,
 	open,
-	ompVersion,
 	connected,
 	launch,
 	defaultCwd,
@@ -215,22 +214,15 @@ export function Roster({
 		);
 	return (
 		<>
-			<SidebarHeader className="flex-row items-center justify-between px-4 pt-4">
-				<h1 className="text-sm font-semibold">omp sessions</h1>
-				<span className="flex items-center gap-1 text-xs text-muted-foreground">
-					{ompVersion ? `omp v${ompVersion}` : ""}
-					<Button asChild variant="ghost" size="icon-compact" active={settingsOpen}>
-						<a href={settingsHref} title="Settings" aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
-							<Settings />
-						</a>
-					</Button>
-				</span>
+			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
+				<h1 className="sr-only">omp sessions</h1>
+				<ProjectPicker projects={projects} current={project} onPick={pickProject} />
+				<Button asChild variant="ghost" size="icon-compact" active={settingsOpen} className="shrink-0 text-muted-foreground">
+					<a href={settingsHref} title="Settings" aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
+						<Settings />
+					</a>
+				</Button>
 			</SidebarHeader>
-			{projects.length > 1 && (
-				<div className="px-2">
-					<ProjectPicker projects={projects} current={project} onPick={pickProject} />
-				</div>
-			)}
 			{!connected && (
 				<p className="mx-3 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
 					Lost the dashboard server. Retrying…

@@ -43,7 +43,6 @@ export const EMPTY_PANE: PaneData = { items: [], completions: null };
 
 export interface DashboardState {
 	connected: boolean;
-	ompVersion: string | null;
 	hosts: RosterHost[];
 	rosterError: string | null;
 	/** Sessions without a live host, newest first. */
@@ -132,8 +131,6 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 		case "server": {
 			const msg = action.msg;
 			switch (msg.t) {
-				case "hello":
-					return { ...state, ompVersion: msg.ompVersion };
 				case "roster":
 					return {
 						...state,
@@ -187,7 +184,6 @@ export interface Dashboard {
 export function useDashboard(): Dashboard {
 	const [state, dispatch] = useReducer(reduce, {
 		connected: false,
-		ompVersion: null,
 		hosts: [],
 		rosterError: null,
 		past: [],

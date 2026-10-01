@@ -617,7 +617,6 @@ try {
 		websocket: {
 			open(ws) {
 				ws.subscribe("roster");
-				send(ws, { t: "hello", ompVersion });
 				send(ws, { t: "roster", hosts: rosterHosts(), error: rosterError });
 				send(ws, pastMsg());
 				if (usageJson) ws.send(usageJson);

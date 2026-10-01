@@ -140,7 +140,6 @@ export function App() {
 					hosts={state.hosts}
 					past={state.past}
 					open={settings ? [] : layout.panes}
-					ompVersion={state.ompVersion}
 					connected={state.connected}
 					launch={state.launch}
 					defaultCwd={defaultCwd(view, state.hosts, state.past)}

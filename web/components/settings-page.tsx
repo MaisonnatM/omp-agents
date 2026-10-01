@@ -1,3 +1,4 @@
+import { Tabs } from "@base-ui/react/tabs";
 import { ArrowDown, ArrowUp, Check, ChevronsUpDown, FolderOpen, Pencil, Plus, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { CatalogModel, ModelChain, ModelRouting, OmpFile, OmpSettings, RetrySettings, RoleRoute } from "../../src/shared";
@@ -529,7 +530,8 @@ function ProviderOrderSection({ order, editing }: { order: string[]; editing: Ed
 	);
 }
 
-function Routing({ routing, configPath, editing }: { routing: ModelRouting; configPath: string | undefined; editing: Editing }) {
+/** Roles, per-model chains, and provider order: which model a session gets and where its fallbacks are served from. */
+function RolesTab({ routing, configPath, editing }: { routing: ModelRouting; configPath: string | undefined; editing: Editing }) {
 	return (
 		<>
 			<Section title="Model roles" meta={configPath && `Saved to ${configPath}`}>
@@ -574,10 +576,7 @@ function Routing({ routing, configPath, editing }: { routing: ModelRouting; conf
 					</table>
 				</Section>
 			)}
-			<div className="grid gap-10 md:grid-cols-2">
-				<RetrySection routing={routing} editing={editing} />
-				<ProviderOrderSection order={routing.modelProviderOrder} editing={editing} />
-			</div>
+			<ProviderOrderSection order={routing.modelProviderOrder} editing={editing} />
 		</>
 	);
 }
@@ -744,9 +743,21 @@ function WorkspacePicker({ cwd, workspaces }: { cwd: string | null; workspaces: 
 	);
 }
 
+type SettingsTab = "roles" | "retry" | "files";
+
+const SETTINGS_TABS: [SettingsTab, string][] = [
+	["roles", "Model roles & provider order"],
+	["retry", "Retry and fallback"],
+	["files", "Files"],
+];
+
+const PANEL = "space-y-10 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background";
+
 /** omp's model routing and the files it reads, for one workspace or for the user only, each editable in place. */
 export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspaces: Workspace[] }) {
 	const [load, setLoad] = useState<Load>({ phase: "loading" });
+	// Kept across workspace switches, which remount the tabs while settings load.
+	const [tab, setTab] = useState<SettingsTab>("roles");
 	const [catalog, setCatalog] = useState<Catalog>({ phase: "loading" });
 	// A save answered after the user switched workspace must not replace the new workspace's settings.
 	const currentCwd = useRef(cwd);
@@ -792,19 +803,35 @@ export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspac
 	else {
 		const { routing, files } = load.settings;
 		const configPath = files.find(file => file.kind === "settings" && file.scope === "user" && file.path.endsWith("/config.yml"))?.pathDisplay;
+		const routingAlert = "error" in routing && (
+			<p role="alert" className="text-sm text-red-600 dark:text-red-400">
+				omp cannot load its settings: {routing.error}
+			</p>
+		);
+		// Panels stay mounted so an unsaved draft survives switching tabs.
 		body = (
-			<>
-				{"error" in routing ? (
-					<p role="alert" className="text-sm text-red-600 dark:text-red-400">
-						omp cannot load its settings: {routing.error}
-					</p>
-				) : (
-					<Routing routing={routing} configPath={configPath} editing={editing} />
-				)}
-				<Section title="Files">
+			<Tabs.Root value={tab} onValueChange={value => setTab(value as SettingsTab)} className="space-y-6">
+				<Tabs.List className="flex gap-1 border-b border-border">
+					{SETTINGS_TABS.map(([value, label]) => (
+						<Tabs.Tab
+							key={value}
+							value={value}
+							className="-mb-px rounded-t-md border-b-2 border-transparent px-3 py-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[active]:border-foreground data-[active]:text-foreground"
+						>
+							{label}
+						</Tabs.Tab>
+					))}
+				</Tabs.List>
+				<Tabs.Panel value="roles" keepMounted className={PANEL}>
+					{"error" in routing ? routingAlert : <RolesTab routing={routing} configPath={configPath} editing={editing} />}
+				</Tabs.Panel>
+				<Tabs.Panel value="retry" keepMounted className={PANEL}>
+					{"error" in routing ? routingAlert : <RetrySection routing={routing} editing={editing} />}
+				</Tabs.Panel>
+				<Tabs.Panel value="files" keepMounted className={PANEL}>
 					<Files key={cwd ?? ""} files={files} editing={editing} />
-				</Section>
-			</>
+				</Tabs.Panel>
+			</Tabs.Root>
 		);
 	}
 

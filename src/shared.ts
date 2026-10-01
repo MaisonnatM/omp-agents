@@ -263,7 +263,6 @@ export interface OmpSettings {
 }
 
 export type ServerMsg =
-	| { t: "hello"; ompVersion: string }
 	| { t: "roster"; hosts: RosterHost[]; error: string | null }
 	/** Newest first. */
 	| { t: "past"; sessions: PastSession[] }
