@@ -1,5 +1,5 @@
 /** Pure transforms from server messages to what the page renders. */
-import type { AgentRow, Item, OmpFile, OmpFileKind, PastSession, PullRequest, RosterHost, View } from "../src/shared";
+import type { AgentRow, CatalogModel, Item, OmpFile, OmpFileKind, PastSession, PullRequest, RosterHost, View } from "../src/shared";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
 
@@ -133,6 +133,16 @@ export const modelName = (selector: string): string =>
 		.slice(selector.lastIndexOf("/") + 1)
 		.replace(/^~/, "")
 		.replace(/^claude-/, "");
+
+/**
+ * A selector as the model `omp models` lists and its `:level` thinking suffix. Model ids can hold colons
+ * (`minimax-m3:batch`), so the suffix splits off only when the rest is a listed model and the whole is not.
+ */
+export function splitSelector(selector: string, models: ReadonlyMap<string, CatalogModel>): { model: string; level: string | null } {
+	const colon = selector.lastIndexOf(":");
+	if (colon < 0 || models.has(selector) || !models.has(selector.slice(0, colon))) return { model: selector, level: null };
+	return { model: selector.slice(0, colon), level: selector.slice(colon + 1) };
+}
 
 /** Providers whose id is not the org that makes their models. */
 const PROVIDER_ORGS: Record<string, string> = { "openai-codex": "openai" };
