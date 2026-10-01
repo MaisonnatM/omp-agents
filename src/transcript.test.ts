@@ -44,6 +44,20 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "error" }]);
 	});
 
+	test("a subagent's yield shows its answer, not the payload type", () => {
+		const t = new Transcript();
+		const call = { type: "toolCall", id: "y1", name: "yield", arguments: { type: "result", data: "done banana" } };
+		t.applyEntry({ type: "message", id: "e1", message: assistant([call], { stopReason: "toolUse" }) });
+		expect(t.items()).toEqual([{ id: "tool:y1", kind: "tool", name: "yield", summary: "done banana", status: "running" }]);
+	});
+
+	test("a tool cut off by an interrupt stops showing as running when the turn ends", () => {
+		const t = new Transcript();
+		t.applyEvent({ type: "tool_execution_start", toolCallId: "c2", toolName: "bash", args: { command: "sleep 40" } });
+		t.applyEvent({ type: "agent_end" });
+		expect(t.items()).toEqual([{ id: "tool:c2", kind: "tool", name: "bash", summary: "sleep 40", status: "error" }]);
+	});
+
 	test("snapshot entries render prompts, replies, and settled tool calls; other custom messages stay hidden", () => {
 		const t = new Transcript();
 		const entries = [

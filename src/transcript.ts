@@ -13,7 +13,7 @@ type ToolItem = Extract<Item, { kind: "tool" }>;
 const COLLAB_PROMPT = "collab-prompt";
 const SUMMARY_MAX = 160;
 
-const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null;
+export const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null;
 const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
 function textOf(content: unknown): string {
@@ -25,7 +25,7 @@ function textOf(content: unknown): string {
 		.join("\n");
 }
 
-function oneLine(text: string): string {
+export function oneLine(text: string): string {
 	const flat = text.replace(/\s+/g, " ").trim();
 	return flat.length > SUMMARY_MAX ? `${flat.slice(0, SUMMARY_MAX - 1)}…` : flat;
 }
@@ -35,7 +35,8 @@ function toolSummary(args: unknown, intent: unknown): string {
 	if (typeof intent === "string" && intent) return oneLine(intent);
 	if (!isObject(args)) return "";
 	if (typeof args.i === "string" && args.i) return oneLine(args.i);
-	for (const key of ["command", "path", "pattern", "query", "url", "file_path", "description"]) {
+	// `data` is a subagent's `yield` payload: its final answer.
+	for (const key of ["command", "path", "pattern", "query", "url", "file_path", "description", "data", "message"]) {
 		const value = args[key];
 		if (typeof value === "string" && value) return oneLine(value);
 	}
@@ -96,8 +97,13 @@ export class Transcript {
 				return this.#upsertTool(str(event.toolCallId), str(event.toolName), toolSummary(event.args, event.intent), "running");
 			case "tool_execution_end":
 				return this.#upsertTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok");
+			case "agent_end":
+				// An interrupted turn ends without tool_execution_end for the call it cut off.
+				return [...this.#items.values()].flatMap(item =>
+					item.kind === "tool" && item.status === "running" ? this.#upsert({ ...item, status: "error" }) : [],
+				);
 			case "notice": {
-				// Our own join/leave notices are noise in a dashboard that joins on every selection.
+				// Join and leave notices (including this dashboard's own) are noise here.
 				if (event.source === "collab") return [];
 				const level = event.level === "warning" || event.level === "error" ? event.level : "info";
 				return this.#upsert({ id: `notice${++this.#liveSeq}`, kind: "notice", level, text: String(event.message) });

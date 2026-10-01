@@ -1,30 +1,37 @@
 import { homedir } from "node:os";
 import type { Server, ServerWebSocket } from "bun";
-import index from "../public/index.html";
-import { SessionGuest } from "./guest";
+import index from "../web/index.html";
+import { type GuestUpdate, SessionGuest } from "./guest";
 import { type HostSnapshot, listHosts, ompVersion } from "./omp";
-import type { ClientMsg, HostStatus, RosterHost, ServerMsg } from "./shared";
+import type { ClientMsg, HostStatus, RosterHost, ServerMsg, View } from "./shared";
 
 const PORT = Number(process.env.PORT ?? 4317);
 const HOSTNAME = "127.0.0.1";
 const POLL_MS = 1500;
+/** Wait this long before rejoining a host whose room dropped us while it stays listed. */
+const REJOIN_MS = 5000;
+/** Coalesce bursts of subagent progress into one roster push. */
+const ROSTER_PUSH_MS = 150;
 const HOME = homedir();
 /** Only pages served by this app may open the socket: it carries full control of every session. */
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 
 interface SocketData {
-	watching: string | null;
+	view: View | null;
 }
 type Socket = ServerWebSocket<SocketData>;
 
-let roster: RosterHost[] = [];
+let hosts: HostSnapshot[] = [];
 let rosterError: string | null = null;
 let rosterJson = "";
+let rosterPush: NodeJS.Timeout | undefined;
+/** One guest per listed host, so every session's subagents are known without opening it. */
 const guests = new Map<string, SessionGuest>();
 
-const topic = (instanceId: string): string => `session:${instanceId}`;
+const phaseTopic = (instanceId: string): string => `phase:${instanceId}`;
+const itemsTopic = (view: View): string => `items:${view.instanceId}:${view.agentId ?? ""}`;
 const send = (ws: Socket, msg: ServerMsg): void => void ws.send(JSON.stringify(msg));
-const publish = (channel: string, msg: ServerMsg): void => void server.publish(channel, JSON.stringify(msg));
+const publish = (topic: string, msg: ServerMsg): void => void server.publish(topic, JSON.stringify(msg));
 
 function statusOf(host: HostSnapshot): HostStatus {
 	if (host.inputRequired) return "needs-input";
@@ -47,76 +54,119 @@ function toRosterHost(host: HostSnapshot): RosterHost {
 		relayConnected: host.relayConnected,
 		status: statusOf(host),
 		access: host.access,
+		agents: guests.get(host.instanceId)?.agents() ?? [],
 	};
 }
 
-function spawnGuest(host: RosterHost): SessionGuest {
-	const guest = new SessionGuest(host, update => {
-		const instanceId = host.instanceId;
-		if (update.kind === "phase") publish(topic(instanceId), { t: "phase", instanceId, phase: update.phase });
-		else publish(topic(instanceId), { t: "items", instanceId, reset: update.reset, items: update.items });
-	});
+function rosterMsg(): ServerMsg {
+	return { t: "roster", hosts: hosts.map(toRosterHost), error: rosterError };
+}
+
+function pushRoster(): void {
+	clearTimeout(rosterPush);
+	rosterPush = undefined;
+	const json = JSON.stringify(rosterMsg());
+	if (json === rosterJson) return;
+	rosterJson = json;
+	server.publish("roster", json);
+}
+
+function onGuestUpdate(instanceId: string, update: GuestUpdate): void {
+	switch (update.kind) {
+		case "phase":
+			publish(phaseTopic(instanceId), { t: "phase", instanceId, phase: update.phase });
+			return;
+		case "items": {
+			const view = { instanceId, agentId: update.agentId };
+			publish(itemsTopic(view), { t: "items", view, reset: update.reset, items: update.items });
+			return;
+		}
+		case "agents":
+			rosterPush ??= setTimeout(pushRoster, ROSTER_PUSH_MS);
+			return;
+	}
+}
+
+function spawnGuest(host: HostSnapshot): SessionGuest {
+	const guest = new SessionGuest(toRosterHost(host), update => onGuestUpdate(host.instanceId, update));
 	guests.set(host.instanceId, guest);
+	for (const ws of watchers(host.instanceId)) openAgentFor(ws);
 	return guest;
 }
 
-function releaseIfUnwatched(instanceId: string): void {
-	if (server.subscriberCount(topic(instanceId)) > 0) return;
-	guests.get(instanceId)?.end("No longer watched.");
-	guests.delete(instanceId);
-}
-
-/** Follow the registry: drop guests whose host vanished, rejoin hosts that rotated to a new room. */
+/** Follow the registry: join new hosts, drop vanished ones, rejoin rotated or dropped rooms. */
 function reconcileGuests(): void {
+	const listed = new Map(hosts.map(host => [host.instanceId, host]));
 	for (const [instanceId, guest] of guests) {
-		const host = roster.find(h => h.instanceId === instanceId);
+		const host = listed.get(instanceId);
 		if (!host) {
 			guest.end("This session is no longer running.");
 			guests.delete(instanceId);
 		} else if (guest.generation !== null && guest.generation !== host.generation) {
 			guest.end("The session switched rooms; rejoining.");
 			guests.delete(instanceId);
-			if (server.subscriberCount(topic(instanceId)) > 0) spawnGuest(host);
+		} else if (guest.endedAt !== null && Date.now() - guest.endedAt > REJOIN_MS) {
+			guests.delete(instanceId);
 		}
 	}
+	for (const host of hosts) if (!guests.has(host.instanceId)) spawnGuest(host);
 }
 
 async function pollRoster(): Promise<void> {
 	try {
-		roster = (await listHosts()).map(toRosterHost);
+		hosts = await listHosts();
 		rosterError = null;
 	} catch (err) {
-		roster = [];
+		hosts = [];
 		rosterError = err instanceof Error ? err.message : String(err);
 	}
 	reconcileGuests();
-	const msg: ServerMsg = { t: "roster", hosts: roster, error: rosterError };
-	const json = JSON.stringify(msg);
-	if (json !== rosterJson) {
-		rosterJson = json;
-		server.publish("roster", json);
-	}
+	pushRoster();
 	setTimeout(pollRoster, POLL_MS);
 }
 
-function watch(ws: Socket, instanceId: string | null): void {
-	const previous = ws.data.watching;
-	ws.data.watching = instanceId;
-	if (previous && previous !== instanceId) {
-		ws.unsubscribe(topic(previous));
-		releaseIfUnwatched(previous);
-	}
-	if (!instanceId) return;
-	const host = roster.find(h => h.instanceId === instanceId);
-	if (!host) {
-		send(ws, { t: "phase", instanceId, phase: { phase: "ended", reason: "This session is no longer running." } });
+/** Sockets currently looking at a session or one of its subagents. */
+const watchers = (instanceId: string): Socket[] => [...sockets].filter(ws => ws.data.view?.instanceId === instanceId);
+const sockets = new Set<Socket>();
+
+/** A subagent view needs its transcript tailed; a fresh guest (after a rejoin) starts a new tail. */
+function openAgentFor(ws: Socket): void {
+	const view = ws.data.view;
+	if (!view?.agentId) return;
+	const tail = guests.get(view.instanceId)?.openAgent(view.agentId);
+	if (tail?.loaded) send(ws, { t: "items", view, reset: true, items: tail.transcript.items() });
+}
+
+function unwatch(ws: Socket): void {
+	const view = ws.data.view;
+	if (!view) return;
+	ws.data.view = null;
+	ws.unsubscribe(phaseTopic(view.instanceId));
+	ws.unsubscribe(itemsTopic(view));
+	if (view.agentId && server.subscriberCount(itemsTopic(view)) === 0) guests.get(view.instanceId)?.closeAgent(view.agentId);
+}
+
+function watch(ws: Socket, view: View | null): void {
+	unwatch(ws);
+	if (!view) return;
+	ws.data.view = view;
+	ws.subscribe(phaseTopic(view.instanceId));
+	ws.subscribe(itemsTopic(view));
+	const guest = guests.get(view.instanceId);
+	if (!guest) {
+		send(ws, { t: "phase", instanceId: view.instanceId, phase: { phase: "ended", reason: "This session is no longer running." } });
 		return;
 	}
-	ws.subscribe(topic(instanceId));
-	let guest = guests.get(instanceId);
-	if (!guest || guest.phase.phase === "ended") guest = spawnGuest(host);
-	send(ws, { t: "phase", instanceId, phase: guest.phase });
-	if (guest.phase.phase === "live") send(ws, { t: "items", instanceId, reset: true, items: guest.transcript.items() });
+	send(ws, { t: "phase", instanceId: view.instanceId, phase: guest.phase });
+	if (view.agentId) openAgentFor(ws);
+	else if (guest.phase.phase === "live") send(ws, { t: "items", view, reset: true, items: guest.transcript.items() });
+}
+
+function parseView(value: unknown): View | null {
+	if (typeof value !== "object" || value === null || !("instanceId" in value) || !("agentId" in value)) return null;
+	const { instanceId, agentId } = value;
+	if (typeof instanceId !== "string" || (agentId !== null && typeof agentId !== "string")) return null;
+	return { instanceId, agentId };
 }
 
 function parseClientMsg(raw: string | Buffer): ClientMsg | null {
@@ -127,18 +177,41 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 		return null;
 	}
 	if (typeof value !== "object" || value === null || !("t" in value)) return null;
-	const id = "instanceId" in value ? value.instanceId : undefined;
 	switch (value.t) {
-		case "watch":
-			return id === null || typeof id === "string" ? { t: "watch", instanceId: id } : null;
-		case "prompt": {
-			const text = "text" in value ? value.text : undefined;
-			return typeof id === "string" && typeof text === "string" && text.trim() ? { t: "prompt", instanceId: id, text } : null;
+		case "watch": {
+			const requested = "view" in value ? value.view : undefined;
+			if (requested === null) return { t: "watch", view: null };
+			const view = parseView(requested);
+			return view ? { t: "watch", view } : null;
 		}
-		case "abort":
+		case "prompt": {
+			const view = parseView("view" in value ? value.view : undefined);
+			const text = "text" in value ? value.text : undefined;
+			return view && typeof text === "string" && text.trim() ? { t: "prompt", view, text } : null;
+		}
+		case "abort": {
+			const id = "instanceId" in value ? value.instanceId : undefined;
 			return typeof id === "string" ? { t: "abort", instanceId: id } : null;
+		}
 		default:
 			return null;
+	}
+}
+
+function onClientMsg(ws: Socket, msg: ClientMsg): void {
+	switch (msg.t) {
+		case "watch":
+			watch(ws, msg.view);
+			return;
+		case "prompt": {
+			const guest = guests.get(msg.view.instanceId);
+			if (msg.view.agentId) guest?.chat(msg.view.agentId, msg.text);
+			else guest?.prompt(msg.text);
+			return;
+		}
+		case "abort":
+			guests.get(msg.instanceId)?.abort();
+			return;
 	}
 }
 
@@ -147,7 +220,7 @@ function upgrade(req: Request, srv: Server<SocketData>): Response | undefined {
 	if (!ALLOWED_HOSTS.has(host) || req.headers.get("origin") !== `http://${host}`) {
 		return new Response("forbidden origin", { status: 403 });
 	}
-	if (srv.upgrade(req, { data: { watching: null } })) return undefined;
+	if (srv.upgrade(req, { data: { view: null } })) return undefined;
 	return new Response("expected a websocket", { status: 426 });
 }
 
@@ -164,19 +237,18 @@ try {
 		},
 		websocket: {
 			open(ws) {
+				sockets.add(ws);
 				ws.subscribe("roster");
 				send(ws, { t: "hello", ompVersion });
-				send(ws, { t: "roster", hosts: roster, error: rosterError });
+				send(ws, rosterMsg());
 			},
 			message(ws, raw) {
 				const msg = parseClientMsg(raw);
-				if (!msg) return;
-				if (msg.t === "watch") watch(ws, msg.instanceId);
-				else if (msg.t === "prompt") guests.get(msg.instanceId)?.prompt(msg.text);
-				else guests.get(msg.instanceId)?.abort();
+				if (msg) onClientMsg(ws, msg);
 			},
 			close(ws) {
-				if (ws.data.watching) releaseIfUnwatched(ws.data.watching);
+				sockets.delete(ws);
+				unwatch(ws);
 			},
 		},
 	});

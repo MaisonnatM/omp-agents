@@ -1,0 +1,24 @@
+import type { AgentStatus, HostStatus } from "../../src/shared";
+import { cn } from "@/lib/utils";
+
+type Status = HostStatus | AgentStatus;
+
+const DOTS: Record<Status, { label: string; className: string }> = {
+	working: { label: "working", className: "bg-emerald-500 shadow-[0_0_0_3px] shadow-emerald-500/25" },
+	running: { label: "running", className: "bg-emerald-500 shadow-[0_0_0_3px] shadow-emerald-500/25" },
+	"needs-input": { label: "needs input", className: "bg-amber-500 shadow-[0_0_0_3px] shadow-amber-500/30" },
+	idle: { label: "idle", className: "bg-muted-foreground/45" },
+	parked: { label: "parked", className: "border border-muted-foreground/60" },
+	aborted: { label: "aborted", className: "bg-red-500/70" },
+	unknown: { label: "status unknown", className: "border border-dashed border-muted-foreground/60" },
+};
+
+export const statusLabel = (status: Status): string => DOTS[status].label;
+
+export function StatusDot({ status }: { status: Status }) {
+	return (
+		<span className="flex size-4 shrink-0 items-center justify-center" role="img" aria-label={DOTS[status].label}>
+			<span className={cn("size-2 rounded-full", DOTS[status].className)} />
+		</span>
+	);
+}
