@@ -129,12 +129,12 @@ interface TranscriptProps {
 interface HeaderProps {
 	title: string;
 	meta: ReactNode;
-	status: string;
-	alert: boolean;
+	status?: string;
+	alert?: boolean;
 	children?: ReactNode;
 }
 
-function Header({ title, meta, status, alert, children }: HeaderProps) {
+export function Header({ title, meta, status, alert = false, children }: HeaderProps) {
 	return (
 		<header className="flex items-center justify-between gap-4 border-b border-border px-6 py-3">
 			<div className="min-w-0">
@@ -142,9 +142,11 @@ function Header({ title, meta, status, alert, children }: HeaderProps) {
 				<p className="truncate text-xs text-muted-foreground">{meta}</p>
 			</div>
 			<div className="flex shrink-0 items-center gap-3">
-				<span className={cn("text-xs", alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} data-status>
-					{status}
-				</span>
+				{status !== undefined && (
+					<span className={cn("text-xs", alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} data-status>
+						{status}
+					</span>
+				)}
 				{children}
 			</div>
 		</header>
@@ -155,7 +157,7 @@ function Header({ title, meta, status, alert, children }: HeaderProps) {
 const Project = ({ cwdDisplay }: { cwdDisplay: string }) => <span title={cwdDisplay}>{projectName(cwdDisplay) ?? cwdDisplay}</span>;
 
 /** `anthropic/claude-opus-5-5` as the Anthropic logo and `opus-5-5`, with the full selector on hover. */
-function Model({ selector }: { selector: string }) {
+export function Model({ selector }: { selector: string }) {
 	return (
 		<span title={selector}>
 			<OrgIcon org={modelOrg(selector)} label className="mr-1 inline-block align-[-0.125em]" />

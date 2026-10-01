@@ -1,6 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentRow, Item, PastSession, RosterHost } from "../src/shared";
-import { agentTree, applyItems, defaultCwd, forkPoints, hashForView, modelName, modelOrg, toBlocks, viewFromHash } from "./view-model";
+import {
+	agentTree,
+	applyItems,
+	defaultCwd,
+	forkPoints,
+	hashForSettings,
+	hashForView,
+	modelName,
+	modelOrg,
+	settingsFromHash,
+	toBlocks,
+	viewFromHash,
+} from "./view-model";
 
 const agent = (id: string, parentId: string | null): AgentRow => ({
 	id,
@@ -54,6 +66,16 @@ describe("view hash", () => {
 	test("a past session is not read as a subagent of an instance named `past`", () => {
 		expect(hashForView({ kind: "past", sessionId: "01a0f6a5-181e" })).toBe("#past/01a0f6a5-181e");
 		expect(viewFromHash("#past/01a0f6a5-181e")).toEqual({ kind: "past", sessionId: "01a0f6a5-181e" });
+	});
+
+	test("the settings page is not read as a session, and its workspace keeps its slashes", () => {
+		const hash = hashForSettings("/Users/me/code/my app");
+		expect(hash).toBe("#settings/%2FUsers%2Fme%2Fcode%2Fmy%20app");
+		expect(settingsFromHash(hash)).toEqual({ cwd: "/Users/me/code/my app" });
+		expect(viewFromHash(hash)).toBeNull();
+		expect(settingsFromHash("#settings")).toEqual({ cwd: null });
+		expect(viewFromHash("#settings")).toBeNull();
+		expect(settingsFromHash("#7c51f77b2a1bf7ba")).toBeNull();
 	});
 });
 

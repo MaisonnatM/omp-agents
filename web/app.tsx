@@ -1,11 +1,17 @@
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useMemo, useSyncExternalStore } from "react";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Conversation, PastConversation } from "./components/conversation";
 import { PlanUsageFooter } from "./components/plan-usage";
 import { Roster } from "./components/roster";
+import { SettingsPage } from "./components/settings-page";
 import { SidebarResizeHandle, storedSidebarWidth } from "./components/sidebar-resize-handle";
 import { useDashboard } from "./use-dashboard";
-import { defaultCwd, hashForView, sameView } from "./view-model";
+import { defaultCwd, hashForSettings, hashForView, sameView, settingsFromHash, workspaces } from "./view-model";
+
+const subscribeHash = (onChange: () => void): (() => void) => {
+	window.addEventListener("hashchange", onChange);
+	return () => window.removeEventListener("hashchange", onChange);
+};
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
@@ -31,15 +37,20 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 export function App() {
 	const { state, send, select, setLaunchOpen, create, fork } = useDashboard();
 	const initialWidth = useMemo(storedSidebarWidth, []);
+	const settings = settingsFromHash(useSyncExternalStore(subscribeHash, () => location.hash));
 	const { view } = state;
+	const viewHost = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
+	const viewPast = view?.kind === "past" ? state.past.find(s => s.sessionId === view.sessionId) : undefined;
 
 	let pane: ReactNode;
-	if (view?.kind === "live") {
+	if (settings) {
+		pane = <SettingsPage cwd={settings.cwd} workspaces={workspaces(state.hosts, state.past)} />;
+	} else if (view?.kind === "live") {
 		pane = (
 			<Conversation
 				key={hashForView(view)}
 				view={view}
-				host={state.hosts.find(h => h.instanceId === view.instanceId) ?? null}
+				host={viewHost ?? null}
 				lastHost={state.viewHost}
 				items={state.items}
 				initialDraft={state.draft && sameView(state.draft.view, view) ? state.draft.text : ""}
@@ -61,7 +72,7 @@ export function App() {
 			<PastConversation
 				key={hashForView(view)}
 				sessionId={view.sessionId}
-				session={state.past.find(s => s.sessionId === view.sessionId) ?? null}
+				session={viewPast ?? null}
 				items={state.items}
 				fork={state.fork}
 				onFork={fork}
@@ -84,6 +95,8 @@ export function App() {
 					connected={state.connected}
 					launch={state.launch}
 					defaultCwd={defaultCwd(view, state.hosts, state.past)}
+					settingsHref={hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null)}
+					settingsOpen={settings !== null}
 					onSelect={select}
 					onLaunchOpen={setLaunchOpen}
 					onCreate={create}
