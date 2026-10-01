@@ -1,5 +1,5 @@
-import { X } from "lucide-react";
-import { type ReactNode, useMemo, useSyncExternalStore } from "react";
+import { Maximize2, Minimize2, X } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { View } from "../src/shared";
 import { Button } from "@/components/ui/button";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -9,6 +9,7 @@ import { PlanUsageFooter } from "./components/plan-usage";
 import { Roster } from "./components/roster";
 import { SettingsPage } from "./components/settings-page";
 import { SidebarResizeHandle, storedSidebarWidth } from "./components/sidebar-resize-handle";
+import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
 import { EMPTY_PANE, useDashboard } from "./use-dashboard";
 import { closePane, defaultCwd, type ForkPoint, focusedView, hashForSettings, hashForView, sameView, settingsFromHash, workspaces } from "./view-model";
 
@@ -16,6 +17,10 @@ const subscribeHash = (onChange: () => void): (() => void) => {
 	window.addEventListener("hashchange", onChange);
 	return () => window.removeEventListener("hashchange", onChange);
 };
+
+/** A pane's cell in the 2x2 grid; the third of three spans the bottom row. */
+const paneArea = (index: number, count: number): string =>
+	count === 3 && index === 2 ? "2 / 1 / 3 / 3" : `${Math.floor(index / 2) + 1} / ${(index % 2) + 1}`;
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
@@ -47,6 +52,21 @@ export function App() {
 	const viewHost = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
 	const viewPast = view?.kind === "past" ? state.past.find(s => s.sessionId === view.sessionId) : undefined;
 	const split = layout.panes.length > 1;
+	const [columns, setColumns] = useState(() => storedSplitRatio("columns"));
+	const [rows, setRows] = useState(() => storedSplitRatio("rows"));
+	const maximized = layout.maximized && !settings;
+
+	// Popovers, menus, and the composer's lists take their Esc first and mark it handled.
+	useEffect(() => {
+		if (!maximized) return;
+		const onKeyDown = (event: KeyboardEvent): void => {
+			if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+			if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+			show({ ...layout, maximized: false });
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [maximized, layout, show]);
 
 	const paneContent = (pane: View, actions: ReactNode): ReactNode => {
 		const { items, completions } = state.panes.get(hashForView(pane)) ?? EMPTY_PANE;
@@ -93,9 +113,16 @@ export function App() {
 		main = <SettingsPage cwd={settings.cwd} workspaces={workspaces(state.hosts, state.past)} />;
 	} else if (layout.panes.length > 0) {
 		main = (
-			<div className={cn("grid h-svh min-h-0 gap-px bg-border", split ? "grid-cols-2" : "grid-cols-1", layout.panes.length > 2 && "grid-rows-2")}>
+			<div
+				className="relative grid h-svh min-h-0 gap-px bg-border"
+				style={{
+					gridTemplateColumns: split ? `${splitAt(columns)} minmax(0, 1fr)` : "minmax(0, 1fr)",
+					gridTemplateRows: layout.panes.length > 2 ? `${splitAt(rows)} minmax(0, 1fr)` : "minmax(0, 1fr)",
+				}}
+			>
 				{layout.panes.map((pane, index) => (
 					// Keyed by view: moving to another cell keeps a pane's draft and scroll; another view resets them.
+					// A maximized pane covers the whole grid; the rest stay mounted, at their size, under it.
 					<section
 						key={hashForView(pane)}
 						tabIndex={-1}
@@ -104,23 +131,39 @@ export function App() {
 						data-focused={index === layout.focus || undefined}
 						onPointerDownCapture={() => index !== layout.focus && focus(index)}
 						onFocusCapture={() => index !== layout.focus && focus(index)}
+						style={{ gridArea: maximized && index === layout.focus ? "1 / 1 / -1 / -1" : paneArea(index, layout.panes.length) }}
 						className={cn(
 							"relative flex min-h-0 min-w-0 flex-col bg-background outline-none",
-							layout.panes.length === 3 && index === 2 && "col-span-2",
-							split && index === layout.focus &&
+							maximized && (index === layout.focus ? "z-10" : "invisible"),
+							split && !maximized && index === layout.focus &&
 								"after:pointer-events-none after:absolute after:inset-0 after:z-20 after:ring-2 after:ring-inset after:ring-[color:var(--focus-ring)]",
 						)}
 					>
 						{paneContent(
 							pane,
 							split && (
-								<Button variant="ghost" size="icon-compact" title="Close pane" aria-label="Close pane" onClick={() => show(closePane(layout, index))}>
-									<X />
-								</Button>
+								<>
+									<Button
+										variant="ghost"
+										size="icon-compact"
+										title={maximized ? "Restore split" : "Maximize pane"}
+										aria-label={maximized ? "Restore split" : "Maximize pane"}
+										onClick={() => show({ ...layout, focus: index, maximized: !maximized })}
+									>
+										{maximized ? <Minimize2 /> : <Maximize2 />}
+									</Button>
+									<Button variant="ghost" size="icon-compact" title="Close pane" aria-label="Close pane" onClick={() => show(closePane(layout, index))}>
+										<X />
+									</Button>
+								</>
 							),
 						)}
 					</section>
 				))}
+				{split && !maximized && (
+					<SplitResizeHandle axis="columns" ratio={columns} onRatio={setColumns} span={layout.panes.length === 3 ? rows : 1} />
+				)}
+				{layout.panes.length > 2 && !maximized && <SplitResizeHandle axis="rows" ratio={rows} onRatio={setRows} />}
 			</div>
 		);
 	} else if (state.hosts.length === 0) {
