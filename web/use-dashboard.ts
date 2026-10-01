@@ -47,6 +47,8 @@ export interface DashboardState {
 	rosterError: string | null;
 	/** Sessions without a live host, newest first. */
 	past: PastSession[];
+	/** Whether the server has sent its session lists, the roster and then the past sessions, since the page loaded. */
+	listed: boolean;
 	layout: Layout;
 	/** Per open view, by {@link hashForView}. */
 	panes: Map<string, PaneData>;
@@ -139,7 +141,7 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 						lastHosts: rememberHosts(state.lastHosts, msg.hosts, state.layout),
 					};
 				case "past":
-					return { ...state, past: msg.sessions };
+					return { ...state, past: msg.sessions, listed: true };
 				case "items":
 					return updatePane(state, msg.view, pane => ({ ...pane, items: applyItems(pane.items, msg.reset, msg.items) }));
 				case "created":
@@ -187,6 +189,7 @@ export function useDashboard(): Dashboard {
 		hosts: [],
 		rosterError: null,
 		past: [],
+		listed: false,
 		layout: layoutFromHash(location.hash) ?? EMPTY_LAYOUT,
 		panes: new Map(),
 		lastHosts: new Map(),

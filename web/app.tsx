@@ -107,7 +107,12 @@ export function App() {
 	if (settings) {
 		main = <SettingsPage cwd={settings.cwd} workspaces={workspaces(state.hosts, state.past)} />;
 	} else if (inbox) {
-		main = <InboxPage project={project} hosts={state.hosts} past={state.past} onOpen={open} />;
+		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
+		main = state.listed ? (
+			<InboxPage project={project} hosts={state.hosts} past={state.past} onOpen={open} />
+		) : (
+			<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
+		);
 	} else if (layout.panes.length > 0) {
 		main = (
 			<div className={cn("grid h-svh min-h-0 gap-px bg-border", split ? "grid-cols-2" : "grid-cols-1", layout.panes.length > 2 && "grid-rows-2")}>

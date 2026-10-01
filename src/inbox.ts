@@ -23,19 +23,26 @@ export function parseRemote(url: string): Repo | null {
 	return match ? { owner: match[1]!, repo: match[2]! } : null;
 }
 
+/** Workspaces' repositories, and lookups in flight. A workspace with no GitHub `origin` yet is asked again next time. */
 const remotes = new Map<string, Promise<Repo | null>>();
 
-/** The GitHub repository that `origin` names in `cwd`, read once per workspace. */
+/** The GitHub repository that `origin` names in `cwd`. */
 function repoOf(cwd: string): Promise<Repo | null> {
-	let repo = remotes.get(cwd);
-	if (!repo) {
-		repo = (async () => {
+	const known = remotes.get(cwd);
+	if (known) return known;
+	const repo = (async () => {
+		try {
 			const child = Bun.spawn(["git", "-C", cwd, "remote", "get-url", "origin"], { stdout: "pipe", stderr: "ignore" });
 			const [out, code] = await Promise.all([new Response(child.stdout).text(), child.exited]);
 			return code === 0 ? parseRemote(out) : null;
-		})();
-		remotes.set(cwd, repo);
-	}
+		} catch {
+			return null;
+		}
+	})();
+	remotes.set(cwd, repo);
+	void repo.then(found => {
+		if (!found) remotes.delete(cwd);
+	});
 	return repo;
 }
 
