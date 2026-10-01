@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import type { ClientMsg, CompletionItem, Item, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
+import type { ClientMsg, CompletionItem, Item, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
 import { applyItems, hashForView, sameView, viewFromHash } from "./view-model";
 
 /** The New session form: closed, open for a directory (with the last attempt's error), or waiting for the session to start. */
@@ -21,6 +21,8 @@ export interface DashboardState {
 	completions: { reqId: number; items: CompletionItem[]; error: string | null } | null;
 	/** `null` until the server's first `omp usage` run finishes. */
 	usage: { plans: PlanUsage[]; error: string | null } | null;
+	/** Last model list the server sent, for the session named by `instanceId`. */
+	models: { instanceId: string; models: ModelOption[]; error: string | null } | null;
 }
 
 type Action =
@@ -44,7 +46,7 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 		}
 		case "select":
 			if (sameView(state.view, action.view)) return state;
-			return { ...state, view: action.view, viewHost: findHost(state.hosts, action.view), items: [], completions: null };
+			return { ...state, view: action.view, viewHost: findHost(state.hosts, action.view), items: [], completions: null, models: null };
 		case "launch":
 			return { ...state, launch: action.launch };
 		case "server": {
@@ -71,6 +73,8 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 					return { ...state, completions: msg };
 				case "usage":
 					return { ...state, usage: { plans: msg.plans, error: msg.error } };
+				case "models":
+					return { ...state, models: msg };
 			}
 		}
 	}
@@ -100,6 +104,7 @@ export function useDashboard(): Dashboard {
 		launch: { phase: "closed" },
 		completions: null,
 		usage: null,
+		models: null,
 	});
 	const socketRef = useRef<WebSocket | null>(null);
 	const viewRef = useRef(state.view);

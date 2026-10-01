@@ -6,7 +6,7 @@
 import { randomBytes } from "node:crypto";
 import { activityOf, type LiveUpdate, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
 import { type RpcChild, type RpcState, startRpc } from "./omp";
-import type { AgentRow, AgentStatus, HostStatus } from "./shared";
+import type { AgentRow, AgentStatus, HostStatus, ModelOption } from "./shared";
 import { isObject } from "./transcript";
 
 /** omp's subagent lifecycle and progress statuses, as the roster's agent statuses. */
@@ -96,6 +96,21 @@ export class DashboardSession {
 
 	abort(): void {
 		this.#child.client.abort().catch((err: unknown) => this.#fail("Stop failed", err));
+	}
+
+	async models(): Promise<ModelOption[]> {
+		const models = await this.#child.client.getAvailableModels();
+		return models.map(({ provider, id }) => ({ provider, id }));
+	}
+
+	setModel({ provider, id }: ModelOption): void {
+		this.#child.client.setModel(provider, id).then(
+			model => {
+				this.model = `${model.provider}/${model.id}`;
+				this.#emit({ kind: "roster" });
+			},
+			(err: unknown) => this.#fail("Model switch failed", err),
+		);
 	}
 
 	end(): Promise<void> {

@@ -31,6 +31,8 @@ If `omp` is not on your `PATH`, or `omp` resolves to a build that does not ship 
 - Subagents appear indented under their session, nested by parent. Each row shows the subagent's id, its type, its status (`running`, `idle`, `parked`, or `aborted`), and what it is doing.
 - Select a row to open it. The selection is in the URL hash, so a reload or a bookmark returns to it. A past session's hash is `#past/<session id>`.
 - In a session, a message sent while a turn runs waits in the composer's queue until the turn ends. **Stop** interrupts the turn.
+- The conversation follows new output while you are at the bottom. Scrolling up pauses that follow; the down-arrow button jumps back to the latest message.
+- Sessions started from the dashboard have a searchable model picker in the composer. It lists models from that session's omp RPC process and switches the active model. Terminal sessions show their current model there, but model changes must be made in the terminal; subagents do not have a separate model picker.
 - In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one. The composer is disabled for aborted subagents, read-only rooms, and the subagents of sessions that the dashboard started, because omp's RPC mode has no command that reaches a subagent.
 - To start a session, click **+** next to the session count, enter a working directory, and click **Start**. The field starts with the directory of the open session, else of the newest live session, else of the newest past session. It accepts an absolute path, a path that starts with `~`, or a path relative to your home directory. When omp is ready, the dashboard opens the session.
 - A session that the dashboard started shows **End session** in its header. **End session** stops its omp process. The session then moves to the past sessions.
@@ -79,7 +81,7 @@ The cost is visible on each host and on its relay (`collab.relayUrl`, by default
 
 Stop the dashboard to leave every room.
 
-The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`. The roster uses `sidebar`, user and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`. `thinking-indicator` shows while the agent works. Fluid's built-in sidebar rail resizes by pointer only and collapses on click. The dashboard turns it off and uses `web/components/sidebar-resize-handle.tsx`, which drives the same sidebar width.
+The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`. The roster uses `sidebar`, user and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`. `thinking-indicator` shows while the agent works. shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button. The model picker uses shadcn's `popover` and `command` combobox pattern. Fluid's built-in sidebar rail resizes by pointer only and collapses on click. The dashboard turns it off and uses `web/components/sidebar-resize-handle.tsx`, which drives the same sidebar width.
 
 ## Security
 

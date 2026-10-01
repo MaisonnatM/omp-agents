@@ -104,6 +104,9 @@ export interface RpcClient {
 	getState(): Promise<RpcState>;
 	prompt(message: string, images?: undefined, streamingBehavior?: "steer" | "followUp"): Promise<string>;
 	abort(): Promise<void>;
+	/** omp's `ModelInfo` carries more fields; this app reads the selector parts. */
+	getAvailableModels(): Promise<{ provider: string; id: string }[]>;
+	setModel(provider: string, modelId: string): Promise<{ provider: string; id: string }>;
 	setSubagentSubscription(level: "progress"): Promise<string>;
 	getSubagents(): Promise<RpcSubagent[]>;
 	onSessionEvent(listener: (event: Frame) => void): () => void;

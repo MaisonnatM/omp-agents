@@ -355,13 +355,19 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 				? { t: "complete", reqId, view, text, cursor } : null;
 		}
 		case "abort":
-		case "end": {
+		case "end":
+		case "list-models": {
 			const id = value.instanceId;
 			return typeof id === "string" ? { t: value.t, instanceId: id } : null;
 		}
 		case "create": {
 			const cwd = value.cwd;
 			return typeof cwd === "string" && cwd.trim() ? { t: "create", cwd } : null;
+		}
+		case "set-model": {
+			const { instanceId, model } = value;
+			return typeof instanceId === "string" && isObject(model) && typeof model.provider === "string" && typeof model.id === "string"
+				? { t: "set-model", instanceId, model: { provider: model.provider, id: model.id } } : null;
 		}
 		default:
 			return null;
@@ -414,6 +420,22 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			return;
 		case "end":
 			void dashboards.get(msg.instanceId)?.end();
+			return;
+		case "list-models": {
+			const dashboard = dashboards.get(msg.instanceId);
+			if (!dashboard) {
+				send(ws, { t: "models", instanceId: msg.instanceId, models: [], error: "Only sessions started from this dashboard can switch models." });
+				return;
+			}
+			try {
+				send(ws, { t: "models", instanceId: msg.instanceId, models: await dashboard.models(), error: null });
+			} catch (error) {
+				send(ws, { t: "models", instanceId: msg.instanceId, models: [], error: String(error) });
+			}
+			return;
+		}
+		case "set-model":
+			dashboards.get(msg.instanceId)?.setModel(msg.model);
 			return;
 	}
 }

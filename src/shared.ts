@@ -120,6 +120,12 @@ export interface PlanUsage {
 	windows: PlanWindow[];
 }
 
+/** A model a session can switch to; `provider/id` is omp's model selector. */
+export interface ModelOption {
+	provider: string;
+	id: string;
+}
+
 export type ServerMsg =
 	| { t: "hello"; ompVersion: string }
 	| { t: "roster"; hosts: RosterHost[]; error: string | null }
@@ -131,7 +137,9 @@ export type ServerMsg =
 	| { t: "created"; result: LaunchResult }
 	| { t: "completions"; reqId: number; items: CompletionItem[]; error: string | null }
 	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */
-	| { t: "usage"; plans: PlanUsage[]; error: string | null };
+	| { t: "usage"; plans: PlanUsage[]; error: string | null }
+	/** Answers `list-models`. `error` is set when the session cannot list or switch models. */
+	| { t: "models"; instanceId: string; models: ModelOption[]; error: string | null };
 
 export type ClientMsg =
 	| { t: "watch"; view: View | null }
@@ -144,5 +152,9 @@ export type ClientMsg =
 	| { t: "create"; cwd: string }
 	/** End a session this dashboard started. */
 	| { t: "end"; instanceId: string }
+	/** Models a session this dashboard started can switch to. */
+	| { t: "list-models"; instanceId: string }
+	/** Switch a session this dashboard started to another model. */
+	| { t: "set-model"; instanceId: string; model: ModelOption }
 	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
 	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number };
