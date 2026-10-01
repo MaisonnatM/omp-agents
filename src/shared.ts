@@ -104,6 +104,31 @@ export interface CompletionItem {
 	cursor: number;
 }
 
+/** One quota window of a provider plan. */
+export interface PlanWindow {
+	/** Short name: the window id (`5h`, `7d`, `monthly`) plus its model tier, else omp's label when that is ambiguous. */
+	label: string;
+	/** omp's name for the limit, e.g. `Claude 7 Day (Fable)`. */
+	title: string;
+	/** Fraction of the window's quota left, 0 to 1. */
+	remaining: number;
+	resetsAt: number | null;
+}
+
+/** A provider account that `omp usage` reports plan limits for. */
+export interface PlanUsage {
+	provider: string;
+	name: string;
+	account: string | null;
+	windows: PlanWindow[];
+}
+
+/** A model a session can switch to; `provider/id` is omp's model selector. */
+export interface ModelOption {
+	provider: string;
+	id: string;
+}
+
 export type ServerMsg =
 	| { t: "hello"; ompVersion: string }
 	| { t: "roster"; hosts: RosterHost[]; error: string | null }
@@ -115,7 +140,11 @@ export type ServerMsg =
 	| { t: "created"; result: LaunchResult }
 	/** Answers this socket's `fork` once the forked session is ready, or once forking failed. */
 	| { t: "forked"; result: ForkResult }
-	| { t: "completions"; reqId: number; items: CompletionItem[]; error: string | null };
+	| { t: "completions"; reqId: number; items: CompletionItem[]; error: string | null }
+	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */
+	| { t: "usage"; plans: PlanUsage[]; error: string | null }
+	/** Answers `list-models`. `error` is set when the session cannot list or switch models. */
+	| { t: "models"; instanceId: string; models: ModelOption[]; error: string | null };
 
 export type ClientMsg =
 	| { t: "watch"; view: View | null }
@@ -130,5 +159,9 @@ export type ClientMsg =
 	| { t: "end"; instanceId: string }
 	/** Start a dashboard session holding the view's history before the user prompt `entryId`. The view's file stays untouched. */
 	| { t: "fork"; view: View; entryId: string }
+	/** Models a session this dashboard started can switch to. */
+	| { t: "list-models"; instanceId: string }
+	/** Switch a session this dashboard started to another model. */
+	| { t: "set-model"; instanceId: string; model: ModelOption }
 	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
 	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number };

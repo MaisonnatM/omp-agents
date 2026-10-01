@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import type { ClientMsg, CompletionItem, Item, LiveView, PastSession, RosterHost, ServerMsg, View } from "../src/shared";
+import type { ClientMsg, CompletionItem, Item, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
 import { applyItems, type ForkPoint, hashForView, sameView, viewFromHash } from "./view-model";
 
 /** The New session form: closed, open for a directory (with the last attempt's error), or waiting for the session to start. */
@@ -28,6 +28,10 @@ export interface DashboardState {
 	/** Composer text for a forked session's first mount. */
 	draft: { view: LiveView; text: string } | null;
 	completions: { reqId: number; items: CompletionItem[]; error: string | null } | null;
+	/** `null` until the server's first `omp usage` run finishes. */
+	usage: { plans: PlanUsage[]; error: string | null } | null;
+	/** Last model list the server sent, for the session named by `instanceId`. */
+	models: { instanceId: string; models: ModelOption[]; error: string | null } | null;
 }
 
 type Action =
@@ -62,6 +66,7 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 				viewHost: findHost(state.hosts, action.view),
 				items: [],
 				completions: null,
+				models: null,
 				fork: state.fork.phase === "forking" ? state.fork : { phase: "idle" },
 				draft: state.draft && sameView(state.draft.view, action.view) ? state.draft : null,
 			};
@@ -98,6 +103,10 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 				}
 				case "completions":
 					return { ...state, completions: msg };
+				case "usage":
+					return { ...state, usage: { plans: msg.plans, error: msg.error } };
+				case "models":
+					return { ...state, models: msg };
 			}
 		}
 	}
@@ -130,6 +139,8 @@ export function useDashboard(): Dashboard {
 		fork: { phase: "idle" },
 		draft: null,
 		completions: null,
+		usage: null,
+		models: null,
 	});
 	const socketRef = useRef<WebSocket | null>(null);
 	const viewRef = useRef(state.view);

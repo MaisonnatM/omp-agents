@@ -31,6 +31,8 @@ If `omp` is not on your `PATH`, or `omp` resolves to a build that does not ship 
 - Subagents appear indented under their session, nested by parent. Each row shows the subagent's id, its type, its status (`running`, `idle`, `parked`, or `aborted`), and what it is doing.
 - Select a row to open it. The selection is in the URL hash, so a reload or a bookmark returns to it. A past session's hash is `#past/<session id>`.
 - In a session, a message sent while a turn runs waits in the composer's queue until the turn ends. **Stop** interrupts the turn.
+- The conversation follows new output while you are at the bottom. Scrolling up pauses that follow; the down-arrow button jumps back to the latest message.
+- Sessions started from the dashboard have a searchable model picker in the composer. It lists models from that session's omp RPC process and switches the active model. Terminal sessions show their current model there, but model changes must be made in the terminal; subagents do not have a separate model picker.
 - In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one. The composer is disabled for aborted subagents, read-only rooms, and the subagents of sessions that the dashboard started, because omp's RPC mode has no command that reaches a subagent.
 - To start a session, click **+** next to the session count, enter a working directory, and click **Start**. The field starts with the directory of the open session, else of the newest live session, else of the newest past session. It accepts an absolute path, a path that starts with `~`, or a path relative to your home directory. When omp is ready, the dashboard opens the session.
 - A session that the dashboard started shows **End session** in its header. **End session** stops its omp process. The session then moves to the past sessions.
@@ -39,6 +41,7 @@ If `omp` is not on your `PATH`, or `omp` resolves to a build that does not ship 
 - Drag the sidebar's right edge to resize it. With the edge focused, the arrow keys resize in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes. Double-click the edge to reset the width. The width is saved in the browser's localStorage.
 - Type `/` to complete discovered file commands and `/skill:<name>` skills. Type `@` to find files in the selected session's working directory. Use arrow keys, Tab or Enter to insert a suggestion, and Esc to close the list. File suggestions follow Git ignore rules in Git repositories.
 - User and assistant messages render GitHub-flavored Markdown, including tables, task lists, fenced code, and links.
+- The bottom of the sidebar shows how much quota is left on each plan that `omp usage` reports, per window: for example `5h 66%  7d 68%` for Anthropic. A window is named by its length plus its model tier (`7d fable`). Two limits that would share a name, like Cursor's monthly limits, show omp's label instead. Amber means less than 20% is left, and red means none. Hover or focus a window to see omp's full limit name and when it resets. The server runs `omp usage --json` at startup and every minute after that.
 
 The dashboard cannot run omp's built-in `/` commands, `$` Python shortcut, or `!` shell shortcut. Collab accepts guest prompts, not host-side TUI commands or direct access to the host's Python kernel. Those inputs return an error in the conversation instead of silently sending literal text to the agent. Run them in the omp terminal.
 
@@ -65,6 +68,8 @@ Sessions started from the dashboard are omp child processes in RPC mode (`--mode
 
 Questions that a terminal session asks through a dialog appear as a notice. Answer them in the omp terminal.
 
+Plan quota comes from `omp usage --json`, run through this same package's CLI. omp builds those reports from its auth storage, extensions, and credential broker, so the server reads the command's output instead of rebuilding that setup. omp can exit non-zero after it prints the reports it did get, so the server reads the output whatever the exit code. When the output is not a usage report, the footer shows the last line omp wrote to stderr.
+
 ### Why the server joins every terminal session
 
 Subagent status lives in the host's memory. The session files on disk cannot tell an idle subagent from a parked one. The guest connection is the one source the protocol offers for live status, and the host already leaves advisor rows out of it. Joining every session keeps those rows current for sessions that you have not opened, and keeps each room ready for a prompt.
@@ -77,7 +82,7 @@ The cost is visible on each host and on its relay (`collab.relayUrl`, by default
 
 Stop the dashboard to leave every room.
 
-The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`. The roster uses `sidebar`, user and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`. `thinking-indicator` shows while the agent works. Fluid's built-in sidebar rail resizes by pointer only and collapses on click. The dashboard turns it off and uses `web/components/sidebar-resize-handle.tsx`, which drives the same sidebar width.
+The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`. The roster uses `sidebar`, user and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`. `thinking-indicator` shows while the agent works. shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button. The model picker uses shadcn's `popover` and `command` combobox pattern. Fluid's built-in sidebar rail resizes by pointer only and collapses on click. The dashboard turns it off and uses `web/components/sidebar-resize-handle.tsx`, which drives the same sidebar width.
 
 ## Security
 
@@ -92,10 +97,10 @@ A control link gives full control of the session. Anyone who holds it can read t
 ## Develop
 
 ```sh
-bun test           # transcript reducer, file tail, and view-model tests
+bun test           # transcript reducer, file tail, usage parser, and view-model tests
 bun run typecheck
 ```
 
-The server lives in `src/`. `src/omp.ts` loads the omp modules, lists the session files, and starts RPC children. `src/tail.ts` reads one transcript file incrementally. `src/transcript.ts` folds session-file lines and live events into display items. `src/guest.ts` runs one Collab guest per terminal session. `src/dashboard-session.ts` drives one session that the dashboard started. `src/server.ts` serves the page and the WebSocket, watches the sessions directory, and points each open view at its file.
+The server lives in `src/`. `src/omp.ts` loads the omp modules, lists the session files, and starts RPC children. `src/tail.ts` reads one transcript file incrementally. `src/transcript.ts` folds session-file lines and live events into display items. `src/guest.ts` runs one Collab guest per terminal session. `src/dashboard-session.ts` drives one session that the dashboard started. `src/usage.ts` runs `omp usage --json` and parses it into plan windows. `src/server.ts` serves the page and the WebSocket, watches the sessions directory, and points each open view at its file.
 
 The page lives in `web/`. Bun's HTML import bundles it, and `bun-plugin-tailwind` (set in `bunfig.toml`) compiles Tailwind v4. `web/use-dashboard.ts` holds the socket and the page state. `web/view-model.ts` holds the pure transforms. Most files in `web/components/ui`, `web/lib`, and `web/hooks` come from the Fluid registry. The dashboard adds an `onKeyDown` hook to Fluid's `InputMessage` so the completion list can intercept arrow keys, Tab, Enter, and Esc before the normal submit behavior. Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight`; raw HTML is escaped and unsafe link schemes are filtered by default.

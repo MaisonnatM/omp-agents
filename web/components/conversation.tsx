@@ -1,8 +1,17 @@
-import { Fragment, type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import type { AgentRow, CompletionItem, ControlPhase, Item, LiveView, PastSession, RosterHost } from "../../src/shared";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import type { AgentRow, CompletionItem, ControlPhase, Item, LiveView, ModelOption, PastSession, RosterHost } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import { InputMessage, type QueuedMessage } from "@/components/ui/input-message";
+import {
+	MessageScroller,
+	MessageScrollerButton,
+	MessageScrollerContent,
+	MessageScrollerItem,
+	MessageScrollerProvider,
+	MessageScrollerViewport,
+	useMessageScroller,
+} from "@/components/ui/message-scroller";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
 import { useIcon } from "@/lib/icon-context";
@@ -12,6 +21,7 @@ import { type ForkPoint, forkPoints, type ToolItem, toBlocks } from "../view-mod
 import { completionTrigger } from "../completion-trigger";
 import { CompletionPopup } from "./completion-popup";
 import { MessageMarkdown } from "./message-markdown";
+import { ModelPicker } from "./model-picker";
 import { hostLabel, pastLabel } from "./roster";
 import { statusLabel } from "./status-dot";
 
@@ -137,79 +147,79 @@ function Header({ title, meta, status, alert, children }: HeaderProps) {
 	);
 }
 
-/** The scrolling message list. It stays pinned to the bottom unless the reader scrolled up. */
+/** The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end. */
 function Transcript({ items, working, fork, onFork }: TranscriptProps) {
-	const scrollRef = useRef<HTMLDivElement>(null);
-	const pinned = useRef(true);
-
-	useLayoutEffect(() => {
-		const el = scrollRef.current;
-		if (el && pinned.current) el.scrollTop = el.scrollHeight;
-	}, [items]);
-
 	const last = items.at(-1);
 	const streaming = last?.kind === "assistant" && last.streaming;
 	const forks = forkPoints(items);
 
 	return (
-		<div
-			ref={scrollRef}
-			onScroll={event => {
-				const el = event.currentTarget;
-				pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-			}}
-			className="min-h-0 flex-1 overflow-y-auto"
-		>
-			<div className="mx-auto flex max-w-3xl flex-col gap-3 px-6 py-6" aria-live="polite" data-transcript>
-				{toBlocks(items).map(block => {
-					if (block.kind === "tools") return <ToolGroup key={block.id} tools={block.tools} />;
-					const item = block.item;
-					if (item.kind === "notice") {
+		<MessageScroller className="flex-1">
+			<MessageScrollerViewport>
+				<MessageScrollerContent className="mx-auto max-w-3xl gap-3 px-6 py-6" aria-relevant="additions text" data-transcript>
+					{toBlocks(items).map(block => {
+						if (block.kind === "tools") {
+							return (
+								<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
+									<ToolGroup tools={block.tools} />
+								</MessageScrollerItem>
+							);
+						}
+						const item = block.item;
+						if (item.kind === "notice") {
+							return (
+								<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
+									<p className={cn("self-center text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
+										{item.text}
+									</p>
+								</MessageScrollerItem>
+							);
+						}
+						const copyable = !(item.kind === "assistant" && item.streaming) && item.text.trim() !== "";
+						const point = forks.get(item.id);
+						const failed = fork.phase === "failed" && fork.itemId === item.id ? fork.error : null;
 						return (
-							<p key={item.id} className={cn("self-center text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
-								{item.text}
-							</p>
+							<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
+								<ChatMessage
+									from={item.kind}
+									time={item.kind === "user" ? (item.from ?? undefined) : undefined}
+									actions={
+										copyable || point ? (
+											<>
+												{copyable && <CopyButton text={item.text} />}
+												{point && (
+													<ForkButton
+														point={point}
+														forking={fork.phase === "forking" && fork.itemId === item.id}
+														disabled={fork.phase === "forking"}
+														onFork={() => onFork(item.id, point)}
+													/>
+												)}
+											</>
+										) : undefined
+									}
+									data-item={item.kind}
+									data-streaming={item.kind === "assistant" ? item.streaming : undefined}
+								>
+									<MessageMarkdown text={item.text} />
+								</ChatMessage>
+								{failed && (
+									<p role="alert" className={cn(item.kind === "user" ? "self-end" : "self-start", "text-xs", NOTICE_TONE.error)}>
+										{failed}
+									</p>
+								)}
+							</MessageScrollerItem>
 						);
-					}
-					const copyable = !(item.kind === "assistant" && item.streaming) && item.text.trim() !== "";
-					const point = forks.get(item.id);
-					const failed = fork.phase === "failed" && fork.itemId === item.id ? fork.error : null;
-					return (
-						<Fragment key={item.id}>
-							<ChatMessage
-								from={item.kind}
-								time={item.kind === "user" ? (item.from ?? undefined) : undefined}
-								actions={
-									copyable || point ? (
-										<>
-											{copyable && <CopyButton text={item.text} />}
-											{point && (
-												<ForkButton
-													point={point}
-													forking={fork.phase === "forking" && fork.itemId === item.id}
-													disabled={fork.phase === "forking"}
-													onFork={() => onFork(item.id, point)}
-												/>
-											)}
-										</>
-									) : undefined
-								}
-								data-item={item.kind}
-								data-streaming={item.kind === "assistant" ? item.streaming : undefined}
-							>
-								<MessageMarkdown text={item.text} />
-							</ChatMessage>
-							{failed && (
-								<p role="alert" className={cn(item.kind === "user" ? "self-end" : "self-start", "text-xs", NOTICE_TONE.error)}>
-									{failed}
-								</p>
-							)}
-						</Fragment>
-					);
-				})}
-				{working && !streaming && <ThinkingIndicator className="self-start" />}
-			</div>
-		</div>
+					})}
+					{working && !streaming && (
+						<MessageScrollerItem messageId="thinking" className="flex flex-col">
+							<ThinkingIndicator className="self-start" />
+						</MessageScrollerItem>
+					)}
+				</MessageScrollerContent>
+			</MessageScrollerViewport>
+			<MessageScrollerButton />
+		</MessageScroller>
 	);
 }
 
@@ -226,10 +236,12 @@ interface PastConversationProps {
 export function PastConversation({ sessionId, session, items, fork, onFork }: PastConversationProps) {
 	const meta = session ? `${session.cwdDisplay} · last active ${new Date(session.modifiedAt).toLocaleString()}` : sessionId;
 	return (
-		<div className="flex h-svh min-h-0 flex-1 flex-col">
-			<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Read-only" alert={false} />
-			<Transcript items={items} working={false} fork={fork} onFork={onFork} />
-		</div>
+		<MessageScrollerProvider autoScroll>
+			<div className="flex h-svh min-h-0 flex-1 flex-col">
+				<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Read-only" alert={false} />
+				<Transcript items={items} working={false} fork={fork} onFork={onFork} />
+			</div>
+		</MessageScrollerProvider>
 	);
 }
 
@@ -246,13 +258,25 @@ interface ConversationProps {
 	onFork: (itemId: string, point: ForkPoint) => void;
 	completions: { reqId: number; items: CompletionItem[]; error: string | null } | null;
 	onComplete: (reqId: number, text: string, cursor: number) => void;
+	/** The last model list the server sent for this session, or `null` while none has arrived. */
+	models: { models: ModelOption[]; error: string | null } | null;
+	onListModels: () => void;
+	onSetModel: (model: ModelOption) => void;
 	onPrompt: (text: string) => void;
 	onAbort: () => void;
 	onEnd: () => void;
 }
 
-/** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts and queues reset per view. */
-export function Conversation({
+/** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts, queues, and scroll reset per view. */
+export function Conversation(props: ConversationProps) {
+	return (
+		<MessageScrollerProvider autoScroll>
+			<LiveConversation {...props} />
+		</MessageScrollerProvider>
+	);
+}
+
+function LiveConversation({
 	view,
 	host,
 	lastHost,
@@ -262,10 +286,14 @@ export function Conversation({
 	onFork,
 	completions,
 	onComplete,
+	models,
+	onListModels,
+	onSetModel,
 	onPrompt,
 	onAbort,
 	onEnd,
 }: ConversationProps) {
+	const { scrollToEnd } = useMessageScroller();
 	const [draft, setDraft] = useState(initialDraft);
 	const [queue, setQueue] = useState<QueuedMessage[]>([]);
 	const [requestId, setRequestId] = useState<number | null>(null);
@@ -335,6 +363,16 @@ export function Conversation({
 			: "Message this session…";
 
 	const directCommand = draft.startsWith("$") ? "Python" : draft.startsWith("!") ? "shell" : null;
+	const shownModel = shown?.model ?? null;
+	// Collab rooms carry no model switch, so only sessions this dashboard started over RPC can change it.
+	const modelSlot =
+		view.agentId !== null ? null : host?.source === "dashboard" && live ? (
+			<ModelPicker current={shownModel} list={models} onOpen={onListModels} onPick={onSetModel} />
+		) : shownModel ? (
+			<span className="truncate px-2 text-xs text-muted-foreground" title="Switch this session's model from its omp terminal.">
+				{shownModel.slice(shownModel.indexOf("/") + 1)}
+			</span>
+		) : null;
 	return (
 		<div className="flex h-svh min-h-0 flex-1 flex-col">
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
@@ -392,8 +430,12 @@ export function Conversation({
 						onPrompt(text);
 						setRequestId(null);
 						// A queued message dispatching on its own must not wipe the draft being typed.
-						if (!meta?.queuedId) setDraft("");
+						if (!meta?.queuedId) {
+							setDraft("");
+							scrollToEnd();
+						}
 					}}
+					leftSlot={modelSlot}
 					placeholder={placeholder}
 					disabled={!writable}
 					// Session prompts sent mid-turn queue until the turn ends; Stop interrupts it.
