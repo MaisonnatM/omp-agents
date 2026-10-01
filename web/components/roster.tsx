@@ -109,6 +109,7 @@ export function Roster({
 	onLaunchOpen,
 	onCreate,
 }: RosterProps) {
+	const [runningOpen, setRunningOpen] = useState(true);
 	return (
 		<>
 			<SidebarHeader className="flex-row items-baseline justify-between px-4 pt-4">
@@ -121,13 +122,16 @@ export function Roster({
 				</p>
 			)}
 			<SidebarContent>
-				<SidebarGroup>
+				<SidebarGroup collapsible open={runningOpen} onOpenChange={setRunningOpen}>
 					<SidebarGroupLabel>{hosts.length === 0 ? "No sessions" : `${hosts.length} running`}</SidebarGroupLabel>
 					<SidebarGroupAction
 						title="New session"
 						aria-label="New session"
 						aria-expanded={launch.phase !== "closed"}
-						onClick={() => onLaunchOpen(launch.phase === "closed")}
+						onClick={() => {
+							if (launch.phase === "closed") setRunningOpen(true);
+							onLaunchOpen(launch.phase === "closed");
+						}}
 					>
 						<Plus />
 					</SidebarGroupAction>
@@ -202,7 +206,7 @@ export function Roster({
 						))}
 					</SidebarMenu>
 				</SidebarGroup>
-				<SidebarGroup>
+				<SidebarGroup collapsible>
 					<SidebarGroupLabel>{past.length === 0 ? "No past sessions" : `${past.length} past`}</SidebarGroupLabel>
 					<SidebarMenu aria-label="Past omp sessions">
 						{past.map(session => (

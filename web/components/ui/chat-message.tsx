@@ -59,7 +59,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
         transition={spring.moderate}
         style={{ transformOrigin: isUser ? "bottom right" : "bottom left" }}
         className={cn(
-          "group flex max-w-[80%] flex-col gap-1.5",
+          "group/message flex max-w-[80%] flex-col gap-1.5",
           isUser ? "items-end self-end" : "items-start self-start",
           className
         )}
@@ -118,8 +118,8 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
               compact ? "text-[11px]" : "text-[12px]",
               !isTouch && [
                 "opacity-0 pointer-events-none transition-opacity duration-150",
-                "group-hover:opacity-100 group-hover:pointer-events-auto",
-                "group-focus-within:opacity-100 group-focus-within:pointer-events-auto",
+                "group-hover/message:opacity-100 group-hover/message:pointer-events-auto",
+                "group-focus-within/message:opacity-100 group-focus-within/message:pointer-events-auto",
               ]
             )}
           >

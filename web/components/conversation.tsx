@@ -1,10 +1,11 @@
-import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { AgentRow, CompletionItem, ControlPhase, Item, LiveView, PastSession, RosterHost } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import { InputMessage, type QueuedMessage } from "@/components/ui/input-message";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
+import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { type ToolItem, toBlocks } from "../view-model";
 import { completionTrigger } from "../completion-trigger";
@@ -52,6 +53,32 @@ function ToolGroup({ tools }: { tools: ToolItem[] }) {
 		</ThinkingSteps>
 	);
 }
+
+function CopyButton({ text }: { text: string }) {
+	const [copied, setCopied] = useState(false);
+	const CopyIcon = useIcon("copy");
+	const CheckIcon = useIcon("check");
+	useEffect(() => {
+		if (!copied) return;
+		const timer = setTimeout(() => setCopied(false), 1500);
+		return () => clearTimeout(timer);
+	}, [copied]);
+	const Icon = copied ? CheckIcon : CopyIcon;
+	return (
+		<Button
+			variant="ghost"
+			size="icon-compact"
+			aria-label={copied ? "Copied" : "Copy message"}
+			title={copied ? "Copied" : "Copy message"}
+			data-copied={copied || undefined}
+			onClick={() => navigator.clipboard.writeText(text).then(() => setCopied(true))}
+		>
+			<Icon />
+		</Button>
+	);
+}
+
+const copyAction = (text: string): ReactNode => (text.trim() ? <CopyButton text={text} /> : undefined);
 
 interface HeaderProps {
 	title: string;
@@ -107,13 +134,25 @@ function Transcript({ items, working }: { items: Item[]; working: boolean }) {
 					switch (item.kind) {
 						case "user":
 							return (
-								<ChatMessage key={item.id} from="user" time={item.from ?? undefined} data-item="user">
+								<ChatMessage
+									key={item.id}
+									from="user"
+									time={item.from ?? undefined}
+									actions={copyAction(item.text)}
+									data-item="user"
+								>
 									<MessageMarkdown text={item.text} />
 								</ChatMessage>
 							);
 						case "assistant":
 							return (
-								<ChatMessage key={item.id} from="assistant" data-item="assistant" data-streaming={item.streaming}>
+								<ChatMessage
+									key={item.id}
+									from="assistant"
+									actions={item.streaming ? undefined : copyAction(item.text)}
+									data-item="assistant"
+									data-streaming={item.streaming}
+								>
 									<MessageMarkdown text={item.text} />
 								</ChatMessage>
 							);
