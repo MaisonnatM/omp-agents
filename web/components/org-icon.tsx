@@ -55,10 +55,20 @@ const LOGOS: Record<string, Logo> = {
 	},
 };
 
-/** The logo of an org such as `anthropic` (see `modelOrg`), or nothing when svgl has none for it. Decorative unless `label` is set. */
-export function OrgIcon({ org, label = false, className }: { org: string; label?: boolean; className?: string }) {
+/** The logo of an org such as `anthropic` (see `modelOrg`), or `fallback` when svgl has none for it. Decorative unless `label` is set. */
+export function OrgIcon({
+	org,
+	label = false,
+	className,
+	fallback = null,
+}: {
+	org: string;
+	label?: boolean;
+	className?: string;
+	fallback?: ReactNode;
+}) {
 	const logo = LOGOS[org];
-	if (!logo) return null;
+	if (!logo) return fallback;
 	return (
 		<svg
 			viewBox={logo.viewBox}

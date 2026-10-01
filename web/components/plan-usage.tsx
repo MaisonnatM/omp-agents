@@ -32,19 +32,21 @@ function WindowLeft({ window }: { window: PlanWindow }) {
 	);
 }
 
-function PlanRow({ plan, showAccount }: { plan: PlanUsage; showAccount: boolean }) {
+function PlanRow({ plan }: { plan: PlanUsage }) {
+	const label = plan.account ? `${plan.name} · ${plan.account}` : plan.name;
 	return (
-		<li className="flex flex-col gap-0.5">
-			<span className="flex min-w-0 items-center gap-1.5" title={plan.account ?? undefined}>
-				<OrgIcon org={providerOrg(plan.provider)} />
-				<span className="shrink-0 font-medium text-foreground">{plan.name}</span>
-				{showAccount && plan.account && <span className="truncate text-muted-foreground">{plan.account}</span>}
-			</span>
-			<span className="flex flex-wrap gap-x-2.5 gap-y-0.5">
-				{plan.windows.map(window => (
-					<WindowLeft key={window.label} window={window} />
-				))}
-			</span>
+		<li className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+			<Tooltip content={label}>
+				<span role="img" aria-label={label} className="flex shrink-0 items-center">
+					<OrgIcon
+						org={providerOrg(plan.provider)}
+						fallback={<span className="font-medium text-foreground">{plan.name}</span>}
+					/>
+				</span>
+			</Tooltip>
+			{plan.windows.map(window => (
+				<WindowLeft key={window.label} window={window} />
+			))}
 		</li>
 	);
 }
@@ -63,20 +65,11 @@ export function PlanUsageFooter({ usage }: { usage: DashboardState["usage"] }) {
 		);
 	else
 		body = (
-			<ul className="flex flex-col gap-2">
+			<ul className="flex flex-col gap-1">
 				{usage.plans.map((plan, index) => (
-					<PlanRow
-						key={`${plan.provider}:${plan.account ?? index}`}
-						plan={plan}
-						showAccount={usage.plans.some(other => other !== plan && other.provider === plan.provider)}
-					/>
+					<PlanRow key={`${plan.provider}:${plan.account ?? index}`} plan={plan} />
 				))}
 			</ul>
 		);
-	return (
-		<SidebarFooter className="gap-1.5 border-t border-border px-4 py-3 text-xs">
-			<h2 className="font-medium text-muted-foreground">Plan quota left</h2>
-			{body}
-		</SidebarFooter>
-	);
+	return <SidebarFooter className="border-t border-border px-3 py-2 text-xs">{body}</SidebarFooter>;
 }
