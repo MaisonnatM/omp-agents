@@ -1,4 +1,4 @@
-import { Check, ChevronsUpDown, Columns2, Folder, Plus, Settings } from "lucide-react";
+import { Check, ChevronsUpDown, Columns2, Folder, Inbox, Plus, Settings } from "lucide-react";
 import { type MouseEvent, useState } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
@@ -21,17 +21,29 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import type { Launch } from "../use-dashboard";
-import { agentTree, hashForView, MAX_PANES, matchesFilter, type OpenMode, sameView, workspaces } from "../view-model";
+import { agentTree, hashForView, INBOX_HASH, MAX_PANES, matchesFilter, type OpenMode, sameView, workspaces } from "../view-model";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** Pixels of extra indent per nesting level below the first subagent level. */
 const NEST_INDENT = 12;
 
-/** The project the sidebar is scoped to, by `cwd`; absent for all projects. */
+/** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
 const PROJECT_KEY = "omp-agents.sidebar-project";
 
+/** The project `cwd` the sidebar and the inbox show, `null` for all projects, and its setter, which localStorage keeps. */
+export function useProject(projects: { cwd: string }[]): [string | null, (cwd: string | null) => void] {
+	const [stored, setStored] = useState(() => localStorage.getItem(PROJECT_KEY));
+	const pick = (cwd: string | null): void => {
+		setStored(cwd);
+		if (cwd === null) localStorage.removeItem(PROJECT_KEY);
+		else localStorage.setItem(PROJECT_KEY, cwd);
+	};
+	// A stored project with no sessions left, or not yet loaded, shows all of them.
+	return [projects.some(({ cwd }) => cwd === stored) ? stored : null, pick];
+}
+
 /** Cmd-click on macOS, Ctrl-click elsewhere, opens a row in a new pane. */
-const modeOf = (event: MouseEvent): OpenMode => (event.metaKey || event.ctrlKey ? "split" : "replace");
+export const modeOf = (event: MouseEvent): OpenMode => (event.metaKey || event.ctrlKey ? "split" : "replace");
 
 export function age(startedAt: number): string {
 	const minutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60_000));
@@ -168,6 +180,10 @@ interface RosterProps {
 	/** The settings page, for the open session's workspace. */
 	settingsHref: string;
 	settingsOpen: boolean;
+	inboxOpen: boolean;
+	/** The selected project's `cwd`, or `null` for all projects. */
+	project: string | null;
+	onPickProject: (cwd: string | null) => void;
 	onOpen: (view: View, mode: OpenMode) => void;
 	onLaunchOpen: (open: boolean) => void;
 	onCreate: (cwd: string) => void;
@@ -182,21 +198,16 @@ export function Roster({
 	defaultCwd,
 	settingsHref,
 	settingsOpen,
+	inboxOpen,
+	project,
+	onPickProject,
 	onOpen,
 	onLaunchOpen,
 	onCreate,
 }: RosterProps) {
 	const [runningOpen, setRunningOpen] = useState(true);
 	const [filter, setFilter] = useState("");
-	const [storedProject, setStoredProject] = useState(() => localStorage.getItem(PROJECT_KEY));
 	const projects = workspaces(hosts, past);
-	// A stored project with no sessions left, or not yet loaded, shows all of them.
-	const project = projects.some(({ cwd }) => cwd === storedProject) ? storedProject : null;
-	const pickProject = (cwd: string | null): void => {
-		setStoredProject(cwd);
-		if (cwd === null) localStorage.removeItem(PROJECT_KEY);
-		else localStorage.setItem(PROJECT_KEY, cwd);
-	};
 	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
 	const shownHosts = hosts.filter(inProject);
 	const shownPast = past.filter(session => inProject(session) && matchesFilter(session, pastLabel(session), filter));
@@ -216,12 +227,19 @@ export function Roster({
 		<>
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
-				<ProjectPicker projects={projects} current={project} onPick={pickProject} />
-				<Button asChild variant="ghost" size="icon-compact" active={settingsOpen} className="shrink-0 text-muted-foreground">
-					<a href={settingsHref} title="Settings" aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
-						<Settings />
-					</a>
-				</Button>
+				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
+				<div className="flex shrink-0 items-center gap-0.5">
+					<Button asChild variant="ghost" size="icon-compact" active={inboxOpen} className="text-muted-foreground">
+						<a href={INBOX_HASH} title="Pull request inbox" aria-label="Pull request inbox" aria-current={inboxOpen ? "page" : undefined}>
+							<Inbox />
+						</a>
+					</Button>
+					<Button asChild variant="ghost" size="icon-compact" active={settingsOpen} className="text-muted-foreground">
+						<a href={settingsHref} title="Settings" aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
+							<Settings />
+						</a>
+					</Button>
+				</div>
 			</SidebarHeader>
 			{!connected && (
 				<p className="mx-3 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">

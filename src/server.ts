@@ -8,6 +8,7 @@ import { DashboardSession, type DashboardUpdate, type ForkedSession } from "./da
 import { type LiveUpdate, SessionGuest } from "./guest";
 import { FileTail } from "./tail";
 import { displayPath, type HostSnapshot, listHosts, listModels, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
+import { loadInbox } from "./inbox";
 import { PullRequestIndex } from "./pull-requests";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "./settings";
 import type { ClientMsg, HostStatus, Item, LiveView, PullRequest, RosterHost, ServerMsg, SettingsError, UserAnswer, View } from "./shared";
@@ -538,17 +539,19 @@ const fail = (status: number, error: string, conflict = false): Response =>
 	Response.json({ error, ...(conflict && { conflict: true }) } satisfies SettingsError, { status });
 
 /**
- * The `cwd` a settings request names, `null` for user-level only, or the response refusing it. `cwd` must be a
+ * The `cwd` a request names, `null` when it names none, or the response refusing it. `cwd` must be a
  * directory some session ran in: the page names workspaces that way, as it names sessions by id.
  */
-function settingsCwd(req: Request): string | null | Response {
+function workspaceCwd(req: Request): string | null | Response {
 	const cwd = new URL(req.url).searchParams.get("cwd");
-	const sessionRan =
-		cwd === null ||
-		hosts.some(host => host.cwd === cwd) ||
-		[...dashboards.values()].some(session => session.cwd === cwd) ||
-		files.some(session => session.cwd === cwd);
-	return sessionRan ? cwd : fail(404, `No session ran in ${cwd}`);
+	return cwd === null || knownCwds().includes(cwd) ? cwd : fail(404, `No session ran in ${cwd}`);
+}
+
+/** Directories sessions ran in: live ones first, then saved ones newest first. */
+function knownCwds(): string[] {
+	const cwds = [...hosts.map(host => host.cwd), ...[...dashboards.values()].map(session => session.cwd), ...files.map(session => session.cwd)];
+	// Sessions from old omp versions recorded no directory.
+	return [...new Set(cwds.filter(Boolean))];
 }
 
 async function answer(run: () => Promise<unknown>): Promise<Response> {
@@ -563,7 +566,7 @@ async function answer(run: () => Promise<unknown>): Promise<Response> {
 /** `GET /api/settings[?cwd=<dir>]`: omp's model routing and files, user-level only without `cwd`. */
 async function settings(req: Request): Promise<Response> {
 	if (!allowedHost(req)) return fail(403, "forbidden host");
-	const cwd = settingsCwd(req);
+	const cwd = workspaceCwd(req);
 	return cwd instanceof Response ? cwd : answer(() => loadOmpSettings(cwd));
 }
 
@@ -571,6 +574,15 @@ async function settings(req: Request): Promise<Response> {
 async function models(req: Request): Promise<Response> {
 	if (!allowedHost(req)) return fail(403, "forbidden host");
 	return answer(async () => ({ models: await listModels() }));
+}
+
+/** `GET /api/inbox[?cwd=<dir>][&fresh]`: the pull requests of that workspace's repository, else of every workspace's. */
+async function inbox(req: Request): Promise<Response> {
+	if (!allowedHost(req)) return fail(403, "forbidden host");
+	const cwd = workspaceCwd(req);
+	if (cwd instanceof Response) return cwd;
+	const fresh = new URL(req.url).searchParams.has("fresh");
+	return answer(() => loadInbox(cwd === null ? knownCwds() : [cwd], fresh));
 }
 
 /**
@@ -583,7 +595,7 @@ function settingsWrite(save: (cwd: string | null, body: unknown) => Promise<unkn
 		if (req.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") {
 			return fail(415, "Expected a JSON body");
 		}
-		const cwd = settingsCwd(req);
+		const cwd = workspaceCwd(req);
 		if (cwd instanceof Response) return cwd;
 		let body: unknown;
 		try {
@@ -607,6 +619,7 @@ try {
 			"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
 			"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
 			"/api/models": { GET: models },
+			"/api/inbox": { GET: inbox },
 		},
 		fetch(req, srv) {
 			const { pathname } = new URL(req.url);

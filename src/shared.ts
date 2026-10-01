@@ -11,6 +11,39 @@ export interface PullRequest {
 	number: number;
 }
 
+/** Where the viewer stands on a pull request in the inbox: they wrote it, or someone asked them to review it. */
+export type InboxRole = "author" | "reviewer";
+
+/** GitHub's review decision, plus `none` for a repository that requires no review. */
+export type ReviewDecision = "approved" | "changes-requested" | "review-required" | "none";
+
+/** The rollup of the head commit's checks. */
+export type CheckState = "passing" | "failing" | "pending" | "none";
+
+/** A pull request on the inbox page, as GitHub reports it now. */
+export interface InboxPullRequest extends PullRequest {
+	title: string;
+	author: string;
+	role: InboxRole;
+	state: "open" | "draft" | "merged";
+	review: ReviewDecision;
+	checks: CheckState;
+	head: string;
+	/** The branch it merges into when that is not the repository's default branch: the PR below it in a stack. */
+	stackedOn: string | null;
+	/** Last update, or the merge for a merged PR, in ms since the epoch. */
+	updatedAt: number;
+}
+
+/** One GitHub repository's inbox, for the workspaces whose `origin` it is. */
+export type RepoInbox = { owner: string; repo: string; cwds: string[] } & ({ pullRequests: InboxPullRequest[] } | { error: string });
+
+export interface Inbox {
+	repos: RepoInbox[];
+	/** Workspaces with no GitHub `origin`, which the inbox cannot show. */
+	unmatched: string[];
+}
+
 /** A subagent of a session. The main agent is the session itself and is not listed. */
 export interface AgentRow {
 	id: string;
