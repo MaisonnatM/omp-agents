@@ -1,6 +1,7 @@
 import { type ReactNode, useMemo } from "react";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Conversation, PastConversation } from "./components/conversation";
+import { PlanUsageFooter } from "./components/plan-usage";
 import { Roster } from "./components/roster";
 import { SidebarResizeHandle, storedSidebarWidth } from "./components/sidebar-resize-handle";
 import { useDashboard } from "./use-dashboard";
@@ -78,6 +79,7 @@ export function App() {
 					onLaunchOpen={setLaunchOpen}
 					onCreate={create}
 				/>
+				<PlanUsageFooter usage={state.usage} />
 				<SidebarResizeHandle />
 			</Sidebar>
 			<SidebarInset>{pane}</SidebarInset>

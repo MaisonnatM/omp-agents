@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import type { ClientMsg, CompletionItem, Item, PastSession, RosterHost, ServerMsg, View } from "../src/shared";
+import type { ClientMsg, CompletionItem, Item, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
 import { applyItems, hashForView, sameView, viewFromHash } from "./view-model";
 
 /** The New session form: closed, open for a directory (with the last attempt's error), or waiting for the session to start. */
@@ -19,6 +19,8 @@ export interface DashboardState {
 	items: Item[];
 	launch: Launch;
 	completions: { reqId: number; items: CompletionItem[]; error: string | null } | null;
+	/** `null` until the server's first `omp usage` run finishes. */
+	usage: { plans: PlanUsage[]; error: string | null } | null;
 }
 
 type Action =
@@ -67,6 +69,8 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 					return { ...state, launch: msg.result.ok ? { phase: "closed" } : { phase: "editing", error: msg.result.error } };
 				case "completions":
 					return { ...state, completions: msg };
+				case "usage":
+					return { ...state, usage: { plans: msg.plans, error: msg.error } };
 			}
 		}
 	}
@@ -95,6 +99,7 @@ export function useDashboard(): Dashboard {
 		items: [],
 		launch: { phase: "closed" },
 		completions: null,
+		usage: null,
 	});
 	const socketRef = useRef<WebSocket | null>(null);
 	const viewRef = useRef(state.view);

@@ -10,6 +10,7 @@ import { FileTail } from "./tail";
 import { type HostSnapshot, listHosts, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
 import type { ClientMsg, HostStatus, Item, LiveView, RosterHost, ServerMsg, View } from "./shared";
 import { isObject } from "./transcript";
+import { fetchPlanUsage } from "./usage";
 
 const PORT = Number(process.env.PORT ?? 4317);
 const HOSTNAME = "127.0.0.1";
@@ -21,6 +22,8 @@ const REJOIN_MS = 5000;
 const ROSTER_PUSH_MS = 150;
 /** Re-list session files at most this often while sessions write. */
 const LIST_THROTTLE_MS = 500;
+/** `omp usage` caches provider reports itself; each run still costs a process and up to one network round trip per provider. */
+const USAGE_POLL_MS = 60_000;
 const HOME = homedir();
 /** Only pages served by this app may open the socket: it carries full control of every session. */
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
@@ -47,6 +50,8 @@ let listTimer: NodeJS.Timeout | undefined;
 /** Views some socket shows, with how many sockets show each; each has a tail while its file is known. */
 const watched = new Map<string, { view: View; sockets: number }>();
 const tails = new Map<string, FileTail>();
+/** The last `usage` message, empty until the first `omp usage` run finishes. */
+let usageJson = "";
 
 const viewKey = (view: View): string =>
 	view.kind === "past" ? `past:${view.sessionId}` : `live:${view.instanceId}:${view.agentId ?? ""}`;
@@ -129,6 +134,21 @@ function pushPast(): void {
 	if (json === pastJson) return;
 	pastJson = json;
 	server.publish("roster", json);
+}
+
+async function pollUsage(): Promise<void> {
+	let msg: ServerMsg;
+	try {
+		msg = { t: "usage", plans: await fetchPlanUsage(), error: null };
+	} catch (err) {
+		msg = { t: "usage", plans: [], error: err instanceof Error ? err.message : String(err) };
+	}
+	const json = JSON.stringify(msg);
+	if (json !== usageJson) {
+		usageJson = json;
+		server.publish("roster", json);
+	}
+	setTimeout(pollUsage, USAGE_POLL_MS);
 }
 
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
@@ -424,6 +444,7 @@ try {
 				send(ws, { t: "hello", ompVersion });
 				send(ws, { t: "roster", hosts: rosterHosts(), error: rosterError });
 				send(ws, pastMsg());
+				if (usageJson) ws.send(usageJson);
 			},
 			message(ws, raw) {
 				const msg = parseClientMsg(raw);
@@ -447,6 +468,7 @@ watchFiles(sessionsDir, { recursive: true }, (_event, name) => {
 });
 await refreshFiles();
 await pollRegistry();
+void pollUsage();
 console.log(`omp-agents (omp v${ompVersion}) on http://${HOSTNAME}:${PORT}`);
 
 async function shutdown(): Promise<void> {

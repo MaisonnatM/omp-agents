@@ -101,6 +101,25 @@ export interface CompletionItem {
 	cursor: number;
 }
 
+/** One quota window of a provider plan. */
+export interface PlanWindow {
+	/** Short name: the window id (`5h`, `7d`, `monthly`) plus its model tier, else omp's label when that is ambiguous. */
+	label: string;
+	/** omp's name for the limit, e.g. `Claude 7 Day (Fable)`. */
+	title: string;
+	/** Fraction of the window's quota left, 0 to 1. */
+	remaining: number;
+	resetsAt: number | null;
+}
+
+/** A provider account that `omp usage` reports plan limits for. */
+export interface PlanUsage {
+	provider: string;
+	name: string;
+	account: string | null;
+	windows: PlanWindow[];
+}
+
 export type ServerMsg =
 	| { t: "hello"; ompVersion: string }
 	| { t: "roster"; hosts: RosterHost[]; error: string | null }
@@ -110,7 +129,9 @@ export type ServerMsg =
 	| { t: "items"; view: View; reset: boolean; items: Item[] }
 	/** Answers this socket's `create` once the new session is ready, or once it failed to start. */
 	| { t: "created"; result: LaunchResult }
-	| { t: "completions"; reqId: number; items: CompletionItem[]; error: string | null };
+	| { t: "completions"; reqId: number; items: CompletionItem[]; error: string | null }
+	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */
+	| { t: "usage"; plans: PlanUsage[]; error: string | null };
 
 export type ClientMsg =
 	| { t: "watch"; view: View | null }

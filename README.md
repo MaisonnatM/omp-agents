@@ -38,6 +38,7 @@ If `omp` is not on your `PATH`, or `omp` resolves to a build that does not ship 
 - Drag the sidebar's right edge to resize it. With the edge focused, the arrow keys resize in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes. Double-click the edge to reset the width. The width is saved in the browser's localStorage.
 - Type `/` to complete discovered file commands and `/skill:<name>` skills. Type `@` to find files in the selected session's working directory. Use arrow keys, Tab or Enter to insert a suggestion, and Esc to close the list. File suggestions follow Git ignore rules in Git repositories.
 - User and assistant messages render GitHub-flavored Markdown, including tables, task lists, fenced code, and links.
+- The bottom of the sidebar shows how much quota is left on each plan that `omp usage` reports, per window: for example `5h 66%  7d 68%` for Anthropic. A window is named by its length plus its model tier (`7d fable`). Two limits that would share a name, like Cursor's monthly limits, show omp's label instead. Amber means less than 20% is left, and red means none. Hover or focus a window to see omp's full limit name and when it resets. The server runs `omp usage --json` at startup and every minute after that.
 
 The dashboard cannot run omp's built-in `/` commands, `$` Python shortcut, or `!` shell shortcut. Collab accepts guest prompts, not host-side TUI commands or direct access to the host's Python kernel. Those inputs return an error in the conversation instead of silently sending literal text to the agent. Run them in the omp terminal.
 
@@ -63,6 +64,8 @@ Sessions started in a terminal are reached through their Collab room:
 Sessions started from the dashboard are omp child processes in RPC mode (`--mode rpc`, NDJSON over stdio), spawned through omp's own `RpcClient` from this same package's CLI. **Start** answers the page as soon as omp reports ready, with no terminal, registry, or relay involved. Prompts, Stop, live events, and subagent progress stay on the pipe. RPC mode has no UI, so the session never blocks on a dialog that nobody can answer. Stopping the dashboard stops every session that it started. The transcripts stay on disk, and `omp --resume <session id>` continues one in a terminal.
 
 Questions that a terminal session asks through a dialog appear as a notice. Answer them in the omp terminal.
+
+Plan quota comes from `omp usage --json`, run through this same package's CLI. omp builds those reports from its auth storage, extensions, and credential broker, so the server reads the command's output instead of rebuilding that setup. omp can exit non-zero after it prints the reports it did get, so the server reads the output whatever the exit code. When the output is not a usage report, the footer shows the last line omp wrote to stderr.
 
 ### Why the server joins every terminal session
 
@@ -91,10 +94,10 @@ A control link gives full control of the session. Anyone who holds it can read t
 ## Develop
 
 ```sh
-bun test           # transcript reducer, file tail, and view-model tests
+bun test           # transcript reducer, file tail, usage parser, and view-model tests
 bun run typecheck
 ```
 
-The server lives in `src/`. `src/omp.ts` loads the omp modules, lists the session files, and starts RPC children. `src/tail.ts` reads one transcript file incrementally. `src/transcript.ts` folds session-file lines and live events into display items. `src/guest.ts` runs one Collab guest per terminal session. `src/dashboard-session.ts` drives one session that the dashboard started. `src/server.ts` serves the page and the WebSocket, watches the sessions directory, and points each open view at its file.
+The server lives in `src/`. `src/omp.ts` loads the omp modules, lists the session files, and starts RPC children. `src/tail.ts` reads one transcript file incrementally. `src/transcript.ts` folds session-file lines and live events into display items. `src/guest.ts` runs one Collab guest per terminal session. `src/dashboard-session.ts` drives one session that the dashboard started. `src/usage.ts` runs `omp usage --json` and parses it into plan windows. `src/server.ts` serves the page and the WebSocket, watches the sessions directory, and points each open view at its file.
 
 The page lives in `web/`. Bun's HTML import bundles it, and `bun-plugin-tailwind` (set in `bunfig.toml`) compiles Tailwind v4. `web/use-dashboard.ts` holds the socket and the page state. `web/view-model.ts` holds the pure transforms. Most files in `web/components/ui`, `web/lib`, and `web/hooks` come from the Fluid registry. The dashboard adds an `onKeyDown` hook to Fluid's `InputMessage` so the completion list can intercept arrow keys, Tab, Enter, and Esc before the normal submit behavior. Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight`; raw HTML is escaped and unsafe link schemes are filtered by default.
