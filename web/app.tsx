@@ -1,15 +1,17 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useMemo, useState, useSyncExternalStore } from "react";
 import type { View } from "../src/shared";
 import { Button } from "@/components/ui/button";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { Conversation, PastConversation } from "./components/conversation";
+import { Conversation, PastConversation, ToolsExpanded } from "./components/conversation";
 import { PlanUsageFooter } from "./components/plan-usage";
 import { Roster } from "./components/roster";
 import { SettingsPage } from "./components/settings-page";
+import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { SidebarResizeHandle, storedSidebarWidth } from "./components/sidebar-resize-handle";
 import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
+import { useShortcuts } from "./shortcuts";
 import { EMPTY_PANE, useDashboard } from "./use-dashboard";
 import { closePane, defaultCwd, type ForkPoint, focusedView, hashForSettings, hashForView, sameView, settingsFromHash, workspaces } from "./view-model";
 
@@ -22,6 +24,19 @@ const subscribeHash = (onChange: () => void): (() => void) => {
 const paneArea = (index: number, count: number): string =>
 	count === 3 && index === 2 ? "2 / 1 / 3 / 3" : `${Math.floor(index / 2) + 1} / ${(index % 2) + 1}`;
 
+/** omp's Agent Hub key: into the session list at the open row, and from there back to the focused pane's composer. */
+function toggleSessionsFocus(): void {
+	const sidebar = document.querySelector<HTMLElement>('[data-sidebar="sidebar"]');
+	if (sidebar?.contains(document.activeElement)) {
+		const pane = document.querySelector<HTMLElement>("[data-pane][data-focused]");
+		(pane?.querySelector<HTMLElement>("textarea:not(:disabled)") ?? pane)?.focus();
+		return;
+	}
+	const row =
+		sidebar?.querySelector<HTMLElement>('[data-sidebar="menu-button"][data-active], [data-sidebar="menu-sub-button"][data-active]') ??
+		sidebar?.querySelector<HTMLElement>('[data-sidebar="menu-button"]');
+	row?.focus();
+}
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
 		<section className="m-auto max-w-lg space-y-3 p-8 text-sm">
@@ -56,19 +71,24 @@ export function App() {
 	const [rows, setRows] = useState(() => storedSplitRatio("rows"));
 	const maximized = layout.maximized && !settings;
 
-	// Popovers, menus, and the composer's lists take their Esc first and mark it handled.
-	useEffect(() => {
-		if (!maximized) return;
-		const onKeyDown = (event: KeyboardEvent): void => {
-			if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
-			if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+	const settingsHref = hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null);
+	const [toolsExpanded, setToolsExpanded] = useState(false);
+	const [shortcutsOpen, setShortcutsOpen] = useState(false);
+	useShortcuts({
+		help: () => setShortcutsOpen(open => !open),
+		tools: () => setToolsExpanded(expanded => !expanded),
+		sessions: toggleSessionsFocus,
+		settings: () => {
+			if (settings) show(layout);
+			else location.hash = settingsHref;
+		},
+		restore: () => {
+			if (!maximized) return false;
 			show({ ...layout, maximized: false });
-		};
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [maximized, layout, show]);
+		},
+	});
 
-	const paneContent = (pane: View, actions: ReactNode): ReactNode => {
+	const paneContent = (pane: View, focused: boolean, actions: ReactNode): ReactNode => {
 		const { items, completions } = state.panes.get(hashForView(pane)) ?? EMPTY_PANE;
 		const onFork = (itemId: string, point: ForkPoint) => fork(pane, itemId, point);
 		if (pane.kind === "past") {
@@ -104,6 +124,7 @@ export function App() {
 				onEnd={() => send({ t: "end", instanceId })}
 				onAnswer={(requestId, answer) => send({ t: "answer", instanceId, requestId, answer })}
 				actions={actions}
+				focused={focused}
 			/>
 		);
 	};
@@ -141,6 +162,7 @@ export function App() {
 					>
 						{paneContent(
 							pane,
+							index === layout.focus,
 							split && (
 								<>
 									<Button
@@ -186,16 +208,20 @@ export function App() {
 					connected={state.connected}
 					launch={state.launch}
 					defaultCwd={defaultCwd(view, state.hosts, state.past)}
-					settingsHref={hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null)}
+					settingsHref={settingsHref}
 					settingsOpen={settings !== null}
 					onOpen={open}
 					onLaunchOpen={setLaunchOpen}
 					onCreate={create}
+					onShowShortcuts={() => setShortcutsOpen(true)}
 				/>
 				<PlanUsageFooter usage={state.usage} />
 				<SidebarResizeHandle />
 			</Sidebar>
-			<SidebarInset>{main}</SidebarInset>
+			<SidebarInset>
+				<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
+			</SidebarInset>
+			<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 		</SidebarProvider>
 	);
 }

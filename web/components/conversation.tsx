@@ -1,5 +1,5 @@
 import { Brain } from "lucide-react";
-import { Fragment, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { createContext, Fragment, type ReactNode, useContext, useEffect, useId, useRef, useState } from "react";
 import type {
 	AgentRow,
 	CompletionItem,
@@ -31,6 +31,7 @@ import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import type { Fork } from "../use-dashboard";
 import { type ForkPoint, forkPoints, modelName, modelOrg, pullRequestUrl, sameView, type ToolItem, toBlocks } from "../view-model";
+import { useShortcuts } from "../shortcuts";
 import { completionTrigger } from "../completion-trigger";
 import { CompletionPopup } from "./completion-popup";
 import { ContextRing } from "./context-ring";
@@ -57,16 +58,21 @@ const NOTICE_TONE: Record<Extract<Item, { kind: "notice" }>["level"], string> = 
 	error: "text-red-600 dark:text-red-400",
 };
 
+/** Whether finished tool groups show their steps. The tools shortcut flips it for every pane. */
+export const ToolsExpanded = createContext(false);
+
 function ToolGroup({ tools }: { tools: ToolItem[] }) {
+	const expanded = useContext(ToolsExpanded);
 	const running = tools.some(tool => tool.status === "running");
 	const failed = tools.filter(tool => tool.status === "error").length;
-	// Open while running, closed once done; a manual toggle wins from then on.
-	const [userOpen, setUserOpen] = useState<boolean | null>(null);
+	// Open while running, else as `expanded` says; a manual toggle wins until `expanded` flips.
+	const [toggle, setToggle] = useState<{ open: boolean; expanded: boolean } | null>(null);
+	const open = toggle?.expanded === expanded ? toggle.open : running || expanded;
 	const header = running
 		? "Working"
 		: `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`;
 	return (
-		<ThinkingSteps open={userOpen ?? running} onOpenChange={setUserOpen} className="w-full max-w-2xl self-start">
+		<ThinkingSteps open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="w-full max-w-2xl self-start">
 			<ThinkingStepsHeader>{header}</ThinkingStepsHeader>
 			<ThinkingStepsContent>
 				{tools.map((tool, index) => (
@@ -333,6 +339,8 @@ interface ConversationProps {
 	onAnswer: (requestId: string, answer: UserAnswer) => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
+	/** Whether this is the focused pane, the one session shortcuts act on. */
+	focused: boolean;
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts, queues, and scroll reset per view. */
@@ -363,6 +371,7 @@ function LiveConversation({
 	onEnd,
 	onAnswer,
 	actions,
+	focused,
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const [draft, setDraft] = useState(initialDraft);
@@ -371,6 +380,7 @@ function LiveConversation({
 	const [active, setActive] = useState(0);
 	const nextId = useRef(0);
 	const composerRef = useRef<HTMLDivElement>(null);
+	const [modelsOpen, setModelsOpen] = useState(false);
 	const popupId = useId();
 
 	const suggestions = requestId !== null && completions?.reqId === requestId ? completions.items : [];
@@ -443,10 +453,15 @@ function LiveConversation({
 	const thinking = shown?.thinkingLevel ?? null;
 	// Collab rooms carry no model or thinking switch, so only sessions this dashboard started over RPC can change them.
 	const switchable = view.agentId === null && host?.source === "dashboard" && live ? host : null;
+	// The list refreshes on every open, whether a click or the model shortcut opened it.
+	const openModels = (open: boolean): void => {
+		setModelsOpen(open);
+		if (open) onListModels();
+	};
 	const modelSlot =
 		view.agentId !== null ? null : switchable ? (
 			<>
-				<ModelPicker current={shownModel} list={models} onOpen={onListModels} onPick={onSetModel} />
+				<ModelPicker current={shownModel} list={models} open={modelsOpen} onOpenChange={openModels} onPick={onSetModel} />
 				{switchable.thinkingLevels.length > 0 && <ThinkingPicker current={thinking} levels={switchable.thinkingLevels} onPick={onSetThinking} />}
 			</>
 		) : shownModel || thinking ? (
@@ -462,6 +477,32 @@ function LiveConversation({
 			</span>
 		) : null;
 	const contextSlot = view.agentId === null && shown?.context ? <ContextRing context={shown.context} /> : null;
+
+	const onComposerKey = useShortcuts(
+		focused
+			? {
+					interrupt: () => {
+						if (view.agentId !== null || !writable || !working) return false;
+						onAbort();
+					},
+					dequeue: () => {
+						const last = queue.at(-1);
+						if (!last) return false;
+						setQueue(queue.slice(0, -1));
+						setDraft(draft ? `${last.text}\n${draft}` : last.text);
+					},
+					model: () => {
+						if (!switchable) return false;
+						openModels(true);
+					},
+					thinking: () => {
+						const levels = switchable?.thinkingLevels ?? [];
+						if (levels.length === 0) return false;
+						onSetThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
+					},
+				}
+			: {},
+	);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
@@ -510,7 +551,8 @@ function LiveConversation({
 							}
 						},
 						onKeyDown: event => {
-							if (!popupOpen || event.nativeEvent.isComposing) return;
+							// The open completion list owns Esc and the arrows.
+							if (!popupOpen || event.nativeEvent.isComposing) return onComposerKey(event);
 							if (event.key === "Escape") {
 								event.preventDefault();
 								setRequestId(null);
