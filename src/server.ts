@@ -78,7 +78,10 @@ function rosterHosts(): RosterHost[] {
 			sessionName: host.sessionName,
 			cwd: host.cwd,
 			cwdDisplay: displayPath(host.cwd),
-			model: host.model ? `${host.model.provider}/${host.model.id}` : null,
+			// The room's status-line snapshot, else the registry row until the guest is welcomed.
+			model: guest?.state?.model ?? (host.model ? `${host.model.provider}/${host.model.id}` : null),
+			thinkingLevel: guest?.state?.thinkingLevel ?? null,
+			context: guest?.state?.context ?? null,
 			startedAt: host.startedAt,
 			participants: host.participants,
 			relayConnected: host.relayConnected,
@@ -97,6 +100,9 @@ function rosterHosts(): RosterHost[] {
 			cwd: session.cwd,
 			cwdDisplay: displayPath(session.cwd),
 			model: session.model,
+			thinkingLevel: session.thinkingLevel,
+			thinkingLevels: session.thinkingLevels,
+			context: session.context,
 			startedAt: session.startedAt,
 			status: session.status,
 			control: { phase: "live", readOnly: false },
@@ -369,6 +375,10 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 			return typeof instanceId === "string" && isObject(model) && typeof model.provider === "string" && typeof model.id === "string"
 				? { t: "set-model", instanceId, model: { provider: model.provider, id: model.id } } : null;
 		}
+		case "set-thinking": {
+			const { instanceId, level } = value;
+			return typeof instanceId === "string" && typeof level === "string" ? { t: "set-thinking", instanceId, level } : null;
+		}
 		default:
 			return null;
 	}
@@ -437,6 +447,11 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 		case "set-model":
 			dashboards.get(msg.instanceId)?.setModel(msg.model);
 			return;
+		case "set-thinking": {
+			const dashboard = dashboards.get(msg.instanceId);
+			if (dashboard?.thinkingLevels.includes(msg.level)) dashboard.setThinkingLevel(msg.level);
+			return;
+		}
 	}
 }
 

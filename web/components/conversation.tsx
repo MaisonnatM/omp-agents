@@ -1,3 +1,4 @@
+import { Brain } from "lucide-react";
 import { type ReactNode, useId, useRef, useState } from "react";
 import type { AgentRow, CompletionItem, ControlPhase, Item, LiveView, ModelOption, PastSession, RosterHost } from "../../src/shared";
 import { Button } from "@/components/ui/button";
@@ -18,10 +19,12 @@ import { cn } from "@/lib/utils";
 import { type ToolItem, toBlocks } from "../view-model";
 import { completionTrigger } from "../completion-trigger";
 import { CompletionPopup } from "./completion-popup";
+import { ContextRing } from "./context-ring";
 import { MessageMarkdown } from "./message-markdown";
 import { ModelPicker } from "./model-picker";
 import { hostLabel, pastLabel } from "./roster";
 import { statusLabel } from "./status-dot";
+import { ThinkingPicker } from "./thinking-picker";
 
 const CONTROL_LABEL: Record<ControlPhase["phase"], string> = {
 	connecting: "Connecting…",
@@ -169,6 +172,7 @@ interface ConversationProps {
 	models: { models: ModelOption[]; error: string | null } | null;
 	onListModels: () => void;
 	onSetModel: (model: ModelOption) => void;
+	onSetThinking: (level: string) => void;
 	onPrompt: (text: string) => void;
 	onAbort: () => void;
 	onEnd: () => void;
@@ -183,7 +187,7 @@ export function Conversation(props: ConversationProps) {
 	);
 }
 
-function LiveConversation({ view, host, lastHost, items, completions, onComplete, models, onListModels, onSetModel, onPrompt, onAbort, onEnd }: ConversationProps) {
+function LiveConversation({ view, host, lastHost, items, completions, onComplete, models, onListModels, onSetModel, onSetThinking, onPrompt, onAbort, onEnd }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const [draft, setDraft] = useState("");
 	const [queue, setQueue] = useState<QueuedMessage[]>([]);
@@ -255,15 +259,28 @@ function LiveConversation({ view, host, lastHost, items, completions, onComplete
 
 	const directCommand = draft.startsWith("$") ? "Python" : draft.startsWith("!") ? "shell" : null;
 	const shownModel = shown?.model ?? null;
-	// Collab rooms carry no model switch, so only sessions this dashboard started over RPC can change it.
+	const thinking = shown?.thinkingLevel ?? null;
+	// Collab rooms carry no model or thinking switch, so only sessions this dashboard started over RPC can change them.
+	const switchable = view.agentId === null && host?.source === "dashboard" && live ? host : null;
 	const modelSlot =
-		view.agentId !== null ? null : host?.source === "dashboard" && live ? (
-			<ModelPicker current={shownModel} list={models} onOpen={onListModels} onPick={onSetModel} />
-		) : shownModel ? (
-			<span className="truncate px-2 text-xs text-muted-foreground" title="Switch this session's model from its omp terminal.">
-				{shownModel.slice(shownModel.indexOf("/") + 1)}
+		view.agentId !== null ? null : switchable ? (
+			<>
+				<ModelPicker current={shownModel} list={models} onOpen={onListModels} onPick={onSetModel} />
+				{switchable.thinkingLevels.length > 0 && <ThinkingPicker current={thinking} levels={switchable.thinkingLevels} onPick={onSetThinking} />}
+			</>
+		) : shownModel || thinking ? (
+			<span className="flex min-w-0 items-center gap-3 px-2 text-xs text-muted-foreground" title="Switch this session's model and thinking level from its omp terminal.">
+				{shownModel && <span className="truncate">{shownModel.slice(shownModel.indexOf("/") + 1)}</span>}
+				{thinking && (
+					<span className="flex shrink-0 items-center gap-1">
+						<Brain aria-hidden="true" className="size-3.5" />
+						<span className="sr-only">Thinking level:</span>
+						{thinking}
+					</span>
+				)}
 			</span>
 		) : null;
+	const contextSlot = view.agentId === null && shown?.context ? <ContextRing context={shown.context} /> : null;
 	return (
 		<div className="flex h-svh min-h-0 flex-1 flex-col">
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
@@ -327,6 +344,7 @@ function LiveConversation({ view, host, lastHost, items, completions, onComplete
 						}
 					}}
 					leftSlot={modelSlot}
+					rightSlot={contextSlot}
 					placeholder={placeholder}
 					disabled={!writable}
 					// Session prompts sent mid-turn queue until the turn ends; Stop interrupts it.

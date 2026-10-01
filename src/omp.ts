@@ -87,6 +87,10 @@ export interface RpcState {
 	sessionFile?: string;
 	sessionName?: string;
 	model?: { provider: string; id: string };
+	/** omp's `ThinkingLevel`. */
+	thinkingLevel?: string;
+	/** omp's `ContextUsage`: estimated tokens in the context window. */
+	contextUsage?: { tokens: number; contextWindow: number };
 }
 /** Subset of omp's `RpcSubagentSnapshot` this app reads. */
 export interface RpcSubagent {
@@ -107,6 +111,9 @@ export interface RpcClient {
 	/** omp's `ModelInfo` carries more fields; this app reads the selector parts. */
 	getAvailableModels(): Promise<{ provider: string; id: string }[]>;
 	setModel(provider: string, modelId: string): Promise<{ provider: string; id: string }>;
+	/** Levels the live model accepts, `off` first. */
+	getAvailableThinkingLevels(): Promise<string[]>;
+	setThinkingLevel(level: string): Promise<void>;
 	setSubagentSubscription(level: "progress"): Promise<string>;
 	getSubagents(): Promise<RpcSubagent[]>;
 	onSessionEvent(listener: (event: Frame) => void): () => void;

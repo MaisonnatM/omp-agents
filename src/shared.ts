@@ -28,6 +28,10 @@ interface RosterHostBase {
 	/** `cwd` with the home directory shortened to `~`. */
 	cwdDisplay: string;
 	model: string | null;
+	/** omp's thinking level (`off`, `low`, … `xhigh`), or `null` before the session reports one. */
+	thinkingLevel: string | null;
+	/** How full the context window is, or `null` before the session reports it. */
+	context: ContextUsage | null;
 	startedAt: number;
 	status: HostStatus;
 	control: ControlPhase;
@@ -38,8 +42,14 @@ export type RosterHost = RosterHostBase &
 	(
 		| { source: "terminal"; participants: number; relayConnected: boolean }
 		/** Started by this dashboard, which can end it. */
-		| { source: "dashboard" }
+		| { source: "dashboard"; thinkingLevels: string[] }
 	);
+
+/** Context-window occupancy as omp's status line counts it. */
+export interface ContextUsage {
+	tokens: number;
+	window: number;
+}
 
 /** A session that has no live host, read from its file on disk. */
 export interface PastSession {
@@ -156,5 +166,7 @@ export type ClientMsg =
 	| { t: "list-models"; instanceId: string }
 	/** Switch a session this dashboard started to another model. */
 	| { t: "set-model"; instanceId: string; model: ModelOption }
+	/** Switch a session this dashboard started to another thinking level, one of its `thinkingLevels`. */
+	| { t: "set-thinking"; instanceId: string; level: string }
 	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
 	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number };
