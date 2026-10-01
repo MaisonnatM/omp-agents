@@ -7,7 +7,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { OmpFileKind, RetrySettings } from "./shared";
-import { oneLine } from "./transcript";
+import { isObject, oneLine } from "./transcript";
 
 export type Access = "view" | "control";
 
@@ -143,16 +143,25 @@ export interface RpcClient {
 	onSubagentLifecycle(listener: (payload: unknown) => void): () => void;
 	onSubagentProgress(listener: (payload: unknown) => void): () => void;
 }
-/** omp's `ptree.ChildProcess`: what `RpcClient` drives; this app reads its pid and waits for it to exit. */
+/** omp's `RpcAgentProcess` (src/modes/rpc/rpc-client.ts): the transport `RpcClient` drives, which `ptree.ChildProcess` implements. */
 interface RpcProcess {
 	readonly pid: number;
 	readonly exited: Promise<number>;
+	readonly stdin: { write(data: string): unknown; flush?(): unknown };
+	readonly stdout: ReadableStream<Uint8Array>;
+	peekStderr(): string;
+	kill(reason?: unknown, graceMs?: number): void;
 }
 interface RpcClientModule {
-	RpcClient: new (options: { spawn: (agentArgs: string[]) => RpcProcess }) => RpcClient;
+	RpcClient: new (options: { spawn: (agentArgs: string[]) => RpcProcess; args: string[] }) => RpcClient;
+}
+interface RpcFrameModule {
+	/** Reassembles protocol v2 chunk frames from parsed JSONL lines. */
+	RpcFrameDecoder: new () => { push(value: unknown): object | undefined };
 }
 interface UtilsModule {
 	ptree: { spawn(cmd: string[], options: { cwd: string; stdin: "pipe" }): RpcProcess };
+	readJsonl(stream: ReadableStream<Uint8Array>): AsyncGenerator<unknown>;
 }
 
 /** A session file on disk, newest first in {@link listSessionFiles}. */
@@ -413,6 +422,7 @@ export const COLLAB_PROTO = protocol.COLLAB_PROTO;
 export const listHosts = registry.listCollabHosts;
 
 const rpc = (await import(join(packageDir, "src", "modes", "rpc", "rpc-client.ts"))) as RpcClientModule;
+const rpcFrames = (await import(join(packageDir, "src", "modes", "rpc", "rpc-frame.ts"))) as RpcFrameModule;
 const utils = (await import(join(dirname(packageDir), "pi-utils", "src", "index.ts"))) as UtilsModule;
 const dirs = (await import(join(dirname(packageDir), "pi-utils", "src", "dirs.ts"))) as DirsModule;
 
@@ -452,24 +462,68 @@ export interface RpcChild {
 	pid: number;
 	/** Settles when the process is gone, however it ended. */
 	exited: Promise<unknown>;
+	/** Write an `extension_ui_response` (or any frame `RpcClient` has no method for) to omp's stdin. */
+	write(frame: object): void;
+}
+
+/**
+ * omp's `RpcClient` parses `extension_ui_request` frames but hands them only to its own login
+ * flow, so this reads a copy of omp's stdout for them, through omp's own JSONL reader and chunk decoder.
+ */
+async function readUiRequests(stdout: ReadableStream<Uint8Array>, onUiRequest: (frame: Record<string, unknown>) => void): Promise<void> {
+	const decoder = new rpcFrames.RpcFrameDecoder();
+	try {
+		for await (const line of utils.readJsonl(stdout)) {
+			const frame = decoder.push(line);
+			if (isObject(frame) && frame.type === "extension_ui_request") onUiRequest(frame);
+		}
+	} catch {
+		// The client reads the other copy and reports a broken stream.
+	}
 }
 
 /**
  * Start this same package's CLI in RPC mode (NDJSON over stdio) in `cwd`, through
- * omp's own `RpcClient`. Resolves once omp reports ready.
+ * omp's own `RpcClient`. Resolves once omp reports ready. `onUiRequest` gets every
+ * `extension_ui_request` frame from spawn on, so a dialog raised while the session opens is not lost.
  */
-export async function startRpc(cwd: string): Promise<RpcChild> {
+export async function startRpc(cwd: string, onUiRequest: (frame: Record<string, unknown>) => void): Promise<RpcChild> {
 	let child: RpcProcess | undefined;
 	const client = new rpc.RpcClient({
+		// `rpc-ui` routes tool dialogs such as `ask` over the protocol; under plain `rpc` omp offers no `ask` tool.
+		// omp reads the last `--mode`, and `RpcClient` puts `--mode rpc` first.
+		args: ["--mode", "rpc-ui"],
 		spawn: agentArgs => {
-			child = utils.ptree.spawn([...ompCommand, ...agentArgs], { cwd, stdin: "pipe" });
-			return child;
+			const proc = utils.ptree.spawn([...ompCommand, ...agentArgs], { cwd, stdin: "pipe" });
+			const [forClient, forDialogs] = proc.stdout.tee();
+			void readUiRequests(forDialogs, onUiRequest);
+			child = proc;
+			// ptree's ChildProcess keeps its state in private fields, so the copy forwards to it rather than inheriting.
+			return {
+				pid: proc.pid,
+				exited: proc.exited,
+				stdin: proc.stdin,
+				stdout: forClient,
+				peekStderr: () => proc.peekStderr(),
+				kill: (signal, graceMs) => proc.kill(signal, graceMs),
+			};
 		},
 	});
 	await client.start();
 	if (!child) throw new Error("omp RPC client started without spawning a process");
-	// ptree rejects `exited` for a killed child.
-	return { client, pid: child.pid, exited: child.exited.catch(() => undefined) };
+	const { stdin } = child;
+	return {
+		client,
+		pid: child.pid,
+		// ptree rejects `exited` for a killed child.
+		exited: child.exited.catch(() => undefined),
+		write: frame => {
+			// One synchronous line, as `RpcClient` writes its own, so frames never interleave.
+			stdin.write(`${JSON.stringify(frame)}\n`);
+			// A failed flush means the process is gone, which `exited` reports.
+			Promise.resolve(stdin.flush?.()).catch(() => {});
+		},
+	};
 }
 
 export function linkErrorCode(err: unknown): LinkErrorCode | null {

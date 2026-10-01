@@ -65,6 +65,7 @@ export function App() {
 				onPrompt={text => send({ t: "prompt", view, text })}
 				onAbort={() => send({ t: "abort", instanceId: view.instanceId })}
 				onEnd={() => send({ t: "end", instanceId: view.instanceId })}
+				onAnswer={(requestId, answer) => send({ t: "answer", instanceId: view.instanceId, requestId, answer })}
 			/>
 		);
 	} else if (view?.kind === "past") {

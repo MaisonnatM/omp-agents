@@ -10,6 +10,7 @@ import type {
 	PastSession,
 	PullRequest,
 	RosterHost,
+	UserAnswer,
 } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
@@ -38,6 +39,7 @@ import { OrgIcon } from "./org-icon";
 import { hostLabel, pastLabel, projectName } from "./roster";
 import { statusLabel } from "./status-dot";
 import { ThinkingPicker } from "./thinking-picker";
+import { UserRequestCard } from "./user-request";
 
 const CONTROL_LABEL: Record<ControlPhase["phase"], string> = {
 	connecting: "Connecting…",
@@ -320,6 +322,7 @@ interface ConversationProps {
 	onPrompt: (text: string) => void;
 	onAbort: () => void;
 	onEnd: () => void;
+	onAnswer: (requestId: string, answer: UserAnswer) => void;
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts, queues, and scroll reset per view. */
@@ -348,6 +351,7 @@ function LiveConversation({
 	onPrompt,
 	onAbort,
 	onEnd,
+	onAnswer,
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const [draft, setDraft] = useState(initialDraft);
@@ -391,6 +395,8 @@ function LiveConversation({
 	const live = phase.phase === "live" && !phase.readOnly;
 	const writable = live && (view.agentId === null || agent?.canMessage === true);
 	const working = view.agentId === null ? host?.status === "working" : agent?.status === "running";
+	// Questions belong to the session's main agent, and only a writer can answer them.
+	const requests = view.agentId === null && live && host ? host.requests : [];
 
 	let status = CONTROL_LABEL[phase.phase];
 	if (phase.phase === "live") {
@@ -461,6 +467,14 @@ function LiveConversation({
 			</Header>
 			<Transcript items={items} working={working === true} fork={fork} onFork={onFork} />
 			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
+				{requests[0] && (
+					<UserRequestCard
+						key={requests[0].id}
+						request={requests[0]}
+						queued={requests.length - 1}
+						onAnswer={answer => onAnswer(requests[0].id, answer)}
+					/>
+				)}
 				{popupOpen && (
 					<CompletionPopup id={popupId} items={suggestions} active={Math.min(active, suggestions.length - 1)}
 						error={completions?.reqId === requestId ? completions.error : null} onPick={pick} />
