@@ -156,8 +156,6 @@ export function App() {
 						className={cn(
 							"relative flex min-h-0 min-w-0 flex-col bg-background outline-none",
 							maximized && (index === layout.focus ? "z-10" : "invisible"),
-							split && !maximized && index === layout.focus &&
-								"after:pointer-events-none after:absolute after:inset-0 after:z-20 after:ring-2 after:ring-inset after:ring-[color:var(--focus-ring)]",
 						)}
 					>
 						{paneContent(
