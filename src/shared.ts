@@ -105,15 +105,6 @@ export interface CompletionItem {
 	cursor: number;
 }
 
-/** One `/` or `@` suggestion, with the composer text and caret it produces when accepted (omp's own insertion). */
-export interface CompletionItem {
-	kind: "command" | "skill" | "file" | "directory";
-	label: string;
-	description: string | null;
-	text: string;
-	cursor: number;
-}
-
 /** One quota window of a provider plan. */
 export interface PlanWindow {
 	/** Short name: the window id (`5h`, `7d`, `monthly`) plus its model tier, else omp's label when that is ambiguous. */
@@ -137,6 +128,65 @@ export interface PlanUsage {
 export interface ModelOption {
 	provider: string;
 	id: string;
+}
+
+/** A model role: the selector omp uses for it and the fallbacks it walks after that selector, in order. */
+export interface RoleRoute {
+	role: string;
+	/** `null` when only a fallback chain names the role. */
+	primary: string | null;
+	fallbacks: string[];
+	/** The role has no chain of its own, so omp walks the `default` chain. */
+	inheritsDefault: boolean;
+}
+
+/** A chain keyed by a model selector or a `provider/*` wildcard. It applies whenever that model is active, whatever the role. */
+export interface ModelChain {
+	key: string;
+	fallbacks: string[];
+}
+
+/** omp's `retry.*` settings, defaults filled in. */
+export interface RetrySettings {
+	enabled: boolean;
+	maxRetries: number;
+	baseDelayMs: number;
+	maxDelayMs: number;
+	waitForUsageReset: boolean;
+	modelFallback: boolean;
+	usageAwareFallback: boolean;
+	usageReservePct: number;
+	usageReservePolicy: string;
+	fallbackRevertPolicy: string;
+}
+
+export interface ModelRouting {
+	roles: RoleRoute[];
+	modelChains: ModelChain[];
+	retry: RetrySettings;
+	modelProviderOrder: string[];
+}
+
+/** What a file feeds into omp: instructions, settings, or something it can run. */
+export type OmpFileKind = "context" | "system-prompt" | "append-system" | "settings" | "agent" | "command" | "rule" | "skill" | "hook";
+
+/** A file omp reads, as found on disk. */
+export interface OmpFile {
+	kind: OmpFileKind;
+	scope: "user" | "project";
+	path: string;
+	/** `path` with the home directory shortened to `~`. */
+	pathDisplay: string;
+	body: { state: "read"; size: number; modifiedAt: number; text: string } | { state: "missing" } | { state: "unreadable"; error: string };
+}
+
+/** `GET /api/settings`: omp's model routing and files, as a session in `cwd` would load them. */
+export interface OmpSettings {
+	/** The workspace whose project files and settings are included; `null` for user-level only. */
+	cwd: string | null;
+	/** `error` is omp's reason when it cannot load the settings, for example a malformed `config.yml`. */
+	routing: ModelRouting | { error: string };
+	files: OmpFile[];
 }
 
 export type ServerMsg =
@@ -175,5 +225,3 @@ export type ClientMsg =
 	| { t: "set-model"; instanceId: string; model: ModelOption }
 	/** Switch a session this dashboard started to another thinking level, one of its `thinkingLevels`. */
 	| { t: "set-thinking"; instanceId: string; level: string }
-	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
-	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number };

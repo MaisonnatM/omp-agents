@@ -1,5 +1,5 @@
 /** Pure transforms from server messages to what the page renders. */
-import type { AgentRow, Item, PastSession, RosterHost, View } from "../src/shared";
+import type { AgentRow, Item, OmpFile, OmpFileKind, PastSession, RosterHost, View } from "../src/shared";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
 
@@ -13,14 +13,30 @@ export interface AgentNode {
 }
 
 const PAST_PREFIX = "past/";
+const SETTINGS = "settings";
+
+/** Where the settings page reads project files and config from; `null` for user-level only. */
+export interface SettingsRoute {
+	cwd: string | null;
+}
+
+/** `#settings` opens the settings page, `#settings/<cwd>` with that workspace's project files and config. */
+export function settingsFromHash(hash: string): SettingsRoute | null {
+	const raw = hash.replace(/^#/, "");
+	if (raw === SETTINGS) return { cwd: null };
+	return raw.startsWith(`${SETTINGS}/`) ? { cwd: decodeURIComponent(raw.slice(SETTINGS.length + 1)) } : null;
+}
+
+export const hashForSettings = (cwd: string | null): string =>
+	cwd === null ? `#${SETTINGS}` : `#${SETTINGS}/${encodeURIComponent(cwd)}`;
 
 /**
  * `#<instanceId>` selects a live session, `#<instanceId>/<agentId>` one of its subagents,
- * and `#past/<sessionId>` a past session. Instance ids are hex, so none reads as `past`.
+ * and `#past/<sessionId>` a past session. Instance ids are hex, so none reads as `past` or `settings`.
  */
 export function viewFromHash(hash: string): View | null {
 	const raw = hash.replace(/^#/, "");
-	if (!raw) return null;
+	if (!raw || settingsFromHash(hash)) return null;
 	if (raw.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(raw.slice(PAST_PREFIX.length)) };
 	const slash = raw.indexOf("/");
 	if (slash < 0) return { kind: "live", instanceId: decodeURIComponent(raw), agentId: null };
@@ -53,6 +69,37 @@ export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSes
 	// Sessions from old omp versions recorded no directory.
 	const candidates = [open, newestHost, ...past].map(row => row?.cwdDisplay).filter(Boolean);
 	return candidates[0] ?? "~";
+}
+
+/** Directories sessions ran in, live ones first, then past ones newest first. The settings page reads a workspace from one. */
+export function workspaces(hosts: RosterHost[], past: PastSession[]): { cwd: string; cwdDisplay: string }[] {
+	const byCwd = new Map<string, string>();
+	for (const row of [...hosts.toSorted((a, b) => b.startedAt - a.startedAt), ...past]) {
+		// Sessions from old omp versions recorded no directory.
+		if (row.cwd && !byCwd.has(row.cwd)) byCwd.set(row.cwd, row.cwdDisplay);
+	}
+	return [...byCwd].map(([cwd, cwdDisplay]) => ({ cwd, cwdDisplay }));
+}
+
+/** Settings page file groups, in the order the page lists them. */
+export const FILE_KIND_LABELS: Record<OmpFileKind, string> = {
+	context: "Context",
+	"system-prompt": "System prompt",
+	"append-system": "Appended system prompt",
+	settings: "Settings",
+	agent: "Agents",
+	command: "Commands",
+	rule: "Rules",
+	skill: "Skills",
+	hook: "Hooks",
+};
+
+/** Files by kind in {@link FILE_KIND_LABELS} order, user files before project files; kinds without files left out. */
+export function fileGroups(files: OmpFile[]): [OmpFileKind, OmpFile[]][] {
+	return (Object.keys(FILE_KIND_LABELS) as OmpFileKind[]).flatMap((kind): [OmpFileKind, OmpFile[]][] => {
+		const group = files.filter(file => file.kind === kind).toSorted((a, b) => (a.scope === b.scope ? 0 : a.scope === "user" ? -1 : 1));
+		return group.length ? [[kind, group]] : [];
+	});
 }
 
 /** A model selector without its provider, router org, or the `claude-` prefix: `anthropic/claude-opus-5-5` reads `opus-5-5`. */

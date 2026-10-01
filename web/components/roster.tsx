@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { useState } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,9 @@ interface RosterProps {
 	connected: boolean;
 	launch: Launch;
 	defaultCwd: string;
+	/** The settings page, for the open session's workspace. */
+	settingsHref: string;
+	settingsOpen: boolean;
 	onSelect: (view: View) => void;
 	onLaunchOpen: (open: boolean) => void;
 	onCreate: (cwd: string) => void;
@@ -106,6 +109,8 @@ export function Roster({
 	connected,
 	launch,
 	defaultCwd,
+	settingsHref,
+	settingsOpen,
 	onSelect,
 	onLaunchOpen,
 	onCreate,
@@ -113,9 +118,16 @@ export function Roster({
 	const [runningOpen, setRunningOpen] = useState(true);
 	return (
 		<>
-			<SidebarHeader className="flex-row items-baseline justify-between px-4 pt-4">
+			<SidebarHeader className="flex-row items-center justify-between px-4 pt-4">
 				<h1 className="text-sm font-semibold">omp sessions</h1>
-				<span className="text-xs text-muted-foreground">{ompVersion ? `omp v${ompVersion}` : ""}</span>
+				<span className="flex items-center gap-1 text-xs text-muted-foreground">
+					{ompVersion ? `omp v${ompVersion}` : ""}
+					<Button asChild variant="ghost" size="icon-compact" active={settingsOpen}>
+						<a href={settingsHref} title="Settings" aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
+							<Settings />
+						</a>
+					</Button>
+				</span>
 			</SidebarHeader>
 			{!connected && (
 				<p className="mx-3 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
