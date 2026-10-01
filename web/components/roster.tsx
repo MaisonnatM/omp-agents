@@ -147,7 +147,7 @@ export function Roster({
 									size="lg"
 									isActive={view?.kind === "live" && view.instanceId === host.instanceId && view.agentId === null}
 									onClick={() => onSelect({ kind: "live", instanceId: host.instanceId, agentId: null })}
-									title={`${host.cwd}\npid ${host.pid} · ${host.participants} participants${host.relayConnected ? "" : " · relay offline"}`}
+									title={`${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
 								>
 									<StatusDot status={host.status} />
 									<span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -156,7 +156,12 @@ export function Roster({
 											<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
 										</span>
 										<span className="truncate text-xs text-muted-foreground">
-											{[host.cwdDisplay, host.model ?? "no model", statusLabel(host.status), !host.relayConnected && "relay offline"]
+											{[
+												host.cwdDisplay,
+												host.model ?? "no model",
+												statusLabel(host.status),
+												host.source === "terminal" && !host.relayConnected && "relay offline",
+											]
 												.filter(Boolean)
 												.join(" · ")}
 										</span>

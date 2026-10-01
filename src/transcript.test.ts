@@ -1,45 +1,82 @@
 import { describe, expect, test } from "bun:test";
 import { Transcript } from "./transcript";
 
-const assistant = (content: unknown[], extra: Record<string, unknown> = {}) => ({ role: "assistant", content, ...extra });
-const collabPrompt = { role: "custom", customType: "collab-prompt", content: "reply with the word pong", details: { from: "probe" } };
+const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({
+	role: "assistant",
+	timestamp,
+	content,
+	...extra,
+});
+const text = (value: string) => ({ type: "text", text: value });
 
 describe("Transcript", () => {
-	test("renders a guest prompt and the streamed reply as omp 18.4 sends them", () => {
+	test("a streamed reply is replaced in place by its file entry, and later events cannot undo it", () => {
 		const t = new Transcript();
-		t.applyEvent({ type: "agent_start" });
-		t.applyEvent({ type: "message_start", message: collabPrompt });
-		t.applyEvent({ type: "message_end", message: collabPrompt });
-		t.applyEvent({ type: "message_start", message: assistant([]) });
+		t.applyEntry({ type: "message", id: "e1", message: { role: "user", timestamp: 100, content: "say pong" } });
+		t.applyEvent({ type: "message_start", message: assistant(200, []) });
 		const streaming = t.applyEvent({
 			type: "message_update",
-			assistantMessageEvent: { type: "text_delta", delta: "po", partial: assistant([{ type: "text", text: "po" }]) },
+			assistantMessageEvent: { type: "text_delta", delta: "po", partial: assistant(200, [text("po")]) },
 		});
-		expect(streaming).toEqual([{ id: "live2:0", kind: "assistant", text: "po", streaming: true }]);
-		t.applyEvent({ type: "message_end", message: assistant([{ type: "text", text: "pong" }], { stopReason: "stop" }) });
+		expect(streaming).toEqual([{ id: "m200:0", kind: "assistant", text: "po", streaming: true }]);
 
+		t.applyEntry({ type: "message", id: "e2", message: assistant(200, [text("pong")], { stopReason: "stop" }) });
+		// The relay delivers the last update after the local file already has the message.
+		const late = t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant(200, [text("pon")]) } });
+
+		expect(late).toEqual([]);
 		expect(t.items()).toEqual([
-			{ id: "live1", kind: "user", text: "reply with the word pong", from: "probe" },
-			{ id: "live2:0", kind: "assistant", text: "pong", streaming: false },
+			{ id: "m100", kind: "user", text: "say pong", from: null },
+			{ id: "m200:0", kind: "assistant", text: "pong", streaming: false },
 		]);
 	});
 
-	test("an update without its start (joined mid-turn) still renders and ends", () => {
+	test("a collab prompt renders from its file entry only: the entry carries no message timestamp to merge on", () => {
 		const t = new Transcript();
-		t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant([{ type: "text", text: "half" }]) } });
-		t.applyEvent({ type: "message_end", message: assistant([{ type: "text", text: "half done" }]) });
-		expect(t.items()).toEqual([{ id: "live1:0", kind: "assistant", text: "half done", streaming: false }]);
+		const prompt = { role: "custom", customType: "collab-prompt", timestamp: 300, content: "hi", details: { from: "probe" } };
+		expect(t.applyEvent({ type: "message_start", message: prompt })).toEqual([]);
+		t.applyEntry({ type: "custom_message", id: "e3", customType: "collab-prompt", content: "hi", details: { from: "probe" } });
+		expect(t.items()).toEqual([{ id: "e3", kind: "user", text: "hi", from: "probe" }]);
 	});
 
-	test("a tool call merges its content block, execution events, and result into one item", () => {
+	test("a fresh session's first prompt shows at once and stays ahead of its reply when the file catches up", () => {
+		const t = new Transcript();
+		const prompt = { role: "user", timestamp: 600, content: "say pong" };
+		t.applyEvent({ type: "message_end", message: prompt });
+		t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant(610, [text("po")]) } });
+		expect(t.takeReordered()).toBe(false);
+
+		// omp writes the prompt to a new session file only together with the finished reply.
+		const reply = assistant(610, [text("pong")], { stopReason: "stop" });
+		t.applyEntry({ type: "message", id: "e1", message: prompt });
+		t.applyEntry({ type: "message", id: "e2", message: reply });
+		t.applyEvent({ type: "notice", level: "info", message: "Saved." });
+
+		expect(t.items().map(item => item.id)).toEqual(["m600", "m610:0", "notice1"]);
+		expect(t.items()[1]).toEqual({ id: "m610:0", kind: "assistant", text: "pong", streaming: false });
+	});
+
+	test("a prompt that reaches the file after its streamed reply moves ahead of it and asks for a reset", () => {
+		const t = new Transcript();
+		t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant(610, [text("po")]) } });
+		expect(t.takeReordered()).toBe(false);
+
+		t.applyEntry({ type: "custom_message", id: "e1", customType: "collab-prompt", content: "say pong", timestamp: new Date(600).toISOString() });
+
+		expect(t.takeReordered()).toBe(true);
+		expect(t.takeReordered()).toBe(false);
+		expect(t.items().map(item => item.id)).toEqual(["e1", "m610:0"]);
+	});
+
+	test("a tool call merges its content block, execution events, and result; a late start cannot reopen it", () => {
 		const t = new Transcript();
 		const call = { type: "toolCall", id: "c1", name: "bash", arguments: { command: "sleep 30 && echo done" } };
-		t.applyEvent({ type: "message_start", message: assistant([call]) });
-		t.applyEvent({ type: "message_end", message: assistant([call], { stopReason: "toolUse" }) });
+		t.applyEntry({ type: "message", id: "e1", message: assistant(400, [call], { stopReason: "toolUse" }) });
 		t.applyEvent({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: call.arguments });
-		t.applyEvent({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", isError: true });
-		// A later replay of the same content block must not resurrect the call as running.
-		t.applyEvent({ type: "message_end", message: assistant([call]) });
+		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "running" }]);
+
+		t.applyEntry({ type: "message", id: "e2", message: { role: "toolResult", timestamp: 401, toolCallId: "c1", toolName: "bash", isError: true } });
+		t.applyEvent({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: call.arguments });
 
 		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "error" }]);
 	});
@@ -47,7 +84,7 @@ describe("Transcript", () => {
 	test("a subagent's yield shows its answer, not the payload type", () => {
 		const t = new Transcript();
 		const call = { type: "toolCall", id: "y1", name: "yield", arguments: { type: "result", data: "done banana" } };
-		t.applyEntry({ type: "message", id: "e1", message: assistant([call], { stopReason: "toolUse" }) });
+		t.applyEntry({ type: "message", id: "e1", message: assistant(500, [call], { stopReason: "toolUse" }) });
 		expect(t.items()).toEqual([{ id: "tool:y1", kind: "tool", name: "yield", summary: "done banana", status: "running" }]);
 	});
 
@@ -58,22 +95,23 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([{ id: "tool:c2", kind: "tool", name: "bash", summary: "sleep 40", status: "error" }]);
 	});
 
-	test("snapshot entries render prompts, replies, and settled tool calls; other custom messages stay hidden", () => {
+	test("file lines render prompts, replies, and settled tool calls; other custom messages stay hidden", () => {
 		const t = new Transcript();
-		const entries = [
+		const lines = [
 			{ type: "model_change", id: "e0", model: "anthropic/claude-opus-5-5" },
-			{ type: "message", id: "e1", message: { role: "user", content: [{ type: "text", text: "list files" }] } },
+			{ type: "message", id: "e1", message: { role: "user", timestamp: 1, content: [text("list files")] } },
 			{ type: "custom_message", id: "e2", customType: "skill-injection", content: "secret", display: true },
-			{ type: "message", id: "e3", message: assistant([{ type: "toolCall", id: "c9", name: "read", arguments: { path: "." }, intent: "Listing files" }]) },
-			{ type: "message", id: "e4", message: { role: "toolResult", toolCallId: "c9", toolName: "read", content: [], isError: false } },
-			{ type: "message", id: "e5", message: assistant([{ type: "text", text: "README.md" }], { stopReason: "stop" }) },
-		];
-		for (const entry of entries) t.applyEntry(entry);
+			{ type: "message", id: "e3", message: assistant(2, [{ type: "toolCall", id: "c9", name: "read", arguments: { path: "." }, intent: "Listing files" }]) },
+			{ type: "message", id: "e4", message: { role: "toolResult", timestamp: 3, toolCallId: "c9", toolName: "read", content: [], isError: false } },
+			{ type: "message", id: "e5", message: assistant(4, [text("README.md")], { stopReason: "aborted" }) },
+		].map(line => JSON.stringify(line));
+		t.applyLines([...lines, "{not json", ""]);
 
 		expect(t.items()).toEqual([
-			{ id: "e1", kind: "user", text: "list files", from: null },
+			{ id: "m1", kind: "user", text: "list files", from: null },
 			{ id: "tool:c9", kind: "tool", name: "read", summary: "Listing files", status: "ok" },
-			{ id: "e5:0", kind: "assistant", text: "README.md", streaming: false },
+			{ id: "m4:0", kind: "assistant", text: "README.md", streaming: false },
+			{ id: "m4:stop", kind: "notice", level: "warning", text: "Interrupted." },
 		]);
 	});
 });

@@ -1,7 +1,7 @@
 /**
- * Loads the collab and session-listing modules shipped inside the installed
- * omp package so this app speaks the exact protocol, crypto, registry, and
- * session-file code of the omp version that is running the sessions.
+ * Loads the collab, session-listing, and RPC modules shipped inside the installed
+ * omp package so this app speaks the exact protocol, crypto, registry, session-file,
+ * and RPC code of the omp version that is running the sessions.
  */
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -76,8 +76,54 @@ interface ListingModule {
 	listAllSessions(): Promise<SessionInfo[]>;
 	isEmptySession(session: SessionInfo): boolean;
 }
+interface DirsModule {
+	getSessionsDir(): string;
+}
 
-/** A session file on disk, newest first in {@link listSavedSessions}. */
+/** Subset of omp's `RpcSessionState` (src/modes/rpc/rpc-types.ts) this app reads. */
+export interface RpcState {
+	sessionId: string;
+	/** Where the session will write; the file appears with its first message. */
+	sessionFile?: string;
+	sessionName?: string;
+	model?: { provider: string; id: string };
+}
+/** Subset of omp's `RpcSubagentSnapshot` this app reads. */
+export interface RpcSubagent {
+	id: string;
+	agent: string;
+	/** omp's `AgentProgress["status"]`. */
+	status: string;
+	description?: string;
+	sessionFile?: string;
+}
+/** Subset of omp's `RpcClient` (src/modes/rpc/rpc-client.ts). */
+export interface RpcClient {
+	start(): Promise<void>;
+	stop(): Promise<void>;
+	getState(): Promise<RpcState>;
+	prompt(message: string, images?: undefined, streamingBehavior?: "steer" | "followUp"): Promise<string>;
+	abort(): Promise<void>;
+	setSubagentSubscription(level: "progress"): Promise<string>;
+	getSubagents(): Promise<RpcSubagent[]>;
+	onSessionEvent(listener: (event: Frame) => void): () => void;
+	/** Payloads are the `task:subagent:lifecycle` / `task:subagent:progress` bus payloads. */
+	onSubagentLifecycle(listener: (payload: unknown) => void): () => void;
+	onSubagentProgress(listener: (payload: unknown) => void): () => void;
+}
+/** omp's `ptree.ChildProcess`: what `RpcClient` drives; this app reads its pid and waits for it to exit. */
+interface RpcProcess {
+	readonly pid: number;
+	readonly exited: Promise<number>;
+}
+interface RpcClientModule {
+	RpcClient: new (options: { spawn: (agentArgs: string[]) => RpcProcess }) => RpcClient;
+}
+interface UtilsModule {
+	ptree: { spawn(cmd: string[], options: { cwd: string; stdin: "pipe" }): RpcProcess };
+}
+
+/** A session file on disk, newest first in {@link listSessionFiles}. */
 export interface SavedSession {
 	id: string;
 	path: string;
@@ -85,6 +131,71 @@ export interface SavedSession {
 	/** The session's title, else its first prompt as one line. */
 	title: string | null;
 	modifiedAt: number;
+	/** A 0-turn stub, which omp's own picker hides. */
+	empty: boolean;
+}
+
+/** Subset of pi-tui's `AutocompleteItem` (pi-tui/src/autocomplete.ts). */
+export interface AutocompleteItem {
+	value: string;
+	label: string;
+	description?: string;
+}
+/** pi-tui's `CombinedAutocompleteProvider`: omp's own `/` and `@` completion. */
+export interface AutocompleteProvider {
+	getSuggestions(
+		lines: string[],
+		cursorLine: number,
+		cursorCol: number,
+	): Promise<{ items: AutocompleteItem[]; prefix: string } | null>;
+	applyCompletion(
+		lines: string[],
+		cursorLine: number,
+		cursorCol: number,
+		item: AutocompleteItem,
+		prefix: string,
+	): { lines: string[]; cursorLine: number; cursorCol: number };
+}
+interface AutocompleteModule {
+	CombinedAutocompleteProvider: new (
+		commands: { name: string; description?: string }[],
+		basePath: string,
+	) => AutocompleteProvider;
+}
+
+/** Subset of omp's `Skill` (src/extensibility/skills.ts). */
+export interface Skill {
+	name: string;
+	description: string;
+	filePath: string;
+	baseDir: string;
+}
+interface SkillsModule {
+	loadSkills(options: Record<string, unknown> & { cwd: string }): Promise<{ skills: Skill[] }>;
+	parseSkillInvocation(text: string): { name: string; args: string; prompt: string } | undefined;
+	buildSkillPromptMessage(skill: Skill, input: { args: string; prompt?: string }): Promise<{ message: string }>;
+}
+
+/** Subset of omp's `FileSlashCommand` (src/extensibility/slash-commands.ts). */
+export interface FileSlashCommand {
+	name: string;
+	description: string;
+}
+interface SlashCommandsModule {
+	loadSlashCommands(options: { cwd: string }): Promise<FileSlashCommand[]>;
+	expandSlashCommand(text: string, fileCommands: FileSlashCommand[]): string;
+}
+
+/** omp settings descriptors (`register`/`combine` in src/config); `get` reads one from a loaded Settings. */
+interface SettingsReader<T> {
+	get(settings: unknown): T;
+}
+interface ConfigModule {
+	Settings: { loadReadOnly(options: { cwd: string }): Promise<unknown> };
+}
+interface ExtensionSettingsModule {
+	cfgSkills: SettingsReader<Record<string, unknown> & { enableSkillCommands?: boolean }>;
+	cfgDisabledExtensions: SettingsReader<string[]>;
 }
 
 /** Subset of pi-tui's `AutocompleteItem` (pi-tui/src/autocomplete.ts). */
@@ -213,23 +324,56 @@ export const COLLAB_PROTO = protocol.COLLAB_PROTO;
 
 export const listHosts = registry.listCollabHosts;
 
+const rpc = (await import(join(packageDir, "src", "modes", "rpc", "rpc-client.ts"))) as RpcClientModule;
+const utils = (await import(join(dirname(packageDir), "pi-utils", "src", "index.ts"))) as UtilsModule;
+const dirs = (await import(join(dirname(packageDir), "pi-utils", "src", "dirs.ts"))) as DirsModule;
+
+/** omp's sessions root: one directory per working directory, each holding `<time>_<id>.jsonl` files. */
+export const sessionsDir: string = dirs.getSessionsDir();
+
+export interface RpcChild {
+	client: RpcClient;
+	pid: number;
+	/** Settles when the process is gone, however it ended. */
+	exited: Promise<unknown>;
+}
+
+/**
+ * Start this same package's CLI in RPC mode (NDJSON over stdio) in `cwd`, through
+ * omp's own `RpcClient`. Resolves once omp reports ready.
+ */
+export async function startRpc(cwd: string): Promise<RpcChild> {
+	let child: RpcProcess | undefined;
+	const client = new rpc.RpcClient({
+		spawn: agentArgs => {
+			child = utils.ptree.spawn([...ompCommand, ...agentArgs], { cwd, stdin: "pipe" });
+			return child;
+		},
+	});
+	await client.start();
+	if (!child) throw new Error("omp RPC client started without spawning a process");
+	// ptree rejects `exited` for a killed child.
+	return { client, pid: child.pid, exited: child.exited.catch(() => undefined) };
+}
+
 export function linkErrorCode(err: unknown): LinkErrorCode | null {
 	return err instanceof registry.CollabLinkError ? err.code : null;
 }
 
-/** Every session file under omp's sessions directory, skipping the 0-turn stubs omp's own picker hides. */
-export async function listSavedSessions(): Promise<SavedSession[]> {
+/** Every session file under omp's sessions directory, newest first. */
+export async function listSessionFiles(): Promise<SavedSession[]> {
 	const sessions = await listing.listAllSessions();
-	return sessions
-		.filter(session => !listing.isEmptySession(session))
-		.map(({ id, path, cwd, title, firstMessage, modified }) => ({
-			id,
-			path,
-			cwd,
-			// omp writes this placeholder when the prefix it scans holds no user text.
-			title: title || (firstMessage && firstMessage !== "(no messages)" ? oneLine(firstMessage) : null),
-			modifiedAt: modified.getTime(),
-		}));
+	return sessions.map(session => ({
+		id: session.id,
+		path: session.path,
+		cwd: session.cwd,
+		// omp writes this placeholder when the prefix it scans holds no user text.
+		title:
+			session.title ||
+			(session.firstMessage && session.firstMessage !== "(no messages)" ? oneLine(session.firstMessage) : null),
+		modifiedAt: session.modified.getTime(),
+		empty: listing.isEmptySession(session),
+	}));
 }
 
 export interface Room {

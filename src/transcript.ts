@@ -1,9 +1,11 @@
 /**
- * Folds collab snapshot entries and live agent events into display items.
+ * Folds a session file's entries, plus live agent events, into display items.
  *
- * The snapshot (`snapshot-chunk` entries) seeds the transcript; afterwards only
- * `event` frames render, mirroring omp's own guest, because every durable
- * `entry` frame repeats a message the events already showed.
+ * The session file is the record: every message it holds renders from it. Live
+ * events only fill the gap before a message reaches the file, streaming the
+ * assistant's partial text and the running state of tool calls. Both sources key
+ * a message by its `timestamp`, which omp writes to the file unchanged, so the
+ * file's copy replaces the streamed one in place and a late event cannot undo it.
  */
 import type { Item } from "./shared";
 
@@ -44,28 +46,51 @@ function toolSummary(args: unknown, intent: unknown): string {
 	return typeof first === "string" ? oneLine(first) : "";
 }
 
+/** The key a message shares between its live events and its file entry. */
+const messageKey = (message: Json): string | undefined =>
+	typeof message.timestamp === "number" ? `m${message.timestamp}` : undefined;
+
 export class Transcript {
-	/** Insertion-ordered: display order is first-seen order. */
+	/** Display order: by message time, then first seen. */
 	#items = new Map<string, Item>();
-	#liveKey: string | null = null;
-	#liveSeq = 0;
+	#times = new Map<string, number>();
+	/** Message keys and tool-call ids the file already settled; live events leave them alone. */
+	#settled = new Set<string>();
+	#noticeSeq = 0;
+	/** Time given to items created by the entry or event being applied. */
+	#now = 0;
+	#latest = 0;
+	#reordered = false;
 
 	items(): Item[] {
 		return [...this.#items.values()];
 	}
 
-	reset(): void {
-		this.#items.clear();
-		this.#liveKey = null;
+	/**
+	 * Whether an item had to go ahead of items already returned since the last call,
+	 * so upserts alone would misplace it. omp writes a fresh session's first prompt
+	 * only together with the first reply, after that reply has streamed.
+	 */
+	takeReordered(): boolean {
+		const reordered = this.#reordered;
+		this.#reordered = false;
+		return reordered;
 	}
 
-	/** Snapshot entry. Returns the items it created or changed. */
+	/** One session-file entry. Returns the items it created or changed. */
 	applyEntry(entry: unknown): Item[] {
 		if (!isObject(entry)) return [];
 		const id = str(entry.id) ?? `entry${this.#items.size}`;
+		const written = typeof entry.timestamp === "string" ? Date.parse(entry.timestamp) : Number.NaN;
+		const sent = isObject(entry.message) ? entry.message.timestamp : undefined;
+		this.#now = typeof sent === "number" ? sent : Number.isNaN(written) ? this.#latest : written;
 		switch (entry.type) {
-			case "message":
-				return this.#applyMessage(id, entry.message, false);
+			case "message": {
+				if (!isObject(entry.message)) return [];
+				const key = messageKey(entry.message) ?? id;
+				this.#settled.add(key);
+				return this.#applyMessage(key, entry.message, false);
+			}
 			case "custom_message":
 				return this.#applyMessage(id, { ...entry, role: "custom" }, false);
 			case "compaction":
@@ -75,7 +100,7 @@ export class Transcript {
 		}
 	}
 
-	/** Complete JSONL lines of a session file, as written to disk or returned by `fetch-transcript`. */
+	/** Complete JSONL lines of a session file. */
 	applyLines(lines: string[]): Item[] {
 		return lines.flatMap(line => {
 			try {
@@ -89,25 +114,20 @@ export class Transcript {
 	/** Live agent event. Returns the items it created or changed. */
 	applyEvent(event: unknown): Item[] {
 		if (!isObject(event)) return [];
+		const message = isObject(event.assistantMessageEvent) && isObject(event.assistantMessageEvent.partial)
+			? event.assistantMessageEvent.partial
+			: event.message;
+		this.#now = isObject(message) && typeof message.timestamp === "number" ? message.timestamp : Date.now();
 		switch (event.type) {
 			case "message_start":
-				this.#liveKey = `live${++this.#liveSeq}`;
-				return this.#applyMessage(this.#liveKey, event.message, true);
-			case "message_update": {
-				// Joining mid-turn yields updates without their start; key them as a fresh message.
-				this.#liveKey ??= `live${++this.#liveSeq}`;
-				const partial = isObject(event.assistantMessageEvent) ? event.assistantMessageEvent.partial : event.message;
-				return this.#applyMessage(this.#liveKey, partial, true);
-			}
-			case "message_end": {
-				const key = this.#liveKey ?? `live${++this.#liveSeq}`;
-				this.#liveKey = null;
-				return this.#applyMessage(key, event.message, false);
-			}
+			case "message_update":
+				return this.#applyLive(message, true);
+			case "message_end":
+				return this.#applyLive(message, false);
 			case "tool_execution_start":
-				return this.#upsertTool(str(event.toolCallId), str(event.toolName), toolSummary(event.args, event.intent), "running");
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), toolSummary(event.args, event.intent), "running");
 			case "tool_execution_end":
-				return this.#upsertTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok");
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok");
 			case "agent_end":
 				// An interrupted turn ends without tool_execution_end for the call it cut off.
 				return [...this.#items.values()].flatMap(item =>
@@ -117,15 +137,10 @@ export class Transcript {
 				// Join and leave notices (including this dashboard's own) are noise here.
 				if (event.source === "collab") return [];
 				const level = event.level === "warning" || event.level === "error" ? event.level : "info";
-				return this.#upsert({ id: `notice${++this.#liveSeq}`, kind: "notice", level, text: String(event.message) });
+				return this.note(level, String(event.message));
 			}
 			case "auto_retry_start":
-				return this.#upsert({
-					id: `notice${++this.#liveSeq}`,
-					kind: "notice",
-					level: "warning",
-					text: `Retrying (${event.attempt}/${event.maxAttempts}): ${String(event.errorMessage)}`,
-				});
+				return this.note("warning", `Retrying (${event.attempt}/${event.maxAttempts}): ${String(event.errorMessage)}`);
 			default:
 				return [];
 		}
@@ -133,11 +148,23 @@ export class Transcript {
 
 	/** Out-of-band line (host errors, questions waiting in the terminal). */
 	note(level: "info" | "warning" | "error", text: string): Item[] {
-		return this.#upsert({ id: `notice${++this.#liveSeq}`, kind: "notice", level, text });
+		this.#now = Date.now();
+		return this.#upsert({ id: `notice${++this.#noticeSeq}`, kind: "notice", level, text });
 	}
 
-	#applyMessage(key: string, message: unknown, streaming: boolean): Item[] {
-		if (!isObject(message)) return [];
+	/**
+	 * Tool results reach the file as soon as they exist; prompts and replies may not (see
+	 * {@link takeReordered}). Collab prompts stay file-only: their file entry carries no
+	 * message timestamp to merge on.
+	 */
+	#applyLive(message: unknown, streaming: boolean): Item[] {
+		if (!isObject(message) || (message.role !== "assistant" && message.role !== "user")) return [];
+		const key = messageKey(message);
+		if (!key || this.#settled.has(key)) return [];
+		return this.#applyMessage(key, message, streaming);
+	}
+
+	#applyMessage(key: string, message: Json, streaming: boolean): Item[] {
 		switch (message.role) {
 			case "user": {
 				if (message.synthetic) return [];
@@ -150,8 +177,11 @@ export class Transcript {
 			}
 			case "assistant":
 				return this.#applyAssistant(key, message, streaming);
-			case "toolResult":
-				return this.#upsertTool(str(message.toolCallId), str(message.toolName), undefined, message.isError ? "error" : "ok");
+			case "toolResult": {
+				const callId = str(message.toolCallId);
+				if (callId) this.#settled.add(`tool:${callId}`);
+				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok");
+			}
 			default:
 				return [];
 		}
@@ -175,6 +205,11 @@ export class Transcript {
 		return changed;
 	}
 
+	#upsertLiveTool(callId: string | undefined, name: string | undefined, summary: string | undefined, status: ToolItem["status"]): Item[] {
+		if (!callId || this.#settled.has(`tool:${callId}`)) return [];
+		return this.#upsertTool(callId, name, summary, status);
+	}
+
 	/** Tool calls show up as content blocks, execution events, and result messages; merge them by call id. */
 	#upsertTool(callId: string | undefined, name: string | undefined, summary: string | undefined, status: ToolItem["status"] | undefined): Item[] {
 		if (!callId) return [];
@@ -194,6 +229,16 @@ export class Transcript {
 		const prev = this.#items.get(item.id);
 		if (prev && JSON.stringify(prev) === JSON.stringify(item)) return [];
 		this.#items.set(item.id, item);
+		if (!prev) {
+			this.#times.set(item.id, this.#now);
+			if (this.#now < this.#latest) {
+				this.#reordered = true;
+				const times = this.#times;
+				// Stable: items with the same time keep their first-seen order.
+				this.#items = new Map([...this.#items].sort(([a], [b]) => (times.get(a) ?? 0) - (times.get(b) ?? 0)));
+			}
+			this.#latest = Math.max(this.#latest, this.#now);
+		}
 		return [item];
 	}
 }

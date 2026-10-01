@@ -1,23 +1,27 @@
 /**
- * One server-side collab guest per listed session. It joins the host's room
- * through omp's own relay client, folds frames into the session transcript,
- * keeps the host's subagent registry, tails subagent transcripts on demand,
- * and reports every change through `emit`.
+ * One server-side collab guest per terminal session. It joins the host's room
+ * through omp's own relay client for what only the room offers: prompting and
+ * stopping the session, messaging its subagents, the host's live subagent
+ * registry, and live agent events. Transcripts never wait on it; they are read
+ * from the session files, so the welcome snapshot the host sends is ignored.
  */
-import { COLLAB_PROTO, type CollabSocket, type Frame, linkErrorCode, openRoom, type Room } from "./omp";
-import type { AgentRow, AgentStatus, GuestPhase, Item, RosterHost } from "./shared";
-import { isObject, oneLine, Transcript } from "./transcript";
+import { existsSync } from "node:fs";
+import { stat } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp";
+import type { AgentRow, AgentStatus, ControlPhase } from "./shared";
+import { isObject, oneLine } from "./transcript";
 
-export type GuestUpdate =
-	| { kind: "phase"; phase: GuestPhase }
-	/** `agentId` is `null` for the session transcript. */
-	| { kind: "items"; agentId: string | null; reset: boolean; items: Item[] }
-	| { kind: "agents" };
+export type LiveUpdate =
+	/** Its roster row changed: control phase, subagents, or what a subagent is doing. */
+	| { kind: "roster" }
+	/** A live agent event of the session; it streams what the session file does not hold yet. */
+	| { kind: "event"; event: unknown }
+	/** An out-of-band line for the session (`agentId` null) or one of its subagents. */
+	| { kind: "note"; agentId: string | null; level: "warning" | "error"; text: string };
 
 const DISPLAY_NAME = "omp-agents";
 const LINK_ATTEMPTS = 3;
-/** How long a caught-up subagent transcript waits before asking the host for new bytes. */
-const TAIL_POLL_MS = 1000;
 
 const AGENT_STATUSES: Record<string, AgentStatus> = { running: "running", idle: "idle", parked: "parked", aborted: "aborted" };
 
@@ -27,13 +31,15 @@ interface HostAgent {
 	isMain: boolean;
 	parentId: string | null;
 	status: AgentStatus;
+	/** ms since the epoch. */
+	createdAt: number;
 }
 
 function parseAgents(value: unknown): HostAgent[] {
 	if (!Array.isArray(value)) return [];
 	return value.flatMap(raw => {
 		if (!isObject(raw)) return [];
-		const { id, displayName, kind, parentId, status } = raw;
+		const { id, displayName, kind, parentId, status, createdAt } = raw;
 		const parsed = typeof status === "string" ? AGENT_STATUSES[status] : undefined;
 		if (typeof id !== "string" || !parsed) return [];
 		return [
@@ -43,6 +49,7 @@ function parseAgents(value: unknown): HostAgent[] {
 				isMain: kind === "main",
 				parentId: typeof parentId === "string" ? parentId : null,
 				status: parsed,
+				createdAt: typeof createdAt === "number" ? createdAt : 0,
 			},
 		];
 	});
@@ -50,14 +57,17 @@ function parseAgents(value: unknown): HostAgent[] {
 
 const nonEmpty = (value: unknown): string | undefined => (typeof value === "string" && value.trim() ? value : undefined);
 
-/** One line saying what a subagent is doing, from a `task:subagent:*` bus payload. */
-function activityOf(channel: unknown, payload: unknown): { id: string; activity: string } | null {
+export const SUBAGENT_LIFECYCLE = "task:subagent:lifecycle";
+export const SUBAGENT_PROGRESS = "task:subagent:progress";
+
+/** One line saying what a subagent is doing, from a `task:subagent:*` payload (a Collab `bus` frame or an RPC subagent frame). */
+export function activityOf(channel: unknown, payload: unknown): { id: string; activity: string } | null {
 	if (!isObject(payload)) return null;
-	if (channel === "task:subagent:lifecycle") {
+	if (channel === SUBAGENT_LIFECYCLE) {
 		const description = nonEmpty(payload.description);
 		return typeof payload.id === "string" && description ? { id: payload.id, activity: oneLine(description) } : null;
 	}
-	if (channel !== "task:subagent:progress" || !isObject(payload.progress)) return null;
+	if (channel !== SUBAGENT_PROGRESS || !isObject(payload.progress)) return null;
 	const progress = payload.progress;
 	if (typeof progress.id !== "string") return null;
 	const text =
@@ -69,67 +79,8 @@ function activityOf(channel: unknown, payload: unknown): { id: string; activity:
 	return text ? { id: progress.id, activity: oneLine(text) } : null;
 }
 
-/** Incremental reader of one subagent's JSONL transcript over `fetch-transcript`. */
-export class AgentTail {
-	readonly transcript = new Transcript();
-	#offset = 0;
-	/** Bytes after the last newline: a line the host was still writing. */
-	#partial = "";
-	#loaded = false;
-	#stopped = false;
-	#timer: NodeJS.Timeout | undefined;
-	readonly #request: (fromByte: number) => void;
-	readonly #emit: (reset: boolean, items: Item[]) => void;
-
-	constructor(request: (fromByte: number) => void, emit: (reset: boolean, items: Item[]) => void) {
-		this.#request = request;
-		this.#emit = emit;
-	}
-
-	get loaded(): boolean {
-		return this.#loaded;
-	}
-
-	/** Read from the start: on open, and after the guest rejoins (pending requests died with the old connection). */
-	restart(): void {
-		clearTimeout(this.#timer);
-		this.transcript.reset();
-		this.#offset = 0;
-		this.#partial = "";
-		this.#loaded = false;
-		this.#request(0);
-	}
-
-	onReply(text: string, newSize: number, error: string | undefined): void {
-		if (this.#stopped) return;
-		if (error) {
-			this.#emit(!this.#loaded, this.transcript.note("error", `Transcript unavailable: ${error}`));
-			this.#loaded = true;
-			return;
-		}
-		const lines = (this.#partial + text).split("\n");
-		this.#partial = lines.pop() ?? "";
-		const changed = this.transcript.applyLines(lines);
-		this.#offset = newSize;
-		if (!this.#loaded) {
-			this.#loaded = true;
-			this.#emit(true, this.transcript.items());
-		} else if (changed.length > 0) {
-			this.#emit(false, changed);
-		}
-		// A non-empty reply may be one 4 MiB slice of a longer file: keep reading until caught up.
-		if (text) this.#request(this.#offset);
-		else this.#timer = setTimeout(() => this.#request(this.#offset), TAIL_POLL_MS);
-	}
-
-	stop(): void {
-		this.#stopped = true;
-		clearTimeout(this.#timer);
-	}
-}
-
 /** Resolve a link, re-listing on `stale_generation` (the host switched sessions mid-request). */
-async function openFreshRoom(host: RosterHost): Promise<Room> {
+async function openFreshRoom(host: HostSnapshot): Promise<Room> {
 	for (let attempt = 1; ; attempt++) {
 		try {
 			return await openRoom(host.instanceId, host.access);
@@ -143,29 +94,28 @@ export class SessionGuest {
 	readonly instanceId: string;
 	/** Room generation this guest is joined to; `null` until the link resolves. */
 	generation: number | null = null;
-	phase: GuestPhase = { phase: "connecting" };
+	control: ControlPhase = { phase: "connecting" };
 	/** When the guest ended, for rejoin backoff. */
 	endedAt: number | null = null;
-	readonly transcript = new Transcript();
 
 	#socket: CollabSocket | null = null;
 	#readOnly = true;
 	#closed = false;
 	#agents: HostAgent[] = [];
 	#activity = new Map<string, string>();
-	#tails = new Map<string, AgentTail>();
-	#pendingReads = new Map<number, AgentTail>();
-	#reqSeq = 0;
-	readonly #emit: (update: GuestUpdate) => void;
+	/** Transcripts found away from where {@link agentFile} expects them, and the agents already looked for. */
+	#foundFiles = new Map<string, string>();
+	#searched = new Set<string>();
+	readonly #emit: (update: LiveUpdate) => void;
 
-	constructor(host: RosterHost, emit: (update: GuestUpdate) => void) {
+	constructor(host: HostSnapshot, emit: (update: LiveUpdate) => void) {
 		this.instanceId = host.instanceId;
 		this.#emit = emit;
 		void this.#start(host);
 	}
 
 	get canWrite(): boolean {
-		return this.phase.phase === "live" && !this.#readOnly;
+		return this.control.phase === "live" && !this.#readOnly;
 	}
 
 	agents(): AgentRow[] {
@@ -179,6 +129,44 @@ export class SessionGuest {
 			activity: this.#activity.get(agent.id) ?? null,
 			canMessage: !this.#readOnly && agent.status !== "aborted",
 		}));
+	}
+
+	/**
+	 * Where omp writes a subagent's transcript: `<id>.jsonl` in its parent's artifacts
+	 * directory, which is the parent's transcript path without `.jsonl`. A subagent that
+	 * outlived a `/new` or `/resume` stays registered but wrote beside the session it
+	 * started in; when the expected file is missing, the guest looks for it among the
+	 * project's sessions and reports a roster change once found.
+	 */
+	agentFile(sessionFile: string, agentId: string): string | null {
+		const found = this.#foundFiles.get(agentId);
+		if (found) return found;
+		const byId = new Map(this.#agents.filter(agent => !agent.isMain).map(agent => [agent.id, agent]));
+		const agent = byId.get(agentId);
+		if (!agent) return null;
+		const ancestors: string[] = [];
+		for (let parent = agent.parentId ? byId.get(agent.parentId) : undefined; parent; parent = parent.parentId ? byId.get(parent.parentId) : undefined) {
+			ancestors.unshift(parent.id);
+		}
+		const expected = join(sessionFile.replace(/\.jsonl$/, ""), ...ancestors, `${agentId}.jsonl`);
+		if (!existsSync(expected) && !this.#searched.has(agentId)) {
+			this.#searched.add(agentId);
+			void this.#findAgentFile(dirname(sessionFile), agent);
+		}
+		return expected;
+	}
+
+	/** The newest `<id>.jsonl` under the project's sessions written since the subagent registered. */
+	async #findAgentFile(projectDir: string, agent: HostAgent): Promise<void> {
+		let newest: { path: string; mtimeMs: number } | null = null;
+		for await (const rel of new Bun.Glob(`*/**/${agent.id}.jsonl`).scan({ cwd: projectDir })) {
+			const path = join(projectDir, rel);
+			const { mtimeMs } = await stat(path);
+			if (mtimeMs >= agent.createdAt && (!newest || mtimeMs > newest.mtimeMs)) newest = { path, mtimeMs };
+		}
+		if (!newest || this.#closed) return;
+		this.#foundFiles.set(agent.id, newest.path);
+		this.#emit({ kind: "roster" });
 	}
 
 	prompt(text: string): void {
@@ -197,24 +185,6 @@ export class SessionGuest {
 		}
 	}
 
-	/** Start tailing a subagent's transcript, or return the tail already running. */
-	openAgent(agentId: string): AgentTail {
-		const existing = this.#tails.get(agentId);
-		if (existing) return existing;
-		const tail: AgentTail = new AgentTail(
-			fromByte => this.#fetchTranscript(tail, agentId, fromByte),
-			(reset, items) => this.#emit({ kind: "items", agentId, reset, items }),
-		);
-		this.#tails.set(agentId, tail);
-		tail.restart();
-		return tail;
-	}
-
-	closeAgent(agentId: string): void {
-		this.#tails.get(agentId)?.stop();
-		this.#tails.delete(agentId);
-	}
-
 	/** Terminal: the host vanished or rotated rooms, the relay gave up, or the dashboard shut down. */
 	end(reason: string): void {
 		if (this.#closed) return;
@@ -222,18 +192,10 @@ export class SessionGuest {
 		this.endedAt = Date.now();
 		this.#socket?.close();
 		this.#socket = null;
-		for (const tail of this.#tails.values()) tail.stop();
-		this.#setPhase({ phase: "ended", reason });
+		this.#setControl({ phase: "ended", reason });
 	}
 
-	#fetchTranscript(tail: AgentTail, agentId: string, fromByte: number): void {
-		if (this.phase.phase !== "live" || !this.#socket) return;
-		const reqId = ++this.#reqSeq;
-		this.#pendingReads.set(reqId, tail);
-		this.#socket.send({ t: "fetch-transcript", reqId, agentId, fromByte });
-	}
-
-	async #start(host: RosterHost): Promise<void> {
+	async #start(host: HostSnapshot): Promise<void> {
 		let room: Room;
 		try {
 			room = await openFreshRoom(host);
@@ -247,13 +209,11 @@ export class SessionGuest {
 		const socket = room.socket;
 		this.#socket = socket;
 		socket.onOpen = () => {
-			this.#pendingReads.clear();
-			this.#setPhase({ phase: "syncing" });
 			socket.send({ t: "hello", proto: COLLAB_PROTO, name: DISPLAY_NAME, writeToken: room.writeToken });
 		};
 		socket.onFrame = frame => this.#onFrame(frame);
 		socket.onClose = (reason, willReconnect) => {
-			if (willReconnect) this.#setPhase({ phase: "reconnecting", reason });
+			if (willReconnect) this.#setControl({ phase: "reconnecting", reason });
 			else this.end(reason);
 		};
 		socket.connect();
@@ -261,54 +221,44 @@ export class SessionGuest {
 
 	#onFrame(frame: Frame): void {
 		if (this.#closed) return;
-		const transcript = this.transcript;
 		switch (frame.t) {
 			case "welcome":
-				transcript.reset();
 				this.#readOnly = this.#readOnly || frame.readOnly === true;
-				this.#setAgents(parseAgents(frame.agents));
-				if (frame.entryCount === 0) this.#goLive();
-				return;
-			case "snapshot-chunk":
-				if (Array.isArray(frame.entries)) for (const entry of frame.entries) transcript.applyEntry(entry);
-				if (frame.final === true) this.#goLive();
+				this.#agents = parseAgents(frame.agents);
+				// Rows carry `canMessage`, which depends on the welcome's read-only verdict.
+				this.#setControl({ phase: "live", readOnly: this.#readOnly });
 				return;
 			case "event":
-				if (this.phase.phase === "live") this.#emitItems(null, transcript.applyEvent(frame.event));
+				this.#emit({ kind: "event", event: frame.event });
 				return;
 			case "agents":
-				this.#setAgents(parseAgents(frame.agents));
+				this.#agents = parseAgents(frame.agents);
+				this.#emit({ kind: "roster" });
 				return;
 			case "bus": {
 				const update = activityOf(frame.channel, frame.data);
 				if (update && this.#activity.get(update.id) !== update.activity) {
 					this.#activity.set(update.id, update.activity);
-					this.#emit({ kind: "agents" });
+					this.#emit({ kind: "roster" });
 				}
-				return;
-			}
-			case "transcript": {
-				const reqId = typeof frame.reqId === "number" ? frame.reqId : -1;
-				const tail = this.#pendingReads.get(reqId);
-				this.#pendingReads.delete(reqId);
-				const text = typeof frame.text === "string" ? frame.text : "";
-				const newSize = typeof frame.newSize === "number" ? frame.newSize : 0;
-				tail?.onReply(text, newSize, typeof frame.error === "string" ? frame.error : undefined);
 				return;
 			}
 			case "ui-request": {
 				const request = frame.request;
-				const title = typeof request === "object" && request !== null && "title" in request ? request.title : undefined;
-				this.#emitItems(null, transcript.note("warning", `The session is asking: ${String(title ?? "a question")}. Answer it in the omp terminal.`));
+				const title = isObject(request) ? request.title : undefined;
+				this.#emit({
+					kind: "note",
+					agentId: null,
+					level: "warning",
+					text: `The session is asking: ${String(title ?? "a question")}. Answer it in the omp terminal.`,
+				});
 				return;
 			}
 			case "error": {
 				const message = String(frame.message);
 				// Agent-command failures name their agent ("agent <id>: …"); show them where the user sent the message.
-				const agentId = [...this.#tails.keys()].find(id => message.startsWith(`agent ${id}:`));
-				const tail = agentId === undefined ? undefined : this.#tails.get(agentId);
-				if (agentId !== undefined && tail) this.#emitItems(agentId, tail.transcript.note("error", message));
-				else this.#emitItems(null, transcript.note("error", `Host: ${message}`));
+				const agent = this.#agents.find(a => !a.isMain && message.startsWith(`agent ${a.id}:`));
+				this.#emit({ kind: "note", agentId: agent?.id ?? null, level: "error", text: agent ? message : `Host: ${message}` });
 				return;
 			}
 			case "bye":
@@ -319,25 +269,8 @@ export class SessionGuest {
 		}
 	}
 
-	#setAgents(agents: HostAgent[]): void {
-		this.#agents = agents;
-		this.#emit({ kind: "agents" });
-	}
-
-	#goLive(): void {
-		this.#setPhase({ phase: "live", readOnly: this.#readOnly });
-		this.#emit({ kind: "items", agentId: null, reset: true, items: this.transcript.items() });
-		for (const tail of this.#tails.values()) tail.restart();
-		// Agent rows carry `canMessage`, which depends on the welcome's read-only verdict.
-		this.#emit({ kind: "agents" });
-	}
-
-	#emitItems(agentId: string | null, items: Item[]): void {
-		if (items.length > 0) this.#emit({ kind: "items", agentId, reset: false, items });
-	}
-
-	#setPhase(phase: GuestPhase): void {
-		this.phase = phase;
-		this.#emit({ kind: "phase", phase });
+	#setControl(control: ControlPhase): void {
+		this.control = control;
+		this.#emit({ kind: "roster" });
 	}
 }

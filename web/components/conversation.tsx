@@ -1,5 +1,5 @@
 import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react";
-import type { AgentRow, CompletionItem, GuestPhase, Item, LiveView, PastSession, RosterHost } from "../../src/shared";
+import type { AgentRow, CompletionItem, ControlPhase, Item, LiveView, PastSession, RosterHost } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import { InputMessage, type QueuedMessage } from "@/components/ui/input-message";
@@ -13,9 +13,8 @@ import { MessageMarkdown } from "./message-markdown";
 import { hostLabel, pastLabel } from "./roster";
 import { statusLabel } from "./status-dot";
 
-const PHASE_LABEL: Record<GuestPhase["phase"], string> = {
+const CONTROL_LABEL: Record<ControlPhase["phase"], string> = {
 	connecting: "Connecting…",
-	syncing: "Loading transcript…",
 	live: "Live",
 	reconnecting: "Reconnecting…",
 	ended: "Disconnected",
@@ -139,12 +138,12 @@ interface PastConversationProps {
 	items: Item[];
 }
 
-/** A past session's saved transcript. Nothing on this page can write to it. */
+/** A past session's saved transcript. It follows the file, but nothing on this page can write to it. */
 export function PastConversation({ sessionId, session, items }: PastConversationProps) {
 	const meta = session ? `${session.cwdDisplay} · last active ${new Date(session.modifiedAt).toLocaleString()}` : sessionId;
 	return (
 		<div className="flex h-svh min-h-0 flex-1 flex-col">
-			<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Ended · read-only" alert={false} />
+			<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Read-only" alert={false} />
 			<Transcript items={items} working={false} />
 		</div>
 	);
@@ -156,7 +155,6 @@ interface ConversationProps {
 	host: RosterHost | null;
 	/** Last known row, for the header after the session ended. */
 	lastHost: RosterHost | null;
-	phase: GuestPhase | undefined;
 	items: Item[];
 	completions: { reqId: number; items: CompletionItem[]; error: string | null } | null;
 	onComplete: (reqId: number, text: string, cursor: number) => void;
@@ -166,7 +164,7 @@ interface ConversationProps {
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts and queues reset per view. */
-export function Conversation({ view, host, lastHost, phase: guestPhase, items, completions, onComplete, onPrompt, onAbort, onEnd }: ConversationProps) {
+export function Conversation({ view, host, lastHost, items, completions, onComplete, onPrompt, onAbort, onEnd }: ConversationProps) {
 	const [draft, setDraft] = useState("");
 	const [queue, setQueue] = useState<QueuedMessage[]>([]);
 	const [requestId, setRequestId] = useState<number | null>(null);
@@ -199,17 +197,17 @@ export function Conversation({ view, host, lastHost, phase: guestPhase, items, c
 
 	const shown = host ?? lastHost;
 	const agent: AgentRow | null = view.agentId ? (shown?.agents.find(a => a.id === view.agentId) ?? null) : null;
-	const phase: GuestPhase = !host
+	const phase: ControlPhase = !host
 		? { phase: "ended", reason: "This session is no longer running." }
 		: view.agentId && !agent
 			? { phase: "ended", reason: "This subagent is no longer registered." }
-			: (guestPhase ?? { phase: "connecting" });
+			: host.control;
 
 	const live = phase.phase === "live" && !phase.readOnly;
 	const writable = live && (view.agentId === null || agent?.canMessage === true);
 	const working = view.agentId === null ? host?.status === "working" : agent?.status === "running";
 
-	let status = PHASE_LABEL[phase.phase];
+	let status = CONTROL_LABEL[phase.phase];
 	if (phase.phase === "live") {
 		const activity = agent ? statusLabel(agent.status) : host ? statusLabel(host.status) : "";
 		status = `${phase.readOnly ? "Live, read-only" : "Live"} · ${activity}`;
@@ -239,7 +237,7 @@ export function Conversation({ view, host, lastHost, phase: guestPhase, items, c
 	return (
 		<div className="flex h-svh min-h-0 flex-1 flex-col">
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
-				{view.agentId === null && host?.owned && (
+				{view.agentId === null && host?.source === "dashboard" && (
 					<Button
 						variant="secondary"
 						size="compact"

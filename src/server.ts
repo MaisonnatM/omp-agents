@@ -1,33 +1,26 @@
-import { statSync } from "node:fs";
+import { mkdirSync, statSync, watch as watchFiles } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
-import type { Server, ServerWebSocket, Subprocess } from "bun";
+import { dirname, join, resolve } from "node:path";
+import type { Server, ServerWebSocket } from "bun";
 import index from "../web/index.html";
 import { complete, expandPrompt, forgetSession } from "./commands";
-import { type GuestUpdate, SessionGuest } from "./guest";
-import { type HostSnapshot, listHosts, listSavedSessions, ompCommand, ompVersion, type SavedSession } from "./omp";
-import type {
-	ClientMsg,
-	HostStatus,
-	Item,
-	LaunchResult,
-	LiveView,
-	PastView,
-	RosterHost,
-	ServerMsg,
-	View,
-} from "./shared";
-import { isObject, Transcript } from "./transcript";
+import { DashboardSession, type DashboardUpdate } from "./dashboard-session";
+import { type LiveUpdate, SessionGuest } from "./guest";
+import { FileTail } from "./tail";
+import { type HostSnapshot, listHosts, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
+import type { ClientMsg, HostStatus, Item, LiveView, RosterHost, ServerMsg, View } from "./shared";
+import { isObject } from "./transcript";
 
 const PORT = Number(process.env.PORT ?? 4317);
 const HOSTNAME = "127.0.0.1";
+/** The registry has no change feed; listing it is one local IPC round trip per host. */
 const POLL_MS = 1500;
 /** Wait this long before rejoining a host whose room dropped us while it stays listed. */
 const REJOIN_MS = 5000;
 /** Coalesce bursts of subagent progress into one roster push. */
 const ROSTER_PUSH_MS = 150;
-/** How long a new session gets to publish itself to the registry before the dashboard kills it. */
-const LAUNCH_TIMEOUT_MS = 30_000;
+/** Re-list session files at most this often while sessions write. */
+const LIST_THROTTLE_MS = 500;
 const HOME = homedir();
 /** Only pages served by this app may open the socket: it carries full control of every session. */
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
@@ -37,25 +30,27 @@ interface SocketData {
 }
 type Socket = ServerWebSocket<SocketData>;
 
+/** Terminal sessions publishing themselves to the Collab registry. */
 let hosts: HostSnapshot[] = [];
 let rosterError: string | null = null;
 let rosterJson = "";
 let rosterPush: NodeJS.Timeout | undefined;
-/** Session files on disk, newest first. The page lists the ones without a live host. */
-let saved: SavedSession[] = [];
-let pastJson = "";
-/** One guest per listed host, so every session's subagents are known without opening it. */
+/** One guest per terminal session, so every session's subagents are known without opening it. */
 const guests = new Map<string, SessionGuest>();
-/**
- * omp processes this dashboard started, by pid. Each runs its TUI in a pseudo-terminal
- * that nobody reads, so it lives only as long as the dashboard.
- */
-const owned = new Map<number, Subprocess>();
-/** Started sessions not listed yet, by pid, with the socket that asked for them. */
-const launches = new Map<number, { ws: Socket; deadline: number }>();
+/** Sessions this dashboard started, by instance id. They live only as long as the dashboard. */
+const dashboards = new Map<string, DashboardSession>();
+/** Every session file on disk, newest first, and the same files by session id. */
+let files: SavedSession[] = [];
+let fileById = new Map<string, SavedSession>();
+let pastJson = "";
+let listTimer: NodeJS.Timeout | undefined;
+/** Views some socket shows, with how many sockets show each; each has a tail while its file is known. */
+const watched = new Map<string, { view: View; sockets: number }>();
+const tails = new Map<string, FileTail>();
 
-const phaseTopic = (instanceId: string): string => `phase:${instanceId}`;
-const itemsTopic = (view: LiveView): string => `items:${view.instanceId}:${view.agentId ?? ""}`;
+const viewKey = (view: View): string =>
+	view.kind === "past" ? `past:${view.sessionId}` : `live:${view.instanceId}:${view.agentId ?? ""}`;
+const itemsTopic = (key: string): string => `items:${key}`;
 const send = (ws: Socket, msg: ServerMsg): void => void ws.send(JSON.stringify(msg));
 const publish = (topic: string, msg: ServerMsg): void => void server.publish(topic, JSON.stringify(msg));
 const displayPath = (path: string): string =>
@@ -67,34 +62,49 @@ function statusOf(host: HostSnapshot): HostStatus {
 	return host.busy ? "working" : "idle";
 }
 
-function toRosterHost(host: HostSnapshot): RosterHost {
-	return {
-		instanceId: host.instanceId,
-		generation: host.generation,
-		pid: host.pid,
-		sessionId: host.sessionId,
-		sessionName: host.sessionName,
-		cwd: host.cwd,
-		cwdDisplay: displayPath(host.cwd),
-		model: host.model ? `${host.model.provider}/${host.model.id}` : null,
-		startedAt: host.startedAt,
-		participants: host.participants,
-		relayConnected: host.relayConnected,
-		status: statusOf(host),
-		access: host.access,
-		owned: owned.has(host.pid),
-		agents: guests.get(host.instanceId)?.agents() ?? [],
-	};
-}
-
-function rosterMsg(): ServerMsg {
-	return { t: "roster", hosts: hosts.map(toRosterHost), error: rosterError };
+function rosterHosts(): RosterHost[] {
+	const terminal = hosts.map((host): RosterHost => {
+		const guest = guests.get(host.instanceId);
+		return {
+			source: "terminal",
+			instanceId: host.instanceId,
+			pid: host.pid,
+			sessionId: host.sessionId,
+			sessionName: host.sessionName,
+			cwd: host.cwd,
+			cwdDisplay: displayPath(host.cwd),
+			model: host.model ? `${host.model.provider}/${host.model.id}` : null,
+			startedAt: host.startedAt,
+			participants: host.participants,
+			relayConnected: host.relayConnected,
+			status: statusOf(host),
+			control: guest?.control ?? { phase: "connecting" },
+			agents: guest?.agents() ?? [],
+		};
+	});
+	const started = [...dashboards.values()].map(
+		(session): RosterHost => ({
+			source: "dashboard",
+			instanceId: session.instanceId,
+			pid: session.pid,
+			sessionId: session.sessionId,
+			sessionName: session.sessionName,
+			cwd: session.cwd,
+			cwdDisplay: displayPath(session.cwd),
+			model: session.model,
+			startedAt: session.startedAt,
+			status: session.status,
+			control: { phase: "live", readOnly: false },
+			agents: session.agents(),
+		}),
+	);
+	return [...terminal, ...started];
 }
 
 function pastMsg(): ServerMsg {
-	const live = new Set(hosts.map(host => host.sessionId));
-	const sessions = saved
-		.filter(session => !live.has(session.id))
+	const live = new Set([...hosts.map(host => host.sessionId), ...[...dashboards.values()].map(s => s.sessionId)]);
+	const sessions = files
+		.filter(session => !session.empty && !live.has(session.id))
 		.map(session => ({
 			sessionId: session.id,
 			title: session.title,
@@ -108,7 +118,7 @@ function pastMsg(): ServerMsg {
 function pushRoster(): void {
 	clearTimeout(rosterPush);
 	rosterPush = undefined;
-	const json = JSON.stringify(rosterMsg());
+	const json = JSON.stringify({ t: "roster", hosts: rosterHosts(), error: rosterError } satisfies ServerMsg);
 	if (json === rosterJson) return;
 	rosterJson = json;
 	server.publish("roster", json);
@@ -121,27 +131,76 @@ function pushPast(): void {
 	server.publish("roster", json);
 }
 
-function onGuestUpdate(instanceId: string, update: GuestUpdate): void {
-	switch (update.kind) {
-		case "phase":
-			publish(phaseTopic(instanceId), { t: "phase", instanceId, phase: update.phase });
-			return;
-		case "items": {
-			const view: LiveView = { kind: "live", instanceId, agentId: update.agentId };
-			publish(itemsTopic(view), { t: "items", view, reset: update.reset, items: update.items });
-			return;
+/** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
+function pathFor(view: View): string | null {
+	if (view.kind === "past") return fileById.get(view.sessionId)?.path ?? null;
+	const dashboard = dashboards.get(view.instanceId);
+	if (dashboard) return view.agentId ? dashboard.agentFile(view.agentId) : dashboard.sessionFile;
+	const host = hosts.find(h => h.instanceId === view.instanceId);
+	const sessionFile = host ? (fileById.get(host.sessionId)?.path ?? null) : null;
+	if (!sessionFile || !view.agentId) return sessionFile;
+	return guests.get(view.instanceId)?.agentFile(sessionFile, view.agentId) ?? null;
+}
+
+/** Point every watched view's tail at its current file: the file shows up, the host switches sessions, a subagent registers. */
+function syncTails(): void {
+	for (const [key, { view }] of watched) {
+		const path = pathFor(view);
+		const tail = tails.get(key);
+		if (tail?.path === path) continue;
+		tails.delete(key);
+		if (!path) {
+			if (tail) publish(itemsTopic(key), { t: "items", view, reset: true, items: [] });
+			continue;
 		}
-		case "agents":
-			rosterPush ??= setTimeout(pushRoster, ROSTER_PUSH_MS);
-			return;
+		const next = new FileTail(path, (reset, items) => {
+			if (tails.get(key) === next) publish(itemsTopic(key), { t: "items", view, reset, items });
+		});
+		tails.set(key, next);
+		next.poke();
 	}
 }
 
-function spawnGuest(host: HostSnapshot): SessionGuest {
-	const guest = new SessionGuest(toRosterHost(host), update => onGuestUpdate(host.instanceId, update));
-	guests.set(host.instanceId, guest);
-	for (const ws of watchers(host.instanceId)) openAgentFor(ws);
-	return guest;
+/**
+ * The watcher does not report every append: on macOS a burst of writes can surface
+ * only as events for omp's `.<file>.lock` sidecar. Any change in a directory therefore
+ * re-reads every tail in it; a re-read with nothing new costs one `stat`.
+ */
+function onFileChange(path: string): void {
+	const dir = dirname(path);
+	for (const tail of tails.values()) if (dirname(tail.path) === dir) tail.poke();
+	// Session files sit one directory below the root; deeper files belong to subagents.
+	if (dirname(dir) === sessionsDir) listTimer ??= setTimeout(refreshFiles, LIST_THROTTLE_MS);
+}
+
+async function refreshFiles(): Promise<void> {
+	files = await listSessionFiles();
+	fileById = new Map(files.map(file => [file.id, file]));
+	listTimer = undefined;
+	syncTails();
+	pushPast();
+}
+
+function onLiveUpdate(instanceId: string, update: LiveUpdate | DashboardUpdate): void {
+	switch (update.kind) {
+		case "roster":
+			rosterPush ??= setTimeout(pushRoster, ROSTER_PUSH_MS);
+			// A subagent may have registered for a view that waits on its file.
+			syncTails();
+			return;
+		case "event":
+			tails.get(viewKey({ kind: "live", instanceId, agentId: null }))?.live(t => t.applyEvent(update.event));
+			return;
+		case "note":
+			tails.get(viewKey({ kind: "live", instanceId, agentId: update.agentId }))?.live(t => t.note(update.level, update.text));
+			return;
+		case "exited":
+			dashboards.delete(instanceId);
+			syncTails();
+			pushRoster();
+			void refreshFiles();
+			return;
+	}
 }
 
 /** Follow the registry: join new hosts, drop vanished ones, rejoin rotated or dropped rooms. */
@@ -161,10 +220,14 @@ function reconcileGuests(): void {
 			guests.delete(instanceId);
 		}
 	}
-	for (const host of hosts) if (!guests.has(host.instanceId)) spawnGuest(host);
+	for (const host of hosts) {
+		if (!guests.has(host.instanceId)) {
+			guests.set(host.instanceId, new SessionGuest(host, update => onLiveUpdate(host.instanceId, update)));
+		}
+	}
 }
 
-async function pollRoster(): Promise<void> {
+async function pollRegistry(): Promise<void> {
 	try {
 		hosts = await listHosts();
 		rosterError = null;
@@ -172,39 +235,15 @@ async function pollRoster(): Promise<void> {
 		hosts = [];
 		rosterError = err instanceof Error ? err.message : String(err);
 	}
-	saved = await listSavedSessions();
-	settleLaunches();
 	reconcileGuests();
+	syncTails();
 	pushRoster();
 	pushPast();
-	setTimeout(pollRoster, POLL_MS);
+	setTimeout(pollRegistry, POLL_MS);
 }
 
-function settleLaunch(pid: number, result: LaunchResult): void {
-	const launch = launches.get(pid);
-	if (!launch) return;
-	launches.delete(pid);
-	send(launch.ws, { t: "created", result });
-}
-
-/** A launch succeeds when the registry lists a host with its pid, and fails when it is not listed in time. */
-function settleLaunches(): void {
-	for (const [pid, { deadline }] of launches) {
-		const host = hosts.find(h => h.pid === pid);
-		if (host) {
-			settleLaunch(pid, { ok: true, instanceId: host.instanceId });
-		} else if (Date.now() > deadline) {
-			settleLaunch(pid, {
-				ok: false,
-				error: `The session did not appear in the Collab registry within ${LAUNCH_TIMEOUT_MS / 1000} seconds. Check that collab.autoStart is control.`,
-			});
-			owned.get(pid)?.kill();
-		}
-	}
-}
-
-/** Start `omp` in `input` (absolute, `~`-relative, or relative to the home directory). */
-function launch(ws: Socket, input: string): void {
+/** Start omp in `input` (absolute, `~`-relative, or relative to the home directory) and answer once it is ready. */
+async function launch(ws: Socket, input: string): Promise<void> {
 	const raw = input.trim();
 	const cwd = raw === "~" || raw.startsWith("~/") ? join(HOME, raw.slice(1)) : resolve(HOME, raw);
 	try {
@@ -213,82 +252,45 @@ function launch(ws: Socket, input: string): void {
 		send(ws, { t: "created", result: { ok: false, error: `${raw} is not a directory.` } });
 		return;
 	}
-	let proc: Subprocess;
+	let session: DashboardSession;
 	try {
-		// omp hosts a Collab room only in interactive mode, which needs a terminal. The PTY must be drained.
-		proc = Bun.spawn(ompCommand, { cwd, terminal: { data() {} } });
+		session = await DashboardSession.start(cwd, update => onLiveUpdate(session.instanceId, update));
 	} catch (err) {
 		send(ws, { t: "created", result: { ok: false, error: `Cannot start omp: ${err instanceof Error ? err.message : String(err)}` } });
 		return;
 	}
-	const pid = proc.pid;
-	owned.set(pid, proc);
-	launches.set(pid, { ws, deadline: Date.now() + LAUNCH_TIMEOUT_MS });
-	void proc.exited.then(code => {
-		owned.delete(pid);
-		proc.terminal?.close();
-		settleLaunch(pid, { ok: false, error: `omp exited with code ${code} before its session appeared.` });
-	});
-}
-
-/** Sockets currently looking at a session or one of its subagents. */
-const watchers = (instanceId: string): Socket[] =>
-	[...sockets].filter(ws => ws.data.view?.kind === "live" && ws.data.view.instanceId === instanceId);
-const sockets = new Set<Socket>();
-
-/** A subagent view needs its transcript tailed; a fresh guest (after a rejoin) starts a new tail. */
-function openAgentFor(ws: Socket): void {
-	const view = ws.data.view;
-	if (view?.kind !== "live" || !view.agentId) return;
-	const tail = guests.get(view.instanceId)?.openAgent(view.agentId);
-	if (tail?.loaded) send(ws, { t: "items", view, reset: true, items: tail.transcript.items() });
+	dashboards.set(session.instanceId, session);
+	pushRoster();
+	send(ws, { t: "created", result: { ok: true, instanceId: session.instanceId } });
 }
 
 function unwatch(ws: Socket): void {
 	const view = ws.data.view;
 	ws.data.view = null;
-	if (view?.kind !== "live") return;
-	ws.unsubscribe(phaseTopic(view.instanceId));
-	ws.unsubscribe(itemsTopic(view));
-	if (view.agentId && server.subscriberCount(itemsTopic(view)) === 0) guests.get(view.instanceId)?.closeAgent(view.agentId);
-}
-
-/** A past session's transcript, read once from its file. The path comes from the listing, never from the page. */
-async function sendPastTranscript(ws: Socket, view: PastView): Promise<void> {
-	const path = saved.find(session => session.id === view.sessionId)?.path;
-	const transcript = new Transcript();
-	let items: Item[];
-	if (!path) {
-		items = transcript.note("error", "No saved session has this id.");
-	} else {
-		try {
-			transcript.applyLines((await Bun.file(path).text()).split("\n"));
-			items = transcript.items();
-		} catch (err) {
-			items = transcript.note("error", `Cannot read the session file: ${err instanceof Error ? err.message : String(err)}`);
-		}
+	if (!view) return;
+	const key = viewKey(view);
+	ws.unsubscribe(itemsTopic(key));
+	const entry = watched.get(key);
+	if (entry && --entry.sockets === 0) {
+		watched.delete(key);
+		tails.delete(key);
 	}
-	if (ws.data.view === view) send(ws, { t: "items", view, reset: true, items });
 }
 
 function watch(ws: Socket, view: View | null): void {
 	unwatch(ws);
 	if (!view) return;
 	ws.data.view = view;
-	if (view.kind === "past") {
-		void sendPastTranscript(ws, view);
-		return;
-	}
-	ws.subscribe(phaseTopic(view.instanceId));
-	ws.subscribe(itemsTopic(view));
-	const guest = guests.get(view.instanceId);
-	if (!guest) {
-		send(ws, { t: "phase", instanceId: view.instanceId, phase: { phase: "ended", reason: "This session is no longer running." } });
-		return;
-	}
-	send(ws, { t: "phase", instanceId: view.instanceId, phase: guest.phase });
-	if (view.agentId) openAgentFor(ws);
-	else if (guest.phase.phase === "live") send(ws, { t: "items", view, reset: true, items: guest.transcript.items() });
+	const key = viewKey(view);
+	ws.subscribe(itemsTopic(key));
+	const entry = watched.get(key);
+	if (entry) entry.sockets++;
+	else watched.set(key, { view, sockets: 1 });
+	syncTails();
+	const tail = tails.get(key);
+	// A tail still loading publishes its first read to every subscriber, this socket included.
+	if (tail?.loaded) send(ws, { t: "items", view, reset: true, items: tail.transcript.items() });
+	else if (!tail) send(ws, { t: "items", view, reset: true, items: [] });
 }
 
 function parseLiveView(value: unknown): LiveView | null {
@@ -352,7 +354,7 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			watch(ws, msg.view);
 			return;
 		case "complete": {
-			const host = hosts.find(row => row.instanceId === msg.view.instanceId);
+			const host = hosts.find(row => row.instanceId === msg.view.instanceId) ?? dashboards.get(msg.view.instanceId);
 			if (!host || ws.data.view?.kind !== "live" || ws.data.view.instanceId !== msg.view.instanceId) return;
 			try {
 				const items = await complete(host.instanceId, host.cwd, msg.text, msg.cursor);
@@ -363,6 +365,12 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			return;
 		}
 		case "prompt": {
+			const dashboard = dashboards.get(msg.view.instanceId);
+			if (dashboard) {
+				// omp's RPC prompt runs the session's own slash-command and skill pipeline.
+				if (!msg.view.agentId) dashboard.prompt(msg.text);
+				return;
+			}
 			const host = hosts.find(row => row.instanceId === msg.view.instanceId);
 			const guest = guests.get(msg.view.instanceId);
 			if (!host || !guest || ws.data.view?.kind !== "live" || ws.data.view.instanceId !== msg.view.instanceId) return;
@@ -378,16 +386,15 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			return;
 		}
 		case "abort":
+			dashboards.get(msg.instanceId)?.abort();
 			guests.get(msg.instanceId)?.abort();
 			return;
 		case "create":
-			launch(ws, msg.cwd);
+			void launch(ws, msg.cwd);
 			return;
-		case "end": {
-			const host = hosts.find(h => h.instanceId === msg.instanceId);
-			if (host) owned.get(host.pid)?.kill();
+		case "end":
+			void dashboards.get(msg.instanceId)?.end();
 			return;
-		}
 	}
 }
 
@@ -413,10 +420,9 @@ try {
 		},
 		websocket: {
 			open(ws) {
-				sockets.add(ws);
 				ws.subscribe("roster");
 				send(ws, { t: "hello", ompVersion });
-				send(ws, rosterMsg());
+				send(ws, { t: "roster", hosts: rosterHosts(), error: rosterError });
 				send(ws, pastMsg());
 			},
 			message(ws, raw) {
@@ -424,7 +430,6 @@ try {
 				if (msg) void onClientMsg(ws, msg);
 			},
 			close(ws) {
-				sockets.delete(ws);
 				unwatch(ws);
 			},
 		},
@@ -435,14 +440,20 @@ try {
 	process.exit(1);
 }
 
-await pollRoster();
+// One recursive watcher on omp's sessions directory drives every tail and the past-session list.
+mkdirSync(sessionsDir, { recursive: true });
+watchFiles(sessionsDir, { recursive: true }, (_event, name) => {
+	if (name) onFileChange(join(sessionsDir, String(name)));
+});
+await refreshFiles();
+await pollRegistry();
 console.log(`omp-agents (omp v${ompVersion}) on http://${HOSTNAME}:${PORT}`);
 
-function shutdown(): void {
+async function shutdown(): Promise<void> {
 	for (const guest of guests.values()) guest.end("Dashboard shut down.");
-	for (const proc of owned.values()) proc.kill();
+	await Promise.all([...dashboards.values()].map(session => session.end()));
 	server.stop(true);
 	process.exit(0);
 }
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.on("SIGINT", () => void shutdown());
+process.on("SIGTERM", () => void shutdown());

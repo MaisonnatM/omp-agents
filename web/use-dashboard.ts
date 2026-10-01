@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import type { ClientMsg, CompletionItem, GuestPhase, Item, PastSession, RosterHost, ServerMsg, View } from "../src/shared";
+import type { ClientMsg, CompletionItem, Item, PastSession, RosterHost, ServerMsg, View } from "../src/shared";
 import { applyItems, hashForView, sameView, viewFromHash } from "./view-model";
 
-/** The New session form: closed, open for a directory (with the last attempt's error), or waiting for the session to be listed. */
+/** The New session form: closed, open for a directory (with the last attempt's error), or waiting for the session to start. */
 export type Launch = { phase: "closed" } | { phase: "editing"; error: string | null } | { phase: "starting" };
 
 export interface DashboardState {
@@ -12,7 +12,6 @@ export interface DashboardState {
 	rosterError: string | null;
 	/** Sessions without a live host, newest first. */
 	past: PastSession[];
-	phases: Record<string, GuestPhase>;
 	view: View | null;
 	/** Last roster row seen for the selected live session, kept after it leaves the roster. */
 	viewHost: RosterHost | null;
@@ -60,8 +59,6 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 					};
 				case "past":
 					return { ...state, past: msg.sessions };
-				case "phase":
-					return { ...state, phases: { ...state.phases, [msg.instanceId]: msg.phase } };
 				case "items":
 					if (!sameView(msg.view, state.view)) return state;
 					return { ...state, items: applyItems(state.items, msg.reset, msg.items) };
@@ -93,7 +90,6 @@ export function useDashboard(): Dashboard {
 		hosts: [],
 		rosterError: null,
 		past: [],
-		phases: {},
 		view: viewFromHash(location.hash),
 		viewHost: null,
 		items: [],

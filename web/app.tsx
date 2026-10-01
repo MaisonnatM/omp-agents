@@ -40,7 +40,6 @@ export function App() {
 				view={view}
 				host={state.hosts.find(h => h.instanceId === view.instanceId) ?? null}
 				lastHost={state.viewHost}
-				phase={state.phases[view.instanceId]}
 				items={state.items}
 				completions={state.completions}
 				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, view, text, cursor })}

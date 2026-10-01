@@ -2,11 +2,9 @@
 
 export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
 
-export type Access = "view" | "control";
-
 export type AgentStatus = "running" | "idle" | "parked" | "aborted";
 
-/** A subagent of a session, from the host's agent registry. The main agent is the session itself and is not listed. */
+/** A subagent of a session. The main agent is the session itself and is not listed. */
 export interface AgentRow {
 	id: string;
 	/** Agent type, e.g. `task` or `explore`. */
@@ -16,13 +14,13 @@ export interface AgentRow {
 	status: AgentStatus;
 	/** What it is doing now, or else its task, as one line. */
 	activity: string | null;
-	/** Whether `agent-cmd` chat can reach it: a writable room and an agent that is not aborted. */
+	/** Whether the dashboard can message it: a writable terminal room and an agent that is not aborted. */
 	canMessage: boolean;
 }
 
-export interface RosterHost {
+interface RosterHostBase {
+	/** Collab instance id for terminal sessions, a dashboard-assigned id for dashboard sessions. Stable across `/new`. */
 	instanceId: string;
-	generation: number;
 	pid: number;
 	sessionId: string;
 	sessionName: string | null;
@@ -31,14 +29,17 @@ export interface RosterHost {
 	cwdDisplay: string;
 	model: string | null;
 	startedAt: number;
-	participants: number;
-	relayConnected: boolean;
 	status: HostStatus;
-	access: Access;
-	/** Started by this dashboard, which can end it. */
-	owned: boolean;
+	control: ControlPhase;
 	agents: AgentRow[];
 }
+
+export type RosterHost = RosterHostBase &
+	(
+		| { source: "terminal"; participants: number; relayConnected: boolean }
+		/** Started by this dashboard, which can end it. */
+		| { source: "dashboard" }
+	);
 
 /** A session that has no live host, read from its file on disk. */
 export interface PastSession {
@@ -71,9 +72,12 @@ export type Item =
 	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error" }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
 
-export type GuestPhase =
+/**
+ * Whether the dashboard can prompt and stop the session right now. Transcripts are read from disk
+ * and never wait on it. Terminal sessions go through a Collab room; dashboard sessions are always live.
+ */
+export type ControlPhase =
 	| { phase: "connecting" }
-	| { phase: "syncing" }
 	| { phase: "live"; readOnly: boolean }
 	| { phase: "reconnecting"; reason: string }
 	| { phase: "ended"; reason: string };
@@ -88,16 +92,23 @@ export interface CompletionItem {
 	cursor: number;
 }
 
+/** One `/` or `@` suggestion, with the composer text and caret it produces when accepted (omp's own insertion). */
+export interface CompletionItem {
+	kind: "command" | "skill" | "file" | "directory";
+	label: string;
+	description: string | null;
+	text: string;
+	cursor: number;
+}
+
 export type ServerMsg =
 	| { t: "hello"; ompVersion: string }
 	| { t: "roster"; hosts: RosterHost[]; error: string | null }
 	/** Newest first. */
 	| { t: "past"; sessions: PastSession[] }
-	/** Connection state of the server's guest in a session's room. Subagent views share it. */
-	| { t: "phase"; instanceId: string; phase: GuestPhase }
 	/** `reset` replaces the view's transcript; otherwise `items` are upserts by id, new ids appended. */
 	| { t: "items"; view: View; reset: boolean; items: Item[] }
-	/** Answers this socket's `create` once the new session is listed, or once it failed to start. */
+	/** Answers this socket's `create` once the new session is ready, or once it failed to start. */
 	| { t: "created"; result: LaunchResult }
 	| { t: "completions"; reqId: number; items: CompletionItem[]; error: string | null };
 
@@ -106,6 +117,8 @@ export type ClientMsg =
 	/** A prompt to the session, or chat to the subagent (steer if running, prompt if idle, revive if parked). */
 	| { t: "prompt"; view: LiveView; text: string }
 	| { t: "abort"; instanceId: string }
+	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
+	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number }
 	/** Start a new omp session in `cwd` (absolute, or starting with `~`). */
 	| { t: "create"; cwd: string }
 	/** End a session this dashboard started. */
