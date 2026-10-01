@@ -92,7 +92,6 @@ export function App() {
 					hosts={state.hosts}
 					past={state.past}
 					view={view}
-					ompVersion={state.ompVersion}
 					connected={state.connected}
 					launch={state.launch}
 					defaultCwd={defaultCwd(view, state.hosts, state.past)}

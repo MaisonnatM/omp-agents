@@ -240,7 +240,7 @@ const SidebarContent = forwardRef<HTMLDivElement, SidebarContentProps>(
           <div
             ref={ref}
             data-sidebar="content"
-            className={cn("scroll-fade flex min-h-0 w-full flex-1 flex-col overflow-y-auto", className)}
+            className={cn("scroll-fade scroll-fade-once-scrolled flex min-h-0 w-full flex-1 flex-col overflow-y-auto", className)}
             {...props}
           >
             {children}
@@ -254,7 +254,7 @@ const SidebarContent = forwardRef<HTMLDivElement, SidebarContentProps>(
     // instead of truncating, so the viewport's direct child is forced back
     // to a plain shrinkable block.
     return (
-      <ScrollArea className={cn("scroll-divider min-h-0 w-full flex-1", className)} viewportClassName={cn("scroll-fade [&>div]:!block [&>div]:!min-w-0", viewportClassName)}>
+      <ScrollArea className={cn("scroll-divider min-h-0 w-full flex-1", className)} viewportClassName={cn("scroll-fade scroll-fade-once-scrolled [&>div]:!block [&>div]:!min-w-0", viewportClassName)}>
         <div ref={ref} data-sidebar="content" className="flex w-full min-w-0 flex-col" {...props}>
           {children}
         </div>
