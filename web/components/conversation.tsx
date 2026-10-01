@@ -33,11 +33,13 @@ const NOTICE_TONE: Record<Extract<Item, { kind: "notice" }>["level"], string> = 
 function ToolGroup({ tools }: { tools: ToolItem[] }) {
 	const running = tools.some(tool => tool.status === "running");
 	const failed = tools.filter(tool => tool.status === "error").length;
+	// Open while running, closed once done; a manual toggle wins from then on.
+	const [userOpen, setUserOpen] = useState<boolean | null>(null);
 	const header = running
 		? "Working"
 		: `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`;
 	return (
-		<ThinkingSteps defaultOpen className="w-full max-w-2xl self-start">
+		<ThinkingSteps open={userOpen ?? running} onOpenChange={setUserOpen} className="w-full max-w-2xl self-start">
 			<ThinkingStepsHeader>{header}</ThinkingStepsHeader>
 			<ThinkingStepsContent>
 				{tools.map((tool, index) => (
