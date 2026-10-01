@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>omp agents</title>
+		<link rel="stylesheet" href="./styles.css" />
+		<script type="module" src="./app.ts"></script>
+	</head>
+	<body>
+		<aside class="roster">
+			<header class="roster-header">
+				<h1>omp sessions</h1>
+				<span id="omp-version" class="muted"></span>
+			</header>
+			<div id="connection" class="connection" hidden></div>
+			<ul id="hosts" class="hosts" aria-label="Running omp sessions"></ul>
+		</aside>
+		<main class="pane">
+			<section id="empty" class="empty" hidden>
+				<h2>No omp sessions are published</h2>
+				<p>
+					Sessions publish themselves to the local Collab registry when <code>collab.autoStart</code> is
+					<code>control</code> (or <code>view</code> for read-only):
+				</p>
+				<pre>omp config set collab.autoStart control</pre>
+				<p>
+					Only sessions started after that setting changed appear here. Restart sessions that were already
+					running, or run <code>/collab</code> inside them.
+				</p>
+				<p id="roster-error" class="error" hidden></p>
+			</section>
+			<section id="placeholder" class="empty" hidden>
+				<p class="muted">Select a session to see its conversation.</p>
+			</section>
+			<section id="session" class="session" hidden>
+				<header class="session-header">
+					<div class="session-title">
+						<h2 id="session-name"></h2>
+						<span id="session-meta" class="muted"></span>
+					</div>
+					<span id="session-phase" class="phase"></span>
+				</header>
+				<ol id="transcript" class="transcript" aria-live="polite"></ol>
+				<form id="composer" class="composer">
+					<textarea id="prompt" rows="3" placeholder="Message this session. Enter sends, Shift+Enter adds a line." aria-label="Prompt"></textarea>
+					<div class="composer-actions">
+						<button id="abort" type="button" class="secondary">Interrupt</button>
+						<button id="send" type="submit">Send</button>
+					</div>
+				</form>
+			</section>
+		</main>
+	</body>
+</html>
