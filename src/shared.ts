@@ -67,7 +67,8 @@ export interface PastView {
 export type View = LiveView | PastView;
 
 export type Item =
-	| { id: string; kind: "user"; text: string; from: string | null }
+	/** `entryId`: the session-file entry omp can branch at; `null` for Collab prompts and prompts not yet in the file. */
+	| { id: string; kind: "user"; text: string; from: string | null; entryId: string | null }
 	| { id: string; kind: "assistant"; text: string; streaming: boolean }
 	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error" }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
@@ -83,6 +84,8 @@ export type ControlPhase =
 	| { phase: "ended"; reason: string };
 
 export type LaunchResult = { ok: true; instanceId: string } | { ok: false; error: string };
+/** `prompt` is the text of the prompt forked at, for the composer. */
+export type ForkResult = { ok: true; instanceId: string; prompt: string } | { ok: false; error: string };
 /** One `/` or `@` suggestion, with the composer text and caret it produces when accepted (omp's own insertion). */
 export interface CompletionItem {
 	kind: "command" | "skill" | "file" | "directory";
@@ -110,6 +113,8 @@ export type ServerMsg =
 	| { t: "items"; view: View; reset: boolean; items: Item[] }
 	/** Answers this socket's `create` once the new session is ready, or once it failed to start. */
 	| { t: "created"; result: LaunchResult }
+	/** Answers this socket's `fork` once the forked session is ready, or once forking failed. */
+	| { t: "forked"; result: ForkResult }
 	| { t: "completions"; reqId: number; items: CompletionItem[]; error: string | null };
 
 export type ClientMsg =
@@ -123,5 +128,7 @@ export type ClientMsg =
 	| { t: "create"; cwd: string }
 	/** End a session this dashboard started. */
 	| { t: "end"; instanceId: string }
+	/** Start a dashboard session holding the view's history before the user prompt `entryId`. The view's file stays untouched. */
+	| { t: "fork"; view: View; entryId: string }
 	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
 	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number };

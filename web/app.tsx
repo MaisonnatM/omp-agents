@@ -4,7 +4,7 @@ import { Conversation, PastConversation } from "./components/conversation";
 import { Roster } from "./components/roster";
 import { SidebarResizeHandle, storedSidebarWidth } from "./components/sidebar-resize-handle";
 import { useDashboard } from "./use-dashboard";
-import { defaultCwd, hashForView } from "./view-model";
+import { defaultCwd, hashForView, sameView } from "./view-model";
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
@@ -28,7 +28,7 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 }
 
 export function App() {
-	const { state, send, select, setLaunchOpen, create } = useDashboard();
+	const { state, send, select, setLaunchOpen, create, fork } = useDashboard();
 	const initialWidth = useMemo(storedSidebarWidth, []);
 	const { view } = state;
 
@@ -41,6 +41,9 @@ export function App() {
 				host={state.hosts.find(h => h.instanceId === view.instanceId) ?? null}
 				lastHost={state.viewHost}
 				items={state.items}
+				initialDraft={state.draft && sameView(state.draft.view, view) ? state.draft.text : ""}
+				fork={state.fork}
+				onFork={fork}
 				completions={state.completions}
 				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, view, text, cursor })}
 				onPrompt={text => send({ t: "prompt", view, text })}
@@ -55,6 +58,8 @@ export function App() {
 				sessionId={view.sessionId}
 				session={state.past.find(s => s.sessionId === view.sessionId) ?? null}
 				items={state.items}
+				fork={state.fork}
+				onFork={fork}
 			/>
 		);
 	} else if (state.hosts.length === 0) {

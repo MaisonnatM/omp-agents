@@ -4,8 +4,9 @@
  * machine. Like any session, its transcript is read from its session file.
  */
 import { randomBytes } from "node:crypto";
+import { statSync } from "node:fs";
 import { activityOf, type LiveUpdate, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
-import { type RpcChild, type RpcState, startRpc } from "./omp";
+import { endsMidTurn, type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp";
 import type { AgentRow, AgentStatus, HostStatus } from "./shared";
 import { isObject } from "./transcript";
 
@@ -28,6 +29,31 @@ interface RpcAgent {
 }
 
 export type DashboardUpdate = LiveUpdate | { kind: "exited" };
+
+export interface ForkedSession {
+	session: DashboardSession;
+	/** Text of the prompt forked at. */
+	prompt: string;
+}
+
+/** The working directory a session file's header records; omp refuses to open the file from any other. */
+async function recordedCwd(sessionFile: string): Promise<string> {
+	const head = await Bun.file(sessionFile).slice(0, 1 << 16).text();
+	// omp may write a title record ahead of the header.
+	const header = head
+		.split("\n", 4)
+		.map(line => {
+			try {
+				return JSON.parse(line) as unknown;
+			} catch {
+				return null;
+			}
+		})
+		.find(record => isObject(record) && record.type === "session");
+	if (!isObject(header) || typeof header.cwd !== "string") throw new Error("the session file has no readable header");
+	if (!statSync(header.cwd, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${header.cwd} no longer exists`);
+	return header.cwd;
+}
 
 export class DashboardSession {
 	/** Same shape as a Collab instance id, so the page's hash routing treats both alike. */
@@ -62,10 +88,43 @@ export class DashboardSession {
 	}
 
 	/** Spawn omp in `cwd` and wait until it accepts commands. */
-	static async start(cwd: string, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+	static start(cwd: string, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+		return DashboardSession.#spawn(cwd, emit, async () => {});
+	}
+
+	/**
+	 * Spawn omp holding the history of `sourceFile` before its user prompt `entryId`, as omp's
+	 * `/branch` does. omp writes the fork to a new file; `sourceFile` is only read.
+	 */
+	static async fork(sourceFile: string, entryId: string, emit: (update: DashboardUpdate) => void): Promise<ForkedSession> {
+		// omp would repair such a file in place on open.
+		if (await endsMidTurn(sourceFile)) throw new Error("this session ended mid-turn. Resume it in omp once, then fork.");
+		let prompt = "";
+		const session = await DashboardSession.#spawn(await recordedCwd(sourceFile), emit, async client => {
+			if ((await client.switchSession(sourceFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
+			try {
+				const branched = await client.branch(entryId);
+				if (branched.cancelled) throw new Error("an omp extension cancelled the branch");
+				prompt = branched.text;
+			} catch (err) {
+				// omp records its exit in the session it holds, so leave the source before stopping.
+				await client.newSession().catch(() => {});
+				throw err;
+			}
+		});
+		return { session, prompt };
+	}
+
+	/** Listens only once `prepare` is done, so the session reports the state `prepare` left it in. */
+	static async #spawn(
+		cwd: string,
+		emit: (update: DashboardUpdate) => void,
+		prepare: (client: RpcClient) => Promise<void>,
+	): Promise<DashboardSession> {
 		const child = await startRpc(cwd);
 		try {
 			await child.client.setSubagentSubscription("progress");
+			await prepare(child.client);
 			return new DashboardSession(cwd, child, await child.client.getState(), emit);
 		} catch (err) {
 			await child.client.stop();

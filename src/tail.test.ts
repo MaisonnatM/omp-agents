@@ -41,7 +41,7 @@ describe("FileTail", () => {
 		await read();
 		expect(emits).toEqual([
 			{ reset: true, items: [] },
-			{ reset: false, items: [{ id: "m1", kind: "user", text: "first", from: null }] },
+			{ reset: false, items: [{ id: "m1", kind: "user", text: "first", from: null, entryId: "e1" }] },
 		]);
 	});
 
@@ -55,7 +55,7 @@ describe("FileTail", () => {
 		await read();
 		expect(emits).toEqual([
 			{ reset: true, items: [] },
-			{ reset: false, items: [{ id: "m2", kind: "user", text: "café ✓", from: null }] },
+			{ reset: false, items: [{ id: "m2", kind: "user", text: "café ✓", from: null, entryId: "e2" }] },
 		]);
 	});
 
@@ -65,6 +65,6 @@ describe("FileTail", () => {
 		await read();
 		writeFileSync(path, user(5, "new"));
 		await read();
-		expect(emits.at(-1)).toEqual({ reset: true, items: [{ id: "m5", kind: "user", text: "new", from: null }] });
+		expect(emits.at(-1)).toEqual({ reset: true, items: [{ id: "m5", kind: "user", text: "new", from: null, entryId: "e5" }] });
 	});
 });

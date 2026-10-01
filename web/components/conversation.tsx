@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { AgentRow, CompletionItem, ControlPhase, Item, LiveView, PastSession, RosterHost } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
@@ -7,7 +7,8 @@ import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import { type ToolItem, toBlocks } from "../view-model";
+import type { Fork } from "../use-dashboard";
+import { type ForkPoint, forkPoints, type ToolItem, toBlocks } from "../view-model";
 import { completionTrigger } from "../completion-trigger";
 import { CompletionPopup } from "./completion-popup";
 import { MessageMarkdown } from "./message-markdown";
@@ -78,7 +79,36 @@ function CopyButton({ text }: { text: string }) {
 	);
 }
 
-const copyAction = (text: string): ReactNode => (text.trim() ? <CopyButton text={text} /> : undefined);
+function ForkButton({ point, forking, disabled, onFork }: { point: ForkPoint; forking: boolean; disabled: boolean; onFork: () => void }) {
+	const BranchIcon = useIcon("git-branch");
+	const LoaderIcon = useIcon("loader");
+	const title = forking
+		? "Forking…"
+		: point.prefill
+			? "Fork from here: a new session with the history before this prompt, ready to edit and resend it"
+			: "Fork from here: a new session with the history through this reply";
+	return (
+		<Button
+			variant="ghost"
+			size="icon-compact"
+			aria-label={forking ? "Forking" : "Fork from here"}
+			title={title}
+			aria-busy={forking || undefined}
+			disabled={disabled}
+			data-fork={point.prefill ? "prompt" : "reply"}
+			onClick={onFork}
+		>
+			{forking ? <LoaderIcon className="animate-spin" /> : <BranchIcon />}
+		</Button>
+	);
+}
+
+interface TranscriptProps {
+	items: Item[];
+	working: boolean;
+	fork: Fork;
+	onFork: (itemId: string, point: ForkPoint) => void;
+}
 
 interface HeaderProps {
 	title: string;
@@ -106,7 +136,7 @@ function Header({ title, meta, status, alert, children }: HeaderProps) {
 }
 
 /** The scrolling message list. It stays pinned to the bottom unless the reader scrolled up. */
-function Transcript({ items, working }: { items: Item[]; working: boolean }) {
+function Transcript({ items, working, fork, onFork }: TranscriptProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const pinned = useRef(true);
 
@@ -117,6 +147,7 @@ function Transcript({ items, working }: { items: Item[]; working: boolean }) {
 
 	const last = items.at(-1);
 	const streaming = last?.kind === "assistant" && last.streaming;
+	const forks = forkPoints(items);
 
 	return (
 		<div
@@ -131,38 +162,48 @@ function Transcript({ items, working }: { items: Item[]; working: boolean }) {
 				{toBlocks(items).map(block => {
 					if (block.kind === "tools") return <ToolGroup key={block.id} tools={block.tools} />;
 					const item = block.item;
-					switch (item.kind) {
-						case "user":
-							return (
-								<ChatMessage
-									key={item.id}
-									from="user"
-									time={item.from ?? undefined}
-									actions={copyAction(item.text)}
-									data-item="user"
-								>
-									<MessageMarkdown text={item.text} />
-								</ChatMessage>
-							);
-						case "assistant":
-							return (
-								<ChatMessage
-									key={item.id}
-									from="assistant"
-									actions={item.streaming ? undefined : copyAction(item.text)}
-									data-item="assistant"
-									data-streaming={item.streaming}
-								>
-									<MessageMarkdown text={item.text} />
-								</ChatMessage>
-							);
-						case "notice":
-							return (
-								<p key={item.id} className={cn("self-center text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
-									{item.text}
-								</p>
-							);
+					if (item.kind === "notice") {
+						return (
+							<p key={item.id} className={cn("self-center text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
+								{item.text}
+							</p>
+						);
 					}
+					const copyable = !(item.kind === "assistant" && item.streaming) && item.text.trim() !== "";
+					const point = forks.get(item.id);
+					const failed = fork.phase === "failed" && fork.itemId === item.id ? fork.error : null;
+					return (
+						<Fragment key={item.id}>
+							<ChatMessage
+								from={item.kind}
+								time={item.kind === "user" ? (item.from ?? undefined) : undefined}
+								actions={
+									copyable || point ? (
+										<>
+											{copyable && <CopyButton text={item.text} />}
+											{point && (
+												<ForkButton
+													point={point}
+													forking={fork.phase === "forking" && fork.itemId === item.id}
+													disabled={fork.phase === "forking"}
+													onFork={() => onFork(item.id, point)}
+												/>
+											)}
+										</>
+									) : undefined
+								}
+								data-item={item.kind}
+								data-streaming={item.kind === "assistant" ? item.streaming : undefined}
+							>
+								<MessageMarkdown text={item.text} />
+							</ChatMessage>
+							{failed && (
+								<p role="alert" className={cn(item.kind === "user" ? "self-end" : "self-start", "text-xs", NOTICE_TONE.error)}>
+									{failed}
+								</p>
+							)}
+						</Fragment>
+					);
 				})}
 				{working && !streaming && <ThinkingIndicator className="self-start" />}
 			</div>
@@ -175,15 +216,17 @@ interface PastConversationProps {
 	/** The listed row, or `null` when the session is no longer listed. */
 	session: PastSession | null;
 	items: Item[];
+	fork: Fork;
+	onFork: (itemId: string, point: ForkPoint) => void;
 }
 
 /** A past session's saved transcript. It follows the file, but nothing on this page can write to it. */
-export function PastConversation({ sessionId, session, items }: PastConversationProps) {
+export function PastConversation({ sessionId, session, items, fork, onFork }: PastConversationProps) {
 	const meta = session ? `${session.cwdDisplay} · last active ${new Date(session.modifiedAt).toLocaleString()}` : sessionId;
 	return (
 		<div className="flex h-svh min-h-0 flex-1 flex-col">
 			<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Read-only" alert={false} />
-			<Transcript items={items} working={false} />
+			<Transcript items={items} working={false} fork={fork} onFork={onFork} />
 		</div>
 	);
 }
@@ -195,6 +238,10 @@ interface ConversationProps {
 	/** Last known row, for the header after the session ended. */
 	lastHost: RosterHost | null;
 	items: Item[];
+	/** Composer text on mount, from a fork. */
+	initialDraft: string;
+	fork: Fork;
+	onFork: (itemId: string, point: ForkPoint) => void;
 	completions: { reqId: number; items: CompletionItem[]; error: string | null } | null;
 	onComplete: (reqId: number, text: string, cursor: number) => void;
 	onPrompt: (text: string) => void;
@@ -203,8 +250,21 @@ interface ConversationProps {
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts and queues reset per view. */
-export function Conversation({ view, host, lastHost, items, completions, onComplete, onPrompt, onAbort, onEnd }: ConversationProps) {
-	const [draft, setDraft] = useState("");
+export function Conversation({
+	view,
+	host,
+	lastHost,
+	items,
+	initialDraft,
+	fork,
+	onFork,
+	completions,
+	onComplete,
+	onPrompt,
+	onAbort,
+	onEnd,
+}: ConversationProps) {
+	const [draft, setDraft] = useState(initialDraft);
 	const [queue, setQueue] = useState<QueuedMessage[]>([]);
 	const [requestId, setRequestId] = useState<number | null>(null);
 	const [active, setActive] = useState(0);
@@ -287,7 +347,7 @@ export function Conversation({ view, host, lastHost, items, completions, onCompl
 					</Button>
 				)}
 			</Header>
-			<Transcript items={items} working={working === true} />
+			<Transcript items={items} working={working === true} fork={fork} onFork={onFork} />
 			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
 				{popupOpen && (
 					<CompletionPopup id={popupId} items={suggestions} active={Math.min(active, suggestions.length - 1)}

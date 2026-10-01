@@ -62,6 +62,7 @@ import {
   Folder,
   SlidersHorizontal,
   Info,
+  GitBranch,
 } from "lucide-react";
 
 export interface IconComponentProps {
@@ -86,7 +87,7 @@ export type IconName =
   | "home" | "message-circle" | "inbox"
   | "pencil" | "scaling" | "skip-forward" | "corner-down-right" | "corner-down-left"
   | "panel-left" | "panel-right" | "chevrons-up-down" | "more-horizontal" | "more-vertical" | "calendar" | "folder"
-  | "sliders-horizontal" | "info";
+  | "sliders-horizontal" | "info" | "git-branch";
 
 export const defaultIcons: Record<IconName, IconComponent> = {
   "chevron-right": ChevronRight,
@@ -148,6 +149,7 @@ export const defaultIcons: Record<IconName, IconComponent> = {
   "folder": Folder,
   "sliders-horizontal": SlidersHorizontal,
   "info": Info,
+  "git-branch": GitBranch,
 };
 
 const IconContext = createContext<Record<IconName, IconComponent> | null>(null);

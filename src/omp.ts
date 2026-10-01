@@ -79,6 +79,21 @@ interface ListingModule {
 interface DirsModule {
 	getSessionsDir(): string;
 }
+/** Subset of omp's `SessionEntry` (src/session/session-entries.ts); the header has `type: "session"`. */
+interface FileEntry {
+	type: string;
+	id: string;
+	parentId?: string | null;
+}
+interface LoaderModule {
+	loadEntriesFromFile(filePath: string): Promise<FileEntry[]>;
+}
+interface ExitDiagnosticsModule {
+	createInterruptedTurnAbortMessage(
+		entries: readonly FileEntry[],
+		fallbackModel?: { api: string; provider: string; model: string },
+	): object | undefined;
+}
 
 /** Subset of omp's `RpcSessionState` (src/modes/rpc/rpc-types.ts) this app reads. */
 export interface RpcState {
@@ -106,6 +121,10 @@ export interface RpcClient {
 	abort(): Promise<void>;
 	setSubagentSubscription(level: "progress"): Promise<string>;
 	getSubagents(): Promise<RpcSubagent[]>;
+	switchSession(sessionPath: string): Promise<{ cancelled: boolean }>;
+	/** Moves to a new session file holding the history before the user prompt `entryId`; `text` is that prompt. */
+	branch(entryId: string): Promise<{ text: string; cancelled: boolean }>;
+	newSession(parentSession?: string): Promise<{ cancelled: boolean }>;
 	onSessionEvent(listener: (event: Frame) => void): () => void;
 	/** Payloads are the `task:subagent:lifecycle` / `task:subagent:progress` bus payloads. */
 	onSubagentLifecycle(listener: (payload: unknown) => void): () => void;
@@ -330,6 +349,27 @@ const dirs = (await import(join(dirname(packageDir), "pi-utils", "src", "dirs.ts
 
 /** omp's sessions root: one directory per working directory, each holding `<time>_<id>.jsonl` files. */
 export const sessionsDir: string = dirs.getSessionsDir();
+const loader = (await import(join(srcDir, "session", "session-loader.ts"))) as LoaderModule;
+const exitDiagnostics = (await import(join(srcDir, "session", "exit-diagnostics.ts"))) as ExitDiagnosticsModule;
+
+/**
+ * Whether omp, opening `sessionFile`, would append an abort record because the process that
+ * last held it exited mid-turn (omp's `switchSession`). Read-only.
+ */
+export async function endsMidTurn(sessionFile: string): Promise<boolean> {
+	const entries = (await loader.loadEntriesFromFile(sessionFile)).filter(entry => entry.type !== "session");
+	const byId = new Map(entries.map(entry => [entry.id, entry]));
+	// omp checks the branch from the leaf, which on load is the last entry.
+	const branch: FileEntry[] = [];
+	const seen = new Set<string>();
+	for (let entry = entries.at(-1); entry && !seen.has(entry.id); entry = entry.parentId ? byId.get(entry.parentId) : undefined) {
+		seen.add(entry.id);
+		branch.push(entry);
+	}
+	// omp passes the session's model as the fallback; any model makes this answer cover every case omp repairs.
+	const anyModel = { api: "", provider: "", model: "" };
+	return exitDiagnostics.createInterruptedTurnAbortMessage(branch.reverse(), anyModel) !== undefined;
+}
 
 export interface RpcChild {
 	client: RpcClient;

@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import type { ClientMsg, CompletionItem, Item, PastSession, RosterHost, ServerMsg, View } from "../src/shared";
-import { applyItems, hashForView, sameView, viewFromHash } from "./view-model";
+import type { ClientMsg, CompletionItem, Item, LiveView, PastSession, RosterHost, ServerMsg, View } from "../src/shared";
+import { applyItems, type ForkPoint, hashForView, sameView, viewFromHash } from "./view-model";
 
 /** The New session form: closed, open for a directory (with the last attempt's error), or waiting for the session to start. */
 export type Launch = { phase: "closed" } | { phase: "editing"; error: string | null } | { phase: "starting" };
+
+/** A fork from a message of the selected view: none, waiting for the forked session, or failed with the reason. */
+export type Fork =
+	| { phase: "idle" }
+	| { phase: "forking"; itemId: string; point: ForkPoint }
+	| { phase: "failed"; itemId: string; error: string };
 
 export interface DashboardState {
 	connected: boolean;
@@ -18,6 +24,9 @@ export interface DashboardState {
 	/** Transcript of the selected view. */
 	items: Item[];
 	launch: Launch;
+	fork: Fork;
+	/** Composer text for a forked session's first mount. */
+	draft: { view: LiveView; text: string } | null;
 	completions: { reqId: number; items: CompletionItem[]; error: string | null } | null;
 }
 
@@ -25,7 +34,8 @@ type Action =
 	| { t: "connected"; connected: boolean }
 	| { t: "server"; msg: ServerMsg }
 	| { t: "select"; view: View | null }
-	| { t: "launch"; launch: Launch };
+	| { t: "launch"; launch: Launch }
+	| { t: "fork"; fork: Fork };
 
 const findHost = (hosts: RosterHost[], view: View | null): RosterHost | null =>
 	view?.kind === "live" ? (hosts.find(host => host.instanceId === view.instanceId) ?? null) : null;
@@ -33,18 +43,32 @@ const findHost = (hosts: RosterHost[], view: View | null): RosterHost | null =>
 function reduce(state: DashboardState, action: Action): DashboardState {
 	switch (action.t) {
 		case "connected": {
-			// The answer to a pending `create` went to the socket that just closed.
+			// The answer to a pending `create` or `fork` went to the socket that just closed.
 			const launch: Launch =
 				!action.connected && state.launch.phase === "starting"
 					? { phase: "editing", error: "Lost the dashboard server while the session was starting. It may still appear." }
 					: state.launch;
-			return { ...state, connected: action.connected, launch };
+			const fork: Fork =
+				!action.connected && state.fork.phase === "forking"
+					? { phase: "failed", itemId: state.fork.itemId, error: "Lost the dashboard server while forking. The fork may still appear." }
+					: state.fork;
+			return { ...state, connected: action.connected, launch, fork };
 		}
 		case "select":
 			if (sameView(state.view, action.view)) return state;
-			return { ...state, view: action.view, viewHost: findHost(state.hosts, action.view), items: [], completions: null };
+			return {
+				...state,
+				view: action.view,
+				viewHost: findHost(state.hosts, action.view),
+				items: [],
+				completions: null,
+				fork: state.fork.phase === "forking" ? state.fork : { phase: "idle" },
+				draft: state.draft && sameView(state.draft.view, action.view) ? state.draft : null,
+			};
 		case "launch":
 			return { ...state, launch: action.launch };
+		case "fork":
+			return { ...state, fork: action.fork };
 		case "server": {
 			const msg = action.msg;
 			switch (msg.t) {
@@ -65,6 +89,13 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 				case "created":
 					if (state.launch.phase !== "starting") return state;
 					return { ...state, launch: msg.result.ok ? { phase: "closed" } : { phase: "editing", error: msg.result.error } };
+				case "forked": {
+					const fork = state.fork;
+					if (fork.phase !== "forking") return state;
+					if (!msg.result.ok) return { ...state, fork: { phase: "failed", itemId: fork.itemId, error: msg.result.error } };
+					const view: LiveView = { kind: "live", instanceId: msg.result.instanceId, agentId: null };
+					return { ...state, fork: { phase: "idle" }, draft: { view, text: fork.point.prefill ? msg.result.prompt : "" } };
+				}
 				case "completions":
 					return { ...state, completions: msg };
 			}
@@ -80,6 +111,8 @@ export interface Dashboard {
 	/** Open or close the New session form. */
 	setLaunchOpen: (open: boolean) => void;
 	create: (cwd: string) => void;
+	/** Fork the selected view at a message's fork point; the forked session opens once ready. */
+	fork: (itemId: string, point: ForkPoint) => void;
 }
 
 /** Live dashboard state over the server's WebSocket; selection lives in the URL hash. */
@@ -94,6 +127,8 @@ export function useDashboard(): Dashboard {
 		viewHost: null,
 		items: [],
 		launch: { phase: "closed" },
+		fork: { phase: "idle" },
+		draft: null,
 		completions: null,
 	});
 	const socketRef = useRef<WebSocket | null>(null);
@@ -120,7 +155,7 @@ export function useDashboard(): Dashboard {
 			ws.onmessage = event => {
 				const msg = JSON.parse(String(event.data)) as ServerMsg;
 				dispatch({ t: "server", msg });
-				if (msg.t === "created" && msg.result.ok) {
+				if ((msg.t === "created" || msg.t === "forked") && msg.result.ok) {
 					location.hash = hashForView({ kind: "live", instanceId: msg.result.instanceId, agentId: null });
 				}
 			};
@@ -165,5 +200,15 @@ export function useDashboard(): Dashboard {
 		[send],
 	);
 
-	return { state, send, select, setLaunchOpen, create };
+	const fork = useCallback(
+		(itemId: string, point: ForkPoint) => {
+			const view = viewRef.current;
+			if (!view) return;
+			dispatch({ t: "fork", fork: { phase: "forking", itemId, point } });
+			send({ t: "fork", view, entryId: point.entryId });
+		},
+		[send],
+	);
+
+	return { state, send, select, setLaunchOpen, create, fork };
 }

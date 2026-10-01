@@ -26,7 +26,7 @@ describe("Transcript", () => {
 
 		expect(late).toEqual([]);
 		expect(t.items()).toEqual([
-			{ id: "m100", kind: "user", text: "say pong", from: null },
+			{ id: "m100", kind: "user", text: "say pong", from: null, entryId: "e1" },
 			{ id: "m200:0", kind: "assistant", text: "pong", streaming: false },
 		]);
 	});
@@ -36,7 +36,7 @@ describe("Transcript", () => {
 		const prompt = { role: "custom", customType: "collab-prompt", timestamp: 300, content: "hi", details: { from: "probe" } };
 		expect(t.applyEvent({ type: "message_start", message: prompt })).toEqual([]);
 		t.applyEntry({ type: "custom_message", id: "e3", customType: "collab-prompt", content: "hi", details: { from: "probe" } });
-		expect(t.items()).toEqual([{ id: "e3", kind: "user", text: "hi", from: "probe" }]);
+		expect(t.items()).toEqual([{ id: "e3", kind: "user", text: "hi", from: "probe", entryId: null }]);
 	});
 
 	test("a fresh session's first prompt shows at once and stays ahead of its reply when the file catches up", () => {
@@ -54,6 +54,17 @@ describe("Transcript", () => {
 
 		expect(t.items().map(item => item.id)).toEqual(["m600", "m610:0", "notice1"]);
 		expect(t.items()[1]).toEqual({ id: "m610:0", kind: "assistant", text: "pong", streaming: false });
+	});
+
+	test("a prompt omp can branch at carries its entry id once the file holds it", () => {
+		const t = new Transcript();
+		const prompt = { role: "user", timestamp: 700, content: "fork me" };
+		expect(t.applyEvent({ type: "message_end", message: prompt })).toEqual([
+			{ id: "m700", kind: "user", text: "fork me", from: null, entryId: null },
+		]);
+		expect(t.applyEntry({ type: "message", id: "a1b2c3d4", message: prompt })).toEqual([
+			{ id: "m700", kind: "user", text: "fork me", from: null, entryId: "a1b2c3d4" },
+		]);
 	});
 
 	test("a prompt that reaches the file after its streamed reply moves ahead of it and asks for a reset", () => {
@@ -108,7 +119,7 @@ describe("Transcript", () => {
 		t.applyLines([...lines, "{not json", ""]);
 
 		expect(t.items()).toEqual([
-			{ id: "m1", kind: "user", text: "list files", from: null },
+			{ id: "m1", kind: "user", text: "list files", from: null, entryId: "e1" },
 			{ id: "tool:c9", kind: "tool", name: "read", summary: "Listing files", status: "ok" },
 			{ id: "m4:0", kind: "assistant", text: "README.md", streaming: false },
 			{ id: "m4:stop", kind: "notice", level: "warning", text: "Interrupted." },

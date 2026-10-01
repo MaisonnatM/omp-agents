@@ -89,10 +89,10 @@ export class Transcript {
 				if (!isObject(entry.message)) return [];
 				const key = messageKey(entry.message) ?? id;
 				this.#settled.add(key);
-				return this.#applyMessage(key, entry.message, false);
+				return this.#applyMessage(key, entry.message, false, str(entry.id) ?? null);
 			}
 			case "custom_message":
-				return this.#applyMessage(id, { ...entry, role: "custom" }, false);
+				return this.#applyMessage(id, { ...entry, role: "custom" }, false, null);
 			case "compaction":
 				return this.#upsert({ id, kind: "notice", level: "info", text: "Earlier context was compacted." });
 			default:
@@ -161,19 +161,20 @@ export class Transcript {
 		if (!isObject(message) || (message.role !== "assistant" && message.role !== "user")) return [];
 		const key = messageKey(message);
 		if (!key || this.#settled.has(key)) return [];
-		return this.#applyMessage(key, message, streaming);
+		return this.#applyMessage(key, message, streaming, null);
 	}
 
-	#applyMessage(key: string, message: Json, streaming: boolean): Item[] {
+	/** `entryId`: the file entry holding `message`, or `null` for a live event. */
+	#applyMessage(key: string, message: Json, streaming: boolean, entryId: string | null): Item[] {
 		switch (message.role) {
 			case "user": {
 				if (message.synthetic) return [];
-				return this.#upsert({ id: key, kind: "user", text: textOf(message.content), from: null });
+				return this.#upsert({ id: key, kind: "user", text: textOf(message.content), from: null, entryId });
 			}
 			case "custom": {
 				if (message.customType !== COLLAB_PROMPT) return [];
 				const from = isObject(message.details) ? (str(message.details.from) ?? null) : null;
-				return this.#upsert({ id: key, kind: "user", text: textOf(message.content), from });
+				return this.#upsert({ id: key, kind: "user", text: textOf(message.content), from, entryId: null });
 			}
 			case "assistant":
 				return this.#applyAssistant(key, message, streaming);

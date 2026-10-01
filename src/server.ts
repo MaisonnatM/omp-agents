@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import type { Server, ServerWebSocket } from "bun";
 import index from "../web/index.html";
 import { complete, expandPrompt, forgetSession } from "./commands";
-import { DashboardSession, type DashboardUpdate } from "./dashboard-session";
+import { DashboardSession, type DashboardUpdate, type ForkedSession } from "./dashboard-session";
 import { type LiveUpdate, SessionGuest } from "./guest";
 import { FileTail } from "./tail";
 import { type HostSnapshot, listHosts, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
@@ -264,6 +264,26 @@ async function launch(ws: Socket, input: string): Promise<void> {
 	send(ws, { t: "created", result: { ok: true, instanceId: session.instanceId } });
 }
 
+/** Fork the view's session file at the user prompt `entryId` into a new dashboard session, and answer once it is ready. */
+async function fork(ws: Socket, view: View, entryId: string): Promise<void> {
+	const source = pathFor(view);
+	if (!source) {
+		send(ws, { t: "forked", result: { ok: false, error: "Cannot fork: this session's file is not known yet." } });
+		return;
+	}
+	let forked: ForkedSession;
+	try {
+		forked = await DashboardSession.fork(source, entryId, update => onLiveUpdate(forked.session.instanceId, update));
+	} catch (err) {
+		send(ws, { t: "forked", result: { ok: false, error: `Cannot fork: ${err instanceof Error ? err.message : String(err)}` } });
+		return;
+	}
+	dashboards.set(forked.session.instanceId, forked.session);
+	pushRoster();
+	pushPast();
+	send(ws, { t: "forked", result: { ok: true, instanceId: forked.session.instanceId, prompt: forked.prompt } });
+}
+
 function unwatch(ws: Socket): void {
 	const view = ws.data.view;
 	ws.data.view = null;
@@ -343,6 +363,11 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 			const cwd = value.cwd;
 			return typeof cwd === "string" && cwd.trim() ? { t: "create", cwd } : null;
 		}
+		case "fork": {
+			const view = parseView(value.view);
+			const entryId = value.entryId;
+			return view && typeof entryId === "string" && entryId ? { t: "fork", view, entryId } : null;
+		}
 		default:
 			return null;
 	}
@@ -391,6 +416,9 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			return;
 		case "create":
 			void launch(ws, msg.cwd);
+			return;
+		case "fork":
+			void fork(ws, msg.view, msg.entryId);
 			return;
 		case "end":
 			void dashboards.get(msg.instanceId)?.end();
