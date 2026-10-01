@@ -7,7 +7,8 @@ import { complete, expandPrompt, forgetSession } from "./commands";
 import { DashboardSession, type DashboardUpdate, type ForkedSession } from "./dashboard-session";
 import { type LiveUpdate, SessionGuest } from "./guest";
 import { FileTail } from "./tail";
-import { type HostSnapshot, listHosts, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
+import { displayPath, type HostSnapshot, listHosts, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
+import { loadOmpSettings } from "./settings";
 import type { ClientMsg, HostStatus, Item, LiveView, RosterHost, ServerMsg, View } from "./shared";
 import { isObject } from "./transcript";
 import { fetchPlanUsage } from "./usage";
@@ -25,7 +26,7 @@ const LIST_THROTTLE_MS = 500;
 /** `omp usage` caches provider reports itself; each run still costs a process and up to one network round trip per provider. */
 const USAGE_POLL_MS = 60_000;
 const HOME = homedir();
-/** Only pages served by this app may open the socket: it carries full control of every session. */
+/** Only pages served by this app may open the socket, which carries full control of every session, or read omp's files. */
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 
 interface SocketData {
@@ -58,8 +59,6 @@ const viewKey = (view: View): string =>
 const itemsTopic = (key: string): string => `items:${key}`;
 const send = (ws: Socket, msg: ServerMsg): void => void ws.send(JSON.stringify(msg));
 const publish = (topic: string, msg: ServerMsg): void => void server.publish(topic, JSON.stringify(msg));
-const displayPath = (path: string): string =>
-	path === HOME || path.startsWith(`${HOME}/`) ? `~${path.slice(HOME.length)}` : path;
 
 function statusOf(host: HostSnapshot): HostStatus {
 	if (host.inputRequired) return "needs-input";
@@ -492,13 +491,33 @@ function upgrade(req: Request, srv: Server<SocketData>): Response | undefined {
 	return new Response("expected a websocket", { status: 426 });
 }
 
+/**
+ * `GET /api/settings[?cwd=<dir>]`: omp's model routing and files, user-level only without `cwd`. Read-only.
+ * `cwd` must be a directory some session ran in: the page names workspaces that way, as it names sessions by id.
+ */
+async function settings(req: Request): Promise<Response> {
+	if (!ALLOWED_HOSTS.has(req.headers.get("host") ?? "")) return new Response("forbidden host", { status: 403 });
+	const cwd = new URL(req.url).searchParams.get("cwd");
+	const sessionRan =
+		cwd === null ||
+		hosts.some(host => host.cwd === cwd) ||
+		[...dashboards.values()].some(session => session.cwd === cwd) ||
+		files.some(session => session.cwd === cwd);
+	if (!sessionRan) return Response.json({ error: `No session ran in ${cwd}` }, { status: 404 });
+	try {
+		return Response.json(await loadOmpSettings(cwd));
+	} catch (err) {
+		return Response.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+	}
+}
+
 let server: Server<SocketData>;
 try {
 	server = Bun.serve<SocketData>({
 		hostname: HOSTNAME,
 		port: PORT,
 		development: false,
-		routes: { "/": index },
+		routes: { "/": index, "/api/settings": { GET: settings } },
 		fetch(req, srv) {
 			if (new URL(req.url).pathname === "/ws") return upgrade(req, srv);
 			return new Response("not found", { status: 404 });

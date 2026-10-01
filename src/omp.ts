@@ -4,7 +4,9 @@
  * and RPC code of the omp version that is running the sessions.
  */
 import { existsSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import type { OmpFileKind, RetrySettings } from "./shared";
 import { oneLine } from "./transcript";
 
 export type Access = "view" | "control";
@@ -78,6 +80,7 @@ interface ListingModule {
 }
 interface DirsModule {
 	getSessionsDir(): string;
+	getAgentDir(): string;
 }
 /** Subset of omp's `SessionEntry` (src/session/session-entries.ts); the header has `type: "session"`. */
 interface FileEntry {
@@ -219,75 +222,43 @@ interface SlashCommandsModule {
 interface SettingsReader<T> {
 	get(settings: unknown): T;
 }
+/** Subset of omp's `Settings` (src/config/settings.ts) this app reads. */
+interface OmpSettingsInstance {
+	/** `modelRoles` as configured, in config order. */
+	getModelRoles(): Record<string, string>;
+}
 interface ConfigModule {
-	Settings: { loadReadOnly(options: { cwd: string }): Promise<unknown> };
+	Settings: { loadReadOnly(options: { cwd: string }): Promise<OmpSettingsInstance> };
 }
 interface ExtensionSettingsModule {
 	cfgSkills: SettingsReader<Record<string, unknown> & { enableSkillCommands?: boolean }>;
 	cfgDisabledExtensions: SettingsReader<string[]>;
 }
-
-/** Subset of pi-tui's `AutocompleteItem` (pi-tui/src/autocomplete.ts). */
-export interface AutocompleteItem {
-	value: string;
-	label: string;
-	description?: string;
+interface SessionSettingsModule {
+	cfgRetry: SettingsReader<Omit<RetrySettings, "fallbackRevertPolicy">>;
+	cfgRetryFallbackChains: SettingsReader<Record<string, string[]>>;
+	cfgRetryFallbackRevertPolicy: SettingsReader<string>;
 }
-/** pi-tui's `CombinedAutocompleteProvider`: omp's own `/` and `@` completion. */
-export interface AutocompleteProvider {
-	getSuggestions(
-		lines: string[],
-		cursorLine: number,
-		cursorCol: number,
-	): Promise<{ items: AutocompleteItem[]; prefix: string } | null>;
-	applyCompletion(
-		lines: string[],
-		cursorLine: number,
-		cursorCol: number,
-		item: AutocompleteItem,
-		prefix: string,
-	): { lines: string[]; cursorLine: number; cursorCol: number };
+interface ModelSettingsModule {
+	cfgModelProviderOrder: SettingsReader<string[]>;
 }
-interface AutocompleteModule {
-	CombinedAutocompleteProvider: new (
-		commands: { name: string; description?: string }[],
-		basePath: string,
-	) => AutocompleteProvider;
+interface FallbackChainsModule {
+	/** Gives every chat role without a chain of its own the `default` chain. */
+	expandDefaultRetryFallbackChains(configured: Record<string, string[]>, roleNames: readonly string[]): Record<string, string[]>;
 }
 
-/** Subset of omp's `Skill` (src/extensibility/skills.ts). */
-export interface Skill {
-	name: string;
-	description: string;
-	filePath: string;
-	baseDir: string;
+/** Subset of omp's capability items (src/capability/types.ts): every item names the file it came from. */
+interface CapabilityItem {
+	_source: { provider: string; path: string; level: "user" | "project" | "native" };
 }
-interface SkillsModule {
-	loadSkills(options: Record<string, unknown> & { cwd: string }): Promise<{ skills: Skill[] }>;
-	parseSkillInvocation(text: string): { name: string; args: string; prompt: string } | undefined;
-	buildSkillPromptMessage(skill: Skill, input: { args: string; prompt?: string }): Promise<{ message: string }>;
+interface DiscoveryModule {
+	loadCapability(id: string, options: { cwd: string; disabledExtensions?: string[] }): Promise<{ items: CapabilityItem[] }>;
 }
-
-/** Subset of omp's `FileSlashCommand` (src/extensibility/slash-commands.ts). */
-export interface FileSlashCommand {
-	name: string;
-	description: string;
+interface AgentDiscoveryModule {
+	discoverAgents(cwd: string): Promise<{ agents: { source: string; filePath?: string }[] }>;
 }
-interface SlashCommandsModule {
-	loadSlashCommands(options: { cwd: string }): Promise<FileSlashCommand[]>;
-	expandSlashCommand(text: string, fileCommands: FileSlashCommand[]): string;
-}
-
-/** omp settings descriptors (`register`/`combine` in src/config); `get` reads one from a loaded Settings. */
-interface SettingsReader<T> {
-	get(settings: unknown): T;
-}
-interface ConfigModule {
-	Settings: { loadReadOnly(options: { cwd: string }): Promise<unknown> };
-}
-interface ExtensionSettingsModule {
-	cfgSkills: SettingsReader<Record<string, unknown> & { enableSkillCommands?: boolean }>;
-	cfgDisabledExtensions: SettingsReader<string[]>;
+interface ConfigFilesModule {
+	findConfigFile(subpath: string, options: { user?: boolean; project?: boolean; cwd?: string }): string | undefined;
 }
 
 const PACKAGE_NAME = "@oh-my-pi/pi-coding-agent";
@@ -349,6 +320,94 @@ export async function loadSessionSkills(cwd: string): Promise<SkillSettings> {
 	return { enableSkillCommands: skillSettings.enableSkillCommands === true, skills: found };
 }
 
+const sessionSettings = (await import(join(srcDir, "session", "settings.ts"))) as SessionSettingsModule;
+const modelSettings = (await import(join(srcDir, "config", "model-settings.ts"))) as ModelSettingsModule;
+const fallbackChains = (await import(join(srcDir, "session", "retry-fallback-chains.ts"))) as FallbackChainsModule;
+const discovery = (await import(join(srcDir, "discovery", "index.ts"))) as DiscoveryModule;
+const agentDiscovery = (await import(join(srcDir, "task", "discovery.ts"))) as AgentDiscoveryModule;
+const configFiles = (await import(join(srcDir, "config.ts"))) as ConfigFilesModule;
+
+export const { expandDefaultRetryFallbackChains } = fallbackChains;
+
+/** omp's config as a session in `cwd` loads it: the global `config.yml`, the project's, and omp's defaults. */
+export interface OmpConfig {
+	modelRoles: Record<string, string>;
+	/** `retry.fallbackChains` as configured, before omp applies the `default` chain to other roles. */
+	fallbackChains: Record<string, string[]>;
+	retry: RetrySettings;
+	modelProviderOrder: string[];
+	disabledExtensions: string[];
+}
+
+/** Read-only: omp's `loadReadOnly` never writes the config files back. */
+export async function loadOmpConfig(cwd: string): Promise<OmpConfig> {
+	const settings = await config.Settings.loadReadOnly({ cwd });
+	return {
+		modelRoles: settings.getModelRoles(),
+		fallbackChains: sessionSettings.cfgRetryFallbackChains.get(settings),
+		retry: {
+			...sessionSettings.cfgRetry.get(settings),
+			fallbackRevertPolicy: sessionSettings.cfgRetryFallbackRevertPolicy.get(settings),
+		},
+		modelProviderOrder: modelSettings.cfgModelProviderOrder.get(settings),
+		disabledExtensions: extensionSettings.cfgDisabledExtensions.get(settings),
+	};
+}
+
+/** omp capabilities that load files, and the kind of file each loads. */
+const FILE_CAPABILITIES: [string, OmpFileKind][] = [
+	["context-files", "context"],
+	["system-prompt", "system-prompt"],
+	["settings", "settings"],
+	["slash-commands", "command"],
+	["rules", "rule"],
+	["skills", "skill"],
+	["hooks", "hook"],
+];
+/** Providers that load installed plugins or omp's bundled defaults, not files the user writes. */
+const PACKAGED_PROVIDERS: Record<string, true> = {
+	"builtin-defaults": true,
+	"agent-plugins": true,
+	"claude-plugins": true,
+	"omp-plugins": true,
+};
+
+export interface FoundFile {
+	kind: OmpFileKind;
+	scope: "user" | "project";
+	path: string;
+}
+
+/** The user-written files a session in `cwd` loads, through omp's own discovery. */
+export async function discoverOmpFiles(cwd: string, disabledExtensions: string[]): Promise<FoundFile[]> {
+	const [capabilityFiles, { agents }] = await Promise.all([
+		Promise.all(
+			FILE_CAPABILITIES.map(async ([id, kind]) => {
+				const { items } = await discovery.loadCapability(id, { cwd, disabledExtensions });
+				return items.flatMap(({ _source: source }): FoundFile[] =>
+					source.level === "native" || PACKAGED_PROVIDERS[source.provider]
+						? []
+						: [{ kind, scope: source.level, path: source.path }],
+				);
+			}),
+		),
+		agentDiscovery.discoverAgents(cwd),
+	]);
+	// Plugin agents report the same scopes; the user's own live in omp's `agents` dirs (task/discovery.ts).
+	const agentFiles = agents.flatMap(({ source, filePath }): FoundFile[] => {
+		if (!filePath || (source !== "user" && source !== "project")) return [];
+		const dir = dirname(filePath);
+		const own = source === "user" ? dir === join(agentDir, "agents") : dir.endsWith("/.omp/agents");
+		return own ? [{ kind: "agent", scope: source, path: filePath }] : [];
+	});
+	// omp loads the project's APPEND_SYSTEM.md instead of the user's when both exist (main.ts).
+	const appendSystem = (["project", "user"] as const).flatMap((scope): FoundFile[] => {
+		const path = configFiles.findConfigFile("APPEND_SYSTEM.md", scope === "user" ? { project: false } : { user: false, cwd });
+		return path ? [{ kind: "append-system", scope, path }] : [];
+	});
+	return [...capabilityFiles.flat(), ...appendSystem, ...agentFiles];
+}
+
 export const COLLAB_PROTO = protocol.COLLAB_PROTO;
 
 export const listHosts = registry.listCollabHosts;
@@ -359,6 +418,13 @@ const dirs = (await import(join(dirname(packageDir), "pi-utils", "src", "dirs.ts
 
 /** omp's sessions root: one directory per working directory, each holding `<time>_<id>.jsonl` files. */
 export const sessionsDir: string = dirs.getSessionsDir();
+/** omp's user config directory, `~/.omp/agent` unless `PI_CODING_AGENT_DIR` moves it. */
+export const agentDir: string = dirs.getAgentDir();
+
+const HOME = homedir();
+/** `path` with the home directory shortened to `~`. */
+export const displayPath = (path: string): string =>
+	path === HOME || path.startsWith(`${HOME}/`) ? `~${path.slice(HOME.length)}` : path;
 const loader = (await import(join(srcDir, "session", "session-loader.ts"))) as LoaderModule;
 const exitDiagnostics = (await import(join(srcDir, "session", "exit-diagnostics.ts"))) as ExitDiagnosticsModule;
 
