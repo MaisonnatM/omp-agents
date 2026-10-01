@@ -39,9 +39,11 @@ export interface Layout {
 	panes: View[];
 	/** Index into `panes`; 0 when there are none. */
 	focus: number;
+	/** The focused pane fills the page with the others kept behind it; only ever true with 2+ panes. */
+	maximized: boolean;
 }
 
-export const EMPTY_LAYOUT: Layout = { panes: [], focus: 0 };
+export const EMPTY_LAYOUT: Layout = { panes: [], focus: 0, maximized: false };
 
 export const focusedView = (layout: Layout): View | null => layout.panes[layout.focus] ?? null;
 
@@ -69,13 +71,16 @@ export const hashForView = (view: View): string => `#${paneForView(view)}`;
 export const sameView = (a: View | null, b: View | null): boolean =>
 	(a && paneForView(a)) === (b && paneForView(b));
 
+const MAXIMIZED = ";max";
+
 /**
  * `#<pane>` for one pane, so single-view links from before split screen still open; `#<pane>,<pane>…@<focus>`
- * for more, with `@<focus>` left out when the first pane has focus. Encoded ids hold no `,` or `@`.
+ * for more, with `@<focus>` left out when the first pane has focus, then `;max` when the focused pane is maximized.
+ * Encoded ids hold no `,`, `@`, or `;`.
  */
-export function hashForLayout({ panes, focus }: Layout): string {
+export function hashForLayout({ panes, focus, maximized }: Layout): string {
 	if (panes.length === 0) return "";
-	return `#${panes.map(paneForView).join(",")}${focus > 0 ? `@${focus}` : ""}`;
+	return `#${panes.map(paneForView).join(",")}${focus > 0 ? `@${focus}` : ""}${maximized ? MAXIMIZED : ""}`;
 }
 
 /**
@@ -84,33 +89,48 @@ export function hashForLayout({ panes, focus }: Layout): string {
  */
 export function layoutFromHash(hash: string): Layout | null {
 	if (settingsFromHash(hash)) return null;
-	const raw = hash.replace(/^#/, "");
+	const marked = hash.replace(/^#/, "");
+	const maximized = marked.endsWith(MAXIMIZED);
+	const raw = maximized ? marked.slice(0, -MAXIMIZED.length) : marked;
 	const at = raw.lastIndexOf("@");
 	const named = (at < 0 ? raw : raw.slice(0, at)).split(",").filter(Boolean).map(viewFromPane);
 	const focused = named[at < 0 ? 0 : Number(raw.slice(at + 1))] ?? named[0];
 	const panes = named.filter((view, index) => named.findIndex(other => sameView(other, view)) === index).slice(0, MAX_PANES);
-	return { panes, focus: Math.max(0, panes.findIndex(view => sameView(view, focused ?? null))) };
+	return {
+		panes,
+		focus: Math.max(0, panes.findIndex(view => sameView(view, focused ?? null))),
+		maximized: maximized && panes.length > 1,
+	};
 }
 
 export type OpenMode = "replace" | "split";
 
 /**
  * `view` in the focused pane, or in a new pane for `split`. A view already open gets focus instead of a second pane;
- * a split with {@link MAX_PANES} open replaces the focused pane.
+ * a split with {@link MAX_PANES} open replaces the focused pane. A plain open keeps a maximized pane maximized,
+ * now showing the opened view; a split brings the split back.
  */
 export function openView(layout: Layout, view: View, mode: OpenMode): Layout {
 	const { panes, focus } = layout;
+	const maximized = layout.maximized && mode === "replace";
 	const open = panes.findIndex(pane => sameView(pane, view));
-	if (open >= 0) return { panes, focus: open };
-	if (panes.length === 0) return { panes: [view], focus: 0 };
-	if (mode === "split" && panes.length < MAX_PANES) return { panes: [...panes, view], focus: panes.length };
-	return { panes: panes.with(focus, view), focus };
+	if (open >= 0) return { panes, focus: open, maximized };
+	if (panes.length === 0) return { panes: [view], focus: 0, maximized: false };
+	if (mode === "split" && panes.length < MAX_PANES) return { panes: [...panes, view], focus: panes.length, maximized: false };
+	return { panes: panes.with(focus, view), focus, maximized };
 }
 
-/** The layout without pane `index`. Focus stays on its view, or moves to the pane taking the closed one's place. */
-export function closePane({ panes, focus }: Layout, index: number): Layout {
+/**
+ * The layout without pane `index`. Focus stays on its view, or moves to the pane taking the closed one's place.
+ * Closing the maximized pane, or leaving one pane, brings the split back.
+ */
+export function closePane({ panes, focus, maximized }: Layout, index: number): Layout {
 	const rest = panes.filter((_, i) => i !== index);
-	return { panes: rest, focus: index < focus ? focus - 1 : Math.max(0, Math.min(focus, rest.length - 1)) };
+	return {
+		panes: rest,
+		focus: index < focus ? focus - 1 : Math.max(0, Math.min(focus, rest.length - 1)),
+		maximized: maximized && index !== focus && rest.length > 1,
+	};
 }
 
 /**
