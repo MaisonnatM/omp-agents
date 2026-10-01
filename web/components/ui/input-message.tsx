@@ -161,7 +161,7 @@ interface InputMessageProps
   /** Extra props forwarded to the underlying textarea. */
   textareaProps?: Omit<
     TextareaHTMLAttributes<HTMLTextAreaElement>,
-    "value" | "onChange" | "onKeyDown" | "disabled" | "placeholder"
+    "value" | "onChange" | "disabled" | "placeholder"
   >;
   /** Assistant response state. When `"streaming"`, the send button becomes a
    *  Stop control (empty draft) or a Queue action (non-empty draft); on the
@@ -495,6 +495,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     const {
       onFocus: _textareaOnFocus,
       onBlur: _textareaOnBlur,
+      onKeyDown: _textareaOnKeyDown,
       "aria-describedby": textareaDescribedBy,
       ...restTextareaProps
     } = textareaProps ?? {};
@@ -766,6 +767,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
 
     const handleKeyDown = useCallback(
       (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+        textareaProps?.onKeyDown?.(e);
+        if (e.defaultPrevented) return;
         if (e.nativeEvent.isComposing) return;
 
         // Suggested prompts: plain ArrowDown moves the highlight into / down
@@ -882,6 +885,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
         suggestionsOpen,
         suggestionsArr,
         activeSuggestion,
+        textareaProps,
         setActiveSuggestion,
         acceptSuggestion,
         placeholderSuggestion,

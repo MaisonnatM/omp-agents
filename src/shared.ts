@@ -79,6 +79,14 @@ export type GuestPhase =
 	| { phase: "ended"; reason: string };
 
 export type LaunchResult = { ok: true; instanceId: string } | { ok: false; error: string };
+/** One `/` or `@` suggestion, with the composer text and caret it produces when accepted (omp's own insertion). */
+export interface CompletionItem {
+	kind: "command" | "skill" | "file" | "directory";
+	label: string;
+	description: string | null;
+	text: string;
+	cursor: number;
+}
 
 export type ServerMsg =
 	| { t: "hello"; ompVersion: string }
@@ -90,7 +98,8 @@ export type ServerMsg =
 	/** `reset` replaces the view's transcript; otherwise `items` are upserts by id, new ids appended. */
 	| { t: "items"; view: View; reset: boolean; items: Item[] }
 	/** Answers this socket's `create` once the new session is listed, or once it failed to start. */
-	| { t: "created"; result: LaunchResult };
+	| { t: "created"; result: LaunchResult }
+	| { t: "completions"; reqId: number; items: CompletionItem[]; error: string | null };
 
 export type ClientMsg =
 	| { t: "watch"; view: View | null }
@@ -100,4 +109,6 @@ export type ClientMsg =
 	/** Start a new omp session in `cwd` (absolute, or starting with `~`). */
 	| { t: "create"; cwd: string }
 	/** End a session this dashboard started. */
-	| { t: "end"; instanceId: string };
+	| { t: "end"; instanceId: string }
+	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
+	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number };

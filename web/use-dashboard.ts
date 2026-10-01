@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import type { ClientMsg, GuestPhase, Item, PastSession, RosterHost, ServerMsg, View } from "../src/shared";
+import type { ClientMsg, CompletionItem, GuestPhase, Item, PastSession, RosterHost, ServerMsg, View } from "../src/shared";
 import { applyItems, hashForView, sameView, viewFromHash } from "./view-model";
 
 /** The New session form: closed, open for a directory (with the last attempt's error), or waiting for the session to be listed. */
@@ -19,6 +19,7 @@ export interface DashboardState {
 	/** Transcript of the selected view. */
 	items: Item[];
 	launch: Launch;
+	completions: { reqId: number; items: CompletionItem[]; error: string | null } | null;
 }
 
 type Action =
@@ -42,7 +43,7 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 		}
 		case "select":
 			if (sameView(state.view, action.view)) return state;
-			return { ...state, view: action.view, viewHost: findHost(state.hosts, action.view), items: [] };
+			return { ...state, view: action.view, viewHost: findHost(state.hosts, action.view), items: [], completions: null };
 		case "launch":
 			return { ...state, launch: action.launch };
 		case "server": {
@@ -67,6 +68,8 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 				case "created":
 					if (state.launch.phase !== "starting") return state;
 					return { ...state, launch: msg.result.ok ? { phase: "closed" } : { phase: "editing", error: msg.result.error } };
+				case "completions":
+					return { ...state, completions: msg };
 			}
 		}
 	}
@@ -95,6 +98,7 @@ export function useDashboard(): Dashboard {
 		viewHost: null,
 		items: [],
 		launch: { phase: "closed" },
+		completions: null,
 	});
 	const socketRef = useRef<WebSocket | null>(null);
 	const viewRef = useRef(state.view);

@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import type { Server, ServerWebSocket, Subprocess } from "bun";
 import index from "../web/index.html";
+import { complete, expandPrompt, forgetSession } from "./commands";
 import { type GuestUpdate, SessionGuest } from "./guest";
 import { type HostSnapshot, listHosts, listSavedSessions, ompCommand, ompVersion, type SavedSession } from "./omp";
 import type {
@@ -151,9 +152,11 @@ function reconcileGuests(): void {
 		if (!host) {
 			guest.end("This session is no longer running.");
 			guests.delete(instanceId);
+			forgetSession(instanceId);
 		} else if (guest.generation !== null && guest.generation !== host.generation) {
 			guest.end("The session switched rooms; rejoining.");
 			guests.delete(instanceId);
+			forgetSession(instanceId);
 		} else if (guest.endedAt !== null && Date.now() - guest.endedAt > REJOIN_MS) {
 			guests.delete(instanceId);
 		}
@@ -321,6 +324,14 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 			const text = value.text;
 			return view && typeof text === "string" && text.trim() ? { t: "prompt", view, text } : null;
 		}
+		case "complete": {
+			const view = parseLiveView(value.view);
+			const { reqId, text, cursor } = value;
+			return view && typeof reqId === "number" && Number.isSafeInteger(reqId) && reqId >= 0 &&
+				typeof text === "string" && text.length <= 4096 && typeof cursor === "number" &&
+				Number.isInteger(cursor) && cursor >= 0 && cursor <= text.length
+				? { t: "complete", reqId, view, text, cursor } : null;
+		}
 		case "abort":
 		case "end": {
 			const id = value.instanceId;
@@ -335,15 +346,35 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 	}
 }
 
-function onClientMsg(ws: Socket, msg: ClientMsg): void {
+async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 	switch (msg.t) {
 		case "watch":
 			watch(ws, msg.view);
 			return;
+		case "complete": {
+			const host = hosts.find(row => row.instanceId === msg.view.instanceId);
+			if (!host || ws.data.view?.kind !== "live" || ws.data.view.instanceId !== msg.view.instanceId) return;
+			try {
+				const items = await complete(host.instanceId, host.cwd, msg.text, msg.cursor);
+				if (ws.data.view?.kind === "live" && ws.data.view.instanceId === host.instanceId) send(ws, { t: "completions", reqId: msg.reqId, items, error: null });
+			} catch (error) {
+				send(ws, { t: "completions", reqId: msg.reqId, items: [], error: String(error) });
+			}
+			return;
+		}
 		case "prompt": {
+			const host = hosts.find(row => row.instanceId === msg.view.instanceId);
 			const guest = guests.get(msg.view.instanceId);
-			if (msg.view.agentId) guest?.chat(msg.view.agentId, msg.text);
-			else guest?.prompt(msg.text);
+			if (!host || !guest || ws.data.view?.kind !== "live" || ws.data.view.instanceId !== msg.view.instanceId) return;
+			try {
+				const text = await expandPrompt(host.instanceId, host.cwd, msg.text, msg.view.agentId ? "subagent" : "session");
+				if (msg.view.agentId) guest.chat(msg.view.agentId, text);
+				else guest.prompt(text);
+			} catch (error) {
+				send(ws, { t: "items", view: msg.view, reset: false, items: [
+					{ id: `error:${Date.now()}`, kind: "notice", level: "error", text: `Could not prepare prompt: ${String(error)}` },
+				] });
+			}
 			return;
 		}
 		case "abort":
@@ -390,7 +421,7 @@ try {
 			},
 			message(ws, raw) {
 				const msg = parseClientMsg(raw);
-				if (msg) onClientMsg(ws, msg);
+				if (msg) void onClientMsg(ws, msg);
 			},
 			close(ws) {
 				sockets.delete(ws);

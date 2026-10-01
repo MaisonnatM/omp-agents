@@ -87,6 +87,69 @@ export interface SavedSession {
 	modifiedAt: number;
 }
 
+/** Subset of pi-tui's `AutocompleteItem` (pi-tui/src/autocomplete.ts). */
+export interface AutocompleteItem {
+	value: string;
+	label: string;
+	description?: string;
+}
+/** pi-tui's `CombinedAutocompleteProvider`: omp's own `/` and `@` completion. */
+export interface AutocompleteProvider {
+	getSuggestions(
+		lines: string[],
+		cursorLine: number,
+		cursorCol: number,
+	): Promise<{ items: AutocompleteItem[]; prefix: string } | null>;
+	applyCompletion(
+		lines: string[],
+		cursorLine: number,
+		cursorCol: number,
+		item: AutocompleteItem,
+		prefix: string,
+	): { lines: string[]; cursorLine: number; cursorCol: number };
+}
+interface AutocompleteModule {
+	CombinedAutocompleteProvider: new (
+		commands: { name: string; description?: string }[],
+		basePath: string,
+	) => AutocompleteProvider;
+}
+
+/** Subset of omp's `Skill` (src/extensibility/skills.ts). */
+export interface Skill {
+	name: string;
+	description: string;
+	filePath: string;
+	baseDir: string;
+}
+interface SkillsModule {
+	loadSkills(options: Record<string, unknown> & { cwd: string }): Promise<{ skills: Skill[] }>;
+	parseSkillInvocation(text: string): { name: string; args: string; prompt: string } | undefined;
+	buildSkillPromptMessage(skill: Skill, input: { args: string; prompt?: string }): Promise<{ message: string }>;
+}
+
+/** Subset of omp's `FileSlashCommand` (src/extensibility/slash-commands.ts). */
+export interface FileSlashCommand {
+	name: string;
+	description: string;
+}
+interface SlashCommandsModule {
+	loadSlashCommands(options: { cwd: string }): Promise<FileSlashCommand[]>;
+	expandSlashCommand(text: string, fileCommands: FileSlashCommand[]): string;
+}
+
+/** omp settings descriptors (`register`/`combine` in src/config); `get` reads one from a loaded Settings. */
+interface SettingsReader<T> {
+	get(settings: unknown): T;
+}
+interface ConfigModule {
+	Settings: { loadReadOnly(options: { cwd: string }): Promise<unknown> };
+}
+interface ExtensionSettingsModule {
+	cfgSkills: SettingsReader<Record<string, unknown> & { enableSkillCommands?: boolean }>;
+	cfgDisabledExtensions: SettingsReader<string[]>;
+}
+
 const PACKAGE_NAME = "@oh-my-pi/pi-coding-agent";
 
 function findPackageDir(): string {
@@ -120,6 +183,31 @@ const protocol = (await import(join(collabDir, "protocol.ts"))) as ProtocolModul
 const crypto = (await import(join(collabDir, "crypto.ts"))) as CryptoModule;
 const relay = (await import(join(collabDir, "relay-client.ts"))) as RelayModule;
 const listing = (await import(join(packageDir, "src", "session", "session-listing.ts"))) as ListingModule;
+const srcDir = join(packageDir, "src");
+const autocomplete = (await import(join(dirname(packageDir), "pi-tui", "src", "autocomplete.ts"))) as AutocompleteModule;
+const skills = (await import(join(srcDir, "extensibility", "skills.ts"))) as SkillsModule;
+const slashCommands = (await import(join(srcDir, "extensibility", "slash-commands.ts"))) as SlashCommandsModule;
+const config = (await import(join(srcDir, "config", "settings.ts"))) as ConfigModule;
+const extensionSettings = (await import(join(srcDir, "extensibility", "settings.ts"))) as ExtensionSettingsModule;
+
+export const CombinedAutocompleteProvider = autocomplete.CombinedAutocompleteProvider;
+export const { parseSkillInvocation, buildSkillPromptMessage } = skills;
+export const { loadSlashCommands, expandSlashCommand } = slashCommands;
+
+export interface SkillSettings {
+	/** `skills.enableSkillCommands`: whether `/skill:<name>` is a command at all. */
+	enableSkillCommands: boolean;
+	skills: Skill[];
+}
+
+/** Skills the way an omp session in `cwd` discovers them: its settings, its disabled extensions, its project dirs. */
+export async function loadSessionSkills(cwd: string): Promise<SkillSettings> {
+	const settings = await config.Settings.loadReadOnly({ cwd });
+	const skillSettings = extensionSettings.cfgSkills.get(settings);
+	const disabledExtensions = extensionSettings.cfgDisabledExtensions.get(settings);
+	const { skills: found } = await skills.loadSkills({ ...skillSettings, disabledExtensions, cwd });
+	return { enableSkillCommands: skillSettings.enableSkillCommands === true, skills: found };
+}
 
 export const COLLAB_PROTO = protocol.COLLAB_PROTO;
 

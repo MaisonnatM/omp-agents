@@ -1,5 +1,5 @@
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
-import type { AgentRow, GuestPhase, Item, LiveView, PastSession, RosterHost } from "../../src/shared";
+import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react";
+import type { AgentRow, CompletionItem, GuestPhase, Item, LiveView, PastSession, RosterHost } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import { InputMessage, type QueuedMessage } from "@/components/ui/input-message";
@@ -7,6 +7,9 @@ import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
 import { cn } from "@/lib/utils";
 import { type ToolItem, toBlocks } from "../view-model";
+import { completionTrigger } from "../completion-trigger";
+import { CompletionPopup } from "./completion-popup";
+import { MessageMarkdown } from "./message-markdown";
 import { hostLabel, pastLabel } from "./roster";
 import { statusLabel } from "./status-dot";
 
@@ -106,13 +109,13 @@ function Transcript({ items, working }: { items: Item[]; working: boolean }) {
 						case "user":
 							return (
 								<ChatMessage key={item.id} from="user" time={item.from ?? undefined} data-item="user">
-									{item.text}
+									<MessageMarkdown text={item.text} />
 								</ChatMessage>
 							);
 						case "assistant":
 							return (
 								<ChatMessage key={item.id} from="assistant" data-item="assistant" data-streaming={item.streaming}>
-									{item.text}
+									<MessageMarkdown text={item.text} />
 								</ChatMessage>
 							);
 						case "notice":
@@ -155,15 +158,44 @@ interface ConversationProps {
 	lastHost: RosterHost | null;
 	phase: GuestPhase | undefined;
 	items: Item[];
+	completions: { reqId: number; items: CompletionItem[]; error: string | null } | null;
+	onComplete: (reqId: number, text: string, cursor: number) => void;
 	onPrompt: (text: string) => void;
 	onAbort: () => void;
 	onEnd: () => void;
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts and queues reset per view. */
-export function Conversation({ view, host, lastHost, phase: guestPhase, items, onPrompt, onAbort, onEnd }: ConversationProps) {
+export function Conversation({ view, host, lastHost, phase: guestPhase, items, completions, onComplete, onPrompt, onAbort, onEnd }: ConversationProps) {
 	const [draft, setDraft] = useState("");
 	const [queue, setQueue] = useState<QueuedMessage[]>([]);
+	const [requestId, setRequestId] = useState<number | null>(null);
+	const [active, setActive] = useState(0);
+	const nextId = useRef(0);
+	const composerRef = useRef<HTMLDivElement>(null);
+	const popupId = useId();
+
+	const suggestions = requestId !== null && completions?.reqId === requestId ? completions.items : [];
+	const popupOpen = requestId !== null;
+	const suggest = (text: string, cursor: number): void => {
+		if (!completionTrigger(text, cursor)) {
+			setRequestId(null);
+			return;
+		}
+		const id = ++nextId.current;
+		setRequestId(id);
+		setActive(0);
+		onComplete(id, text, cursor);
+	};
+	const pick = (item: CompletionItem): void => {
+		setDraft(item.text);
+		setRequestId(null);
+		requestAnimationFrame(() => {
+			const el = composerRef.current?.querySelector("textarea");
+			el?.focus();
+			el?.setSelectionRange(item.cursor, item.cursor);
+		});
+	};
 
 	const shown = host ?? lastHost;
 	const agent: AgentRow | null = view.agentId ? (shown?.agents.find(a => a.id === view.agentId) ?? null) : null;
@@ -203,6 +235,7 @@ export function Conversation({ view, host, lastHost, phase: guestPhase, items, o
 					: "Message this subagent…"
 			: "Message this session…";
 
+	const directCommand = draft.startsWith("$") ? "Python" : draft.startsWith("!") ? "shell" : null;
 	return (
 		<div className="flex h-svh min-h-0 flex-1 flex-col">
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
@@ -218,12 +251,47 @@ export function Conversation({ view, host, lastHost, phase: guestPhase, items, o
 				)}
 			</Header>
 			<Transcript items={items} working={working === true} />
-			<div className="mx-auto w-full max-w-3xl px-6 pb-5">
+			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
+				{popupOpen && (
+					<CompletionPopup id={popupId} items={suggestions} active={Math.min(active, suggestions.length - 1)}
+						error={completions?.reqId === requestId ? completions.error : null} onPick={pick} />
+				)}
 				<InputMessage
+					ref={composerRef}
 					value={draft}
-					onValueChange={setDraft}
+					onValueChange={text => {
+						setDraft(text);
+						suggest(text, composerRef.current?.querySelector("textarea")?.selectionStart ?? text.length);
+					}}
+					textareaProps={{
+						"aria-controls": popupOpen ? popupId : undefined,
+						"aria-expanded": popupOpen,
+						"aria-autocomplete": "list",
+						"aria-activedescendant": popupOpen && suggestions.length ? `${popupId}-${Math.min(active, suggestions.length - 1)}` : undefined,
+						onClick: event => suggest(draft, event.currentTarget.selectionStart),
+						onKeyUp: event => {
+							if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+								suggest(draft, event.currentTarget.selectionStart);
+							}
+						},
+						onKeyDown: event => {
+							if (!popupOpen || event.nativeEvent.isComposing) return;
+							if (event.key === "Escape") {
+								event.preventDefault();
+								setRequestId(null);
+							} else if (suggestions.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+								event.preventDefault();
+								setActive(index => (index + (event.key === "ArrowDown" ? 1 : -1) + suggestions.length) % suggestions.length);
+							} else if (suggestions.length && (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey))) {
+								event.preventDefault();
+								pick(suggestions[Math.min(active, suggestions.length - 1)]);
+							}
+						},
+					}}
 					onSend={(text, _files, meta) => {
+						if (directCommand) return;
 						onPrompt(text);
+						setRequestId(null);
 						// A queued message dispatching on its own must not wipe the draft being typed.
 						if (!meta?.queuedId) setDraft("");
 					}}
@@ -237,6 +305,11 @@ export function Conversation({ view, host, lastHost, phase: guestPhase, items, o
 					onQueueChange={setQueue}
 					sendLabel={agent ? "Send to subagent" : "Send to session"}
 				/>
+				{directCommand && (
+					<p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+						Direct {directCommand} execution needs the omp terminal. Collab cannot run it in this session.
+					</p>
+				)}
 			</div>
 		</div>
 	);

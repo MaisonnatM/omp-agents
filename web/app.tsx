@@ -42,6 +42,8 @@ export function App() {
 				lastHost={state.viewHost}
 				phase={state.phases[view.instanceId]}
 				items={state.items}
+				completions={state.completions}
+				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, view, text, cursor })}
 				onPrompt={text => send({ t: "prompt", view, text })}
 				onAbort={() => send({ t: "abort", instanceId: view.instanceId })}
 				onEnd={() => send({ t: "end", instanceId: view.instanceId })}
