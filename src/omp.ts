@@ -6,8 +6,8 @@
 import { existsSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import type { OmpFileKind, RetrySettings } from "./shared";
-import { oneLine } from "./transcript";
+import type { CatalogModel, OmpFileKind, RetrySettings, RoutingEdit } from "./shared";
+import { isObject, oneLine } from "./transcript";
 
 export type Access = "view" | "control";
 
@@ -222,13 +222,32 @@ interface SlashCommandsModule {
 interface SettingsReader<T> {
 	get(settings: unknown): T;
 }
-/** Subset of omp's `Settings` (src/config/settings.ts) this app reads. */
+/** Subset of omp's `Settings` (src/config/settings.ts) this app reads and writes. */
 interface OmpSettingsInstance {
 	/** `modelRoles` as configured, in config order. */
 	getModelRoles(): Record<string, string>;
+	/** Stages one role in the global `config.yml`; `flush` writes it, leaving every other role as it is on disk. */
+	setModelRole(role: string, selector: string | undefined): void;
+	/** Writes staged changes into the re-read global `config.yml` under omp's lock. */
+	flush(): Promise<void>;
 }
 interface ConfigModule {
-	Settings: { loadReadOnly(options: { cwd: string }): Promise<OmpSettingsInstance> };
+	Settings: {
+		loadReadOnly(options: { cwd: string }): Promise<OmpSettingsInstance>;
+		/** A private instance that persists what is set on it, unlike omp's process-wide `Settings.init`. */
+		loadIsolated(options: { cwd: string }): Promise<OmpSettingsInstance>;
+	};
+}
+/** Subset of omp's `Setting` handle (src/config/registry.ts). `set`/`setEntry` stage a global write; `undefined` removes. */
+interface SettingHandle {
+	readonly enumValues: readonly string[] | undefined;
+	/** @throws Error when `value` does not fit the setting. */
+	assertWritable(value: unknown): void;
+	set(settings: OmpSettingsInstance, value: unknown): void;
+	setEntry(settings: OmpSettingsInstance, key: string, value: unknown): void;
+}
+interface SettingsRegistryModule {
+	lookup(id: string): SettingHandle | undefined;
 }
 interface ExtensionSettingsModule {
 	cfgSkills: SettingsReader<Record<string, unknown> & { enableSkillCommands?: boolean }>;
@@ -245,6 +264,11 @@ interface ModelSettingsModule {
 interface FallbackChainsModule {
 	/** Gives every chat role without a chain of its own the `default` chain. */
 	expandDefaultRetryFallbackChains(configured: Record<string, string[]>, roleNames: readonly string[]): Record<string, string[]>;
+	/** omp's reading of a selector: `provider/id`, then an optional `:level` once `find` knows the id without it. */
+	parseRetryFallbackSelector(
+		selector: string,
+		lookup: { find(provider: string, id: string): unknown },
+	): { provider: string; id: string; thinkingLevel: string | undefined } | undefined;
 }
 
 /** Subset of omp's capability items (src/capability/types.ts): every item names the file it came from. */
@@ -326,8 +350,9 @@ const fallbackChains = (await import(join(srcDir, "session", "retry-fallback-cha
 const discovery = (await import(join(srcDir, "discovery", "index.ts"))) as DiscoveryModule;
 const agentDiscovery = (await import(join(srcDir, "task", "discovery.ts"))) as AgentDiscoveryModule;
 const configFiles = (await import(join(srcDir, "config.ts"))) as ConfigFilesModule;
+const settingsRegistry = (await import(join(srcDir, "config", "registry.ts"))) as SettingsRegistryModule;
 
-export const { expandDefaultRetryFallbackChains } = fallbackChains;
+export const { expandDefaultRetryFallbackChains, parseRetryFallbackSelector } = fallbackChains;
 
 /** omp's config as a session in `cwd` loads it: the global `config.yml`, the project's, and omp's defaults. */
 export interface OmpConfig {
@@ -352,6 +377,74 @@ export async function loadOmpConfig(cwd: string): Promise<OmpConfig> {
 		modelProviderOrder: modelSettings.cfgModelProviderOrder.get(settings),
 		disabledExtensions: extensionSettings.cfgDisabledExtensions.get(settings),
 	};
+}
+
+function setting(id: string): SettingHandle {
+	const handle = settingsRegistry.lookup(id);
+	if (!handle) throw new Error(`omp ${ompVersion} has no setting ${id}`);
+	return handle;
+}
+
+/** The values omp accepts for `retry.<key>`, or `undefined` when it is not an enum. */
+export const retryChoices = (key: keyof RetrySettings): readonly string[] | undefined => setting(`retry.${key}`).enumValues;
+
+/** @throws Error, with omp's message, when omp would not write `value` to `retry.<key>`. */
+export const assertRetryValue = (key: keyof RetrySettings, value: unknown): void => setting(`retry.${key}`).assertWritable(value);
+
+/**
+ * Writes `edit` to the global `config.yml` through omp's own write path, as `omp config set` does: omp re-reads
+ * the file under its lock and writes back only the paths the edit set, so every other key survives.
+ * The caller has validated `edit`.
+ */
+export async function writeRouting(cwd: string, edit: RoutingEdit): Promise<void> {
+	// Loading a config to write moves one omp cannot parse aside; refuse while it is broken instead.
+	await config.Settings.loadReadOnly({ cwd });
+	const settings = await config.Settings.loadIsolated({ cwd });
+	const setChain = (key: string, fallbacks: string[]): void =>
+		setting("retry.fallbackChains").setEntry(settings, key, fallbacks.length > 0 ? fallbacks : undefined);
+	switch (edit.kind) {
+		case "role":
+			if (edit.primary !== undefined) settings.setModelRole(edit.role, edit.primary);
+			if (edit.fallbacks !== undefined) setChain(edit.role, edit.fallbacks);
+			break;
+		case "model-chain":
+			setChain(edit.key, edit.fallbacks);
+			break;
+		case "retry":
+			for (const [key, value] of Object.entries(edit.values)) setting(`retry.${key}`).set(settings, value);
+			break;
+		case "provider-order":
+			setting("modelProviderOrder").set(settings, edit.providers.length > 0 ? edit.providers : undefined);
+			break;
+	}
+	await settings.flush();
+}
+
+const MODELS_TIMEOUT_MS = 30_000;
+
+/** Every model `omp models` lists for this agent dir, in omp's order. */
+export async function listModels(): Promise<CatalogModel[]> {
+	const child = Bun.spawn([...ompCommand, "models", "--json"], { stdout: "pipe", stderr: "pipe", timeout: MODELS_TIMEOUT_MS });
+	const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+	let data: unknown;
+	try {
+		data = JSON.parse(stdout);
+	} catch {
+		throw new Error(stderr.trim().split("\n").pop() || `omp models exited with code ${code}`);
+	}
+	if (!isObject(data) || !Array.isArray(data.models)) throw new Error("omp models --json printed no models");
+	return (data.models as unknown[]).flatMap((model): CatalogModel[] =>
+		isObject(model) && typeof model.selector === "string" && typeof model.provider === "string"
+			? [
+					{
+						selector: model.selector,
+						provider: model.provider,
+						name: typeof model.name === "string" ? model.name : model.selector,
+						thinking: Array.isArray(model.thinking) ? model.thinking.filter(level => typeof level === "string") : [],
+					},
+				]
+			: [],
+	);
 }
 
 /** omp capabilities that load files, and the kind of file each loads. */

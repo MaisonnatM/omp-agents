@@ -7,10 +7,10 @@ import { complete, expandPrompt, forgetSession } from "./commands";
 import { DashboardSession, type DashboardUpdate, type ForkedSession } from "./dashboard-session";
 import { type LiveUpdate, SessionGuest } from "./guest";
 import { FileTail } from "./tail";
-import { displayPath, type HostSnapshot, listHosts, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
+import { displayPath, type HostSnapshot, listHosts, listModels, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
 import { PullRequestIndex } from "./pull-requests";
-import { loadOmpSettings } from "./settings";
-import type { ClientMsg, HostStatus, Item, LiveView, PullRequest, RosterHost, ServerMsg, View } from "./shared";
+import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "./settings";
+import type { ClientMsg, HostStatus, Item, LiveView, PullRequest, RosterHost, ServerMsg, SettingsError, View } from "./shared";
 import { isObject } from "./transcript";
 import { fetchPlanUsage } from "./usage";
 
@@ -27,8 +27,13 @@ const LIST_THROTTLE_MS = 500;
 /** `omp usage` caches provider reports itself; each run still costs a process and up to one network round trip per provider. */
 const USAGE_POLL_MS = 60_000;
 const HOME = homedir();
-/** Only pages served by this app may open the socket, which carries full control of every session, or read omp's files. */
+/**
+ * Only pages served by this app may open the socket, which carries full control of every session, or read omp's files.
+ * DNS rebinding cannot pass the Host check; a cross-site page cannot pass the Origin check that also guards writes.
+ */
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
+const allowedHost = (req: Request): boolean => ALLOWED_HOSTS.has(req.headers.get("host") ?? "");
+const sameOrigin = (req: Request): boolean => allowedHost(req) && req.headers.get("origin") === `http://${req.headers.get("host")}`;
 
 interface SocketData {
 	view: View | null;
@@ -499,32 +504,70 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 }
 
 function upgrade(req: Request, srv: Server<SocketData>): Response | undefined {
-	const host = req.headers.get("host") ?? "";
-	if (!ALLOWED_HOSTS.has(host) || req.headers.get("origin") !== `http://${host}`) {
-		return new Response("forbidden origin", { status: 403 });
-	}
+	if (!sameOrigin(req)) return new Response("forbidden origin", { status: 403 });
 	if (srv.upgrade(req, { data: { view: null } })) return undefined;
 	return new Response("expected a websocket", { status: 426 });
 }
 
+const fail = (status: number, error: string, conflict = false): Response =>
+	Response.json({ error, ...(conflict && { conflict: true }) } satisfies SettingsError, { status });
+
 /**
- * `GET /api/settings[?cwd=<dir>]`: omp's model routing and files, user-level only without `cwd`. Read-only.
- * `cwd` must be a directory some session ran in: the page names workspaces that way, as it names sessions by id.
+ * The `cwd` a settings request names, `null` for user-level only, or the response refusing it. `cwd` must be a
+ * directory some session ran in: the page names workspaces that way, as it names sessions by id.
  */
-async function settings(req: Request): Promise<Response> {
-	if (!ALLOWED_HOSTS.has(req.headers.get("host") ?? "")) return new Response("forbidden host", { status: 403 });
+function settingsCwd(req: Request): string | null | Response {
 	const cwd = new URL(req.url).searchParams.get("cwd");
 	const sessionRan =
 		cwd === null ||
 		hosts.some(host => host.cwd === cwd) ||
 		[...dashboards.values()].some(session => session.cwd === cwd) ||
 		files.some(session => session.cwd === cwd);
-	if (!sessionRan) return Response.json({ error: `No session ran in ${cwd}` }, { status: 404 });
+	return sessionRan ? cwd : fail(404, `No session ran in ${cwd}`);
+}
+
+async function answer(run: () => Promise<unknown>): Promise<Response> {
 	try {
-		return Response.json(await loadOmpSettings(cwd));
+		return Response.json(await run());
 	} catch (err) {
-		return Response.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+		if (err instanceof Rejected) return fail(err.status, err.message, err.conflict);
+		return fail(500, err instanceof Error ? err.message : String(err));
 	}
+}
+
+/** `GET /api/settings[?cwd=<dir>]`: omp's model routing and files, user-level only without `cwd`. */
+async function settings(req: Request): Promise<Response> {
+	if (!allowedHost(req)) return fail(403, "forbidden host");
+	const cwd = settingsCwd(req);
+	return cwd instanceof Response ? cwd : answer(() => loadOmpSettings(cwd));
+}
+
+/** `GET /api/models`: the models omp lists, for the settings page's pickers. */
+async function models(req: Request): Promise<Response> {
+	if (!allowedHost(req)) return fail(403, "forbidden host");
+	return answer(async () => ({ models: await listModels() }));
+}
+
+/**
+ * A settings write: `PUT /api/settings/routing` or `/api/settings/file`, `?cwd=` as for reading.
+ * Only this app's own page may write, with a JSON body; the answer is the settings as they load after the write.
+ */
+function settingsWrite(save: (cwd: string | null, body: unknown) => Promise<unknown>) {
+	return async (req: Request): Promise<Response> => {
+		if (!sameOrigin(req)) return fail(403, "forbidden origin");
+		if (req.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") {
+			return fail(415, "Expected a JSON body");
+		}
+		const cwd = settingsCwd(req);
+		if (cwd instanceof Response) return cwd;
+		let body: unknown;
+		try {
+			body = await req.json();
+		} catch {
+			return fail(400, "The body is not valid JSON");
+		}
+		return answer(() => save(cwd, body));
+	};
 }
 
 let server: Server<SocketData>;
@@ -533,9 +576,17 @@ try {
 		hostname: HOSTNAME,
 		port: PORT,
 		development: false,
-		routes: { "/": index, "/api/settings": { GET: settings } },
+		routes: {
+			"/": index,
+			"/api/settings": { GET: settings },
+			"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
+			"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
+			"/api/models": { GET: models },
+		},
 		fetch(req, srv) {
-			if (new URL(req.url).pathname === "/ws") return upgrade(req, srv);
+			const { pathname } = new URL(req.url);
+			if (pathname === "/ws") return upgrade(req, srv);
+			if (pathname.startsWith("/api/")) return fail(404, `No ${req.method} ${pathname}`);
 			return new Response("not found", { status: 404 });
 		},
 		websocket: {
