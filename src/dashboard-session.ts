@@ -5,9 +5,9 @@
  */
 import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
-import { activityOf, type LiveUpdate, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
+import { activityOf, contextOf, type LiveUpdate, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
 import { endsMidTurn, type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp";
-import type { AgentRow, AgentStatus, HostStatus, ModelOption } from "./shared";
+import type { AgentRow, AgentStatus, ContextUsage, HostStatus, ModelOption } from "./shared";
 import { isObject } from "./transcript";
 
 /** omp's subagent lifecycle and progress statuses, as the roster's agent statuses. */
@@ -55,6 +55,9 @@ async function recordedCwd(sessionFile: string): Promise<string> {
 	return header.cwd;
 }
 
+/** Session events after which the model, thinking level, or context size can have changed. */
+const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_changed", "auto_compaction_end"]);
+
 export class DashboardSession {
 	/** Same shape as a Collab instance id, so the page's hash routing treats both alike. */
 	readonly instanceId = randomBytes(8).toString("hex");
@@ -63,12 +66,18 @@ export class DashboardSession {
 	readonly pid: number;
 	sessionId: string;
 	sessionFile: string | null;
-	sessionName: string | null;
-	model: string | null;
+	sessionName: string | null = null;
+	model: string | null = null;
+	thinkingLevel: string | null = null;
+	/** Levels the current model accepts, `off` first. */
+	thinkingLevels: string[] = [];
+	context: ContextUsage | null = null;
 	status: HostStatus = "idle";
 	readonly #child: RpcChild;
 	#agents = new Map<string, RpcAgent>();
 	readonly #emit: (update: DashboardUpdate) => void;
+	#refreshing = false;
+	#refreshAgain = false;
 
 	private constructor(cwd: string, child: RpcChild, state: RpcState, emit: (update: DashboardUpdate) => void) {
 		this.cwd = cwd;
@@ -77,8 +86,7 @@ export class DashboardSession {
 		this.#emit = emit;
 		this.sessionId = state.sessionId;
 		this.sessionFile = state.sessionFile ?? null;
-		this.sessionName = state.sessionName ?? null;
-		this.model = state.model ? `${state.model.provider}/${state.model.id}` : null;
+		this.#applyState(state);
 
 		const { client } = child;
 		client.onSessionEvent(event => this.#onEvent(event));
@@ -125,7 +133,9 @@ export class DashboardSession {
 		try {
 			await child.client.setSubagentSubscription("progress");
 			await prepare(child.client);
-			return new DashboardSession(cwd, child, await child.client.getState(), emit);
+			const session = new DashboardSession(cwd, child, await child.client.getState(), emit);
+			session.thinkingLevels = await child.client.getAvailableThinkingLevels();
+			return session;
 		} catch (err) {
 			await child.client.stop();
 			throw err;
@@ -164,11 +174,15 @@ export class DashboardSession {
 
 	setModel({ provider, id }: ModelOption): void {
 		this.#child.client.setModel(provider, id).then(
-			model => {
-				this.model = `${model.provider}/${model.id}`;
-				this.#emit({ kind: "roster" });
-			},
+			() => this.#refresh(),
 			(err: unknown) => this.#fail("Model switch failed", err),
+		);
+	}
+
+	setThinkingLevel(level: string): void {
+		this.#child.client.setThinkingLevel(level).then(
+			() => this.#refresh(),
+			(err: unknown) => this.#fail("Thinking level switch failed", err),
 		);
 	}
 
@@ -187,15 +201,41 @@ export class DashboardSession {
 		// A non-terminal end hands over to a queued follow-up.
 		else if (event.type === "agent_end" && event.isTerminal !== false) {
 			this.#setStatus("idle");
-			void this.#child.client.getState().then(
-				state => {
-					this.sessionName = state.sessionName ?? this.sessionName;
-					this.model = state.model ? `${state.model.provider}/${state.model.id}` : this.model;
+			this.#refresh();
+		} else if (typeof event.type === "string" && STATE_EVENTS.has(event.type)) this.#refresh();
+	}
+
+	#applyState(state: RpcState): void {
+		this.sessionName = state.sessionName ?? this.sessionName;
+		this.model = state.model ? `${state.model.provider}/${state.model.id}` : this.model;
+		this.thinkingLevel = state.thinkingLevel ?? null;
+		this.context = contextOf(state.contextUsage);
+	}
+
+	/** Re-read omp's state; a request that arrives mid-read runs once more after it, so the last change always lands. */
+	#refresh(): void {
+		if (this.#refreshing) {
+			this.#refreshAgain = true;
+			return;
+		}
+		this.#refreshing = true;
+		const { client } = this.#child;
+		Promise.all([client.getState(), client.getAvailableThinkingLevels()])
+			.then(
+				([state, levels]) => {
+					this.#applyState(state);
+					this.thinkingLevels = levels;
 					this.#emit({ kind: "roster" });
 				},
+				// The process exited; `exited` reports it.
 				() => {},
-			);
-		}
+			)
+			.finally(() => {
+				this.#refreshing = false;
+				if (!this.#refreshAgain) return;
+				this.#refreshAgain = false;
+				this.#refresh();
+			});
 	}
 
 	#setStatus(status: HostStatus): void {

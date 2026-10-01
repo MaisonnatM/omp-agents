@@ -50,6 +50,7 @@ export function App() {
 				models={state.models?.instanceId === view.instanceId ? state.models : null}
 				onListModels={() => send({ t: "list-models", instanceId: view.instanceId })}
 				onSetModel={model => send({ t: "set-model", instanceId: view.instanceId, model })}
+				onSetThinking={level => send({ t: "set-thinking", instanceId: view.instanceId, level })}
 				onPrompt={text => send({ t: "prompt", view, text })}
 				onAbort={() => send({ t: "abort", instanceId: view.instanceId })}
 				onEnd={() => send({ t: "end", instanceId: view.instanceId })}

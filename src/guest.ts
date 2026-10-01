@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp";
-import type { AgentRow, AgentStatus, ControlPhase } from "./shared";
+import type { AgentRow, AgentStatus, ContextUsage, ControlPhase } from "./shared";
 import { isObject, oneLine } from "./transcript";
 
 export type LiveUpdate =
@@ -79,6 +79,38 @@ export function activityOf(channel: unknown, payload: unknown): { id: string; ac
 	return text ? { id: progress.id, activity: oneLine(text) } : null;
 }
 
+/** omp's `ContextUsage` (a Collab state frame or an RPC state), as the roster's context numbers. */
+export function contextOf(value: unknown): ContextUsage | null {
+	if (!isObject(value)) return null;
+	const { tokens, contextWindow } = value;
+	return typeof tokens === "number" && typeof contextWindow === "number" && contextWindow > 0
+		? { tokens, window: contextWindow }
+		: null;
+}
+
+/** Model, thinking level, and context from the host's status-line snapshot. */
+interface HostState {
+	model: string | null;
+	thinkingLevel: string | null;
+	context: ContextUsage | null;
+}
+
+function parseState(value: unknown): HostState | null {
+	if (!isObject(value)) return null;
+	const { model, thinkingLevel } = value;
+	return {
+		model: isObject(model) && typeof model.provider === "string" && typeof model.id === "string" ? `${model.provider}/${model.id}` : null,
+		thinkingLevel: nonEmpty(thinkingLevel) ?? null,
+		context: contextOf(value.contextUsage),
+	};
+}
+
+const sameState = (a: HostState | null, b: HostState | null): boolean =>
+	a?.model === b?.model &&
+	a?.thinkingLevel === b?.thinkingLevel &&
+	a?.context?.tokens === b?.context?.tokens &&
+	a?.context?.window === b?.context?.window;
+
 /** Resolve a link, re-listing on `stale_generation` (the host switched sessions mid-request). */
 async function openFreshRoom(host: HostSnapshot): Promise<Room> {
 	for (let attempt = 1; ; attempt++) {
@@ -97,6 +129,8 @@ export class SessionGuest {
 	control: ControlPhase = { phase: "connecting" };
 	/** When the guest ended, for rejoin backoff. */
 	endedAt: number | null = null;
+	/** The host's last status-line snapshot; `null` until the welcome arrives. */
+	state: HostState | null = null;
 
 	#socket: CollabSocket | null = null;
 	#readOnly = true;
@@ -225,12 +259,20 @@ export class SessionGuest {
 			case "welcome":
 				this.#readOnly = this.#readOnly || frame.readOnly === true;
 				this.#agents = parseAgents(frame.agents);
+				this.state = parseState(frame.state);
 				// Rows carry `canMessage`, which depends on the welcome's read-only verdict.
 				this.#setControl({ phase: "live", readOnly: this.#readOnly });
 				return;
 			case "event":
 				this.#emit({ kind: "event", event: frame.event });
 				return;
+			case "state": {
+				const state = parseState(frame.state);
+				if (sameState(state, this.state)) return;
+				this.state = state;
+				this.#emit({ kind: "roster" });
+				return;
+			}
 			case "agents":
 				this.#agents = parseAgents(frame.agents);
 				this.#emit({ kind: "roster" });
