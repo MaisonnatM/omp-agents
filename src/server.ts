@@ -8,7 +8,8 @@ import { DashboardSession, type DashboardUpdate, type ForkedSession } from "./da
 import { type LiveUpdate, SessionGuest } from "./guest";
 import { FileTail } from "./tail";
 import { type HostSnapshot, listHosts, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
-import type { ClientMsg, HostStatus, Item, LiveView, RosterHost, ServerMsg, View } from "./shared";
+import { PullRequestIndex } from "./pull-requests";
+import type { ClientMsg, HostStatus, Item, LiveView, PullRequest, RosterHost, ServerMsg, View } from "./shared";
 import { isObject } from "./transcript";
 import { fetchPlanUsage } from "./usage";
 
@@ -46,6 +47,7 @@ const dashboards = new Map<string, DashboardSession>();
 let files: SavedSession[] = [];
 let fileById = new Map<string, SavedSession>();
 let pastJson = "";
+const pullRequestIndex = new PullRequestIndex();
 let listTimer: NodeJS.Timeout | undefined;
 /** Views some socket shows, with how many sockets show each; each has a tail while its file is known. */
 const watched = new Map<string, { view: View; sockets: number }>();
@@ -60,6 +62,11 @@ const send = (ws: Socket, msg: ServerMsg): void => void ws.send(JSON.stringify(m
 const publish = (topic: string, msg: ServerMsg): void => void server.publish(topic, JSON.stringify(msg));
 const displayPath = (path: string): string =>
 	path === HOME || path.startsWith(`${HOME}/`) ? `~${path.slice(HOME.length)}` : path;
+
+const pullRequestsOf = (sessionId: string): PullRequest[] => {
+	const path = fileById.get(sessionId)?.path;
+	return path ? pullRequestIndex.of(path) : [];
+};
 
 function statusOf(host: HostSnapshot): HostStatus {
 	if (host.inputRequired) return "needs-input";
@@ -88,6 +95,7 @@ function rosterHosts(): RosterHost[] {
 			status: statusOf(host),
 			control: guest?.control ?? { phase: "connecting" },
 			agents: guest?.agents() ?? [],
+			pullRequests: pullRequestsOf(host.sessionId),
 		};
 	});
 	const started = [...dashboards.values()].map(
@@ -107,6 +115,7 @@ function rosterHosts(): RosterHost[] {
 			status: session.status,
 			control: { phase: "live", readOnly: false },
 			agents: session.agents(),
+			pullRequests: pullRequestsOf(session.sessionId),
 		}),
 	);
 	return [...terminal, ...started];
@@ -122,6 +131,7 @@ function pastMsg(): ServerMsg {
 			cwd: session.cwd,
 			cwdDisplay: displayPath(session.cwd),
 			modifiedAt: session.modifiedAt,
+			pullRequests: pullRequestIndex.of(session.path),
 		}));
 	return { t: "past", sessions };
 }
@@ -205,6 +215,12 @@ async function refreshFiles(): Promise<void> {
 	listTimer = undefined;
 	syncTails();
 	pushPast();
+	// The first scan reads every transcript; the list shows before it finishes.
+	void pullRequestIndex.refresh(files).then(changed => {
+		if (!changed) return;
+		pushPast();
+		pushRoster();
+	});
 }
 
 function onLiveUpdate(instanceId: string, update: LiveUpdate | DashboardUpdate): void {
