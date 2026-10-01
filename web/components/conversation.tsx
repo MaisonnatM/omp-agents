@@ -1,6 +1,16 @@
 import { Brain } from "lucide-react";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
-import type { AgentRow, CompletionItem, ControlPhase, Item, LiveView, ModelOption, PastSession, RosterHost } from "../../src/shared";
+import { Fragment, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import type {
+	AgentRow,
+	CompletionItem,
+	ControlPhase,
+	Item,
+	LiveView,
+	ModelOption,
+	PastSession,
+	PullRequest,
+	RosterHost,
+} from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import { InputMessage, type QueuedMessage } from "@/components/ui/input-message";
@@ -18,7 +28,7 @@ import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader 
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import type { Fork } from "../use-dashboard";
-import { type ForkPoint, forkPoints, modelName, modelOrg, type ToolItem, toBlocks } from "../view-model";
+import { type ForkPoint, forkPoints, modelName, modelOrg, pullRequestUrl, type ToolItem, toBlocks } from "../view-model";
 import { completionTrigger } from "../completion-trigger";
 import { CompletionPopup } from "./completion-popup";
 import { ContextRing } from "./context-ring";
@@ -166,6 +176,24 @@ export function Model({ selector }: { selector: string }) {
 	);
 }
 
+/** The PRs a session submitted, after a separator, each linking to GitHub. */
+function PullRequests({ pullRequests }: { pullRequests: PullRequest[] }) {
+	return pullRequests.map(pr => (
+		<Fragment key={pullRequestUrl(pr)}>
+			{" · "}
+			<a
+				href={pullRequestUrl(pr)}
+				target="_blank"
+				rel="noreferrer"
+				title={`${pr.owner}/${pr.repo}#${pr.number} on GitHub`}
+				className="underline-offset-2 hover:text-foreground hover:underline"
+			>
+				#{pr.number}
+			</a>
+		</Fragment>
+	));
+}
+
 /** The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end. */
 function Transcript({ items, working, fork, onFork }: TranscriptProps) {
 	const last = items.at(-1);
@@ -256,6 +284,7 @@ export function PastConversation({ sessionId, session, items, fork, onFork }: Pa
 	const meta = session ? (
 		<>
 			<Project cwdDisplay={session.cwdDisplay} /> · last active {new Date(session.modifiedAt).toLocaleString()}
+			<PullRequests pullRequests={session.pullRequests} />
 		</>
 	) : (
 		sessionId
@@ -376,6 +405,7 @@ function LiveConversation({
 		: shown && (
 				<>
 					<Project cwdDisplay={shown.cwdDisplay} /> · {shown.model ? <Model selector={shown.model} /> : "no model"} · pid {shown.pid}
+					<PullRequests pullRequests={shown.pullRequests} />
 				</>
 			);
 

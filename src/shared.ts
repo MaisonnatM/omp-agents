@@ -4,6 +4,13 @@ export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
 
 export type AgentStatus = "running" | "idle" | "parked" | "aborted";
 
+/** A GitHub pull request a session submitted with `gt submit` or `gh pr create`. */
+export interface PullRequest {
+	owner: string;
+	repo: string;
+	number: number;
+}
+
 /** A subagent of a session. The main agent is the session itself and is not listed. */
 export interface AgentRow {
 	id: string;
@@ -36,6 +43,8 @@ interface RosterHostBase {
 	status: HostStatus;
 	control: ControlPhase;
 	agents: AgentRow[];
+	/** What the session and its subagents submitted; the session's own first. */
+	pullRequests: PullRequest[];
 }
 
 export type RosterHost = RosterHostBase &
@@ -60,6 +69,8 @@ export interface PastSession {
 	cwdDisplay: string;
 	/** Last write to the session file, in ms since the epoch. */
 	modifiedAt: number;
+	/** What the session and its subagents submitted; the session's own first. */
+	pullRequests: PullRequest[];
 }
 
 export interface LiveView {
@@ -224,4 +235,4 @@ export type ClientMsg =
 	/** Switch a session this dashboard started to another model. */
 	| { t: "set-model"; instanceId: string; model: ModelOption }
 	/** Switch a session this dashboard started to another thinking level, one of its `thinkingLevels`. */
-	| { t: "set-thinking"; instanceId: string; level: string }
+	| { t: "set-thinking"; instanceId: string; level: string };

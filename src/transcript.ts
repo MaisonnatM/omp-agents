@@ -18,7 +18,7 @@ const SUMMARY_MAX = 160;
 export const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null;
 const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
-function textOf(content: unknown): string {
+export function textOf(content: unknown): string {
 	if (typeof content === "string") return content;
 	if (!Array.isArray(content)) return "";
 	return content

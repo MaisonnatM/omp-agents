@@ -7,6 +7,7 @@ import {
 	forkPoints,
 	hashForSettings,
 	hashForView,
+	matchesFilter,
 	modelName,
 	modelOrg,
 	settingsFromHash,
@@ -91,6 +92,35 @@ describe("defaultCwd", () => {
 		expect(defaultCwd(null, hosts, sessions)).toBe("~/new");
 		expect(defaultCwd({ kind: "past", sessionId: "s1" }, [], sessions)).toBe("~/saved");
 		expect(defaultCwd(null, [], [])).toBe("~");
+	});
+});
+
+describe("matchesFilter", () => {
+	const session = {
+		sessionId: "s1",
+		title: "Fix all outstanding problems",
+		cwd: "/Users/me/code/webapp",
+		cwdDisplay: "~/code/webapp",
+		modifiedAt: 0,
+		pullRequests: [{ owner: "acme", repo: "webapp", number: 6596 }],
+	} satisfies PastSession;
+	const matches = (query: string) => matchesFilter(session, session.title, query);
+
+	test("a pasted PR link matches only the sessions that submitted that exact PR", () => {
+		expect(matches("https://github.com/acme/webapp/pull/6596/files")).toBe(true);
+		expect(matches("https://app.graphite.com/github/pr/Acme/webapp/6596")).toBe(true);
+		expect(matches("https://github.com/acme/webapp/pull/6597")).toBe(false);
+		expect(matches("https://github.com/other/webapp/pull/6596")).toBe(false);
+	});
+
+	test("a PR number matches the PR; other text matches the title or directory", () => {
+		expect(matches("#6596")).toBe(true);
+		expect(matches(" 6596 ")).toBe(true);
+		expect(matches("6597")).toBe(false);
+		expect(matches("OUTSTANDING")).toBe(true);
+		expect(matches("code/webapp")).toBe(true);
+		expect(matches("composer")).toBe(false);
+		expect(matches("")).toBe(true);
 	});
 });
 

@@ -17,7 +17,7 @@ import {
 	SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import type { Launch } from "../use-dashboard";
-import { agentTree, hashForView } from "../view-model";
+import { agentTree, hashForView, matchesFilter } from "../view-model";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** Pixels of extra indent per nesting level below the first subagent level. */
@@ -116,6 +116,8 @@ export function Roster({
 	onCreate,
 }: RosterProps) {
 	const [runningOpen, setRunningOpen] = useState(true);
+	const [filter, setFilter] = useState("");
+	const shownPast = past.filter(session => matchesFilter(session, pastLabel(session), filter));
 	return (
 		<>
 			<SidebarHeader className="flex-row items-center justify-between px-4 pt-4">
@@ -178,6 +180,7 @@ export function Roster({
 												host.model ?? "no model",
 												statusLabel(host.status),
 												host.source === "terminal" && !host.relayConnected && "relay offline",
+												host.pullRequests.map(pr => `#${pr.number}`).join(" "),
 											]
 												.filter(Boolean)
 												.join(" · ")}
@@ -220,9 +223,28 @@ export function Roster({
 					</SidebarMenu>
 				</SidebarGroup>
 				<SidebarGroup collapsible>
-					<SidebarGroupLabel>{past.length === 0 ? "No past sessions" : `${past.length} past`}</SidebarGroupLabel>
+					<SidebarGroupLabel>
+						{past.length === 0
+							? "No past sessions"
+							: filter.trim()
+								? `${shownPast.length} of ${past.length} past`
+								: `${past.length} past`}
+					</SidebarGroupLabel>
+					{past.length > 0 && (
+						<div className="px-2 pb-2">
+							<SidebarInput
+								type="search"
+								value={filter}
+								onChange={event => setFilter(event.target.value)}
+								placeholder="Filter, or paste a PR link"
+								aria-label="Filter past sessions"
+								spellCheck={false}
+								className="text-xs"
+							/>
+						</div>
+					)}
 					<SidebarMenu aria-label="Past omp sessions">
-						{past.map(session => (
+						{shownPast.map(session => (
 							<SidebarMenuItem key={session.sessionId}>
 								<SidebarMenuButton
 									size="lg"
@@ -238,7 +260,11 @@ export function Roster({
 												{age(session.modifiedAt)}
 											</span>
 										</span>
-										<span className="truncate text-xs text-muted-foreground">{session.cwdDisplay || "unknown directory"}</span>
+										<span className="truncate text-xs text-muted-foreground">
+											{[session.cwdDisplay || "unknown directory", session.pullRequests.map(pr => `#${pr.number}`).join(" ")]
+												.filter(Boolean)
+												.join(" · ")}
+										</span>
 									</span>
 								</SidebarMenuButton>
 							</SidebarMenuItem>
