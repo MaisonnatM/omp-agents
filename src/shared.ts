@@ -203,7 +203,40 @@ export interface ModelRouting {
 	roles: RoleRoute[];
 	modelChains: ModelChain[];
 	retry: RetrySettings;
+	/** The values omp accepts for each enum `retry.*` setting. */
+	retryChoices: Partial<Record<keyof RetrySettings, readonly string[]>>;
 	modelProviderOrder: string[];
+}
+
+/** A model `omp models` lists. `thinking` holds the levels it takes as a `:level` suffix on its selector. */
+export interface CatalogModel {
+	selector: string;
+	provider: string;
+	name: string;
+	thinking: string[];
+}
+
+/**
+ * `PUT /api/settings/routing`: one change to omp's model routing, written to the user's `config.yml` through omp.
+ * An absent field stays as it is. An empty `fallbacks` removes the chain, so a role walks the `default` chain again.
+ */
+export type RoutingEdit =
+	| { kind: "role"; role: string; primary?: string; fallbacks?: string[] }
+	| { kind: "model-chain"; key: string; fallbacks: string[] }
+	| { kind: "retry"; values: Partial<RetrySettings> }
+	| { kind: "provider-order"; providers: string[] };
+
+/** `PUT /api/settings/file`: new text for a file the page listed. `baseHash` is the hash it was read with, `null` if it was missing. */
+export interface FileEdit {
+	path: string;
+	text: string;
+	baseHash: string | null;
+}
+
+/** The body of every failed settings request. `conflict`: the file changed on disk since the page read it. */
+export interface SettingsError {
+	error: string;
+	conflict?: true;
 }
 
 /** What a file feeds into omp: instructions, settings, or something it can run. */
@@ -216,7 +249,8 @@ export interface OmpFile {
 	path: string;
 	/** `path` with the home directory shortened to `~`. */
 	pathDisplay: string;
-	body: { state: "read"; size: number; modifiedAt: number; text: string } | { state: "missing" } | { state: "unreadable"; error: string };
+	/** `hash` is the SHA-256 of `text`; a save must name it, so a file changed on disk since is not overwritten. */
+	body: { state: "read"; size: number; modifiedAt: number; text: string; hash: string } | { state: "missing" } | { state: "unreadable"; error: string };
 }
 
 /** `GET /api/settings`: omp's model routing and files, as a session in `cwd` would load them. */
