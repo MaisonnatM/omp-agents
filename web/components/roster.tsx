@@ -1,7 +1,9 @@
-import { Plus, Settings } from "lucide-react";
+import { Check, ChevronsUpDown, Folder, Plus, Settings } from "lucide-react";
 import { useState } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
 	SidebarContent,
 	SidebarGroup,
@@ -16,12 +18,16 @@ import {
 	SidebarMenuSubButton,
 	SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 import type { Launch } from "../use-dashboard";
-import { agentTree, hashForView, matchesFilter } from "../view-model";
+import { agentTree, hashForView, matchesFilter, workspaces } from "../view-model";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** Pixels of extra indent per nesting level below the first subagent level. */
 const NEST_INDENT = 12;
+
+/** The project the sidebar is scoped to, by `cwd`; absent for all projects. */
+const PROJECT_KEY = "omp-agents.sidebar-project";
 
 export function age(startedAt: number): string {
 	const minutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60_000));
@@ -85,6 +91,67 @@ function NewSessionForm({ launch, defaultCwd, connected, onCreate, onCancel }: N
 	);
 }
 
+interface ProjectPickerProps {
+	/** Directories sessions ran in, as {@link workspaces} lists them. */
+	projects: { cwd: string; cwdDisplay: string }[];
+	/** The selected project's `cwd`, or `null` for all projects. */
+	current: string | null;
+	onPick: (cwd: string | null) => void;
+}
+
+/** Scopes the roster to one directory's running and past sessions. */
+function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
+	const [open, setOpen] = useState(false);
+	const selected = projects.find(project => project.cwd === current);
+	const label = selected ? (projectName(selected.cwdDisplay) ?? selected.cwdDisplay) : "All projects";
+	const pick = (cwd: string | null): void => {
+		setOpen(false);
+		if (cwd !== current) onPick(cwd);
+	};
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger asChild>
+				<Button
+					variant="ghost"
+					size="compact"
+					leadingIcon={Folder}
+					trailingIcon={ChevronsUpDown}
+					title={selected?.cwdDisplay}
+					aria-label={`Show sessions from: ${label}`}
+					active={open}
+				>
+					<span className="max-w-56 truncate">{label}</span>
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] p-0">
+				<Command>
+					<CommandInput aria-label="Search projects" placeholder="Search projects…" />
+					<CommandList>
+						<CommandEmpty>No project matches.</CommandEmpty>
+						<CommandGroup>
+							<CommandItem value="All projects" onSelect={() => pick(null)}>
+								All projects
+								<Check className={cn("ml-auto", current === null ? "opacity-100" : "opacity-0")} />
+							</CommandItem>
+						</CommandGroup>
+						<CommandGroup heading="Projects">
+							{projects.map(project => (
+								<CommandItem key={project.cwd} value={project.cwd} keywords={[project.cwdDisplay]} onSelect={() => pick(project.cwd)}>
+									<span className="flex min-w-0 flex-col">
+										<span className="truncate">{projectName(project.cwdDisplay) ?? project.cwdDisplay}</span>
+										<span className="truncate text-xs text-muted-foreground">{project.cwdDisplay}</span>
+									</span>
+									<Check className={cn("ml-auto shrink-0", project.cwd === current ? "opacity-100" : "opacity-0")} />
+								</CommandItem>
+							))}
+						</CommandGroup>
+					</CommandList>
+				</Command>
+			</PopoverContent>
+		</Popover>
+	);
+}
+
 interface RosterProps {
 	hosts: RosterHost[];
 	past: PastSession[];
@@ -117,7 +184,18 @@ export function Roster({
 }: RosterProps) {
 	const [runningOpen, setRunningOpen] = useState(true);
 	const [filter, setFilter] = useState("");
-	const shownPast = past.filter(session => matchesFilter(session, pastLabel(session), filter));
+	const [storedProject, setStoredProject] = useState(() => localStorage.getItem(PROJECT_KEY));
+	const projects = workspaces(hosts, past);
+	// A stored project with no sessions left, or not yet loaded, shows all of them.
+	const project = projects.some(({ cwd }) => cwd === storedProject) ? storedProject : null;
+	const pickProject = (cwd: string | null): void => {
+		setStoredProject(cwd);
+		if (cwd === null) localStorage.removeItem(PROJECT_KEY);
+		else localStorage.setItem(PROJECT_KEY, cwd);
+	};
+	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
+	const shownHosts = hosts.filter(inProject);
+	const shownPast = past.filter(session => inProject(session) && matchesFilter(session, pastLabel(session), filter));
 	return (
 		<>
 			<SidebarHeader className="flex-row items-center justify-between px-4 pt-4">
@@ -131,6 +209,11 @@ export function Roster({
 					</Button>
 				</span>
 			</SidebarHeader>
+			{projects.length > 1 && (
+				<div className="px-2">
+					<ProjectPicker projects={projects} current={project} onPick={pickProject} />
+				</div>
+			)}
 			{!connected && (
 				<p className="mx-3 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
 					Lost the dashboard server. Retrying…
@@ -138,7 +221,13 @@ export function Roster({
 			)}
 			<SidebarContent>
 				<SidebarGroup collapsible open={runningOpen} onOpenChange={setRunningOpen}>
-					<SidebarGroupLabel>{hosts.length === 0 ? "No sessions" : `${hosts.length} running`}</SidebarGroupLabel>
+					<SidebarGroupLabel>
+						{hosts.length === 0
+							? "No sessions"
+							: project
+								? `${shownHosts.length} of ${hosts.length} running`
+								: `${hosts.length} running`}
+					</SidebarGroupLabel>
 					<SidebarGroupAction
 						title="New session"
 						aria-label="New session"
@@ -160,7 +249,7 @@ export function Roster({
 						/>
 					)}
 					<SidebarMenu aria-label="Running omp sessions">
-						{hosts.map(host => (
+						{shownHosts.map(host => (
 							<SidebarMenuItem key={host.instanceId}>
 								<SidebarMenuButton
 									size="lg"
@@ -226,7 +315,7 @@ export function Roster({
 					<SidebarGroupLabel>
 						{past.length === 0
 							? "No past sessions"
-							: filter.trim()
+							: filter.trim() || project
 								? `${shownPast.length} of ${past.length} past`
 								: `${past.length} past`}
 					</SidebarGroupLabel>
