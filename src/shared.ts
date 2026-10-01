@@ -105,15 +105,6 @@ export interface CompletionItem {
 	cursor: number;
 }
 
-/** One `/` or `@` suggestion, with the composer text and caret it produces when accepted (omp's own insertion). */
-export interface CompletionItem {
-	kind: "command" | "skill" | "file" | "directory";
-	label: string;
-	description: string | null;
-	text: string;
-	cursor: number;
-}
-
 /** One quota window of a provider plan. */
 export interface PlanWindow {
 	/** Short name: the window id (`5h`, `7d`, `monthly`) plus its model tier, else omp's label when that is ambiguous. */
@@ -174,6 +165,4 @@ export type ClientMsg =
 	/** Switch a session this dashboard started to another model. */
 	| { t: "set-model"; instanceId: string; model: ModelOption }
 	/** Switch a session this dashboard started to another thinking level, one of its `thinkingLevels`. */
-	| { t: "set-thinking"; instanceId: string; level: string }
-	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
-	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number };
+	| { t: "set-thinking"; instanceId: string; level: string };

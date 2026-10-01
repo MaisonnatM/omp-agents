@@ -227,69 +227,6 @@ interface ExtensionSettingsModule {
 	cfgDisabledExtensions: SettingsReader<string[]>;
 }
 
-/** Subset of pi-tui's `AutocompleteItem` (pi-tui/src/autocomplete.ts). */
-export interface AutocompleteItem {
-	value: string;
-	label: string;
-	description?: string;
-}
-/** pi-tui's `CombinedAutocompleteProvider`: omp's own `/` and `@` completion. */
-export interface AutocompleteProvider {
-	getSuggestions(
-		lines: string[],
-		cursorLine: number,
-		cursorCol: number,
-	): Promise<{ items: AutocompleteItem[]; prefix: string } | null>;
-	applyCompletion(
-		lines: string[],
-		cursorLine: number,
-		cursorCol: number,
-		item: AutocompleteItem,
-		prefix: string,
-	): { lines: string[]; cursorLine: number; cursorCol: number };
-}
-interface AutocompleteModule {
-	CombinedAutocompleteProvider: new (
-		commands: { name: string; description?: string }[],
-		basePath: string,
-	) => AutocompleteProvider;
-}
-
-/** Subset of omp's `Skill` (src/extensibility/skills.ts). */
-export interface Skill {
-	name: string;
-	description: string;
-	filePath: string;
-	baseDir: string;
-}
-interface SkillsModule {
-	loadSkills(options: Record<string, unknown> & { cwd: string }): Promise<{ skills: Skill[] }>;
-	parseSkillInvocation(text: string): { name: string; args: string; prompt: string } | undefined;
-	buildSkillPromptMessage(skill: Skill, input: { args: string; prompt?: string }): Promise<{ message: string }>;
-}
-
-/** Subset of omp's `FileSlashCommand` (src/extensibility/slash-commands.ts). */
-export interface FileSlashCommand {
-	name: string;
-	description: string;
-}
-interface SlashCommandsModule {
-	loadSlashCommands(options: { cwd: string }): Promise<FileSlashCommand[]>;
-	expandSlashCommand(text: string, fileCommands: FileSlashCommand[]): string;
-}
-
-/** omp settings descriptors (`register`/`combine` in src/config); `get` reads one from a loaded Settings. */
-interface SettingsReader<T> {
-	get(settings: unknown): T;
-}
-interface ConfigModule {
-	Settings: { loadReadOnly(options: { cwd: string }): Promise<unknown> };
-}
-interface ExtensionSettingsModule {
-	cfgSkills: SettingsReader<Record<string, unknown> & { enableSkillCommands?: boolean }>;
-	cfgDisabledExtensions: SettingsReader<string[]>;
-}
-
 const PACKAGE_NAME = "@oh-my-pi/pi-coding-agent";
 
 function findPackageDir(): string {
