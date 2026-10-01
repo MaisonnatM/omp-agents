@@ -55,6 +55,36 @@ export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSes
 	return candidates[0] ?? "~";
 }
 
+/** A model selector without its provider, router org, or the `claude-` prefix: `anthropic/claude-opus-5-5` reads `opus-5-5`. */
+export const modelName = (selector: string): string =>
+	selector
+		.slice(selector.lastIndexOf("/") + 1)
+		.replace(/^~/, "")
+		.replace(/^claude-/, "");
+
+/** Providers whose id is not the org that makes their models. */
+const PROVIDER_ORGS: Record<string, string> = { "openai-codex": "openai" };
+
+export const providerOrg = (provider: string): string => PROVIDER_ORGS[provider] ?? provider;
+
+/** Model families that resellers such as Cursor serve under their own provider id. */
+const FAMILY_ORGS: [RegExp, string][] = [
+	[/^claude/, "anthropic"],
+	[/^(gpt|o\d|codex)/, "openai"],
+	[/^deepseek/, "deepseek"],
+	[/^kimi/, "moonshotai"],
+];
+
+/** The org that makes a `provider/id` model: a router's `org/model` id names it, else the model family, else the provider. */
+export function modelOrg(selector: string): string {
+	const slash = selector.indexOf("/");
+	const provider = selector.slice(0, slash);
+	const id = selector.slice(slash + 1);
+	const routed = id.indexOf("/");
+	if (routed >= 0) return id.slice(0, routed).replace(/^~/, "");
+	return FAMILY_ORGS.find(([family]) => family.test(id))?.[1] ?? providerOrg(provider);
+}
+
 /** Apply an `items` message: replace on reset, else upsert by id and append new ids. */
 export function applyItems(prev: Item[], reset: boolean, items: Item[]): Item[] {
 	if (reset) return items;

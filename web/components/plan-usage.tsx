@@ -4,6 +4,8 @@ import { SidebarFooter } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DashboardState } from "../use-dashboard";
+import { providerOrg } from "../view-model";
+import { OrgIcon } from "./org-icon";
 
 /** Below this fraction left, a window reads as running low. */
 const LOW = 0.2;
@@ -33,7 +35,8 @@ function WindowLeft({ window }: { window: PlanWindow }) {
 function PlanRow({ plan, showAccount }: { plan: PlanUsage; showAccount: boolean }) {
 	return (
 		<li className="flex flex-col gap-0.5">
-			<span className="flex min-w-0 items-baseline gap-1.5" title={plan.account ?? undefined}>
+			<span className="flex min-w-0 items-center gap-1.5" title={plan.account ?? undefined}>
+				<OrgIcon org={providerOrg(plan.provider)} />
 				<span className="shrink-0 font-medium text-foreground">{plan.name}</span>
 				{showAccount && plan.account && <span className="truncate text-muted-foreground">{plan.account}</span>}
 			</span>
