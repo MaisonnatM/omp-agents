@@ -75,6 +75,17 @@ export class Transcript {
 		}
 	}
 
+	/** Complete JSONL lines of a session file, as written to disk or returned by `fetch-transcript`. */
+	applyLines(lines: string[]): Item[] {
+		return lines.flatMap(line => {
+			try {
+				return line ? this.applyEntry(JSON.parse(line)) : [];
+			} catch {
+				return [];
+			}
+		});
+	}
+
 	/** Live agent event. Returns the items it created or changed. */
 	applyEvent(event: unknown): Item[] {
 		if (!isObject(event)) return [];

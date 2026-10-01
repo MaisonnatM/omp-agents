@@ -1,5 +1,5 @@
 /** Pure transforms from server messages to what the page renders. */
-import type { AgentRow, Item, View } from "../src/shared";
+import type { AgentRow, Item, PastSession, RosterHost, View } from "../src/shared";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
 
@@ -12,22 +12,48 @@ export interface AgentNode {
 	depth: number;
 }
 
-/** `#<instanceId>` selects a session, `#<instanceId>/<agentId>` one of its subagents. */
+const PAST_PREFIX = "past/";
+
+/**
+ * `#<instanceId>` selects a live session, `#<instanceId>/<agentId>` one of its subagents,
+ * and `#past/<sessionId>` a past session. Instance ids are hex, so none reads as `past`.
+ */
 export function viewFromHash(hash: string): View | null {
 	const raw = hash.replace(/^#/, "");
 	if (!raw) return null;
+	if (raw.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(raw.slice(PAST_PREFIX.length)) };
 	const slash = raw.indexOf("/");
-	if (slash < 0) return { instanceId: decodeURIComponent(raw), agentId: null };
-	return { instanceId: decodeURIComponent(raw.slice(0, slash)), agentId: decodeURIComponent(raw.slice(slash + 1)) };
+	if (slash < 0) return { kind: "live", instanceId: decodeURIComponent(raw), agentId: null };
+	return {
+		kind: "live",
+		instanceId: decodeURIComponent(raw.slice(0, slash)),
+		agentId: decodeURIComponent(raw.slice(slash + 1)),
+	};
 }
 
 export function hashForView(view: View): string {
+	if (view.kind === "past") return `#${PAST_PREFIX}${encodeURIComponent(view.sessionId)}`;
 	const session = encodeURIComponent(view.instanceId);
 	return view.agentId === null ? `#${session}` : `#${session}/${encodeURIComponent(view.agentId)}`;
 }
 
 export const sameView = (a: View | null, b: View | null): boolean =>
-	a?.instanceId === b?.instanceId && a?.agentId === b?.agentId;
+	(a && hashForView(a)) === (b && hashForView(b));
+
+/**
+ * Where a new session starts unless the user types another directory: the open session's,
+ * else the newest live one's, else the newest past one's.
+ */
+export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[]): string {
+	const open =
+		view?.kind === "live"
+			? hosts.find(host => host.instanceId === view.instanceId)
+			: past.find(session => session.sessionId === view?.sessionId);
+	const newestHost = hosts.toSorted((a, b) => b.startedAt - a.startedAt)[0];
+	// Sessions from old omp versions recorded no directory.
+	const candidates = [open, newestHost, ...past].map(row => row?.cwdDisplay).filter(Boolean);
+	return candidates[0] ?? "~";
+}
 
 /** Apply an `items` message: replace on reset, else upsert by id and append new ids. */
 export function applyItems(prev: Item[], reset: boolean, items: Item[]): Item[] {

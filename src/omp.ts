@@ -1,10 +1,11 @@
 /**
- * Loads the collab modules shipped inside the installed omp package so this
- * app speaks the exact protocol, crypto, and registry code of the omp version
- * that is running the sessions.
+ * Loads the collab and session-listing modules shipped inside the installed
+ * omp package so this app speaks the exact protocol, crypto, registry, and
+ * session-file code of the omp version that is running the sessions.
  */
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { oneLine } from "./transcript";
 
 export type Access = "view" | "control";
 
@@ -62,6 +63,30 @@ interface RelayModule {
 	CollabSocket: new (opts: { wsUrl: string; role: "guest"; key: CryptoKey }) => CollabSocket;
 }
 
+/** Subset of omp's `SessionInfo` (src/session/session-listing.ts) this app reads. */
+interface SessionInfo {
+	path: string;
+	id: string;
+	cwd: string;
+	title?: string;
+	modified: Date;
+	firstMessage: string;
+}
+interface ListingModule {
+	listAllSessions(): Promise<SessionInfo[]>;
+	isEmptySession(session: SessionInfo): boolean;
+}
+
+/** A session file on disk, newest first in {@link listSavedSessions}. */
+export interface SavedSession {
+	id: string;
+	path: string;
+	cwd: string;
+	/** The session's title, else its first prompt as one line. */
+	title: string | null;
+	modifiedAt: number;
+}
+
 const PACKAGE_NAME = "@oh-my-pi/pi-coding-agent";
 
 function findPackageDir(): string {
@@ -84,13 +109,17 @@ if (!existsSync(join(collabDir, "relay-client.ts"))) {
 	throw new Error(`${collabDir} does not ship the collab sources this app imports (omp too old or a compiled build)`);
 }
 
-export const ompVersion: string = require(join(packageDir, "package.json")).version;
+const manifest = require(join(packageDir, "package.json")) as { version: string; bin: { omp: string } };
+export const ompVersion: string = manifest.version;
+/** Runs this same package's CLI, so new sessions match the modules loaded here. */
+export const ompCommand: string[] = [process.execPath, join(packageDir, manifest.bin.omp)];
 
 // Dynamic imports: the module location is the user's omp install, only known at runtime.
 const registry = (await import(join(collabDir, "registry.ts"))) as RegistryModule;
 const protocol = (await import(join(collabDir, "protocol.ts"))) as ProtocolModule;
 const crypto = (await import(join(collabDir, "crypto.ts"))) as CryptoModule;
 const relay = (await import(join(collabDir, "relay-client.ts"))) as RelayModule;
+const listing = (await import(join(packageDir, "src", "session", "session-listing.ts"))) as ListingModule;
 
 export const COLLAB_PROTO = protocol.COLLAB_PROTO;
 
@@ -98,6 +127,21 @@ export const listHosts = registry.listCollabHosts;
 
 export function linkErrorCode(err: unknown): LinkErrorCode | null {
 	return err instanceof registry.CollabLinkError ? err.code : null;
+}
+
+/** Every session file under omp's sessions directory, skipping the 0-turn stubs omp's own picker hides. */
+export async function listSavedSessions(): Promise<SavedSession[]> {
+	const sessions = await listing.listAllSessions();
+	return sessions
+		.filter(session => !listing.isEmptySession(session))
+		.map(({ id, path, cwd, title, firstMessage, modified }) => ({
+			id,
+			path,
+			cwd,
+			// omp writes this placeholder when the prefix it scans holds no user text.
+			title: title || (firstMessage && firstMessage !== "(no messages)" ? oneLine(firstMessage) : null),
+			modifiedAt: modified.getTime(),
+		}));
 }
 
 export interface Room {

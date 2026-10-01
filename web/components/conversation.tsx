@@ -1,12 +1,13 @@
-import { useLayoutEffect, useRef, useState } from "react";
-import type { AgentRow, GuestPhase, Item, RosterHost, View } from "../../src/shared";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import type { AgentRow, GuestPhase, Item, LiveView, PastSession, RosterHost } from "../../src/shared";
+import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import { InputMessage, type QueuedMessage } from "@/components/ui/input-message";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
 import { cn } from "@/lib/utils";
 import { type ToolItem, toBlocks } from "../view-model";
-import { hostLabel } from "./roster";
+import { hostLabel, pastLabel } from "./roster";
 import { statusLabel } from "./status-dot";
 
 const PHASE_LABEL: Record<GuestPhase["phase"], string> = {
@@ -50,8 +51,104 @@ function ToolGroup({ tools }: { tools: ToolItem[] }) {
 	);
 }
 
+interface HeaderProps {
+	title: string;
+	meta: string;
+	status: string;
+	alert: boolean;
+	children?: ReactNode;
+}
+
+function Header({ title, meta, status, alert, children }: HeaderProps) {
+	return (
+		<header className="flex items-center justify-between gap-4 border-b border-border px-6 py-3">
+			<div className="min-w-0">
+				<h2 className="truncate text-sm font-semibold">{title}</h2>
+				<p className="truncate text-xs text-muted-foreground">{meta}</p>
+			</div>
+			<div className="flex shrink-0 items-center gap-3">
+				<span className={cn("text-xs", alert ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} data-status>
+					{status}
+				</span>
+				{children}
+			</div>
+		</header>
+	);
+}
+
+/** The scrolling message list. It stays pinned to the bottom unless the reader scrolled up. */
+function Transcript({ items, working }: { items: Item[]; working: boolean }) {
+	const scrollRef = useRef<HTMLDivElement>(null);
+	const pinned = useRef(true);
+
+	useLayoutEffect(() => {
+		const el = scrollRef.current;
+		if (el && pinned.current) el.scrollTop = el.scrollHeight;
+	}, [items]);
+
+	const last = items.at(-1);
+	const streaming = last?.kind === "assistant" && last.streaming;
+
+	return (
+		<div
+			ref={scrollRef}
+			onScroll={event => {
+				const el = event.currentTarget;
+				pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+			}}
+			className="min-h-0 flex-1 overflow-y-auto"
+		>
+			<div className="mx-auto flex max-w-3xl flex-col gap-3 px-6 py-6" aria-live="polite" data-transcript>
+				{toBlocks(items).map(block => {
+					if (block.kind === "tools") return <ToolGroup key={block.id} tools={block.tools} />;
+					const item = block.item;
+					switch (item.kind) {
+						case "user":
+							return (
+								<ChatMessage key={item.id} from="user" time={item.from ?? undefined} data-item="user">
+									{item.text}
+								</ChatMessage>
+							);
+						case "assistant":
+							return (
+								<ChatMessage key={item.id} from="assistant" data-item="assistant" data-streaming={item.streaming}>
+									{item.text}
+								</ChatMessage>
+							);
+						case "notice":
+							return (
+								<p key={item.id} className={cn("self-center text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
+									{item.text}
+								</p>
+							);
+					}
+				})}
+				{working && !streaming && <ThinkingIndicator className="self-start" />}
+			</div>
+		</div>
+	);
+}
+
+interface PastConversationProps {
+	sessionId: string;
+	/** The listed row, or `null` when the session is no longer listed. */
+	session: PastSession | null;
+	items: Item[];
+}
+
+/** A past session's saved transcript. Nothing on this page can write to it. */
+export function PastConversation({ sessionId, session, items }: PastConversationProps) {
+	const meta = session ? `${session.cwdDisplay} · last active ${new Date(session.modifiedAt).toLocaleString()}` : sessionId;
+	return (
+		<div className="flex h-svh min-h-0 flex-1 flex-col">
+			<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Ended · read-only" alert={false} />
+			<Transcript items={items} working={false} />
+		</div>
+	);
+}
+
 interface ConversationProps {
-	view: View;
+	view: LiveView;
 	/** Current roster row, or `null` once the session has left the roster. */
 	host: RosterHost | null;
 	/** Last known row, for the header after the session ended. */
@@ -60,19 +157,13 @@ interface ConversationProps {
 	items: Item[];
 	onPrompt: (text: string) => void;
 	onAbort: () => void;
+	onEnd: () => void;
 }
 
-/** One session or subagent: header, live transcript, composer. Keyed by view, so drafts and queues reset per view. */
-export function Conversation({ view, host, lastHost, phase: guestPhase, items, onPrompt, onAbort }: ConversationProps) {
+/** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts and queues reset per view. */
+export function Conversation({ view, host, lastHost, phase: guestPhase, items, onPrompt, onAbort, onEnd }: ConversationProps) {
 	const [draft, setDraft] = useState("");
 	const [queue, setQueue] = useState<QueuedMessage[]>([]);
-	const scrollRef = useRef<HTMLDivElement>(null);
-	const pinned = useRef(true);
-
-	useLayoutEffect(() => {
-		const el = scrollRef.current;
-		if (el && pinned.current) el.scrollTop = el.scrollHeight;
-	}, [items]);
 
 	const shown = host ?? lastHost;
 	const agent: AgentRow | null = view.agentId ? (shown?.agents.find(a => a.id === view.agentId) ?? null) : null;
@@ -85,8 +176,6 @@ export function Conversation({ view, host, lastHost, phase: guestPhase, items, o
 	const live = phase.phase === "live" && !phase.readOnly;
 	const writable = live && (view.agentId === null || agent?.canMessage === true);
 	const working = view.agentId === null ? host?.status === "working" : agent?.status === "running";
-	const last = items.at(-1);
-	const streaming = last?.kind === "assistant" && last.streaming;
 
 	let status = PHASE_LABEL[phase.phase];
 	if (phase.phase === "live") {
@@ -116,54 +205,19 @@ export function Conversation({ view, host, lastHost, phase: guestPhase, items, o
 
 	return (
 		<div className="flex h-svh min-h-0 flex-1 flex-col">
-			<header className="flex items-center justify-between gap-4 border-b border-border px-6 py-3">
-				<div className="min-w-0">
-					<h2 className="truncate text-sm font-semibold">{title}</h2>
-					<p className="truncate text-xs text-muted-foreground">{meta}</p>
-				</div>
-				<span
-					className={cn("shrink-0 text-xs", phase.phase === "ended" ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}
-					data-phase={phase.phase}
-				>
-					{status}
-				</span>
-			</header>
-			<div
-				ref={scrollRef}
-				onScroll={event => {
-					const el = event.currentTarget;
-					pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-				}}
-				className="min-h-0 flex-1 overflow-y-auto"
-			>
-				<div className="mx-auto flex max-w-3xl flex-col gap-3 px-6 py-6" aria-live="polite" data-transcript>
-					{toBlocks(items).map(block => {
-						if (block.kind === "tools") return <ToolGroup key={block.id} tools={block.tools} />;
-						const item = block.item;
-						switch (item.kind) {
-							case "user":
-								return (
-									<ChatMessage key={item.id} from="user" time={item.from ?? undefined} data-item="user">
-										{item.text}
-									</ChatMessage>
-								);
-							case "assistant":
-								return (
-									<ChatMessage key={item.id} from="assistant" data-item="assistant" data-streaming={item.streaming}>
-										{item.text}
-									</ChatMessage>
-								);
-							case "notice":
-								return (
-									<p key={item.id} className={cn("self-center text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
-										{item.text}
-									</p>
-								);
-						}
-					})}
-					{working && !streaming && <ThinkingIndicator className="self-start" />}
-				</div>
-			</div>
+			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
+				{view.agentId === null && host?.owned && (
+					<Button
+						variant="secondary"
+						size="compact"
+						onClick={onEnd}
+						title="Stop the omp process this dashboard started. Its transcript moves to Past sessions."
+					>
+						End session
+					</Button>
+				)}
+			</Header>
+			<Transcript items={items} working={working === true} />
 			<div className="mx-auto w-full max-w-3xl px-6 pb-5">
 				<InputMessage
 					value={draft}

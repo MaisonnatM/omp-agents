@@ -35,14 +35,35 @@ export interface RosterHost {
 	relayConnected: boolean;
 	status: HostStatus;
 	access: Access;
+	/** Started by this dashboard, which can end it. */
+	owned: boolean;
 	agents: AgentRow[];
 }
 
-/** What the conversation pane shows: a session, or one of its subagents. */
-export interface View {
+/** A session that has no live host, read from its file on disk. */
+export interface PastSession {
+	sessionId: string;
+	/** Its title, else its first prompt as one line; `null` when it has neither. */
+	title: string | null;
+	cwd: string;
+	cwdDisplay: string;
+	/** Last write to the session file, in ms since the epoch. */
+	modifiedAt: number;
+}
+
+export interface LiveView {
+	kind: "live";
 	instanceId: string;
 	agentId: string | null;
 }
+
+export interface PastView {
+	kind: "past";
+	sessionId: string;
+}
+
+/** What the conversation pane shows: a live session or one of its subagents, or a past session's saved transcript. */
+export type View = LiveView | PastView;
 
 export type Item =
 	| { id: string; kind: "user"; text: string; from: string | null }
@@ -57,16 +78,26 @@ export type GuestPhase =
 	| { phase: "reconnecting"; reason: string }
 	| { phase: "ended"; reason: string };
 
+export type LaunchResult = { ok: true; instanceId: string } | { ok: false; error: string };
+
 export type ServerMsg =
 	| { t: "hello"; ompVersion: string }
 	| { t: "roster"; hosts: RosterHost[]; error: string | null }
+	/** Newest first. */
+	| { t: "past"; sessions: PastSession[] }
 	/** Connection state of the server's guest in a session's room. Subagent views share it. */
 	| { t: "phase"; instanceId: string; phase: GuestPhase }
 	/** `reset` replaces the view's transcript; otherwise `items` are upserts by id, new ids appended. */
-	| { t: "items"; view: View; reset: boolean; items: Item[] };
+	| { t: "items"; view: View; reset: boolean; items: Item[] }
+	/** Answers this socket's `create` once the new session is listed, or once it failed to start. */
+	| { t: "created"; result: LaunchResult };
 
 export type ClientMsg =
 	| { t: "watch"; view: View | null }
 	/** A prompt to the session, or chat to the subagent (steer if running, prompt if idle, revive if parked). */
-	| { t: "prompt"; view: View; text: string }
-	| { t: "abort"; instanceId: string };
+	| { t: "prompt"; view: LiveView; text: string }
+	| { t: "abort"; instanceId: string }
+	/** Start a new omp session in `cwd` (absolute, or starting with `~`). */
+	| { t: "create"; cwd: string }
+	/** End a session this dashboard started. */
+	| { t: "end"; instanceId: string };

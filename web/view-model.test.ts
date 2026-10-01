@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentRow, Item } from "../src/shared";
-import { agentTree, applyItems, hashForView, toBlocks, viewFromHash } from "./view-model";
+import type { AgentRow, Item, PastSession, RosterHost } from "../src/shared";
+import { agentTree, applyItems, defaultCwd, hashForView, toBlocks, viewFromHash } from "./view-model";
 
 const agent = (id: string, parentId: string | null): AgentRow => ({
 	id,
@@ -24,10 +24,30 @@ describe("agentTree", () => {
 
 describe("view hash", () => {
 	test("round-trips session and subagent views, including ids that need escaping", () => {
-		const view = { instanceId: "7c51f77b2a1bf7ba", agentId: "Parent/Child #2" };
+		const view = { kind: "live", instanceId: "7c51f77b2a1bf7ba", agentId: "Parent/Child #2" } as const;
 		expect(viewFromHash(hashForView(view))).toEqual(view);
-		expect(viewFromHash("#7c51f77b2a1bf7ba")).toEqual({ instanceId: "7c51f77b2a1bf7ba", agentId: null });
+		expect(viewFromHash("#7c51f77b2a1bf7ba")).toEqual({ kind: "live", instanceId: "7c51f77b2a1bf7ba", agentId: null });
 		expect(viewFromHash("")).toBeNull();
+	});
+
+	test("a past session is not read as a subagent of an instance named `past`", () => {
+		expect(hashForView({ kind: "past", sessionId: "01a0f6a5-181e" })).toBe("#past/01a0f6a5-181e");
+		expect(viewFromHash("#past/01a0f6a5-181e")).toEqual({ kind: "past", sessionId: "01a0f6a5-181e" });
+	});
+});
+
+describe("defaultCwd", () => {
+	const host = (instanceId: string, cwdDisplay: string, startedAt: number) => ({ instanceId, cwdDisplay, startedAt }) as RosterHost;
+	const past = (sessionId: string, cwdDisplay: string) => ({ sessionId, cwdDisplay }) as PastSession;
+	const hosts = [host("a", "~/old", 1), host("b", "~/new", 2)];
+	const sessions = [past("s1", ""), past("s2", "~/saved")];
+
+	test("prefers the open session, then the newest live one, then the newest past one with a directory", () => {
+		expect(defaultCwd({ kind: "live", instanceId: "a", agentId: null }, hosts, sessions)).toBe("~/old");
+		expect(defaultCwd({ kind: "past", sessionId: "s2" }, hosts, sessions)).toBe("~/saved");
+		expect(defaultCwd(null, hosts, sessions)).toBe("~/new");
+		expect(defaultCwd({ kind: "past", sessionId: "s1" }, [], sessions)).toBe("~/saved");
+		expect(defaultCwd(null, [], [])).toBe("~");
 	});
 });
 

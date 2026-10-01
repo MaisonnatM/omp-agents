@@ -109,13 +109,7 @@ export class AgentTail {
 		}
 		const lines = (this.#partial + text).split("\n");
 		this.#partial = lines.pop() ?? "";
-		const changed = lines.flatMap(line => {
-			try {
-				return line ? this.transcript.applyEntry(JSON.parse(line)) : [];
-			} catch {
-				return [];
-			}
-		});
+		const changed = this.transcript.applyLines(lines);
 		this.#offset = newSize;
 		if (!this.#loaded) {
 			this.#loaded = true;

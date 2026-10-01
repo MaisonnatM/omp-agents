@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { Conversation } from "./components/conversation";
+import { Conversation, PastConversation } from "./components/conversation";
 import { Roster } from "./components/roster";
 import { SidebarResizeHandle, storedSidebarWidth } from "./components/sidebar-resize-handle";
 import { useDashboard } from "./use-dashboard";
-import { hashForView } from "./view-model";
+import { defaultCwd, hashForView } from "./view-model";
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
@@ -19,7 +19,8 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 			</pre>
 			<p>
 				Only sessions started after that setting changed appear here. Restart sessions that were already running, or
-				run <code>/new</code> or <code>/collab</code> inside them.
+				run <code>/new</code> or <code>/collab</code> inside them. Or start one here with the <strong>+</strong> next to
+				the session list.
 			</p>
 			{rosterError && <p className="text-red-600 dark:text-red-400">Registry error: {rosterError}</p>}
 		</section>
@@ -27,41 +28,58 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 }
 
 export function App() {
-	const { state, send, select } = useDashboard();
+	const { state, send, select, setLaunchOpen, create } = useDashboard();
 	const initialWidth = useMemo(storedSidebarWidth, []);
 	const { view } = state;
-	const host = view ? (state.hosts.find(h => h.instanceId === view.instanceId) ?? null) : null;
+
+	let pane: ReactNode;
+	if (view?.kind === "live") {
+		pane = (
+			<Conversation
+				key={hashForView(view)}
+				view={view}
+				host={state.hosts.find(h => h.instanceId === view.instanceId) ?? null}
+				lastHost={state.viewHost}
+				phase={state.phases[view.instanceId]}
+				items={state.items}
+				onPrompt={text => send({ t: "prompt", view, text })}
+				onAbort={() => send({ t: "abort", instanceId: view.instanceId })}
+				onEnd={() => send({ t: "end", instanceId: view.instanceId })}
+			/>
+		);
+	} else if (view?.kind === "past") {
+		pane = (
+			<PastConversation
+				key={hashForView(view)}
+				sessionId={view.sessionId}
+				session={state.past.find(s => s.sessionId === view.sessionId) ?? null}
+				items={state.items}
+			/>
+		);
+	} else if (state.hosts.length === 0) {
+		pane = <EmptyState rosterError={state.rosterError} />;
+	} else {
+		pane = <p className="m-auto text-sm text-muted-foreground">Select a session to see its conversation.</p>;
+	}
 
 	return (
 		<SidebarProvider width={initialWidth} persist={false} shortcut={null} className="h-svh">
 			<Sidebar collapsible="none" className="relative">
 				<Roster
 					hosts={state.hosts}
+					past={state.past}
 					view={view}
 					ompVersion={state.ompVersion}
 					connected={state.connected}
+					launch={state.launch}
+					defaultCwd={defaultCwd(view, state.hosts, state.past)}
 					onSelect={select}
+					onLaunchOpen={setLaunchOpen}
+					onCreate={create}
 				/>
 				<SidebarResizeHandle />
 			</Sidebar>
-			<SidebarInset>
-				{view ? (
-					<Conversation
-						key={hashForView(view)}
-						view={view}
-						host={host}
-						lastHost={state.viewHost}
-						phase={state.phases[view.instanceId]}
-						items={state.items}
-						onPrompt={text => send({ t: "prompt", view, text })}
-						onAbort={() => send({ t: "abort", instanceId: view.instanceId })}
-					/>
-				) : state.hosts.length === 0 ? (
-					<EmptyState rosterError={state.rosterError} />
-				) : (
-					<p className="m-auto text-sm text-muted-foreground">Select a session to see its conversation.</p>
-				)}
-			</SidebarInset>
+			<SidebarInset>{pane}</SidebarInset>
 		</SidebarProvider>
 	);
 }
