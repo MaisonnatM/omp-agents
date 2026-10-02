@@ -1,27 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentRow, PastSession, RosterHost } from "../src/shared";
-import { agentTree, defaultCwd } from "./sessions";
-
-const agent = (id: string, parentId: string | null): AgentRow => ({
-	id,
-	kind: "task",
-	parentId,
-	status: "running",
-	activity: null,
-	canMessage: true,
-	queue: { steering: [], followUp: [] },
-});
-
-describe("agentTree", () => {
-	test("orders children under their parent with increasing depth", () => {
-		const nodes = agentTree([agent("B", null), agent("A1", "A"), agent("A", null), agent("A1a", "A1")]);
-		expect(nodes.map(({ agent, depth }) => `${agent.id}:${depth}`)).toEqual(["B:0", "A:0", "A1:1", "A1a:2"]);
-	});
-
-	test("a child whose parent is not listed becomes a top-level row", () => {
-		expect(agentTree([agent("Orphan", "Gone")]).map(({ agent, depth }) => `${agent.id}:${depth}`)).toEqual(["Orphan:0"]);
-	});
-});
+import type { PastSession, RosterHost } from "../src/shared";
+import { defaultCwd } from "./sessions";
 
 describe("defaultCwd", () => {
 	const host = (instanceId: string, cwdDisplay: string, startedAt: number) => ({ instanceId, cwd: cwdDisplay, cwdDisplay, startedAt }) as RosterHost;

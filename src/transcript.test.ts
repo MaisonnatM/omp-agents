@@ -45,7 +45,7 @@ describe("Transcript", () => {
 		expect(update("po", call)).toEqual([]);
 		expect(update("pong", call)).toEqual([{ id: "m200:0", kind: "assistant", text: "pong", streaming: true }]);
 		expect(t.applyEvent({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", isError: true })).toEqual([
-			{ id: "tool:c1", kind: "tool", name: "bash", summary: "ls", status: "error" },
+			{ id: "tool:c1", kind: "tool", name: "bash", summary: "ls", status: "error", agents: [] },
 		]);
 	});
 
@@ -102,43 +102,70 @@ describe("Transcript", () => {
 		const call = { type: "toolCall", id: "c1", name: "bash", arguments: { command: "sleep 30 && echo done" } };
 		t.applyEntry({ type: "message", id: "e1", message: assistant(400, [call], { stopReason: "toolUse" }) });
 		t.applyEvent({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: call.arguments });
-		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "running" }]);
+		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "running", agents: [] }]);
 
 		t.applyEntry({ type: "message", id: "e2", message: { role: "toolResult", timestamp: 401, toolCallId: "c1", toolName: "bash", isError: true } });
 		t.applyEvent({ type: "tool_execution_start", toolCallId: "c1", toolName: "bash", args: call.arguments });
 
-		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "error" }]);
+		expect(t.items()).toEqual([{ id: "tool:c1", kind: "tool", name: "bash", summary: "sleep 30 && echo done", status: "error", agents: [] }]);
 	});
 
 	test("a subagent's yield shows its answer, not the payload type", () => {
 		const t = new Transcript();
 		const call = { type: "toolCall", id: "y1", name: "yield", arguments: { type: "result", data: "done banana" } };
 		t.applyEntry({ type: "message", id: "e1", message: assistant(500, [call], { stopReason: "toolUse" }) });
-		expect(t.items()).toEqual([{ id: "tool:y1", kind: "tool", name: "yield", summary: "done banana", status: "running" }]);
+		expect(t.items()).toEqual([{ id: "tool:y1", kind: "tool", name: "yield", summary: "done banana", status: "running", agents: [] }]);
 	});
 
 	test("a tool cut off by an interrupt stops showing as running when the turn ends", () => {
 		const t = new Transcript();
 		t.applyEvent({ type: "tool_execution_start", toolCallId: "c2", toolName: "bash", args: { command: "sleep 40" } });
 		t.applyEvent({ type: "agent_end" });
-		expect(t.items()).toEqual([{ id: "tool:c2", kind: "tool", name: "bash", summary: "sleep 40", status: "error" }]);
+		expect(t.items()).toEqual([{ id: "tool:c2", kind: "tool", name: "bash", summary: "sleep 40", status: "error", agents: [] }]);
+	});
+
+	test("a task row names its subagents by the ids omp gave them, not the task names, from progress and results alike", () => {
+		const t = new Transcript();
+		const call = { type: "toolCall", id: "k1", name: "task", arguments: { tasks: [{ name: "Fix" }, { name: "Fix" }] } };
+		t.applyEntry({ type: "message", id: "e1", message: assistant(700, [call], { stopReason: "toolUse" }) });
+		const details = { progress: [{ id: "Fix" }, { id: "Fix2" }], results: [{ id: "Fix2" }, { id: "Review" }] };
+		t.applyEntry({ type: "message", id: "e2", message: { role: "toolResult", timestamp: 701, toolCallId: "k1", toolName: "task", details } });
+
+		expect(t.items()).toEqual([{ id: "tool:k1", kind: "tool", name: "task", summary: "", status: "ok", agents: ["Fix", "Fix2", "Review"] }]);
+	});
+
+	test("a running task shows each subagent as its live updates name it, one at a time", () => {
+		const t = new Transcript();
+		const update = (id: string) => ({ type: "tool_execution_update", toolCallId: "k2", toolName: "task", partialResult: { details: { results: [], progress: [{ id }] } } });
+		t.applyEvent({ type: "tool_execution_start", toolCallId: "k2", toolName: "task", args: { i: "Spawning reviewers" } });
+		t.applyEvent(update("Alpha"));
+		t.applyEvent(update("Beta"));
+		expect(t.applyEvent(update("Alpha"))).toEqual([]);
+
+		expect(t.items()).toEqual([{ id: "tool:k2", kind: "tool", name: "task", summary: "Spawning reviewers", status: "running", agents: ["Alpha", "Beta"] }]);
+	});
+
+	test("only a task result names subagents", () => {
+		const t = new Transcript();
+		t.applyEntry({ type: "message", id: "e1", message: { role: "toolResult", timestamp: 1, toolCallId: "b1", toolName: "bash", details: { results: [{ id: "x" }] } } });
+		expect(t.items()).toEqual([{ id: "tool:b1", kind: "tool", name: "bash", summary: "", status: "ok", agents: [] }]);
 	});
 
 	test("a steer and a follow-up show where the agent took them, though omp stamps them when they were queued", () => {
 		const t = new Transcript();
 		const call = { type: "toolCall", id: "c1", name: "bash", arguments: { command: "sleep 60" } };
 		const user = (timestamp: number, content: string) => ({ role: "user", timestamp, content });
-		t.applyLines(
-			[
-				{ type: "message", id: "e1", message: user(100, "sleep, then say DONE") },
-				{ type: "message", id: "e2", message: assistant(101, [call], { stopReason: "toolUse" }) },
-				{ type: "message", id: "e3", message: { role: "toolResult", timestamp: 110, toolCallId: "c1", toolName: "bash", isError: false } },
-				{ type: "message", id: "e4", message: user(102, "steer: add apple") },
-				{ type: "message", id: "e5", message: assistant(111, [text("DONE apple")], { stopReason: "stop" }) },
-				{ type: "message", id: "e6", message: user(103, "follow-up: say banana") },
-				{ type: "message", id: "e7", message: assistant(120, [text("banana")], { stopReason: "stop" }) },
-			].map(line => JSON.stringify(line)),
-		);
+		for (const entry of [
+			{ type: "message", id: "e1", message: user(100, "sleep, then say DONE") },
+			{ type: "message", id: "e2", message: assistant(101, [call], { stopReason: "toolUse" }) },
+			{ type: "message", id: "e3", message: { role: "toolResult", timestamp: 110, toolCallId: "c1", toolName: "bash", isError: false } },
+			{ type: "message", id: "e4", message: user(102, "steer: add apple") },
+			{ type: "message", id: "e5", message: assistant(111, [text("DONE apple")], { stopReason: "stop" }) },
+			{ type: "message", id: "e6", message: user(103, "follow-up: say banana") },
+			{ type: "message", id: "e7", message: assistant(120, [text("banana")], { stopReason: "stop" }) },
+		]) {
+			t.applyEntry(entry);
+		}
 		expect(t.items().map(item => item.id)).toEqual(["m100", "tool:c1", "m102", "m111:0", "m103", "m120:0"]);
 	});
 
@@ -150,21 +177,22 @@ describe("Transcript", () => {
 		expect(t.items().map(item => item.id)).toEqual(["m111:0", "m103"]);
 	});
 
-	test("file lines render prompts, replies, and settled tool calls; other custom messages stay hidden", () => {
+	test("file entries render prompts, replies, and settled tool calls; other custom messages stay hidden", () => {
 		const t = new Transcript();
-		const lines = [
+		for (const entry of [
 			{ type: "model_change", id: "e0", model: "anthropic/claude-opus-5-5" },
 			{ type: "message", id: "e1", message: { role: "user", timestamp: 1, content: [text("list files")] } },
 			{ type: "custom_message", id: "e2", customType: "skill-injection", content: "secret", display: true },
 			{ type: "message", id: "e3", message: assistant(2, [{ type: "toolCall", id: "c9", name: "read", arguments: { path: "." }, intent: "Listing files" }]) },
 			{ type: "message", id: "e4", message: { role: "toolResult", timestamp: 3, toolCallId: "c9", toolName: "read", content: [], isError: false } },
 			{ type: "message", id: "e5", message: assistant(4, [text("README.md")], { stopReason: "aborted" }) },
-		].map(line => JSON.stringify(line));
-		t.applyLines([...lines, "{not json", ""]);
+		]) {
+			t.applyEntry(entry);
+		}
 
 		expect(t.items()).toEqual([
 			{ id: "m1", kind: "user", text: "list files", skill: null, from: null, entryId: "e1" },
-			{ id: "tool:c9", kind: "tool", name: "read", summary: "Listing files", status: "ok" },
+			{ id: "tool:c9", kind: "tool", name: "read", summary: "Listing files", status: "ok", agents: [] },
 			{ id: "m4:0", kind: "assistant", text: "README.md", streaming: false },
 			{ id: "m4:stop", kind: "notice", level: "warning", text: "Interrupted." },
 		]);

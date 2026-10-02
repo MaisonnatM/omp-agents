@@ -2,7 +2,7 @@
 import { dirname } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { FileTail } from "../tail";
-import type { ServerMsg, View } from "../shared";
+import { EMPTY_WORK, type ServerMsg, type View } from "../shared";
 
 export interface SocketData {
 	/** The views this socket shows, by {@link viewKey}. */
@@ -14,7 +14,8 @@ export const send = (ws: Socket, msg: ServerMsg): void => void ws.send(JSON.stri
 
 export const viewKey = (view: View): string =>
 	view.kind === "past" ? `past:${view.sessionId}` : `live:${view.instanceId}:${view.agentId ?? ""}`;
-const itemsTopic = (key: string): string => `items:${key}`;
+/** Where a view's `items` and `work` go. */
+const viewTopic = (key: string): string => `view:${key}`;
 
 /** Whether the socket shows a view of live session `instanceId`, or of one of its subagents. */
 export const watching = (ws: Socket, instanceId: string): boolean =>
@@ -40,7 +41,7 @@ export class Views {
 		ws.data.views = next;
 		for (const key of prev.keys()) {
 			if (next.has(key)) continue;
-			ws.unsubscribe(itemsTopic(key));
+			ws.unsubscribe(viewTopic(key));
 			const entry = this.#watched.get(key);
 			if (entry && --entry.sockets === 0) {
 				this.#watched.delete(key);
@@ -49,7 +50,7 @@ export class Views {
 		}
 		const added = [...next].filter(([key]) => !prev.has(key));
 		for (const [key, view] of added) {
-			ws.subscribe(itemsTopic(key));
+			ws.subscribe(viewTopic(key));
 			const entry = this.#watched.get(key);
 			if (entry) entry.sockets++;
 			else this.#watched.set(key, { view, sockets: 1 });
@@ -58,8 +59,13 @@ export class Views {
 		for (const [key, view] of added) {
 			const tail = this.#tails.get(key);
 			// A tail still loading publishes its first read to every subscriber, this socket included.
-			if (tail?.loaded) send(ws, { t: "items", view, reset: true, items: tail.transcript.items() });
-			else if (!tail) send(ws, { t: "items", view, reset: true, items: [] });
+			if (tail?.loaded) {
+				send(ws, { t: "items", view, reset: true, items: tail.transcript.items() });
+				send(ws, { t: "work", view, work: tail.work.snapshot() });
+			} else if (!tail) {
+				send(ws, { t: "items", view, reset: true, items: [] });
+				send(ws, { t: "work", view, work: EMPTY_WORK });
+			}
 		}
 	}
 
@@ -71,12 +77,21 @@ export class Views {
 			if (tail?.path === path) continue;
 			this.#tails.delete(key);
 			if (!path) {
-				if (tail) this.#publish(itemsTopic(key), { t: "items", view, reset: true, items: [] });
+				if (tail) {
+					this.#publish(viewTopic(key), { t: "items", view, reset: true, items: [] });
+					this.#publish(viewTopic(key), { t: "work", view, work: EMPTY_WORK });
+				}
 				continue;
 			}
-			const next = new FileTail(path, (reset, items) => {
-				if (this.#tails.get(key) === next) this.#publish(itemsTopic(key), { t: "items", view, reset, items });
-			});
+			const next = new FileTail(
+				path,
+				(reset, items) => {
+					if (this.#tails.get(key) === next) this.#publish(viewTopic(key), { t: "items", view, reset, items });
+				},
+				work => {
+					if (this.#tails.get(key) === next) this.#publish(viewTopic(key), { t: "work", view, work });
+				},
+			);
 			this.#tails.set(key, next);
 			next.poke();
 		}
