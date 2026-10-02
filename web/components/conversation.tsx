@@ -39,7 +39,7 @@ import { ContextRing } from "./context-ring";
 import { MessageMarkdown } from "./message-markdown";
 import { Model, ModelPicker } from "./model-picker";
 import { OrgIcon } from "./org-icon";
-import { hostLabel, pastLabel, projectName } from "./roster";
+import { hostLabel, pastLabel, projectName, ShipStep } from "./roster";
 import { statusLabel } from "./status-dot";
 import { ThinkingPicker } from "./thinking-picker";
 import { UserRequestCard } from "./user-request";
@@ -361,6 +361,7 @@ interface PastConversationProps {
 export function PastConversation({ sessionId, session, items, fork, onFork, resume, onResume, actions }: PastConversationProps) {
 	const meta = session ? (
 		<>
+			<ShipStep ship={session.ship} />{" "}
 			<Project cwdDisplay={session.cwdDisplay} /> · last active {new Date(session.modifiedAt).toLocaleString()}
 			<PullRequests pullRequests={session.pullRequests} />
 		</>
@@ -533,6 +534,7 @@ function LiveConversation({
 		? [`${agent.kind} subagent of ${shown ? hostLabel(shown) : "a session"}`, agent.activity].filter(Boolean).join(" · ")
 		: shown && (
 				<>
+					<ShipStep ship={shown.ship} />{" "}
 					<Project cwdDisplay={shown.cwdDisplay} /> · {shown.model ? <Model selector={shown.model} /> : "no model"} · pid {shown.pid}
 					<PullRequests pullRequests={shown.pullRequests} />
 				</>

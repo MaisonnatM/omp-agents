@@ -200,6 +200,29 @@ describe("PullRequestIndex", () => {
 		expect(index.of(session)).toEqual([]);
 	});
 
+	test("shows the latest parent workflow stage and picks up live review work on append", async () => {
+		const dir = sessionDir();
+		const session = join(dir, "2026-10-01T00-00-00-000Z_ship.jsonl");
+		const state = (stage: string, work?: string) => JSON.stringify({
+			type: "custom", customType: "omp-ship.state", data: { stage, work, issue: "ENG-123", pr: 42, updatedAt: new Date(0).toISOString() },
+		});
+		writeFileSync(session, `${state("thermonuclear")}\n`);
+		const child = join(dir, "2026-10-01T00-00-00-000Z_ship", "Child");
+		mkdirSync(child, { recursive: true });
+		writeFileSync(join(child, "sub.jsonl"), `${state("merged")}\n`);
+		const index = new PullRequestIndex(async () => null);
+		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
+
+		expect(await index.refresh(listed(1))).toBe(true);
+		expect(index.shipOf(session)).toEqual({ stage: "thermonuclear", issue: "ENG-123", pr: 42 });
+		appendFileSync(session, `${state("live", "rebase")}\n`);
+		expect(await index.refresh(listed(2))).toBe(true);
+		expect(index.shipOf(session)).toEqual({ stage: "live", work: "rebase", issue: "ENG-123", pr: 42 });
+		appendFileSync(session, `${state("unknown")}\n`);
+		expect(await index.refresh(listed(3))).toBe(false);
+		expect(index.shipOf(session)?.work).toBe("rebase");
+	});
+
 	test("asks for the repository only of sessions that name a bare number, and links pushes once the inbox names their PR", async () => {
 		const dir = sessionDir();
 		const reader = join(dir, "2026-10-01T00-00-00-000Z_s1.jsonl");

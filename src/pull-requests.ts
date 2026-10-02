@@ -7,7 +7,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { parseRemote, type Repo } from "./inbox";
-import type { LinkedPullRequest, PullRequest, PullRequestLink } from "./shared";
+import type { LinkedPullRequest, PullRequest, PullRequestLink, ShipProgress } from "./shared";
 import { isObject, textOf } from "./transcript";
 
 const NEWLINE = 0x0a;
@@ -30,7 +30,11 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "pr://"];
+const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state"];
+const SHIP_STAGES: Record<ShipProgress["stage"], true> = {
+	ticket: true, implement: true, draft_pr: true, thermonuclear: true, ready_gate: true, live: true, merged: true,
+};
+const SHIP_WORK: Record<NonNullable<ShipProgress["work"]>, true> = { rebase: true, fix_comments: true, fix_ci: true };
 
 /**
  * One pull request a transcript links to. `number` is a PR in the session's own repository, the one `origin`
@@ -91,6 +95,7 @@ export class PullRequestScan {
 	/** Bash calls, then their background jobs, whose output has not been read yet, and what it can prove. */
 	readonly #pending = new Map<string, Expected>();
 	readonly found = new Map<string, PullRequestRef>();
+	ship: ShipProgress | null = null;
 
 	applyLine(line: string): void {
 		const backgrounding = this.#pending.size > 0 && line.includes('"jobId"');
@@ -102,6 +107,17 @@ export class PullRequestScan {
 			return;
 		}
 		if (!isObject(entry)) return;
+		if (entry.type === "custom" && entry.customType === "omp-ship.state" && isObject(entry.data)) {
+			const data = entry.data;
+			if (typeof data.stage !== "string" || !Object.hasOwn(SHIP_STAGES, data.stage)) return;
+			this.ship = {
+				stage: data.stage as ShipProgress["stage"],
+				...(typeof data.work === "string" && Object.hasOwn(SHIP_WORK, data.work) ? { work: data.work as ShipProgress["work"] } : {}),
+				...(typeof data.issue === "string" ? { issue: data.issue } : {}),
+				...(typeof data.pr === "number" && Number.isInteger(data.pr) && data.pr > 0 ? { pr: data.pr } : {}),
+			};
+			return;
+		}
 		if (entry.type === "custom_message" && entry.customType === "async-result" && typeof entry.content === "string") {
 			// One notice carries the output of every job it delivers; only a bash job's is what `gt`, `gh`, or `git` printed.
 			const jobs = isObject(entry.details) && Array.isArray(entry.details.jobs) ? entry.details.jobs : [];
@@ -276,6 +292,11 @@ export class PullRequestIndex {
 		return this.#sessions.get(sessionPath)?.pullRequests ?? [];
 	}
 
+	/** The latest /ship stage from the session's own transcript, not its subagents'. */
+	shipOf(sessionPath: string): ShipProgress | null {
+		return this.#sessions.get(sessionPath)?.transcripts.get(sessionPath)?.scan.ship ?? null;
+	}
+
 	/**
 	 * Read what the listed session files gained since the last refresh and forget unlisted ones.
 	 * Resolves whether any session's pull requests changed. Refreshes run one at a time.
@@ -315,11 +336,13 @@ export class PullRequestIndex {
 	async #refresh(sessions: readonly ListedSession[]): Promise<boolean> {
 		const listed = new Set(sessions.map(session => session.path));
 		for (const path of this.#sessions.keys()) if (!listed.has(path)) this.#sessions.delete(path);
+		let changed = false;
 		const touched: SessionScan[] = [];
 		for (const { path, cwd, modifiedAt } of sessions) {
 			let session = this.#sessions.get(path);
 			// A subagent's writes do not touch the session file, but its result does once it finishes.
 			if (session?.modifiedAt === modifiedAt) continue;
+			const previousShip = session?.transcripts.get(path)?.scan.ship;
 			session ??= { modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path)]]), refs: [], repo: null, pullRequests: [] };
 			this.#sessions.set(path, session);
 			for (const file of await subagentFiles(path)) {
@@ -328,6 +351,7 @@ export class PullRequestIndex {
 			let complete = true;
 			for (const transcript of session.transcripts.values()) if (!(await transcript.read())) complete = false;
 			if (complete) session.modifiedAt = modifiedAt;
+			if (JSON.stringify(previousShip ?? null) !== JSON.stringify(session.transcripts.get(path)?.scan.ship ?? null)) changed = true;
 			session.refs = [...session.transcripts.values()].flatMap(transcript => [...transcript.scan.found.values()]);
 			touched.push(session);
 		}
@@ -339,7 +363,6 @@ export class PullRequestIndex {
 					session.repo = await this.#repoOf(session.cwd);
 				}),
 		);
-		let changed = false;
 		for (const session of touched) if (this.#resolve(session)) changed = true;
 		return changed;
 	}
