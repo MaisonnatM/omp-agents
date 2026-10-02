@@ -137,6 +137,15 @@ export function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 			const view = parseLiveView(value.view);
 			return view?.agentId ? { t: "cancel-agent", view: { ...view, agentId: view.agentId } } : null;
 		}
+		case "resume-all": {
+			const { reqId, sessionIds } = value;
+			if (!isCounter(reqId) || !Array.isArray(sessionIds) || sessionIds.length === 0) return null;
+			return sessionIds.every(isNonEmpty) ? { t: "resume-all", reqId, sessionIds: [...new Set(sessionIds)] } : null;
+		}
+		case "dismiss-interrupted": {
+			const { sessionId } = value;
+			return isNonEmpty(sessionId) ? { t: "dismiss-interrupted", sessionId } : null;
+		}
 		default:
 			return null;
 	}

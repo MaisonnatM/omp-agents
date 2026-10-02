@@ -128,8 +128,8 @@ export class SessionFiles {
 		return this.pullRequests.refresh(this.#files);
 	}
 
-	/** The saved sessions that no live session continues, newest first. */
-	past(liveSessionIds: ReadonlySet<string>): PastSession[] {
+	/** The saved sessions that no live session continues, newest first. `interrupted` names those that stopped without End session. */
+	past(liveSessionIds: ReadonlySet<string>, interrupted: (sessionId: string) => boolean): PastSession[] {
 		return this.#files
 			.filter(session => !session.empty && !liveSessionIds.has(session.id))
 			.map(session => ({
@@ -139,6 +139,7 @@ export class SessionFiles {
 				cwdDisplay: displayPath(session.cwd),
 				modifiedAt: session.modifiedAt,
 				...this.#factsAt(session.path),
+				interrupted: interrupted(session.id),
 			}));
 	}
 }

@@ -4,8 +4,13 @@ import { join, resolve } from "node:path";
 
 export const HOME = homedir();
 
+const configDir = join(process.env.XDG_CONFIG_HOME || join(HOME, ".config"), "omp-agents");
+
 /** Where the dashboard keeps its access token: `$XDG_CONFIG_HOME/omp-agents/token`, else `~/.config/omp-agents/token`. */
-export const tokenFile = join(process.env.XDG_CONFIG_HOME || join(HOME, ".config"), "omp-agents", "token");
+export const tokenFile = join(configDir, "token");
+
+/** The sessions this dashboard started that stopped without End session, beside {@link tokenFile}. */
+export const interruptedFile = join(configDir, "interrupted.json");
 
 /** `path` with the home directory shortened to `~`. */
 export const displayPath = (path: string): string =>

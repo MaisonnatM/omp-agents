@@ -229,6 +229,8 @@ export interface PastSession {
 	/** What the session and its subagents submitted or worked on; the session's own first. */
 	pullRequests: LinkedPullRequest[];
 	ship: ShipProgress | null;
+	/** The dashboard started it, and it stopped without **End session**: with the dashboard server, or on its own. */
+	interrupted: boolean;
 }
 
 export interface LiveView {
@@ -484,6 +486,8 @@ export type ServerMsg =
 	| { t: "work"; view: View; work: SessionWork }
 	/** Answers this socket's `start` with `reqId` once the session is ready, or once starting it failed. */
 	| { t: "started"; reqId: number; result: StartResult }
+	/** Answers this socket's `resume-all` with `reqId` once every session is ready or failed to start. */
+	| { t: "resumed-all"; reqId: number; started: { sessionId: string; instanceId: string }[]; errors: string[] }
 	/** Answers this socket's `complete` for `scope`; `reqId` counts per composer. */
 	| { t: "completions"; scope: CompletionScope; reqId: number; items: CompletionItem[]; error: string | null }
 	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */
@@ -507,6 +511,10 @@ export type ClientMsg =
 	| { t: "end"; instanceId: string }
 	/** Start a dashboard session. `reqId` counts per page and comes back with the answer. */
 	| ({ t: "start"; reqId: number } & StartRequest)
+	/** Resume each of these past sessions, as `start` with `resume` does. `reqId` counts per page and comes back with the answer. */
+	| { t: "resume-all"; reqId: number; sessionIds: string[] }
+	/** Move an interrupted session to the past sessions. */
+	| { t: "dismiss-interrupted"; sessionId: string }
 	/** Models a session this dashboard started can switch to. */
 	| { t: "list-models"; instanceId: string }
 	/** Switch a session this dashboard started to another model. */
