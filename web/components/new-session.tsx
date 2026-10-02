@@ -5,7 +5,8 @@ import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@
 import { InputMessage } from "@/components/ui/input-message";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import type { Launch } from "../use-dashboard";
+import type { Completions, Launch } from "../use-dashboard";
+import { useCompletion } from "./completion-popup";
 import { DirectCommandNote, directCommandOf, Header } from "./conversation";
 import { projectName } from "./roster";
 
@@ -81,6 +82,10 @@ interface NewSessionProps {
 	workspaces: { cwd: string; cwdDisplay: string }[];
 	launch: Launch;
 	connected: boolean;
+	/** The server's last answer to this draft's `complete`. */
+	completions: Completions | null;
+	/** Ask for `/` and `@` suggestions, resolved as a session started in `cwd` would resolve them. */
+	onComplete: (reqId: number, text: string, cursor: number) => void;
 	onPickCwd: (cwd: string) => void;
 	/** Start omp in `cwd` with `prompt` as its first message. */
 	onStart: (prompt: string) => void;
@@ -90,8 +95,9 @@ interface NewSessionProps {
  * A session not started yet: a composer and the directory it will run in. omp starts only when the first message is
  * sent, so leaving the draft leaves nothing running. The message stays in the composer until the session opens.
  */
-export function NewSession({ cwd, workspaces, launch, connected, onPickCwd, onStart }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart }: NewSessionProps) {
 	const [draft, setDraft] = useState("");
+	const completion = useCompletion({ draft, setDraft, completions, onComplete });
 	const starting = launch.phase === "starting";
 	const directCommand = directCommandOf(draft);
 	const name = projectName(cwd) ?? cwd;
@@ -105,17 +111,21 @@ export function NewSession({ cwd, workspaces, launch, connected, onPickCwd, onSt
 			)}
 			<p className="m-auto max-w-sm px-6 text-center text-sm text-muted-foreground">omp starts in {name} when you send the first message.</p>
 			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
+				{completion.popup}
 				<InputMessage
+					ref={completion.composerRef}
 					value={draft}
-					onValueChange={setDraft}
+					onValueChange={completion.onValueChange}
 					onSend={text => {
-						if (!directCommand) onStart(text);
+						if (directCommand) return;
+						completion.close();
+						onStart(text);
 					}}
 					leftSlot={<DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={starting} onPick={onPickCwd} />}
 					placeholder={`Message a new session in ${name}…`}
 					disabled={starting || !connected}
 					sendLabel="Start session"
-					textareaProps={{ autoFocus: true }}
+					textareaProps={{ ...completion.textareaProps, autoFocus: true }}
 				/>
 				{directCommand && <DirectCommandNote kind={directCommand} />}
 			</div>

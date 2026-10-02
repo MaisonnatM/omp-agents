@@ -165,7 +165,7 @@ export function App() {
 				fork={state.fork}
 				onFork={onFork}
 				completions={completions}
-				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, view: pane, text, cursor })}
+				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "live", view: pane }, text, cursor })}
 				models={state.models.get(instanceId) ?? null}
 				onListModels={() => send({ t: "list-models", instanceId })}
 				onSetModel={model => send({ t: "set-model", instanceId, model })}
@@ -191,6 +191,8 @@ export function App() {
 				workspaces={workspaces(state.hosts, state.past)}
 				launch={state.launch}
 				connected={state.connected}
+				completions={state.newSessionCompletions}
+				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
 				onPickCwd={next => (location.hash = hashForNewSession(next))}
 				onStart={prompt => create(cwd, prompt)}
 			/>

@@ -46,9 +46,12 @@ async function buildCatalog(cwd: string): Promise<Catalog> {
 	return { provider: new CombinedAutocompleteProvider(commands, cwd), skills: skillMap, fileCommands };
 }
 
-/** Keyed by session and cwd: two sessions in one directory get separate entries, and a `/move` gets a fresh one. */
-function catalogFor(instanceId: string, cwd: string): Promise<Catalog> {
-	const key = `${instanceId}\u0000${cwd}`;
+/**
+ * Keyed by session and cwd: two sessions in one directory get separate entries, and a `/move` gets a fresh one.
+ * `instanceId` is `null` for a session not started yet, so every new-session draft in a directory shares one entry.
+ */
+function catalogFor(instanceId: string | null, cwd: string): Promise<Catalog> {
+	const key = `${instanceId ?? ""}\u0000${cwd}`;
 	const cached = catalogs.get(key);
 	if (cached && Date.now() - cached.at < CATALOG_TTL_MS) return cached.loading;
 	const loading = buildCatalog(cwd);
@@ -92,7 +95,7 @@ function kindOf(item: AutocompleteItem): CompletionItem["kind"] {
 	return item.value.startsWith("skill:") ? "skill" : "command";
 }
 
-export async function complete(instanceId: string, cwd: string, text: string, cursor: number): Promise<CompletionItem[]> {
+export async function complete(instanceId: string | null, cwd: string, text: string, cursor: number): Promise<CompletionItem[]> {
 	const catalog = await catalogFor(instanceId, cwd);
 	const { lines, line, col } = toEditor(text, cursor);
 	const suggestions = await catalog.provider.getSuggestions(lines, line, col);

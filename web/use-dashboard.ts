@@ -72,6 +72,8 @@ export interface DashboardState {
 	/** Last roster row seen for each open live session, by instance id, kept after it leaves the roster. */
 	lastHosts: Map<string, RosterHost>;
 	launch: Launch;
+	/** The server's last answer to the new-session draft's `complete`. */
+	newSessionCompletions: Completions | null;
 	fork: Fork;
 	resume: Resume;
 	/** Composer text for a forked session's first mount. */
@@ -198,8 +200,12 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 					if (!msg.result.ok) return { ...state, resume: { phase: "failed", sessionId: msg.sessionId, error: msg.result.error } };
 					return { ...state, resume: { phase: "idle" }, started: { instanceId: msg.result.instanceId, cwd: msg.result.cwd } };
 				}
-				case "completions":
-					return updatePane(state, msg.view, pane => ({ ...pane, completions: { reqId: msg.reqId, items: msg.items, error: msg.error } }));
+				case "completions": {
+					const completions = { reqId: msg.reqId, items: msg.items, error: msg.error };
+					return msg.scope.kind === "new"
+						? { ...state, newSessionCompletions: completions }
+						: updatePane(state, msg.scope.view, pane => ({ ...pane, completions }));
+				}
 				case "usage":
 					return { ...state, usage: { plans: msg.plans, error: msg.error } };
 				case "models":
@@ -243,6 +249,7 @@ export function useDashboard(): Dashboard {
 		panes: new Map(),
 		lastHosts: new Map(),
 		launch: { phase: "idle" },
+		newSessionCompletions: null,
 		fork: { phase: "idle" },
 		resume: { phase: "idle" },
 		draft: null,
