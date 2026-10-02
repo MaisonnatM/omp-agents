@@ -165,7 +165,7 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 						if (item.kind === "notice") {
 							return (
 								<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
-									<p className={cn("self-center text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
+									<p className={cn("self-center whitespace-pre-line text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
 										{item.text}
 									</p>
 								</MessageScrollerItem>

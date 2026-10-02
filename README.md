@@ -25,7 +25,7 @@ omp-agents lists the sessions that run in your terminals and the ones it starts 
 - **Live roster.** Every running and past session, with a status dot (running, idle, or waiting on a question), filtered by project.
 - **Subagent tree.** The subagents of the focused session, indented by parent, with their status and current activity.
 - **Live conversations.** Streaming Markdown transcripts, tool calls, and context-window usage, in up to four split panes.
-- **Full control.** Prompt, steer, queue follow-ups, interrupt, answer `ask` questions and extension dialogs, switch model and thinking level, end sessions.
+- **Full control.** Prompt, steer, queue follow-ups, interrupt, answer `ask` questions and extension dialogs, message and cancel subagents, run `!` shell and built-in `/` commands in dashboard sessions, switch model and thinking level, end sessions.
 - **Session lifecycle.** Start a session in any project, resume a past one, or fork a conversation from any prompt or reply.
 - **Pull request inbox.** A Graphite-style inbox of your GitHub pull requests, linked to the sessions that submitted or worked on them.
 - **Settings editor.** Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place.
@@ -36,7 +36,7 @@ omp-agents lists the sessions that run in your terminals and the ones it starts 
 ## Requirements
 
 - [Bun](https://bun.sh) 1.4 or later. Tested with Bun 1.4.2.
-- omp installed with Bun and on your `PATH`. Tested with omp 18.4.8.
+- omp installed with Bun and on your `PATH`. Tested with omp 18.4.10.
 
   ```sh
   bun install -g @oh-my-pi/pi-coding-agent

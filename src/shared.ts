@@ -165,7 +165,7 @@ export interface AgentRow {
 	status: AgentStatus;
 	/** What it is doing now, or else its task, as one line. */
 	activity: string | null;
-	/** Whether the dashboard can message it: a writable terminal room and an agent that is not aborted. */
+	/** Whether the dashboard can message it: a writable terminal room and an agent that is not aborted, or a running subagent of a session this dashboard started. */
 	canMessage: boolean;
 	queue: MessageQueue;
 }
@@ -480,4 +480,6 @@ export type ClientMsg =
 	/** Switch a session this dashboard started to another thinking level, one of its `thinkingLevels`. */
 	| { t: "set-thinking"; instanceId: string; level: string }
 	/** Reply to one of a live session's pending `requests`. */
-	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer };
+	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer }
+	/** Cancel a running subagent of a live session without stopping the session's turn; it cannot be revived after. */
+	| { t: "cancel-agent"; view: LiveView & { agentId: string } };

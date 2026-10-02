@@ -80,6 +80,9 @@ export function createClientHandler({ sessions, views, start }: SocketEnv): (ws:
 			case "abort":
 				sessions.get(msg.instanceId)?.abort();
 				return;
+			case "cancel-agent":
+				sessions.get(msg.view.instanceId)?.cancelAgent(msg.view.agentId);
+				return;
 			case "start":
 				send(ws, { t: "started", reqId: msg.reqId, result: await start(msg) });
 				return;

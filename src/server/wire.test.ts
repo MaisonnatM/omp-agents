@@ -30,6 +30,13 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "prompt", view: { kind: "past", sessionId: "s1" }, text: "go", delivery: "steer" })).toBeNull();
 	});
 
+	test("cancel-agent needs a live view of a subagent, not of the session", () => {
+		const agent = { kind: "live", instanceId: "i1", agentId: "Worker" } as const;
+		expect(msg({ t: "cancel-agent", view: agent })).toEqual({ t: "cancel-agent", view: agent });
+		expect(msg({ t: "cancel-agent", view: live })).toBeNull();
+		expect(msg({ t: "cancel-agent", view: { kind: "past", sessionId: "s1" } })).toBeNull();
+	});
+
 	test("dequeue and complete take counters and in-range cursors only", () => {
 		const messages = [{ queue: "followUp", text: "later" }];
 		expect(msg({ t: "dequeue", reqId: 0, view: live, messages })).toMatchObject({ t: "dequeue", reqId: 0 });

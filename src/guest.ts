@@ -268,6 +268,12 @@ export class SessionGuest implements LiveSession {
 		this.#socket?.send({ t: "abort" });
 	}
 
+	/** omp's Agent Hub kill over Collab: the host aborts a running subagent and tombstones it. */
+	cancelAgent(agentId: string): void {
+		if (!this.canWrite || !this.#running(agentId)) return;
+		this.#socket?.send({ t: "agent-cmd", cmd: "kill", agentId });
+	}
+
 	/** Whether the agent's turn runs, as the host last reported it: its `state` frames for the main agent, its registry for subagents. */
 	#running(key: string): boolean {
 		return key ? this.#agents.some(a => a.id === key && !a.isMain && a.status === "running") : this.state?.streaming === true;

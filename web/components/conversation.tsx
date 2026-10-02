@@ -81,13 +81,21 @@ export function Header({ title, meta, status, alert = false, children }: HeaderP
 /** The project a session runs in, with its full directory on hover. */
 const Project = ({ cwdDisplay }: { cwdDisplay: string }) => <span title={cwdDisplay}>{projectName(cwdDisplay) ?? cwdDisplay}</span>;
 
-/** The omp terminal shortcut a draft starts with, which the dashboard cannot run: `$` Python or `!` shell. */
-export const directCommandOf = (draft: string): "Python" | "shell" | null =>
-	draft.startsWith("$") ? "Python" : draft.startsWith("!") ? "shell" : null;
+/** Where a draft goes: a session this dashboard started, which runs `!` over RPC; a draft that starts one; or a Collab room or a subagent. */
+export type ShellReach = "rpc" | "new" | "none";
 
-export const DirectCommandNote = ({ kind }: { kind: "Python" | "shell" }) => (
+/** Why the composer holds back a draft that starts with one of omp's terminal shortcuts, or `null` when it can send it. */
+export function blockedShortcut(draft: string, shell: ShellReach): string | null {
+	if (draft.startsWith("$")) return "Direct Python execution needs the omp terminal.";
+	if (!draft.startsWith("!")) return null;
+	if (shell === "none") return "Direct shell execution needs the omp terminal. Collab cannot run it here.";
+	if (shell === "new") return "Start the session with a prompt. A ! command runs once omp has replied.";
+	return draft.startsWith("!!") ? "omp's RPC mode cannot keep a command's output out of context. Use ! or the omp terminal." : null;
+}
+
+export const ShortcutNote = ({ text }: { text: string }) => (
 	<p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-		Direct {kind} execution needs the omp terminal. Collab cannot run it in this session.
+		{text}
 	</p>
 );
 
@@ -360,20 +368,22 @@ function LiveConversation({
 					<PullRequests pullRequests={shown.pullRequests} />
 				</>
 			);
+	// omp's RPC mode reaches only a running subagent, so nothing could send a follow-up held until it stopped.
+	const followUps = !(agent && host?.source === "dashboard");
 
 	const placeholder = !writable
 		? phase.phase === "live" && agent && !agent.canMessage
 			? "This subagent cannot be messaged."
 			: "Messaging is unavailable for this view."
 		: working
-			? `Steer ${agent ? "this subagent" : "the running turn"}… ${FOLLOW_UP_KEYS} sends once it finishes`
+			? `Steer ${agent ? "this subagent" : "the running turn"}…${followUps ? ` ${FOLLOW_UP_KEYS} sends once it finishes` : ""}`
 			: agent
 				? agent.status === "parked"
 					? "Message to revive this subagent…"
 					: "Message this subagent…"
 				: "Message this session…";
 
-	const directCommand = directCommandOf(draft);
+	const directCommand = blockedShortcut(draft, view.agentId === null && host?.source === "dashboard" ? "rpc" : "none");
 	const shownModel = shown?.model ?? null;
 	const thinking = shown?.thinkingLevel ?? null;
 	// Collab rooms carry no model or thinking switch, so only sessions this dashboard started over RPC can change them.
@@ -409,7 +419,7 @@ function LiveConversation({
 
 	const followUp = (): boolean | void => {
 		const text = draft.trim();
-		if (!writable || !text || directCommand) return false;
+		if (!writable || !followUps || !text || directCommand) return false;
 		submit(text, "followUp");
 	};
 	const endable = view.agentId === null && live;
@@ -448,7 +458,7 @@ function LiveConversation({
 			: {}),
 	});
 	const completion = useCompletion({ draft, setDraft, completions, onComplete, onKeyDown: onComposerKey });
-	const followUpButton = writable && working && (
+	const followUpButton = writable && working && followUps && (
 		<Tooltip content={`Send once the turn finishes · ${FOLLOW_UP_KEYS}`} side="top">
 			<Button variant="ghost" size="icon-sm" aria-label="Send once the turn finishes" disabled={!draft.trim() || directCommand !== null} onClick={followUp}>
 				<ListEnd aria-hidden="true" />
@@ -527,7 +537,7 @@ function LiveConversation({
 					onRemoveQueued={item => take(queued.filter(entry => entry.item.id === item.id), false)}
 					sendLabel={`${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
 				/>
-				{directCommand && <DirectCommandNote kind={directCommand} />}
+				{directCommand && <ShortcutNote text={directCommand} />}
 			</div>
 		</div>
 	);

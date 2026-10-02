@@ -154,6 +154,9 @@ function onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 			pushRoster();
 			void refreshFiles();
 			return;
+		case "written":
+			onFileChange(update.path);
+			return;
 	}
 }
 

@@ -4,7 +4,7 @@ import { projectName } from "../labels";
 import type { Completions } from "../pane-store";
 import type { StartOf } from "../starts";
 import { useCompletion } from "./completion-popup";
-import { DirectCommandNote, directCommandOf, EmptyConversation, Header } from "./conversation";
+import { blockedShortcut, EmptyConversation, Header, ShortcutNote } from "./conversation";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
@@ -27,7 +27,7 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 	const [draft, setDraft] = useState("");
 	const completion = useCompletion({ draft, setDraft, completions, onComplete });
 	const starting = launch?.phase === "starting";
-	const directCommand = directCommandOf(draft);
+	const directCommand = blockedShortcut(draft, "new");
 	const name = projectName(cwd) ?? cwd;
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
@@ -56,7 +56,7 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					sendLabel="Start session"
 					textareaProps={{ ...completion.textareaProps, autoFocus: true }}
 				/>
-				{directCommand && <DirectCommandNote kind={directCommand} />}
+				{directCommand && <ShortcutNote text={directCommand} />}
 			</div>
 		</div>
 	);

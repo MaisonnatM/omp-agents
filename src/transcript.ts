@@ -63,6 +63,15 @@ function userPrompt(text: string): { text: string; skill: string | null } {
 	return match ? { text: match[2]?.trim() ?? "", skill: match[1] } : { text, skill: null };
 }
 
+/** A `!` command the user ran, as omp's terminal shows it: the command and its output, then how it ended when it failed. */
+function shellRun(message: Json): string {
+	const run = [`$ ${str(message.command) ?? ""}`, (str(message.output) ?? "").replace(/\n+$/, "")].filter(Boolean).join("\n");
+	const fence = "`".repeat(Math.max(3, ...[...run.matchAll(/`+/g)].map(match => match[0].length + 1)));
+	const exitCode = message.exitCode;
+	const ended = message.cancelled === true ? "Cancelled." : typeof exitCode === "number" && exitCode !== 0 ? `Exit code ${exitCode}.` : null;
+	return [`${fence}sh\n${run}\n${fence}`, ended].filter(Boolean).join("\n\n");
+}
+
 /** Whether two items show the same thing. Every field of an item is a primitive, so a shallow comparison covers them all. */
 function sameItem(a: Item, b: Item): boolean {
 	const x: Json = a;
@@ -219,6 +228,8 @@ export class Transcript {
 				if (callId) this.#settled.add(`tool:${callId}`);
 				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok");
 			}
+			case "bashExecution":
+				return this.#upsert({ id: key, kind: "user", text: shellRun(message), skill: null, from: null, entryId: null });
 			default:
 				return [];
 		}
