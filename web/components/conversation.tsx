@@ -62,6 +62,7 @@ const QUEUE_TAGS: [keyof MessageQueue, string][] = [
 const FOLLOW_UP_KEYS = SHORTCUTS.filter(({ id }) => id === "followUp")
 	.map(({ chord }) => chordLabel(chord))
 	.join(" or ");
+const END_KEYS = chordLabel(SHORTCUTS.find(({ id }) => id === "end")!.chord);
 
 const NOTICE_TONE: Record<Extract<Item, { kind: "notice" }>["level"], string> = {
 	info: "text-muted-foreground",
@@ -588,9 +589,15 @@ function LiveConversation({
 		if (!writable || !text || directCommand) return false;
 		submit(text, "followUp");
 	};
+	const endable = view.agentId === null && live;
 	const onComposerKey = useShortcuts({
-		// The textarea's own key, so it needs no focused pane.
+		// The textarea's own keys, so they need no focused pane.
 		followUp,
+		// As omp's Ctrl+D, only from an empty composer, so on macOS it still deletes forward through a draft.
+		end: () => {
+			if (!endable || draft !== "") return false;
+			onEnd();
+		},
 		...(focused
 			? {
 					interrupt: () => {
@@ -625,16 +632,16 @@ function LiveConversation({
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
-				{view.agentId === null && host && live && (
+				{endable && host && (
 					<Button
 						variant="secondary"
 						size="compact"
 						onClick={onEnd}
-						title={
+						title={`${
 							host.source === "dashboard"
-								? "Stop the omp process this dashboard started. Its transcript moves to Past sessions, where Resume continues it."
-								: `Stop the omp process running in its terminal (pid ${host.pid}). Its transcript moves to Past sessions, where Resume continues it.`
-						}
+								? "Stop the omp process this dashboard started."
+								: `Stop the omp process running in its terminal (pid ${host.pid}).`
+						} Its transcript moves to Past sessions, where Resume continues it. ${END_KEYS} in the empty composer.`}
 					>
 						End session
 					</Button>
