@@ -12,7 +12,7 @@ import { loadInbox, repoOf } from "./inbox";
 import { PullRequestIndex } from "./pull-requests";
 import { linkSessions, type SessionEntry } from "./session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "./settings";
-import { type ClientMsg, EMPTY_QUEUE, type HostStatus, type Item, type LinkedPullRequest, type LiveView, type RosterHost, type ServerMsg, type SettingsError, type UserAnswer, type View } from "./shared";
+import { type ClientMsg, EMPTY_QUEUE, type HostStatus, type Item, type LaunchResult, type LinkedPullRequest, type LiveView, type RosterHost, type ServerMsg, type SettingsError, type UserAnswer, type View } from "./shared";
 import { isObject } from "./transcript";
 import { fetchPlanUsage } from "./usage";
 
@@ -337,6 +337,31 @@ async function fork(ws: Socket, view: View, entryId: string): Promise<void> {
 	send(ws, { t: "forked", result: { ok: true, instanceId: forked.session.instanceId, cwd: forked.session.cwd, prompt: forked.prompt } });
 }
 
+/** Past sessions this server is resuming, so a second click starts no second omp on the same file. */
+const resuming = new Set<string>();
+
+/** Continue past session `sessionId` in a new dashboard session, and answer once it is ready. */
+async function resume(ws: Socket, sessionId: string): Promise<void> {
+	const reply = (result: LaunchResult): void => send(ws, { t: "resumed", sessionId, result });
+	const live = hosts.some(host => host.sessionId === sessionId) || [...dashboards.values()].some(session => session.sessionId === sessionId);
+	if (live || resuming.has(sessionId)) return reply({ ok: false, error: "This session is already running." });
+	const path = fileById.get(sessionId)?.path;
+	if (!path) return reply({ ok: false, error: "Cannot resume: this session's file is not known." });
+	resuming.add(sessionId);
+	let session: DashboardSession;
+	try {
+		session = await DashboardSession.resume(path, update => onLiveUpdate(session.instanceId, update));
+	} catch (err) {
+		return reply({ ok: false, error: `Cannot resume: ${err instanceof Error ? err.message : String(err)}` });
+	} finally {
+		resuming.delete(sessionId);
+	}
+	dashboards.set(session.instanceId, session);
+	pushRoster();
+	pushPast();
+	reply({ ok: true, instanceId: session.instanceId, cwd: session.cwd });
+}
+
 const watching = (ws: Socket, instanceId: string): boolean =>
 	[...ws.data.views.values()].some(view => view.kind === "live" && view.instanceId === instanceId);
 
@@ -443,6 +468,10 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 			const entryId = value.entryId;
 			return view && typeof entryId === "string" && entryId ? { t: "fork", view, entryId } : null;
 		}
+		case "resume": {
+			const sessionId = value.sessionId;
+			return typeof sessionId === "string" && sessionId ? { t: "resume", sessionId } : null;
+		}
 		case "set-model": {
 			const { instanceId, model } = value;
 			return typeof instanceId === "string" && isObject(model) && typeof model.provider === "string" && typeof model.id === "string"
@@ -526,6 +555,9 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			return;
 		case "fork":
 			void fork(ws, msg.view, msg.entryId);
+			return;
+		case "resume":
+			void resume(ws, msg.sessionId);
 			return;
 		case "end":
 			void dashboards.get(msg.instanceId)?.end();

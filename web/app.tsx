@@ -70,7 +70,7 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 }
 
 export function App() {
-	const { state, send, open, focus, show, setLaunchOpen, create, fork } = useDashboard();
+	const { state, send, open, focus, show, setLaunchOpen, create, fork, resume } = useDashboard();
 	const initialWidth = useMemo(storedSidebarWidth, []);
 	const hash = useHash();
 	const settings = settingsFromHash(hash);
@@ -124,6 +124,8 @@ export function App() {
 					items={items}
 					fork={state.fork}
 					onFork={onFork}
+					resume={state.resume}
+					onResume={() => resume(pane.sessionId)}
 					actions={actions}
 				/>
 			);

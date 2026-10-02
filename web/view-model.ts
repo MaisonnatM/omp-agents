@@ -178,6 +178,13 @@ export function closePane({ panes, focus, maximized }: Layout, index: number): L
 	};
 }
 
+/** The pane showing `from` shows `to` instead and takes focus; without such a pane, `to` opens in the focused pane. */
+export function swapView(layout: Layout, from: View, to: View): Layout {
+	const index = layout.panes.findIndex(pane => sameView(pane, from));
+	if (index < 0) return openView(layout, to, "replace");
+	return { ...layout, panes: layout.panes.with(index, to), focus: index };
+}
+
 /**
  * Where a new session starts unless the user types another directory: the open session's,
  * else the newest live one's, else the newest past one's, each only from `project` when one is selected.

@@ -366,6 +366,8 @@ export type ServerMsg =
 	| { t: "created"; result: LaunchResult }
 	/** Answers this socket's `fork` once the forked session is ready, or once forking failed. */
 	| { t: "forked"; result: ForkResult }
+	/** Answers this socket's `resume` of past session `sessionId` once its omp is ready, or once resuming failed. */
+	| { t: "resumed"; sessionId: string; result: LaunchResult }
 	/** Answers this socket's `complete` for `view`; `reqId` counts per view. */
 	| { t: "completions"; view: LiveView; reqId: number; items: CompletionItem[]; error: string | null }
 	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */
@@ -391,6 +393,8 @@ export type ClientMsg =
 	| { t: "end"; instanceId: string }
 	/** Start a dashboard session holding the view's history before the user prompt `entryId`. The view's file stays untouched. */
 	| { t: "fork"; view: View; entryId: string }
+	/** Start a dashboard session that continues past session `sessionId` in its own file, as `omp --resume` does. */
+	| { t: "resume"; sessionId: string }
 	/** Models a session this dashboard started can switch to. */
 	| { t: "list-models"; instanceId: string }
 	/** Switch a session this dashboard started to another model. */

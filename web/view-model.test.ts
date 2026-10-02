@@ -19,6 +19,7 @@ import {
 	modelOrg,
 	openView,
 	sessionFromHash,
+	swapView,
 	settingsFromHash,
 	splitSelector,
 	toBlocks,
@@ -230,6 +231,12 @@ describe("opening and closing panes", () => {
 		expect(closePane(maximized([a, b, c], 1), 1)).toEqual(split([a, c], 1));
 		expect(closePane(maximized([a, b, c], 2), 0)).toEqual(maximized([b, c], 1));
 		expect(closePane(maximized([a, b], 0), 1)).toEqual(split([a], 0));
+	});
+
+	test("a resumed session takes the pane of its transcript, else the focused pane", () => {
+		const past: View = { kind: "past", sessionId: "s" };
+		expect(swapView(split([a, past, b], 2), past, c)).toEqual(split([a, c, b], 1));
+		expect(swapView(split([a, b], 1), past, c)).toEqual(split([a, c], 1));
 	});
 });
 
