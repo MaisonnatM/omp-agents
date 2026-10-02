@@ -141,6 +141,13 @@ export class DashboardSession {
 		return { session, prompt };
 	}
 
+	/** Spawn omp holding `sessionFile`, as `omp --resume` does. omp records an abort in a file that ended mid-turn. */
+	static async resume(sessionFile: string, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+		return DashboardSession.#spawn(await recordedCwd(sessionFile), emit, async client => {
+			if ((await client.switchSession(sessionFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
+		});
+	}
+
 	/** Listens only once `prepare` is done, so the session reports the state `prepare` left it in. Questions count from spawn. */
 	static async #spawn(
 		cwd: string,

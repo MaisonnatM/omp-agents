@@ -32,7 +32,7 @@ import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader 
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import type { Fork } from "../use-dashboard";
+import type { Fork, Resume } from "../use-dashboard";
 import { type ForkPoint, forkPoints, hashForInbox, modelName, modelOrg, pullRequestUrl, sameView, type ToolItem, toBlocks } from "../view-model";
 import { chordLabel, SHORTCUTS, useShortcuts } from "../shortcuts";
 import { completionTrigger } from "../completion-trigger";
@@ -316,12 +316,14 @@ interface PastConversationProps {
 	items: Item[];
 	fork: Fork;
 	onFork: (itemId: string, point: ForkPoint) => void;
+	resume: Resume;
+	onResume: () => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
 }
 
-/** A past session's saved transcript. It follows the file, but nothing on this page can write to it. */
-export function PastConversation({ sessionId, session, items, fork, onFork, actions }: PastConversationProps) {
+/** A past session's saved transcript. It follows the file; **Resume** continues it in a session this dashboard starts. */
+export function PastConversation({ sessionId, session, items, fork, onFork, resume, onResume, actions }: PastConversationProps) {
 	const meta = session ? (
 		<>
 			<Project cwdDisplay={session.cwdDisplay} /> · last active {new Date(session.modifiedAt).toLocaleString()}
@@ -330,12 +332,31 @@ export function PastConversation({ sessionId, session, items, fork, onFork, acti
 	) : (
 		sessionId
 	);
+	const resuming = resume.phase === "resuming" && resume.sessionId === sessionId;
+	const failed = resume.phase === "failed" && resume.sessionId === sessionId ? resume.error : null;
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
 				<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Read-only" alert={false}>
+					{session && (
+						<Button
+							variant="secondary"
+							size="compact"
+							onClick={onResume}
+							disabled={resume.phase === "resuming"}
+							aria-busy={resuming || undefined}
+							title="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here."
+						>
+							{resuming ? "Resuming…" : "Resume"}
+						</Button>
+					)}
 					{actions}
 				</Header>
+				{failed && (
+					<p role="alert" className={cn("border-b border-border px-6 py-2 text-xs", NOTICE_TONE.error)}>
+						{failed}
+					</p>
+				)}
 				<Transcript view={{ kind: "past", sessionId }} items={items} working={false} fork={fork} onFork={onFork} />
 			</div>
 		</MessageScrollerProvider>
