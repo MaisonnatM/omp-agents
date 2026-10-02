@@ -549,7 +549,7 @@ const SidebarMenu = forwardRef<HTMLUListElement, SidebarMenuProps>(
             else if (ref) (ref as React.MutableRefObject<HTMLUListElement | null>).current = node;
           }}
           data-sidebar="menu"
-          className={cn("relative flex w-full min-w-0 flex-col select-none", className)}
+          className={cn("relative flex w-full min-w-0 flex-col gap-0.5 select-none", className)}
           {...containerProps}
           {...props}
         >

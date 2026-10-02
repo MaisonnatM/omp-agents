@@ -1,5 +1,5 @@
-import { AppWindow, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Folder, GitPullRequest, Inbox, Keyboard, MessagesSquare, Play, Plus, Settings } from "lucide-react";
-import { type MouseEvent, type ReactElement, type ReactNode, useState } from "react";
+import { AppWindow, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, MessagesSquare, Play, Plus, Settings } from "lucide-react";
+import { type CSSProperties, type MouseEvent, type ReactElement, type ReactNode, useState } from "react";
 import type { PastSession, PullRequest, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -7,19 +7,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
 	ContextMenu,
 	ContextMenuContent,
-	ContextMenuItem,
-	ContextMenuLinkItem,
-	ContextMenuSeparator,
-	ContextMenuShortcut,
 	ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuTrigger,
+	MenuItem,
+	MenuLinkItem,
+	MenuSeparator,
+	MenuShortcut,
+} from "@/components/ui/menu";
 import {
 	SidebarContent,
 	SidebarGroup,
 	SidebarGroupAction,
 	SidebarGroupLabel,
 	SidebarHeader,
-	SidebarInput,
 	SidebarMenu,
 	SidebarMenuAction,
 	SidebarMenuBadge,
@@ -39,8 +41,6 @@ import {
 	inboxRepoKey,
 	inboxSectionId,
 	inboxSections,
-	MAX_PANES,
-	matchesFilter,
 	type OpenMode,
 	pullRequestUrl,
 	sameView,
@@ -90,34 +90,48 @@ export const pastLabel = (session: PastSession): string => session.title ?? proj
 
 interface RowMenuProps {
 	view: View;
-	/** `view` is on screen, which leaves out Open in split, as the row's own split button does. */
+	/** The row's name, which the "More actions" button is labelled after. */
+	label: string;
+	/** `view` is on screen, which leaves out Open in split. */
 	isOpen: boolean;
 	onOpen: (view: View, mode: OpenMode) => void;
-	/** The row's `SidebarMenuItem`, which right-click and the context-menu key open the menu on. */
+	/** The row's `SidebarMenuButton`. */
 	children: ReactElement;
 	/** The row's own items, after Open and Open in split. */
 	items?: ReactNode;
+	style?: CSSProperties;
 }
 
-/** A sidebar row with its quick actions on right-click. */
-export function RowMenu({ view, isOpen, onOpen, children, items }: RowMenuProps) {
+/** A sidebar row whose quick actions open on right-click and from its hover-revealed "More actions" button. */
+export function RowMenu({ view, label, isOpen, onOpen, children, items, style }: RowMenuProps) {
+	const menuItems = (
+		<>
+			<MenuItem onClick={() => onOpen(view, "replace")}>
+				<AppWindow />
+				Open
+			</MenuItem>
+			{!isOpen && (
+				<MenuItem onClick={() => onOpen(view, "split")}>
+					<Columns2 />
+					Open in split
+					<MenuShortcut>{SPLIT_CLICK}</MenuShortcut>
+				</MenuItem>
+			)}
+			{items}
+		</>
+	);
 	return (
 		<ContextMenu>
-			<ContextMenuTrigger render={children} />
-			<ContextMenuContent>
-				<ContextMenuItem onClick={() => onOpen(view, "replace")}>
-					<AppWindow />
-					Open
-				</ContextMenuItem>
-				{!isOpen && (
-					<ContextMenuItem onClick={() => onOpen(view, "split")}>
-						<Columns2 />
-						Open in split
-						<ContextMenuShortcut>{SPLIT_CLICK}</ContextMenuShortcut>
-					</ContextMenuItem>
-				)}
-				{items}
-			</ContextMenuContent>
+			<ContextMenuTrigger render={<SidebarMenuItem style={style} />}>
+				{children}
+				<DropdownMenu>
+					<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${label}`} title="More actions" />}>
+						<Ellipsis />
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end">{menuItems}</DropdownMenuContent>
+				</DropdownMenu>
+			</ContextMenuTrigger>
+			<ContextMenuContent>{menuItems}</ContextMenuContent>
 		</ContextMenu>
 	);
 }
@@ -126,26 +140,26 @@ export function RowMenu({ view, isOpen, onOpen, children, items }: RowMenuProps)
 function SessionItems({ row }: { row: { cwd: string; sessionId: string; pullRequests: PullRequest[] } }) {
 	return (
 		<>
-			<ContextMenuSeparator />
+			<MenuSeparator />
 			{row.pullRequests.map(pr => (
-				<ContextMenuLinkItem key={pullRequestUrl(pr)} href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
+				<MenuLinkItem key={pullRequestUrl(pr)} href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
 					<GitPullRequest />
 					Open {pr.repo}#{pr.number}
-				</ContextMenuLinkItem>
+				</MenuLinkItem>
 			))}
-			<ContextMenuLinkItem href={hashForSettings(row.cwd)}>
+			<MenuLinkItem href={hashForSettings(row.cwd)}>
 				<Settings />
 				Workspace settings
-			</ContextMenuLinkItem>
-			<ContextMenuSeparator />
-			<ContextMenuItem onClick={() => void navigator.clipboard.writeText(row.cwd)}>
+			</MenuLinkItem>
+			<MenuSeparator />
+			<MenuItem onClick={() => void navigator.clipboard.writeText(row.cwd)}>
 				<Folder />
 				Copy path
-			</ContextMenuItem>
-			<ContextMenuItem onClick={() => void navigator.clipboard.writeText(row.sessionId)}>
+			</MenuItem>
+			<MenuItem onClick={() => void navigator.clipboard.writeText(row.sessionId)}>
 				<Copy />
 				Copy session ID
-			</ContextMenuItem>
+			</MenuItem>
 		</>
 	);
 }
@@ -326,25 +340,13 @@ export function Roster({
 	toggle,
 }: RosterProps) {
 	const [runningOpen, setRunningOpen] = useState(true);
-	const [filter, setFilter] = useState("");
 	const projects = workspaces(hosts, past);
 	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
 	const shownHosts = hosts.filter(inProject);
-	const shownPast = past.filter(session => inProject(session) && matchesFilter(session, pastLabel(session), filter));
+	const shownPast = past.filter(inProject);
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	const selectedProject = projects.find(({ cwd }) => cwd === project);
 	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
-	const splitAction = (view: View, name: string) =>
-		!isOpen(view) && (
-			<SidebarMenuAction
-				showOnHover
-				aria-label={`Open ${name} in split`}
-				title={open.length < MAX_PANES ? `Open in split (${SPLIT_CLICK})` : `Open in the focused pane: ${MAX_PANES} panes is the most`}
-				onClick={() => onOpen(view, "split")}
-			>
-				<Columns2 />
-			</SidebarMenuAction>
-		);
 	return (
 		<Tabs value={inboxOpen ? "inbox" : "sessions"} onValueChange={value => onInboxOpen(value === "inbox")} className="flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
@@ -399,6 +401,7 @@ export function Roster({
 									<RowMenu
 										key={host.instanceId}
 										view={hostView}
+										label={hostLabel(host)}
 										isOpen={isOpen(hostView)}
 										onOpen={onOpen}
 										items={
@@ -407,40 +410,37 @@ export function Roster({
 												{/* The server ends only what it controls: a dashboard session, or a terminal room shared writable. */}
 												{host.control.phase === "live" && !host.control.readOnly && (
 													<>
-														<ContextMenuSeparator />
-														<ContextMenuItem variant="destructive" onClick={() => onEnd(host.instanceId)}>
+														<MenuSeparator />
+														<MenuItem variant="destructive" onClick={() => onEnd(host.instanceId)}>
 															<CircleStop />
 															End session
-														</ContextMenuItem>
+														</MenuItem>
 													</>
 												)}
 											</>
 										}
 									>
-										<SidebarMenuItem>
-											<SidebarMenuButton
-												isActive={isOpen(hostView)}
-												onClick={event => onOpen(hostView, modeOf(event))}
-												title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-											>
-												<StatusDot status={host.status} />
-												<span className="flex min-w-0 flex-1 items-baseline gap-2">
-													<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
-													{(host.pullRequests.length > 0 || (host.source === "terminal" && !host.relayConnected)) && (
-														<span className="shrink-0 text-xs text-muted-foreground">
-															{[
-																host.source === "terminal" && !host.relayConnected && "relay offline",
-																host.pullRequests.map(pr => `#${pr.number}`).join(" "),
-															]
-																.filter(Boolean)
-																.join(" · ")}
-														</span>
-													)}
-													<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
-												</span>
-											</SidebarMenuButton>
-											{splitAction(hostView, hostLabel(host))}
-										</SidebarMenuItem>
+										<SidebarMenuButton
+											isActive={isOpen(hostView)}
+											onClick={event => onOpen(hostView, modeOf(event))}
+											title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
+										>
+											<StatusDot status={host.status} />
+											<span className="flex min-w-0 flex-1 items-baseline gap-2">
+												<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
+												{(host.pullRequests.length > 0 || (host.source === "terminal" && !host.relayConnected)) && (
+													<span className="shrink-0 text-xs text-muted-foreground">
+														{[
+															host.source === "terminal" && !host.relayConnected && "relay offline",
+															host.pullRequests.map(pr => `#${pr.number}`).join(" "),
+														]
+															.filter(Boolean)
+															.join(" · ")}
+													</span>
+												)}
+												<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
+											</span>
+										</SidebarMenuButton>
 									</RowMenu>
 								);
 							})}
@@ -448,25 +448,8 @@ export function Roster({
 					</SidebarGroup>
 					<SidebarGroup collapsible>
 						<SidebarGroupLabel>
-							{past.length === 0
-								? "No past sessions"
-								: filter.trim() || project
-									? `${shownPast.length} of ${past.length} past`
-									: `${past.length} past`}
+							{past.length === 0 ? "No past sessions" : project ? `${shownPast.length} of ${past.length} past` : `${past.length} past`}
 						</SidebarGroupLabel>
-						{past.length > 0 && (
-							<div className="px-2 pb-2">
-								<SidebarInput
-									type="search"
-									value={filter}
-									onChange={event => setFilter(event.target.value)}
-									placeholder="Filter, or paste a PR link"
-									aria-label="Filter past sessions"
-									spellCheck={false}
-									className="text-xs"
-								/>
-							</div>
-						)}
 						<SidebarMenu aria-label="Past omp sessions">
 							{shownPast.map(session => {
 								const pastView: View = { kind: "past", sessionId: session.sessionId };
@@ -474,38 +457,35 @@ export function Roster({
 									<RowMenu
 										key={session.sessionId}
 										view={pastView}
+										label={pastLabel(session)}
 										isOpen={isOpen(pastView)}
 										onOpen={onOpen}
 										items={
 											<>
 												{/* One resume runs at a time, as the pane's Resume button allows. */}
-												<ContextMenuItem disabled={resume.phase === "resuming"} onClick={() => onResume(session.sessionId)}>
+												<MenuItem disabled={resume.phase === "resuming"} onClick={() => onResume(session.sessionId)}>
 													<Play />
 													{resume.phase === "resuming" && resume.sessionId === session.sessionId ? "Resuming…" : "Resume"}
-												</ContextMenuItem>
+												</MenuItem>
 												<SessionItems row={session} />
 											</>
 										}
 									>
-										<SidebarMenuItem>
-											<SidebarMenuButton
-												isActive={isOpen(pastView)}
-												onClick={event => onOpen(pastView, modeOf(event))}
-												title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-											>
-												<span className="size-4 shrink-0" aria-hidden />
-												<span className="flex min-w-0 flex-1 items-baseline gap-2">
-													<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
-													{session.pullRequests.length > 0 && (
-														<span className="shrink-0 text-xs text-muted-foreground">
-															{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}
-														</span>
-													)}
-													<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(session.modifiedAt)}</span>
-												</span>
-											</SidebarMenuButton>
-											{splitAction(pastView, pastLabel(session))}
-										</SidebarMenuItem>
+										<SidebarMenuButton
+											isActive={isOpen(pastView)}
+											onClick={event => onOpen(pastView, modeOf(event))}
+											title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
+										>
+											<span className="flex min-w-0 flex-1 items-baseline gap-2">
+												<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
+												{session.pullRequests.length > 0 && (
+													<span className="shrink-0 text-xs text-muted-foreground">
+														{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}
+													</span>
+												)}
+												<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(session.modifiedAt)}</span>
+											</span>
+										</SidebarMenuButton>
 									</RowMenu>
 								);
 							})}
