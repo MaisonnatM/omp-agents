@@ -380,9 +380,9 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 
 const details = new Map<string, { at: number; answer: Promise<PullRequestDetail> }>();
 
-/** One pull request in full, live from `gh`. `fresh` skips the cache. */
-export function loadPullRequestDetail(pr: PullRequest, fresh: boolean): Promise<PullRequestDetail> {
-	return cached(details, `${pr.owner}/${pr.repo}#${pr.number}`.toLowerCase(), fresh, async () =>
+/** One pull request in full, live from `gh`. */
+export function loadPullRequestDetail(pr: PullRequest): Promise<PullRequestDetail> {
+	return cached(details, `${pr.owner}/${pr.repo}#${pr.number}`.toLowerCase(), false, async () =>
 		parseDetailAnswer(await graphql(["-f", `query=${DETAIL_QUERY}`, "-f", `owner=${pr.owner}`, "-f", `repo=${pr.repo}`, "-F", `number=${pr.number}`]), pr),
 	);
 }
