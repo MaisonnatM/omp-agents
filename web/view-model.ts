@@ -27,6 +27,7 @@ const PAST_PREFIX = "past/";
 const SETTINGS = "settings";
 const INBOX = "inbox";
 const SESSION_PREFIX = "session/";
+const NEW = "new";
 
 /** The inbox page, and the pull request whose row it scrolls to and highlights; `null` for none. */
 export interface InboxRoute {
@@ -74,6 +75,20 @@ export function settingsFromHash(hash: string): SettingsRoute | null {
 export const hashForSettings = (cwd: string | null): string =>
 	cwd === null ? `#${SETTINGS}` : `#${SETTINGS}/${encodeURIComponent(cwd)}`;
 
+/** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. */
+export interface NewSessionRoute {
+	cwd: string | null;
+}
+
+/** `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen. No omp runs until its first message. */
+export function newSessionFromHash(hash: string): NewSessionRoute | null {
+	const raw = hash.replace(/^#/, "");
+	if (raw === NEW) return { cwd: null };
+	return raw.startsWith(`${NEW}/`) ? { cwd: decodeURIComponent(raw.slice(NEW.length + 1)) } : null;
+}
+
+export const hashForNewSession = (cwd: string | null): string => (cwd === null ? `#${NEW}` : `#${NEW}/${encodeURIComponent(cwd)}`);
+
 /** Panes the page splits into at most, as a 2x2 grid. */
 export const MAX_PANES = 4;
 
@@ -98,7 +113,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, or `session`. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `session`, or `new`. */
 function viewFromPane(pane: string): View {
 	if (pane.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(pane.slice(PAST_PREFIX.length)) };
 	const slash = pane.indexOf("/");
@@ -129,11 +144,11 @@ export function hashForLayout({ panes, focus, maximized }: Layout): string {
 
 /**
  * The layout a hash names, keeping the first {@link MAX_PANES} distinct views and focus on the view it named.
- * `null` for the settings and inbox pages, which leave the panes behind them alone, and for a `#session/<id>` link,
- * which names no layout until the session lists show where that session runs.
+ * `null` for the settings, inbox, and new-session pages, which leave the panes behind them alone, and for a
+ * `#session/<id>` link, which names no layout until the session lists show where that session runs.
  */
 export function layoutFromHash(hash: string): Layout | null {
-	if (settingsFromHash(hash) || inboxFromHash(hash) || sessionFromHash(hash) !== null) return null;
+	if (settingsFromHash(hash) || inboxFromHash(hash) || newSessionFromHash(hash) || sessionFromHash(hash) !== null) return null;
 	const marked = hash.replace(/^#/, "");
 	const maximized = marked.endsWith(MAXIMIZED);
 	const raw = maximized ? marked.slice(0, -MAXIMIZED.length) : marked;
@@ -186,7 +201,7 @@ export function swapView(layout: Layout, from: View, to: View): Layout {
 }
 
 /**
- * Where a new session starts unless the user types another directory: the open session's,
+ * Where a new session starts unless the user picks another directory: the open session's,
  * else the newest live one's, else the newest past one's, each only from `project` when one is selected.
  */
 export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[], project: string | null): string {

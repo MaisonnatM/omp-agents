@@ -391,8 +391,8 @@ export type ClientMsg =
 	| { t: "abort"; instanceId: string }
 	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
 	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number }
-	/** Start a new omp session in `cwd` (absolute, or starting with `~`). */
-	| { t: "create"; cwd: string }
+	/** Start a new omp session in `cwd` (absolute, or starting with `~`) and send it `prompt` as its first message. */
+	| { t: "create"; cwd: string; prompt: string }
 	/** End a live session: stop the omp process this dashboard started, or send SIGTERM to a terminal session's omp. */
 	| { t: "end"; instanceId: string }
 	/** Start a dashboard session holding the view's history before the user prompt `entryId`. The view's file stays untouched. */

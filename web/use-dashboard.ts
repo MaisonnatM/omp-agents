@@ -5,6 +5,7 @@ import {
 	EMPTY_LAYOUT,
 	type ForkPoint,
 	hashForLayout,
+	hashForNewSession,
 	hashForView,
 	type Layout,
 	layoutFromHash,
@@ -24,8 +25,8 @@ const subscribeHash = (onChange: () => void): (() => void) => {
 /** The URL hash, rendering again whenever it changes. */
 export const useHash = (): string => useSyncExternalStore(subscribeHash, () => location.hash);
 
-/** The New session form: closed, open for a directory (with the last attempt's error), or waiting for the session to start. */
-export type Launch = { phase: "closed" } | { phase: "editing"; error: string | null } | { phase: "starting" };
+/** Starting a session from the new-session draft: none, waiting for omp to start and take the first message, or failed with the reason. */
+export type Launch = { phase: "idle" } | { phase: "starting" } | { phase: "failed"; error: string };
 
 /** A fork from a message of `view`: none, waiting for the forked session, or failed with the reason. One runs at a time. */
 export type Fork =
@@ -88,6 +89,8 @@ type Action =
 	| { t: "server"; msg: ServerMsg }
 	| { t: "layout"; layout: Layout }
 	| { t: "launch"; launch: Launch }
+	/** A failed start's error goes away with its draft; a start under way keeps waiting for its answer. */
+	| { t: "dismiss-launch" }
 	| { t: "fork"; fork: Fork }
 	| { t: "resume"; resume: Resume };
 
@@ -123,7 +126,7 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 			// The answer to a pending `create`, `fork`, or `resume` went to the socket that just closed.
 			const launch: Launch =
 				!action.connected && state.launch.phase === "starting"
-					? { phase: "editing", error: "Lost the dashboard server while the session was starting. It may still appear." }
+					? { phase: "failed", error: "Lost the dashboard server while the session was starting. It may still appear." }
 					: state.launch;
 			const fork: Fork =
 				!action.connected && state.fork.phase === "forking"
@@ -153,6 +156,8 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 		}
 		case "launch":
 			return { ...state, launch: action.launch };
+		case "dismiss-launch":
+			return state.launch.phase === "failed" ? { ...state, launch: { phase: "idle" } } : state;
 		case "fork":
 			return { ...state, fork: action.fork };
 		case "resume":
@@ -173,8 +178,8 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 					return updatePane(state, msg.view, pane => ({ ...pane, items: applyItems(pane.items, msg.reset, msg.items) }));
 				case "created":
 					if (state.launch.phase !== "starting") return state;
-					if (!msg.result.ok) return { ...state, launch: { phase: "editing", error: msg.result.error } };
-					return { ...state, launch: { phase: "closed" }, started: { instanceId: msg.result.instanceId, cwd: msg.result.cwd } };
+					if (!msg.result.ok) return { ...state, launch: { phase: "failed", error: msg.result.error } };
+					return { ...state, launch: { phase: "idle" }, started: { instanceId: msg.result.instanceId, cwd: msg.result.cwd } };
 				case "forked": {
 					const fork = state.fork;
 					if (fork.phase !== "forking") return state;
@@ -216,9 +221,10 @@ export interface Dashboard {
 	focus: (index: number) => void;
 	/** Show `layout`, as a new history entry. */
 	show: (layout: Layout) => void;
-	/** Open or close the New session form. */
-	setLaunchOpen: (open: boolean) => void;
-	create: (cwd: string) => void;
+	/** Open the new-session draft in the default directory, clearing a failed start's error. */
+	openNewSession: () => void;
+	/** Start omp in `cwd` with `prompt` as its first message; the session opens in the focused pane once ready. */
+	create: (cwd: string, prompt: string) => void;
 	/** Fork `view` at a message's fork point; the forked session opens in the focused pane once ready. */
 	fork: (view: View, itemId: string, point: ForkPoint) => void;
 	/** Continue past session `sessionId`; its panes show the live session once omp is ready. */
@@ -236,7 +242,7 @@ export function useDashboard(): Dashboard {
 		layout: layoutFromHash(location.hash) ?? EMPTY_LAYOUT,
 		panes: new Map(),
 		lastHosts: new Map(),
-		launch: { phase: "closed" },
+		launch: { phase: "idle" },
 		fork: { phase: "idle" },
 		resume: { phase: "idle" },
 		draft: null,
@@ -327,14 +333,15 @@ export function useDashboard(): Dashboard {
 		send({ t: "watch", views: state.layout.panes });
 	}, [send, state.layout.panes]);
 
-	const setLaunchOpen = useCallback((open: boolean) => {
-		dispatch({ t: "launch", launch: open ? { phase: "editing", error: null } : { phase: "closed" } });
+	const openNewSession = useCallback(() => {
+		dispatch({ t: "dismiss-launch" });
+		location.hash = hashForNewSession(null);
 	}, []);
 
 	const create = useCallback(
-		(cwd: string) => {
+		(cwd: string, prompt: string) => {
 			dispatch({ t: "launch", launch: { phase: "starting" } });
-			send({ t: "create", cwd });
+			send({ t: "create", cwd, prompt });
 		},
 		[send],
 	);
@@ -355,5 +362,5 @@ export function useDashboard(): Dashboard {
 		[send],
 	);
 
-	return { state, send, open, focus, show, setLaunchOpen, create, fork, resume };
+	return { state, send, open, focus, show, openNewSession, create, fork, resume };
 }
