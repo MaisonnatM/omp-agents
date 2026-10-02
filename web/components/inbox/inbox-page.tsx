@@ -1,17 +1,50 @@
 import { ChevronRight, RefreshCw } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import type { Inbox, PastSession, PullRequest, RepoInbox, RosterHost, View } from "../../../src/shared";
+import type { Inbox, InboxPullRequest, PastSession, PullRequest, RepoInbox, RosterHost, View } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { type InboxTarget, inboxRepoKey, inboxSectionId, inboxSections, samePullRequest } from "../../inbox-model";
 import { projectName } from "../../labels";
+import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { hashForInbox, type OpenMode } from "../../routing";
+import type { StartOf, StartOp } from "../../starts";
 import { refreshInbox, useInbox } from "../../use-inbox";
 import { Header } from "../conversation";
 import { PullRequestSheetContent } from "./pr-details";
 import { PullRequestRow, rowId, sessionsFor } from "./pr-row";
+import { QuickActionButtons } from "./quick-actions";
+
+type QuickOp = Extract<StartOp, { kind: "quick" }>;
+
+/** The action of the quick start under way for `pr`, if any. */
+const pendingOf = (quick: StartOf<"quick"> | null, pr: PullRequest): QuickActionId | null =>
+	quick?.phase === "starting" && samePullRequest(quick.op.pr, pr) ? quick.op.action : null;
+
+/** Why a quick action's session did not start, with a button that forgets it. */
+function QuickStartFailed({ op, error, onDismiss }: { op: QuickOp; error: string; onDismiss: () => void }) {
+	return (
+		<p role="alert" className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+			<span className="min-w-0">
+				Cannot start "{QUICK_ACTIONS[op.action].label}" on {op.pr.owner}/{op.pr.repo}#{op.pr.number}: {error}
+			</span>
+			<Button variant="ghost" size="compact" className="shrink-0" onClick={onDismiss}>
+				Dismiss
+			</Button>
+		</p>
+	);
+}
+
+/** The start of `action` on `pr`, in `cwd`: the repository's most recently used workspace. */
+const quickOp = (pr: InboxPullRequest, cwd: string, action: QuickActionId, mode: OpenMode): QuickOp => ({
+	kind: "quick",
+	cwd,
+	prompt: QUICK_ACTIONS[action].prompt(pr),
+	pr: { owner: pr.owner, repo: pr.repo, number: pr.number },
+	action,
+	mode,
+});
 
 /** Folded repositories and sections: `owner/repo`, and `owner/repo:<section title>`. */
 const COLLAPSED_KEY = "omp-agents.inbox-collapsed";
@@ -77,9 +110,11 @@ interface RepoProps {
 	collapsed: ReadonlySet<string>;
 	onToggle: (key: string) => void;
 	onOpen: (view: View, mode: OpenMode) => void;
+	quick: StartOf<"quick"> | null;
+	onQuickAction: (op: QuickOp) => void;
 }
 
-function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen }: RepoProps) {
+function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen, quick, onQuickAction }: RepoProps) {
 	const name = `${inbox.owner}/${inbox.repo}`;
 	const key = inboxRepoKey(inbox);
 	const headingId = `inbox-${name}`;
@@ -119,6 +154,8 @@ function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen }
 									sessions={sessionsFor(pr, hosts, past)}
 									targeted={target !== null && samePullRequest(pr, target)}
 									onOpen={onOpen}
+									pending={pendingOf(quick, pr)}
+									onQuickAction={(action, mode) => onQuickAction(quickOp(pr, inbox.cwds[0]!, action, mode))}
 								/>
 							))}
 						</ul>
@@ -157,6 +194,16 @@ function placeOf(inbox: Inbox, pr: PullRequest): { repo: string; section: string
 	return null;
 }
 
+/** The pull request as the inbox lists it, with the workspace a session on it starts in; `null` when the inbox does not list it. */
+function listedPullRequest(inbox: Inbox, pr: PullRequest): { pr: InboxPullRequest; cwd: string } | null {
+	for (const repo of inbox.repos) {
+		if ("error" in repo) continue;
+		const listed = repo.pullRequests.find(other => samePullRequest(other, pr));
+		if (listed && repo.cwds[0] !== undefined) return { pr: listed, cwd: repo.cwds[0] };
+	}
+	return null;
+}
+
 /** Why the inbox does not list the PR a link named. `allProjects`: the sidebar shows every project. */
 function MissingTarget({ target, inbox, allProjects }: { target: PullRequest; inbox: Inbox; allProjects: boolean }) {
 	const repo = `${target.owner}/${target.repo}`;
@@ -184,10 +231,14 @@ interface InboxPageProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The section a sidebar link last chose, to unfold, scroll to, and focus. */
 	section: InboxTarget | null;
+	/** The quick action's start under way or failed, whichever the page last asked for. */
+	quick: StartOf<"quick"> | null;
+	onQuickAction: (op: QuickOp) => void;
+	onDismissQuick: () => void;
 }
 
 /** The pull requests of the sidebar's project, or of every project, in Graphite's inbox sections, read from GitHub. */
-export function InboxPage({ project, hosts, past, target, onOpen, section }: InboxPageProps) {
+export function InboxPage({ project, hosts, past, target, onOpen, section, quick, onQuickAction, onDismissQuick }: InboxPageProps) {
 	const { read, error, refreshing } = useInbox(project, true);
 	const [collapsed, toggleCollapsed, expand] = useCollapsed();
 	const place = read && target ? placeOf(read.inbox, target) : null;
@@ -199,6 +250,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 	/** The PR the sheet shows, kept after the hash drops it so the sheet's content stays through its exit slide. */
 	const sheetPr = useRef<PullRequest | null>(null);
 	if (target) sheetPr.current = target;
+	const sheetListed = read && sheetPr.current ? listedPullRequest(read.inbox, sheetPr.current) : null;
 
 	useEffect(() => {
 		if (!place || !targetKey || shown.current === targetKey) return;
@@ -244,6 +296,8 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 						collapsed={collapsed}
 						onToggle={toggleCollapsed}
 						onOpen={onOpen}
+						quick={quick}
+						onQuickAction={onQuickAction}
 					/>
 				))}
 				{unmatched.length > 0 && (
@@ -275,10 +329,30 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 			</Header>
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				<TooltipProvider>
-					<div className="mx-auto w-full max-w-5xl space-y-10 px-6 py-6">{body}</div>
+					<div className="mx-auto w-full max-w-5xl space-y-10 px-6 py-6">
+						{quick?.phase === "failed" && <QuickStartFailed op={quick.op} error={quick.error} onDismiss={onDismissQuick} />}
+						{body}
+					</div>
 					{sheetPr.current && (
 						<Sheet open={target !== null} onClose={() => (location.hash = hashForInbox(null))}>
-							<PullRequestSheetContent key={rowId(sheetPr.current)} pr={sheetPr.current} />
+							<PullRequestSheetContent
+								key={rowId(sheetPr.current)}
+								pr={sheetPr.current}
+								actions={
+									sheetListed && (
+										<>
+											<QuickActionButtons
+												pr={sheetListed.pr}
+												pending={pendingOf(quick, sheetListed.pr)}
+												onRun={(action, mode) => onQuickAction(quickOp(sheetListed.pr, sheetListed.cwd, action, mode))}
+											/>
+											{quick?.phase === "failed" && samePullRequest(quick.op.pr, sheetListed.pr) && (
+												<QuickStartFailed op={quick.op} error={quick.error} onDismiss={onDismissQuick} />
+											)}
+										</>
+									)
+								}
+							/>
 						</Sheet>
 					)}
 				</TooltipProvider>

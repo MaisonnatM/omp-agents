@@ -1,4 +1,4 @@
-import { Check, CircleCheck, CircleDashed, CircleX, Link2, type LucideIcon, MessageSquare } from "lucide-react";
+import { Check, CircleCheck, CircleDashed, CircleX, GitMerge, Link2, type LucideIcon, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import type { CheckState, InboxPullRequest, PastSession, PullRequest, PullRequestLink, ReviewDecision, RosterHost, SessionLinksEdit, SessionLinksResult, View } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,17 @@ import { putJson } from "../../api";
 import { hashForInbox, type OpenMode } from "../../routing";
 import { samePullRequest } from "../../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
+import type { QuickActionId } from "../../quick-actions";
 import { Avatar, IconTip, Reviewers, STATE_ICON } from "./avatars";
+import { QuickActionsMenu } from "./quick-actions";
 
 const CHECK_ICON: Record<Exclude<CheckState, "none">, [LucideIcon, string, string]> = {
 	passing: [CircleCheck, "text-emerald-600 dark:text-emerald-400", "Checks on the latest commit passed"],
 	failing: [CircleX, "text-red-600 dark:text-red-400", "Checks on the latest commit failed"],
 	pending: [CircleDashed, "text-amber-600 dark:text-amber-400", "Checks on the latest commit are still running"],
 };
+
+const CONFLICTS_ICON: [LucideIcon, string, string] = [GitMerge, "text-red-600 dark:text-red-400", "Merge conflicts with its base branch"];
 
 const REVIEW_LABEL: Record<Exclude<ReviewDecision, "none">, [string, string]> = {
 	approved: ["Approved", "text-emerald-600 dark:text-emerald-400"],
@@ -110,9 +114,12 @@ interface RowProps {
 	/** The PR the inbox link named, highlighted while its sheet shows. */
 	targeted: boolean;
 	onOpen: (view: View, mode: OpenMode) => void;
+	/** The quick action whose session is starting for this PR, if any. */
+	pending: QuickActionId | null;
+	onQuickAction: (action: QuickActionId, mode: OpenMode) => void;
 }
 
-export function PullRequestRow({ pr, sessions, targeted, onOpen }: RowProps) {
+export function PullRequestRow({ pr, sessions, targeted, onOpen, pending, onQuickAction }: RowProps) {
 	const review = pr.state === "merged" || pr.review === "none" ? null : REVIEW_LABEL[pr.review];
 	return (
 		<li id={rowId(pr)} data-targeted={targeted || undefined} className={cn("scroll-my-6", targeted && "ring-2 ring-inset ring-ring")}>
@@ -162,6 +169,8 @@ export function PullRequestRow({ pr, sessions, targeted, onOpen }: RowProps) {
 					{review && <span className={review[1]}>{review[0]}</span>}
 					<Unresolved unresolved={pr.unresolved} />
 					{pr.checks !== "none" && <IconTip icon={CHECK_ICON[pr.checks]} />}
+					{pr.conflicts && <IconTip icon={CONFLICTS_ICON} />}
+					<QuickActionsMenu pr={pr} pending={pending} onRun={onQuickAction} />
 					{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
 					<span className="w-14 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={new Date(pr.updatedAt).toLocaleString()}>
 						{age(pr.updatedAt)}
