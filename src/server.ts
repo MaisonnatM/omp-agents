@@ -295,8 +295,8 @@ async function pollRegistry(): Promise<void> {
 	setTimeout(pollRegistry, POLL_MS);
 }
 
-/** Start omp in `input` (absolute, `~`-relative, or relative to the home directory) and answer once it is ready. */
-async function launch(ws: Socket, input: string): Promise<void> {
+/** Start omp in `input` (absolute, `~`-relative, or relative to the home directory), send it `prompt`, and answer once it is ready. */
+async function launch(ws: Socket, input: string, prompt: string): Promise<void> {
 	const raw = input.trim();
 	const cwd = raw === "~" || raw.startsWith("~/") ? join(HOME, raw.slice(1)) : resolve(HOME, raw);
 	try {
@@ -313,6 +313,7 @@ async function launch(ws: Socket, input: string): Promise<void> {
 		return;
 	}
 	dashboards.set(session.instanceId, session);
+	session.prompt(prompt, "steer");
 	pushRoster();
 	send(ws, { t: "created", result: { ok: true, instanceId: session.instanceId, cwd: session.cwd } });
 }
@@ -471,8 +472,8 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 			return typeof id === "string" ? { t: value.t, instanceId: id } : null;
 		}
 		case "create": {
-			const cwd = value.cwd;
-			return typeof cwd === "string" && cwd.trim() ? { t: "create", cwd } : null;
+			const { cwd, prompt } = value;
+			return typeof cwd === "string" && cwd.trim() && typeof prompt === "string" && prompt.trim() ? { t: "create", cwd, prompt } : null;
 		}
 		case "fork": {
 			const view = parseView(value.view);
@@ -562,7 +563,7 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			guests.get(msg.instanceId)?.abort();
 			return;
 		case "create":
-			void launch(ws, msg.cwd);
+			void launch(ws, msg.cwd, msg.prompt);
 			return;
 		case "fork":
 			void fork(ws, msg.view, msg.entryId);

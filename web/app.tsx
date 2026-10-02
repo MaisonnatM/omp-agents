@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Conversation, PastConversation, ToolsExpanded } from "./components/conversation";
 import { InboxPage } from "./components/inbox-page";
 import { PlanUsageFooter } from "./components/plan-usage";
+import { NewSession } from "./components/new-session";
 import { Roster, SPLIT_CLICK, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings-page";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
@@ -22,9 +23,11 @@ import {
 	focusedView,
 	hashForSettings,
 	hashForInbox,
+	hashForNewSession,
 	hashForView,
 	inboxFromHash,
 	type InboxTarget,
+	newSessionFromHash,
 	sameView,
 	settingsFromHash,
 	workspaces,
@@ -73,11 +76,13 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 }
 
 export function App() {
-	const { state, send, open, focus, show, setLaunchOpen, create, fork, resume } = useDashboard();
+	const { state, send, open, focus, show, openNewSession, create, fork, resume } = useDashboard();
 	const initialWidth = useMemo(storedSidebarWidth, []);
 	const hash = useHash();
 	const settings = settingsFromHash(hash);
 	const inbox = inboxFromHash(hash);
+	const newSession = newSessionFromHash(hash);
+	const page = settings || inbox || newSession;
 	const [project, pickProject] = useProject(workspaces(state.hosts, state.past));
 	const { started } = state;
 	// A session started in another directory than the selected project would be missing from the sidebar.
@@ -91,7 +96,7 @@ export function App() {
 	const split = layout.panes.length > 1;
 	const [columns, setColumns] = useState(() => storedSplitRatio("columns"));
 	const [rows, setRows] = useState(() => storedSplitRatio("rows"));
-	const maximized = layout.maximized && !settings && !inbox;
+	const maximized = layout.maximized && !page;
 
 	const settingsHref = hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
@@ -162,7 +167,19 @@ export function App() {
 	};
 
 	let main: ReactNode;
-	if (settings) {
+	if (newSession) {
+		const cwd = newSession.cwd ?? defaultCwd(view, state.hosts, state.past, project);
+		main = (
+			<NewSession
+				cwd={cwd}
+				workspaces={workspaces(state.hosts, state.past)}
+				launch={state.launch}
+				connected={state.connected}
+				onPickCwd={next => (location.hash = hashForNewSession(next))}
+				onStart={prompt => create(cwd, prompt)}
+			/>
+		);
+	} else if (settings) {
 		main = <SettingsPage cwd={settings.cwd} workspaces={workspaces(state.hosts, state.past)} />;
 	} else if (inbox) {
 		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
@@ -241,10 +258,9 @@ export function App() {
 				<Roster
 					hosts={state.hosts}
 					past={state.past}
-					open={settings || inbox ? [] : layout.panes}
+					open={page ? [] : layout.panes}
 					connected={state.connected}
-					launch={state.launch}
-					defaultCwd={defaultCwd(view, state.hosts, state.past, project)}
+					newSessionOpen={newSession !== null}
 					settingsHref={settingsHref}
 					settingsOpen={settings !== null}
 					inboxOpen={inbox !== null}
@@ -254,8 +270,7 @@ export function App() {
 					project={project}
 					onPickProject={pickProject}
 					onOpen={open}
-					onLaunchOpen={setLaunchOpen}
-					onCreate={create}
+					onNewSession={openNewSession}
 					onShowShortcuts={() => setShortcutsOpen(true)}
 				/>
 				<PlanUsageFooter usage={state.usage} />
@@ -264,7 +279,7 @@ export function App() {
 			<SidebarInset>
 				<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
 			</SidebarInset>
-			{viewHost && !settings && !inbox && <SubagentsSidebar host={viewHost} open={layout.panes} onOpen={open} />}
+			{viewHost && !page && <SubagentsSidebar host={viewHost} open={layout.panes} onOpen={open} />}
 			<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 		</SidebarProvider>
 	);

@@ -21,7 +21,6 @@ import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { IS_MAC, useShortcuts } from "../shortcuts";
-import type { Launch } from "../use-dashboard";
 import { useInbox } from "../use-inbox";
 import {
 	hashForInbox,
@@ -76,54 +75,6 @@ export const projectName = (cwdDisplay: string): string | undefined => cwdDispla
 export const hostLabel = (host: RosterHost): string => host.sessionName ?? projectName(host.cwdDisplay) ?? host.cwdDisplay;
 
 export const pastLabel = (session: PastSession): string => session.title ?? projectName(session.cwdDisplay) ?? "Untitled session";
-
-interface NewSessionFormProps {
-	launch: Exclude<Launch, { phase: "closed" }>;
-	defaultCwd: string;
-	connected: boolean;
-	onCreate: (cwd: string) => void;
-	onCancel: () => void;
-}
-
-function NewSessionForm({ launch, defaultCwd, connected, onCreate, onCancel }: NewSessionFormProps) {
-	const [cwd, setCwd] = useState(defaultCwd);
-	const starting = launch.phase === "starting";
-	return (
-		<form
-			className="mx-2 mb-2 flex flex-col gap-2 rounded-md border border-border p-2"
-			aria-label="New session"
-			onSubmit={event => {
-				event.preventDefault();
-				if (cwd.trim()) onCreate(cwd);
-			}}
-		>
-			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
-				Working directory
-				<SidebarInput
-					value={cwd}
-					onChange={event => setCwd(event.target.value)}
-					disabled={starting}
-					autoFocus
-					spellCheck={false}
-					className="font-mono text-xs"
-				/>
-			</label>
-			{launch.phase === "editing" && launch.error && (
-				<p className="text-xs text-red-600 dark:text-red-400" role="alert">
-					{launch.error}
-				</p>
-			)}
-			<div className="flex justify-end gap-2">
-				<Button type="button" variant="ghost" size="compact" onClick={onCancel} disabled={starting}>
-					Cancel
-				</Button>
-				<Button type="submit" size="compact" disabled={starting || !connected || !cwd.trim()}>
-					{starting ? "Starting…" : "Start"}
-				</Button>
-			</div>
-		</form>
-	);
-}
 
 interface ProjectPickerProps {
 	/** Directories sessions ran in, as {@link workspaces} lists them. */
@@ -252,8 +203,8 @@ interface RosterProps {
 	/** Views on screen, highlighted in the list. */
 	open: View[];
 	connected: boolean;
-	launch: Launch;
-	defaultCwd: string;
+	/** The new-session draft is open. */
+	newSessionOpen: boolean;
 	/** The settings page, for the open session's workspace. */
 	settingsHref: string;
 	settingsOpen: boolean;
@@ -267,8 +218,8 @@ interface RosterProps {
 	project: string | null;
 	onPickProject: (cwd: string | null) => void;
 	onOpen: (view: View, mode: OpenMode) => void;
-	onLaunchOpen: (open: boolean) => void;
-	onCreate: (cwd: string) => void;
+	/** Open the new-session draft; no omp starts until its first message. */
+	onNewSession: () => void;
 	onShowShortcuts: () => void;
 }
 
@@ -277,8 +228,7 @@ export function Roster({
 	past,
 	open,
 	connected,
-	launch,
-	defaultCwd,
+	newSessionOpen,
 	settingsHref,
 	settingsOpen,
 	inboxOpen,
@@ -288,8 +238,7 @@ export function Roster({
 	project,
 	onPickProject,
 	onOpen,
-	onLaunchOpen,
-	onCreate,
+	onNewSession,
 	onShowShortcuts,
 }: RosterProps) {
 	const [runningOpen, setRunningOpen] = useState(true);
@@ -353,26 +302,11 @@ export function Roster({
 						<SidebarGroupAction
 							title={newSessionLabel}
 							aria-label={newSessionLabel}
-							aria-expanded={launch.phase !== "closed"}
-							onClick={() => {
-								if (launch.phase !== "closed") return onLaunchOpen(false);
-								setRunningOpen(true);
-								// A chosen project names the directory, so the session starts at once; the form shows while omp starts and on failure.
-								if (project !== null && connected) onCreate(project);
-								else onLaunchOpen(true);
-							}}
+							aria-current={newSessionOpen ? "page" : undefined}
+							onClick={onNewSession}
 						>
 							<Plus />
 						</SidebarGroupAction>
-						{launch.phase !== "closed" && (
-							<NewSessionForm
-								launch={launch}
-								defaultCwd={defaultCwd}
-								connected={connected}
-								onCreate={onCreate}
-								onCancel={() => onLaunchOpen(false)}
-							/>
-						)}
 						<SidebarMenu aria-label="Running omp sessions">
 							{shownHosts.map(host => {
 								const hostView: View = { kind: "live", instanceId: host.instanceId, agentId: null };

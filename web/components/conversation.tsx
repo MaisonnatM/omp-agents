@@ -188,6 +188,16 @@ export function Header({ title, meta, status, alert = false, children }: HeaderP
 /** The project a session runs in, with its full directory on hover. */
 const Project = ({ cwdDisplay }: { cwdDisplay: string }) => <span title={cwdDisplay}>{projectName(cwdDisplay) ?? cwdDisplay}</span>;
 
+/** The omp terminal shortcut a draft starts with, which the dashboard cannot run: `$` Python or `!` shell. */
+export const directCommandOf = (draft: string): "Python" | "shell" | null =>
+	draft.startsWith("$") ? "Python" : draft.startsWith("!") ? "shell" : null;
+
+export const DirectCommandNote = ({ kind }: { kind: "Python" | "shell" }) => (
+	<p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+		Direct {kind} execution needs the omp terminal. Collab cannot run it in this session.
+	</p>
+);
+
 /** The skill a prompt invoked, as a pill ahead of the user's words. */
 function SkillBadge({ name }: { name: string }) {
 	return (
@@ -552,7 +562,7 @@ function LiveConversation({
 					: "Message this subagent…"
 				: "Message this session…";
 
-	const directCommand = draft.startsWith("$") ? "Python" : draft.startsWith("!") ? "shell" : null;
+	const directCommand = directCommandOf(draft);
 	const shownModel = shown?.model ?? null;
 	const thinking = shown?.thinkingLevel ?? null;
 	// Collab rooms carry no model or thinking switch, so only sessions this dashboard started over RPC can change them.
@@ -710,11 +720,7 @@ function LiveConversation({
 					onRemoveQueued={item => take(queued.filter(entry => entry.item.id === item.id), false)}
 					sendLabel={`${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
 				/>
-				{directCommand && (
-					<p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-						Direct {directCommand} execution needs the omp terminal. Collab cannot run it in this session.
-					</p>
-				)}
+				{directCommand && <DirectCommandNote kind={directCommand} />}
 			</div>
 		</div>
 	);

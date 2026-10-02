@@ -8,6 +8,7 @@ import {
 	forkPoints,
 	hashForInbox,
 	hashForLayout,
+	hashForNewSession,
 	hashForSettings,
 	hashForView,
 	inboxFromHash,
@@ -17,6 +18,7 @@ import {
 	matchesFilter,
 	modelLabel,
 	modelOrg,
+	newSessionFromHash,
 	openView,
 	providerLabel,
 	sessionFromHash,
@@ -151,6 +153,17 @@ describe("layout hash", () => {
 		expect(settingsFromHash("#settings")).toEqual({ cwd: null });
 		expect(layoutFromHash("#settings")).toBeNull();
 		expect(settingsFromHash("#7c51f77b2a1bf7ba")).toBeNull();
+	});
+
+	test("the new-session draft is not read as a layout, and its directory keeps its slashes and tilde", () => {
+		const hash = hashForNewSession("~/code/my app");
+		expect(hash).toBe("#new/~%2Fcode%2Fmy%20app");
+		expect(newSessionFromHash(hash)).toEqual({ cwd: "~/code/my app" });
+		expect(layoutFromHash(hash)).toBeNull();
+		expect(newSessionFromHash("#new")).toEqual({ cwd: null });
+		expect(layoutFromHash("#new")).toBeNull();
+		expect(newSessionFromHash("#newer")).toBeNull();
+		expect(newSessionFromHash("#7c51f77b2a1bf7ba")).toBeNull();
 	});
 
 	test("the inbox hash opens the page alone or at one pull request's row, and no inbox hash is read as a layout", () => {
