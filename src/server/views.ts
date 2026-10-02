@@ -98,7 +98,7 @@ export class Views {
 	}
 
 	/** An out-of-band line for session `instanceId` (`agentId` null) or one of its subagents. */
-	note(instanceId: string, agentId: string | null, level: "warning" | "error", text: string): void {
+	note(instanceId: string, agentId: string | null, level: "info" | "warning" | "error", text: string): void {
 		this.#tails.get(viewKey({ kind: "live", instanceId, agentId }))?.live(t => t.note(level, text));
 	}
 }

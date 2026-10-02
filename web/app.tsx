@@ -257,7 +257,7 @@ export function App() {
 			</SidebarInset>
 			{subagentsHost && (
 				<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-					<SubagentsSidebar host={subagentsHost} open={layout.panes} onOpen={open} />
+					<SubagentsSidebar host={subagentsHost} open={layout.panes} onOpen={open} onCancel={view => send({ t: "cancel-agent", view })} />
 				</DashboardSidebar>
 			)}
 			<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />

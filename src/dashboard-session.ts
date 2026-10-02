@@ -32,7 +32,11 @@ interface RpcAgent {
 	sessionFile: string | null;
 }
 
-export type DashboardUpdate = LiveUpdate | { kind: "exited" };
+export type DashboardUpdate =
+	| LiveUpdate
+	| { kind: "exited" }
+	/** omp appended to `path` without the lock churn that the file watcher reports on macOS, as a `!` command's record. */
+	| { kind: "written"; path: string };
 
 /** Same shape as a Collab instance id, so the page's hash routing treats both alike. */
 export const newInstanceId = (): string => randomBytes(8).toString("hex");
@@ -90,6 +94,8 @@ export class DashboardSession implements LiveSession {
 	readonly #emit: (update: DashboardUpdate) => void;
 	#refreshing = false;
 	#refreshAgain = false;
+	/** Whether the last prompt the user sent was a `/` command, whose `command_output` frames the conversation shows. */
+	#userCommand = false;
 
 	private constructor(
 		instanceId: string,
@@ -165,8 +171,13 @@ export class DashboardSession implements LiveSession {
 		const requests = new PendingRequests(() => emit({ kind: "roster" }));
 		let session: DashboardSession | undefined;
 		const child = await startRpc(cwd, frame => {
-			if (frame.type === "session_info_update") {
+			if (frame.type === "session_info_update" || frame.type === "config_update") {
 				if (session) session.#refresh();
+				return;
+			}
+			if (frame.type === "command_output") {
+				// The bare `/rename` that titles a session prints too; only a command the user typed shows its output.
+				if (session && session.#userCommand && typeof frame.text === "string") emit({ kind: "note", agentId: null, level: "info", text: frame.text });
 				return;
 			}
 			const change = parseRpcRequest(frame, Date.now());
@@ -248,8 +259,8 @@ export class DashboardSession implements LiveSession {
 			parentId: null,
 			status: agent.status,
 			activity: agent.activity,
-			// omp's RPC mode has no command that reaches a subagent.
-			canMessage: false,
+			// omp's `steer_subagent` reaches only a running subagent.
+			canMessage: agent.status === "running",
 			queue: EMPTY_QUEUE,
 		}));
 	}
@@ -258,11 +269,35 @@ export class DashboardSession implements LiveSession {
 		return this.#agents.get(agentId)?.sessionFile ?? null;
 	}
 
-	/** omp queues a prompt sent while a turn runs, as a steer or a follow-up, and starts one sent while idle. */
+	/**
+	 * omp queues a prompt sent while a turn runs, as a steer or a follow-up, and starts one sent while idle. Its prompt runs
+	 * the session's own slash-command and skill pipeline. A subagent takes every message as a steer: omp reaches only a
+	 * running one, so a follow-up held until it stopped could never be sent.
+	 */
 	async prompt(agentId: string | null, text: string, delivery: Delivery): Promise<void> {
-		// omp's RPC mode has no command that reaches a subagent. Its prompt runs the session's own slash-command and skill pipeline.
-		if (agentId !== null) return;
+		if (agentId !== null) {
+			await this.#child.client.steerSubagent(agentId, text).catch((err: unknown) => this.#fail("Message failed", err, agentId));
+			return;
+		}
+		if (text.startsWith("!")) return this.#shell(text);
+		this.#userCommand = text.startsWith("/");
 		await this.#child.client.prompt(text, undefined, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
+	}
+
+	/** A `!` command, which omp runs in the session's directory and records in its file for the agent to see. */
+	async #shell(text: string): Promise<void> {
+		if (text.startsWith("!!")) throw new Error("omp's RPC mode cannot keep a command's output out of context. Use ! or the omp terminal.");
+		// omp writes a fresh session's file only with its first reply, so a command run before it would show nowhere.
+		if (!this.sessionFile || !statSync(this.sessionFile, { throwIfNoEntry: false })) {
+			throw new Error("omp saves this session with its first reply. Send a prompt before a ! command.");
+		}
+		const command = text.slice(1).trim();
+		if (!command) throw new Error("! needs a command.");
+		const file = this.sessionFile;
+		await this.#child.client.bash(command).then(
+			() => this.#emit({ kind: "written", path: file }),
+			(err: unknown) => this.#fail("Shell command failed", err),
+		);
 	}
 
 	/** Whether omp still held the message; it may have delivered it since the page saw the queue. */
@@ -278,6 +313,11 @@ export class DashboardSession implements LiveSession {
 
 	abort(): void {
 		this.#child.client.abort().catch((err: unknown) => this.#fail("Stop failed", err));
+	}
+
+	cancelAgent(agentId: string): void {
+		if (this.#agents.get(agentId)?.status !== "running") return;
+		this.#child.client.cancelSubagent(agentId).catch((err: unknown) => this.#fail("Cancel failed", err, agentId));
 	}
 
 	async models(): Promise<ModelOption[]> {
@@ -304,8 +344,8 @@ export class DashboardSession implements LiveSession {
 		return this.#child.client.stop();
 	}
 
-	#fail(what: string, err: unknown): void {
-		this.#emit({ kind: "note", agentId: null, level: "error", text: `${what}: ${errorText(err)}` });
+	#fail(what: string, err: unknown, agentId: string | null = null): void {
+		this.#emit({ kind: "note", agentId, level: "error", text: `${what}: ${errorText(err)}` });
 	}
 
 	#onEvent(event: unknown): void {

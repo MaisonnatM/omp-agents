@@ -52,6 +52,12 @@ export interface RpcClient {
 	/** Payloads are the `task:subagent:lifecycle` / `task:subagent:progress` bus payloads. */
 	onSubagentLifecycle(listener: (payload: unknown) => void): () => void;
 	onSubagentProgress(listener: (payload: unknown) => void): () => void;
+	/** Messages a running subagent as its user; rejects when it is not running or refuses the message. */
+	steerSubagent(subagentId: string, message: string): Promise<void>;
+	/** Hard-stops a running subagent; `false` when it was not running. */
+	cancelSubagent(subagentId: string): Promise<boolean>;
+	/** Runs a user `!` command in the session's directory and records it in the session. */
+	bash(command: string): Promise<unknown>;
 }
 
 export interface RpcChild {
@@ -63,8 +69,8 @@ export interface RpcChild {
 	write(frame: object): void;
 }
 
-/** Frames `RpcClient` drops: dialogs, which it hands only to its own login flow, and title changes. */
-const UNROUTED_FRAMES: Record<string, true> = { extension_ui_request: true, session_info_update: true };
+/** Frames `RpcClient` drops: dialogs, which it hands only to its own login flow, title changes, and built-in slash commands' output and model switches. */
+const UNROUTED_FRAMES: Record<string, true> = { extension_ui_request: true, session_info_update: true, command_output: true, config_update: true };
 
 /**
  * Reads a copy of omp's stdout for {@link UNROUTED_FRAMES}, through omp's own JSONL reader and chunk decoder.

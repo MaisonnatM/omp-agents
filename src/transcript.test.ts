@@ -195,4 +195,21 @@ describe("Transcript", () => {
 
 		expect(t.items()).toEqual([{ id: "e1", kind: "user", text: "fix the scroll", skill: "mma-mode", from: null, entryId: null }]);
 	});
+
+	test("a ! command renders as the user's command and output, fenced past any backticks in it, with its failure", () => {
+		const t = new Transcript();
+		const run = (timestamp: number, extra: Record<string, unknown>) =>
+			t.applyEntry({ type: "message", id: `e${timestamp}`, message: { role: "bashExecution", timestamp, command: "ls", output: "a\n", exitCode: 0, ...extra } });
+		run(1, {});
+		run(2, { command: "echo '```'", output: "```\n", exitCode: 0 });
+		run(3, { output: "", exitCode: 2 });
+		run(4, { output: "", exitCode: undefined, cancelled: true });
+
+		expect(t.items().map(item => item.kind === "user" && item.text)).toEqual([
+			"```sh\n$ ls\na\n```",
+			"````sh\n$ echo '```'\n```\n````",
+			"```sh\n$ ls\n```\n\nExit code 2.",
+			"```sh\n$ ls\n```\n\nCancelled.",
+		]);
+	});
 });

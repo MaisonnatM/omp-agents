@@ -1,6 +1,6 @@
-import { ExternalLink } from "lucide-react";
-import type { RosterHost, View } from "../../src/shared";
-import { MenuLinkItem } from "@/components/ui/menu";
+import { CircleStop, ExternalLink } from "lucide-react";
+import type { LiveView, RosterHost, View } from "../../src/shared";
+import { MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton } from "@/components/ui/sidebar";
 import { hostLabel, modeOf } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
@@ -17,10 +17,13 @@ interface SubagentsSidebarProps {
 	/** Views on screen, highlighted in the list. */
 	open: View[];
 	onOpen: (view: View, mode: OpenMode) => void;
+	/** Stop a running subagent for good, leaving the session's turn running. */
+	onCancel: (view: LiveView & { agentId: string }) => void;
 }
 
 /** The right sidebar's content: the subagents of the focused live session, nested by parent. */
-export function SubagentsSidebar({ host, open, onOpen }: SubagentsSidebarProps) {
+export function SubagentsSidebar({ host, open, onOpen, onCancel }: SubagentsSidebarProps) {
+	const writable = host.control.phase === "live" && !host.control.readOnly;
 	const label = hostLabel(host);
 	const count = host.agents.length;
 	return (
@@ -36,7 +39,7 @@ export function SubagentsSidebar({ host, open, onOpen }: SubagentsSidebarProps) 
 					{count > 0 && (
 						<SidebarMenu aria-label={`Subagents of ${label}`}>
 							{agentTree(host.agents).map(({ agent, depth }) => {
-								const view: View = { kind: "live", instanceId: host.instanceId, agentId: agent.id };
+								const view = { kind: "live", instanceId: host.instanceId, agentId: agent.id } as const;
 								const isOpen = open.some(pane => sameView(pane, view));
 								return (
 									<RowMenu
@@ -47,11 +50,22 @@ export function SubagentsSidebar({ host, open, onOpen }: SubagentsSidebarProps) 
 										onOpen={onOpen}
 										style={{ marginInlineStart: depth * NEST_INDENT }}
 										items={
-											// The row is a link, so the menu keeps what the browser's own would offer for it.
-											<MenuLinkItem href={hashForView(view)} target="_blank">
-												<ExternalLink />
-												Open in new tab
-											</MenuLinkItem>
+											<>
+												{/* The row is a link, so the menu keeps what the browser's own would offer for it. */}
+												<MenuLinkItem href={hashForView(view)} target="_blank">
+													<ExternalLink />
+													Open in new tab
+												</MenuLinkItem>
+												{writable && agent.status === "running" && (
+													<>
+														<MenuSeparator />
+														<MenuItem variant="destructive" onClick={() => onCancel(view)}>
+															<CircleStop />
+															Cancel subagent
+														</MenuItem>
+													</>
+												)}
+											</>
 										}
 									>
 										<SidebarMenuButton asChild isActive={isOpen} className="h-auto min-h-8 py-1">

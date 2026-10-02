@@ -133,6 +133,10 @@ export function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 			const answer = parseAnswer(value.answer);
 			return typeof instanceId === "string" && typeof requestId === "string" && answer ? { t: "answer", instanceId, requestId, answer } : null;
 		}
+		case "cancel-agent": {
+			const view = parseLiveView(value.view);
+			return view?.agentId ? { t: "cancel-agent", view: { ...view, agentId: view.agentId } } : null;
+		}
 		default:
 			return null;
 	}

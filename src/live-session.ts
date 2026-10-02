@@ -12,7 +12,7 @@ export type LiveUpdate =
 	/** A live agent event of the session; it streams what the session file does not hold yet. */
 	| { kind: "event"; event: unknown }
 	/** An out-of-band line for the session (`agentId` null) or one of its subagents. */
-	| { kind: "note"; agentId: string | null; level: "warning" | "error"; text: string };
+	| { kind: "note"; agentId: string | null; level: "info" | "warning" | "error"; text: string };
 
 export interface LiveSession {
 	/** Collab's instance id for a terminal session, a random one for a session this dashboard started. */
@@ -31,6 +31,8 @@ export interface LiveSession {
 	/** Take a queued message back; whether the session still held it. */
 	dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean>;
 	abort(): void;
+	/** Hard-stop a running subagent, as omp's Agent Hub kill does; the session's own turn goes on. */
+	cancelAgent(agentId: string): void;
 	/** Stop the session as closing its terminal would; a terminal session's file stays resumable. */
 	end(): Promise<void>;
 	/** Reply to one of the session's pending questions; a reply to a question already gone is dropped. */

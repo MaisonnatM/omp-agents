@@ -227,7 +227,12 @@ export const exitDiagnostics = await load<ExitDiagnosticsModule>(join(srcDir, "s
 });
 export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), { getSessionsDir: "function", getAgentDir: "function" });
 
-export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc-client.ts"), { RpcClient: "function" });
+export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc-client.ts"), {
+	RpcClient: "function",
+	"RpcClient.prototype.steerSubagent": "function",
+	"RpcClient.prototype.cancelSubagent": "function",
+	"RpcClient.prototype.bash": "function",
+});
 export const rpcFrames = await load<RpcFrameModule>(join(srcDir, "modes", "rpc", "rpc-frame.ts"), { RpcFrameDecoder: "function" });
 export const utils = await load<UtilsModule>(join(utilsSrc, "index.ts"), { "ptree.spawn": "function", readJsonl: "function" });
 
