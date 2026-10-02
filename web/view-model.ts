@@ -305,29 +305,6 @@ export interface InboxTarget {
 /** The id of a section on the inbox page. It holds no spaces, since `aria-controls` lists ids separated by spaces. */
 export const inboxSectionId = ({ repo, title }: InboxTarget): string => `inbox-${repo}-${title.toLowerCase().replaceAll(" ", "-")}`;
 
-/** A pull request link from GitHub or Graphite: `owner`, `repo`, `number`. */
-const PR_LINK = /(?:github\.com\/([\w.-]+)\/([\w.-]+)\/pull|app\.graphite\.com\/github\/pr\/([\w.-]+)\/([\w.-]+))\/(\d+)/;
-
-/**
- * Whether a past session matches the sidebar filter. A pasted PR link matches the sessions that
- * submitted or worked on that PR; `#6596` or `6596` also matches any PR with that number; any other text
- * matches the title or directory.
- */
-export function matchesFilter(session: PastSession, label: string, query: string): boolean {
-	const text = query.trim().toLowerCase();
-	if (!text) return true;
-	const link = PR_LINK.exec(text);
-	if (link) {
-		const [owner, repo] = link[1] ? [link[1], link[2]] : [link[3], link[4]];
-		return session.pullRequests.some(
-			pr => pr.number === Number(link[5]) && pr.owner.toLowerCase() === owner && pr.repo.toLowerCase() === repo,
-		);
-	}
-	const number = /^#?(\d+)$/.exec(text)?.[1];
-	if (number && session.pullRequests.some(pr => pr.number === Number(number))) return true;
-	return label.toLowerCase().includes(text) || session.cwdDisplay.toLowerCase().includes(text);
-}
-
 /** Words that keep their own casing in a label. */
 const BRAND_WORDS: Record<string, string> = {
 	deepseek: "DeepSeek",

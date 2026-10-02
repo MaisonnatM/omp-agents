@@ -1,7 +1,11 @@
 import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu"
+import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 
 import { cn } from "@/lib/utils"
+
+// A context menu and a dropdown menu share Base UI's menu parts, so the items
+// below render in either popup: one item tree can back both openers.
 
 function ContextMenu({
   ...props
@@ -33,6 +37,9 @@ function ContextMenuTrigger({
   )
 }
 
+const popupClassName =
+  "max-h-(--available-height) min-w-48 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-hidden"
+
 function ContextMenuContent({
   className,
   ...props
@@ -42,10 +49,7 @@ function ContextMenuContent({
       <ContextMenuPrimitive.Positioner className="z-50 outline-hidden">
         <ContextMenuPrimitive.Popup
           data-slot="context-menu-content"
-          className={cn(
-            "max-h-(--available-height) min-w-48 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-hidden",
-            className
-          )}
+          className={cn(popupClassName, className)}
           {...props}
         />
       </ContextMenuPrimitive.Positioner>
@@ -53,19 +57,59 @@ function ContextMenuContent({
   )
 }
 
+function DropdownMenu({
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.Root>) {
+  return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+}
+
+function DropdownMenuTrigger({
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.Trigger>) {
+  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
+}
+
+function DropdownMenuContent({
+  className,
+  side = "bottom",
+  align = "start",
+  sideOffset = 4,
+  alignOffset = 0,
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.Popup> &
+  Pick<React.ComponentProps<typeof MenuPrimitive.Positioner>, "side" | "align" | "sideOffset" | "alignOffset">) {
+  return (
+    <MenuPrimitive.Portal>
+      <MenuPrimitive.Positioner
+        className="z-50 outline-hidden"
+        side={side}
+        align={align}
+        sideOffset={sideOffset}
+        alignOffset={alignOffset}
+      >
+        <MenuPrimitive.Popup
+          data-slot="dropdown-menu-content"
+          className={cn(popupClassName, className)}
+          {...props}
+        />
+      </MenuPrimitive.Positioner>
+    </MenuPrimitive.Portal>
+  )
+}
+
 const itemClassName =
   "relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
 
-function ContextMenuItem({
+function MenuItem({
   className,
   variant = "default",
   ...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.Item> & {
+}: React.ComponentProps<typeof MenuPrimitive.Item> & {
   variant?: "default" | "destructive"
 }) {
   return (
-    <ContextMenuPrimitive.Item
-      data-slot="context-menu-item"
+    <MenuPrimitive.Item
+      data-slot="menu-item"
       data-variant={variant}
       className={cn(
         itemClassName,
@@ -77,14 +121,14 @@ function ContextMenuItem({
   )
 }
 
-function ContextMenuLinkItem({
+function MenuLinkItem({
   className,
   closeOnClick = true,
   ...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.LinkItem>) {
+}: React.ComponentProps<typeof MenuPrimitive.LinkItem>) {
   return (
-    <ContextMenuPrimitive.LinkItem
-      data-slot="context-menu-link-item"
+    <MenuPrimitive.LinkItem
+      data-slot="menu-link-item"
       closeOnClick={closeOnClick}
       className={cn(itemClassName, className)}
       {...props}
@@ -92,26 +136,26 @@ function ContextMenuLinkItem({
   )
 }
 
-function ContextMenuSeparator({
+function MenuSeparator({
   className,
   ...props
-}: React.ComponentProps<typeof ContextMenuPrimitive.Separator>) {
+}: React.ComponentProps<typeof MenuPrimitive.Separator>) {
   return (
-    <ContextMenuPrimitive.Separator
-      data-slot="context-menu-separator"
+    <MenuPrimitive.Separator
+      data-slot="menu-separator"
       className={cn("-mx-1 my-1 h-px bg-border", className)}
       {...props}
     />
   )
 }
 
-function ContextMenuShortcut({
+function MenuShortcut({
   className,
   ...props
 }: React.ComponentProps<"span">) {
   return (
     <span
-      data-slot="context-menu-shortcut"
+      data-slot="menu-shortcut"
       className={cn("ml-auto pl-4 text-xs text-muted-foreground", className)}
       {...props}
     />
@@ -122,8 +166,11 @@ export {
   ContextMenu,
   ContextMenuTrigger,
   ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuLinkItem,
-  ContextMenuSeparator,
-  ContextMenuShortcut,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  MenuItem,
+  MenuLinkItem,
+  MenuSeparator,
+  MenuShortcut,
 }
