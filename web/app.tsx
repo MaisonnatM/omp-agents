@@ -29,6 +29,7 @@ import {
 } from "./routing";
 import { defaultCwd, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
+import { startOf } from "./starts";
 import { useDashboard, useHash } from "./use-dashboard";
 
 /**
@@ -71,7 +72,10 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 }
 
 export function App() {
-	const { state, send, open, focus, show, openNewSession, create, fork, resume } = useDashboard();
+	const { state, send, open, focus, show, openNewSession, start } = useDashboard();
+	const launch = startOf(state.starts, "new");
+	const fork = startOf(state.starts, "fork");
+	const resume = startOf(state.starts, "resume");
 	const sidebars = useSidebarPanels();
 	const hash = useHash();
 	const settings = settingsFromHash(hash);
@@ -148,11 +152,11 @@ export function App() {
 		main = (
 			<NewSession
 				cwd={cwd}
-				launch={state.launch}
+				launch={launch}
 				connected={state.connected}
 				completions={state.newSessionCompletions}
 				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
-				onStart={prompt => create(cwd, prompt)}
+				onStart={prompt => start({ kind: "new", cwd, prompt })}
 			/>
 		);
 	} else if (settings) {
@@ -189,11 +193,10 @@ export function App() {
 						session={pane.kind === "past" ? state.past.find(s => s.sessionId === pane.sessionId) ?? null : null}
 						initialDraft={state.draft && sameView(state.draft.view, pane) ? state.draft.text : ""}
 						models={pane.kind === "live" ? state.models.get(pane.instanceId) ?? null : null}
-						fork={state.fork}
-						resume={state.resume}
+						fork={fork}
+						resume={resume}
 						send={send}
-						forkSession={fork}
-						resumeSession={resume}
+						startSession={start}
 						focus={focus}
 						onEnd={endHost}
 						onLayout={onPaneLayout}
@@ -236,11 +239,11 @@ export function App() {
 					onPickProject={pickProject}
 					onOpen={open}
 					onNewSession={openNewSession}
-					resume={state.resume}
+					resume={resume}
 					onResume={sessionId => {
 						// The pane shows the resume's progress and failure, and the live session takes it over.
 						open({ kind: "past", sessionId }, "replace");
-						resume(sessionId);
+						start({ kind: "resume", sessionId });
 					}}
 					onEnd={endHost}
 					onShowShortcuts={() => setShortcutsOpen(true)}

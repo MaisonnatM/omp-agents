@@ -36,7 +36,7 @@ import { age, hostLabel, modeOf, pastLabel, projectName, SPLIT_CLICK } from "../
 import { hashForInbox, hashForSettings, type OpenMode, sameView } from "../routing";
 import { workspaces } from "../sessions";
 import { useShortcuts } from "../shortcuts";
-import type { Resume } from "../use-dashboard";
+import type { StartOf } from "../starts";
 import { useInbox } from "../use-inbox";
 import { StatusDot, statusLabel } from "./status-dot";
 
@@ -279,7 +279,7 @@ interface RosterProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** Open the new-session draft; no omp starts until its first message. */
 	onNewSession: () => void;
-	resume: Resume;
+	resume: StartOf<"resume"> | null;
 	/** Continue past session `sessionId`, in the pane that shows it. */
 	onResume: (sessionId: string) => void;
 	/** End running session `instanceId`, as its pane's End session does. */
@@ -431,9 +431,9 @@ export function Roster({
 										items={
 											<>
 												{/* One resume runs at a time, as the pane's Resume button allows. */}
-												<MenuItem disabled={resume.phase === "resuming"} onClick={() => onResume(session.sessionId)}>
+												<MenuItem disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
 													<Play />
-													{resume.phase === "resuming" && resume.sessionId === session.sessionId ? "Resuming…" : "Resume"}
+													{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
 												</MenuItem>
 												<SessionItems row={session} />
 											</>

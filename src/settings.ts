@@ -7,18 +7,8 @@ import { agentDir, assertRetryValue, expandDefaultRetryFallbackChains, loadOmpCo
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
 import { listModels } from "./omp/models";
 import { displayPath, HOME } from "./paths";
+import { Rejected } from "./server/http";
 import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared";
-
-/** A request the server refuses, with the HTTP status it answers. `conflict`: the file changed on disk since it was read. */
-export class Rejected extends Error {
-	constructor(
-		readonly status: 400 | 404 | 409,
-		message: string,
-		readonly conflict = false,
-	) {
-		super(message);
-	}
-}
 
 /**
  * Every role omp knows a model or a chain for, in config order, with the fallbacks omp walks for it.

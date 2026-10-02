@@ -4,6 +4,7 @@ import type { RosterHost, PastSession, View, ModelOption, Delivery, MessageQueue
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePane } from "../pane-store";
+import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
 import type { Dashboard } from "../use-dashboard";
 import { Conversation, PastConversation } from "./conversation";
@@ -21,11 +22,10 @@ interface PaneProps {
 	session: PastSession | null;
 	initialDraft: string;
 	models: { models: ModelOption[]; error: string | null } | null;
-	fork: Dashboard["state"]["fork"];
-	resume: Dashboard["state"]["resume"];
+	fork: StartOf<"fork"> | null;
+	resume: StartOf<"resume"> | null;
 	send: Dashboard["send"];
-	forkSession: Dashboard["fork"];
-	resumeSession: Dashboard["resume"];
+	startSession: Dashboard["start"];
 	focus: Dashboard["focus"];
 	onEnd: (instanceId: string) => void;
 	onLayout: (index: number, kind: "max" | "close") => void;
@@ -40,11 +40,11 @@ const paneArea = (index: number, count: number): string =>
 /** Its own external-store subscription means another pane's token never asks this pane to render. */
 export const Pane = memo(function Pane({
 	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models,
-	fork, resume, send, forkSession, resumeSession, focus, onEnd, onLayout, toggleRight, rightOpen,
+	fork, resume, send, startSession, focus, onEnd, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
 	const { items, completions, dequeued } = usePane(view);
-	const onFork = useCallback((itemId: string, point: ForkPoint) => forkSession(view, itemId, point), [forkSession, view]);
-	const onResume = useCallback(() => view.kind === "past" && resumeSession(view.sessionId), [resumeSession, view]);
+	const onFork = useCallback((itemId: string, point: ForkPoint) => startSession({ kind: "fork", view, itemId, point }), [startSession, view]);
+	const onResume = useCallback(() => view.kind === "past" && startSession({ kind: "resume", sessionId: view.sessionId }), [startSession, view]);
 	const onMaximize = useCallback(() => onLayout(index, "max"), [index, onLayout]);
 	const onClose = useCallback(() => onLayout(index, "close"), [index, onLayout]);
 	const onFocus = useCallback(() => !focused && focus(index), [focus, focused, index]);

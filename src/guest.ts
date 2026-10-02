@@ -8,22 +8,19 @@
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { expandPrompt } from "./commands";
 import { errorText, isObject, nonEmptyStr } from "./json";
+import type { LiveSession, LiveUpdate } from "./live-session";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp/collab";
-import type { AgentRow, AgentStatus, ContextUsage, ControlPhase, Delivery, MessageQueue, UserAnswer, UserRequest } from "./shared";
+import { displayPath } from "./paths";
+import type { AgentRow, AgentStatus, ContextUsage, ControlPhase, Delivery, HostStatus, LinkedPullRequest, MessageQueue, RosterHost, UserAnswer, UserRequest } from "./shared";
 import { oneLine } from "./transcript";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
 
-export type LiveUpdate =
-	/** Its roster row changed: control phase, subagents, or what a subagent is doing. */
-	| { kind: "roster" }
-	/** A live agent event of the session; it streams what the session file does not hold yet. */
-	| { kind: "event"; event: unknown }
-	/** An out-of-band line for the session (`agentId` null) or one of its subagents. */
-	| { kind: "note"; agentId: string | null; level: "warning" | "error"; text: string };
-
 const DISPLAY_NAME = "omp-agents";
 const LINK_ATTEMPTS = 3;
+/** Wait this long before rejoining a host whose room dropped us while it stays listed. */
+const REJOIN_MS = 5000;
 
 const AGENT_STATUSES: Record<string, AgentStatus> = { running: "running", idle: "idle", parked: "parked", aborted: "aborted" };
 
@@ -131,7 +128,14 @@ async function openFreshRoom(host: HostSnapshot): Promise<Room> {
 	}
 }
 
-export class SessionGuest {
+function statusOf(host: HostSnapshot): HostStatus {
+	if (host.inputRequired) return "needs-input";
+	if (host.busy === null) return "unknown";
+	return host.busy ? "working" : "idle";
+}
+
+/** A terminal session, joined through its Collab room. Its registry row is the guest's snapshot of it. */
+export class SessionGuest implements LiveSession {
 	readonly instanceId: string;
 	/** Room generation this guest is joined to; `null` until the link resolves. */
 	generation: number | null = null;
@@ -141,12 +145,14 @@ export class SessionGuest {
 	/** The host's last status-line snapshot; `null` until the welcome arrives. */
 	state: HostState | null = null;
 
+	/** The registry's latest listing of this session, replaced on every poll. */
+	#host: HostSnapshot;
 	#socket: CollabSocket | null = null;
 	#readOnly = true;
 	#closed = false;
 	#agents: HostAgent[] = [];
 	#activity = new Map<string, string>();
-	/** Transcripts found away from where {@link agentFile} expects them, and the agents already looked for. */
+	/** Transcripts found away from where {@link #agentFile} expects them, and the agents already looked for. */
 	#foundFiles = new Map<string, string>();
 	#searched = new Set<string>();
 	readonly #emit: (update: LiveUpdate) => void;
@@ -166,12 +172,67 @@ export class SessionGuest {
 
 	constructor(host: HostSnapshot, emit: (update: LiveUpdate) => void) {
 		this.instanceId = host.instanceId;
+		this.#host = host;
 		this.#emit = emit;
 		void this.#start(host);
 	}
 
+	get cwd(): string {
+		return this.#host.cwd;
+	}
+
+	get sessionId(): string {
+		return this.#host.sessionId;
+	}
+
 	get canWrite(): boolean {
 		return this.control.phase === "live" && !this.#readOnly;
+	}
+
+	row(pullRequests: LinkedPullRequest[]): RosterHost {
+		const host = this.#host;
+		return {
+			source: "terminal",
+			instanceId: host.instanceId,
+			pid: host.pid,
+			sessionId: host.sessionId,
+			sessionName: host.sessionName,
+			cwd: host.cwd,
+			cwdDisplay: displayPath(host.cwd),
+			// The room's status-line snapshot, else the registry row until the guest is welcomed.
+			model: this.state?.model ?? (host.model ? `${host.model.provider}/${host.model.id}` : null),
+			thinkingLevel: this.state?.thinkingLevel ?? null,
+			context: this.state?.context ?? null,
+			startedAt: host.startedAt,
+			participants: host.participants,
+			relayConnected: host.relayConnected,
+			status: statusOf(host),
+			control: this.control,
+			agents: this.agents(),
+			pullRequests,
+			requests: this.requests(),
+			queue: this.queue(null),
+		};
+	}
+
+	transcriptPath(agentId: string | null, savedFile: (sessionId: string) => string | null): string | null {
+		const sessionFile = savedFile(this.#host.sessionId);
+		if (!sessionFile || !agentId) return sessionFile;
+		return this.#agentFile(sessionFile, agentId);
+	}
+
+	follow(listed: ReadonlyMap<string, HostSnapshot>): boolean {
+		const host = listed.get(this.instanceId);
+		if (!host) {
+			this.disconnect("This session is no longer running.");
+			return false;
+		}
+		if (this.generation !== null && this.generation !== host.generation) {
+			this.disconnect("The session switched rooms; rejoining.");
+			return false;
+		}
+		this.#host = host;
+		return this.endedAt === null || Date.now() - this.endedAt <= REJOIN_MS;
 	}
 
 	agents(): AgentRow[] {
@@ -204,7 +265,7 @@ export class SessionGuest {
 	 * started in; when the expected file is missing, the guest looks for it among the
 	 * project's sessions and reports a roster change once found.
 	 */
-	agentFile(sessionFile: string, agentId: string): string | null {
+	#agentFile(sessionFile: string, agentId: string): string | null {
 		const found = this.#foundFiles.get(agentId);
 		if (found) return found;
 		const byId = new Map(this.#agents.filter(agent => !agent.isMain).map(agent => [agent.id, agent]));
@@ -235,6 +296,12 @@ export class SessionGuest {
 		this.#emit({ kind: "roster" });
 	}
 
+	/** Prepare `text` as the terminal would, expanding a skill or file command, then {@link send} it. */
+	async prompt(agentId: string | null, text: string, delivery: Delivery): Promise<void> {
+		const payload = await expandPrompt(this.instanceId, this.#host.cwd, text, agentId ? "subagent" : "session");
+		this.send(agentId, { text, payload }, delivery);
+	}
+
 	/**
 	 * Prompt the main agent (`agentId` null) or chat to a subagent. The host steers a running agent, prompts an idle
 	 * one, and revives a parked subagent. A follow-up waits here while the agent's turn runs.
@@ -253,8 +320,12 @@ export class SessionGuest {
 		}
 	}
 
-	/** Take a held follow-up back. False when it is no longer held: its turn ended and the guest sent it. */
-	dequeue(agentId: string | null, text: string): boolean {
+	/**
+	 * Take a held follow-up back. False when it is no longer held: its turn ended and the guest sent it. Collab shows no
+	 * guest the host's queue, so a terminal session's queue holds only this guest's own follow-ups.
+	 */
+	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean> {
+		if (queue !== "followUp") return false;
 		const key = agentId ?? "";
 		const held = this.#followUps.get(key) ?? [];
 		const index = held.findIndex(message => message.text === text);
@@ -301,8 +372,27 @@ export class SessionGuest {
 		this.#socket?.send({ t: "ui-response", reqId: Number(requestId), value: answer.kind === "value" ? answer.value : undefined });
 	}
 
+	/**
+	 * Stop the terminal session's omp as closing its terminal would; it leaves the registry on exit, and its file stays
+	 * resumable. A room shared read-only grants no control, ending it included.
+	 */
+	async end(): Promise<void> {
+		const { pid } = this.#host;
+		// `kill` with 0, 1, or a negative pid signals process groups or every process; only one omp process is meant.
+		if (!this.canWrite || !Number.isInteger(pid) || pid <= 1 || pid === process.pid) return;
+		try {
+			process.kill(pid, "SIGTERM");
+		} catch {
+			// The process already exited; the next registry poll drops it.
+		}
+	}
+
+	async dispose(): Promise<void> {
+		this.disconnect("Dashboard shut down.");
+	}
+
 	/** Terminal: the host vanished or rotated rooms, the relay gave up, or the dashboard shut down. */
-	end(reason: string): void {
+	disconnect(reason: string): void {
 		if (this.#closed) return;
 		this.#closed = true;
 		this.endedAt = Date.now();
@@ -323,7 +413,7 @@ export class SessionGuest {
 		try {
 			room = await openFreshRoom(host);
 		} catch (err) {
-			this.end(errorText(err));
+			this.disconnect(errorText(err));
 			return;
 		}
 		if (this.#closed) return;
@@ -337,7 +427,7 @@ export class SessionGuest {
 		socket.onFrame = frame => this.#onFrame(frame);
 		socket.onClose = (reason, willReconnect) => {
 			if (willReconnect) this.#setControl({ phase: "reconnecting", reason });
-			else this.end(reason);
+			else this.disconnect(reason);
 		};
 		socket.connect();
 	}
@@ -404,7 +494,7 @@ export class SessionGuest {
 				return;
 			}
 			case "bye":
-				this.end(`Host ended the room: ${String(frame.reason)}`);
+				this.disconnect(`Host ended the room: ${String(frame.reason)}`);
 				return;
 			default:
 				return;

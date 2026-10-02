@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { agentDir } from "./omp/config";
-import { loadOmpSettings, parseRoutingEdit, Rejected, routeRoles, saveOmpFile } from "./settings";
+import { Rejected } from "./server/http";
+import { loadOmpSettings, parseRoutingEdit, routeRoles, saveOmpFile } from "./settings";
 import type { CatalogModel, RoutingEdit } from "./shared";
 
 describe("routeRoles", () => {

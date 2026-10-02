@@ -1,5 +1,5 @@
 /** omp's RPC mode: a session this dashboard starts as a child process and drives through omp's own `RpcClient`. */
-import { isObject } from "../json";
+import { errorText, isObject } from "../json";
 import type { Frame } from "./collab";
 import { ompCommand } from "./install";
 import { type RpcProcess, rpc, rpcFrames, utils } from "./modules";
@@ -66,13 +66,19 @@ export interface RpcChild {
 /**
  * omp's `RpcClient` parses `extension_ui_request` frames but hands them only to its own login
  * flow, so this reads a copy of omp's stdout for them, through omp's own JSONL reader and chunk decoder.
+ * A listener that throws loses its frame, not the dialogs and cancels that follow it.
  */
 async function readUiRequests(stdout: ReadableStream<Uint8Array>, onUiRequest: (frame: Record<string, unknown>) => void): Promise<void> {
 	const decoder = new rpcFrames.RpcFrameDecoder();
 	try {
 		for await (const line of utils.readJsonl(stdout)) {
 			const frame = decoder.push(line);
-			if (isObject(frame) && frame.type === "extension_ui_request") onUiRequest(frame);
+			if (!isObject(frame) || frame.type !== "extension_ui_request") continue;
+			try {
+				onUiRequest(frame);
+			} catch (err) {
+				console.error(`omp-agents: dropped an omp dialog: ${errorText(err)}`);
+			}
 		}
 	} catch {
 		// The client reads the other copy and reports a broken stream.

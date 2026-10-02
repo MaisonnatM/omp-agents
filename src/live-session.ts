@@ -1,0 +1,43 @@
+/** What the server asks of a running session, whether it is a terminal session it joined or one it started itself. */
+import type { HostSnapshot } from "./omp/collab";
+import type { Delivery, LinkedPullRequest, MessageQueue, ModelOption, RosterHost, UserAnswer } from "./shared";
+
+/** What a live session reports as it runs. */
+export type LiveUpdate =
+	/** Its roster row changed: control phase, subagents, or what a subagent is doing. */
+	| { kind: "roster" }
+	/** A live agent event of the session; it streams what the session file does not hold yet. */
+	| { kind: "event"; event: unknown }
+	/** An out-of-band line for the session (`agentId` null) or one of its subagents. */
+	| { kind: "note"; agentId: string | null; level: "warning" | "error"; text: string };
+
+export interface LiveSession {
+	/** Collab's instance id for a terminal session, a random one for a session this dashboard started. */
+	readonly instanceId: string;
+	readonly cwd: string;
+	readonly sessionId: string;
+	/** The session's roster row; `pullRequests` is what the pull-request index knows of it. */
+	row(pullRequests: LinkedPullRequest[]): RosterHost;
+	/**
+	 * The file the main agent (`agentId` null) or a subagent writes, or `null` while it is not known.
+	 * `savedFile` resolves a session id to its file among the files on disk.
+	 */
+	transcriptPath(agentId: string | null, savedFile: (sessionId: string) => string | null): string | null;
+	/** Send `text` to the main agent or chat to a subagent; `delivery` applies while a turn runs. Rejects when the text cannot be prepared. */
+	prompt(agentId: string | null, text: string, delivery: Delivery): Promise<void>;
+	/** Take a queued message back; whether the session still held it. */
+	dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean>;
+	abort(): void;
+	/** Stop the session as closing its terminal would; a terminal session's file stays resumable. */
+	end(): Promise<void>;
+	/** Reply to one of the session's pending questions; a reply to a question already gone is dropped. */
+	answer(requestId: string, answer: UserAnswer): void;
+	/** Follow the Collab registry's latest listing. `false` once the session should leave the roster. */
+	follow(listed: ReadonlyMap<string, HostSnapshot>): boolean;
+	/** Let go of the session as the dashboard shuts down: a terminal session keeps running, one this dashboard started stops. */
+	dispose(): Promise<void>;
+	/** Models the session can switch to; only a session this dashboard started offers them. */
+	models?(): Promise<ModelOption[]>;
+	setModel?(model: ModelOption): void;
+	setThinking?(level: string): void;
+}

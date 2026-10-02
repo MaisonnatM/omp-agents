@@ -2,14 +2,14 @@ import { useState } from "react";
 import { InputMessage } from "@/components/ui/input-message";
 import { projectName } from "../labels";
 import type { Completions } from "../pane-store";
-import type { Launch } from "../use-dashboard";
+import type { StartOf } from "../starts";
 import { useCompletion } from "./completion-popup";
 import { DirectCommandNote, directCommandOf, Header } from "./conversation";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
 	cwd: string;
-	launch: Launch;
+	launch: StartOf<"new"> | null;
 	connected: boolean;
 	/** The server's last answer to this draft's `complete`. */
 	completions: Completions | null;
@@ -26,13 +26,13 @@ interface NewSessionProps {
 export function NewSession({ cwd, launch, connected, completions, onComplete, onStart }: NewSessionProps) {
 	const [draft, setDraft] = useState("");
 	const completion = useCompletion({ draft, setDraft, completions, onComplete });
-	const starting = launch.phase === "starting";
+	const starting = launch?.phase === "starting";
 	const directCommand = directCommandOf(draft);
 	const name = projectName(cwd) ?? cwd;
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header title="New session" meta={<span title={cwd}>{cwd}</span>} status={starting ? "Starting omp…" : undefined} />
-			{launch.phase === "failed" && (
+			{launch?.phase === "failed" && (
 				<p role="alert" className="border-b border-border px-6 py-2 text-xs text-red-600 dark:text-red-400">
 					{launch.error}
 				</p>

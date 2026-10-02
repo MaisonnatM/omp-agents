@@ -16,8 +16,8 @@ import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { skillLabel } from "../labels";
 import { sameView } from "../routing";
+import type { StartOf } from "../starts";
 import { type ForkPoint, forkPoints, type ToolItem, toBlocks } from "../transcript-view";
-import type { Fork } from "../use-dashboard";
 import { MessageMarkdown } from "./message-markdown";
 
 const TOOL_ICON = { running: "loader", ok: "check", error: "x" } as const;
@@ -112,7 +112,7 @@ interface TranscriptProps {
 	view: View;
 	items: Item[];
 	working: boolean;
-	fork: Fork;
+	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
 }
 
@@ -145,7 +145,7 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 	const forks = useMemo(() => forkPoints(items), [items]);
 	const blocks = useMemo(() => toBlocks(items), [items]);
 	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
-	const here = fork.phase !== "idle" && sameView(fork.view, view) ? fork : null;
+	const here = fork && sameView(fork.op.view, view) ? fork : null;
 
 	return (
 		<MessageScroller className="flex-1">
@@ -171,7 +171,7 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 						}
 						const copyable = !(item.kind === "assistant" && item.streaming) && typedText(item).trim() !== "";
 						const point = forks.get(item.id);
-						const failed = here?.phase === "failed" && here.itemId === item.id ? here.error : null;
+						const failed = here?.phase === "failed" && here.op.itemId === item.id ? here.error : null;
 						return (
 							<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
 								<ChatMessage
@@ -184,8 +184,8 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 												{point && (
 													<ForkButton
 														point={point}
-														forking={here?.phase === "forking" && here.itemId === item.id}
-														disabled={fork.phase === "forking"}
+														forking={here?.phase === "starting" && here.op.itemId === item.id}
+														disabled={fork?.phase === "starting"}
 														onFork={() => onFork(item.id, point)}
 													/>
 												)}

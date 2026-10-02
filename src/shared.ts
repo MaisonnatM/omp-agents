@@ -281,10 +281,17 @@ export type ControlPhase =
 	| { phase: "reconnecting"; reason: string }
 	| { phase: "ended"; reason: string };
 
-/** `cwd` is the absolute directory the new session runs in. */
-export type LaunchResult = { ok: true; instanceId: string; cwd: string } | { ok: false; error: string };
-/** `prompt` is the text of the prompt forked at, for the composer. */
-export type ForkResult = { ok: true; instanceId: string; cwd: string; prompt: string } | { ok: false; error: string };
+/**
+ * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` as its first
+ * message; a fork holding the view's history before the user prompt `entryId`, its file left untouched; or past session
+ * `sessionId` continued in its own file, as `omp --resume` does.
+ */
+export type StartRequest =
+	| { kind: "new"; cwd: string; prompt: string }
+	| { kind: "fork"; view: View; entryId: string }
+	| { kind: "resume"; sessionId: string };
+/** `cwd` is the absolute directory the session runs in. `prompt` is the text of the prompt a fork branched at, for the composer; `null` for the other kinds. */
+export type StartResult = { ok: true; instanceId: string; cwd: string; prompt: string | null } | { ok: false; error: string };
 /** Where `/` and `@` resolve: an open live view's session, or the directory the new-session draft will start omp in. */
 export type CompletionScope = { kind: "live"; view: LiveView } | { kind: "new"; cwd: string };
 /** One `/` or `@` suggestion, with the composer text and caret it produces when accepted (omp's own insertion). */
@@ -430,12 +437,8 @@ export type ServerMsg =
 	| { t: "past"; sessions: PastSession[] }
 	/** `reset` replaces the view's transcript; otherwise `items` are upserts by id, new ids appended. */
 	| { t: "items"; view: View; reset: boolean; items: Item[] }
-	/** Answers this socket's `create` once the new session is ready, or once it failed to start. */
-	| { t: "created"; result: LaunchResult }
-	/** Answers this socket's `fork` once the forked session is ready, or once forking failed. */
-	| { t: "forked"; result: ForkResult }
-	/** Answers this socket's `resume` of past session `sessionId` once its omp is ready, or once resuming failed. */
-	| { t: "resumed"; sessionId: string; result: LaunchResult }
+	/** Answers this socket's `start` with `reqId` once the session is ready, or once starting it failed. */
+	| { t: "started"; reqId: number; result: StartResult }
 	/** Answers this socket's `complete` for `scope`; `reqId` counts per composer. */
 	| { t: "completions"; scope: CompletionScope; reqId: number; items: CompletionItem[]; error: string | null }
 	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */
@@ -455,14 +458,10 @@ export type ClientMsg =
 	| { t: "abort"; instanceId: string }
 	/** Suggestions for the composer text with the caret at `cursor`, resolved against the scope's cwd and its skills and commands. */
 	| { t: "complete"; reqId: number; scope: CompletionScope; text: string; cursor: number }
-	/** Start a new omp session in `cwd` (absolute, or starting with `~`) and send it `prompt` as its first message. */
-	| { t: "create"; cwd: string; prompt: string }
 	/** End a live session: stop the omp process this dashboard started, or send SIGTERM to a terminal session's omp. */
 	| { t: "end"; instanceId: string }
-	/** Start a dashboard session holding the view's history before the user prompt `entryId`. The view's file stays untouched. */
-	| { t: "fork"; view: View; entryId: string }
-	/** Start a dashboard session that continues past session `sessionId` in its own file, as `omp --resume` does. */
-	| { t: "resume"; sessionId: string }
+	/** Start a dashboard session. `reqId` counts per page and comes back with the answer. */
+	| ({ t: "start"; reqId: number } & StartRequest)
 	/** Models a session this dashboard started can switch to. */
 	| { t: "list-models"; instanceId: string }
 	/** Switch a session this dashboard started to another model. */

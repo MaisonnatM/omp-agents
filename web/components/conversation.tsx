@@ -24,7 +24,7 @@ import { hashForInbox } from "../routing";
 import { chordLabel, SHORTCUTS, useShortcuts } from "../shortcuts";
 import type { ForkPoint } from "../transcript-view";
 import type { Completions } from "../pane-store";
-import type { Fork, Resume } from "../use-dashboard";
+import type { StartOf } from "../starts";
 import { useCompletion } from "./completion-popup";
 import { ContextRing } from "./context-ring";
 import { Model, ModelPicker } from "./model-picker";
@@ -139,9 +139,9 @@ interface PastConversationProps {
 	/** The listed row, or `null` when the session is no longer listed. */
 	session: PastSession | null;
 	items: Item[];
-	fork: Fork;
+	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
-	resume: Resume;
+	resume: StartOf<"resume"> | null;
 	onResume: () => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
@@ -158,8 +158,8 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 	) : (
 		sessionId
 	);
-	const resuming = resume.phase === "resuming" && resume.sessionId === sessionId;
-	const failed = resume.phase === "failed" && resume.sessionId === sessionId ? resume.error : null;
+	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
+	const failed = resume?.phase === "failed" && resume.op.sessionId === sessionId ? resume.error : null;
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
@@ -169,7 +169,7 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 							variant="secondary"
 							size="compact"
 							onClick={onResume}
-							disabled={resume.phase === "resuming"}
+							disabled={resume?.phase === "starting"}
 							aria-busy={resuming || undefined}
 							title="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here."
 						>
@@ -198,7 +198,7 @@ interface ConversationProps {
 	items: Item[];
 	/** Composer text on mount, from a fork. */
 	initialDraft: string;
-	fork: Fork;
+	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
 	completions: Completions | null;
 	onComplete: (reqId: number, text: string, cursor: number) => void;

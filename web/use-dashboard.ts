@@ -15,7 +15,7 @@ import {
 	swapView,
 	viewForSession,
 } from "./routing";
-import type { ForkPoint } from "./transcript-view";
+import { beginStart, dismissFailed, dropHidden, loseStarts, requestOf, settleStart, type StartOp, type Starts } from "./starts";
 
 const subscribeHash = (onChange: () => void): (() => void) => {
 	window.addEventListener("hashchange", onChange);
@@ -26,18 +26,6 @@ const subscribeHash = (onChange: () => void): (() => void) => {
 export const useHash = (): string => useSyncExternalStore(subscribeHash, () => location.hash);
 
 const NO_VIEWS: View[] = [];
-
-/** Starting a session from the new-session draft: none, waiting for omp to start and take the first message, or failed with the reason. */
-export type Launch = { phase: "idle" } | { phase: "starting" } | { phase: "failed"; error: string };
-
-/** A fork from a message of `view`: none, waiting for the forked session, or failed with the reason. One runs at a time. */
-export type Fork =
-	| { phase: "idle" }
-	| { phase: "forking"; view: View; itemId: string; point: ForkPoint }
-	| { phase: "failed"; view: View; itemId: string; error: string };
-
-/** Resuming a past session: none, waiting for its omp, or failed with the reason. One runs at a time. */
-export type Resume = { phase: "idle" } | { phase: "resuming"; sessionId: string } | { phase: "failed"; sessionId: string; error: string };
 
 export interface Models {
 	models: ModelOption[];
@@ -55,11 +43,10 @@ export interface DashboardState {
 	layout: Layout;
 	/** Last roster row seen for each open live session, by instance id, kept after it leaves the roster. */
 	lastHosts: Map<string, RosterHost>;
-	launch: Launch;
+	/** Starts of new, forked, and resumed sessions, by the `reqId` the server answers with. */
+	starts: Starts;
 	/** The server's last answer to the new-session draft's `complete`. */
 	newSessionCompletions: Completions | null;
-	fork: Fork;
-	resume: Resume;
 	/** Composer text for a forked session's first mount. */
 	draft: { view: LiveView; text: string } | null;
 	/** The session this page last started, forked, or resumed, once it is ready. */
@@ -75,11 +62,9 @@ type Action =
 	/** Everything the server sends except what {@link isPaneMsg} says belongs to one view, which the pane store takes. */
 	| { t: "server"; msg: Exclude<ServerMsg, PaneMsg> }
 	| { t: "layout"; layout: Layout }
-	| { t: "launch"; launch: Launch }
-	/** A failed start's error goes away with its draft; a start under way keeps waiting for its answer. */
-	| { t: "dismiss-launch" }
-	| { t: "fork"; fork: Fork }
-	| { t: "resume"; resume: Resume };
+	| { t: "start"; reqId: number; op: StartOp }
+	/** A failed new session's error goes away with its draft; a start under way keeps waiting for its answer. */
+	| { t: "dismiss-new-session" };
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
 
@@ -111,22 +96,8 @@ function keepUnchanged<T extends { instanceId: string }>(prev: T[], next: T[]): 
 
 function reduce(state: DashboardState, action: Action): DashboardState {
 	switch (action.t) {
-		case "connected": {
-			// The answer to a pending `create`, `fork`, or `resume` went to the socket that just closed.
-			const launch: Launch =
-				!action.connected && state.launch.phase === "starting"
-					? { phase: "failed", error: "Lost the dashboard server while the session was starting. It may still appear." }
-					: state.launch;
-			const fork: Fork =
-				!action.connected && state.fork.phase === "forking"
-					? { phase: "failed", view: state.fork.view, itemId: state.fork.itemId, error: "Lost the dashboard server while forking. The fork may still appear." }
-					: state.fork;
-			const resume: Resume =
-				!action.connected && state.resume.phase === "resuming"
-					? { phase: "failed", sessionId: state.resume.sessionId, error: "Lost the dashboard server while resuming. The session may still appear." }
-					: state.resume;
-			return { ...state, connected: action.connected, launch, fork, resume };
-		}
+		case "connected":
+			return { ...state, connected: action.connected, starts: action.connected ? state.starts : loseStarts(state.starts) };
 		case "layout": {
 			if (hashForLayout(action.layout) === hashForLayout(state.layout)) return state;
 			// A view that stays open stays the same object, so its pane can skip the update.
@@ -137,19 +108,14 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 				layout,
 				lastHosts: rememberHosts(state.lastHosts, state.hosts, layout),
 				models: pick(state.models, liveIds(layout)),
-				fork: state.fork.phase === "failed" && !shown(state.fork.view) ? { phase: "idle" } : state.fork,
-				resume: state.resume.phase === "failed" && !shown({ kind: "past", sessionId: state.resume.sessionId }) ? { phase: "idle" } : state.resume,
+				starts: dropHidden(state.starts, shown),
 				draft: state.draft && shown(state.draft.view) ? state.draft : null,
 			};
 		}
-		case "launch":
-			return { ...state, launch: action.launch };
-		case "dismiss-launch":
-			return state.launch.phase === "failed" ? { ...state, launch: { phase: "idle" } } : state;
-		case "fork":
-			return { ...state, fork: action.fork };
-		case "resume":
-			return { ...state, resume: action.resume };
+		case "start":
+			return { ...state, starts: beginStart(state.starts, action.reqId, action.op) };
+		case "dismiss-new-session":
+			return { ...state, starts: dismissFailed(state.starts, "new") };
 		case "server": {
 			const msg = action.msg;
 			switch (msg.t) {
@@ -162,27 +128,18 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 					};
 				case "past":
 					return { ...state, past: msg.sessions, listed: true };
-				case "created":
-					if (state.launch.phase !== "starting") return state;
-					if (!msg.result.ok) return { ...state, launch: { phase: "failed", error: msg.result.error } };
-					return { ...state, launch: { phase: "idle" }, started: { instanceId: msg.result.instanceId, cwd: msg.result.cwd } };
-				case "forked": {
-					const fork = state.fork;
-					if (fork.phase !== "forking") return state;
-					if (!msg.result.ok) return { ...state, fork: { phase: "failed", view: fork.view, itemId: fork.itemId, error: msg.result.error } };
-					const view: LiveView = { kind: "live", instanceId: msg.result.instanceId, agentId: null };
-					return {
-						...state,
-						fork: { phase: "idle" },
-						draft: { view, text: fork.point.prefill ? msg.result.prompt : "" },
-						started: { instanceId: msg.result.instanceId, cwd: msg.result.cwd },
-					};
-				}
-				case "resumed": {
-					const { resume } = state;
-					if (resume.phase !== "resuming" || resume.sessionId !== msg.sessionId) return state;
-					if (!msg.result.ok) return { ...state, resume: { phase: "failed", sessionId: msg.sessionId, error: msg.result.error } };
-					return { ...state, resume: { phase: "idle" }, started: { instanceId: msg.result.instanceId, cwd: msg.result.cwd } };
+				case "started": {
+					const start = state.starts.get(msg.reqId);
+					if (start?.phase !== "starting") return state;
+					const starts = settleStart(state.starts, msg.reqId, msg.result);
+					if (!msg.result.ok) return { ...state, starts };
+					const { instanceId, cwd, prompt } = msg.result;
+					// A fork's composer starts with the prompt it branched at, to edit; forking a reply starts it empty.
+					const draft: DashboardState["draft"] =
+						start.op.kind === "fork"
+							? { view: { kind: "live", instanceId, agentId: null }, text: start.op.point.prefill ? (prompt ?? "") : "" }
+							: state.draft;
+					return { ...state, starts, draft, started: { instanceId, cwd } };
 				}
 				case "completions":
 					return { ...state, newSessionCompletions: { reqId: msg.reqId, items: msg.items, error: msg.error } };
@@ -207,12 +164,8 @@ export interface Dashboard {
 	show: (layout: Layout) => void;
 	/** Open the new-session draft in the default directory, clearing a failed start's error. */
 	openNewSession: () => void;
-	/** Start omp in `cwd` with `prompt` as its first message; the session opens in the focused pane once ready. */
-	create: (cwd: string, prompt: string) => void;
-	/** Fork `view` at a message's fork point; the forked session opens in the focused pane once ready. */
-	fork: (view: View, itemId: string, point: ForkPoint) => void;
-	/** Continue past session `sessionId`; its panes show the live session once omp is ready. */
-	resume: (sessionId: string) => void;
+	/** Start a session; it opens in the focused pane once ready, and a resumed one in the pane of the past session it continues. */
+	start: (op: StartOp) => void;
 }
 
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
@@ -225,10 +178,8 @@ export function useDashboard(): Dashboard {
 		listed: false,
 		layout: layoutFromHash(location.hash) ?? EMPTY_LAYOUT,
 		lastHosts: new Map(),
-		launch: { phase: "idle" },
+		starts: new Map(),
 		newSessionCompletions: null,
-		fork: { phase: "idle" },
-		resume: { phase: "idle" },
 		draft: null,
 		started: null,
 		usage: null,
@@ -237,6 +188,9 @@ export function useDashboard(): Dashboard {
 	const socketRef = useRef<WebSocket | null>(null);
 	const layoutRef = useRef(state.layout);
 	layoutRef.current = state.layout;
+	// What the page asked to start when the last answer was rendered; a `started` message finds its start here before the render that settles it.
+	const startsRef = useRef(state.starts);
+	startsRef.current = state.starts;
 	// A page covering the panes shows none of them, so the server stops streaming them until the panes return.
 	const hash = useHash();
 	const watched = isPageHash(hash) ? NO_VIEWS : state.layout.panes;
@@ -278,11 +232,11 @@ export function useDashboard(): Dashboard {
 				const msg = JSON.parse(String(event.data)) as ServerMsg;
 				if (isPaneMsg(msg)) applyPaneMessage(msg);
 				else dispatch({ t: "server", msg });
-				if ((msg.t === "created" || msg.t === "forked") && msg.result.ok) {
-					open({ kind: "live", instanceId: msg.result.instanceId, agentId: null }, "replace");
-				}
-				if (msg.t === "resumed" && msg.result.ok) {
-					show(swapView(layoutRef.current, { kind: "past", sessionId: msg.sessionId }, { kind: "live", instanceId: msg.result.instanceId, agentId: null }));
+				if (msg.t === "started" && msg.result.ok) {
+					const op = startsRef.current.get(msg.reqId)?.op;
+					const live: LiveView = { kind: "live", instanceId: msg.result.instanceId, agentId: null };
+					if (op?.kind === "resume") show(swapView(layoutRef.current, { kind: "past", sessionId: op.sessionId }, live));
+					else if (op) open(live, "replace");
 				}
 			};
 			ws.onclose = () => {
@@ -326,33 +280,19 @@ export function useDashboard(): Dashboard {
 	}, [send, watched]);
 
 	const openNewSession = useCallback(() => {
-		dispatch({ t: "dismiss-launch" });
+		dispatch({ t: "dismiss-new-session" });
 		location.hash = hashForNewSession(null);
 	}, []);
 
-	const create = useCallback(
-		(cwd: string, prompt: string) => {
-			dispatch({ t: "launch", launch: { phase: "starting" } });
-			send({ t: "create", cwd, prompt });
+	const nextReqId = useRef(0);
+	const start = useCallback(
+		(op: StartOp) => {
+			const reqId = nextReqId.current++;
+			dispatch({ t: "start", reqId, op });
+			send({ t: "start", reqId, ...requestOf(op) });
 		},
 		[send],
 	);
 
-	const fork = useCallback(
-		(view: View, itemId: string, point: ForkPoint) => {
-			dispatch({ t: "fork", fork: { phase: "forking", view, itemId, point } });
-			send({ t: "fork", view, entryId: point.entryId });
-		},
-		[send],
-	);
-
-	const resume = useCallback(
-		(sessionId: string) => {
-			dispatch({ t: "resume", resume: { phase: "resuming", sessionId } });
-			send({ t: "resume", sessionId });
-		},
-		[send],
-	);
-
-	return { state, send, open, focus, show, openNewSession, create, fork, resume };
+	return { state, send, open, focus, show, openNewSession, start };
 }
