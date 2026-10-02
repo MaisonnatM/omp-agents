@@ -1,4 +1,4 @@
-import { ArrowUpRight, Brain, ListEnd, Sparkles } from "lucide-react";
+import { ArrowUpRight, Brain, CircleStop, ListEnd, MessageCircle, Sparkles } from "lucide-react";
 import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import type {
 	AgentRow,
@@ -156,6 +156,8 @@ interface TranscriptProps {
 	working: boolean;
 	fork: Fork;
 	onFork: (itemId: string, point: ForkPoint) => void;
+	/** Shown in place of the transcript until its first item or turn. */
+	empty?: ReactNode;
 }
 
 interface HeaderProps {
@@ -197,6 +199,34 @@ export const DirectCommandNote = ({ kind }: { kind: "Python" | "shell" }) => (
 		Direct {kind} execution needs the omp terminal. Collab cannot run it in this session.
 	</p>
 );
+
+/** A conversation with no messages yet: what sending the first one does, and the composer's completions. */
+export function EmptyConversation({ title, children }: { title: string; children: ReactNode }) {
+	return (
+		<div className="m-auto flex max-w-sm flex-col items-center gap-4 px-6 py-8 text-center" data-empty-conversation>
+			<span className="flex size-10 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+				<MessageCircle aria-hidden="true" className="size-5" />
+			</span>
+			<div className="space-y-1">
+				<h2 className="text-sm font-medium">{title}</h2>
+				<p className="text-sm text-pretty text-muted-foreground">{children}</p>
+			</div>
+			<ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+				{[
+					["/", "commands and skills"],
+					["@", "files"],
+				].map(([key, label]) => (
+					<li key={key} className="flex items-center gap-1.5">
+						<kbd className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-[5px] border border-border bg-background px-1.5 font-sans text-xs text-foreground">
+							{key}
+						</kbd>
+						{label}
+					</li>
+				))}
+			</ul>
+		</div>
+	);
+}
 
 /** The skill a prompt invoked, as a pill ahead of the user's words. */
 function SkillBadge({ name }: { name: string }) {
@@ -260,7 +290,7 @@ function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 }
 
 /** The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end. */
-function Transcript({ view, items, working, fork, onFork }: TranscriptProps) {
+function Transcript({ view, items, working, fork, onFork, empty }: TranscriptProps) {
 	const last = items.at(-1);
 	const streaming = last?.kind === "assistant" && last.streaming;
 	const forks = forkPoints(items);
@@ -332,6 +362,7 @@ function Transcript({ view, items, working, fork, onFork }: TranscriptProps) {
 							</MessageScrollerItem>
 						);
 					})}
+					{items.length === 0 && !working && empty}
 					{working && !streaming && (
 						<MessageScrollerItem messageId="thinking" className="flex flex-col">
 							<ThinkingIndicator className="self-start" />
@@ -406,6 +437,8 @@ interface ConversationProps {
 	/** Last known row, for the header after the session ended. */
 	lastHost: RosterHost | null;
 	items: Item[];
+	/** Whether `items` arrived, so an empty list is a conversation with no messages and not one still loading. */
+	loaded: boolean;
 	/** Composer text on mount, from a fork. */
 	initialDraft: string;
 	fork: Fork;
@@ -444,6 +477,7 @@ function LiveConversation({
 	host,
 	lastHost,
 	items,
+	loaded,
 	initialDraft,
 	fork,
 	onFork,
@@ -636,8 +670,9 @@ function LiveConversation({
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
 				{endable && host && (
 					<Button
-						variant="secondary"
+						variant="primary"
 						size="compact"
+						leadingIcon={CircleStop}
 						onClick={onEnd}
 						title={`${
 							host.source === "dashboard"
@@ -650,7 +685,23 @@ function LiveConversation({
 				)}
 				{actions}
 			</Header>
-			<Transcript view={view} items={items} working={working === true} fork={fork} onFork={onFork} />
+			<Transcript
+				view={view}
+				items={items}
+				working={working === true}
+				fork={fork}
+				onFork={onFork}
+				empty={
+					loaded &&
+					view.agentId === null &&
+					writable &&
+					shown && (
+						<EmptyConversation title="No messages yet">
+							omp is running in {projectName(shown.cwdDisplay) ?? shown.cwdDisplay}. Send a message to start its first turn.
+						</EmptyConversation>
+					)
+				}
+			/>
 			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
 				{requests[0] && (
 					<UserRequestCard

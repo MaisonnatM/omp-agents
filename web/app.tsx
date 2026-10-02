@@ -142,7 +142,7 @@ export function App() {
 	});
 
 	const paneContent = (pane: View, focused: boolean, actions: ReactNode): ReactNode => {
-		const { items, completions, dequeued } = state.panes.get(hashForView(pane)) ?? EMPTY_PANE;
+		const { items, loaded, completions, dequeued } = state.panes.get(hashForView(pane)) ?? EMPTY_PANE;
 		const onFork = (itemId: string, point: ForkPoint) => fork(pane, itemId, point);
 		if (pane.kind === "past") {
 			return (
@@ -165,6 +165,7 @@ export function App() {
 				host={state.hosts.find(h => h.instanceId === instanceId) ?? null}
 				lastHost={state.lastHosts.get(instanceId) ?? null}
 				items={items}
+				loaded={loaded}
 				initialDraft={state.draft && sameView(state.draft.view, pane) ? state.draft.text : ""}
 				fork={state.fork}
 				onFork={onFork}
