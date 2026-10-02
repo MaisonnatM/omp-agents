@@ -125,6 +125,10 @@ export function age(startedAt: number): string {
 	return `${Math.floor(minutes / 1440)}d`;
 }
 
+/** When a page last read its data: the time alone today, else the date and time. */
+export const readTime = (at: number): string =>
+	new Date(at).toDateString() === new Date().toDateString() ? new Date(at).toLocaleTimeString() : new Date(at).toLocaleString();
+
 /** The project a directory holds, its last segment: `~/code/webapp` reads `webapp`. */
 export const projectName = (cwdDisplay: string): string | undefined => cwdDisplay.split("/").filter(Boolean).pop();
 
