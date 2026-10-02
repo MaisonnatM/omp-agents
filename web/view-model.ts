@@ -1,5 +1,16 @@
 /** Pure transforms from server messages to what the page renders. */
-import type { AgentRow, CatalogModel, Item, OmpFile, OmpFileKind, PastSession, PullRequest, RosterHost, View } from "../src/shared";
+import type {
+	AgentRow,
+	CatalogModel,
+	InboxPullRequest,
+	Item,
+	OmpFile,
+	OmpFileKind,
+	PastSession,
+	PullRequest,
+	RosterHost,
+	View,
+} from "../src/shared";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
 
@@ -14,6 +25,9 @@ export interface AgentNode {
 
 const PAST_PREFIX = "past/";
 const SETTINGS = "settings";
+
+/** The hash of the inbox page, which lists the pull requests of the sidebar's project. */
+export const INBOX_HASH = "#inbox";
 
 /** Where the settings page reads project files and config from; `null` for user-level only. */
 export interface SettingsRoute {
@@ -54,7 +68,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past` or `settings`. */
+/** Instance ids are hex, so none reads as `past`, `settings`, or `inbox`. */
 function viewFromPane(pane: string): View {
 	if (pane.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(pane.slice(PAST_PREFIX.length)) };
 	const slash = pane.indexOf("/");
@@ -85,10 +99,10 @@ export function hashForLayout({ panes, focus, maximized }: Layout): string {
 
 /**
  * The layout a hash names, keeping the first {@link MAX_PANES} distinct views and focus on the view it named.
- * `null` for the settings page, which leaves the panes behind it alone.
+ * `null` for the settings and inbox pages, which leave the panes behind them alone.
  */
 export function layoutFromHash(hash: string): Layout | null {
-	if (settingsFromHash(hash)) return null;
+	if (settingsFromHash(hash) || hash === INBOX_HASH) return null;
 	const marked = hash.replace(/^#/, "");
 	const maximized = marked.endsWith(MAXIMIZED);
 	const raw = maximized ? marked.slice(0, -MAXIMIZED.length) : marked;
@@ -180,6 +194,36 @@ export function fileGroups(files: OmpFile[]): [OmpFileKind, OmpFile[]][] {
 }
 
 export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
+
+export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
+
+export const samePullRequest = (a: PullRequest, b: PullRequest): boolean =>
+	a.number === b.number && a.owner.toLowerCase() === b.owner.toLowerCase() && a.repo.toLowerCase() === b.repo.toLowerCase();
+
+/** Graphite's inbox sections, in page order. A pull request goes in the first section that takes it. */
+const INBOX_SECTIONS: [title: string, takes: (pr: InboxPullRequest) => boolean][] = [
+	["Needs your review", pr => pr.role === "reviewer" && pr.state !== "merged"],
+	["Returned to you", pr => pr.state === "open" && pr.review === "changes-requested"],
+	["Approved", pr => pr.state === "open" && pr.review === "approved"],
+	["Waiting for review", pr => pr.state === "open"],
+	["Drafts", pr => pr.state === "draft"],
+	["Recently merged", pr => pr.state === "merged"],
+];
+
+export interface InboxSection {
+	title: string;
+	/** Most recently updated first. */
+	pullRequests: InboxPullRequest[];
+}
+
+/** A repository's pull requests in Graphite's inbox sections, leaving out the empty ones. */
+export function inboxSections(pullRequests: InboxPullRequest[]): InboxSection[] {
+	const sections = INBOX_SECTIONS.map(([title]): InboxSection => ({ title, pullRequests: [] }));
+	for (const pr of pullRequests.toSorted((a, b) => b.updatedAt - a.updatedAt)) {
+		sections[INBOX_SECTIONS.findIndex(([, takes]) => takes(pr))]?.pullRequests.push(pr);
+	}
+	return sections.filter(section => section.pullRequests.length > 0);
+}
 
 /** A pull request link from GitHub or Graphite: `owner`, `repo`, `number`. */
 const PR_LINK = /(?:github\.com\/([\w.-]+)\/([\w.-]+)\/pull|app\.graphite\.com\/github\/pr\/([\w.-]+)\/([\w.-]+))\/(\d+)/;

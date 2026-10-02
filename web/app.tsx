@@ -5,15 +5,27 @@ import { Button } from "@/components/ui/button";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { Conversation, PastConversation, ToolsExpanded } from "./components/conversation";
+import { InboxPage } from "./components/inbox-page";
 import { PlanUsageFooter } from "./components/plan-usage";
-import { Roster } from "./components/roster";
+import { Roster, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings-page";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { SidebarResizeHandle, storedSidebarWidth } from "./components/sidebar-resize-handle";
 import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
 import { useShortcuts } from "./shortcuts";
 import { EMPTY_PANE, useDashboard } from "./use-dashboard";
-import { closePane, defaultCwd, type ForkPoint, focusedView, hashForSettings, hashForView, sameView, settingsFromHash, workspaces } from "./view-model";
+import {
+	closePane,
+	defaultCwd,
+	type ForkPoint,
+	focusedView,
+	hashForSettings,
+	hashForView,
+	INBOX_HASH,
+	sameView,
+	settingsFromHash,
+	workspaces,
+} from "./view-model";
 
 const subscribeHash = (onChange: () => void): (() => void) => {
 	window.addEventListener("hashchange", onChange);
@@ -61,7 +73,10 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 export function App() {
 	const { state, send, open, focus, show, setLaunchOpen, create, fork } = useDashboard();
 	const initialWidth = useMemo(storedSidebarWidth, []);
-	const settings = settingsFromHash(useSyncExternalStore(subscribeHash, () => location.hash));
+	const hash = useSyncExternalStore(subscribeHash, () => location.hash);
+	const settings = settingsFromHash(hash);
+	const inbox = hash === INBOX_HASH;
+	const [project, pickProject] = useProject(workspaces(state.hosts, state.past));
 	const { layout } = state;
 	const view = focusedView(layout);
 	const viewHost = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
@@ -69,7 +84,7 @@ export function App() {
 	const split = layout.panes.length > 1;
 	const [columns, setColumns] = useState(() => storedSplitRatio("columns"));
 	const [rows, setRows] = useState(() => storedSplitRatio("rows"));
-	const maximized = layout.maximized && !settings;
+	const maximized = layout.maximized && !settings && !inbox;
 
 	const settingsHref = hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
@@ -132,6 +147,13 @@ export function App() {
 	let main: ReactNode;
 	if (settings) {
 		main = <SettingsPage cwd={settings.cwd} workspaces={workspaces(state.hosts, state.past)} />;
+	} else if (inbox) {
+		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
+		main = state.listed ? (
+			<InboxPage project={project} hosts={state.hosts} past={state.past} onOpen={open} />
+		) : (
+			<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
+		);
 	} else if (layout.panes.length > 0) {
 		main = (
 			<div
@@ -202,12 +224,15 @@ export function App() {
 				<Roster
 					hosts={state.hosts}
 					past={state.past}
-					open={settings ? [] : layout.panes}
+					open={settings || inbox ? [] : layout.panes}
 					connected={state.connected}
 					launch={state.launch}
 					defaultCwd={defaultCwd(view, state.hosts, state.past)}
 					settingsHref={settingsHref}
 					settingsOpen={settings !== null}
+					inboxOpen={inbox}
+					project={project}
+					onPickProject={pickProject}
 					onOpen={open}
 					onLaunchOpen={setLaunchOpen}
 					onCreate={create}
