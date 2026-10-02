@@ -7,6 +7,7 @@ import {
 	GitPullRequest,
 	GitPullRequestDraft,
 	type LucideIcon,
+	MessageSquare,
 	RefreshCw,
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
@@ -160,6 +161,22 @@ function Reviewers({ reviewers }: { reviewers: Reviewer[] }) {
 	);
 }
 
+/** How many review threads wait for a resolution, shown only while some might. */
+function Unresolved({ unresolved: { count, exact } }: { unresolved: InboxPullRequest["unresolved"] }) {
+	if (count === 0 && exact) return null;
+	const label = exact
+		? `${count} unresolved ${count === 1 ? "comment" : "comments"}`
+		: `At least ${count} unresolved comments; GitHub listed only some threads`;
+	return (
+		<Tooltip content={label}>
+			<span role="img" aria-label={label} className="flex shrink-0 items-center gap-1 tabular-nums text-muted-foreground">
+				<MessageSquare aria-hidden className="size-4" />
+				{exact ? count : `${count}+`}
+			</span>
+		</Tooltip>
+	);
+}
+
 interface SessionLink {
 	view: View;
 	label: string;
@@ -225,6 +242,7 @@ function PullRequestRow({ pr, sessions, onOpen }: RowProps) {
 			<div className="flex shrink-0 items-center gap-3 text-xs">
 				<Reviewers reviewers={pr.reviewers} />
 				{review && <span className={review[1]}>{review[0]}</span>}
+				<Unresolved unresolved={pr.unresolved} />
 				{pr.checks !== "none" && <IconTip icon={CHECK_ICON[pr.checks]} />}
 				<span className="w-14 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={new Date(pr.updatedAt).toLocaleString()}>
 					{age(pr.updatedAt)}

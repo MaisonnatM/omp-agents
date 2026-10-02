@@ -97,6 +97,10 @@ export function App() {
 			if (settings) show(layout);
 			else location.hash = settingsHref;
 		},
+		inbox: () => {
+			if (inbox) show(layout);
+			else location.hash = INBOX_HASH;
+		},
 		restore: () => {
 			if (!maximized) return false;
 			show({ ...layout, maximized: false });
