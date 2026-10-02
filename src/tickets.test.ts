@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseIssues } from "./tickets";
+import { linearMarkdown, parseIssueDetail, parseIssues } from "./tickets";
 
 const issue = (id: string, fields: Record<string, unknown> = {}) => ({
 	id,
@@ -71,5 +71,54 @@ describe("parseIssues", () => {
 	test("throws when the tool answers text that is not an issue list", () => {
 		expect(() => parseIssues("Team not found")).toThrow("something other than JSON: Team not found");
 		expect(() => parseIssues(JSON.stringify({ items: [] }))).toThrow("without issues");
+	});
+});
+
+describe("linearMarkdown", () => {
+	test("turns Linear's issue mentions into links and its images into image links, and drops an image without a source", () => {
+		const text = [
+			'Fixed in <issue id="2cfd" href="https://linear.app/acme/issue/ENG-2305/count">ENG-2305</issue>; see',
+			'<linear-image>{"type":"image","attrs":{"src":"https://uploads.linear.app/a/b?signature=x"}}</linear-image>',
+			"<linear-image>{}</linear-image>",
+		].join("\n");
+		expect(linearMarkdown(text)).toBe("Fixed in [ENG-2305](<https://linear.app/acme/issue/ENG-2305/count>); see\n![image](<https://uploads.linear.app/a/b?signature=x>)\n");
+	});
+});
+
+describe("parseIssueDetail", () => {
+	const comment = (id: string, createdAt: string, parentId: string | null, body = id) => ({ id, body, createdAt, parentId, author: { id: "u", name: "Ada" } });
+
+	test("threads the comments oldest first, a reply under its first comment, and keeps the issue's links", () => {
+		const issueText = JSON.stringify(
+			issue("ENG-1", {
+				description: "Do it",
+				createdBy: "Grace",
+				createdAt: "2026-09-01T00:00:00.000Z",
+				attachments: [{ id: "a", title: "feat: do it", url: "https://github.com/acme/web/pull/1" }, { id: "b", title: "", url: "https://example.com" }, { id: "c" }],
+			}),
+		);
+		// Linear lists comments newest first.
+		const commentsText = JSON.stringify({
+			comments: [
+				comment("reply", "2026-09-03T00:00:00.000Z", "root"),
+				comment("orphan", "2026-09-04T00:00:00.000Z", "gone"),
+				comment("later", "2026-09-02T12:00:00.000Z", null),
+				comment("root", "2026-09-02T00:00:00.000Z", null),
+			],
+		});
+		const detail = parseIssueDetail(issueText, commentsText);
+		expect(detail.description).toBe("Do it");
+		expect(detail.createdBy).toBe("Grace");
+		expect(detail.attachments).toEqual([
+			{ title: "feat: do it", url: "https://github.com/acme/web/pull/1" },
+			{ title: "https://example.com", url: "https://example.com" },
+		]);
+		expect(detail.threads.map(thread => thread.map(({ body }) => body))).toEqual([["root", "reply"], ["later"], ["orphan"]]);
+		expect(detail.threads[0]![0]!.author).toBe("Ada");
+	});
+
+	test("throws when get_issue answers no issue", () => {
+		expect(() => parseIssueDetail("Issue not found", JSON.stringify({ comments: [] }))).toThrow("get_issue answered something other than JSON");
+		expect(() => parseIssueDetail(JSON.stringify({ title: "No id" }), JSON.stringify({ comments: [] }))).toThrow("without an issue");
 	});
 });

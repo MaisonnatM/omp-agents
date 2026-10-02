@@ -35,7 +35,7 @@ const tab = await browser.open({
 });
 ```
 
-The page routes through the URL hash. Besides a session's own hash, the routes are `#inbox`, `#inbox/<owner>/<repo>/<number>`, `#new`, `#new/<encoded cwd>`, and `#settings`. `web/routing.ts` parses them.
+The page routes through the URL hash. Besides a session's own hash, the routes are `#inbox`, `#inbox/<owner>/<repo>/<number>`, `#tickets`, `#tickets/<identifier>`, `#new`, `#new/<encoded cwd>`, and `#settings`. `web/routing.ts` parses them.
 
 ## omp internals
 

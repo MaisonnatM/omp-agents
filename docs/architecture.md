@@ -86,11 +86,13 @@ A `start` of kind `new` carries a `branch`, `null` for the directory as it is. F
 
 `GET /api/tickets`, or `GET /api/tickets?fresh` to skip the server's 30-second cache, answers the tickets page with `{ tickets }`. A failed read is the API's usual `{ error }` with status 500, and the page keeps showing the last tickets it has with the error above them. The server reads Linear through Linear's MCP server, with the OAuth sign-in that omp keeps for it, through `src/omp/mcp.ts`: it loads omp's own MCP config for the enabled server whose `url` has the `mcp.linear.app` host, and gets an access token for its `auth.credentialId`, or for the id omp files a sign-in for that URL under, from `omp token <credentialId>`, which refreshes the token through omp's credential owner. The token stays in memory for five minutes and is dropped when Linear answers 401, which the page reports as a `/mcp reauth <name>` hint; it is never logged. Linear's GraphQL API refuses that token, so the server calls the MCP endpoint's `list_issues` tool through omp's `callMCP`, a stateless JSON-RPC `tools/call` POST. It asks for each open state type in full, following the cursor, and for completed, canceled, and duplicate issues updated in the last seven days, in parallel, then drops repeats by identifier.
 
+`GET /api/ticket?id=<identifier>`, such as `?id=ENG-2368`, answers the tickets page's sheet with that issue in full: the row's fields, the description, who opened it and when, the links Linear attaches to it, and its comment threads. The server calls `get_issue` and `list_comments` in parallel, through the same MCP sign-in, with no cache, so each opening reads the issue again. It rewrites Linear's `<issue>` mentions as markdown links and its `<linear-image>` tags as image links, and threads the comments by `parentId`, oldest first. An identifier that is not a team key, a dash, and a number answers 400.
+
 ## Front-end components
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`. The roster uses `sidebar`, and its **Inbox**, **Tickets**, and **Sessions** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`. User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`. `thinking-indicator` shows while the agent works. shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button. The model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern. Fluid's built-in sidebar rail resizes by pointer only …
 
-Fluid Functionalism has no sheet, so the inbox's pull request sheet, `web/components/ui/sheet.tsx`, follows the sidebar's mobile sheet: Radix `Dialog` for focus and dismissal, and a framer-motion slide on the `moderate` spring.
+Fluid Functionalism has no sheet, so the sheet that the inbox shows a pull request in, and the tickets page an issue in, `web/components/ui/sheet.tsx`, follows the sidebar's mobile sheet: Radix `Dialog` for focus and dismissal, and a framer-motion slide on the `moderate` spring.
 
 The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items. Both share Base UI's menu items, so each row builds one item list and both menus render it. The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
 
@@ -120,7 +122,7 @@ The server lives in `src/`:
 - `src/session-links.ts`: writes the session block into a pull request's description.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more. A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
 - `src/git.ts`: the git checkout of a directory, and the worktree a new session's branch runs in.
-- `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text.
+- `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, and one issue in full for its sheet.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
@@ -129,13 +131,13 @@ The server lives in `src/`:
 The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
 - `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, settings, and new-session pages, and focus handling.
-- `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, or started by an inbox quick action.
+- `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, or started by a quick action on a pull request or a Linear issue.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
-- `web/quick-actions.ts`: the inbox's quick actions, which pull requests each applies to and the prompt that starts its session.
+- `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it. `web/components/quick-actions.tsx` holds their row menu, sheet buttons, and failure note.
 - `web/api.ts`: every HTTP request the page makes. `web/settings-api.ts` holds the settings page's requests.
 - `web/polled-store.ts`: the store of server reads that a sidebar list and its page share, kept in localStorage and re-read every minute while the page is open. `web/use-inbox.ts` makes one for the inbox, with one entry per project, and `web/use-tickets.ts` one for the tickets, with one entry, since Linear is not per project.
-- `web/use-pull-request.ts`: reads the details of the pull request that the inbox's sheet shows.
+- `web/use-detail.ts`: reads the pull request or Linear issue in full that a sheet shows.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header. `web/components/git.tsx` holds the branch picker and the repository and branch in a header's meta line.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read. `web/components/session-switcher.tsx` is the Cmd+K search over every session.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.

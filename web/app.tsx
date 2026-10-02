@@ -117,7 +117,7 @@ export function App() {
 	const tab: SidebarTab = page?.kind === "inbox" || page?.kind === "tickets" ? page.kind : "sessions";
 	const showTab = (next: SidebarTab): void => {
 		if (next === "sessions") show(layout);
-		else location.hash = next === "inbox" ? hashForInbox(null) : hashForTickets();
+		else location.hash = next === "inbox" ? hashForInbox(null) : hashForTickets(null);
 	};
 	const step = (by: 1 | -1): boolean | void => {
 		const next = adjacentSession(listedViews, view, by);
@@ -198,7 +198,19 @@ export function App() {
 			);
 			break;
 		case "tickets":
-			main = <TicketsPage section={sectionTarget} />;
+			// Until the sessions are listed, the workspace a quick action starts in is not known yet.
+			main = state.listed ? (
+				<TicketsPage
+					target={page.target}
+					section={sectionTarget}
+					cwd={defaultCwd(view, state.hosts, state.past, project)}
+					quick={quick}
+					onQuickAction={start}
+					onDismissQuick={() => dismissStart("quick")}
+				/>
+			) : (
+				<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
+			);
 			break;
 		default:
 			if (layout.panes.length > 0) {

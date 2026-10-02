@@ -5,7 +5,7 @@ import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestUrl } from "../../inbox-model";
 import { age } from "../../labels";
-import { usePullRequest } from "../../use-pull-request";
+import { useDetail } from "../../use-detail";
 import { MessageMarkdown } from "../message-markdown";
 import { Avatar, IconTip, STATE_ICON } from "./avatars";
 
@@ -25,8 +25,8 @@ const EVENT_ACTION: Record<NonNullable<PullRequestEvent["review"]> | "comment", 
 	comment: "commented",
 };
 
-/** A titled part of a pull request's details. */
-function DetailSection({ title, children }: { title: ReactNode; children: ReactNode }) {
+/** A titled part of a sheet's details. */
+export function DetailSection({ title, children }: { title: ReactNode; children: ReactNode }) {
 	return (
 		<section className="space-y-2">
 			<h5 className="flex items-baseline gap-2 text-xs font-medium text-muted-foreground">{title}</h5>
@@ -36,7 +36,7 @@ function DetailSection({ title, children }: { title: ReactNode; children: ReactN
 }
 
 /** An external link that says where it goes. */
-function OutLink({ href, children }: { href: string; children: ReactNode }) {
+export function OutLink({ href, children }: { href: string; children: ReactNode }) {
 	return (
 		<a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:text-foreground hover:underline">
 			{children}
@@ -114,7 +114,7 @@ function Checks({ checks }: { checks: PullRequestCheck[] }) {
 
 /** A pull request read from GitHub, as the inbox's sheet shows it: a header that names it, with `actions` below, then its details. */
 export function PullRequestSheetContent({ pr, actions }: { pr: PullRequest; actions?: ReactNode }) {
-	const { detail, error } = usePullRequest(pr);
+	const { detail, error } = useDetail<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
 	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
 	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking GitHub for the pull request…</p>;
 	if (detail) body = <PullRequestSections detail={detail} />;

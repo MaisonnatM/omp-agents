@@ -6,8 +6,8 @@ import { directoryOf } from "../paths";
 import type { PullRequestIndex } from "../pull-requests";
 import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, saveOmpFile, saveRouting } from "../settings";
-import { loadTickets } from "../tickets";
-import type { LinkedPullRequest } from "../shared";
+import { loadTicketDetail, loadTickets } from "../tickets";
+import { type LinkedPullRequest, TICKET_ID } from "../shared";
 import { answer, fail, type Guards } from "./http";
 import { parsePullRequestQuery, parseSessionLinks } from "./wire";
 
@@ -79,6 +79,14 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return answer(() => loadTickets(fresh));
 	};
 
+	/** `GET /api/ticket?id=<identifier>`: that Linear issue in full, for the tickets page's sheet. */
+	const ticket: Handler = async req => {
+		const refused = guards.admit(req);
+		if (refused) return refused;
+		const id = new URL(req.url).searchParams.get("id") ?? "";
+		return TICKET_ID.test(id) ? answer(() => loadTicketDetail(id)) : fail(400, "Expected ?id= naming a Linear issue, such as ENG-123");
+	};
+
 	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for the inbox's sheet. */
 	const pullRequest: Handler = async req => {
 		const refused = guards.admit(req);
@@ -139,6 +147,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/pull-request/sessions": { PUT: sessionLinks },
 		"/api/inbox": { GET: inbox },
 		"/api/tickets": { GET: tickets },
+		"/api/ticket": { GET: ticket },
 		"/api/pull-request": { GET: pullRequest },
 		"/api/git": { GET: git },
 	};

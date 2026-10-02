@@ -2,50 +2,26 @@ import { RefreshCw } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import type { Inbox, InboxPullRequest, PastSession, PullRequest, RepoInbox, RosterHost, View } from "../../../src/shared";
 import { projectName, readTime } from "../../labels";
-import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
+import { type PullRequestActionId, pullRequestActions, pullRequestStart } from "../../quick-actions";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { inboxRepoKey, inboxSection, inboxSections, samePullRequest } from "../../inbox-model";
 import { hashForInbox, type OpenMode } from "../../routing";
 import type { SectionTarget } from "../../section";
-import type { StartOf, StartOp } from "../../starts";
+import type { QuickOp, StartOf } from "../../starts";
 import { refreshInbox, useInbox } from "../../use-inbox";
 import { Header } from "../conversation";
 import { FoldButton, useCollapsed, useRevealSection } from "../fold";
+import { QuickActionButtons, QuickStartFailed } from "../quick-actions";
 import { PullRequestSheetContent } from "./pr-details";
 import { PullRequestRow, rowId, sessionsFor } from "./pr-row";
-import { QuickActionButtons } from "./quick-actions";
-
-type QuickOp = Extract<StartOp, { kind: "quick" }>;
 
 /** The action of the quick start under way for `pr`, if any. */
-const pendingOf = (quick: StartOf<"quick"> | null, pr: PullRequest): QuickActionId | null =>
-	quick?.phase === "starting" && samePullRequest(quick.op.pr, pr) ? quick.op.action : null;
-
-/** Why a quick action's session did not start, with a button that forgets it. */
-function QuickStartFailed({ op, error, onDismiss }: { op: QuickOp; error: string; onDismiss: () => void }) {
-	return (
-		<p role="alert" className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-			<span className="min-w-0">
-				Cannot start "{QUICK_ACTIONS[op.action].label}" on {op.pr.owner}/{op.pr.repo}#{op.pr.number}: {error}
-			</span>
-			<Button variant="ghost" size="compact" className="shrink-0" onClick={onDismiss}>
-				Dismiss
-			</Button>
-		</p>
-	);
+function pendingOf(quick: StartOf<"quick"> | null, pr: PullRequest): PullRequestActionId | null {
+	const subject = quick?.phase === "starting" ? quick.op.subject : null;
+	return subject?.kind === "pull-request" && samePullRequest(subject.pr, pr) ? subject.action : null;
 }
-
-/** The start of `action` on `pr`, in `cwd`: the repository's most recently used workspace. */
-const quickOp = (pr: InboxPullRequest, cwd: string, action: QuickActionId, mode: OpenMode): QuickOp => ({
-	kind: "quick",
-	cwd,
-	prompt: QUICK_ACTIONS[action].prompt(pr),
-	pr: { owner: pr.owner, repo: pr.repo, number: pr.number },
-	action,
-	mode,
-});
 
 /** Folded repositories and sections: `owner/repo`, and `owner/repo:<section title>`. */
 const COLLAPSED_KEY = "omp-agents.inbox-collapsed";
@@ -103,7 +79,7 @@ function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen, 
 									targeted={target !== null && samePullRequest(pr, target)}
 									onOpen={onOpen}
 									pending={pendingOf(quick, pr)}
-									onQuickAction={(action, mode) => onQuickAction(quickOp(pr, inbox.cwds[0]!, action, mode))}
+									onQuickAction={(action, mode) => onQuickAction(pullRequestStart(pr, action, inbox.cwds[0]!, mode))}
 								/>
 							))}
 						</ul>
@@ -197,6 +173,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 	const sheetPr = useRef<PullRequest | null>(null);
 	if (target) sheetPr.current = target;
 	const sheetListed = read && sheetPr.current ? listedPullRequest(read.data, sheetPr.current) : null;
+	const failed = quick?.phase === "failed" && quick.op.subject.kind === "pull-request" ? { op: quick.op, error: quick.error, pr: quick.op.subject.pr } : null;
 
 	useEffect(() => {
 		if (!place || !targetKey || shown.current === targetKey) return;
@@ -258,7 +235,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				<TooltipProvider>
 					<div className="mx-auto w-full max-w-5xl space-y-10 px-6 py-6">
-						{quick?.phase === "failed" && <QuickStartFailed op={quick.op} error={quick.error} onDismiss={onDismissQuick} />}
+						{failed && <QuickStartFailed op={failed.op} error={failed.error} onDismiss={onDismissQuick} />}
 						{body}
 					</div>
 					{sheetPr.current && (
@@ -270,13 +247,11 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 									sheetListed && (
 										<>
 											<QuickActionButtons
-												pr={sheetListed.pr}
+												actions={pullRequestActions(sheetListed.pr)}
 												pending={pendingOf(quick, sheetListed.pr)}
-												onRun={(action, mode) => onQuickAction(quickOp(sheetListed.pr, sheetListed.cwd, action, mode))}
+												onRun={(action, mode) => onQuickAction(pullRequestStart(sheetListed.pr, action, sheetListed.cwd, mode))}
 											/>
-											{quick?.phase === "failed" && samePullRequest(quick.op.pr, sheetListed.pr) && (
-												<QuickStartFailed op={quick.op} error={quick.error} onDismiss={onDismissQuick} />
-											)}
+											{failed && samePullRequest(failed.pr, sheetListed.pr) && <QuickStartFailed op={failed.op} error={failed.error} onDismiss={onDismissQuick} />}
 										</>
 									)
 								}

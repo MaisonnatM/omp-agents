@@ -103,11 +103,15 @@ describe("layout hash", () => {
 		for (const hash of ["#inbox", "#inbox/acme/web.app/6596", "#inbox/acme"]) expect(layoutFromHash(hash)).toBeNull();
 	});
 
-	test("the tickets hash opens the tickets page, which covers the panes instead of naming a layout", () => {
-		expect(pageFromHash(hashForTickets())).toEqual({ kind: "tickets" });
-		expect(layoutFromHash(hashForTickets())).toBeNull();
+	test("the tickets hash opens the page alone or at one issue's row, and no tickets hash is read as a layout", () => {
+		expect(hashForTickets(null)).toBe("#tickets");
+		expect(hashForTickets("ENG-2368")).toBe("#tickets/ENG-2368");
+		expect(pageFromHash("#tickets")).toEqual({ kind: "tickets", target: null });
+		expect(pageFromHash("#tickets/ENG-2368")).toEqual({ kind: "tickets", target: "ENG-2368" });
+		expect(pageFromHash("#tickets/not-an-issue")).toEqual({ kind: "tickets", target: null });
 		expect(pageFromHash("#ticketsx")).toBeNull();
 		expect(pageFromHash("#7c51f77b2a1bf7ba")).toBeNull();
+		for (const hash of ["#tickets", "#tickets/ENG-2368", "#tickets/x"]) expect(layoutFromHash(hash)).toBeNull();
 	});
 
 	test("every page hash names its page and route, and a session or layout hash names none", () => {

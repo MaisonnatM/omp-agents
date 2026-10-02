@@ -8,9 +8,9 @@ import { putJson } from "../../api";
 import { hashForInbox, type OpenMode } from "../../routing";
 import { samePullRequest } from "../../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
-import type { QuickActionId } from "../../quick-actions";
+import { type PullRequestActionId, pullRequestActions } from "../../quick-actions";
+import { QuickActionsMenu } from "../quick-actions";
 import { Avatar, IconTip, Reviewers, STATE_ICON } from "./avatars";
-import { QuickActionsMenu } from "./quick-actions";
 
 const CHECK_ICON: Record<Exclude<CheckState, "none">, [LucideIcon, string, string]> = {
 	passing: [CircleCheck, "text-emerald-600 dark:text-emerald-400", "Checks on the latest commit passed"],
@@ -115,8 +115,8 @@ interface RowProps {
 	targeted: boolean;
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The quick action whose session is starting for this PR, if any. */
-	pending: QuickActionId | null;
-	onQuickAction: (action: QuickActionId, mode: OpenMode) => void;
+	pending: PullRequestActionId | null;
+	onQuickAction: (action: PullRequestActionId, mode: OpenMode) => void;
 }
 
 export function PullRequestRow({ pr, sessions, targeted, onOpen, pending, onQuickAction }: RowProps) {
@@ -170,7 +170,12 @@ export function PullRequestRow({ pr, sessions, targeted, onOpen, pending, onQuic
 					<Unresolved unresolved={pr.unresolved} />
 					{pr.checks !== "none" && <IconTip icon={CHECK_ICON[pr.checks]} />}
 					{pr.conflicts && <IconTip icon={CONFLICTS_ICON} />}
-					<QuickActionsMenu pr={pr} pending={pending} onRun={onQuickAction} />
+					<QuickActionsMenu
+						actions={pullRequestActions(pr)}
+						pending={pending}
+						onRun={onQuickAction}
+						label="Quick actions: start a session that works on this pull request"
+					/>
 					{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
 					<span className="w-14 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={new Date(pr.updatedAt).toLocaleString()}>
 						{age(pr.updatedAt)}

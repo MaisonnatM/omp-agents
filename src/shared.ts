@@ -126,6 +126,30 @@ export interface TicketsAnswer {
 	tickets: Ticket[];
 }
 
+/** A Linear issue's identifier as Linear shows it, `ENG-2368`: its team's key, a dash, and its number. */
+export const TICKET_ID = /^[A-Z][A-Z0-9_]*-\d+$/;
+
+export interface TicketComment {
+	author: string;
+	/** Markdown. */
+	body: string;
+	/** ISO time. */
+	createdAt: string;
+}
+
+/** `GET /api/ticket?id=<identifier>`: a Linear issue in full, for the tickets page's sheet. */
+export interface TicketDetail extends Ticket {
+	/** Markdown, with Linear's issue mentions as links and its images as image links. */
+	description: string;
+	createdBy: string | null;
+	/** ISO time. */
+	createdAt: string;
+	/** What Linear links the issue to: pull requests, documents, and other pages. */
+	attachments: { title: string; url: string }[];
+	/** Comment threads, oldest first, each its first comment then the replies. */
+	threads: TicketComment[][];
+}
+
 /** How one check on a pull request's head commit went; `skipped` covers neutral and skipped runs. */
 export type CheckRunState = "passing" | "failing" | "pending" | "skipped";
 

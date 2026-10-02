@@ -317,7 +317,7 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 				{groups.map(({ status, tickets: { length } }) => (
 					<SectionLink
 						key={status}
-						href={hashForTickets()}
+						href={hashForTickets(null)}
 						section={ticketSection(status)}
 						chosen={target}
 						title={status}
