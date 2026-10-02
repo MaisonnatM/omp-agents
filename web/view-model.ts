@@ -25,9 +25,39 @@ export interface AgentNode {
 
 const PAST_PREFIX = "past/";
 const SETTINGS = "settings";
+const INBOX = "inbox";
+const SESSION_PREFIX = "session/";
 
-/** The hash of the inbox page, which lists the pull requests of the sidebar's project. */
-export const INBOX_HASH = "#inbox";
+/** The inbox page, and the pull request whose row it scrolls to and highlights; `null` for none. */
+export interface InboxRoute {
+	target: PullRequest | null;
+}
+
+/**
+ * `#inbox` opens the inbox page, which lists the pull requests of the sidebar's project, and
+ * `#inbox/<owner>/<repo>/<number>` opens it at that pull request's row. Any other `#inbox/…` opens the page alone.
+ */
+export function inboxFromHash(hash: string): InboxRoute | null {
+	const raw = hash.replace(/^#/, "");
+	if (raw !== INBOX && !raw.startsWith(`${INBOX}/`)) return null;
+	const match = /^inbox\/([\w.-]+)\/([\w.-]+)\/(\d+)$/.exec(raw);
+	return { target: match ? { owner: match[1]!, repo: match[2]!, number: Number(match[3]) } : null };
+}
+
+export const hashForInbox = (target: PullRequest | null): string =>
+	target ? `#${INBOX}/${target.owner}/${target.repo}/${target.number}` : `#${INBOX}`;
+
+/** `#session/<id>` names a session by its id, which outlives the host running it, for links from outside the page. */
+export function sessionFromHash(hash: string): string | null {
+	const raw = hash.replace(/^#/, "");
+	return raw.startsWith(SESSION_PREFIX) && raw.length > SESSION_PREFIX.length ? decodeURIComponent(raw.slice(SESSION_PREFIX.length)) : null;
+}
+
+/** The view a session id opens: the live host that runs the session, else its saved transcript. */
+export function viewForSession(sessionId: string, hosts: RosterHost[]): View {
+	const host = hosts.find(h => h.sessionId === sessionId);
+	return host ? { kind: "live", instanceId: host.instanceId, agentId: null } : { kind: "past", sessionId };
+}
 
 /** Where the settings page reads project files and config from; `null` for user-level only. */
 export interface SettingsRoute {
@@ -68,7 +98,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, or `inbox`. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, or `session`. */
 function viewFromPane(pane: string): View {
 	if (pane.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(pane.slice(PAST_PREFIX.length)) };
 	const slash = pane.indexOf("/");
@@ -99,10 +129,11 @@ export function hashForLayout({ panes, focus, maximized }: Layout): string {
 
 /**
  * The layout a hash names, keeping the first {@link MAX_PANES} distinct views and focus on the view it named.
- * `null` for the settings and inbox pages, which leave the panes behind them alone.
+ * `null` for the settings and inbox pages, which leave the panes behind them alone, and for a `#session/<id>` link,
+ * which names no layout until the session lists show where that session runs.
  */
 export function layoutFromHash(hash: string): Layout | null {
-	if (settingsFromHash(hash) || hash === INBOX_HASH) return null;
+	if (settingsFromHash(hash) || inboxFromHash(hash) || sessionFromHash(hash) !== null) return null;
 	const marked = hash.replace(/^#/, "");
 	const maximized = marked.endsWith(MAXIMIZED);
 	const raw = maximized ? marked.slice(0, -MAXIMIZED.length) : marked;
@@ -230,7 +261,7 @@ const PR_LINK = /(?:github\.com\/([\w.-]+)\/([\w.-]+)\/pull|app\.graphite\.com\/
 
 /**
  * Whether a past session matches the sidebar filter. A pasted PR link matches the sessions that
- * submitted that PR; `#6596` or `6596` also matches any PR with that number; any other text
+ * submitted or worked on that PR; `#6596` or `6596` also matches any PR with that number; any other text
  * matches the title or directory.
  */
 export function matchesFilter(session: PastSession, label: string, query: string): boolean {

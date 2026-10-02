@@ -6,10 +6,11 @@ import {
 	closePane,
 	defaultCwd,
 	forkPoints,
+	hashForInbox,
 	hashForLayout,
 	hashForSettings,
 	hashForView,
-	INBOX_HASH,
+	inboxFromHash,
 	inboxSections,
 	type Layout,
 	layoutFromHash,
@@ -17,9 +18,11 @@ import {
 	modelName,
 	modelOrg,
 	openView,
+	sessionFromHash,
 	settingsFromHash,
 	splitSelector,
 	toBlocks,
+	viewForSession,
 } from "./view-model";
 
 const agent = (id: string, parentId: string | null): AgentRow => ({
@@ -122,8 +125,24 @@ describe("layout hash", () => {
 		expect(settingsFromHash("#7c51f77b2a1bf7ba")).toBeNull();
 	});
 
-	test("the inbox page is not read as a layout", () => {
-		expect(layoutFromHash(INBOX_HASH)).toBeNull();
+	test("the inbox hash opens the page alone or at one pull request's row, and no inbox hash is read as a layout", () => {
+		const target = { owner: "acme", repo: "web.app", number: 6596 };
+		expect(hashForInbox(null)).toBe("#inbox");
+		expect(hashForInbox(target)).toBe("#inbox/acme/web.app/6596");
+		expect(inboxFromHash("#inbox")).toEqual({ target: null });
+		expect(inboxFromHash("#inbox/acme/web.app/6596")).toEqual({ target });
+		expect(inboxFromHash("#inbox/acme/web.app")).toEqual({ target: null });
+		expect(inboxFromHash("#7c51f77b2a1bf7ba")).toBeNull();
+		for (const hash of ["#inbox", "#inbox/acme/web.app/6596", "#inbox/acme"]) expect(layoutFromHash(hash)).toBeNull();
+	});
+
+	test("a session link names the session by id and opens the host that runs it, else its saved transcript", () => {
+		const hosts = [{ instanceId: "7c51f77b", sessionId: "01a0f6a5-181e" }] as RosterHost[];
+		expect(sessionFromHash("#session/01a0f6a5-181e")).toBe("01a0f6a5-181e");
+		expect(sessionFromHash("#past/01a0f6a5-181e")).toBeNull();
+		expect(layoutFromHash("#session/01a0f6a5-181e")).toBeNull();
+		expect(viewForSession("01a0f6a5-181e", hosts)).toEqual(live("7c51f77b"));
+		expect(viewForSession("9d2e0000", hosts)).toEqual(past("9d2e0000"));
 	});
 });
 
@@ -235,7 +254,7 @@ describe("matchesFilter", () => {
 		cwd: "/Users/me/code/webapp",
 		cwdDisplay: "~/code/webapp",
 		modifiedAt: 0,
-		pullRequests: [{ owner: "acme", repo: "webapp", number: 6596 }],
+		pullRequests: [{ owner: "acme", repo: "webapp", number: 6596, link: "worked" }],
 	} satisfies PastSession;
 	const matches = (query: string) => matchesFilter(session, session.title, query);
 

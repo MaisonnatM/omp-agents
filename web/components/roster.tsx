@@ -22,7 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useShortcuts } from "../shortcuts";
 import type { Launch } from "../use-dashboard";
-import { agentTree, hashForView, INBOX_HASH, MAX_PANES, matchesFilter, type OpenMode, sameView, workspaces } from "../view-model";
+import { agentTree, hashForInbox, hashForView, MAX_PANES, matchesFilter, type OpenMode, sameView, workspaces } from "../view-model";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** Pixels of extra indent per nesting level below the first subagent level. */
@@ -236,7 +236,7 @@ export function Roster({
 					<Keyboard />
 				</Button>
 				<Button asChild variant="ghost" size="icon-compact" active={inboxOpen} className="shrink-0 text-muted-foreground">
-					<a href={INBOX_HASH} title="Pull request inbox" aria-label="Pull request inbox" aria-current={inboxOpen ? "page" : undefined}>
+					<a href={hashForInbox(null)} title="Pull request inbox" aria-label="Pull request inbox" aria-current={inboxOpen ? "page" : undefined}>
 						<Inbox />
 					</a>
 				</Button>

@@ -1,4 +1,5 @@
 import {
+	Check,
 	ChevronRight,
 	CircleCheck,
 	CircleDashed,
@@ -6,6 +7,7 @@ import {
 	GitMerge,
 	GitPullRequest,
 	GitPullRequestDraft,
+	Link2,
 	type LucideIcon,
 	MessageSquare,
 	RefreshCw,
@@ -18,18 +20,21 @@ import type {
 	PastSession,
 	Person,
 	PullRequest,
+	PullRequestLink,
 	RepoInbox,
 	ReviewDecision,
 	Reviewer,
 	ReviewerState,
 	RosterHost,
+	SessionLinksEdit,
+	SessionLinksResult,
 	View,
 } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { readJson } from "../settings-api";
-import { graphiteUrl, inboxSections, type OpenMode, samePullRequest } from "../view-model";
+import { graphiteUrl, inboxSections, type OpenMode, pullRequestUrl, samePullRequest } from "../view-model";
 import { Header } from "./conversation";
 import { age, hostLabel, modeOf, pastLabel, projectName } from "./roster";
 
@@ -76,17 +81,24 @@ function storedCollapsed(): Set<string> {
 	}
 }
 
-/** The folded repositories and sections, and a toggle that keeps them in localStorage across reloads. */
-function useCollapsed(): [ReadonlySet<string>, (key: string) => void] {
+/** The folded repositories and sections, a toggle, and an unfold for a row the page must show; localStorage keeps them across reloads. */
+function useCollapsed(): [ReadonlySet<string>, (key: string) => void, (keys: string[]) => void] {
 	const [collapsed, setCollapsed] = useState(storedCollapsed);
-	const toggle = (key: string): void => {
-		const next = new Set(collapsed);
-		if (!next.delete(key)) next.add(key);
+	const store = (next: Set<string>): void => {
 		setCollapsed(next);
 		if (next.size === 0) localStorage.removeItem(COLLAPSED_KEY);
 		else localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
 	};
-	return [collapsed, toggle];
+	const toggle = (key: string): void => {
+		const next = new Set(collapsed);
+		if (!next.delete(key)) next.add(key);
+		store(next);
+	};
+	const expand = (keys: string[]): void => {
+		const next = new Set(collapsed);
+		if (keys.filter(key => next.delete(key)).length > 0) store(next);
+	};
+	return [collapsed, toggle, expand];
 }
 
 interface FoldProps {
@@ -179,28 +191,91 @@ function Unresolved({ unresolved: { count, exact } }: { unresolved: InboxPullReq
 
 interface SessionLink {
 	view: View;
+	sessionId: string;
 	label: string;
+	link: PullRequestLink;
 }
 
-/** The sessions whose transcripts submitted `pr`, live ones first. */
+/** The sessions that submitted `pr`, then those that worked on it, live ones first within each. */
 function sessionsFor(pr: InboxPullRequest, hosts: RosterHost[], past: PastSession[]): SessionLink[] {
-	const submitted = (row: { pullRequests: PullRequest[] }): boolean => row.pullRequests.some(other => samePullRequest(other, pr));
-	return [
-		...hosts.filter(submitted).map((host): SessionLink => ({ view: { kind: "live", instanceId: host.instanceId, agentId: null }, label: hostLabel(host) })),
-		...past.filter(submitted).map((session): SessionLink => ({ view: { kind: "past", sessionId: session.sessionId }, label: pastLabel(session) })),
+	const linked = [
+		...hosts.flatMap(host => {
+			const found = host.pullRequests.find(other => samePullRequest(other, pr));
+			const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
+			return found ? [{ view, sessionId: host.sessionId, label: hostLabel(host), link: found.link }] : [];
+		}),
+		...past.flatMap(session => {
+			const found = session.pullRequests.find(other => samePullRequest(other, pr));
+			const view: View = { kind: "past", sessionId: session.sessionId };
+			return found ? [{ view, sessionId: session.sessionId, label: pastLabel(session), link: found.link }] : [];
+		}),
 	];
+	return linked.toSorted((a, b) => Number(a.link === "worked") - Number(b.link === "worked"));
+}
+
+/** The DOM id of a pull request's row, which an inbox link to that PR scrolls to. */
+const rowId = (pr: PullRequest): string => `inbox-pr-${pr.owner}/${pr.repo}/${pr.number}`.toLowerCase();
+
+type Writing = { phase: "idle" | "writing" } | { phase: "done"; changed: boolean } | { phase: "failed"; error: string };
+
+/** Writes links to the PR's sessions into its description on GitHub. Only a click writes, and a rerun replaces the links it wrote. */
+function LinkSessionsButton({ pr, sessions }: { pr: PullRequest; sessions: SessionLink[] }) {
+	const [writing, setWriting] = useState<Writing>({ phase: "idle" });
+	const write = async (): Promise<void> => {
+		setWriting({ phase: "writing" });
+		const edit: SessionLinksEdit = { owner: pr.owner, repo: pr.repo, number: pr.number, sessionIds: sessions.map(session => session.sessionId) };
+		try {
+			const response = await fetch("/api/pull-request/sessions", {
+				method: "PUT",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify(edit),
+			});
+			setWriting({ phase: "done", changed: (await readJson<SessionLinksResult>(response)).changed });
+		} catch (err) {
+			setWriting({ phase: "failed", error: err instanceof Error ? err.message : String(err) });
+		}
+	};
+	const count = sessions.length === 1 ? "this session" : `these ${sessions.length} sessions`;
+	const label =
+		writing.phase === "done"
+			? writing.changed
+				? `Linked ${count} in the pull request's description`
+				: `The pull request's description already links ${count}`
+			: writing.phase === "failed"
+				? `Cannot write the description: ${writing.error}`
+				: `Link ${count} in the pull request's description on GitHub. The links open only on this machine.`;
+	return (
+		<Tooltip content={label}>
+			<Button
+				variant="ghost"
+				size="icon-compact"
+				aria-label={label}
+				loading={writing.phase === "writing"}
+				className={cn("text-muted-foreground", writing.phase === "failed" && "text-red-600 dark:text-red-400")}
+				onClick={() => void write()}
+			>
+				{writing.phase === "done" ? <Check /> : <Link2 />}
+			</Button>
+		</Tooltip>
+	);
 }
 
 interface RowProps {
 	pr: InboxPullRequest;
 	sessions: SessionLink[];
+	/** The PR the inbox link named, highlighted. */
+	targeted: boolean;
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
-function PullRequestRow({ pr, sessions, onOpen }: RowProps) {
+function PullRequestRow({ pr, sessions, targeted, onOpen }: RowProps) {
 	const review = pr.state === "merged" || pr.review === "none" ? null : REVIEW_LABEL[pr.review];
 	return (
-		<li className="flex items-start gap-3 px-3 py-2.5 hover:bg-muted/50">
+		<li
+			id={rowId(pr)}
+			data-targeted={targeted || undefined}
+			className={cn("flex scroll-my-6 items-start gap-3 px-3 py-2.5 hover:bg-muted/50", targeted && "bg-accent/60 ring-2 ring-inset ring-ring hover:bg-accent/60")}
+		>
 			<IconTip icon={STATE_ICON[pr.state]} className="mt-0.5" />
 			<Avatar person={pr.author} label={`Opened by ${pr.author.login}`} className="mt-px" />
 			<div className="min-w-0 flex-1 space-y-0.5">
@@ -228,11 +303,14 @@ function PullRequestRow({ pr, sessions, onOpen }: RowProps) {
 					{pr.role === "reviewer" && <span>· by {pr.author.login}</span>}
 					{sessions.slice(0, 3).map(session => (
 						<button
-							key={session.view.kind === "live" ? session.view.instanceId : session.view.sessionId}
+							key={session.sessionId}
 							type="button"
-							title="Open the session that submitted it (⌘-click to split)"
+							title={`Open the session that ${session.link === "submitted" ? "submitted" : "worked on"} it (⌘-click to split)`}
 							onClick={event => onOpen(session.view, modeOf(event))}
-							className="max-w-48 truncate rounded bg-muted px-1.5 py-px text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+							className={cn(
+								"max-w-48 truncate rounded px-1.5 py-px text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
+								session.link === "submitted" ? "bg-muted" : "ring-1 ring-inset ring-border",
+							)}
 						>
 							{session.label}
 						</button>
@@ -244,6 +322,7 @@ function PullRequestRow({ pr, sessions, onOpen }: RowProps) {
 				{review && <span className={review[1]}>{review[0]}</span>}
 				<Unresolved unresolved={pr.unresolved} />
 				{pr.checks !== "none" && <IconTip icon={CHECK_ICON[pr.checks]} />}
+				{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
 				<span className="w-14 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={new Date(pr.updatedAt).toLocaleString()}>
 					{age(pr.updatedAt)}
 				</span>
@@ -256,12 +335,13 @@ interface RepoProps {
 	inbox: RepoInbox;
 	hosts: RosterHost[];
 	past: PastSession[];
+	target: PullRequest | null;
 	collapsed: ReadonlySet<string>;
 	onToggle: (key: string) => void;
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
-function RepoSection({ inbox, hosts, past, collapsed, onToggle, onOpen }: RepoProps) {
+function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen }: RepoProps) {
 	const name = `${inbox.owner}/${inbox.repo}`;
 	const key = name.toLowerCase();
 	const headingId = `inbox-${name}`;
@@ -294,7 +374,13 @@ function RepoSection({ inbox, hosts, past, collapsed, onToggle, onOpen }: RepoPr
 					{sectionOpen && (
 						<ul id={listId} className="divide-y divide-border overflow-hidden rounded-md border border-border">
 							{section.pullRequests.map(pr => (
-								<PullRequestRow key={pr.number} pr={pr} sessions={sessionsFor(pr, hosts, past)} onOpen={onOpen} />
+								<PullRequestRow
+									key={pr.number}
+									pr={pr}
+									sessions={sessionsFor(pr, hosts, past)}
+									targeted={target !== null && samePullRequest(pr, target)}
+									onOpen={onOpen}
+								/>
 							))}
 						</ul>
 					)}
@@ -321,20 +407,69 @@ function RepoSection({ inbox, hosts, past, collapsed, onToggle, onOpen }: RepoPr
 	);
 }
 
+/** The fold keys of the repository and the section that list `pr`, or `null` when the inbox does not list it. */
+function placeOf(inbox: Inbox, pr: PullRequest): { repo: string; section: string } | null {
+	for (const repo of inbox.repos) {
+		if ("error" in repo) continue;
+		const section = inboxSections(repo.pullRequests).find(({ pullRequests }) => pullRequests.some(other => samePullRequest(other, pr)));
+		const key = `${repo.owner}/${repo.repo}`.toLowerCase();
+		if (section) return { repo: key, section: `${key}:${section.title}` };
+	}
+	return null;
+}
+
+/** Why the inbox does not list the PR a link named, and the way to it on GitHub. `allProjects`: the sidebar shows every project. */
+function MissingTarget({ target, inbox, allProjects }: { target: PullRequest; inbox: Inbox; allProjects: boolean }) {
+	const repo = `${target.owner}/${target.repo}`;
+	const covered = inbox.repos.some(other => `${other.owner}/${other.repo}`.toLowerCase() === repo.toLowerCase());
+	let reason = `${repo}#${target.number} is not in this inbox, which covers only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}. `;
+	if (covered) {
+		reason = `${repo}#${target.number} is not in this inbox. The inbox lists your open pull requests, your merges from the last seven days, and the pull requests that wait for your review. `;
+	} else if (allProjects) {
+		reason = `${repo}#${target.number} is not in this inbox, because no session ran in ${repo}. `;
+	}
+	return (
+		<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+			{reason}
+			<a href={pullRequestUrl(target)} target="_blank" rel="noreferrer" className="text-foreground underline underline-offset-2">
+				Open it on GitHub
+			</a>
+		</p>
+	);
+}
+
 interface InboxPageProps {
 	/** The sidebar's project `cwd`, or `null` for every project. */
 	project: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
+	/** The PR an inbox link named: its row unfolds, scrolls into view, and stays highlighted. */
+	target: PullRequest | null;
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
 /** The pull requests of the sidebar's project, or of every project, in Graphite's inbox sections, read from GitHub. */
-export function InboxPage({ project, hosts, past, onOpen }: InboxPageProps) {
+export function InboxPage({ project, hosts, past, target, onOpen }: InboxPageProps) {
 	const [load, setLoad] = useState<Load>({ phase: "loading" });
 	const [refreshing, setRefreshing] = useState(false);
 	const controller = useRef<AbortController | null>(null);
-	const [collapsed, toggleCollapsed] = useCollapsed();
+	const [collapsed, toggleCollapsed, expand] = useCollapsed();
+	const place = load.phase === "loaded" && target ? placeOf(load.inbox, target) : null;
+	const targetKey = target && rowId(target);
+	/** The target whose row the page already unfolded and scrolled to; folding it again afterwards stays folded. */
+	const shown = useRef<string | null>(null);
+
+	useEffect(() => {
+		if (!place || !targetKey || shown.current === targetKey) return;
+		const folded = [place.repo, place.section].filter(key => collapsed.has(key));
+		if (folded.length > 0) {
+			// Unfolding renders the row; this effect runs again and then scrolls to it.
+			expand(folded);
+			return;
+		}
+		shown.current = targetKey;
+		document.getElementById(targetKey)?.scrollIntoView({ block: "center", behavior: "smooth" });
+	}, [place?.repo, place?.section, targetKey, collapsed]);
 
 	const fetchInbox = useCallback(
 		async (fresh: boolean): Promise<void> => {
@@ -374,6 +509,7 @@ export function InboxPage({ project, hosts, past, onOpen }: InboxPageProps) {
 		const { repos, unmatched } = load.inbox;
 		body = (
 			<>
+				{target && !place && <MissingTarget target={target} inbox={load.inbox} allProjects={project === null} />}
 				{repos.length === 0 && <p className="text-sm text-muted-foreground">No session ran in a GitHub repository.</p>}
 				{repos.map(repo => (
 					<RepoSection
@@ -381,6 +517,7 @@ export function InboxPage({ project, hosts, past, onOpen }: InboxPageProps) {
 						inbox={repo}
 						hosts={hosts}
 						past={past}
+						target={target}
 						collapsed={collapsed}
 						onToggle={toggleCollapsed}
 						onOpen={onOpen}

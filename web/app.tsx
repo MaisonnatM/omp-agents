@@ -1,5 +1,5 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
-import { type ReactNode, useMemo, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import type { View } from "../src/shared";
 import { Button } from "@/components/ui/button";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -13,24 +13,20 @@ import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { SidebarResizeHandle, storedSidebarWidth } from "./components/sidebar-resize-handle";
 import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
 import { useShortcuts } from "./shortcuts";
-import { EMPTY_PANE, useDashboard } from "./use-dashboard";
+import { EMPTY_PANE, useDashboard, useHash } from "./use-dashboard";
 import {
 	closePane,
 	defaultCwd,
 	type ForkPoint,
 	focusedView,
 	hashForSettings,
+	hashForInbox,
 	hashForView,
-	INBOX_HASH,
+	inboxFromHash,
 	sameView,
 	settingsFromHash,
 	workspaces,
 } from "./view-model";
-
-const subscribeHash = (onChange: () => void): (() => void) => {
-	window.addEventListener("hashchange", onChange);
-	return () => window.removeEventListener("hashchange", onChange);
-};
 
 /** A pane's cell in the 2x2 grid; the third of three spans the bottom row. */
 const paneArea = (index: number, count: number): string =>
@@ -73,9 +69,9 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 export function App() {
 	const { state, send, open, focus, show, setLaunchOpen, create, fork } = useDashboard();
 	const initialWidth = useMemo(storedSidebarWidth, []);
-	const hash = useSyncExternalStore(subscribeHash, () => location.hash);
+	const hash = useHash();
 	const settings = settingsFromHash(hash);
-	const inbox = hash === INBOX_HASH;
+	const inbox = inboxFromHash(hash);
 	const [project, pickProject] = useProject(workspaces(state.hosts, state.past));
 	const { layout } = state;
 	const view = focusedView(layout);
@@ -99,7 +95,7 @@ export function App() {
 		},
 		inbox: () => {
 			if (inbox) show(layout);
-			else location.hash = INBOX_HASH;
+			else location.hash = hashForInbox(null);
 		},
 		restore: () => {
 			if (!maximized) return false;
@@ -154,7 +150,7 @@ export function App() {
 	} else if (inbox) {
 		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
 		main = state.listed ? (
-			<InboxPage project={project} hosts={state.hosts} past={state.past} onOpen={open} />
+			<InboxPage project={project} hosts={state.hosts} past={state.past} target={inbox.target} onOpen={open} />
 		) : (
 			<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
 		);
@@ -234,7 +230,7 @@ export function App() {
 					defaultCwd={defaultCwd(view, state.hosts, state.past)}
 					settingsHref={settingsHref}
 					settingsOpen={settings !== null}
-					inboxOpen={inbox}
+					inboxOpen={inbox !== null}
 					project={project}
 					onPickProject={pickProject}
 					onOpen={open}

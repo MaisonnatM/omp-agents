@@ -8,10 +8,11 @@ import { DashboardSession, type DashboardUpdate, type ForkedSession } from "./da
 import { type LiveUpdate, SessionGuest } from "./guest";
 import { FileTail } from "./tail";
 import { displayPath, type HostSnapshot, listHosts, listModels, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
-import { loadInbox } from "./inbox";
+import { loadInbox, repoOf } from "./inbox";
 import { PullRequestIndex } from "./pull-requests";
+import { linkSessions, type SessionEntry } from "./session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "./settings";
-import type { ClientMsg, HostStatus, Item, LiveView, PullRequest, RosterHost, ServerMsg, SettingsError, UserAnswer, View } from "./shared";
+import type { ClientMsg, HostStatus, Item, LinkedPullRequest, LiveView, RosterHost, ServerMsg, SettingsError, UserAnswer, View } from "./shared";
 import { isObject } from "./transcript";
 import { fetchPlanUsage } from "./usage";
 
@@ -55,7 +56,7 @@ const dashboards = new Map<string, DashboardSession>();
 let files: SavedSession[] = [];
 let fileById = new Map<string, SavedSession>();
 let pastJson = "";
-const pullRequestIndex = new PullRequestIndex();
+const pullRequestIndex = new PullRequestIndex(repoOf);
 let listTimer: NodeJS.Timeout | undefined;
 /** Views some socket shows, with how many sockets show each; each has a tail while its file is known. */
 const watched = new Map<string, { view: View; sockets: number }>();
@@ -69,7 +70,7 @@ const itemsTopic = (key: string): string => `items:${key}`;
 const send = (ws: Socket, msg: ServerMsg): void => void ws.send(JSON.stringify(msg));
 const publish = (topic: string, msg: ServerMsg): void => void server.publish(topic, JSON.stringify(msg));
 
-const pullRequestsOf = (sessionId: string): PullRequest[] => {
+const pullRequestsOf = (sessionId: string): LinkedPullRequest[] => {
 	const path = fileById.get(sessionId)?.path;
 	return path ? pullRequestIndex.of(path) : [];
 };
@@ -576,13 +577,38 @@ async function models(req: Request): Promise<Response> {
 	return answer(async () => ({ models: await listModels() }));
 }
 
-/** `GET /api/inbox[?cwd=<dir>][&fresh]`: the pull requests of that workspace's repository, else of every workspace's. */
+/**
+ * `GET /api/inbox[?cwd=<dir>][&fresh]`: the pull requests of that workspace's repository, else of every workspace's.
+ * Each answer also tells the pull-request index which branch heads which PR, which links the sessions that pushed them.
+ */
 async function inbox(req: Request): Promise<Response> {
 	if (!allowedHost(req)) return fail(403, "forbidden host");
 	const cwd = workspaceCwd(req);
 	if (cwd instanceof Response) return cwd;
 	const fresh = new URL(req.url).searchParams.has("fresh");
-	return answer(() => loadInbox(cwd === null ? knownCwds() : [cwd], fresh));
+	return answer(async () => {
+		const loaded = await loadInbox(cwd === null ? knownCwds() : [cwd], fresh);
+		let linked = false;
+		for (const repo of loaded.repos) if ("pullRequests" in repo && pullRequestIndex.learnHeads(repo, repo.pullRequests)) linked = true;
+		if (linked) {
+			pushPast();
+			pushRoster();
+		}
+		return loaded;
+	});
+}
+
+/** A write's JSON body, or the response refusing it. Only this app's own page may write, and only with a JSON body, which a cross-site form cannot send. */
+async function writeBody(req: Request): Promise<{ body: unknown } | Response> {
+	if (!sameOrigin(req)) return fail(403, "forbidden origin");
+	if (req.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") {
+		return fail(415, "Expected a JSON body");
+	}
+	try {
+		return { body: await req.json() };
+	} catch {
+		return fail(400, "The body is not valid JSON");
+	}
 }
 
 /**
@@ -591,20 +617,41 @@ async function inbox(req: Request): Promise<Response> {
  */
 function settingsWrite(save: (cwd: string | null, body: unknown) => Promise<unknown>) {
 	return async (req: Request): Promise<Response> => {
-		if (!sameOrigin(req)) return fail(403, "forbidden origin");
-		if (req.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") {
-			return fail(415, "Expected a JSON body");
-		}
+		const write = await writeBody(req);
+		if (write instanceof Response) return write;
 		const cwd = workspaceCwd(req);
-		if (cwd instanceof Response) return cwd;
-		let body: unknown;
-		try {
-			body = await req.json();
-		} catch {
-			return fail(400, "The body is not valid JSON");
-		}
-		return answer(() => save(cwd, body));
+		return cwd instanceof Response ? cwd : answer(() => save(cwd, write.body));
 	};
+}
+
+/**
+ * `PUT /api/pull-request/sessions`: `{ owner, repo, number, sessionIds }`. Writes links to those sessions into the
+ * PR's description on GitHub, each of which must have submitted or worked on that PR. Answers `{ changed }`.
+ */
+async function sessionLinks(req: Request): Promise<Response> {
+	const write = await writeBody(req);
+	if (write instanceof Response) return write;
+	const { body } = write;
+	if (
+		!isObject(body) ||
+		typeof body.owner !== "string" ||
+		typeof body.repo !== "string" ||
+		!Number.isSafeInteger(body.number) ||
+		!Array.isArray(body.sessionIds) ||
+		body.sessionIds.length === 0 ||
+		!body.sessionIds.every(id => typeof id === "string")
+	) {
+		return fail(400, "Expected { owner, repo, number, sessionIds }");
+	}
+	const pr = { owner: body.owner, repo: body.repo, number: body.number as number };
+	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
+	const sessions: SessionEntry[] = [];
+	for (const sessionId of new Set(body.sessionIds as string[])) {
+		const linked = pullRequestsOf(sessionId).find(other => `${other.owner}/${other.repo}#${other.number}`.toLowerCase() === name.toLowerCase());
+		if (!linked) return fail(404, `Session ${sessionId} did not submit or work on ${name}`);
+		sessions.push({ sessionId, link: linked.link });
+	}
+	return answer(() => linkSessions(pr, sessions, `http://${HOSTNAME}:${PORT}`));
 }
 
 let server: Server<SocketData>;
@@ -619,6 +666,7 @@ try {
 			"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
 			"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
 			"/api/models": { GET: models },
+			"/api/pull-request/sessions": { PUT: sessionLinks },
 			"/api/inbox": { GET: inbox },
 		},
 		fetch(req, srv) {

@@ -15,8 +15,8 @@ export interface Repo {
 	repo: string;
 }
 
-/** `git@github.com:o/r.git`, `ssh://git@github.com/o/r.git`, or `https://github.com/o/r`. */
-const GITHUB_REMOTE = /^(?:git@github\.com:|(?:https|ssh|git):\/\/(?:[^@/]+@)?github\.com\/)([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
+/** `git@github.com:o/r.git`, `ssh://git@github.com/o/r.git`, or `https://github.com/o/r`; `git push` prints `github.com:o/r.git`. */
+const GITHUB_REMOTE = /^(?:(?:[^@/:]+@)?github\.com:|(?:https|ssh|git):\/\/(?:[^@/]+@)?github\.com\/)([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
 
 export function parseRemote(url: string): Repo | null {
 	const match = GITHUB_REMOTE.exec(url.trim());
@@ -27,7 +27,7 @@ export function parseRemote(url: string): Repo | null {
 const remotes = new Map<string, Promise<Repo | null>>();
 
 /** The GitHub repository that `origin` names in `cwd`. */
-function repoOf(cwd: string): Promise<Repo | null> {
+export function repoOf(cwd: string): Promise<Repo | null> {
 	const known = remotes.get(cwd);
 	if (known) return known;
 	const repo = (async () => {

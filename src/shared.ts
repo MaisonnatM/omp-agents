@@ -4,11 +4,22 @@ export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
 
 export type AgentStatus = "running" | "idle" | "parked" | "aborted";
 
-/** A GitHub pull request a session submitted with `gt submit` or `gh pr create`. */
+/** A GitHub pull request. */
 export interface PullRequest {
 	owner: string;
 	repo: string;
 	number: number;
+}
+
+/**
+ * How a session's tool calls touched a pull request: it submitted it with `gt submit` or `gh pr create`, or it
+ * worked on it with `gh pr checkout`, `edit`, `comment`, `review`, `merge`, or `ready`, a `git push` to its branch,
+ * or an omp `pr://` read.
+ */
+export type PullRequestLink = "submitted" | "worked";
+
+export interface LinkedPullRequest extends PullRequest {
+	link: PullRequestLink;
 }
 
 /** Where the viewer stands on a pull request in the inbox: they wrote it, or someone asked them to review it. */
@@ -93,8 +104,8 @@ interface RosterHostBase {
 	status: HostStatus;
 	control: ControlPhase;
 	agents: AgentRow[];
-	/** What the session and its subagents submitted; the session's own first. */
-	pullRequests: PullRequest[];
+	/** What the session and its subagents submitted or worked on; the session's own first. */
+	pullRequests: LinkedPullRequest[];
 	/** Questions the session waits on, oldest first. */
 	requests: UserRequest[];
 }
@@ -121,8 +132,8 @@ export interface PastSession {
 	cwdDisplay: string;
 	/** Last write to the session file, in ms since the epoch. */
 	modifiedAt: number;
-	/** What the session and its subagents submitted; the session's own first. */
-	pullRequests: PullRequest[];
+	/** What the session and its subagents submitted or worked on; the session's own first. */
+	pullRequests: LinkedPullRequest[];
 }
 
 export interface LiveView {
@@ -287,6 +298,16 @@ export interface FileEdit {
 export interface SettingsError {
 	error: string;
 	conflict?: true;
+}
+
+/** `PUT /api/pull-request/sessions`: write links to these sessions, each linked to the PR, into its description on GitHub. */
+export interface SessionLinksEdit extends PullRequest {
+	sessionIds: string[];
+}
+
+/** The answer to a {@link SessionLinksEdit}: whether the description changed. A rerun with the same sessions changes nothing. */
+export interface SessionLinksResult {
+	changed: boolean;
 }
 
 /** What a file feeds into omp: instructions, settings, or something it can run. */

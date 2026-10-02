@@ -26,6 +26,7 @@ describe("parseRemote", () => {
 		expect(parseRemote("git@github.com:acme/web.app.git\n")).toEqual({ owner: "acme", repo: "web.app" });
 		expect(parseRemote("https://github.com/acme/webapp")).toEqual({ owner: "acme", repo: "webapp" });
 		expect(parseRemote("ssh://git@github.com/acme/webapp.git")).toEqual({ owner: "acme", repo: "webapp" });
+		expect(parseRemote("github.com:acme/webapp.git")).toEqual({ owner: "acme", repo: "webapp" });
 		expect(parseRemote("https://gitlab.com/acme/webapp.git")).toBeNull();
 	});
 });
