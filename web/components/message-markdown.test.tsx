@@ -21,3 +21,18 @@ test("unfinished streaming fences remain code blocks", () => {
 	expect(html).toContain("hljs-keyword");
 	expect(html).toContain("answer");
 });
+
+test("GitHub text renders the HTML GitHub allows, hides comments, and still refuses executable markup", () => {
+	const html = renderToStaticMarkup(
+		<MessageMarkdown
+			github
+			text={'<!-- CURSOR_SUMMARY -->\n<details><summary>More</summary>\n\nHidden **bold**\n\n</details>\n\n<img src="x" onerror="alert(1)"> <script>alert(1)</script>\n\n```ts\nconst answer = 42\n```'}
+		/>,
+	);
+	expect(html).toContain("<details><summary>More</summary>");
+	expect(html).toContain("<strong>bold</strong>");
+	expect(html).toContain("hljs-keyword");
+	expect(html).not.toContain("CURSOR_SUMMARY");
+	expect(html).not.toContain("onerror");
+	expect(html).not.toContain("<script>");
+});

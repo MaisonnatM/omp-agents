@@ -91,6 +91,68 @@ export interface Inbox {
 	unmatched: string[];
 }
 
+/** How one check on a pull request's head commit went; `skipped` covers neutral and skipped runs. */
+export type CheckRunState = "passing" | "failing" | "pending" | "skipped";
+
+export interface PullRequestCheck {
+	name: string;
+	state: CheckRunState;
+	url: string | null;
+}
+
+export interface PullRequestFile {
+	path: string;
+	additions: number;
+	deletions: number;
+	change: "added" | "deleted" | "modified" | "renamed" | "copied" | "changed";
+}
+
+export interface PullRequestComment {
+	author: Person;
+	/** Markdown, as written on GitHub. */
+	body: string;
+	/** When it was posted, in ms since the epoch. */
+	at: number;
+	url: string | null;
+}
+
+/** A comment on the pull request, or a submitted review, which may carry no text when it only approves or asks for changes. */
+export interface PullRequestEvent extends PullRequestComment {
+	/** `null` for a plain comment. */
+	review: "approved" | "changes-requested" | "commented" | "dismissed" | null;
+}
+
+/** An unresolved review thread on a line of a file; `line` is `null` once the line no longer exists in the diff. */
+export interface PullRequestThread {
+	path: string;
+	line: number | null;
+	comments: PullRequestComment[];
+}
+
+/** One pull request in full, as the inbox shows it in place of opening GitHub. */
+export interface PullRequestDetail extends PullRequest {
+	title: string;
+	body: string;
+	author: Person;
+	reviewers: Reviewer[];
+	state: "open" | "draft" | "merged" | "closed";
+	review: ReviewDecision;
+	head: string;
+	base: string;
+	additions: number;
+	deletions: number;
+	/** All files the PR changes; `files` lists at most the first 100. */
+	changedFiles: number;
+	files: PullRequestFile[];
+	/** The head commit's checks, failing first, then pending, passing, and skipped. */
+	checks: PullRequestCheck[];
+	threads: PullRequestThread[];
+	/** Comments and reviews, oldest first: the latest 50 of each. */
+	conversation: PullRequestEvent[];
+	/** In ms since the epoch. */
+	createdAt: number;
+}
+
 /** A subagent of a session. The main agent is the session itself and is not listed. */
 export interface AgentRow {
 	id: string;

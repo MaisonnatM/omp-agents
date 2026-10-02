@@ -217,7 +217,7 @@ const typedText = (item: Exclude<Item, ToolItem>): string =>
 	item.kind === "user" && item.skill ? [`/skill:${item.skill}`, item.text].filter(Boolean).join(" ") : item.text;
 
 /**
- * The PRs a session submitted or worked on, after a separator. The number opens the PR's row in the inbox, the
+ * The PRs a session submitted or worked on, after a separator. The number opens the PR's details in the inbox, the
  * arrow after it opens the PR on GitHub, and the Graphite mark opens it on Graphite.
  */
 function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
