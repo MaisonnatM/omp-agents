@@ -16,9 +16,6 @@ import {
 	SidebarMenuBadge,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	SidebarMenuSub,
-	SidebarMenuSubButton,
-	SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -26,9 +23,7 @@ import { useShortcuts } from "../shortcuts";
 import type { Launch } from "../use-dashboard";
 import { useInbox } from "../use-inbox";
 import {
-	agentTree,
 	hashForInbox,
-	hashForView,
 	type InboxTarget,
 	inboxRepoKey,
 	inboxSectionId,
@@ -40,9 +35,6 @@ import {
 	workspaces,
 } from "../view-model";
 import { StatusDot, statusLabel } from "./status-dot";
-
-/** Pixels of extra indent per nesting level below the first subagent level. */
-const NEST_INDENT = 12;
 
 /** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
 const PROJECT_KEY = "omp-agents.sidebar-project";
@@ -389,8 +381,6 @@ export function Roster({
 												</span>
 												<span className="truncate text-xs text-muted-foreground">
 													{[
-														host.cwdDisplay,
-														host.model ?? "no model",
 														statusLabel(host.status),
 														host.source === "terminal" && !host.relayConnected && "relay offline",
 														host.pullRequests.map(pr => `#${pr.number}`).join(" "),
@@ -401,44 +391,6 @@ export function Roster({
 											</span>
 										</SidebarMenuButton>
 										{splitAction(hostView, hostLabel(host))}
-										{host.agents.length > 0 && (
-											<SidebarMenuSub aria-label={`Subagents of ${hostLabel(host)}`}>
-												{agentTree(host.agents).map(({ agent, depth }) => {
-													const agentView: View = { kind: "live", instanceId: host.instanceId, agentId: agent.id };
-													return (
-														<SidebarMenuSubItem key={agent.id}>
-															<SidebarMenuSubButton
-																href={hashForView(agentView)}
-																onClick={event => {
-																	// Shift- and middle-clicks keep the link's own new-window behavior.
-																	if (event.button !== 0 || event.shiftKey || event.altKey) return;
-																	event.preventDefault();
-																	onOpen(agentView, modeOf(event));
-																}}
-																isActive={isOpen(agentView)}
-																className="h-auto min-h-7 py-1"
-																style={{ marginInlineStart: depth * NEST_INDENT }}
-																title={agent.activity ?? undefined}
-															>
-																<StatusDot status={agent.status} />
-																<span className="flex min-w-0 flex-1 flex-col">
-																	<span className="flex items-baseline gap-1.5">
-																		<span className="truncate text-foreground">{agent.id}</span>
-																		<span className="shrink-0 text-xs text-muted-foreground">
-																			{agent.kind} · {statusLabel(agent.status)}
-																		</span>
-																	</span>
-																	{agent.activity && (
-																		<span className="truncate text-xs text-muted-foreground">{agent.activity}</span>
-																	)}
-																</span>
-															</SidebarMenuSubButton>
-															{splitAction(agentView, agent.id)}
-														</SidebarMenuSubItem>
-													);
-												})}
-											</SidebarMenuSub>
-										)}
 									</SidebarMenuItem>
 								);
 							})}
@@ -484,11 +436,11 @@ export function Roster({
 														{age(session.modifiedAt)}
 													</span>
 												</span>
-												<span className="truncate text-xs text-muted-foreground">
-													{[session.cwdDisplay || "unknown directory", session.pullRequests.map(pr => `#${pr.number}`).join(" ")]
-														.filter(Boolean)
-														.join(" · ")}
-												</span>
+												{session.pullRequests.length > 0 && (
+													<span className="truncate text-xs text-muted-foreground">
+														{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}
+													</span>
+												)}
 											</span>
 										</SidebarMenuButton>
 										{splitAction(pastView, pastLabel(session))}
