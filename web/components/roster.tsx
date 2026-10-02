@@ -419,26 +419,24 @@ export function Roster({
 									>
 										<SidebarMenuItem>
 											<SidebarMenuButton
-												size="lg"
 												isActive={isOpen(hostView)}
 												onClick={event => onOpen(hostView, modeOf(event))}
-												title={`${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
+												title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
 											>
 												<StatusDot status={host.status} />
-												<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-													<span className="flex items-baseline gap-2">
-														<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
-														<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
-													</span>
-													<span className="truncate text-xs text-muted-foreground">
-														{[
-															statusLabel(host.status),
-															host.source === "terminal" && !host.relayConnected && "relay offline",
-															host.pullRequests.map(pr => `#${pr.number}`).join(" "),
-														]
-															.filter(Boolean)
-															.join(" · ")}
-													</span>
+												<span className="flex min-w-0 flex-1 items-baseline gap-2">
+													<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
+													{(host.pullRequests.length > 0 || (host.source === "terminal" && !host.relayConnected)) && (
+														<span className="shrink-0 text-xs text-muted-foreground">
+															{[
+																host.source === "terminal" && !host.relayConnected && "relay offline",
+																host.pullRequests.map(pr => `#${pr.number}`).join(" "),
+															]
+																.filter(Boolean)
+																.join(" · ")}
+														</span>
+													)}
+													<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
 												</span>
 											</SidebarMenuButton>
 											{splitAction(hostView, hostLabel(host))}
@@ -491,24 +489,19 @@ export function Roster({
 									>
 										<SidebarMenuItem>
 											<SidebarMenuButton
-												size="lg"
 												isActive={isOpen(pastView)}
 												onClick={event => onOpen(pastView, modeOf(event))}
 												title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
 											>
 												<span className="size-4 shrink-0" aria-hidden />
-												<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-													<span className="flex items-baseline gap-2">
-														<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
-														<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
-															{age(session.modifiedAt)}
-														</span>
-													</span>
+												<span className="flex min-w-0 flex-1 items-baseline gap-2">
+													<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
 													{session.pullRequests.length > 0 && (
-														<span className="truncate text-xs text-muted-foreground">
+														<span className="shrink-0 text-xs text-muted-foreground">
 															{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}
 														</span>
 													)}
+													<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(session.modifiedAt)}</span>
 												</span>
 											</SidebarMenuButton>
 											{splitAction(pastView, pastLabel(session))}
