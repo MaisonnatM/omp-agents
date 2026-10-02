@@ -33,7 +33,7 @@ const NEXT: Record<Stage, string> = {
 	draft_pr: "Push and run `gh pr create --draft` with the issue ID in the title and `Fixes <ID>` in the body.",
 	thermonuclear: `Run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${CHECKBOX}\` to the PR body.`,
 	ready_gate: "Ask the user to approve, then run `gh pr ready <N>`.",
-	live: "Work the first need below. Stop at 'ready to merge'. Never merge without an explicit request.",
+	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
 	merged: "Done.",
 };
 
@@ -114,6 +114,7 @@ export function liveNeeds(s: PrStatus): Need[] {
 export function liveSummary(s: PrStatus): string {
 	if (s.state === "MERGED") return "merged";
 	if (s.state === "CLOSED") return "closed without merge";
+	if (s.draft) return "draft; not live for review";
 	const needs = liveNeeds(s);
 	if (needs.length > 0) return needs.map(n => `${LABEL[n.kind]} (${n.detail})`).join(" · ");
 	if (s.approved && s.checks !== "pending") return "approved, check forge mergeability";
@@ -124,7 +125,8 @@ export function renderLines(s: ShipState): string[] {
 	const at = STAGES.indexOf(s.stage);
 	const ref = [s.issue, s.pr ? `PR #${s.pr}${s.prStatus?.draft ? " (draft)" : ""}` : ""].filter(Boolean).join(" · ");
 	const lines = [`ship ${ref || "(no ticket yet)"}`];
-	lines.push(STAGES.map((stage, i) => `${i < at || s.stage === "merged" ? "✓" : i === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
+	lines.push(STAGES.slice(0, 4).map((stage, i) => `${i < at || s.stage === "merged" ? "✓" : i === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
+	lines.push(STAGES.slice(4).map((stage, i) => `${i + 4 < at || s.stage === "merged" ? "✓" : i + 4 === at ? "▶" : "○"} ${LABEL[stage]}`).join("  "));
 	if (s.stage === "live" && s.prStatus) lines.push(`Live: ${liveSummary(s.prStatus)}`);
 	if (s.stage === "live" && s.work) lines.push(`Working on: ${LABEL[s.work]}`);
 	if (s.prStatus && !s.prStatus.reviewed && (s.stage === "thermonuclear" || s.stage === "ready_gate")) lines.push("Thermonuclear checkbox missing from the PR body");
@@ -261,7 +263,8 @@ export default function ship(pi: ExtensionAPI) {
 	pi.on("tool_call", async (event, ctx) => {
 		if (event.toolName !== "bash") return;
 		const input = event.input;
-		const cwd = input.cwd || ctx.cwd;
+		if (typeof input.command !== "string") return;
+		const cwd = typeof input.cwd === "string" ? input.cwd : ctx.cwd;
 		for (const seg of segments(input.command)) {
 			const create = seg.match(/\bgh\s+pr\s+create\b(.*)$/);
 			if (create && !args(create[1]).some(a => a === "--draft" || a === "-d" || a.startsWith("--draft="))) {
@@ -271,16 +274,22 @@ export default function ship(pi: ExtensionAPI) {
 			if (ready && !args(ready[1]).includes("--undo")) {
 				const reason = await bodyHasCheckbox(args(ready[1]), cwd);
 				if (reason) return { block: true, reason };
+				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "The thermonuclear review is complete. Mark this draft ready for human review?"))) {
+					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
+				}
 			}
 			if (/\bgt\s+(submit|ss)\b/.test(seg) && /(^|\s)(--publish|-p)(\s|$)/.test(seg)) {
 				const reason = await bodyHasCheckbox([], cwd);
 				if (reason) return { block: true, reason };
+				if (!ctx.hasUI || !(await ctx.ui.confirm("Put PR live for review?", "Publish this reviewed PR for human review?"))) {
+					return { block: true, reason: "The PR remains a draft until the operator approves putting it live." };
+				}
 			}
 		}
 	});
 
 	pi.on("tool_result", async (event, ctx) => {
-		if (event.toolName !== "bash" || event.isError || !state) return;
+		if (event.toolName !== "bash" || event.isError || !state || typeof event.input.command !== "string") return;
 		const command = event.input.command;
 		const output = event.content.map(c => (c.type === "text" ? c.text : "")).join("\n");
 		const url = output.match(/https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/pull\/(\d+)/);
@@ -293,6 +302,13 @@ export default function ship(pi: ExtensionAPI) {
 		}
 	});
 
+	const toolParamsSchema = z.object({
+		stage: z.enum([...STAGES, ...LIVE_WORK]).optional().describe("Stage or live work to record. Omit to read."),
+		issue: z.string().optional().describe("Linear issue identifier, e.g. ENG-123"),
+		pr: z.number().int().optional().describe("Pull request number"),
+		repo: z.string().optional().describe("owner/name; resolved from the cwd when omitted"),
+		note: z.string().optional().describe("One-line status note; empty string clears it"),
+	});
 	pi.registerTool({
 		loadMode: "essential",
 		name: "ship_stage",
@@ -302,16 +318,22 @@ export default function ship(pi: ExtensionAPI) {
 			"While live, record the work you start: rebase, fix_comments, or fix_ci; record `live` again after you push.",
 			"Call with no stage to read the current stage, the PR's live needs from GitHub, and the next action.",
 		].join(" "),
-		parameters: z.object({
-			stage: z.enum([...STAGES, ...LIVE_WORK]).optional().describe("Stage or live work to record. Omit to read."),
-			issue: z.string().optional().describe("Linear issue identifier, e.g. ENG-123"),
-			pr: z.number().int().optional().describe("Pull request number"),
-			repo: z.string().optional().describe("owner/name; resolved from the cwd when omitted"),
-			note: z.string().optional().describe("One-line status note; empty string clears it"),
-		}),
+		parameters: toolParamsSchema,
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const { stage, issue, pr, repo, note } = params;
+			const parsed = toolParamsSchema.safeParse(params);
+			if (!parsed.success) return { content: [{ type: "text", text: "Invalid ship stage input." }], isError: true };
+			const { stage, issue, pr, repo, note } = parsed.data;
+			await refresh(ctx);
 			if (stage || issue || pr || repo || note !== undefined) {
+				if (stage === "ready_gate" && state?.prStatus?.reviewed !== true) {
+					return { content: [{ type: "text", text: "The PR must have the thermonuclear checkbox after the review fixes are pushed." }], isError: true };
+				}
+				if ((stage === "live" || stage === "rebase" || stage === "fix_comments" || stage === "fix_ci") && (!state?.prStatus || state.prStatus.draft || state.prStatus.state !== "OPEN")) {
+					return { content: [{ type: "text", text: "The PR must be open and ready for review before recording live work." }], isError: true };
+				}
+				if (stage === "merged" && state?.prStatus?.state !== "MERGED") {
+					return { content: [{ type: "text", text: "GitHub has not reported this PR merged." }], isError: true };
+				}
 				const base: ShipState = state ?? { stage: "ticket", updatedAt: "" };
 				const isWork = stage === "rebase" || stage === "fix_comments" || stage === "fix_ci";
 				const next: ShipState = {

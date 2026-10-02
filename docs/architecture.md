@@ -4,7 +4,16 @@ The server's design, its protocols, and its HTTP API. For installation, see the 
 
 ## omp modules
 
-The server imports omp's own modules from the installed package: the Collab modules (`src/collab/registry.ts`, `protocol.ts`, `crypto.ts`, and `relay-client.ts`), the session listing (`src/session/session-listing.ts`), and the RPC client (`src/modes/rpc/rpc-client.ts`). It does not reimplement a protocol, the encryption, or the session-file format, so it always speaks the same version as the sessions it shows.
+The server imports omp's own modules from the installed package, so it does not reimplement a protocol, the encryption, or the session-file format, and it always speaks the same version as the sessions it shows. `src/omp.ts` is the only file that imports them. It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
+
+Paths in this document that start with `pi-coding-agent/`, `pi-tui/`, or `pi-utils/` are inside that install, in `@oh-my-pi/`. They are not in this repository. The main ones:
+
+- Collab: `pi-coding-agent/src/collab/registry.ts`, `protocol.ts`, `crypto.ts`, and `relay-client.ts`.
+- Session files: `pi-coding-agent/src/session/session-listing.ts` and `session-loader.ts`.
+- RPC: `pi-coding-agent/src/modes/rpc/rpc-client.ts`, `rpc-frame.ts`, and the frame types in `rpc-types.ts`. `RpcClient` drops `extension_ui_request` and `session_info_update` frames, so `src/omp.ts` reads them from its own copy of the child's stdout (`UNROUTED_FRAMES`); see [Dashboard sessions](#dashboard-sessions).
+- Settings and discovery: `pi-coding-agent/src/config/settings.ts`, `pi-coding-agent/src/discovery/index.ts`, and `pi-coding-agent/src/task/discovery.ts`.
+- Completions: `pi-tui/src/autocomplete.ts`, and the skills and slash commands in `pi-coding-agent/src/extensibility/`.
+- Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
 
 ## Transcripts
 
@@ -52,7 +61,7 @@ Plan quota comes from `omp usage --json`, run through this same package's CLI. o
 
 ## HTTP API
 
-**Settings** reads `GET /api/settings`, or `GET /api/settings?cwd=<directory>` for a workspace. The server loads omp's settings with omp's own read-only loader (`Settings.loadReadOnly` in `src/config/settings.ts`), the same way a session that starts in that directory would, and applies omp's rule for which roles use the `default` chain (`expandDefaultRetryFallbackChains`). It finds the files through omp's capability discovery (`src/discovery`), agent discovery (`src/task/discovery.ts`), and `findConfigFile` for `APPEND_SYSTEM.md`, and then reads each file from disk. Each file carries the SHA-256 of its text. `GET /api/models` runs `omp models --json` for the pickers.
+**Settings** reads `GET /api/settings`, or `GET /api/settings?cwd=<directory>` for a workspace. The server loads omp's settings with omp's own read-only loader (`Settings.loadReadOnly` in `pi-coding-agent/src/config/settings.ts`), the same way a session that starts in that directory would, and applies omp's rule for which roles use the `default` chain (`expandDefaultRetryFallbackChains`). It finds the files through omp's capability discovery (`pi-coding-agent/src/discovery`), agent discovery (`pi-coding-agent/src/task/discovery.ts`), and `findConfigFile` for `APPEND_SYSTEM.md`, and then reads each file from disk. Each file carries the SHA-256 of its text. `GET /api/models` runs `omp models --json` for the pickers.
 
 Edits go through two endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
 
@@ -75,6 +84,46 @@ Questions use Fluid's `ask-user-questions`, installed from `https://www.fluidfun
 
 ## Code layout
 
-The server lives in `src/`. `src/omp.ts` loads the omp modules, lists the session files, starts RPC children, reads omp's config and file discovery, and writes routing changes through omp. `src/tail.ts` reads one transcript file incrementally. `src/transcript.ts` folds session-file lines and live events into display items. `src/pull-requests.ts` finds the pull requests each session submitted or worked on. `src/session-links.ts` writes the session block into a pull request's description. `src/inbox.ts` maps each workspace to its GitHub repository and reads the inbox's pull requests with one `gh api graphql` call per repository, and one pull request's details with one more. `src/guest.ts` runs one Collab guest per terminal session. `src/dashboard-session.ts` drives one session that the dashboard started. `src/user-requests.ts` parses the RPC and Collab question frames into one request shape, writes the answers back, and keeps each session's pending questions. `src/usage.ts` runs `omp usage --json` and parses it into plan windows. `src/settings.ts` builds the settings page's model routing and file list and checks and saves its edits. `src/server.ts` serves the page, the WebSocket, and the `/api/` endpoints, watches the sessions directory, and points each open view at its file. Tests run with `PI_CODING_AGENT_DIR` pointed at a temporary directory (`src/test-env.ts`, preloaded by `bunfig.toml`), so they never touch `~/.omp/agent`.
+The server lives in `src/`:
 
-The page lives in `web/`. Bun's HTML import bundles it, and `bun-plugin-tailwind` (set in `bunfig.toml`) compiles Tailwind v4. `web/use-dashboard.ts` holds the socket and the page state. `web/use-inbox.ts` holds the inbox cache that the sidebar and the inbox page share, one entry per project. `web/use-pull-request.ts` reads the details of the pull request that the inbox's sheet shows. `web/view-model.ts` holds the pure transforms. `web/settings-api.ts` makes the settings page's requests. `web/shortcuts.ts` holds the keyboard shortcut table, which both the key listeners and the shortcut dialog read. Most files in `web/components/ui`, `web/lib`, and `web/hooks` come from the Fluid registry. The dashboard adds an `onKeyDown` hook to Fluid's `InputMessage` so the completion list can intercept arrow keys, Tab, Enter, and Esc before the normal submit behavior. It replaces the queue of Fluid's `InputMessage`, which held every message sent during a response in the browser, with rows that the page passes in, each with a tag and edit and remove callbacks, because omp or the server holds the queue. It adds a `header` prop to Fluid's `AskUserQuestions`, which replaces the `Question 1 of 1` line with the question's status and **Dismiss**, and a `description` field for a question, which shows a confirm's message. Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight`; raw HTML is escaped and unsafe link schemes are filtered by default.
+- `src/server.ts`: the entry point. Serves the page, the WebSocket, and the `/api/` endpoints, lists the hosts and session files, builds the roster (`rosterHosts`), watches the sessions directory, and points each open view at its file. `PORT` sets the port, 4317 by default.
+- `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `ServerMsg`, `ClientMsg`, the inbox and pull request shapes).
+- `src/omp.ts`: loads the omp modules, lists the session files, starts RPC children, reads omp's config and file discovery, and writes routing changes through omp.
+- `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
+- `src/guest.ts`: runs one Collab guest per terminal session.
+- `src/user-requests.ts`: parses the RPC and Collab question frames into one request shape, writes the answers back, and keeps each session's pending questions.
+- `src/commands.ts`: the composer's `/` and `@` completions, and the expansion of file commands and skills before a guest prompt.
+- `src/tail.ts`: reads one transcript file incrementally.
+- `src/transcript.ts`: folds session-file lines and live events into display items.
+- `src/pull-requests.ts`: finds the pull requests each session submitted or worked on.
+- `src/session-links.ts`: writes the session block into a pull request's description.
+- `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
+- `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
+- `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
+- `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory. `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`.
+
+The page lives in `web/`. Bun's HTML import bundles `web/index.html` and `web/main.tsx`, and `bun-plugin-tailwind` (set in `bunfig.toml`) compiles Tailwind v4:
+
+- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, settings, and new-session pages, and focus handling.
+- `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
+- `web/view-model.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
+- `web/use-inbox.ts`: the inbox cache that the sidebar and the inbox page share, one entry per project.
+- `web/use-pull-request.ts`: reads the details of the pull request that the inbox's sheet shows.
+- `web/settings-api.ts`: the settings page's requests.
+- `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
+- `web/components/roster.tsx`: the left sidebar's session and inbox lists, and the project picker.
+- `web/components/conversation.tsx`: a pane, with its header, transcript, and composer.
+- `web/components/inbox-page.tsx`, `settings-page.tsx`, and `new-session.tsx`: the other pages.
+- `web/components/ui`, `web/lib`, and `web/hooks`: mostly files from the Fluid registry; see below.
+
+A new field on a session row starts in `src/shared.ts` (`RosterHost`, or `PastSession` for past sessions). `rosterHosts` in `src/server.ts` fills it in, and `web/components/roster.tsx` and the header in `web/components/conversation.tsx` show it.
+
+`templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`). Its `agent/` files are copies of the maintainer's `~/.omp/agent` files, except for `AGENTS.md`, which is a generic version. After you edit one of those live files, copy it back. `bun run omp-template --dry-run` shows a copy that has drifted as `keep yours`.
+
+Changes the dashboard makes to Fluid's components:
+
+- It adds an `onKeyDown` hook to `InputMessage`, so the completion list can intercept arrow keys, Tab, Enter, and Esc before the normal submit behavior.
+- It replaces `InputMessage`'s queue, which held every message sent during a response in the browser, with rows that the page passes in, each with a tag and edit and remove callbacks, because omp or the server holds the queue.
+- It adds a `header` prop to `AskUserQuestions`, which replaces the `Question 1 of 1` line with the question's status and **Dismiss**, and a `description` field for a question, which shows a confirm's message.
+
+Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight` (`web/components/message-markdown.tsx`). In agent text, raw HTML is escaped and unsafe link schemes are filtered. Text from GitHub, which means pull request descriptions and comments, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's.
