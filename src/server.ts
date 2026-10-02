@@ -314,7 +314,7 @@ async function launch(ws: Socket, input: string): Promise<void> {
 	}
 	dashboards.set(session.instanceId, session);
 	pushRoster();
-	send(ws, { t: "created", result: { ok: true, instanceId: session.instanceId } });
+	send(ws, { t: "created", result: { ok: true, instanceId: session.instanceId, cwd: session.cwd } });
 }
 
 /** Fork the view's session file at the user prompt `entryId` into a new dashboard session, and answer once it is ready. */
@@ -334,7 +334,7 @@ async function fork(ws: Socket, view: View, entryId: string): Promise<void> {
 	dashboards.set(forked.session.instanceId, forked.session);
 	pushRoster();
 	pushPast();
-	send(ws, { t: "forked", result: { ok: true, instanceId: forked.session.instanceId, prompt: forked.prompt } });
+	send(ws, { t: "forked", result: { ok: true, instanceId: forked.session.instanceId, cwd: forked.session.cwd, prompt: forked.prompt } });
 }
 
 const watching = (ws: Socket, instanceId: string): boolean =>

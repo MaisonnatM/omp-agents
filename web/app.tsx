@@ -1,5 +1,5 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { View } from "../src/shared";
 import { Button } from "@/components/ui/button";
 import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -76,6 +76,11 @@ export function App() {
 	const settings = settingsFromHash(hash);
 	const inbox = inboxFromHash(hash);
 	const [project, pickProject] = useProject(workspaces(state.hosts, state.past));
+	const { started } = state;
+	// A session started in another directory than the selected project would be missing from the sidebar.
+	useEffect(() => {
+		if (started && project !== null && started.cwd !== project) pickProject(started.cwd);
+	}, [started]);
 	const { layout } = state;
 	const view = focusedView(layout);
 	const viewHost = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
@@ -234,7 +239,7 @@ export function App() {
 					open={settings || inbox ? [] : layout.panes}
 					connected={state.connected}
 					launch={state.launch}
-					defaultCwd={defaultCwd(view, state.hosts, state.past)}
+					defaultCwd={defaultCwd(view, state.hosts, state.past, project)}
 					settingsHref={settingsHref}
 					settingsOpen={settings !== null}
 					inboxOpen={inbox !== null}

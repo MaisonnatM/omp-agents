@@ -70,6 +70,8 @@ export interface DashboardState {
 	fork: Fork;
 	/** Composer text for a forked session's first mount. */
 	draft: { view: LiveView; text: string } | null;
+	/** The session this page last started or forked, once it is ready. */
+	started: { instanceId: string; cwd: string } | null;
 	/** `null` until the server's first `omp usage` run finishes. */
 	usage: { plans: PlanUsage[]; error: string | null } | null;
 	/** Last model list the server sent for each open live session, by instance id. */
@@ -158,13 +160,19 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 					return updatePane(state, msg.view, pane => ({ ...pane, items: applyItems(pane.items, msg.reset, msg.items) }));
 				case "created":
 					if (state.launch.phase !== "starting") return state;
-					return { ...state, launch: msg.result.ok ? { phase: "closed" } : { phase: "editing", error: msg.result.error } };
+					if (!msg.result.ok) return { ...state, launch: { phase: "editing", error: msg.result.error } };
+					return { ...state, launch: { phase: "closed" }, started: { instanceId: msg.result.instanceId, cwd: msg.result.cwd } };
 				case "forked": {
 					const fork = state.fork;
 					if (fork.phase !== "forking") return state;
 					if (!msg.result.ok) return { ...state, fork: { phase: "failed", view: fork.view, itemId: fork.itemId, error: msg.result.error } };
 					const view: LiveView = { kind: "live", instanceId: msg.result.instanceId, agentId: null };
-					return { ...state, fork: { phase: "idle" }, draft: { view, text: fork.point.prefill ? msg.result.prompt : "" } };
+					return {
+						...state,
+						fork: { phase: "idle" },
+						draft: { view, text: fork.point.prefill ? msg.result.prompt : "" },
+						started: { instanceId: msg.result.instanceId, cwd: msg.result.cwd },
+					};
 				}
 				case "completions":
 					return updatePane(state, msg.view, pane => ({ ...pane, completions: { reqId: msg.reqId, items: msg.items, error: msg.error } }));
@@ -210,6 +218,7 @@ export function useDashboard(): Dashboard {
 		launch: { phase: "closed" },
 		fork: { phase: "idle" },
 		draft: null,
+		started: null,
 		usage: null,
 		models: new Map(),
 	});

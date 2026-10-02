@@ -180,17 +180,17 @@ export function closePane({ panes, focus, maximized }: Layout, index: number): L
 
 /**
  * Where a new session starts unless the user types another directory: the open session's,
- * else the newest live one's, else the newest past one's.
+ * else the newest live one's, else the newest past one's, each only from `project` when one is selected.
  */
-export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[]): string {
+export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[], project: string | null): string {
 	const open =
 		view?.kind === "live"
 			? hosts.find(host => host.instanceId === view.instanceId)
 			: past.find(session => session.sessionId === view?.sessionId);
-	const newestHost = hosts.toSorted((a, b) => b.startedAt - a.startedAt)[0];
+	const rows = [open, ...hosts.toSorted((a, b) => b.startedAt - a.startedAt), ...past];
 	// Sessions from old omp versions recorded no directory.
-	const candidates = [open, newestHost, ...past].map(row => row?.cwdDisplay).filter(Boolean);
-	return candidates[0] ?? "~";
+	const chosen = rows.find(row => row?.cwdDisplay && (project === null || row.cwd === project));
+	return chosen?.cwdDisplay ?? "~";
 }
 
 /** Directories sessions ran in, live ones first, then past ones newest first. The settings page reads a workspace from one. */

@@ -215,9 +215,10 @@ export type ControlPhase =
 	| { phase: "reconnecting"; reason: string }
 	| { phase: "ended"; reason: string };
 
-export type LaunchResult = { ok: true; instanceId: string } | { ok: false; error: string };
+/** `cwd` is the absolute directory the new session runs in. */
+export type LaunchResult = { ok: true; instanceId: string; cwd: string } | { ok: false; error: string };
 /** `prompt` is the text of the prompt forked at, for the composer. */
-export type ForkResult = { ok: true; instanceId: string; prompt: string } | { ok: false; error: string };
+export type ForkResult = { ok: true; instanceId: string; cwd: string; prompt: string } | { ok: false; error: string };
 /** One `/` or `@` suggestion, with the composer text and caret it produces when accepted (omp's own insertion). */
 export interface CompletionItem {
 	kind: "command" | "skill" | "file" | "directory";
