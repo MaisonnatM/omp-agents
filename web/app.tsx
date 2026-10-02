@@ -10,6 +10,7 @@ import { PlanUsageFooter } from "./components/plan-usage";
 import { Roster, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings-page";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
+import { SubagentsSidebar } from "./components/subagents-sidebar";
 import { SidebarResizeHandle, storedSidebarWidth } from "./components/sidebar-resize-handle";
 import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
 import { useShortcuts } from "./shortcuts";
@@ -33,19 +34,21 @@ import {
 const paneArea = (index: number, count: number): string =>
 	count === 3 && index === 2 ? "2 / 1 / 3 / 3" : `${Math.floor(index / 2) + 1} / ${(index % 2) + 1}`;
 
-/** omp's Agent Hub key: into the session list at the open row, and from there back to the focused pane's composer. */
+/**
+ * omp's Agent Hub key: into the sidebars at the open row (a session on the left, a subagent on the right),
+ * and from there back to the focused pane's composer.
+ */
 function toggleSessionsFocus(): void {
-	const sidebar = document.querySelector<HTMLElement>('[data-sidebar="sidebar"]');
-	if (sidebar?.contains(document.activeElement)) {
+	const sidebars = [...document.querySelectorAll<HTMLElement>('[data-sidebar="sidebar"]')];
+	if (sidebars.some(sidebar => sidebar.contains(document.activeElement))) {
 		const pane = document.querySelector<HTMLElement>("[data-pane][data-focused]");
 		(pane?.querySelector<HTMLElement>("textarea:not(:disabled)") ?? pane)?.focus();
 		return;
 	}
 	// The kept-mounted sessions list stays in the DOM, hidden, while the Inbox tab shows.
 	const row =
-		sidebar?.querySelector<HTMLElement>(
-			':is([data-sidebar="menu-button"], [data-sidebar="menu-sub-button"])[data-active]:not([hidden] *)',
-		) ?? sidebar?.querySelector<HTMLElement>('[data-sidebar="menu-button"]:not([hidden] *)');
+		document.querySelector<HTMLElement>('[data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active]:not([hidden] *)') ??
+		document.querySelector<HTMLElement>('[data-slot="sidebar"][data-side="left"] [data-sidebar="menu-button"]:not([hidden] *)');
 	row?.focus();
 }
 function EmptyState({ rosterError }: { rosterError: string | null }) {
@@ -261,6 +264,7 @@ export function App() {
 			<SidebarInset>
 				<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
 			</SidebarInset>
+			{viewHost && !settings && !inbox && <SubagentsSidebar host={viewHost} open={layout.panes} onOpen={open} />}
 			<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 		</SidebarProvider>
 	);
