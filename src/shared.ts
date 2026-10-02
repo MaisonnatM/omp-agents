@@ -20,10 +20,25 @@ export type ReviewDecision = "approved" | "changes-requested" | "review-required
 /** The rollup of the head commit's checks. */
 export type CheckState = "passing" | "failing" | "pending" | "none";
 
+/** A GitHub user, bot, or team; `avatarUrl` is `null` when GitHub reports none. */
+export interface Person {
+	login: string;
+	avatarUrl: string | null;
+}
+
+/** Where one reviewer stands: their latest review, or `requested` while a review from them is pending. */
+export type ReviewerState = "approved" | "changes-requested" | "commented" | "requested";
+
+export interface Reviewer extends Person {
+	state: ReviewerState;
+}
+
 /** A pull request on the inbox page, as GitHub reports it now. */
 export interface InboxPullRequest extends PullRequest {
 	title: string;
-	author: string;
+	author: Person;
+	/** Requested reviewers first, then the others in GitHub's order of their latest reviews. */
+	reviewers: Reviewer[];
 	role: InboxRole;
 	state: "open" | "draft" | "merged";
 	review: ReviewDecision;

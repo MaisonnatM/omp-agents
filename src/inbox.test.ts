@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { parseInboxAnswer, parseRemote } from "./inbox";
 
 const repo = { owner: "acme", repo: "webapp" };
+const me = { login: "me", avatarUrl: "https://avatars.example/me" };
 
 const node = (number: number, fields: Record<string, unknown>) => ({
 	number,
@@ -13,7 +14,7 @@ const node = (number: number, fields: Record<string, unknown>) => ({
 	baseRefName: "main",
 	updatedAt: "2026-10-01T10:00:00Z",
 	mergedAt: null,
-	author: { login: "me" },
+	author: me,
 	repository: { defaultBranchRef: { name: "main" } },
 	commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
 	...fields,
@@ -39,7 +40,7 @@ describe("parseInboxAnswer", () => {
 							node(2, { isDraft: true, reviewDecision: null, commits: { nodes: [{ commit: { statusCheckRollup: null } }] } }),
 						],
 					},
-					reviewing: { nodes: [node(3, { author: { login: "teammate" }, reviewDecision: "CHANGES_REQUESTED" }), node(1, {})] },
+					reviewing: { nodes: [node(3, { author: { login: "teammate", avatarUrl: null }, reviewDecision: "CHANGES_REQUESTED" }), node(1, {})] },
 					merged: { nodes: [node(4, { state: "MERGED", mergedAt: "2026-09-30T08:00:00Z" })] },
 				},
 			},
@@ -50,7 +51,8 @@ describe("parseInboxAnswer", () => {
 				...repo,
 				number: 1,
 				title: "PR 1",
-				author: "me",
+				author: me,
+				reviewers: [],
 				role: "author",
 				state: "open",
 				review: "approved",
@@ -63,7 +65,8 @@ describe("parseInboxAnswer", () => {
 				...repo,
 				number: 2,
 				title: "PR 2",
-				author: "me",
+				author: me,
+				reviewers: [],
 				role: "author",
 				state: "draft",
 				review: "none",
@@ -76,7 +79,8 @@ describe("parseInboxAnswer", () => {
 				...repo,
 				number: 3,
 				title: "PR 3",
-				author: "teammate",
+				author: { login: "teammate", avatarUrl: null },
+				reviewers: [],
 				role: "reviewer",
 				state: "open",
 				review: "changes-requested",
@@ -89,7 +93,8 @@ describe("parseInboxAnswer", () => {
 				...repo,
 				number: 4,
 				title: "PR 4",
-				author: "me",
+				author: me,
+				reviewers: [],
 				role: "author",
 				state: "merged",
 				review: "review-required",
@@ -98,6 +103,41 @@ describe("parseInboxAnswer", () => {
 				stackedOn: null,
 				updatedAt: Date.parse("2026-09-30T08:00:00Z"),
 			},
+		]);
+	});
+
+	test("lists each reviewer once: a pending request over an older review, and neither the author nor a dismissed review", () => {
+		const [pr] = parseInboxAnswer(
+			{
+				data: {
+					authored: {
+						nodes: [
+							node(1, {
+								reviewRequests: {
+									nodes: [
+										{ requestedReviewer: { login: "bsaintot", avatarUrl: "https://avatars.example/bsaintot" } },
+										{ requestedReviewer: { slug: "frontend", avatarUrl: "https://avatars.example/frontend" } },
+									],
+								},
+								latestReviews: {
+									nodes: [
+										{ state: "COMMENTED", author: { login: "bsaintot", avatarUrl: "https://avatars.example/bsaintot" } },
+										{ state: "APPROVED", author: { login: "lencshu", avatarUrl: "https://avatars.example/lencshu" } },
+										{ state: "COMMENTED", author: me },
+										{ state: "DISMISSED", author: { login: "cursor", avatarUrl: null } },
+									],
+								},
+							}),
+						],
+					},
+				},
+			},
+			repo,
+		);
+		expect(pr?.reviewers).toEqual([
+			{ login: "bsaintot", avatarUrl: "https://avatars.example/bsaintot", state: "requested" },
+			{ login: "frontend", avatarUrl: "https://avatars.example/frontend", state: "requested" },
+			{ login: "lencshu", avatarUrl: "https://avatars.example/lencshu", state: "approved" },
 		]);
 	});
 

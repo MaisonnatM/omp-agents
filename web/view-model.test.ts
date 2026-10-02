@@ -133,7 +133,8 @@ describe("inbox sections", () => {
 		repo: "webapp",
 		number,
 		title: `PR ${number}`,
-		author: "me",
+		author: { login: "me", avatarUrl: null },
+		reviewers: [],
 		role: "author",
 		state: "open",
 		review: "review-required",
@@ -146,7 +147,7 @@ describe("inbox sections", () => {
 
 	test("each PR lands in the first section that takes it, newest first, and empty sections drop out", () => {
 		const sections = inboxSections([
-			pr(1, { role: "reviewer", review: "changes-requested", author: "teammate" }),
+			pr(1, { role: "reviewer", review: "changes-requested", author: { login: "teammate", avatarUrl: null } }),
 			pr(2, { review: "changes-requested" }),
 			pr(3, { review: "approved" }),
 			pr(4, {}),
