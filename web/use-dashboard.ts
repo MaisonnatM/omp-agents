@@ -32,6 +32,8 @@ export interface Models {
 	error: string | null;
 }
 
+/** The page's last **Resume all**: waiting for the server's answer, or failed for some of its sessions. One that resumed everything leaves no trace. */
+export type ResumeAll = { phase: "starting"; reqId: number } | { phase: "failed"; error: string };
 
 export interface DashboardState {
 	connected: boolean;
@@ -56,6 +58,7 @@ export interface DashboardState {
 	usage: { plans: PlanUsage[]; error: string | null } | null;
 	/** Last model list the server sent for each open live session, by instance id. */
 	models: Map<string, Models>;
+	resumeAll: ResumeAll | null;
 }
 
 type Action =
@@ -65,7 +68,9 @@ type Action =
 	| { t: "layout"; layout: Layout }
 	| { t: "start"; reqId: number; op: StartOp }
 	/** A failed start's error goes away; a start under way keeps waiting for its answer. */
-	| { t: "dismiss-start"; kind: StartKind };
+	| { t: "dismiss-start"; kind: StartKind }
+	| { t: "resume-all"; reqId: number }
+	| { t: "dismiss-resume-all" };
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
 
@@ -98,7 +103,15 @@ function keepUnchanged<T extends { instanceId: string }>(prev: T[], next: T[]): 
 function reduce(state: DashboardState, action: Action): DashboardState {
 	switch (action.t) {
 		case "connected":
-			return { ...state, connected: action.connected, starts: action.connected ? state.starts : loseStarts(state.starts) };
+			return {
+				...state,
+				connected: action.connected,
+				starts: action.connected ? state.starts : loseStarts(state.starts),
+				resumeAll:
+					!action.connected && state.resumeAll?.phase === "starting"
+						? { phase: "failed", error: "Lost the dashboard server while resuming. The sessions may still appear." }
+						: state.resumeAll,
+			};
 		case "layout": {
 			if (hashForLayout(action.layout) === hashForLayout(state.layout)) return state;
 			// A view that stays open stays the same object, so its pane can skip the update.
@@ -117,6 +130,10 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, starts: beginStart(state.starts, action.reqId, action.op) };
 		case "dismiss-start":
 			return { ...state, starts: dismissFailed(state.starts, action.kind) };
+		case "resume-all":
+			return { ...state, resumeAll: { phase: "starting", reqId: action.reqId } };
+		case "dismiss-resume-all":
+			return state.resumeAll?.phase === "failed" ? { ...state, resumeAll: null } : state;
 		case "server": {
 			const msg = action.msg;
 			switch (msg.t) {
@@ -141,6 +158,13 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 							? { view: { kind: "live", instanceId, agentId: null }, text: start.op.point.prefill ? (prompt ?? "") : "" }
 							: state.draft;
 					return { ...state, starts, draft, started: { instanceId, cwd } };
+				}
+				case "resumed-all": {
+					if (state.resumeAll?.phase !== "starting" || state.resumeAll.reqId !== msg.reqId) return state;
+					const [first] = msg.errors;
+					if (first === undefined) return { ...state, resumeAll: null };
+					const count = msg.errors.length === 1 ? "1 session" : `${msg.errors.length} sessions`;
+					return { ...state, resumeAll: { phase: "failed", error: `Could not resume ${count}. ${first}` } };
 				}
 				case "completions":
 					return { ...state, newSessionCompletions: { reqId: msg.reqId, items: msg.items, error: msg.error } };
@@ -169,6 +193,10 @@ export interface Dashboard {
 	dismissStart: (kind: StartKind) => void;
 	/** Start a session; it opens in the focused pane once ready (a quick action's in the pane its mode says), and a resumed one in the pane of the past session it continues. */
 	start: (op: StartOp) => void;
+	/** Resume these interrupted sessions; a pane that shows one of them shows it live once it runs. */
+	resumeAll: (sessionIds: string[]) => void;
+	/** Forget why the last **Resume all** failed. */
+	dismissResumeAll: () => void;
 }
 
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
@@ -187,6 +215,7 @@ export function useDashboard(): Dashboard {
 		started: null,
 		usage: null,
 		models: new Map(),
+		resumeAll: null,
 	});
 	const socketRef = useRef<WebSocket | null>(null);
 	const layoutRef = useRef(state.layout);
@@ -240,6 +269,14 @@ export function useDashboard(): Dashboard {
 					const live: LiveView = { kind: "live", instanceId: msg.result.instanceId, agentId: null };
 					if (op?.kind === "resume") show(swapView(layoutRef.current, { kind: "past", sessionId: op.sessionId }, live));
 					else if (op) open(live, op.kind === "quick" ? op.mode : "replace");
+				}
+				if (msg.t === "resumed-all") {
+					const layout = layoutRef.current;
+					const panes = layout.panes.map(view => {
+						const started = view.kind === "past" && msg.started.find(({ sessionId }) => sessionId === view.sessionId);
+						return started ? { kind: "live" as const, instanceId: started.instanceId, agentId: null } : view;
+					});
+					if (panes.some((view, index) => view !== layout.panes[index])) show({ ...layout, panes });
 				}
 			};
 			ws.onclose = () => {
@@ -299,5 +336,15 @@ export function useDashboard(): Dashboard {
 		[send],
 	);
 
-	return { state, send, open, focus, show, openNewSession, dismissStart, start };
+	const resumeAll = useCallback(
+		(sessionIds: string[]) => {
+			const reqId = nextReqId.current++;
+			dispatch({ t: "resume-all", reqId });
+			send({ t: "resume-all", reqId, sessionIds });
+		},
+		[send],
+	);
+	const dismissResumeAll = useCallback(() => dispatch({ t: "dismiss-resume-all" }), []);
+
+	return { state, send, open, focus, show, openNewSession, dismissStart, start, resumeAll, dismissResumeAll };
 }

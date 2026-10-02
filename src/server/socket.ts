@@ -10,6 +10,8 @@ export interface SocketEnv {
 	sessions: LiveSessions;
 	views: Views;
 	start(request: StartRequest): Promise<StartResult>;
+	/** Move interrupted session `sessionId` to the past sessions. */
+	dismissInterrupted(sessionId: string): void;
 }
 
 /**
@@ -21,7 +23,7 @@ function reply(ws: Socket, instanceId: string, msg: ServerMsg): void {
 }
 
 /** The handler of one socket message. A message naming a session that is gone does nothing. */
-export function createClientHandler({ sessions, views, start }: SocketEnv): (ws: Socket, msg: ClientMsg) => Promise<void> {
+export function createClientHandler({ sessions, views, start, dismissInterrupted }: SocketEnv): (ws: Socket, msg: ClientMsg) => Promise<void> {
 	return async (ws, msg) => {
 		switch (msg.t) {
 			case "watch":
@@ -85,6 +87,19 @@ export function createClientHandler({ sessions, views, start }: SocketEnv): (ws:
 				return;
 			case "start":
 				send(ws, { t: "started", reqId: msg.reqId, result: await start(msg) });
+				return;
+			case "resume-all": {
+				const results = await Promise.all(msg.sessionIds.map(async sessionId => ({ sessionId, result: await start({ kind: "resume", sessionId }) })));
+				send(ws, {
+					t: "resumed-all",
+					reqId: msg.reqId,
+					started: results.flatMap(({ sessionId, result }) => (result.ok ? [{ sessionId, instanceId: result.instanceId }] : [])),
+					errors: results.flatMap(({ result }) => (result.ok ? [] : [result.error])),
+				});
+				return;
+			}
+			case "dismiss-interrupted":
+				dismissInterrupted(msg.sessionId);
 				return;
 			case "end":
 				await sessions.get(msg.instanceId)?.end();

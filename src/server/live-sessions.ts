@@ -1,6 +1,6 @@
 /** Every session the dashboard can drive, in one registry: terminal sessions it joined, and sessions it started. */
 import { forgetSession } from "../commands";
-import { type DashboardUpdate, newInstanceId } from "../dashboard-session";
+import { DashboardSession, type DashboardUpdate, newInstanceId } from "../dashboard-session";
 import { SessionGuest } from "../guest";
 import type { LiveSession, LiveUpdate, SessionFacts } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
@@ -41,6 +41,11 @@ export class LiveSessions {
 	/** The ids of the sessions that run now, which are not past sessions. */
 	sessionIds(): Set<string> {
 		return new Set([...this.#sessions.values()].map(session => session.sessionId));
+	}
+
+	/** The ids of the running sessions that this dashboard started. */
+	startedHere(): Set<string> {
+		return new Set([...this.#sessions.values()].flatMap(session => (session instanceof DashboardSession ? [session.sessionId] : [])));
 	}
 
 	/** The directories running sessions work in. */

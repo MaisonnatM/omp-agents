@@ -34,7 +34,8 @@ interface RpcAgent {
 
 export type DashboardUpdate =
 	| LiveUpdate
-	| { kind: "exited" }
+	/** `ended`: {@link DashboardSession.end} stopped it. Otherwise it went down with the dashboard or on its own. */
+	| { kind: "exited"; ended: boolean }
 	/** omp appended to `path` without the lock churn that the file watcher reports on macOS, as a `!` command's record. */
 	| { kind: "written"; path: string };
 
@@ -96,6 +97,8 @@ export class DashboardSession implements LiveSession {
 	#refreshAgain = false;
 	/** Whether the last prompt the user sent was a `/` command, whose `command_output` frames the conversation shows. */
 	#userCommand = false;
+	/** Whether **End session** stopped the process, rather than the dashboard shutting down or omp exiting on its own. */
+	#ended = false;
 
 	private constructor(
 		instanceId: string,
@@ -122,7 +125,7 @@ export class DashboardSession implements LiveSession {
 		client.onSubagentProgress(payload => this.#onSubagent(SUBAGENT_PROGRESS, payload));
 		void child.exited.then(() => {
 			requests.clear();
-			emit({ kind: "exited" });
+			emit({ kind: "exited", ended: this.#ended });
 		});
 	}
 
@@ -230,8 +233,9 @@ export class DashboardSession implements LiveSession {
 		return true;
 	}
 
+	/** The process stops, but the session counts as interrupted, to resume once the dashboard runs again. */
 	dispose(): Promise<void> {
-		return this.end();
+		return this.#child.client.stop();
 	}
 
 	get status(): HostStatus {
@@ -341,6 +345,7 @@ export class DashboardSession implements LiveSession {
 	}
 
 	end(): Promise<void> {
+		this.#ended = true;
 		return this.#child.client.stop();
 	}
 

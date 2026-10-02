@@ -56,7 +56,7 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 }
 
 export function App() {
-	const { state, send, open, focus, show, openNewSession, dismissStart, start } = useDashboard();
+	const { state, send, open, focus, show, openNewSession, dismissStart, start, resumeAll, dismissResumeAll } = useDashboard();
 	const launch = startOf(state.starts, "new");
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
@@ -84,10 +84,13 @@ export function App() {
 	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
 	// The running sessions the sidebar lists, in its order, which ending a session moves its panes along.
 	const listedHosts = state.hosts.filter(inProject).map(host => host.instanceId);
-	/** Every row of the sidebar's sessions list, running then past, which the previous and next session keys walk. */
+	/** Every row of the sidebar's sessions list, running, then interrupted, then past, which the previous and next session keys walk. */
 	const listedViews: View[] = [
 		...listedHosts.map((instanceId): View => ({ kind: "live", instanceId, agentId: null })),
-		...state.past.filter(inProject).map(({ sessionId }): View => ({ kind: "past", sessionId })),
+		...state.past
+			.filter(inProject)
+			.toSorted((a, b) => Number(b.interrupted) - Number(a.interrupted))
+			.map(({ sessionId }): View => ({ kind: "past", sessionId })),
 	];
 	const latest = useRef({ layout, listedHosts, sidebars });
 	latest.current = { layout, listedHosts, sidebars };
@@ -263,6 +266,10 @@ export function App() {
 						open({ kind: "past", sessionId }, "replace");
 						start({ kind: "resume", sessionId });
 					}}
+					resumeAll={state.resumeAll}
+					onResumeAll={resumeAll}
+					onDismissResumeAll={dismissResumeAll}
+					onDismissInterrupted={sessionId => send({ t: "dismiss-interrupted", sessionId })}
 					onEnd={endHost}
 					onShowShortcuts={() => setShortcutsOpen(true)}
 					toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}

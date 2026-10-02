@@ -1,4 +1,4 @@
-import { AppWindow, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, MessagesSquare, Play, Plus, Settings } from "lucide-react";
+import { AppWindow, Archive, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, Loader, MessagesSquare, Play, Plus, Settings } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
 import type { PastSession, PullRequest, RosterHost, View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,7 @@ import { hashForInbox, hashForSettings, type OpenMode, sameView } from "../routi
 import { workspaces } from "../sessions";
 import { shortcutKeys, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
+import type { ResumeAll } from "../use-dashboard";
 import { useInbox } from "../use-inbox";
 import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -290,6 +291,13 @@ interface RosterProps {
 	resume: StartOf<"resume"> | null;
 	/** Continue past session `sessionId`, in the pane that shows it. */
 	onResume: (sessionId: string) => void;
+	/** The page's last **Resume all**, while it runs or after it failed. */
+	resumeAll: ResumeAll | null;
+	/** Resume every interrupted session the sidebar lists. */
+	onResumeAll: (sessionIds: string[]) => void;
+	onDismissResumeAll: () => void;
+	/** Move interrupted session `sessionId` to the past sessions. */
+	onDismissInterrupted: (sessionId: string) => void;
 	/** End running session `instanceId`, as its pane's End session does. */
 	onEnd: (instanceId: string) => void;
 	onShowShortcuts: () => void;
@@ -315,6 +323,10 @@ export function Roster({
 	onNewSession,
 	resume,
 	onResume,
+	resumeAll,
+	onResumeAll,
+	onDismissResumeAll,
+	onDismissInterrupted,
 	onEnd,
 	onShowShortcuts,
 	toggle,
@@ -324,9 +336,51 @@ export function Roster({
 	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
 	const shownHosts = hosts.filter(inProject);
 	const shownPast = past.filter(inProject);
+	const shownInterrupted = shownPast.filter(session => session.interrupted);
+	const shownEnded = shownPast.filter(session => !session.interrupted);
+	const resumingAll = resumeAll?.phase === "starting";
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	const selectedProject = projects.find(({ cwd }) => cwd === project);
 	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
+	const pastRow = (session: PastSession, items?: ReactNode) => {
+		const pastView: View = { kind: "past", sessionId: session.sessionId };
+		return (
+			<RowMenu
+				key={session.sessionId}
+				view={pastView}
+				label={pastLabel(session)}
+				isOpen={isOpen(pastView)}
+				onOpen={onOpen}
+				items={
+					<>
+						{/* One resume runs at a time, as the pane's Resume button allows. */}
+						<MenuItem disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
+							<Play />
+							{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
+						</MenuItem>
+						{items}
+						<SessionItems row={session} />
+					</>
+				}
+			>
+				<SidebarMenuButton
+					isActive={isOpen(pastView)}
+					onClick={event => onOpen(pastView, modeOf(event))}
+					title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
+				>
+					<span className="flex min-w-0 flex-1 items-baseline gap-2">
+						{project === null && session.title !== null && <ProjectBadge cwdDisplay={session.cwdDisplay} />}
+						<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
+						<ShipStep ship={session.ship} />
+						{session.pullRequests.length > 0 && (
+							<span className="shrink-0 text-xs text-muted-foreground">{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}</span>
+						)}
+						<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(session.modifiedAt)}</span>
+					</span>
+				</SidebarMenuButton>
+			</RowMenu>
+		);
+	};
 	return (
 		<Tabs value={inboxOpen ? "inbox" : "sessions"} onValueChange={value => onInboxOpen(value === "inbox")} className="flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
@@ -431,52 +485,45 @@ export function Roster({
 							})}
 						</SidebarMenu>
 					</SidebarGroup>
+					{shownInterrupted.length > 0 && (
+						<SidebarGroup collapsible>
+							<SidebarGroupLabel>{`${shownInterrupted.length} interrupted`}</SidebarGroupLabel>
+							{/* The group action's props carry no `disabled`, so it styles a native button that does. */}
+							<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
+								<button
+									type="button"
+									title={resumingAll ? "Resuming…" : "Resume all"}
+									aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
+									disabled={resumingAll || !connected}
+									onClick={() => onResumeAll(shownInterrupted.map(session => session.sessionId))}
+								>
+									{resumingAll ? <Loader className="animate-spin" /> : <ListRestart />}
+								</button>
+							</SidebarGroupAction>
+							{resumeAll?.phase === "failed" && (
+								<p role="alert" className="mx-2 mb-1 flex items-start gap-2 rounded-md bg-red-500/10 px-2 py-1.5 text-xs text-red-600 dark:text-red-400">
+									<span className="min-w-0 flex-1">{resumeAll.error}</span>
+									<button type="button" className="shrink-0 underline-offset-2 hover:underline" onClick={onDismissResumeAll}>
+										Dismiss
+									</button>
+								</p>
+							)}
+							<SidebarMenu aria-label="Interrupted omp sessions">
+								{shownInterrupted.map(session =>
+									pastRow(
+										session,
+										<MenuItem onClick={() => onDismissInterrupted(session.sessionId)}>
+											<Archive />
+											Move to past
+										</MenuItem>,
+									),
+								)}
+							</SidebarMenu>
+						</SidebarGroup>
+					)}
 					<SidebarGroup collapsible>
-						<SidebarGroupLabel>
-							{shownPast.length === 0 ? "No past sessions" : `${shownPast.length} past`}
-						</SidebarGroupLabel>
-						<SidebarMenu aria-label="Past omp sessions">
-							{shownPast.map(session => {
-								const pastView: View = { kind: "past", sessionId: session.sessionId };
-								return (
-									<RowMenu
-										key={session.sessionId}
-										view={pastView}
-										label={pastLabel(session)}
-										isOpen={isOpen(pastView)}
-										onOpen={onOpen}
-										items={
-											<>
-												{/* One resume runs at a time, as the pane's Resume button allows. */}
-												<MenuItem disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
-													<Play />
-													{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
-												</MenuItem>
-												<SessionItems row={session} />
-											</>
-										}
-									>
-										<SidebarMenuButton
-											isActive={isOpen(pastView)}
-											onClick={event => onOpen(pastView, modeOf(event))}
-											title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-										>
-											<span className="flex min-w-0 flex-1 items-baseline gap-2">
-												{project === null && session.title !== null && <ProjectBadge cwdDisplay={session.cwdDisplay} />}
-												<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
-												<ShipStep ship={session.ship} />
-												{session.pullRequests.length > 0 && (
-													<span className="shrink-0 text-xs text-muted-foreground">
-														{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}
-													</span>
-												)}
-												<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(session.modifiedAt)}</span>
-											</span>
-										</SidebarMenuButton>
-									</RowMenu>
-								);
-							})}
-						</SidebarMenu>
+						<SidebarGroupLabel>{shownEnded.length === 0 ? "No past sessions" : `${shownEnded.length} past`}</SidebarGroupLabel>
+						<SidebarMenu aria-label="Past omp sessions">{shownEnded.map(session => pastRow(session))}</SidebarMenu>
 					</SidebarGroup>
 				</SidebarContent>
 			</TabPanel>

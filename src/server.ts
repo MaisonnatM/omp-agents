@@ -6,9 +6,10 @@ import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
-import { displayPath, tokenFile } from "./paths";
+import { displayPath, interruptedFile, tokenFile } from "./paths";
 import { loadToken } from "./server/auth";
 import { fail, guardsFor } from "./server/http";
+import { InterruptedSessions } from "./server/interrupted";
 import { LiveSessions, type SessionUpdate } from "./server/live-sessions";
 import { buildPage, servePage } from "./server/page";
 import { createRoutes } from "./server/routes";
@@ -38,6 +39,7 @@ const guards = guardsFor(PORT, token);
 const page = await buildPage();
 const files = new SessionFiles();
 const sessions = new LiveSessions(onLiveUpdate);
+const interrupted = new InterruptedSessions(interruptedFile);
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
 const pathFor = (view: View): string | null =>
 	view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -47,11 +49,19 @@ const startSession = createStarter({
 	pathFor,
 	savedFile: files.pathOf,
 	onStarted() {
+		interrupted.setRunning(sessions.startedHere());
 		pushRoster();
 		pushPast();
 	},
 });
-const handleClientMsg = createClientHandler({ sessions, views, start: startSession });
+const handleClientMsg = createClientHandler({
+	sessions,
+	views,
+	start: startSession,
+	dismissInterrupted(sessionId) {
+		if (interrupted.dismiss(sessionId)) pushPast();
+	},
+});
 
 let rosterError: string | null = null;
 let rosterJson = "";
@@ -67,7 +77,7 @@ let usageJson = "";
 const knownCwds = (): string[] => [...new Set([...sessions.cwds(), ...files.cwds()].filter(Boolean))];
 
 const rosterMsg = (): ServerMsg => ({ t: "roster", hosts: sessions.rows(files.factsOf), error: rosterError });
-const pastMsg = (): ServerMsg => ({ t: "past", sessions: files.past(sessions.sessionIds()) });
+const pastMsg = (): ServerMsg => ({ t: "past", sessions: files.past(sessions.sessionIds(), id => interrupted.has(id)) });
 
 /** Whether any socket listens. Pushes, and the work to compare them with the last one, wait for the first. */
 const hasSubscribers = (): boolean => server.subscriberCount("roster") > 0;
@@ -149,11 +159,17 @@ function onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 		case "note":
 			views.note(instanceId, update.agentId, update.level, update.text);
 			return;
-		case "exited":
+		case "exited": {
+			// Only a session this dashboard started reports its exit.
+			const sessionId = sessions.get(instanceId)?.sessionId;
+			if (sessionId && !update.ended) interrupted.interrupt(sessionId);
 			sessions.remove(instanceId);
+			interrupted.setRunning(sessions.startedHere());
 			pushRoster();
+			pushPast();
 			void refreshFiles();
 			return;
+		}
 		case "written":
 			onFileChange(update.path);
 			return;

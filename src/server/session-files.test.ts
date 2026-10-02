@@ -31,7 +31,7 @@ function setup() {
 	return { root, project, files: new SessionFiles(root) };
 }
 
-const titles = (files: SessionFiles): (string | null)[] => files.past(new Set()).map(session => session.title);
+const titles = (files: SessionFiles): (string | null)[] => files.past(new Set(), () => false).map(session => session.title);
 
 describe("sessionFileOf", () => {
 	const root = "/sessions";
