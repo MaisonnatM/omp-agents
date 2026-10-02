@@ -1,5 +1,6 @@
 /** Starting a dashboard session: a new one, a fork of a transcript, or a past session resumed. All three spawn omp the same way. */
 import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
+import { checkoutDir } from "../git";
 import { errorText } from "../json";
 import { directoryOf } from "../paths";
 import type { StartRequest, StartResult, View } from "../shared";
@@ -41,10 +42,19 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 	async function spawnFor(request: StartRequest): Promise<{ started: Started } | { error: string }> {
 		switch (request.kind) {
 			case "new": {
-				const cwd = directoryOf(request.cwd);
-				if (!cwd) return { error: `${request.cwd.trim()} is not a directory.` };
+				const dir = directoryOf(request.cwd);
+				if (!dir) return { error: `${request.cwd.trim()} is not a directory.` };
 				// omp writes a fresh session's file only with its first reply, so a first `!` command would show nowhere.
 				if (request.prompt.startsWith("!")) return { error: "Start the session with a prompt. A ! command runs once omp has replied." };
+				const { branch } = request;
+				let cwd = dir;
+				if (branch) {
+					try {
+						cwd = await checkoutDir(dir, branch);
+					} catch (err) {
+						return { error: `Cannot check out ${branch.name}: ${errorText(err)}` };
+					}
+				}
 				return launch("Cannot start omp", async (id, emit) => ({ session: await DashboardSession.start(id, cwd, emit), prompt: null }));
 			}
 			case "fork": {

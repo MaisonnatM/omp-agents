@@ -3,7 +3,7 @@
  * Each parser returns a typed value, or `null` for anything else, so no caller casts what it received.
  */
 import { isObject } from "../json";
-import type { ClientMsg, CompletionScope, LiveView, PullRequest, SessionLinksEdit, StartRequest, UserAnswer, View } from "../shared";
+import type { BranchChoice, ClientMsg, CompletionScope, LiveView, PullRequest, SessionLinksEdit, StartRequest, UserAnswer, View } from "../shared";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
@@ -43,11 +43,20 @@ function parseAnswer(value: unknown): UserAnswer | null {
 	return null;
 }
 
+/** `null` for no branch; `undefined` for a value that is not one. */
+function parseBranchChoice(value: unknown): BranchChoice | null | undefined {
+	if (value === null || value === undefined) return null;
+	if (!isObject(value) || !isNonEmpty(value.name)) return undefined;
+	if (value.kind === "existing") return { kind: "existing", name: value.name };
+	return value.kind === "new" && isNonEmpty(value.base) ? { kind: "new", name: value.name, base: value.base } : undefined;
+}
+
 function parseStartRequest(value: Record<string, unknown>): StartRequest | null {
 	switch (value.kind) {
 		case "new": {
 			const { cwd, prompt } = value;
-			return isNonEmpty(cwd) && isNonEmpty(prompt) ? { kind: "new", cwd, prompt } : null;
+			const branch = parseBranchChoice(value.branch);
+			return isNonEmpty(cwd) && isNonEmpty(prompt) && branch !== undefined ? { kind: "new", cwd, prompt, branch } : null;
 		}
 		case "fork": {
 			const view = parseView(value.view);

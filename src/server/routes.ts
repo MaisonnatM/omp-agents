@@ -1,6 +1,8 @@
-/** The HTTP API the page reads and writes omp's settings, the inbox, and pull requests through. */
+/** The HTTP API the page reads and writes omp's settings, the inbox, pull requests, and git checkouts through. */
+import { gitCheckout } from "../git";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
 import { listModels } from "../omp/models";
+import { directoryOf } from "../paths";
 import type { PullRequestIndex } from "../pull-requests";
 import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, saveOmpFile, saveRouting } from "../settings";
@@ -77,6 +79,17 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	};
 
 	/**
+	 * `GET /api/git?cwd=<dir>`: the git checkout of a directory, `null` outside one, for the new-session draft's branch
+	 * picker and a session's header. Like a new session, `cwd` may name any directory.
+	 */
+	const git: Handler = async req => {
+		const refused = guards.admit(req);
+		if (refused) return refused;
+		const cwd = directoryOf(new URL(req.url).searchParams.get("cwd") ?? "");
+		return cwd ? answer(() => gitCheckout(cwd)) : fail(404, "Expected ?cwd= naming a directory");
+	};
+
+	/**
 	 * A settings write: `PUT /api/settings/routing` or `/api/settings/file`, `?cwd=` as for reading.
 	 * Only this app's own page may write, with a JSON body; the answer is the settings as they load after the write.
 	 */
@@ -117,5 +130,6 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/pull-request/sessions": { PUT: sessionLinks },
 		"/api/inbox": { GET: inbox },
 		"/api/pull-request": { GET: pullRequest },
+		"/api/git": { GET: git },
 	};
 }

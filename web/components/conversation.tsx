@@ -25,8 +25,10 @@ import { shortcutKeys, useShortcuts } from "../shortcuts";
 import type { ForkPoint } from "../transcript-view";
 import type { Completions } from "../pane-store";
 import type { StartOf } from "../starts";
+import { useGitCheckout } from "../use-git-checkout";
 import { useCompletion } from "./completion-popup";
 import { ContextRing } from "./context-ring";
+import { GitRef } from "./git";
 import { Model, ModelPicker } from "./model-picker";
 import { OrgIcon } from "./org-icon";
 import { ShipStep } from "./ship-step";
@@ -309,6 +311,8 @@ function LiveConversation({
 	const live = phase.phase === "live" && !phase.readOnly;
 	const writable = live && (view.agentId === null || agent?.canMessage === true);
 	const working = view.agentId === null ? host?.status === "working" : agent?.status === "running";
+	// Read again when a turn starts or ends, since a turn can switch the branch.
+	const checkout = useGitCheckout(view.agentId === null ? (shown?.cwd ?? null) : null, working);
 	// Questions belong to the session's main agent, and only a writer can answer them.
 	const requests = view.agentId === null && live && host ? host.requests : [];
 
@@ -364,7 +368,15 @@ function LiveConversation({
 		: shown && (
 				<>
 					<ShipStep ship={shown.ship} />{" "}
-					<Project cwdDisplay={shown.cwdDisplay} /> · {shown.model ? <Model selector={shown.model} /> : "no model"} · pid {shown.pid}
+					<Project cwdDisplay={shown.cwdDisplay} />
+					{checkout && (checkout.github || checkout.branch) && (
+						<>
+							{" · "}
+							<GitRef github={checkout.github} branch={checkout.branch} />
+						</>
+					)}
+					{" · "}
+					{shown.model ? <Model selector={shown.model} /> : "no model"} · pid {shown.pid}
 					<PullRequests pullRequests={shown.pullRequests} />
 				</>
 			);

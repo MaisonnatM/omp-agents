@@ -1,11 +1,11 @@
-import type { PullRequest, StartRequest, StartResult, View } from "../src/shared";
+import type { BranchChoice, PullRequest, StartRequest, StartResult, View } from "../src/shared";
 import type { QuickActionId } from "./quick-actions";
 import type { OpenMode } from "./routing";
 import type { ForkPoint } from "./transcript-view";
 
 /** What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. A quick action keeps its pull request and action, which the inbox shows progress and failure for. */
 export type StartOp =
-	| { kind: "new"; cwd: string; prompt: string }
+	| { kind: "new"; cwd: string; prompt: string; branch: BranchChoice | null }
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
 	| { kind: "resume"; sessionId: string }
 	| { kind: "quick"; cwd: string; prompt: string; pr: PullRequest; action: QuickActionId; mode: OpenMode };
@@ -23,8 +23,9 @@ export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 export const requestOf = (op: StartOp): StartRequest => {
 	switch (op.kind) {
 		case "new":
+			return { kind: "new", cwd: op.cwd, prompt: op.prompt, branch: op.branch };
 		case "quick":
-			return { kind: "new", cwd: op.cwd, prompt: op.prompt };
+			return { kind: "new", cwd: op.cwd, prompt: op.prompt, branch: null };
 		case "fork":
 			return { kind: "fork", view: op.view, entryId: op.point.entryId };
 		case "resume":
