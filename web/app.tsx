@@ -24,7 +24,6 @@ import {
 	focusedView,
 	hashForSettings,
 	hashForInbox,
-	hashForNewSession,
 	hashForView,
 	inboxFromHash,
 	type InboxTarget,
@@ -193,12 +192,10 @@ export function App() {
 		main = (
 			<NewSession
 				cwd={cwd}
-				workspaces={workspaces(state.hosts, state.past)}
 				launch={state.launch}
 				connected={state.connected}
 				completions={state.newSessionCompletions}
 				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
-				onPickCwd={next => (location.hash = hashForNewSession(next))}
 				onStart={prompt => create(cwd, prompt)}
 			/>
 		);
