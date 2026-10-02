@@ -12,7 +12,7 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { agentTree, hashForView, MAX_PANES, type OpenMode, sameView } from "../view-model";
-import { hostLabel, modeOf } from "./roster";
+import { hostLabel, modeOf, SPLIT_CLICK } from "./roster";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** Pixels of extra indent per nesting level below the first subagent level. */
@@ -71,7 +71,7 @@ export function SubagentsSidebar({ host, open, onOpen }: SubagentsSidebarProps) 
 											<SidebarMenuAction
 												showOnHover
 												aria-label={`Open ${agent.id} in split`}
-												title={open.length < MAX_PANES ? "Open in split (⌘-click)" : `Open in the focused pane: ${MAX_PANES} panes is the most`}
+												title={open.length < MAX_PANES ? `Open in split (${SPLIT_CLICK})` : `Open in the focused pane: ${MAX_PANES} panes is the most`}
 												onClick={() => onOpen(view, "split")}
 											>
 												<Columns2 />

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Conversation, PastConversation, ToolsExpanded } from "./components/conversation";
 import { InboxPage } from "./components/inbox-page";
 import { PlanUsageFooter } from "./components/plan-usage";
-import { Roster, useProject } from "./components/roster";
+import { Roster, SPLIT_CLICK, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings-page";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { SubagentsSidebar } from "./components/subagents-sidebar";
@@ -230,7 +230,7 @@ export function App() {
 	} else {
 		main = (
 			<p className="m-auto max-w-sm text-center text-sm text-muted-foreground">
-				Select a session to see its conversation. ⌘-click (Ctrl-click) more to see up to four side by side.
+				Select a session to see its conversation. {SPLIT_CLICK} more to see up to four side by side.
 			</p>
 		);
 	}
