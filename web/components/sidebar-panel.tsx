@@ -92,7 +92,7 @@ export function useSidebarPanels(): SidebarPanels {
 		setOpen: (side, open) => {
 			if (open === panels[side].open) return;
 			const { id } = SIDEBARS[side];
-			const hiding = document.querySelector(open ? `[data-sidebar-strip="${side}"]` : `#${id}`);
+			const hiding = document.querySelector(open ? `[aria-controls="${id}"][aria-expanded="false"]` : `#${id}`);
 			const refocus = hiding?.contains(document.activeElement) ?? false;
 			flushSync(() => update(side, { ...panels[side], open }));
 			if (refocus) document.querySelector<HTMLElement>(`[aria-controls="${id}"]:not([hidden] *)`)?.focus();
@@ -106,7 +106,7 @@ interface SidebarToggleProps {
 	onToggle: () => void;
 }
 
-/** Hides the sidebar from its header, or shows it again from the strip left in its place. */
+/** Hides the sidebar from its header, or shows it again: from the strip left in its place, or for the right one, from the page header. */
 export function SidebarToggle({ side, open, onToggle }: SidebarToggleProps) {
 	const { name, id, shortcut, hideIcon: Hide, showIcon: Show } = SIDEBARS[side];
 	const chord = SHORTCUTS.find(({ id }) => id === shortcut)?.chord;
@@ -204,8 +204,9 @@ interface DashboardSidebarProps {
 }
 
 /**
- * A sidebar with its resize handle, or, while it is hidden, a strip holding the button that shows it again. The hidden
- * sidebar stays mounted, so its filter and scroll survive.
+ * A sidebar with its resize handle. While the left one is hidden, a strip holds the button that shows it again; the
+ * right one's button moves into the page header instead (see `App`). The hidden sidebar stays mounted, so its filter
+ * and scroll survive.
  */
 export function DashboardSidebar({ side, panel, onResize, onToggle, children }: DashboardSidebarProps) {
 	return (
@@ -214,14 +215,8 @@ export function DashboardSidebar({ side, panel, onResize, onToggle, children }: 
 				{children}
 				<SidebarResizeHandle side={side} width={panel.width} onWidth={onResize} />
 			</Sidebar>
-			{!panel.open && (
-				<div
-					data-sidebar-strip={side}
-					className={cn(
-						"sticky top-0 flex h-svh shrink-0 flex-col pt-4",
-						side === "left" ? "border-r border-border px-2" : "order-last border-l border-border px-3",
-					)}
-				>
+			{side === "left" && !panel.open && (
+				<div className="sticky top-0 flex h-svh shrink-0 flex-col border-r border-border px-2 pt-4">
 					<SidebarToggle side={side} open={false} onToggle={onToggle} />
 				</div>
 			)}

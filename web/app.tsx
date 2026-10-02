@@ -108,6 +108,11 @@ export function App() {
 	/** The live session whose subagents the right sidebar lists. Over a past session or a page, it has none. */
 	const subagentsHost = page ? undefined : viewHost;
 	const toggleSidebar = (side: SidebarSide): void => sidebars.setOpen(side, !sidebars.panels[side].open);
+	/** While the subagents sidebar is hidden, the button that shows it again ends the header of the pane at the top right. */
+	const showSubagents = subagentsHost && !sidebars.panels.right.open && (
+		<SidebarToggle side="right" open={false} onToggle={() => toggleSidebar("right")} />
+	);
+	const topRightPane = maximized ? layout.focus : Math.min(1, layout.panes.length - 1);
 
 	const settingsHref = hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
@@ -233,22 +238,25 @@ export function App() {
 						{paneContent(
 							pane,
 							index === layout.focus,
-							split && (
-								<>
-									<Button
-										variant="ghost"
-										size="icon-compact"
-										title={maximized ? "Restore split" : "Maximize pane"}
-										aria-label={maximized ? "Restore split" : "Maximize pane"}
-										onClick={() => show({ ...layout, focus: index, maximized: !maximized })}
-									>
-										{maximized ? <Minimize2 /> : <Maximize2 />}
-									</Button>
-									<Button variant="ghost" size="icon-compact" title="Close pane" aria-label="Close pane" onClick={() => show(closePane(layout, index))}>
-										<X />
-									</Button>
-								</>
-							),
+							<>
+								{split && (
+									<>
+										<Button
+											variant="ghost"
+											size="icon-compact"
+											title={maximized ? "Restore split" : "Maximize pane"}
+											aria-label={maximized ? "Restore split" : "Maximize pane"}
+											onClick={() => show({ ...layout, focus: index, maximized: !maximized })}
+										>
+											{maximized ? <Minimize2 /> : <Maximize2 />}
+										</Button>
+										<Button variant="ghost" size="icon-compact" title="Close pane" aria-label="Close pane" onClick={() => show(closePane(layout, index))}>
+											<X />
+										</Button>
+									</>
+								)}
+								{index === topRightPane && showSubagents}
+							</>,
 						)}
 					</section>
 				))}
