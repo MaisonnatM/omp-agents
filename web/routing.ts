@@ -193,5 +193,16 @@ export function endSession(layout: Layout, instanceId: string, listed: string[])
 	return { ...layout, panes };
 }
 
+/**
+ * The view `step` rows from the focused view's session in `listed` (the sidebar's sessions, in order), or `null` past
+ * either end. A subagent stands for its session's row, and a view the sidebar does not list steps onto its first or last row.
+ */
+export function adjacentSession(listed: View[], current: View | null, step: 1 | -1): View | null {
+	const row = current?.kind === "live" ? { ...current, agentId: null } : current;
+	const at = listed.findIndex(view => sameView(view, row));
+	if (at < 0) return (step > 0 ? listed[0] : listed.at(-1)) ?? null;
+	return listed[at + step] ?? null;
+}
+
 /** Whether the hash names a page that covers the panes: settings, inbox, or the new-session draft. */
 export const isPageHash = (hash: string): boolean => settingsFromHash(hash) !== null || inboxFromHash(hash) !== null || newSessionFromHash(hash) !== null;

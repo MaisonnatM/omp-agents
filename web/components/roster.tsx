@@ -36,7 +36,7 @@ import { type InboxTarget, inboxRepoKey, inboxSectionId, inboxSections, pullRequ
 import { age, hostLabel, modeOf, pastLabel, projectName, SPLIT_CLICK } from "../labels";
 import { hashForInbox, hashForSettings, type OpenMode, sameView } from "../routing";
 import { workspaces } from "../sessions";
-import { useShortcuts } from "../shortcuts";
+import { shortcutKeys, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
 import { useInbox } from "../use-inbox";
 import { ShipStep } from "./ship-step";
@@ -332,12 +332,19 @@ export function Roster({
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
-				<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
+				<Button
+					variant="ghost"
+					size="icon-compact"
+					className="ml-auto shrink-0 text-muted-foreground"
+					title={`Keyboard shortcuts (${shortcutKeys("help")})`}
+					aria-label="Keyboard shortcuts"
+					onClick={onShowShortcuts}
+				>
 					<Keyboard />
 				</Button>
 
 				<Button asChild variant="ghost" size="icon-compact" active={settingsOpen} className="shrink-0 text-muted-foreground">
-					<a href={settingsHref} title="Settings" aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
+					<a href={settingsHref} title={`Settings (${shortcutKeys("settings")})`} aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
 						<Settings />
 					</a>
 				</Button>
@@ -363,7 +370,7 @@ export function Roster({
 							{shownHosts.length === 0 ? "No sessions" : `${shownHosts.length} running`}
 						</SidebarGroupLabel>
 						<SidebarGroupAction
-							title={newSessionLabel}
+							title={`${newSessionLabel} (${shortcutKeys("newSession")})`}
 							aria-label={newSessionLabel}
 							aria-current={newSessionOpen ? "page" : undefined}
 							onClick={onNewSession}

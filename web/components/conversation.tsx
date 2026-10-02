@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestUrl } from "../inbox-model";
 import { hostLabel, pastLabel, projectName } from "../labels";
 import { hashForInbox } from "../routing";
-import { chordLabel, SHORTCUTS, useShortcuts } from "../shortcuts";
+import { shortcutKeys, useShortcuts } from "../shortcuts";
 import type { ForkPoint } from "../transcript-view";
 import type { Completions } from "../pane-store";
 import type { StartOf } from "../starts";
@@ -42,16 +42,13 @@ const CONTROL_LABEL: Record<ControlPhase["phase"], string> = {
 	ended: "Disconnected",
 };
 
-/** omp's queues, in the order its Alt+↑ takes them back, with the tag each queued row shows. */
+/** omp's queues, in the order ↑ takes them back, with the tag each queued row shows. */
 const QUEUE_TAGS: [keyof MessageQueue, string][] = [
 	["steering", "Steer"],
 	["followUp", "Follow-up"],
 ];
 
-const FOLLOW_UP_KEYS = SHORTCUTS.filter(({ id }) => id === "followUp")
-	.map(({ chord }) => chordLabel(chord))
-	.join(" or ");
-const END_KEYS = chordLabel(SHORTCUTS.find(({ id }) => id === "end")!.chord);
+const FOLLOW_UP_KEYS = shortcutKeys("followUp");
 
 
 interface HeaderProps {
@@ -416,21 +413,23 @@ function LiveConversation({
 		submit(text, "followUp");
 	};
 	const endable = view.agentId === null && live;
+	const focusComposer = (): boolean | void => {
+		const textarea = completion.composerRef.current?.querySelector("textarea");
+		if (!textarea || textarea.disabled) return false;
+		textarea.focus();
+	};
 	const onComposerKey = useShortcuts({
 		// The textarea's own keys, so they need no focused pane.
 		followUp,
-		// As omp's Ctrl+D, only from an empty composer, so on macOS it still deletes forward through a draft.
-		end: () => {
-			if (!endable || draft !== "") return false;
-			onEnd();
-		},
 		...(focused
 			? {
 					interrupt: () => {
 						if (view.agentId !== null || !writable || !working) return false;
 						interrupt();
 					},
+					// As ↑ edits the last message in a chat app; with a draft, ↑ keeps moving the caret.
 					dequeue: () => {
+						if (draft !== "") return false;
 						// omp takes back its last steer before its last follow-up.
 						const last = queued.findLast(entry => entry.queue === "steering") ?? queued.at(-1);
 						return take(last ? [last] : [], true);
@@ -444,6 +443,7 @@ function LiveConversation({
 						if (levels.length === 0) return false;
 						onSetThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
 					},
+					focusComposer,
 				}
 			: {}),
 	});
@@ -464,11 +464,11 @@ function LiveConversation({
 						size="compact"
 						leadingIcon={CircleStop}
 						onClick={onEnd}
-						title={`${
+						title={
 							host.source === "dashboard"
-								? "Stop the omp process this dashboard started."
-								: `Stop the omp process running in its terminal (pid ${host.pid}).`
-						} Its transcript moves to Past sessions, where Resume continues it. ${END_KEYS} in the empty composer.`}
+								? "Stop the omp process this dashboard started. Its transcript moves to Past sessions, where Resume continues it."
+								: `Stop the omp process running in its terminal (pid ${host.pid}). Its transcript moves to Past sessions, where Resume continues it.`
+						}
 					>
 						End session
 					</Button>
