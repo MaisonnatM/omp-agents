@@ -1,4 +1,4 @@
-import { Check, ChevronsUpDown, Columns2, Folder, Keyboard, Plus, Settings } from "lucide-react";
+import { Check, ChevronsUpDown, Columns2, Folder, Inbox, Keyboard, MessagesSquare, Plus, Settings } from "lucide-react";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
@@ -18,8 +18,9 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
+import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { useShortcuts } from "../shortcuts";
+import { IS_MAC, useShortcuts } from "../shortcuts";
 import type { Launch } from "../use-dashboard";
 import { useInbox } from "../use-inbox";
 import {
@@ -51,8 +52,16 @@ export function useProject(projects: { cwd: string }[]): [string | null, (cwd: s
 	return [projects.some(({ cwd }) => cwd === stored) ? stored : null, pick];
 }
 
-/** Cmd-click on macOS, Ctrl-click elsewhere, opens a row in a new pane. */
-export const modeOf = (event: MouseEvent): OpenMode => (event.metaKey || event.ctrlKey ? "split" : "replace");
+/** ⌘-click on macOS, where Ctrl-click opens the context menu, and Ctrl-click elsewhere, opens a row in a new pane. */
+export const modeOf = (event: MouseEvent): OpenMode => ((IS_MAC ? event.metaKey : event.ctrlKey) ? "split" : "replace");
+
+/** The gesture {@link modeOf} reads as a split, as hints name it. */
+export const SPLIT_CLICK = IS_MAC ? "⌘-click" : "Ctrl-click";
+
+const SIDEBAR_TABS = [
+	{ value: "inbox", label: "Inbox", icon: Inbox },
+	{ value: "sessions", label: "Sessions", icon: MessagesSquare },
+] as const;
 
 export function age(startedAt: number): string {
 	const minutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60_000));
@@ -297,7 +306,7 @@ export function Roster({
 			<SidebarMenuAction
 				showOnHover
 				aria-label={`Open ${name} in split`}
-				title={open.length < MAX_PANES ? "Open in split (⌘-click)" : `Open in the focused pane: ${MAX_PANES} panes is the most`}
+				title={open.length < MAX_PANES ? `Open in split (${SPLIT_CLICK})` : `Open in the focused pane: ${MAX_PANES} panes is the most`}
 				onClick={() => onOpen(view, "split")}
 			>
 				<Columns2 />
@@ -318,11 +327,13 @@ export function Roster({
 					</a>
 				</Button>
 			</SidebarHeader>
-			<TabsList aria-label="Sidebar" className="mx-2 flex">
-				{(["Inbox", "Sessions"] as const).map(label => (
-					<TabItem key={label} value={label.toLowerCase()} label={label} className="flex-1 justify-center" />
-				))}
-			</TabsList>
+			<SizeProvider size="compact">
+				<TabsList aria-label="Sidebar" className="mx-2 flex">
+					{SIDEBAR_TABS.map(({ value, label, icon }) => (
+						<TabItem key={value} value={value} label={label} icon={icon} className="flex-1 justify-center" />
+					))}
+				</TabsList>
+			</SizeProvider>
 			{!connected && (
 				<p className="mx-3 mt-2 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
 					Lost the dashboard server. Retrying…

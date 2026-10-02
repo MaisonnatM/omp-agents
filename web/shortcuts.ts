@@ -80,7 +80,7 @@ export function shortcutsFor(event: KeyEvent): Shortcut[] {
 	);
 }
 
-const IS_MAC =
+export const IS_MAC =
 	typeof navigator !== "undefined" &&
 	/mac/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || "");
 

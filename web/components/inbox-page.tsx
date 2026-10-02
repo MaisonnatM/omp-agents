@@ -37,7 +37,7 @@ import { readJson } from "../settings-api";
 import { refreshInbox, useInbox } from "../use-inbox";
 import { graphiteUrl, type InboxTarget, inboxRepoKey, inboxSectionId, inboxSections, type OpenMode, pullRequestUrl, samePullRequest } from "../view-model";
 import { Header } from "./conversation";
-import { age, hostLabel, modeOf, pastLabel, projectName } from "./roster";
+import { age, hostLabel, modeOf, pastLabel, projectName, SPLIT_CLICK } from "./roster";
 
 /** Folded repositories and sections: `owner/repo`, and `owner/repo:<section title>`. */
 const COLLAPSED_KEY = "omp-agents.inbox-collapsed";
@@ -301,7 +301,7 @@ function PullRequestRow({ pr, sessions, targeted, onOpen }: RowProps) {
 						<button
 							key={session.sessionId}
 							type="button"
-							title={`Open the session that ${session.link === "submitted" ? "submitted" : "worked on"} it (⌘-click to split)`}
+							title={`Open the session that ${session.link === "submitted" ? "submitted" : "worked on"} it (${SPLIT_CLICK} to split)`}
 							onClick={event => onOpen(session.view, modeOf(event))}
 							className={cn(
 								"max-w-48 truncate rounded px-1.5 py-px text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
