@@ -26,7 +26,7 @@ omp-agents lists the sessions that run in your terminals and the ones it starts 
 - **Plan and changes.** The focused conversation's todo list and the files its agent changed, with each file's latest diff; subagents open from the `task` call that spawned them.
 - **Live conversations.** Streaming Markdown transcripts, tool calls, and context-window usage, in up to four split panes.
 - **Full control.** Prompt, steer, queue follow-ups, interrupt, answer `ask` questions and extension dialogs, message and cancel subagents, run `!` shell and built-in `/` commands in dashboard sessions, switch model and thinking level, end sessions.
-- **Session lifecycle.** Start a session in any project, resume a past one, or fork a conversation from any prompt or reply.
+- **Session lifecycle.** Start a session in any project, on any branch or a new one in its own git worktree, resume a past one, or fork a conversation from any prompt or reply.
 - **Pull request inbox.** A Graphite-style inbox of your GitHub pull requests, linked to the sessions that submitted or worked on them.
 - **Settings editor.** Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place.
 - **Plan quota.** Remaining quota per provider plan, from `omp usage`.

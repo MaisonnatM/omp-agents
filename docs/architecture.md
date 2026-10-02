@@ -79,6 +79,10 @@ Every response from these endpoints is JSON. An error is `{ error, conflict? }` 
 
 `PUT /api/pull-request/sessions` takes `{ owner, repo, number, sessionIds }`, the link button's request. The server refuses a session that did not submit or work on that pull request by the rules in [Pull requests and the inbox](usage.md#pull-requests-and-the-inbox). It reads the description with `gh api repos/<owner>/<repo>/pulls/<number>`, puts the session block in it, and writes it back with `gh api --method PATCH` only when the text changed. The answer is `{ changed }`, or `{ error }` with the HTTP status.
 
+`GET /api/git?cwd=<directory>` answers the git checkout that the directory is in, or `null` outside one: the GitHub repository that `origin` names, the checked-out branch, every local branch with the worktree that has it checked out, and the main worktree. It runs `git worktree list --porcelain`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the inbox's cached lookup. Like a new session's `start`, `cwd` may name any directory. The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
+
+A `start` of kind `new` carries a `branch`, `null` for the directory as it is. For an existing branch, the server runs omp in the worktree that has it checked out, or in the starting directory when that worktree is the directory's own (`git rev-parse --show-toplevel`); with no such worktree it runs `git worktree add <dir> <branch>`. For a new branch, it runs `git check-ref-format --branch` and then `git worktree add -b <branch> <dir> <base>`. `<dir>` is `worktreeDir` in `src/shared.ts`, beside the main worktree. The server refuses a `<dir>` that already exists, because `git worktree add -b` creates the branch before it checks the path. A branch that git refuses answers the `start` with git's reason, and no omp spawns. A failed start makes the draft read the checkout again, so a branch that the start created shows as an existing one.
+
 ## Front-end components
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`. The roster uses `sidebar`, and its **Inbox** and **Sessions** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`. User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`. `thinking-indicator` shows while the agent works. shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button. The model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern. Fluid's built-in sidebar rail resizes by pointer only and collapses on click. The dashboard turns it off and uses `web/components/sidebar-panel.tsx`, which gives each sidebar its own width and open state, because Fluid's provider holds only one of each.
@@ -112,6 +116,7 @@ The server lives in `src/`:
 - `src/pull-requests.ts`: finds the pull requests each session submitted or worked on.
 - `src/session-links.ts`: writes the session block into a pull request's description.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more. A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
+- `src/git.ts`: the git checkout of a directory, and the worktree a new session's branch runs in.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
 - `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory. `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`.
@@ -126,6 +131,7 @@ The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web
 - `web/api.ts`: every HTTP request the page makes. `web/settings-api.ts` holds the settings page's requests.
 - `web/use-inbox.ts`: the inbox cache that the sidebar and the inbox page share, one entry per project.
 - `web/use-pull-request.ts`: reads the details of the pull request that the inbox's sheet shows.
+- `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header. `web/components/git.tsx` holds the branch picker and the repository and branch in a header's meta line.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read. `web/components/session-switcher.tsx` is the Cmd+K search over every session.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/components/roster.tsx`: the left sidebar's session and inbox lists, and the project picker.

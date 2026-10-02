@@ -326,13 +326,40 @@ export type ControlPhase =
 	| { phase: "reconnecting"; reason: string }
 	| { phase: "ended"; reason: string };
 
+/** A local branch, and the worktree that has it checked out, `null` when none has. */
+export interface LocalBranch {
+	name: string;
+	worktree: string | null;
+}
+
+/** The git checkout a directory is in: what the new-session draft's branch picker lists and a session's header names. */
+export interface GitCheckout {
+	/** The GitHub repository that `origin` names, `null` when `origin` is not on GitHub. */
+	github: { owner: string; repo: string } | null;
+	/** The branch checked out in the directory, `null` when HEAD is detached. */
+	branch: string | null;
+	/** Every local branch, the checked-out one first, then the most recently committed to. */
+	branches: LocalBranch[];
+	/** The repository's main worktree, beside which new worktrees go. */
+	mainWorktree: string;
+}
+
+/** Where a new worktree for `branch` goes: beside the main worktree, named after both (`~/code/app-fix-login` for `fix/login`). */
+export const worktreeDir = (mainWorktree: string, branch: string): string => `${mainWorktree}-${branch.replace(/[^\w.-]+/g, "-")}`;
+
+/**
+ * The branch a new session works on: an existing one, in the worktree that has it checked out (a new worktree beside
+ * the main one when none has), or a new branch from `base`, always in a new worktree.
+ */
+export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; name: string; base: string };
+
 /**
  * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` as its first
- * message; a fork holding the view's history before the user prompt `entryId`, its file left untouched; or past session
- * `sessionId` continued in its own file, as `omp --resume` does.
+ * message, on `branch` when it names one, else in `cwd` as it is; a fork holding the view's history before the user
+ * prompt `entryId`, its file left untouched; or past session `sessionId` continued in its own file, as `omp --resume` does.
  */
 export type StartRequest =
-	| { kind: "new"; cwd: string; prompt: string }
+	| { kind: "new"; cwd: string; prompt: string; branch: BranchChoice | null }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "resume"; sessionId: string };
 /** `cwd` is the absolute directory the session runs in. `prompt` is the text of the prompt a fork branched at, for the composer; `null` for the other kinds. */
