@@ -298,6 +298,8 @@ export function Roster({
 	const shownHosts = hosts.filter(inProject);
 	const shownPast = past.filter(session => inProject(session) && matchesFilter(session, pastLabel(session), filter));
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
+	const selectedProject = projects.find(({ cwd }) => cwd === project);
+	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
 	const splitAction = (view: View, name: string) =>
 		!isOpen(view) && (
 			<SidebarMenuAction
@@ -346,12 +348,15 @@ export function Roster({
 									: `${hosts.length} running`}
 						</SidebarGroupLabel>
 						<SidebarGroupAction
-							title="New session"
-							aria-label="New session"
+							title={newSessionLabel}
+							aria-label={newSessionLabel}
 							aria-expanded={launch.phase !== "closed"}
 							onClick={() => {
-								if (launch.phase === "closed") setRunningOpen(true);
-								onLaunchOpen(launch.phase === "closed");
+								if (launch.phase !== "closed") return onLaunchOpen(false);
+								setRunningOpen(true);
+								// A chosen project names the directory, so the session starts at once; the form shows while omp starts and on failure.
+								if (project !== null && connected) onCreate(project);
+								else onLaunchOpen(true);
 							}}
 						>
 							<Plus />
