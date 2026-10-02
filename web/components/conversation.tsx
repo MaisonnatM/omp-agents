@@ -1,4 +1,4 @@
-import { ArrowUpRight, Brain, ListEnd } from "lucide-react";
+import { ArrowUpRight, Brain, ListEnd, Sparkles } from "lucide-react";
 import { createContext, Fragment, type ReactNode, useContext, useEffect, useId, useRef, useState } from "react";
 import type {
 	AgentRow,
@@ -33,14 +33,13 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import type { Fork, Resume } from "../use-dashboard";
-import { type ForkPoint, forkPoints, hashForInbox, modelName, modelOrg, pullRequestUrl, sameView, type ToolItem, toBlocks } from "../view-model";
+import { type ForkPoint, forkPoints, hashForInbox, pullRequestUrl, sameView, skillLabel, type ToolItem, toBlocks } from "../view-model";
 import { chordLabel, SHORTCUTS, useShortcuts } from "../shortcuts";
 import { completionTrigger } from "../completion-trigger";
 import { CompletionPopup } from "./completion-popup";
 import { ContextRing } from "./context-ring";
 import { MessageMarkdown } from "./message-markdown";
-import { ModelPicker } from "./model-picker";
-import { OrgIcon } from "./org-icon";
+import { Model, ModelPicker } from "./model-picker";
 import { hostLabel, pastLabel, projectName } from "./roster";
 import { statusLabel } from "./status-dot";
 import { ThinkingPicker } from "./thinking-picker";
@@ -189,15 +188,24 @@ export function Header({ title, meta, status, alert = false, children }: HeaderP
 /** The project a session runs in, with its full directory on hover. */
 const Project = ({ cwdDisplay }: { cwdDisplay: string }) => <span title={cwdDisplay}>{projectName(cwdDisplay) ?? cwdDisplay}</span>;
 
-/** `anthropic/claude-opus-5-5` as the Anthropic logo and `opus-5-5`, with the full selector on hover. */
-export function Model({ selector }: { selector: string }) {
+/** The skill a prompt invoked, as a pill ahead of the user's words. */
+function SkillBadge({ name }: { name: string }) {
 	return (
-		<span title={selector}>
-			<OrgIcon org={modelOrg(selector)} label className="mr-1 inline-block align-[-0.125em]" />
-			{modelName(selector)}
+		<span
+			title={`/skill:${name}`}
+			className="inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-xs font-medium text-foreground ring-1 ring-border"
+			data-skill={name}
+		>
+			<Sparkles aria-hidden className="size-3 text-violet-500 dark:text-violet-400" />
+			<span className="sr-only">Skill:</span>
+			{skillLabel(name)}
 		</span>
 	);
 }
+
+/** What a prompt's copy button copies: a skill prompt as the user typed it, not the skill's text. */
+const typedText = (item: Exclude<Item, ToolItem>): string =>
+	item.kind === "user" && item.skill ? [`/skill:${item.skill}`, item.text].filter(Boolean).join(" ") : item.text;
 
 /**
  * The PRs a session submitted or worked on, after a separator. The number opens the PR's row in the inbox, and the
@@ -261,7 +269,7 @@ function Transcript({ view, items, working, fork, onFork }: TranscriptProps) {
 								</MessageScrollerItem>
 							);
 						}
-						const copyable = !(item.kind === "assistant" && item.streaming) && item.text.trim() !== "";
+						const copyable = !(item.kind === "assistant" && item.streaming) && typedText(item).trim() !== "";
 						const point = forks.get(item.id);
 						const failed = here?.phase === "failed" && here.itemId === item.id ? here.error : null;
 						return (
@@ -272,7 +280,7 @@ function Transcript({ view, items, working, fork, onFork }: TranscriptProps) {
 									actions={
 										copyable || point ? (
 											<>
-												{copyable && <CopyButton text={item.text} />}
+												{copyable && <CopyButton text={typedText(item)} />}
 												{point && (
 													<ForkButton
 														point={point}
@@ -287,7 +295,14 @@ function Transcript({ view, items, working, fork, onFork }: TranscriptProps) {
 									data-item={item.kind}
 									data-streaming={item.kind === "assistant" ? item.streaming : undefined}
 								>
-									<MessageMarkdown text={item.text} />
+									{item.kind === "user" && item.skill ? (
+										<div className="flex flex-col items-start gap-1.5">
+											<SkillBadge name={item.skill} />
+											{item.text && <MessageMarkdown text={item.text} />}
+										</div>
+									) : (
+										<MessageMarkdown text={item.text} />
+									)}
 								</ChatMessage>
 								{failed && (
 									<p role="alert" className={cn(item.kind === "user" ? "self-end" : "self-start", "text-xs", NOTICE_TONE.error)}>
@@ -555,7 +570,11 @@ function LiveConversation({
 			</>
 		) : shownModel || thinking ? (
 			<span className="flex min-w-0 items-center gap-3 px-2 text-xs text-muted-foreground" title="Switch this session's model and thinking level from its omp terminal.">
-				{shownModel && <span className="truncate">{shownModel.slice(shownModel.indexOf("/") + 1)}</span>}
+				{shownModel && (
+					<span className="truncate">
+						<Model selector={shownModel} />
+					</span>
+				)}
 				{thinking && (
 					<span className="flex shrink-0 items-center gap-1">
 						<Brain aria-hidden="true" className="size-3.5" />

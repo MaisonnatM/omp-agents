@@ -173,8 +173,12 @@ export interface PastView {
 export type View = LiveView | PastView;
 
 export type Item =
-	/** `entryId`: the session-file entry omp can branch at; `null` for Collab prompts and prompts not yet in the file. */
-	| { id: string; kind: "user"; text: string; from: string | null; entryId: string | null }
+	/**
+	 * `skill`: the skill a `/skill:<name>` prompt invoked, with `text` holding only what the user typed after it; `null` for
+	 * any other prompt. `entryId`: the session-file entry omp can branch at; `null` for Collab and skill prompts and prompts
+	 * not yet in the file.
+	 */
+	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null }
 	| { id: string; kind: "assistant"; text: string; streaming: boolean }
 	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error" }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
