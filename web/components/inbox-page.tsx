@@ -40,6 +40,7 @@ import type {
 } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { Sheet, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { readJson } from "../settings-api";
 import { refreshInbox, useInbox } from "../use-inbox";
@@ -286,16 +287,13 @@ function LinkSessionsButton({ pr, sessions }: { pr: PullRequest; sessions: Sessi
 interface RowProps {
 	pr: InboxPullRequest;
 	sessions: SessionLink[];
-	/** The PR the inbox link named: highlighted, with its details open below it. */
+	/** The PR the inbox link named, highlighted while its sheet shows. */
 	targeted: boolean;
-	/** Changes when the page's Refresh asks GitHub again. */
-	reload: number;
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
-function PullRequestRow({ pr, sessions, targeted, reload, onOpen }: RowProps) {
+function PullRequestRow({ pr, sessions, targeted, onOpen }: RowProps) {
 	const review = pr.state === "merged" || pr.review === "none" ? null : REVIEW_LABEL[pr.review];
-	const detailsId = `${rowId(pr)}-details`;
 	return (
 		<li id={rowId(pr)} data-targeted={targeted || undefined} className={cn("scroll-my-6", targeted && "ring-2 ring-inset ring-ring")}>
 			<div className={cn("flex items-start gap-3 px-3 py-2.5", targeted ? "bg-accent/60" : "hover:bg-muted/50")}>
@@ -304,10 +302,9 @@ function PullRequestRow({ pr, sessions, targeted, reload, onOpen }: RowProps) {
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<div className="flex min-w-0 items-baseline gap-2">
 						<a
-							href={hashForInbox(targeted ? null : pr)}
-							aria-expanded={targeted}
-							aria-controls={targeted ? detailsId : undefined}
-							title={targeted ? "Hide the details" : `Show the details of ${pr.owner}/${pr.repo}#${pr.number}`}
+							href={hashForInbox(pr)}
+							aria-haspopup="dialog"
+							title={`Show the details of ${pr.owner}/${pr.repo}#${pr.number}`}
 							className="truncate rounded-sm text-sm font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
 						>
 							{pr.title}
@@ -351,12 +348,6 @@ function PullRequestRow({ pr, sessions, targeted, reload, onOpen }: RowProps) {
 					</span>
 				</div>
 			</div>
-			{targeted && (
-				// Indented under the title, past the state icon and the author's picture.
-				<div id={detailsId} className="py-4 pr-3 pl-[3.75rem]">
-					<PullRequestDetails pr={pr} reload={reload} withTitle={false} />
-				</div>
-			)}
 		</li>
 	);
 }
@@ -448,59 +439,59 @@ function Checks({ checks }: { checks: PullRequestCheck[] }) {
 	);
 }
 
-interface DetailsProps {
-	pr: PullRequest;
-	/** Changes when the page's Refresh asks GitHub again. */
-	reload: number;
-	/** Shows the title and state, which a row already shows. */
-	withTitle: boolean;
-}
-
-/** A pull request's description, checks, unresolved comments, conversation, and files, read from GitHub in place of opening it there. */
-function PullRequestDetails({ pr, reload, withTitle }: DetailsProps) {
-	const { detail, error } = usePullRequest(pr, reload);
-	if (!detail) {
-		return error ? (
+/** A pull request read from GitHub, as the inbox's sheet shows it: a header that names it, then its details. */
+function PullRequestSheetContent({ pr }: { pr: PullRequest }) {
+	const { detail, error } = usePullRequest(pr);
+	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
+	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking GitHub for the pull request…</p>;
+	if (detail) body = <PullRequestSections detail={detail} />;
+	else if (error) {
+		body = (
 			<p role="alert" className="text-sm text-red-600 dark:text-red-400">
 				Cannot load the pull request: {error}
 			</p>
-		) : (
-			<p className="text-sm text-muted-foreground">Asking GitHub for the pull request…</p>
 		);
 	}
+	return (
+		<>
+			<header className="space-y-1.5 border-b border-border py-3 pr-12 pl-5">
+				<SheetTitle className="flex items-start gap-2.5 text-base leading-snug font-semibold">
+					{detail && <IconTip icon={STATE_ICON[detail.state]} className="mt-1" />}
+					<span className="min-w-0">{detail?.title ?? name}</span>
+				</SheetTitle>
+				<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+					<span className="tabular-nums">{name}</span>
+					{detail && (
+						<>
+							<span className="min-w-0 truncate">
+								<span className="font-mono">{detail.head}</span> into <span className="font-mono">{detail.base}</span>
+							</span>
+							<span className="tabular-nums">
+								<span className="text-emerald-600 dark:text-emerald-400">+{detail.additions}</span>{" "}
+								<span className="text-red-600 dark:text-red-400">−{detail.deletions}</span> in {detail.changedFiles}{" "}
+								{detail.changedFiles === 1 ? "file" : "files"}
+							</span>
+							<span title={new Date(detail.createdAt).toLocaleString()}>
+								opened by {detail.author.login} {age(detail.createdAt)} ago
+							</span>
+						</>
+					)}
+					<span className="ml-auto flex gap-3">
+						<OutLink href={pullRequestUrl(pr)}>GitHub</OutLink>
+						<OutLink href={graphiteUrl(pr)}>Graphite</OutLink>
+					</span>
+				</p>
+			</header>
+			<div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">{body}</div>
+		</>
+	);
+}
+
+/** A pull request's description, checks, unresolved comments, conversation, and files. */
+function PullRequestSections({ detail }: { detail: PullRequestDetail }) {
 	const { body, checks, threads, conversation, files } = detail;
 	return (
-		<div className="space-y-5">
-			{withTitle && (
-				<div className="flex items-start gap-3">
-					<IconTip icon={STATE_ICON[detail.state]} className="mt-0.5" />
-					<h4 className="min-w-0 text-sm font-medium">
-						{detail.title} <span className="text-xs font-normal tabular-nums text-muted-foreground">#{detail.number}</span>
-					</h4>
-				</div>
-			)}
-			{error && (
-				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
-					Cannot refresh the pull request: {error}
-				</p>
-			)}
-			<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-				<span className="min-w-0 truncate">
-					<span className="font-mono">{detail.head}</span> into <span className="font-mono">{detail.base}</span>
-				</span>
-				<span className="tabular-nums">
-					<span className="text-emerald-600 dark:text-emerald-400">+{detail.additions}</span>{" "}
-					<span className="text-red-600 dark:text-red-400">−{detail.deletions}</span> in {detail.changedFiles}{" "}
-					{detail.changedFiles === 1 ? "file" : "files"}
-				</span>
-				<span title={new Date(detail.createdAt).toLocaleString()}>
-					opened by {detail.author.login} {age(detail.createdAt)} ago
-				</span>
-				<span className="ml-auto flex gap-3">
-					<OutLink href={pullRequestUrl(detail)}>GitHub</OutLink>
-					<OutLink href={graphiteUrl(detail)}>Graphite</OutLink>
-				</span>
-			</p>
+		<>
 			<DetailSection title="Description">
 				{body.trim() ? (
 					<div className="text-sm [&_img]:max-w-full">
@@ -577,7 +568,7 @@ function PullRequestDetails({ pr, reload, withTitle }: DetailsProps) {
 					)}
 				</DetailSection>
 			)}
-		</div>
+		</>
 	);
 }
 
@@ -586,13 +577,12 @@ interface RepoProps {
 	hosts: RosterHost[];
 	past: PastSession[];
 	target: PullRequest | null;
-	reload: number;
 	collapsed: ReadonlySet<string>;
 	onToggle: (key: string) => void;
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
-function RepoSection({ inbox, hosts, past, target, reload, collapsed, onToggle, onOpen }: RepoProps) {
+function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen }: RepoProps) {
 	const name = `${inbox.owner}/${inbox.repo}`;
 	const key = inboxRepoKey(inbox);
 	const headingId = `inbox-${name}`;
@@ -631,7 +621,6 @@ function RepoSection({ inbox, hosts, past, target, reload, collapsed, onToggle, 
 									pr={pr}
 									sessions={sessionsFor(pr, hosts, past)}
 									targeted={target !== null && samePullRequest(pr, target)}
-									reload={reload}
 									onOpen={onOpen}
 								/>
 							))}
@@ -671,8 +660,8 @@ function placeOf(inbox: Inbox, pr: PullRequest): { repo: string; section: string
 	return null;
 }
 
-/** Why the inbox does not list the PR a link named, then that PR's details. `allProjects`: the sidebar shows every project. */
-function MissingTarget({ target, inbox, allProjects, reload }: { target: PullRequest; inbox: Inbox; allProjects: boolean; reload: number }) {
+/** Why the inbox does not list the PR a link named. `allProjects`: the sidebar shows every project. */
+function MissingTarget({ target, inbox, allProjects }: { target: PullRequest; inbox: Inbox; allProjects: boolean }) {
 	const repo = `${target.owner}/${target.repo}`;
 	const covered = inbox.repos.some(other => `${other.owner}/${other.repo}`.toLowerCase() === repo.toLowerCase());
 	let reason = `${repo}#${target.number} is not in this inbox, which covers only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}.`;
@@ -682,12 +671,9 @@ function MissingTarget({ target, inbox, allProjects, reload }: { target: PullReq
 		reason = `${repo}#${target.number} is not in this inbox, because no session ran in ${repo}.`;
 	}
 	return (
-		<div className="space-y-4 rounded-md border border-border p-4 ring-2 ring-inset ring-ring">
-			<p role="status" className="text-sm text-muted-foreground">
-				{reason}
-			</p>
-			<PullRequestDetails key={rowId(target)} pr={target} reload={reload} withTitle />
-		</div>
+		<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+			{reason}
+		</p>
 	);
 }
 
@@ -696,7 +682,7 @@ interface InboxPageProps {
 	project: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The PR an inbox link named: its row unfolds, scrolls into view, stays highlighted, and shows its details. */
+	/** The PR an inbox link named: its row unfolds, scrolls into view, and stays highlighted while its details show in a sheet. */
 	target: PullRequest | null;
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The section a sidebar link last chose, to unfold, scroll to, and focus. */
@@ -707,14 +693,15 @@ interface InboxPageProps {
 export function InboxPage({ project, hosts, past, target, onOpen, section }: InboxPageProps) {
 	const { read, error, refreshing } = useInbox(project, true);
 	const [collapsed, toggleCollapsed, expand] = useCollapsed();
-	/** Counts the Refresh button's presses, which read the open pull request's details again too. */
-	const [reload, setReload] = useState(0);
 	const place = read && target ? placeOf(read.inbox, target) : null;
 	const targetKey = target && rowId(target);
 	/** The target whose row the page already unfolded and scrolled to; folding it again afterwards stays folded. */
 	const shown = useRef<string | null>(null);
 	/** The sidebar section the page already unfolded, scrolled to, and focused. */
 	const revealed = useRef<InboxTarget | null>(null);
+	/** The PR the sheet shows, kept after the hash drops it so the sheet's content stays through its exit slide. */
+	const sheetPr = useRef<PullRequest | null>(null);
+	if (target) sheetPr.current = target;
 
 	useEffect(() => {
 		if (!place || !targetKey || shown.current === targetKey) return;
@@ -725,7 +712,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 			return;
 		}
 		shown.current = targetKey;
-		document.getElementById(targetKey)?.scrollIntoView({ block: "start", behavior: "smooth" });
+		document.getElementById(targetKey)?.scrollIntoView({ block: "center", behavior: "smooth" });
 	}, [place?.repo, place?.section, targetKey, collapsed]);
 
 	// Waits for the section to unfold, and for an inbox that has it to load.
@@ -748,7 +735,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 		body = (
 			<>
 				{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the inbox: {error}</p>}
-				{target && !place && <MissingTarget target={target} inbox={read.inbox} allProjects={project === null} reload={reload} />}
+				{target && !place && <MissingTarget target={target} inbox={read.inbox} allProjects={project === null} />}
 				{repos.length === 0 && <p className="text-sm text-muted-foreground">No session ran in a GitHub repository.</p>}
 				{repos.map(repo => (
 					<RepoSection
@@ -757,7 +744,6 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 						hosts={hosts}
 						past={past}
 						target={target}
-						reload={reload}
 						collapsed={collapsed}
 						onToggle={toggleCollapsed}
 						onOpen={onOpen}
@@ -786,22 +772,18 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 						: "Your pull requests and review requests on GitHub"
 				}
 			>
-				<Button
-					variant="ghost"
-					size="compact"
-					leadingIcon={RefreshCw}
-					disabled={refreshing}
-					onClick={() => {
-						void refreshInbox(project, true);
-						setReload(count => count + 1);
-					}}
-				>
+				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void refreshInbox(project, true)}>
 					{refreshing ? "Refreshing…" : "Refresh"}
 				</Button>
 			</Header>
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				<TooltipProvider>
 					<div className="mx-auto w-full max-w-5xl space-y-10 px-6 py-6">{body}</div>
+					{sheetPr.current && (
+						<Sheet open={target !== null} onClose={() => (location.hash = hashForInbox(null))}>
+							<PullRequestSheetContent key={rowId(sheetPr.current)} pr={sheetPr.current} />
+						</Sheet>
+					)}
 				</TooltipProvider>
 			</div>
 		</div>

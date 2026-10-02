@@ -708,7 +708,7 @@ async function inbox(req: Request): Promise<Response> {
 	});
 }
 
-/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>[&fresh]`: that pull request in full, for the inbox to show in place. */
+/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for the inbox's sheet. */
 async function pullRequest(req: Request): Promise<Response> {
 	if (!allowedHost(req)) return fail(403, "forbidden host");
 	const params = new URL(req.url).searchParams;
@@ -718,7 +718,7 @@ async function pullRequest(req: Request): Promise<Response> {
 	if (!/^[\w.-]+$/.test(owner) || !/^[\w.-]+$/.test(repo) || !Number.isSafeInteger(number) || number < 1) {
 		return fail(400, "Expected ?owner=&repo=&number=");
 	}
-	return answer(() => loadPullRequestDetail({ owner, repo, number }, params.has("fresh")));
+	return answer(() => loadPullRequestDetail({ owner, repo, number }));
 }
 
 /** A write's JSON body, or the response refusing it. Only this app's own page may write, and only with a JSON body, which a cross-site form cannot send. */
