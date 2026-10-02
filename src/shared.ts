@@ -73,6 +73,8 @@ export interface InboxPullRequest extends PullRequest {
 	state: "open" | "draft" | "merged";
 	review: ReviewDecision;
 	checks: CheckState;
+	/** True when GitHub reports the PR as `CONFLICTING` with its base branch; false for `MERGEABLE`, `UNKNOWN` (not computed yet), and merged PRs. */
+	conflicts: boolean;
 	head: string;
 	/** The branch it merges into when that is not the repository's default branch: the PR below it in a stack. */
 	stackedOn: string | null;

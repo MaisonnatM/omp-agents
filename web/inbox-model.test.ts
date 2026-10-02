@@ -14,6 +14,7 @@ describe("inbox sections", () => {
 		state: "open",
 		review: "review-required",
 		checks: "passing",
+		conflicts: false,
 		head: `me/branch-${number}`,
 		stackedOn: null,
 		unresolved: { count: 0, exact: true },

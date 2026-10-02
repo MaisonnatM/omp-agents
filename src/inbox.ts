@@ -91,7 +91,7 @@ const AVATAR = "avatarUrl(size: 48)";
 const THREADS = 100;
 
 const PR_FIELDS = `... on PullRequest {
-	number title isDraft state reviewDecision headRefName baseRefName updatedAt mergedAt
+	number title isDraft state reviewDecision mergeable headRefName baseRefName updatedAt mergedAt
 	author { login ${AVATAR} }
 	reviewRequests(first: 10) { nodes { requestedReviewer {
 		... on User { login ${AVATAR} } ... on Bot { login ${AVATAR} } ... on Mannequin { login ${AVATAR} } ... on Team { slug ${AVATAR} }
@@ -191,6 +191,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole)
 		state: node.state === "MERGED" ? "merged" : node.isDraft === true ? "draft" : "open",
 		review: REVIEW[str(node.reviewDecision) ?? ""] ?? "none",
 		checks: CHECKS[rollup ?? ""] ?? "none",
+		conflicts: node.state !== "MERGED" && node.mergeable === "CONFLICTING",
 		head,
 		stackedOn: defaultBranch !== undefined && base !== defaultBranch ? base : null,
 		unresolved: parseUnresolved(node.reviewThreads),
