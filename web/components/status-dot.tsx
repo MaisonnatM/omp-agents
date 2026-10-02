@@ -7,7 +7,7 @@ const DOTS: Record<Status, { label: string; className: string }> = {
 	working: { label: "working", className: "bg-emerald-500 shadow-[0_0_0_3px] shadow-emerald-500/25" },
 	running: { label: "running", className: "bg-emerald-500 shadow-[0_0_0_3px] shadow-emerald-500/25" },
 	"needs-input": { label: "needs input", className: "bg-amber-500 shadow-[0_0_0_3px] shadow-amber-500/30" },
-	idle: { label: "idle", className: "bg-muted-foreground/45" },
+	idle: { label: "idle", className: "bg-blue-500 shadow-[0_0_0_3px] shadow-blue-500/25" },
 	parked: { label: "parked", className: "border border-muted-foreground/60" },
 	aborted: { label: "aborted", className: "bg-red-500/70" },
 	unknown: { label: "status unknown", className: "border border-dashed border-muted-foreground/60" },

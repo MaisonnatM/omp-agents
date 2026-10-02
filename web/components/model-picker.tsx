@@ -1,5 +1,4 @@
 import { Check, ChevronsUpDown } from "lucide-react";
-import { useState } from "react";
 import type { ModelOption } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -11,8 +10,9 @@ interface ModelPickerProps {
 	current: string | null;
 	/** The last list the server sent for this session, or `null` while none has arrived. */
 	list: { models: ModelOption[]; error: string | null } | null;
-	/** Refresh the list from omp whenever the picker opens. */
-	onOpen: () => void;
+	open: boolean;
+	/** The parent refreshes the list from omp whenever the picker opens. */
+	onOpenChange: (open: boolean) => void;
 	onPick: (model: ModelOption) => void;
 }
 
@@ -27,16 +27,9 @@ function byProvider(models: ModelOption[]): [string, ModelOption[]][] {
 }
 
 /** The composer's model switch: a searchable list of the session's models, grouped by provider. */
-export function ModelPicker({ current, list, onOpen, onPick }: ModelPickerProps) {
-	const [open, setOpen] = useState(false);
+export function ModelPicker({ current, list, open, onOpenChange, onPick }: ModelPickerProps) {
 	return (
-		<Popover
-			open={open}
-			onOpenChange={next => {
-				setOpen(next);
-				if (next) onOpen();
-			}}
-		>
+		<Popover open={open} onOpenChange={onOpenChange}>
 			<PopoverTrigger asChild>
 				<Button variant="ghost" size="compact" trailingIcon={ChevronsUpDown} title={current ?? undefined} aria-label={`Choose model: ${current ? current.slice(current.indexOf("/") + 1) : "none selected"}`} active={open}>
 					<span className="max-w-56 truncate">{current ? current.slice(current.indexOf("/") + 1) : "Choose model"}</span>
@@ -66,7 +59,7 @@ export function ModelPicker({ current, list, onOpen, onPick }: ModelPickerProps)
 													key={selector}
 													value={selector}
 													onSelect={() => {
-														setOpen(false);
+														onOpenChange(false);
 														if (selector !== current) onPick(model);
 													}}
 												>

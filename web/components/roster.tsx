@@ -1,4 +1,4 @@
-import { Check, ChevronsUpDown, Columns2, Folder, Plus, Settings } from "lucide-react";
+import { Check, ChevronsUpDown, Columns2, Folder, Keyboard, Plus, Settings } from "lucide-react";
 import { type MouseEvent, useState } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
@@ -171,6 +171,7 @@ interface RosterProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	onLaunchOpen: (open: boolean) => void;
 	onCreate: (cwd: string) => void;
+	onShowShortcuts: () => void;
 }
 
 export function Roster({
@@ -185,6 +186,7 @@ export function Roster({
 	onOpen,
 	onLaunchOpen,
 	onCreate,
+	onShowShortcuts,
 }: RosterProps) {
 	const [runningOpen, setRunningOpen] = useState(true);
 	const [filter, setFilter] = useState("");
@@ -217,6 +219,9 @@ export function Roster({
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={pickProject} />
+				<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
+					<Keyboard />
+				</Button>
 				<Button asChild variant="ghost" size="icon-compact" active={settingsOpen} className="shrink-0 text-muted-foreground">
 					<a href={settingsHref} title="Settings" aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
 						<Settings />
