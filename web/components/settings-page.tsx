@@ -7,8 +7,9 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { loadModels, loadSettings, SettingsRequestError, saveFile, saveRouting } from "../settings-api";
-import { FILE_KIND_LABELS, fileGroups, hashForSettings, providerOrg, splitSelector } from "../view-model";
-import { Header, Model } from "./conversation";
+import { FILE_KIND_LABELS, fileGroups, hashForSettings, modelLabel, providerOrg, splitSelector } from "../view-model";
+import { Header } from "./conversation";
+import { Model, ModelRow, modelDescription, ProviderHeading } from "./model-picker";
 import { OrgIcon } from "./org-icon";
 
 type Load = { phase: "loading" } | { phase: "loaded"; settings: OmpSettings } | { phase: "failed"; error: string };
@@ -169,7 +170,7 @@ function SelectorPicker({ value, catalog, label, onPick }: { value: string | nul
 		<div className="flex min-w-0 items-center gap-1">
 			<Popover open={open} onOpenChange={setOpen}>
 				<PopoverTrigger asChild>
-					<Button variant="ghost" size="compact" trailingIcon={ChevronsUpDown} aria-label={`${label}: ${model ?? "none"}`} active={open} className="min-w-0">
+					<Button variant="ghost" size="compact" trailingIcon={ChevronsUpDown} aria-label={`${label}: ${model ? modelDescription(model) : "none"}`} active={open} className="min-w-0">
 						<span className="max-w-56 truncate">{model ? <Model selector={model} /> : "Choose a model"}</span>
 					</Button>
 				</PopoverTrigger>
@@ -189,11 +190,16 @@ function SelectorPicker({ value, catalog, label, onPick }: { value: string | nul
 								<>
 									<CommandEmpty>No model matches.</CommandEmpty>
 									{catalog.byProvider.map(([provider, group]) => (
-										<CommandGroup key={provider} heading={provider}>
+										<CommandGroup key={provider} heading={<ProviderHeading provider={provider} />}>
 											{group.map(option => (
-												<CommandItem key={option.selector} value={`${option.selector} ${option.name}`} onSelect={() => pickModel(option)}>
-													<span className="truncate">{option.selector.slice(provider.length + 1)}</span>
-													<Check className={cn("ml-auto", option.selector === model ? "opacity-100" : "opacity-0")} />
+												<CommandItem
+													key={option.selector}
+													value={option.selector}
+													keywords={[modelLabel(option.selector), option.name]}
+													title={option.selector}
+													onSelect={() => pickModel(option)}
+												>
+													<ModelRow selector={option.selector} id={option.selector.slice(provider.length + 1)} selected={option.selector === model} />
 												</CommandItem>
 											))}
 										</CommandGroup>

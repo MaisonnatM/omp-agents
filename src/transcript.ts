@@ -13,6 +13,15 @@ type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
 
 const COLLAB_PROMPT = "collab-prompt";
+/** How omp's terminal and RPC clients record a `/skill:<name>` prompt: the skill's text, with the invocation in `details`. */
+const SKILL_PROMPT = "skill-prompt";
+/**
+ * omp's `prompts/skills/user-invocation.md` as rendered: the skill's name, its body, its directory, then what the user
+ * typed around the `/skill:` token. Collab and subagent prompts carry only this text, since the dashboard expands
+ * skills before sending them.
+ */
+const SKILL_INVOCATION =
+	/^\[IMPORTANT: User invoked the "([^"]+)" skill; follow its instructions\. Full skill below\.\]\n[\s\S]*\n\[Skill directory: [^\n]*\]\n[^\n]*(?:\nUser: ([\s\S]*))?$/;
 const SUMMARY_MAX = 160;
 
 export const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null;
@@ -49,6 +58,12 @@ function toolSummary(args: unknown, intent: unknown): string {
 /** The key a message shares between its live events and its file entry. */
 const messageKey = (message: Json): string | undefined =>
 	typeof message.timestamp === "number" ? `m${message.timestamp}` : undefined;
+
+/** A prompt as the user typed it: an expanded skill reads as the skill's name and the user's words, not the skill's text. */
+function userPrompt(text: string): { text: string; skill: string | null } {
+	const match = SKILL_INVOCATION.exec(text);
+	return match ? { text: match[2]?.trim() ?? "", skill: match[1] } : { text, skill: null };
+}
 
 export class Transcript {
 	/** Display order: by message time, then first seen. */
@@ -178,12 +193,18 @@ export class Transcript {
 		switch (message.role) {
 			case "user": {
 				if (message.synthetic) return [];
-				return this.#upsert({ id: key, kind: "user", text: textOf(message.content), from: null, entryId });
+				return this.#upsert({ id: key, kind: "user", ...userPrompt(textOf(message.content)), from: null, entryId });
 			}
 			case "custom": {
+				const details = isObject(message.details) ? message.details : {};
+				if (message.customType === SKILL_PROMPT) {
+					const skill = str(details.name);
+					// Subagents get skills as hidden context the user never typed.
+					if (message.attribution !== "user" || !skill) return [];
+					return this.#upsert({ id: key, kind: "user", text: str(details.args) ?? "", skill, from: null, entryId: null });
+				}
 				if (message.customType !== COLLAB_PROMPT) return [];
-				const from = isObject(message.details) ? (str(message.details.from) ?? null) : null;
-				return this.#upsert({ id: key, kind: "user", text: textOf(message.content), from, entryId: null });
+				return this.#upsert({ id: key, kind: "user", ...userPrompt(textOf(message.content)), from: str(details.from) ?? null, entryId: null });
 			}
 			case "assistant":
 				return this.#applyAssistant(key, message, streaming);

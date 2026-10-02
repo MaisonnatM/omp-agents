@@ -298,12 +298,59 @@ export function matchesFilter(session: PastSession, label: string, query: string
 	return label.toLowerCase().includes(text) || session.cwdDisplay.toLowerCase().includes(text);
 }
 
-/** A model selector without its provider, router org, or the `claude-` prefix: `anthropic/claude-opus-5-5` reads `opus-5-5`. */
-export const modelName = (selector: string): string =>
-	selector
-		.slice(selector.lastIndexOf("/") + 1)
-		.replace(/^~/, "")
-		.replace(/^claude-/, "");
+/** Words that keep their own casing in a label. */
+const BRAND_WORDS: Record<string, string> = {
+	deepseek: "DeepSeek",
+	glm: "GLM",
+	gpt: "GPT",
+	minimax: "MiniMax",
+	moonshotai: "Moonshot AI",
+	openai: "OpenAI",
+	openrouter: "OpenRouter",
+	oss: "OSS",
+	xai: "xAI",
+};
+
+function labelWord(word: string): string {
+	const brand = BRAND_WORDS[word.toLowerCase()];
+	if (brand) return brand;
+	// Sizes such as a `1m` context, `31b` parameters, or `a3b` active ones.
+	if (/^a?\d+(\.\d+)?[bkm]$/i.test(word)) return word.toUpperCase();
+	// Versions such as `4o`, and OpenAI's lowercase `o3`.
+	if (/^(\d|o\d)/.test(word)) return word;
+	return word[0].toUpperCase() + word.slice(1);
+}
+
+const labelWords = (words: string[]): string => words.filter(Boolean).map(labelWord).join(" ");
+
+/** A provider id as its name: `openai-codex` reads `OpenAI Codex`. */
+export const providerLabel = (provider: string): string => labelWords(provider.split("-"));
+
+/** A skill name as its title: `poteto-mode` reads `Poteto Mode`. */
+export const skillLabel = (name: string): string => labelWords(name.split(/[-_\s]+/));
+
+/**
+ * A model selector as people name the model, leaving its provider and org to the logo: `anthropic/claude-opus-5-5`
+ * reads `Opus 5.5`. A `:suffix`, such as a thinking level or a router's `batch` tier, follows in parentheses.
+ */
+export function modelLabel(selector: string): string {
+	const id = selector.slice(selector.lastIndexOf("/") + 1);
+	const colon = id.indexOf(":");
+	const name = (colon < 0 ? id : id.slice(0, colon))
+		// Anthropic's older ids put the version first: `claude-3-5-sonnet` is Sonnet 3.5.
+		.replace(/^claude-(?:([\d.-]*\d)-([a-z]+))?/, (_, version?: string, family?: string) => (version ? `${family}-${version}` : ""))
+		.replace(/-(\d{8}|\d{4}-\d{2}-\d{2})$/, "");
+	const words: string[] = [];
+	for (const word of name.split("-")) {
+		const last = words.at(-1);
+		// `5-5` is version 5.5 and `4-0` plain 4; longer numbers such as `gpt-4-1106` are builds, not minor versions.
+		if (last !== undefined && /^\d{1,2}$/.test(last) && /^\d{1,2}$/.test(word)) {
+			if (word !== "0") words[words.length - 1] = `${last}.${word}`;
+		} else words.push(word);
+	}
+	const label = labelWords(words).replace(/^GPT (?=\d)/, "GPT-");
+	return colon < 0 ? label : `${label} (${id.slice(colon + 1)})`;
+}
 
 /**
  * A selector as the model `omp models` lists and its `:level` thinking suffix. Model ids can hold colons

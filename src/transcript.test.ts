@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { buildSkillPromptMessage } from "./omp";
 import { Transcript } from "./transcript";
 
 const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({
@@ -26,7 +30,7 @@ describe("Transcript", () => {
 
 		expect(late).toEqual([]);
 		expect(t.items()).toEqual([
-			{ id: "m100", kind: "user", text: "say pong", from: null, entryId: "e1" },
+			{ id: "m100", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1" },
 			{ id: "m200:0", kind: "assistant", text: "pong", streaming: false },
 		]);
 	});
@@ -36,7 +40,7 @@ describe("Transcript", () => {
 		const prompt = { role: "custom", customType: "collab-prompt", timestamp: 300, content: "hi", details: { from: "probe" } };
 		expect(t.applyEvent({ type: "message_start", message: prompt })).toEqual([]);
 		t.applyEntry({ type: "custom_message", id: "e3", customType: "collab-prompt", content: "hi", details: { from: "probe" } });
-		expect(t.items()).toEqual([{ id: "e3", kind: "user", text: "hi", from: "probe", entryId: null }]);
+		expect(t.items()).toEqual([{ id: "e3", kind: "user", text: "hi", skill: null, from: "probe", entryId: null }]);
 	});
 
 	test("a fresh session's first prompt shows at once and stays ahead of its reply when the file catches up", () => {
@@ -60,10 +64,10 @@ describe("Transcript", () => {
 		const t = new Transcript();
 		const prompt = { role: "user", timestamp: 700, content: "fork me" };
 		expect(t.applyEvent({ type: "message_end", message: prompt })).toEqual([
-			{ id: "m700", kind: "user", text: "fork me", from: null, entryId: null },
+			{ id: "m700", kind: "user", text: "fork me", skill: null, from: null, entryId: null },
 		]);
 		expect(t.applyEntry({ type: "message", id: "a1b2c3d4", message: prompt })).toEqual([
-			{ id: "m700", kind: "user", text: "fork me", from: null, entryId: "a1b2c3d4" },
+			{ id: "m700", kind: "user", text: "fork me", skill: null, from: null, entryId: "a1b2c3d4" },
 		]);
 	});
 
@@ -145,10 +149,36 @@ describe("Transcript", () => {
 		t.applyLines([...lines, "{not json", ""]);
 
 		expect(t.items()).toEqual([
-			{ id: "m1", kind: "user", text: "list files", from: null, entryId: "e1" },
+			{ id: "m1", kind: "user", text: "list files", skill: null, from: null, entryId: "e1" },
 			{ id: "tool:c9", kind: "tool", name: "read", summary: "Listing files", status: "ok" },
 			{ id: "m4:0", kind: "assistant", text: "README.md", streaming: false },
 			{ id: "m4:stop", kind: "notice", level: "warning", text: "Interrupted." },
 		]);
+	});
+
+	test("a skill the dashboard expanded before sending reads as the skill and the words the user typed after it", async () => {
+		const baseDir = mkdtempSync(join(tmpdir(), "skill-"));
+		const filePath = join(baseDir, "SKILL.md");
+		writeFileSync(filePath, "---\nname: poteto-mode\ndescription: d\n---\n\n# Poteto\n\nUser: not the user's words.\n");
+		const skill = { name: "poteto-mode", description: "d", filePath, baseDir };
+		const sent = (await buildSkillPromptMessage(skill, { args: "do X\nand Y" })).message;
+		const bare = (await buildSkillPromptMessage(skill, { args: "" })).message;
+		const t = new Transcript();
+		t.applyEntry({ type: "custom_message", id: "e1", customType: "collab-prompt", content: sent, details: { from: "probe" } });
+		t.applyEntry({ type: "message", id: "e2", message: { role: "user", timestamp: 2, content: [text(bare)] } });
+
+		expect(t.items()).toEqual([
+			{ id: "e1", kind: "user", text: "do X\nand Y", skill: "poteto-mode", from: "probe", entryId: null },
+			{ id: "m2", kind: "user", text: "", skill: "poteto-mode", from: null, entryId: "e2" },
+		]);
+	});
+
+	test("a skill the user invoked in omp renders from the invocation omp records, and a subagent's hidden skill stays hidden", () => {
+		const t = new Transcript();
+		const details = { name: "mma-mode", path: "/s/SKILL.md", args: "fix the scroll", prompt: "/skill:mma-mode fix the scroll" };
+		t.applyEntry({ type: "custom_message", id: "e1", customType: "skill-prompt", content: "[IMPORTANT: …]", display: true, attribution: "user", details });
+		t.applyEntry({ type: "custom_message", id: "e2", customType: "skill-prompt", content: "body", display: false, details: { name: "mma-mode", path: "/s/SKILL.md" } });
+
+		expect(t.items()).toEqual([{ id: "e1", kind: "user", text: "fix the scroll", skill: "mma-mode", from: null, entryId: null }]);
 	});
 });

@@ -15,13 +15,15 @@ import {
 	type Layout,
 	layoutFromHash,
 	matchesFilter,
-	modelName,
+	modelLabel,
 	modelOrg,
 	openView,
+	providerLabel,
 	sessionFromHash,
-	swapView,
 	settingsFromHash,
+	skillLabel,
 	splitSelector,
+	swapView,
 	toBlocks,
 	viewForSession,
 } from "./view-model";
@@ -37,11 +39,28 @@ const agent = (id: string, parentId: string | null): AgentRow => ({
 });
 
 describe("model labels", () => {
-	test("a direct provider's model drops the provider and the claude- prefix", () => {
-		expect(modelName("anthropic/claude-opus-5-5")).toBe("opus-5-5");
+	test("a direct provider's model reads as its family and dotted version", () => {
+		expect(modelLabel("anthropic/claude-opus-5-5")).toBe("Opus 5.5");
 		expect(modelOrg("anthropic/claude-opus-5-5")).toBe("anthropic");
-		expect(modelName("openai-codex/gpt-5.5")).toBe("gpt-5.5");
+		expect(modelLabel("openai-codex/gpt-5.5")).toBe("GPT-5.5");
 		expect(modelOrg("openai-codex/gpt-5.5")).toBe("openai");
+	});
+
+	test("dated and version-first Anthropic ids read like the current ones", () => {
+		expect(modelLabel("anthropic/claude-haiku-4-5-20251001")).toBe("Haiku 4.5");
+		expect(modelLabel("anthropic/claude-3-5-sonnet-20241022")).toBe("Sonnet 3.5");
+		expect(modelLabel("openrouter/openai/gpt-4o-mini-2024-07-18")).toBe("GPT-4o Mini");
+	});
+
+	test("only one- and two-digit parts join into a version, and a zero minor version drops", () => {
+		expect(modelLabel("openai/gpt-4-1106-preview")).toBe("GPT-4 1106 Preview");
+		expect(modelLabel("cursor/claude-opus-5-5-1m-fast")).toBe("Opus 5.5 1M Fast");
+		expect(modelLabel("anthropic/claude-sonnet-4-0")).toBe("Sonnet 4");
+	});
+
+	test("a colon suffix reads in parentheses, whether a router's tier or a thinking level", () => {
+		expect(modelLabel("openrouter/openai/o3-mini:batch")).toBe("o3 Mini (batch)");
+		expect(modelLabel("anthropic/claude-sonnet-5-5:high")).toBe("Sonnet 5.5 (high)");
 	});
 
 	test("a reseller's model belongs to the family's org", () => {
@@ -50,10 +69,17 @@ describe("model labels", () => {
 	});
 
 	test("a router's org/model id names the org", () => {
-		expect(modelName("openrouter/~anthropic/claude-opus-latest")).toBe("opus-latest");
+		expect(modelLabel("openrouter/~anthropic/claude-opus-latest")).toBe("Opus Latest");
 		expect(modelOrg("openrouter/~anthropic/claude-opus-latest")).toBe("anthropic");
-		expect(modelName("openrouter/moonshotai/kimi-k3")).toBe("kimi-k3");
+		expect(modelLabel("openrouter/moonshotai/kimi-k3")).toBe("Kimi K3");
 		expect(modelOrg("openrouter/z-ai/glm-5.3")).toBe("z-ai");
+	});
+
+	test("provider ids and skill names read as titles, keeping brand casing", () => {
+		expect(providerLabel("openai-codex")).toBe("OpenAI Codex");
+		expect(providerLabel("openrouter")).toBe("OpenRouter");
+		expect(skillLabel("poteto-mode")).toBe("Poteto Mode");
+		expect(skillLabel("Poteto Mode")).toBe("Poteto Mode");
 	});
 });
 
@@ -290,7 +316,7 @@ describe("matchesFilter", () => {
 });
 
 describe("transcript rendering", () => {
-	const user: Item = { id: "u", kind: "user", text: "go", from: null, entryId: "e-u" };
+	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
 	const tool = (id: string, status: "running" | "ok"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status });
 
 	test("upserts keep position and append new ids", () => {
@@ -309,7 +335,7 @@ describe("transcript rendering", () => {
 });
 
 describe("forkPoints", () => {
-	const prompt = (id: string, entryId: string | null): Item => ({ id, kind: "user", text: id, from: null, entryId });
+	const prompt = (id: string, entryId: string | null): Item => ({ id, kind: "user", text: id, skill: null, from: null, entryId });
 	const reply = (id: string, streaming = false): Item => ({ id, kind: "assistant", text: id, streaming });
 	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok" };
 
