@@ -12,7 +12,7 @@ import { loadInbox, repoOf } from "./inbox";
 import { PullRequestIndex } from "./pull-requests";
 import { linkSessions, type SessionEntry } from "./session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "./settings";
-import { type ClientMsg, EMPTY_QUEUE, type HostStatus, type Item, type LaunchResult, type LinkedPullRequest, type LiveView, type RosterHost, type ServerMsg, type SettingsError, type UserAnswer, type View } from "./shared";
+import { type ClientMsg, type CompletionScope, EMPTY_QUEUE, type HostStatus, type Item, type LaunchResult, type LinkedPullRequest, type LiveView, type RosterHost, type ServerMsg, type SettingsError, type UserAnswer, type View } from "./shared";
 import { isObject } from "./transcript";
 import { fetchPlanUsage } from "./usage";
 
@@ -295,14 +295,22 @@ async function pollRegistry(): Promise<void> {
 	setTimeout(pollRegistry, POLL_MS);
 }
 
-/** Start omp in `input` (absolute, `~`-relative, or relative to the home directory), send it `prompt`, and answer once it is ready. */
-async function launch(ws: Socket, input: string, prompt: string): Promise<void> {
+/** The directory `input` names (absolute, `~`-relative, or relative to the home directory), or `null` when it is not one. */
+function directoryOf(input: string): string | null {
 	const raw = input.trim();
 	const cwd = raw === "~" || raw.startsWith("~/") ? join(HOME, raw.slice(1)) : resolve(HOME, raw);
 	try {
-		if (!statSync(cwd).isDirectory()) throw new Error("not a directory");
+		return statSync(cwd).isDirectory() ? cwd : null;
 	} catch {
-		send(ws, { t: "created", result: { ok: false, error: `${raw} is not a directory.` } });
+		return null;
+	}
+}
+
+/** Start omp in the directory `input` names, send it `prompt`, and answer once it is ready. */
+async function launch(ws: Socket, input: string, prompt: string): Promise<void> {
+	const cwd = directoryOf(input);
+	if (!cwd) {
+		send(ws, { t: "created", result: { ok: false, error: `${input.trim()} is not a directory.` } });
 		return;
 	}
 	let session: DashboardSession;
@@ -421,6 +429,14 @@ function parseView(value: unknown): View | null {
 	return parseLiveView(value);
 }
 
+function parseCompletionScope(value: unknown): CompletionScope | null {
+	if (isObject(value) && value.kind === "new") {
+		return typeof value.cwd === "string" && value.cwd.trim() ? { kind: "new", cwd: value.cwd } : null;
+	}
+	const view = isObject(value) && value.kind === "live" ? parseLiveView(value.view) : null;
+	return view && { kind: "live", view };
+}
+
 function parseAnswer(value: unknown): UserAnswer | null {
 	if (!isObject(value)) return null;
 	if (value.kind === "cancel") return { kind: "cancel" };
@@ -458,12 +474,12 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 				? { t: "dequeue", reqId, view, messages } : null;
 		}
 		case "complete": {
-			const view = parseLiveView(value.view);
+			const scope = parseCompletionScope(value.scope);
 			const { reqId, text, cursor } = value;
-			return view && typeof reqId === "number" && Number.isSafeInteger(reqId) && reqId >= 0 &&
+			return scope && typeof reqId === "number" && Number.isSafeInteger(reqId) && reqId >= 0 &&
 				typeof text === "string" && text.length <= 4096 && typeof cursor === "number" &&
 				Number.isInteger(cursor) && cursor >= 0 && cursor <= text.length
-				? { t: "complete", reqId, view, text, cursor } : null;
+				? { t: "complete", reqId, scope, text, cursor } : null;
 		}
 		case "abort":
 		case "end":
@@ -510,13 +526,26 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			watch(ws, msg.views);
 			return;
 		case "complete": {
-			const host = hosts.find(row => row.instanceId === msg.view.instanceId) ?? dashboards.get(msg.view.instanceId);
-			if (!host || !watching(ws, msg.view.instanceId)) return;
+			const { scope, reqId } = msg;
+			// A live view completes as its session, only while this socket watches it; a draft as a session not started yet in its cwd.
+			let instanceId: string | null = null;
+			let cwd: string | null;
+			if (scope.kind === "live") {
+				const host = hosts.find(row => row.instanceId === scope.view.instanceId) ?? dashboards.get(scope.view.instanceId);
+				if (!host || !watching(ws, host.instanceId)) return;
+				({ instanceId, cwd } = host);
+			} else {
+				cwd = directoryOf(scope.cwd);
+				if (!cwd) {
+					send(ws, { t: "completions", scope, reqId, items: [], error: `${scope.cwd.trim()} is not a directory.` });
+					return;
+				}
+			}
 			try {
-				const items = await complete(host.instanceId, host.cwd, msg.text, msg.cursor);
-				if (watching(ws, host.instanceId)) send(ws, { t: "completions", view: msg.view, reqId: msg.reqId, items, error: null });
+				const items = await complete(instanceId, cwd, msg.text, msg.cursor);
+				if (instanceId === null || watching(ws, instanceId)) send(ws, { t: "completions", scope, reqId, items, error: null });
 			} catch (error) {
-				send(ws, { t: "completions", view: msg.view, reqId: msg.reqId, items: [], error: String(error) });
+				send(ws, { t: "completions", scope, reqId, items: [], error: String(error) });
 			}
 			return;
 		}

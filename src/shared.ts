@@ -223,6 +223,8 @@ export type ControlPhase =
 export type LaunchResult = { ok: true; instanceId: string; cwd: string } | { ok: false; error: string };
 /** `prompt` is the text of the prompt forked at, for the composer. */
 export type ForkResult = { ok: true; instanceId: string; cwd: string; prompt: string } | { ok: false; error: string };
+/** Where `/` and `@` resolve: an open live view's session, or the directory the new-session draft will start omp in. */
+export type CompletionScope = { kind: "live"; view: LiveView } | { kind: "new"; cwd: string };
 /** One `/` or `@` suggestion, with the composer text and caret it produces when accepted (omp's own insertion). */
 export interface CompletionItem {
 	kind: "command" | "skill" | "file" | "directory";
@@ -372,8 +374,8 @@ export type ServerMsg =
 	| { t: "forked"; result: ForkResult }
 	/** Answers this socket's `resume` of past session `sessionId` once its omp is ready, or once resuming failed. */
 	| { t: "resumed"; sessionId: string; result: LaunchResult }
-	/** Answers this socket's `complete` for `view`; `reqId` counts per view. */
-	| { t: "completions"; view: LiveView; reqId: number; items: CompletionItem[]; error: string | null }
+	/** Answers this socket's `complete` for `scope`; `reqId` counts per composer. */
+	| { t: "completions"; scope: CompletionScope; reqId: number; items: CompletionItem[]; error: string | null }
 	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */
 	| { t: "usage"; plans: PlanUsage[]; error: string | null }
 	/** Answers `list-models`. `error` is set when the session cannot list or switch models. */
@@ -386,11 +388,11 @@ export type ClientMsg =
 	| { t: "watch"; views: View[] }
 	/** A prompt to the session, or chat to the subagent (prompt if idle, revive if parked); `delivery` applies while a turn runs. */
 	| { t: "prompt"; view: LiveView; text: string; delivery: Delivery }
-	/** Take `messages` out of the view's queue before the agent gets them. `reqId` counts per view, as for `complete`. */
+	/** Take `messages` out of the view's queue before the agent gets them. `reqId` counts per view. */
 	| { t: "dequeue"; reqId: number; view: LiveView; messages: { queue: keyof MessageQueue; text: string }[] }
 	| { t: "abort"; instanceId: string }
-	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
-	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number }
+	/** Suggestions for the composer text with the caret at `cursor`, resolved against the scope's cwd and its skills and commands. */
+	| { t: "complete"; reqId: number; scope: CompletionScope; text: string; cursor: number }
 	/** Start a new omp session in `cwd` (absolute, or starting with `~`) and send it `prompt` as its first message. */
 	| { t: "create"; cwd: string; prompt: string }
 	/** End a live session: stop the omp process this dashboard started, or send SIGTERM to a terminal session's omp. */

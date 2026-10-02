@@ -1,8 +1,7 @@
 import { ArrowUpRight, Brain, ListEnd, Sparkles } from "lucide-react";
-import { createContext, Fragment, type ReactNode, useContext, useEffect, useId, useRef, useState } from "react";
+import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import type {
 	AgentRow,
-	CompletionItem,
 	ControlPhase,
 	Delivery,
 	Item,
@@ -32,11 +31,10 @@ import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader 
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import type { Fork, Resume } from "../use-dashboard";
+import type { Completions, Fork, Resume } from "../use-dashboard";
 import { type ForkPoint, forkPoints, hashForInbox, pullRequestUrl, sameView, skillLabel, type ToolItem, toBlocks } from "../view-model";
 import { chordLabel, SHORTCUTS, useShortcuts } from "../shortcuts";
-import { completionTrigger } from "../completion-trigger";
-import { CompletionPopup } from "./completion-popup";
+import { useCompletion } from "./completion-popup";
 import { ContextRing } from "./context-ring";
 import { MessageMarkdown } from "./message-markdown";
 import { Model, ModelPicker } from "./model-picker";
@@ -399,7 +397,7 @@ interface ConversationProps {
 	initialDraft: string;
 	fork: Fork;
 	onFork: (itemId: string, point: ForkPoint) => void;
-	completions: { reqId: number; items: CompletionItem[]; error: string | null } | null;
+	completions: Completions | null;
 	onComplete: (reqId: number, text: string, cursor: number) => void;
 	/** The last model list the server sent for this session, or `null` while none has arrived. */
 	models: { models: ModelOption[]; error: string | null } | null;
@@ -455,34 +453,8 @@ function LiveConversation({
 	const [draft, setDraft] = useState(initialDraft);
 	/** The `dequeue` whose text goes back into the draft; a removed row asks for none. */
 	const [dequeueId, setDequeueId] = useState<number | null>(null);
-	const [requestId, setRequestId] = useState<number | null>(null);
-	const [active, setActive] = useState(0);
 	const nextId = useRef(0);
-	const composerRef = useRef<HTMLDivElement>(null);
 	const [modelsOpen, setModelsOpen] = useState(false);
-	const popupId = useId();
-
-	const suggestions = requestId !== null && completions?.reqId === requestId ? completions.items : [];
-	const popupOpen = requestId !== null;
-	const suggest = (text: string, cursor: number): void => {
-		if (!completionTrigger(text, cursor)) {
-			setRequestId(null);
-			return;
-		}
-		const id = ++nextId.current;
-		setRequestId(id);
-		setActive(0);
-		onComplete(id, text, cursor);
-	};
-	const pick = (item: CompletionItem): void => {
-		setDraft(item.text);
-		setRequestId(null);
-		requestAnimationFrame(() => {
-			const el = composerRef.current?.querySelector("textarea");
-			el?.focus();
-			el?.setSelectionRange(item.cursor, item.cursor);
-		});
-	};
 
 	const shown = host ?? lastHost;
 	const agent: AgentRow | null = view.agentId ? (shown?.agents.find(a => a.id === view.agentId) ?? null) : null;
@@ -518,7 +490,7 @@ function LiveConversation({
 		setDequeueId(null);
 		const text = dequeued.texts.join("\n");
 		setDraft(current => (current ? `${text}\n${current}` : text));
-		composerRef.current?.querySelector("textarea")?.focus();
+		completion.composerRef.current?.querySelector("textarea")?.focus();
 	}, [dequeued, dequeueId]);
 	// As omp's Esc does, the session's queued messages come back into the composer instead of running after the interrupt.
 	const interrupt = (): void => {
@@ -528,7 +500,7 @@ function LiveConversation({
 
 	const submit = (text: string, delivery: Delivery): void => {
 		onPrompt(text, delivery);
-		setRequestId(null);
+		completion.close();
 		setDraft("");
 		scrollToEnd();
 	};
@@ -627,6 +599,7 @@ function LiveConversation({
 				}
 			: {}),
 	});
+	const completion = useCompletion({ draft, setDraft, completions, onComplete, onKeyDown: onComposerKey });
 	const followUpButton = writable && working && (
 		<Tooltip content={`Send once the turn finishes · ${FOLLOW_UP_KEYS}`} side="top">
 			<Button variant="ghost" size="icon-sm" aria-label="Send once the turn finishes" disabled={!draft.trim() || directCommand !== null} onClick={followUp}>
@@ -663,43 +636,12 @@ function LiveConversation({
 						onAnswer={answer => onAnswer(requests[0].id, answer)}
 					/>
 				)}
-				{popupOpen && (
-					<CompletionPopup id={popupId} items={suggestions} active={Math.min(active, suggestions.length - 1)}
-						error={completions?.reqId === requestId ? completions.error : null} onPick={pick} />
-				)}
+				{completion.popup}
 				<InputMessage
-					ref={composerRef}
+					ref={completion.composerRef}
 					value={draft}
-					onValueChange={text => {
-						setDraft(text);
-						suggest(text, composerRef.current?.querySelector("textarea")?.selectionStart ?? text.length);
-					}}
-					textareaProps={{
-						"aria-controls": popupOpen ? popupId : undefined,
-						"aria-expanded": popupOpen,
-						"aria-autocomplete": "list",
-						"aria-activedescendant": popupOpen && suggestions.length ? `${popupId}-${Math.min(active, suggestions.length - 1)}` : undefined,
-						onClick: event => suggest(draft, event.currentTarget.selectionStart),
-						onKeyUp: event => {
-							if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
-								suggest(draft, event.currentTarget.selectionStart);
-							}
-						},
-						onKeyDown: event => {
-							// The open completion list owns Esc and the arrows.
-							if (!popupOpen || event.nativeEvent.isComposing) return onComposerKey(event);
-							if (event.key === "Escape") {
-								event.preventDefault();
-								setRequestId(null);
-							} else if (suggestions.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
-								event.preventDefault();
-								setActive(index => (index + (event.key === "ArrowDown" ? 1 : -1) + suggestions.length) % suggestions.length);
-							} else if (suggestions.length && (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey))) {
-								event.preventDefault();
-								pick(suggestions[Math.min(active, suggestions.length - 1)]);
-							}
-						},
-					}}
+					onValueChange={completion.onValueChange}
+					textareaProps={completion.textareaProps}
 					onSend={text => {
 						if (!directCommand) submit(text, "steer");
 					}}
