@@ -8,8 +8,10 @@ import {
 	hashForLayout,
 	hashForNewSession,
 	hashForSettings,
+	hashForTickets,
 	hashForView,
 	inboxFromHash,
+	isPageHash,
 	type Layout,
 	layoutFromHash,
 	newSessionFromHash,
@@ -17,6 +19,7 @@ import {
 	sessionFromHash,
 	settingsFromHash,
 	swapView,
+	ticketsFromHash,
 	viewForSession,
 } from "./routing";
 
@@ -99,6 +102,18 @@ describe("layout hash", () => {
 		expect(inboxFromHash("#inbox/acme/web.app")).toEqual({ target: null });
 		expect(inboxFromHash("#7c51f77b2a1bf7ba")).toBeNull();
 		for (const hash of ["#inbox", "#inbox/acme/web.app/6596", "#inbox/acme"]) expect(layoutFromHash(hash)).toBeNull();
+	});
+
+	test("the tickets hash opens the tickets page, which covers the panes instead of naming a layout", () => {
+		expect(ticketsFromHash(hashForTickets())).toBe(true);
+		expect(ticketsFromHash("#tickets/ENG-1")).toBe(true);
+		expect(ticketsFromHash("#ticketsx")).toBe(false);
+		expect(ticketsFromHash("#7c51f77b2a1bf7ba")).toBe(false);
+		for (const hash of [hashForTickets(), "#tickets/ENG-1"]) {
+			expect(layoutFromHash(hash)).toBeNull();
+			expect(isPageHash(hash)).toBe(true);
+		}
+		expect(isPageHash("#7c51f77b2a1bf7ba")).toBe(false);
 	});
 
 	test("a session link names the session by id and opens the host that runs it, else its saved transcript", () => {

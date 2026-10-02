@@ -7,12 +7,13 @@ import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
 import { PlanPanel } from "./components/plan-panel";
 import { PlanUsageFooter } from "./components/plan-usage";
-import { Roster, useProject } from "./components/roster";
+import { Roster, type SidebarTab, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings/settings-page";
 import { SessionSwitcher } from "./components/session-switcher";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
 import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
+import { TicketsPage } from "./components/tickets/tickets-page";
 import { ToolsExpanded } from "./components/transcript";
 import { type InboxTarget } from "./inbox-model";
 import { SPLIT_CLICK } from "./labels";
@@ -23,15 +24,18 @@ import {
 	focusedView,
 	hashForSettings,
 	hashForInbox,
+	hashForTickets,
 	hashForView,
 	inboxFromHash,
 	newSessionFromHash,
 	sameView,
 	settingsFromHash,
+	ticketsFromHash,
 } from "./routing";
 import { defaultCwd, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
+import type { TicketsTarget } from "./tickets-model";
 import { useDashboard, useHash } from "./use-dashboard";
 
 
@@ -66,8 +70,9 @@ export function App() {
 	const hash = useHash();
 	const settings = settingsFromHash(hash);
 	const inbox = inboxFromHash(hash);
+	const tickets = ticketsFromHash(hash);
 	const newSession = newSessionFromHash(hash);
-	const page = settings || inbox || newSession;
+	const page = settings || inbox || tickets || newSession;
 	const [project, pickProject] = useProject(workspaces(state.hosts, state.past));
 	const { started } = state;
 	// A session started in another directory than the selected project would be missing from the sidebar.
@@ -117,9 +122,11 @@ export function App() {
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [switcherOpen, setSwitcherOpen] = useState(false);
 	const [inboxTarget, setInboxTarget] = useState<InboxTarget | null>(null);
-	const showInbox = (open: boolean): void => {
-		if (open) location.hash = hashForInbox(null);
-		else show(layout);
+	const [ticketsTarget, setTicketsTarget] = useState<TicketsTarget | null>(null);
+	const tab: SidebarTab = inbox ? "inbox" : tickets ? "tickets" : "sessions";
+	const showTab = (next: SidebarTab): void => {
+		if (next === "sessions") show(layout);
+		else location.hash = next === "inbox" ? hashForInbox(null) : hashForTickets();
 	};
 	const step = (by: 1 | -1): boolean | void => {
 		const next = adjacentSession(listedViews, view, by);
@@ -144,7 +151,11 @@ export function App() {
 		},
 		inbox: () => {
 			if (inbox) return false;
-			showInbox(true);
+			showTab("inbox");
+		},
+		tickets: () => {
+			if (tickets) return false;
+			showTab("tickets");
 		},
 		sessions: () => {
 			if (!page) return false;
@@ -190,6 +201,8 @@ export function App() {
 		) : (
 			<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
 		);
+	} else if (tickets) {
+		main = <TicketsPage group={ticketsTarget} />;
 	} else if (layout.panes.length > 0) {
 		main = (
 			<div
@@ -254,10 +267,12 @@ export function App() {
 					newSessionOpen={newSession !== null}
 					settingsHref={settingsHref}
 					settingsOpen={settings !== null}
-					inboxOpen={inbox !== null}
-					onInboxOpen={showInbox}
+					tab={tab}
+					onTab={showTab}
 					inboxTarget={inboxTarget}
 					onInboxTarget={setInboxTarget}
+					ticketsTarget={ticketsTarget}
+					onTicketsTarget={setTicketsTarget}
 					project={project}
 					onPickProject={pickProject}
 					onOpen={open}

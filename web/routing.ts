@@ -4,6 +4,7 @@ import type { PullRequest, RosterHost, View } from "../src/shared";
 const PAST_PREFIX = "past/";
 const SETTINGS = "settings";
 const INBOX = "inbox";
+const TICKETS = "tickets";
 const SESSION_PREFIX = "session/";
 const NEW = "new";
 
@@ -25,6 +26,14 @@ export function inboxFromHash(hash: string): InboxRoute | null {
 
 export const hashForInbox = (target: PullRequest | null): string =>
 	target ? `#${INBOX}/${target.owner}/${target.repo}/${target.number}` : `#${INBOX}`;
+
+/** `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues. Any `#tickets/…` opens it too. */
+export function ticketsFromHash(hash: string): boolean {
+	const raw = hash.replace(/^#/, "");
+	return raw === TICKETS || raw.startsWith(`${TICKETS}/`);
+}
+
+export const hashForTickets = (): string => `#${TICKETS}`;
 
 /** `#session/<id>` names a session by its id, which outlives the host running it, for links from outside the page. */
 export function sessionFromHash(hash: string): string | null {
@@ -91,7 +100,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `session`, or `new`. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `session`, or `new`. */
 function viewFromPane(pane: string): View {
 	if (pane.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(pane.slice(PAST_PREFIX.length)) };
 	const slash = pane.indexOf("/");
@@ -122,11 +131,11 @@ export function hashForLayout({ panes, focus, maximized }: Layout): string {
 
 /**
  * The layout a hash names, keeping the first {@link MAX_PANES} distinct views and focus on the view it named.
- * `null` for the settings, inbox, and new-session pages, which leave the panes behind them alone, and for a
+ * `null` for the settings, inbox, tickets, and new-session pages, which leave the panes behind them alone, and for a
  * `#session/<id>` link, which names no layout until the session lists show where that session runs.
  */
 export function layoutFromHash(hash: string): Layout | null {
-	if (settingsFromHash(hash) || inboxFromHash(hash) || newSessionFromHash(hash) || sessionFromHash(hash) !== null) return null;
+	if (settingsFromHash(hash) || inboxFromHash(hash) || ticketsFromHash(hash) || newSessionFromHash(hash) || sessionFromHash(hash) !== null) return null;
 	const marked = hash.replace(/^#/, "");
 	const maximized = marked.endsWith(MAXIMIZED);
 	const raw = maximized ? marked.slice(0, -MAXIMIZED.length) : marked;
@@ -204,5 +213,6 @@ export function adjacentSession(listed: View[], current: View | null, step: 1 | 
 	return listed[at + step] ?? null;
 }
 
-/** Whether the hash names a page that covers the panes: settings, inbox, or the new-session draft. */
-export const isPageHash = (hash: string): boolean => settingsFromHash(hash) !== null || inboxFromHash(hash) !== null || newSessionFromHash(hash) !== null;
+/** Whether the hash names a page that covers the panes: settings, inbox, tickets, or the new-session draft. */
+export const isPageHash = (hash: string): boolean =>
+	settingsFromHash(hash) !== null || inboxFromHash(hash) !== null || ticketsFromHash(hash) || newSessionFromHash(hash) !== null;
