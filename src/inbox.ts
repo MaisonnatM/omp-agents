@@ -2,6 +2,7 @@
  * The inbox page's pull requests, per GitHub repository, live from `gh`: as Graphite's inbox gathers them, the
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
+import { createCache } from "./cache";
 import { errorText, isObject, num, str } from "./json";
 import { run, runJson } from "./proc";
 import type {
@@ -25,8 +26,6 @@ import type {
 } from "./shared";
 
 const GH_TIMEOUT_MS = 20_000;
-/** How long one repository's answer serves later loads, so that several tabs and quick switches share one query. */
-const FRESH_MS = 30_000;
 const MERGED_DAYS = 7;
 
 export interface Repo {
@@ -242,19 +241,7 @@ async function queryRepo(repo: Repo): Promise<InboxPullRequest[]> {
 	return parseInboxAnswer(answer, repo);
 }
 
-/** Answers kept for {@link FRESH_MS}, by key; a failure is not kept, so the next load asks again. */
-function cached<T>(cache: Map<string, { at: number; answer: Promise<T> }>, key: string, fresh: boolean, load: () => Promise<T>): Promise<T> {
-	const now = Date.now();
-	for (const [other, entry] of cache) if (now - entry.at >= FRESH_MS) cache.delete(other);
-	const hit = cache.get(key);
-	if (hit && !fresh) return hit.answer;
-	const answer = load();
-	cache.set(key, { at: now, answer });
-	answer.catch(() => cache.get(key)?.answer === answer && cache.delete(key));
-	return answer;
-}
-
-const loaded = new Map<string, { at: number; answer: Promise<InboxPullRequest[]> }>();
+const loaded = createCache<InboxPullRequest[]>();
 
 const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
 
@@ -394,11 +381,11 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 	};
 }
 
-const details = new Map<string, { at: number; answer: Promise<PullRequestDetail> }>();
+const details = createCache<PullRequestDetail>();
 
 /** One pull request in full, live from `gh`. */
 export function loadPullRequestDetail(pr: PullRequest): Promise<PullRequestDetail> {
-	return cached(details, `${pr.owner}/${pr.repo}#${pr.number}`.toLowerCase(), false, async () =>
+	return details.get(`${pr.owner}/${pr.repo}#${pr.number}`.toLowerCase(), async () =>
 		parseDetailAnswer(
 			await runJson(
 				["gh", "api", "graphql", "-f", `query=${DETAIL_QUERY}`, "-f", `owner=${pr.owner}`, "-f", `repo=${pr.repo}`, "-F", `number=${pr.number}`],
@@ -427,7 +414,7 @@ export async function loadInbox(cwds: string[], fresh: boolean): Promise<Inbox> 
 	const repos = await Promise.all(
 		[...byRepo.values()].map(async (entry): Promise<RepoInbox> => {
 			try {
-				const pullRequests = await cached(loaded, `${entry.owner}/${entry.repo}`.toLowerCase(), fresh, () => queryRepo(entry));
+				const pullRequests = await loaded.get(`${entry.owner}/${entry.repo}`.toLowerCase(), () => queryRepo(entry), fresh);
 				return { ...entry, pullRequests };
 			} catch (err) {
 				return { ...entry, error: errorText(err) };

@@ -18,6 +18,7 @@ export type ShortcutId =
 	| "restore"
 	| "focusComposer"
 	| "inbox"
+	| "tickets"
 	| "sessions"
 	| "project";
 
@@ -81,6 +82,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "restore", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{ id: "focusComposer", label: "Focus the composer", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
 	{ id: "inbox", label: "Go to the pull request inbox", keys: [{ goTo: "i" }] },
+	{ id: "tickets", label: "Go to your Linear tickets", keys: [{ goTo: "t" }] },
 	{ id: "sessions", label: "Go to the sessions", keys: [{ goTo: "s" }] },
 	{ id: "project", label: "Choose the sidebar's project", keys: [{ goTo: "p" }] },
 ];

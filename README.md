@@ -28,6 +28,7 @@ omp-agents lists the sessions that run in your terminals and the ones it starts 
 - **Full control.** Prompt, steer, queue follow-ups, interrupt, answer `ask` questions and extension dialogs, message and cancel subagents, run `!` shell and built-in `/` commands in dashboard sessions, switch model and thinking level, end sessions.
 - **Session lifecycle.** Start a session in any project, on any branch or a new one in its own git worktree, resume a past one, or fork a conversation from any prompt or reply.
 - **Pull request inbox.** A Graphite-style inbox of your GitHub pull requests, linked to the sessions that submitted or worked on them.
+- **Linear tickets.** The Linear issues assigned to you, grouped by workflow state like Linear's My issues, read through omp's Linear MCP sign-in.
 - **Settings editor.** Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place.
 - **Plan quota.** Remaining quota per provider plan, from `omp usage`.
 - **Keyboard-first.** Shortcuts that follow omp's terminal keys; press `?` to list them.
@@ -43,6 +44,7 @@ omp-agents lists the sessions that run in your terminals and the ones it starts 
   ```
 
 - Optional, for the pull request inbox: the [GitHub CLI](https://cli.github.com) (`gh`), signed in with `gh auth login`.
+- Optional, for the Linear tickets: Linear's MCP server added to omp (`/mcp add` with `https://mcp.linear.app/mcp`) and signed in.
 
 ## Quick start
 
@@ -91,7 +93,7 @@ Files and settings that you already have keep your version unless you pass `--fo
 
 ## Usage
 
-Select a session in the left sidebar to read its conversation and message it. Cmd-click (Ctrl-click on Linux and Windows) opens it in a split pane. Click **+** to start a session, **Resume** to continue a past one, and **Fork from here** under a prompt or a reply to branch a conversation. The **Inbox** tab shows your pull requests, and the gear button opens **Settings**.
+Select a session in the left sidebar to read its conversation and message it. Cmd-click (Ctrl-click on Linux and Windows) opens it in a split pane. Click **+** to start a session, **Resume** to continue a past one, and **Fork from here** under a prompt or a reply to branch a conversation. The **Inbox** tab shows your pull requests, the **Tickets** tab your Linear issues, and the gear button opens **Settings**.
 
 While a turn runs, Enter steers it and Cmd+Enter (Ctrl+Enter on Linux and Windows) queues a follow-up, as in omp's terminal. Esc interrupts the turn.
 

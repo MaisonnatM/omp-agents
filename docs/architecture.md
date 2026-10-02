@@ -12,6 +12,7 @@ Paths in this document that start with `pi-coding-agent/`, `pi-tui/`, or `pi-uti
 - Session files: `pi-coding-agent/src/session/session-listing.ts` and `session-loader.ts`.
 - RPC: `pi-coding-agent/src/modes/rpc/rpc-client.ts`, `rpc-frame.ts`, and the frame types in `rpc-types.ts`. `RpcClient` drops `extension_ui_request` and `session_info_update` frames, so `src/omp/rpc.ts` reads them from its own copy of the child's stdout (`UNROUTED_FRAMES`); see [Dashboard sessions](#dashboard-sessions).
 - Settings and discovery: `pi-coding-agent/src/config/settings.ts`, `pi-coding-agent/src/discovery/index.ts`, and `pi-coding-agent/src/task/discovery.ts`.
+- MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), and `oauth-credentials.ts`, which `src/omp/mcp.ts` wraps for the tickets page.
 - Completions: `pi-tui/src/autocomplete.ts`, and the skills and slash commands in `pi-coding-agent/src/extensibility/`.
 - Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
 
@@ -83,9 +84,11 @@ Every response from these endpoints is JSON. An error is `{ error, conflict? }` 
 
 A `start` of kind `new` carries a `branch`, `null` for the directory as it is. For an existing branch, the server runs omp in the worktree that has it checked out, or in the starting directory when that worktree is the directory's own (`git rev-parse --show-toplevel`); with no such worktree it runs `git worktree add <dir> <branch>`. For a new branch, it runs `git check-ref-format --branch` and then `git worktree add -b <branch> <dir> <base>`. `<dir>` is `worktreeDir` in `src/shared.ts`, beside the main worktree. The server refuses a `<dir>` that already exists, because `git worktree add -b` creates the branch before it checks the path. A branch that git refuses answers the `start` with git's reason, and no omp spawns. A failed start makes the draft read the checkout again, so a branch that the start created shows as an existing one.
 
+`GET /api/tickets`, or `GET /api/tickets?fresh` to skip the server's 30-second cache, answers the tickets page with `{ tickets }`. A failed read is the API's usual `{ error }` with status 500, and the page keeps showing the last tickets it has with the error above them. The server reads Linear through Linear's MCP server, with the OAuth sign-in that omp keeps for it, through `src/omp/mcp.ts`: it loads omp's own MCP config for the enabled server whose `url` has the `mcp.linear.app` host, and gets an access token for its `auth.credentialId`, or for the id omp files a sign-in for that URL under, from `omp token <credentialId>`, which refreshes the token through omp's credential owner. The token stays in memory for five minutes and is dropped when Linear answers 401, which the page reports as a `/mcp reauth <name>` hint; it is never logged. Linear's GraphQL API refuses that token, so the server calls the MCP endpoint's `list_issues` tool through omp's `callMCP`, a stateless JSON-RPC `tools/call` POST. It asks for each open state type in full, following the cursor, and for completed, canceled, and duplicate issues updated in the last seven days, in parallel, then drops repeats by identifier.
+
 ## Front-end components
 
-The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`. The roster uses `sidebar`, and its **Inbox** and **Sessions** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`. User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`. `thinking-indicator` shows while the agent works. shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button. The model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern. Fluid's built-in sidebar rail resizes by pointer only and collapses on click. The dashboard turns it off and uses `web/components/sidebar-panel.tsx`, which gives each sidebar its own width and open state, because Fluid's provider holds only one of each.
+The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`. The roster uses `sidebar`, and its **Inbox**, **Tickets**, and **Sessions** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`. User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`. `thinking-indicator` shows while the agent works. shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button. The model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern. Fluid's built-in sidebar rail resizes by pointer only …
 
 Fluid Functionalism has no sheet, so the inbox's pull request sheet, `web/components/ui/sheet.tsx`, follows the sidebar's mobile sheet: Radix `Dialog` for focus and dismissal, and a framer-motion slide on the `moderate` spring.
 
@@ -103,8 +106,8 @@ The server lives in `src/`:
 - `src/server/socket.ts`: handles each socket message. `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`. It builds the roster rows.
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list. `src/server/interrupted.ts` keeps which dashboard sessions were interrupted. `src/server/views.ts` points each open view at its file and folds live events into it.
-- `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, the inbox and pull request shapes).
-- `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `config.ts`, `discovery.ts`, `models.ts`, and `prompts.ts` wrap one area each.
+- `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, the inbox, pull request, and ticket shapes).
+- `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
 - `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON, and `src/paths.ts` names the home directory, the token file, and the interrupted sessions' file.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
 - `src/guest.ts`: runs one Collab guest per terminal session. `src/subagents.ts` finds each subagent's transcript file.
@@ -117,27 +120,29 @@ The server lives in `src/`:
 - `src/session-links.ts`: writes the session block into a pull request's description.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more. A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
 - `src/git.ts`: the git checkout of a directory, and the worktree a new session's branch runs in.
+- `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text.
+- `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
 - `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory. `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`.
 
 The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
-- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, settings, and new-session pages, and focus handling.
+- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, settings, and new-session pages, and focus handling.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, or started by an inbox quick action.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
-- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
+- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
 - `web/quick-actions.ts`: the inbox's quick actions, which pull requests each applies to and the prompt that starts its session.
 - `web/api.ts`: every HTTP request the page makes. `web/settings-api.ts` holds the settings page's requests.
-- `web/use-inbox.ts`: the inbox cache that the sidebar and the inbox page share, one entry per project.
+- `web/polled-store.ts`: the store of server reads that a sidebar list and its page share, kept in localStorage and re-read every minute while the page is open. `web/use-inbox.ts` makes one for the inbox, with one entry per project, and `web/use-tickets.ts` one for the tickets, with one entry, since Linear is not per project.
 - `web/use-pull-request.ts`: reads the details of the pull request that the inbox's sheet shows.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header. `web/components/git.tsx` holds the branch picker and the repository and branch in a header's meta line.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read. `web/components/session-switcher.tsx` is the Cmd+K search over every session.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
-- `web/components/roster.tsx`: the left sidebar's session and inbox lists, and the project picker.
+- `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
 - `web/components/pane.tsx`: a pane. `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript, whose `task` rows link to their subagents.
 - `web/components/plan-panel.tsx`: the right sidebar's plan and changes for the focused pane.
-- `web/components/inbox/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
+- `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages. `web/components/fold.tsx` holds the foldable sections that the inbox and tickets pages share, and the hook that reveals the section a sidebar link chose; `web/section.ts` names such a section target.
 - `web/components/ui`, `web/lib`, and `web/hooks`: mostly files from the Fluid registry; see below.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`). Its `agent/` files are copies of the maintainer's `~/.omp/agent` files, except for `AGENTS.md`, which is a generic version. After you edit one of those live files, copy it back. `bun run omp-template --dry-run` shows a copy that has drifted as `keep yours`.

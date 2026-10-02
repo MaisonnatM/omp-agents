@@ -93,6 +93,39 @@ export interface Inbox {
 	unmatched: string[];
 }
 
+/** Linear's workflow state categories, in the order its My issues lists them. */
+export const TICKET_STATUS_TYPES = ["triage", "started", "unstarted", "backlog", "completed", "canceled"] as const;
+export type TicketStatusType = (typeof TICKET_STATUS_TYPES)[number];
+
+/** Linear's priority: 0 none, 1 urgent, 2 high, 3 medium, 4 low. */
+export type TicketPriority = 0 | 1 | 2 | 3 | 4;
+
+/** A Linear issue assigned to the viewer, on the tickets page. */
+export interface Ticket {
+	/** The identifier Linear shows: `ENG-2368`. */
+	id: string;
+	title: string;
+	url: string;
+	/** The workflow state's name: `In Review`. */
+	status: string;
+	statusType: TicketStatusType;
+	priority: TicketPriority;
+	labels: string[];
+	project: string | null;
+	team: string;
+	/** `YYYY-MM-DD`. */
+	dueDate: string | null;
+	/** ISO time. */
+	updatedAt: string;
+	/** Linear's suggested git branch name. */
+	branch: string;
+}
+
+/** `GET /api/tickets`: the viewer's assigned Linear issues. A failed read is the API's usual `{ error }` with status 500. */
+export interface TicketsAnswer {
+	tickets: Ticket[];
+}
+
 /** How one check on a pull request's head commit went; `skipped` covers neutral and skipped runs. */
 export type CheckRunState = "passing" | "failing" | "pending" | "skipped";
 

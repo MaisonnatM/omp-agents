@@ -1,17 +1,18 @@
-import { ChevronRight, RefreshCw } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { type ReactNode, useEffect, useRef } from "react";
 import type { Inbox, InboxPullRequest, PastSession, PullRequest, RepoInbox, RosterHost, View } from "../../../src/shared";
+import { projectName, readTime } from "../../labels";
+import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { type InboxTarget, inboxRepoKey, inboxSectionId, inboxSections, samePullRequest } from "../../inbox-model";
-import { projectName } from "../../labels";
-import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
+import { inboxRepoKey, inboxSection, inboxSections, samePullRequest } from "../../inbox-model";
 import { hashForInbox, type OpenMode } from "../../routing";
+import type { SectionTarget } from "../../section";
 import type { StartOf, StartOp } from "../../starts";
 import { refreshInbox, useInbox } from "../../use-inbox";
 import { Header } from "../conversation";
+import { FoldButton, useCollapsed, useRevealSection } from "../fold";
 import { PullRequestSheetContent } from "./pr-details";
 import { PullRequestRow, rowId, sessionsFor } from "./pr-row";
 import { QuickActionButtons } from "./quick-actions";
@@ -49,59 +50,6 @@ const quickOp = (pr: InboxPullRequest, cwd: string, action: QuickActionId, mode:
 /** Folded repositories and sections: `owner/repo`, and `owner/repo:<section title>`. */
 const COLLAPSED_KEY = "omp-agents.inbox-collapsed";
 
-function storedCollapsed(): Set<string> {
-	try {
-		const keys: unknown = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]");
-		return new Set(Array.isArray(keys) ? keys.filter(key => typeof key === "string") : []);
-	} catch {
-		return new Set();
-	}
-}
-
-/** The folded repositories and sections, a toggle, and an unfold for a row the page must show; localStorage keeps them across reloads. */
-function useCollapsed(): [ReadonlySet<string>, (key: string) => void, (keys: string[]) => void] {
-	const [collapsed, setCollapsed] = useState(storedCollapsed);
-	const store = (next: Set<string>): void => {
-		setCollapsed(next);
-		if (next.size === 0) localStorage.removeItem(COLLAPSED_KEY);
-		else localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
-	};
-	const toggle = (key: string): void => {
-		const next = new Set(collapsed);
-		if (!next.delete(key)) next.add(key);
-		store(next);
-	};
-	const expand = (keys: string[]): void => {
-		const next = new Set(collapsed);
-		if (keys.filter(key => next.delete(key)).length > 0) store(next);
-	};
-	return [collapsed, toggle, expand];
-}
-
-interface FoldProps {
-	open: boolean;
-	onToggle: () => void;
-	/** The id of the region the button shows and hides. */
-	controls: string;
-	children: ReactNode;
-	className?: string;
-}
-
-function FoldButton({ open, onToggle, controls, children, className }: FoldProps) {
-	return (
-		<button
-			type="button"
-			aria-expanded={open}
-			aria-controls={controls}
-			onClick={onToggle}
-			className={cn("-ml-1 flex min-w-0 items-baseline gap-2 rounded px-1 text-left outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring", className)}
-		>
-			<ChevronRight aria-hidden className={cn("size-3.5 shrink-0 self-center transition-transform", open && "rotate-90")} />
-			{children}
-		</button>
-	);
-}
-
 interface RepoProps {
 	inbox: RepoInbox;
 	hosts: RosterHost[];
@@ -134,11 +82,11 @@ function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen, 
 		body = sections.map(section => {
 			const sectionKey = `${key}:${section.title}`;
 			const sectionOpen = !collapsed.has(sectionKey);
-			const sectionId = inboxSectionId({ repo: key, title: section.title });
-			const listId = `${sectionId}-list`;
+			const { id } = inboxSection(key, section.title);
+			const listId = `${id}-list`;
 			return (
 				// Focused when its sidebar link is chosen.
-				<div key={section.title} id={sectionId} tabIndex={-1} className="scroll-mt-6 space-y-1.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+				<div key={section.title} id={id} tabIndex={-1} className="scroll-mt-6 space-y-1.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
 					<h4 className="text-xs font-medium text-muted-foreground">
 						<FoldButton open={sectionOpen} onToggle={() => onToggle(sectionKey)} controls={listId}>
 							{section.title}
@@ -230,7 +178,7 @@ interface InboxPageProps {
 	target: PullRequest | null;
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The section a sidebar link last chose, to unfold, scroll to, and focus. */
-	section: InboxTarget | null;
+	section: SectionTarget | null;
 	/** The quick action's start under way or failed, whichever the page last asked for. */
 	quick: StartOf<"quick"> | null;
 	onQuickAction: (op: QuickOp) => void;
@@ -240,17 +188,15 @@ interface InboxPageProps {
 /** The pull requests of the sidebar's project, or of every project, in Graphite's inbox sections, read from GitHub. */
 export function InboxPage({ project, hosts, past, target, onOpen, section, quick, onQuickAction, onDismissQuick }: InboxPageProps) {
 	const { read, error, refreshing } = useInbox(project, true);
-	const [collapsed, toggleCollapsed, expand] = useCollapsed();
-	const place = read && target ? placeOf(read.inbox, target) : null;
+	const [collapsed, toggleCollapsed, expand] = useCollapsed(COLLAPSED_KEY);
+	const place = read && target ? placeOf(read.data, target) : null;
 	const targetKey = target && rowId(target);
 	/** The target whose row the page already unfolded and scrolled to; folding it again afterwards stays folded. */
 	const shown = useRef<string | null>(null);
-	/** The sidebar section the page already unfolded, scrolled to, and focused. */
-	const revealed = useRef<InboxTarget | null>(null);
 	/** The PR the sheet shows, kept after the hash drops it so the sheet's content stays through its exit slide. */
 	const sheetPr = useRef<PullRequest | null>(null);
 	if (target) sheetPr.current = target;
-	const sheetListed = read && sheetPr.current ? listedPullRequest(read.inbox, sheetPr.current) : null;
+	const sheetListed = read && sheetPr.current ? listedPullRequest(read.data, sheetPr.current) : null;
 
 	useEffect(() => {
 		if (!place || !targetKey || shown.current === targetKey) return;
@@ -264,27 +210,17 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 		document.getElementById(targetKey)?.scrollIntoView({ block: "center", behavior: "smooth" });
 	}, [place?.repo, place?.section, targetKey, collapsed]);
 
-	// Waits for the section to unfold, and for an inbox that has it to load.
-	useEffect(() => {
-		if (!section || revealed.current === section) return;
-		const folds = [section.repo, `${section.repo}:${section.title}`];
-		if (folds.some(key => collapsed.has(key))) return expand(folds);
-		const element = document.getElementById(inboxSectionId(section));
-		if (!element) return;
-		revealed.current = section;
-		element.scrollIntoView({ block: "start" });
-		element.focus({ preventScroll: true });
-	});
+	useRevealSection(section, collapsed, expand);
 
 	let body: ReactNode;
 	if (!read && error) body = <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot load the inbox: {error}</p>;
 	else if (!read) body = <p className="text-sm text-muted-foreground">Asking GitHub for pull requests…</p>;
 	else {
-		const { repos, unmatched } = read.inbox;
+		const { repos, unmatched } = read.data;
 		body = (
 			<>
 				{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the inbox: {error}</p>}
-				{target && !place && <MissingTarget target={target} inbox={read.inbox} allProjects={project === null} />}
+				{target && !place && <MissingTarget target={target} inbox={read.data} allProjects={project === null} />}
 				{repos.length === 0 && <p className="text-sm text-muted-foreground">No session ran in a GitHub repository.</p>}
 				{repos.map(repo => (
 					<RepoSection
@@ -313,15 +249,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 		<div className="flex h-svh min-h-0 flex-1 flex-col">
 			<Header
 				title="Inbox"
-				meta={
-					read
-						? `Your pull requests and review requests on GitHub · updated ${
-								new Date(read.at).toDateString() === new Date().toDateString()
-									? new Date(read.at).toLocaleTimeString()
-									: new Date(read.at).toLocaleString()
-							}`
-						: "Your pull requests and review requests on GitHub"
-				}
+				meta={read ? `Your pull requests and review requests on GitHub · updated ${readTime(read.at)}` : "Your pull requests and review requests on GitHub"}
 			>
 				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void refreshInbox(project, true)}>
 					{refreshing ? "Refreshing…" : "Refresh"}
