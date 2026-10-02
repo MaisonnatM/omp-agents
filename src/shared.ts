@@ -93,6 +93,36 @@ export interface Inbox {
 	unmatched: string[];
 }
 
+/** A Linear workflow state's category, in Linear's list order. */
+export type TicketStatusType = "triage" | "started" | "unstarted" | "backlog" | "completed" | "canceled";
+
+/** Linear's priority: 0 none, 1 urgent, 2 high, 3 medium, 4 low. */
+export type TicketPriority = 0 | 1 | 2 | 3 | 4;
+
+/** A Linear issue assigned to the viewer, on the tickets page. */
+export interface Ticket {
+	/** The identifier Linear shows: `ENG-2368`. */
+	id: string;
+	title: string;
+	url: string;
+	/** The workflow state's name: `In Review`. */
+	status: string;
+	statusType: TicketStatusType;
+	priority: TicketPriority;
+	labels: string[];
+	project: string | null;
+	team: string;
+	/** `YYYY-MM-DD`. */
+	dueDate: string | null;
+	/** ISO time. */
+	updatedAt: string;
+	/** Linear's suggested git branch name. */
+	branch: string;
+}
+
+/** `GET /api/tickets`: the viewer's assigned Linear issues, or why they could not be read. */
+export type TicketsAnswer = { tickets: Ticket[] } | { error: string };
+
 /** How one check on a pull request's head commit went; `skipped` covers neutral and skipped runs. */
 export type CheckRunState = "passing" | "failing" | "pending" | "skipped";
 

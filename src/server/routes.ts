@@ -1,4 +1,4 @@
-/** The HTTP API the page reads and writes omp's settings, the inbox, pull requests, and git checkouts through. */
+/** The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, and Linear tickets through. */
 import { gitCheckout } from "../git";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
 import { listModels } from "../omp/models";
@@ -6,6 +6,7 @@ import { directoryOf } from "../paths";
 import type { PullRequestIndex } from "../pull-requests";
 import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, saveOmpFile, saveRouting } from "../settings";
+import { loadTickets } from "../tickets";
 import type { LinkedPullRequest } from "../shared";
 import { answer, fail, type Guards } from "./http";
 import { parsePullRequestQuery, parseSessionLinks } from "./wire";
@@ -70,6 +71,14 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		});
 	};
 
+	/** `GET /api/tickets[?fresh]`: the viewer's assigned Linear issues, or why they could not be read. */
+	const tickets: Handler = async req => {
+		const refused = guards.admit(req);
+		if (refused) return refused;
+		const fresh = new URL(req.url).searchParams.has("fresh");
+		return answer(() => loadTickets(fresh));
+	};
+
 	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for the inbox's sheet. */
 	const pullRequest: Handler = async req => {
 		const refused = guards.admit(req);
@@ -129,6 +138,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/models": { GET: models },
 		"/api/pull-request/sessions": { PUT: sessionLinks },
 		"/api/inbox": { GET: inbox },
+		"/api/tickets": { GET: tickets },
 		"/api/pull-request": { GET: pullRequest },
 		"/api/git": { GET: git },
 	};
