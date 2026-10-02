@@ -28,7 +28,9 @@ bun test
 bun run typecheck
 ```
 
-The tests cover the transcript reducer, file tail, pull-request scan, PR description links, inbox parsing, usage parser, role routing, settings edits, question mapping, shortcut matching, and view model. They run with `PI_CODING_AGENT_DIR` pointed at a temporary directory (`src/test-env.ts`, preloaded by `bunfig.toml`), so they never touch `~/.omp/agent`.
+The tests cover the transcript reducer, file tail, open views, the Collab guest's follow-ups and room links, subagent transcript lookup, prompt expansion, pull-request scan, PR description links, inbox parsing, usage parser, role routing, settings edits, question mapping, shortcut matching, and view model. They run with `PI_CODING_AGENT_DIR` pointed at a temporary directory (`src/test-env.ts`, preloaded by `bunfig.toml`), so they never touch `~/.omp/agent`.
+
+GitHub Actions runs the same two checks on every pull request and every push to `main` (`.github/workflows/checks.yml`), against the Bun and omp versions that the README names as tested. Bump them there together with the README.
 
 ## Pull requests
 
