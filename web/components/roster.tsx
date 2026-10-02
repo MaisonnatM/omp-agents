@@ -349,7 +349,6 @@ export function Roster({
 		<Tabs value={inboxOpen ? "inbox" : "sessions"} onValueChange={value => onInboxOpen(value === "inbox")} className="flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
-				{toggle}
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
 				<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
 					<Keyboard />
@@ -360,11 +359,12 @@ export function Roster({
 						<Settings />
 					</a>
 				</Button>
+				{toggle}
 			</SidebarHeader>
 			<SizeProvider size="compact">
-				<TabsList aria-label="Sidebar" className="mx-2 flex">
+				<TabsList aria-label="Sidebar" className="mx-2 self-start">
 					{SIDEBAR_TABS.map(({ value, label, icon }) => (
-						<TabItem key={value} value={value} label={label} icon={icon} className="flex-1 justify-center" />
+						<TabItem key={value} value={value} label={label} icon={icon} />
 					))}
 				</TabsList>
 			</SizeProvider>
