@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildSkillPromptMessage } from "./omp";
+import { buildSkillPromptMessage } from "./omp/prompts";
 import { Transcript } from "./transcript";
 
 const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({
@@ -32,6 +32,20 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([
 			{ id: "m100", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1" },
 			{ id: "m200:0", kind: "assistant", text: "pong", streaming: false },
+		]);
+	});
+
+	test("a replayed message reports only what changed in it", () => {
+		const t = new Transcript();
+		const update = (reply: string, ...blocks: unknown[]) =>
+			t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant(200, [text(reply), ...blocks]) } });
+		const call = { type: "toolCall", id: "c1", name: "bash", arguments: { command: "ls" } };
+
+		expect(update("po", call).map(item => item.id)).toEqual(["m200:0", "tool:c1"]);
+		expect(update("po", call)).toEqual([]);
+		expect(update("pong", call)).toEqual([{ id: "m200:0", kind: "assistant", text: "pong", streaming: true }]);
+		expect(t.applyEvent({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", isError: true })).toEqual([
+			{ id: "tool:c1", kind: "tool", name: "bash", summary: "ls", status: "error" },
 		]);
 	});
 

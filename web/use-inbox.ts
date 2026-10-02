@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { Inbox } from "../src/shared";
-import { readJson } from "./settings-api";
+import { getJson } from "./api";
 
 /** How often the open inbox asks again; the server answers from its cache in between. */
 const POLL_MS = 60_000;
@@ -71,8 +71,7 @@ export async function refreshInbox(scope: string | null, fresh: boolean): Promis
 	if (scope !== null) params.set("cwd", scope);
 	if (fresh) params.set("fresh", "");
 	try {
-		const response = await fetch(`/api/inbox${params.size ? `?${params}` : ""}`, { signal: current.controller.signal });
-		const inbox = await readJson<Inbox>(response);
+		const inbox = await getJson<Inbox>(`/api/inbox${params.size ? `?${params}` : ""}`, current.controller.signal);
 		update(current.key, { read: { inbox, at: Date.now() }, error: null, refreshing: false });
 		persist();
 	} catch (err) {

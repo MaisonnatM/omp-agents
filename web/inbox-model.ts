@@ -1,0 +1,46 @@
+/** Pull request links and the inbox page's sections. */
+import type { InboxPullRequest, PullRequest } from "../src/shared";
+
+export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
+
+export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
+
+export const samePullRequest = (a: PullRequest, b: PullRequest): boolean =>
+	a.number === b.number && a.owner.toLowerCase() === b.owner.toLowerCase() && a.repo.toLowerCase() === b.repo.toLowerCase();
+
+/** Graphite's inbox sections, in page order. A pull request goes in the first section that takes it. */
+const INBOX_SECTIONS: [title: string, takes: (pr: InboxPullRequest) => boolean][] = [
+	["Needs your review", pr => pr.role === "reviewer" && pr.state !== "merged"],
+	["Returned to you", pr => pr.state === "open" && pr.review === "changes-requested"],
+	["Approved", pr => pr.state === "open" && pr.review === "approved"],
+	["Waiting for review", pr => pr.state === "open"],
+	["Drafts", pr => pr.state === "draft"],
+	["Recently merged", pr => pr.state === "merged"],
+];
+
+export interface InboxSection {
+	title: string;
+	/** Most recently updated first. */
+	pullRequests: InboxPullRequest[];
+}
+
+/** A repository's pull requests in Graphite's inbox sections, leaving out the empty ones. */
+export function inboxSections(pullRequests: InboxPullRequest[]): InboxSection[] {
+	const sections = INBOX_SECTIONS.map(([title]): InboxSection => ({ title, pullRequests: [] }));
+	for (const pr of pullRequests.toSorted((a, b) => b.updatedAt - a.updatedAt)) {
+		sections[INBOX_SECTIONS.findIndex(([, takes]) => takes(pr))]?.pullRequests.push(pr);
+	}
+	return sections.filter(section => section.pullRequests.length > 0);
+}
+
+/** A repository's key in the inbox's folds and section links: `owner/repo`, lowercased. */
+export const inboxRepoKey = ({ owner, repo }: { owner: string; repo: string }): string => `${owner}/${repo}`.toLowerCase();
+
+/** A section of the inbox page, by {@link inboxRepoKey} and title, which a sidebar link scrolls to. */
+export interface InboxTarget {
+	repo: string;
+	title: string;
+}
+
+/** The id of a section on the inbox page. It holds no spaces, since `aria-controls` lists ids separated by spaces. */
+export const inboxSectionId = ({ repo, title }: InboxTarget): string => `inbox-${repo}-${title.toLowerCase().replaceAll(" ", "-")}`;

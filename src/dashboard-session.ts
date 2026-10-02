@@ -5,10 +5,13 @@
  */
 import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
-import { activityOf, contextOf, type LiveUpdate, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
-import { endsMidTurn, type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp";
-import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type UserAnswer, type UserRequest } from "./shared";
-import { isObject } from "./transcript";
+import { activityOf, contextOf, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
+import { errorText, isObject } from "./json";
+import type { LiveSession, LiveUpdate, SessionFacts } from "./live-session";
+import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rpc";
+import { endsMidTurn } from "./omp/sessions";
+import { displayPath } from "./paths";
+import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type RosterHost, type UserAnswer, type UserRequest } from "./shared";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
 /** omp's subagent lifecycle and progress statuses, as the roster's agent statuses. */
@@ -30,6 +33,9 @@ interface RpcAgent {
 }
 
 export type DashboardUpdate = LiveUpdate | { kind: "exited" };
+
+/** Same shape as a Collab instance id, so the page's hash routing treats both alike. */
+export const newInstanceId = (): string => randomBytes(8).toString("hex");
 
 export interface ForkedSession {
 	session: DashboardSession;
@@ -61,9 +67,8 @@ const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_chang
 
 const isTexts = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === "string");
 
-export class DashboardSession {
-	/** Same shape as a Collab instance id, so the page's hash routing treats both alike. */
-	readonly instanceId = randomBytes(8).toString("hex");
+export class DashboardSession implements LiveSession {
+	readonly instanceId: string;
 	readonly startedAt = Date.now();
 	readonly cwd: string;
 	readonly pid: number;
@@ -87,12 +92,14 @@ export class DashboardSession {
 	#refreshAgain = false;
 
 	private constructor(
+		instanceId: string,
 		cwd: string,
 		child: RpcChild,
 		requests: PendingRequests,
 		state: RpcState,
 		emit: (update: DashboardUpdate) => void,
 	) {
+		this.instanceId = instanceId;
 		this.cwd = cwd;
 		this.#child = child;
 		this.#requests = requests;
@@ -113,20 +120,20 @@ export class DashboardSession {
 		});
 	}
 
-	/** Spawn omp in `cwd` and wait until it accepts commands. */
-	static start(cwd: string, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
-		return DashboardSession.#spawn(cwd, emit, async () => {});
+	/** Spawn omp in `cwd` and wait until it accepts commands. `emit` hears `instanceId` from spawn on, before this resolves. */
+	static start(instanceId: string, cwd: string, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+		return DashboardSession.#spawn(instanceId, cwd, emit, async () => {});
 	}
 
 	/**
 	 * Spawn omp holding the history of `sourceFile` before its user prompt `entryId`, as omp's
 	 * `/branch` does. omp writes the fork to a new file; `sourceFile` is only read.
 	 */
-	static async fork(sourceFile: string, entryId: string, emit: (update: DashboardUpdate) => void): Promise<ForkedSession> {
+	static async fork(instanceId: string, sourceFile: string, entryId: string, emit: (update: DashboardUpdate) => void): Promise<ForkedSession> {
 		// omp would repair such a file in place on open.
 		if (await endsMidTurn(sourceFile)) throw new Error("this session ended mid-turn. Resume it in omp once, then fork.");
 		let prompt = "";
-		const session = await DashboardSession.#spawn(await recordedCwd(sourceFile), emit, async client => {
+		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sourceFile), emit, async client => {
 			if ((await client.switchSession(sourceFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
 			try {
 				const branched = await client.branch(entryId);
@@ -142,14 +149,15 @@ export class DashboardSession {
 	}
 
 	/** Spawn omp holding `sessionFile`, as `omp --resume` does. omp records an abort in a file that ended mid-turn. */
-	static async resume(sessionFile: string, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
-		return DashboardSession.#spawn(await recordedCwd(sessionFile), emit, async client => {
+	static async resume(instanceId: string, sessionFile: string, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+		return DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), emit, async client => {
 			if ((await client.switchSession(sessionFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
 		});
 	}
 
 	/** Listens only once `prepare` is done, so the session reports the state `prepare` left it in. Questions count from spawn. */
 	static async #spawn(
+		instanceId: string,
 		cwd: string,
 		emit: (update: DashboardUpdate) => void,
 		prepare: (client: RpcClient) => Promise<void>,
@@ -168,14 +176,51 @@ export class DashboardSession {
 		try {
 			await child.client.setSubagentSubscription("progress");
 			await prepare(child.client);
-			session = new DashboardSession(cwd, child, requests, await child.client.getState(), emit);
+			session = new DashboardSession(instanceId, cwd, child, requests, await child.client.getState(), emit);
 			session.thinkingLevels = await child.client.getAvailableThinkingLevels();
 			return session;
 		} catch (err) {
-			requests.clear();
+			// Stop omp before anything else can throw, or the process outlives the failed start.
 			await child.client.stop();
+			requests.clear();
 			throw err;
 		}
+	}
+
+	row(facts: SessionFacts): RosterHost {
+		return {
+			source: "dashboard",
+			instanceId: this.instanceId,
+			pid: this.pid,
+			sessionId: this.sessionId,
+			sessionName: this.sessionName,
+			cwd: this.cwd,
+			cwdDisplay: displayPath(this.cwd),
+			model: this.model,
+			thinkingLevel: this.thinkingLevel,
+			thinkingLevels: this.thinkingLevels,
+			context: this.context,
+			startedAt: this.startedAt,
+			status: this.status,
+			control: { phase: "live", readOnly: false },
+			agents: this.agents(),
+			...facts,
+			requests: this.requests(),
+			queue: this.queue,
+		};
+	}
+
+	transcriptPath(agentId: string | null): string | null {
+		return agentId ? this.agentFile(agentId) : this.sessionFile;
+	}
+
+	/** A session this dashboard started follows its own process, which reports its exit. */
+	follow(): boolean {
+		return true;
+	}
+
+	dispose(): Promise<void> {
+		return this.end();
 	}
 
 	get status(): HostStatus {
@@ -214,12 +259,15 @@ export class DashboardSession {
 	}
 
 	/** omp queues a prompt sent while a turn runs, as a steer or a follow-up, and starts one sent while idle. */
-	prompt(text: string, delivery: Delivery): void {
-		this.#child.client.prompt(text, undefined, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
+	async prompt(agentId: string | null, text: string, delivery: Delivery): Promise<void> {
+		// omp's RPC mode has no command that reaches a subagent. Its prompt runs the session's own slash-command and skill pipeline.
+		if (agentId !== null) return;
+		await this.#child.client.prompt(text, undefined, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
 	}
 
 	/** Whether omp still held the message; it may have delivered it since the page saw the queue. */
-	async dequeue(queue: keyof MessageQueue, text: string): Promise<boolean> {
+	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean> {
+		if (agentId !== null) return false;
 		try {
 			return (await this.#child.client.removeQueuedMessage(text, queue)).removed;
 		} catch (err) {
@@ -244,7 +292,8 @@ export class DashboardSession {
 		);
 	}
 
-	setThinkingLevel(level: string): void {
+	setThinking(level: string): void {
+		if (!this.thinkingLevels.includes(level)) return;
 		this.#child.client.setThinkingLevel(level).then(
 			() => this.#refresh(),
 			(err: unknown) => this.#fail("Thinking level switch failed", err),
@@ -256,7 +305,7 @@ export class DashboardSession {
 	}
 
 	#fail(what: string, err: unknown): void {
-		this.#emit({ kind: "note", agentId: null, level: "error", text: `${what}: ${err instanceof Error ? err.message : String(err)}` });
+		this.#emit({ kind: "note", agentId: null, level: "error", text: `${what}: ${errorText(err)}` });
 	}
 
 	#onEvent(event: unknown): void {

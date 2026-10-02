@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { agentDir } from "./omp";
-import { loadOmpSettings, parseRoutingEdit, Rejected, routeRoles, saveOmpFile } from "./settings";
+import { agentDir } from "./omp/config";
+import { Rejected } from "./server/http";
+import { loadOmpSettings, parseRoutingEdit, routeRoles, saveOmpFile } from "./settings";
 import type { CatalogModel, RoutingEdit } from "./shared";
 
 describe("routeRoles", () => {
@@ -121,6 +122,20 @@ describe("saveOmpFile", () => {
 
 		await saveOmpFile(null, { path, text: "from the page\n", baseHash: await loadedHash(path) });
 		expect(await Bun.file(path).text()).toBe("from the page\n");
+	});
+
+	test("a symlinked file keeps its link and target permissions after a save", async () => {
+		const path = join(agentDir, "AGENTS.md");
+		const target = join(agentDir, "target.md");
+		mkdirSync(agentDir, { recursive: true });
+		writeFileSync(target, "before\n", { mode: 0o600 });
+		rmSync(path, { force: true });
+		symlinkSync(target, path);
+		const baseHash = await loadedHash(path);
+		await saveOmpFile(null, { path, text: "after\n", baseHash });
+		expect(readlinkSync(path)).toBe(target);
+		expect(await Bun.file(target).text()).toBe("after\n");
+		expect(statSync(target).mode & 0o777).toBe(0o600);
 	});
 
 	test("only a path omp's discovery lists for the workspace can be written", async () => {

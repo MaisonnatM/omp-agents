@@ -1,100 +1,23 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentRow, CatalogModel, InboxPullRequest, Item, PastSession, RosterHost, View } from "../src/shared";
+import type { RosterHost, View } from "../src/shared";
 import {
-	agentTree,
-	applyItems,
 	closePane,
-	defaultCwd,
 	endSession,
-	forkPoints,
 	hashForInbox,
 	hashForLayout,
 	hashForNewSession,
 	hashForSettings,
 	hashForView,
 	inboxFromHash,
-	inboxSections,
 	type Layout,
 	layoutFromHash,
-	modelLabel,
-	modelOrg,
 	newSessionFromHash,
 	openView,
-	providerLabel,
 	sessionFromHash,
 	settingsFromHash,
-	skillLabel,
-	splitSelector,
 	swapView,
-	toBlocks,
 	viewForSession,
-} from "./view-model";
-
-const agent = (id: string, parentId: string | null): AgentRow => ({
-	id,
-	kind: "task",
-	parentId,
-	status: "running",
-	activity: null,
-	canMessage: true,
-	queue: { steering: [], followUp: [] },
-});
-
-describe("model labels", () => {
-	test("a direct provider's model reads as its family and dotted version", () => {
-		expect(modelLabel("anthropic/claude-opus-5-5")).toBe("Opus 5.5");
-		expect(modelOrg("anthropic/claude-opus-5-5")).toBe("anthropic");
-		expect(modelLabel("openai-codex/gpt-5.5")).toBe("GPT-5.5");
-		expect(modelOrg("openai-codex/gpt-5.5")).toBe("openai");
-	});
-
-	test("dated and version-first Anthropic ids read like the current ones", () => {
-		expect(modelLabel("anthropic/claude-haiku-4-5-20251001")).toBe("Haiku 4.5");
-		expect(modelLabel("anthropic/claude-3-5-sonnet-20241022")).toBe("Sonnet 3.5");
-		expect(modelLabel("openrouter/openai/gpt-4o-mini-2024-07-18")).toBe("GPT-4o Mini");
-	});
-
-	test("only one- and two-digit parts join into a version, and a zero minor version drops", () => {
-		expect(modelLabel("openai/gpt-4-1106-preview")).toBe("GPT-4 1106 Preview");
-		expect(modelLabel("cursor/claude-opus-5-5-1m-fast")).toBe("Opus 5.5 1M Fast");
-		expect(modelLabel("anthropic/claude-sonnet-4-0")).toBe("Sonnet 4");
-	});
-
-	test("a colon suffix reads in parentheses, whether a router's tier or a thinking level", () => {
-		expect(modelLabel("openrouter/openai/o3-mini:batch")).toBe("o3 Mini (batch)");
-		expect(modelLabel("anthropic/claude-sonnet-5-5:high")).toBe("Sonnet 5.5 (high)");
-	});
-
-	test("a reseller's model belongs to the family's org", () => {
-		expect(modelOrg("cursor/claude-opus-4-7")).toBe("anthropic");
-		expect(modelOrg("cursor/composer-2")).toBe("cursor");
-	});
-
-	test("a router's org/model id names the org", () => {
-		expect(modelLabel("openrouter/~anthropic/claude-opus-latest")).toBe("Opus Latest");
-		expect(modelOrg("openrouter/~anthropic/claude-opus-latest")).toBe("anthropic");
-		expect(modelLabel("openrouter/moonshotai/kimi-k3")).toBe("Kimi K3");
-		expect(modelOrg("openrouter/z-ai/glm-5.3")).toBe("z-ai");
-	});
-
-	test("provider ids and skill names read as titles, keeping brand casing", () => {
-		expect(providerLabel("openai-codex")).toBe("OpenAI Codex");
-		expect(providerLabel("openrouter")).toBe("OpenRouter");
-		expect(skillLabel("poteto-mode")).toBe("Poteto Mode");
-		expect(skillLabel("Poteto Mode")).toBe("Poteto Mode");
-	});
-});
-
-describe("agentTree", () => {
-	test("orders children under their parent with increasing depth", () => {
-		const nodes = agentTree([agent("B", null), agent("A1", "A"), agent("A", null), agent("A1a", "A1")]);
-		expect(nodes.map(({ agent, depth }) => `${agent.id}:${depth}`)).toEqual(["B:0", "A:0", "A1:1", "A1a:2"]);
-	});
-
-	test("a child whose parent is not listed becomes a top-level row", () => {
-		expect(agentTree([agent("Orphan", "Gone")]).map(({ agent, depth }) => `${agent.id}:${depth}`)).toEqual(["Orphan:0"]);
-	});
-});
+} from "./routing";
 
 describe("layout hash", () => {
 	const live = (instanceId: string, agentId: string | null = null) => ({ kind: "live", instanceId, agentId }) as const;
@@ -187,48 +110,6 @@ describe("layout hash", () => {
 	});
 });
 
-describe("inbox sections", () => {
-	const pr = (number: number, fields: Partial<InboxPullRequest>): InboxPullRequest => ({
-		owner: "acme",
-		repo: "webapp",
-		number,
-		title: `PR ${number}`,
-		author: { login: "me", avatarUrl: null },
-		reviewers: [],
-		role: "author",
-		state: "open",
-		review: "review-required",
-		checks: "passing",
-		head: `me/branch-${number}`,
-		stackedOn: null,
-		unresolved: { count: 0, exact: true },
-		updatedAt: number,
-		...fields,
-	});
-
-	test("each PR lands in the first section that takes it, newest first, and empty sections drop out", () => {
-		const sections = inboxSections([
-			pr(1, { role: "reviewer", review: "changes-requested", author: { login: "teammate", avatarUrl: null } }),
-			pr(2, { review: "changes-requested" }),
-			pr(3, { review: "approved" }),
-			pr(4, {}),
-			pr(5, { review: "none" }),
-			pr(6, { state: "draft", review: "approved" }),
-			pr(7, { state: "merged", review: "approved" }),
-			pr(8, { role: "reviewer", state: "merged" }),
-		]);
-		expect(sections.map(section => [section.title, section.pullRequests.map(p => p.number)])).toEqual([
-			["Needs your review", [1]],
-			["Returned to you", [2]],
-			["Approved", [3]],
-			["Waiting for review", [5, 4]],
-			["Drafts", [6]],
-			["Recently merged", [8, 7]],
-		]);
-		expect(inboxSections([pr(1, { state: "draft" })]).map(section => section.title)).toEqual(["Drafts"]);
-	});
-});
-
 describe("opening and closing panes", () => {
 	const view = (instanceId: string) => ({ kind: "live", instanceId, agentId: null }) as const;
 	const [a, b, c, d, e] = ["a", "b", "c", "d", "e"].map(view);
@@ -296,93 +177,5 @@ describe("opening and closing panes", () => {
 		expect(endSession(split([a], 0), "a", ["a"])).toEqual(split([a], 0));
 		expect(endSession(split([a, b], 0), "a", ["a", "b"])).toEqual(split([a, b], 0));
 		expect(endSession(split([a], 0), "a", ["b", "c"])).toEqual(split([a], 0));
-	});
-});
-
-describe("defaultCwd", () => {
-	const host = (instanceId: string, cwdDisplay: string, startedAt: number) => ({ instanceId, cwd: cwdDisplay, cwdDisplay, startedAt }) as RosterHost;
-	const past = (sessionId: string, cwdDisplay: string) => ({ sessionId, cwd: cwdDisplay, cwdDisplay }) as PastSession;
-	const hosts = [host("a", "~/old", 1), host("b", "~/new", 2)];
-	const sessions = [past("s1", ""), past("s2", "~/saved")];
-
-	test("prefers the open session, then the newest live one, then the newest past one with a directory", () => {
-		expect(defaultCwd({ kind: "live", instanceId: "a", agentId: null }, hosts, sessions, null)).toBe("~/old");
-		expect(defaultCwd({ kind: "past", sessionId: "s2" }, hosts, sessions, null)).toBe("~/saved");
-		expect(defaultCwd(null, hosts, sessions, null)).toBe("~/new");
-		expect(defaultCwd({ kind: "past", sessionId: "s1" }, [], sessions, null)).toBe("~/saved");
-		expect(defaultCwd(null, [], [], null)).toBe("~");
-	});
-
-	test("stays in the selected project, so the new session is listed under it", () => {
-		expect(defaultCwd({ kind: "live", instanceId: "b", agentId: null }, hosts, sessions, "~/old")).toBe("~/old");
-		expect(defaultCwd(null, hosts, sessions, "~/saved")).toBe("~/saved");
-	});
-});
-
-describe("transcript rendering", () => {
-	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
-	const tool = (id: string, status: "running" | "ok"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status });
-
-	test("upserts keep position and append new ids", () => {
-		const items = applyItems([user, tool("t1", "running")], false, [tool("t1", "ok"), tool("t2", "running")]);
-		expect(items.map(item => (item.kind === "tool" ? `${item.id}:${item.status}` : item.id))).toEqual(["u", "t1:ok", "t2:running"]);
-	});
-
-	test("consecutive tools group into one block; a message splits groups", () => {
-		const blocks = toBlocks([tool("t1", "ok"), tool("t2", "ok"), user, tool("t3", "running")]);
-		expect(blocks.map(block => (block.kind === "tools" ? block.tools.map(t => t.id).join("+") : block.item.id))).toEqual([
-			"t1+t2",
-			"u",
-			"t3",
-		]);
-	});
-});
-
-describe("forkPoints", () => {
-	const prompt = (id: string, entryId: string | null): Item => ({ id, kind: "user", text: id, skill: null, from: null, entryId });
-	const reply = (id: string, streaming = false): Item => ({ id, kind: "assistant", text: id, streaming });
-	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok" };
-
-	test("a prompt forks at itself; a turn's last reply forks at the next prompt, keeping the whole turn", () => {
-		const items = [prompt("p1", "e1"), reply("r1a"), tool, reply("r1b"), prompt("p2", "e2"), reply("r2")];
-		expect(Object.fromEntries(forkPoints(items))).toEqual({
-			p1: { entryId: "e1", prefill: true },
-			r1b: { entryId: "e2", prefill: false },
-			p2: { entryId: "e2", prefill: true },
-		});
-	});
-
-	test("a reply forks only when a prompt omp can branch at follows it, and not while it streams", () => {
-		const items = [
-			prompt("p1", "e1"),
-			reply("r1"),
-			prompt("collab", null),
-			reply("r2"),
-			prompt("p3", "e3"),
-			reply("r3", true),
-			prompt("steer", "e4"),
-			reply("r4"),
-		];
-		expect(Object.fromEntries(forkPoints(items))).toEqual({
-			p1: { entryId: "e1", prefill: true },
-			r2: { entryId: "e3", prefill: false },
-			p3: { entryId: "e3", prefill: true },
-			steer: { entryId: "e4", prefill: true },
-		});
-	});
-});
-
-describe("splitSelector", () => {
-	const listed = (selector: string): [string, CatalogModel] => [selector, { selector, provider: "openrouter", name: selector, thinking: ["low"] }];
-	const models = new Map([listed("openrouter/minimax/minimax-m3"), listed("openrouter/minimax/minimax-m3:batch")]);
-
-	test("a colon that belongs to a listed model id is not a thinking level", () => {
-		expect(splitSelector("openrouter/minimax/minimax-m3:batch", models)).toEqual({ model: "openrouter/minimax/minimax-m3:batch", level: null });
-		expect(splitSelector("openrouter/minimax/minimax-m3:batch:low", models)).toEqual({
-			model: "openrouter/minimax/minimax-m3:batch",
-			level: "low",
-		});
-		expect(splitSelector("openrouter/minimax/minimax-m3:low", models)).toEqual({ model: "openrouter/minimax/minimax-m3", level: "low" });
-		expect(splitSelector("cursor/grok-4.7-high", models)).toEqual({ model: "cursor/grok-4.7-high", level: null });
 	});
 });

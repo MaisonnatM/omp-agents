@@ -2,8 +2,10 @@ import { ExternalLink } from "lucide-react";
 import type { RosterHost, View } from "../../src/shared";
 import { MenuLinkItem } from "@/components/ui/menu";
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton } from "@/components/ui/sidebar";
-import { agentTree, hashForView, type OpenMode, sameView } from "../view-model";
-import { hostLabel, modeOf, RowMenu } from "./roster";
+import { hostLabel, modeOf } from "../labels";
+import { hashForView, type OpenMode, sameView } from "../routing";
+import { agentTree } from "../sessions";
+import { RowMenu } from "./roster";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** Pixels of extra indent per nesting level below the first subagent level. */

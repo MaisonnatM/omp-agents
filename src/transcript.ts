@@ -7,6 +7,7 @@
  * a message by its `timestamp`, which omp writes to the file unchanged, so the
  * file's copy replaces the streamed one in place and a late event cannot undo it.
  */
+import { isObject, str } from "./json";
 import type { Item } from "./shared";
 
 type Json = Record<string, unknown>;
@@ -23,9 +24,6 @@ const SKILL_PROMPT = "skill-prompt";
 const SKILL_INVOCATION =
 	/^\[IMPORTANT: User invoked the "([^"]+)" skill; follow its instructions\. Full skill below\.\]\n[\s\S]*\n\[Skill directory: [^\n]*\]\n[^\n]*(?:\nUser: ([\s\S]*))?$/;
 const SUMMARY_MAX = 160;
-
-export const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null;
-const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
 export function textOf(content: unknown): string {
 	if (typeof content === "string") return content;
@@ -63,6 +61,14 @@ const messageKey = (message: Json): string | undefined =>
 function userPrompt(text: string): { text: string; skill: string | null } {
 	const match = SKILL_INVOCATION.exec(text);
 	return match ? { text: match[2]?.trim() ?? "", skill: match[1] } : { text, skill: null };
+}
+
+/** Whether two items show the same thing. Every field of an item is a primitive, so a shallow comparison covers them all. */
+function sameItem(a: Item, b: Item): boolean {
+	const x: Json = a;
+	const y: Json = b;
+	const keys = Object.keys(x);
+	return keys.length === Object.keys(y).length && keys.every(key => x[key] === y[key]);
 }
 
 export class Transcript {
@@ -258,7 +264,7 @@ export class Transcript {
 
 	#upsert(item: Item): Item[] {
 		const prev = this.#items.get(item.id);
-		if (prev && JSON.stringify(prev) === JSON.stringify(item)) return [];
+		if (prev && sameItem(prev, item)) return [];
 		this.#items.set(item.id, item);
 		if (!prev) {
 			this.#times.set(item.id, this.#now);

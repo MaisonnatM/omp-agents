@@ -53,7 +53,7 @@ bun install
 bun start
 ```
 
-Open <http://127.0.0.1:4317>. Sessions that the dashboard starts appear right away. To also see the sessions you start in a terminal, enable [Collab auto-start](#show-terminal-sessions).
+On start, the server prints a sign-in address, `http://127.0.0.1:4317/?token=<token>`. Open it once: it signs the browser in with a cookie, and from then on <http://127.0.0.1:4317> works in that browser. Sessions that the dashboard starts appear right away. To also see the sessions you start in a terminal, enable [Collab auto-start](#show-terminal-sessions).
 
 ## Configuration
 
@@ -121,9 +121,9 @@ See [docs/architecture.md](docs/architecture.md) for the design, the HTTP API, a
 ## Security
 
 > [!WARNING]
-> The dashboard has no login. Any program or user account on this machine can drive every listed session, and the agents run tools on your machine. Run it only on a machine that you alone use, and never expose its port through a tunnel or a proxy.
+> The agents run tools on your machine. The access token stops web pages and other user accounts, not a program that runs as you: it can read the token file. Run the dashboard only on a machine that you alone use, and never expose its port through a tunnel or a proxy.
 
-The server listens on `127.0.0.1` only, keeps Collab links and room keys in memory, and checks `Host` and `Origin` so that other websites in your browser cannot reach it. See [SECURITY.md](SECURITY.md) for the full threat model and how to report a vulnerability.
+The server listens on `127.0.0.1` only, keeps Collab links and room keys in memory, and requires an access token, kept in `~/.config/omp-agents/token` with mode `0600`, for the page, the WebSocket, and every `/api/` route. Delete the file and restart to rotate it. See [SECURITY.md](SECURITY.md) for the full threat model and how to report a vulnerability.
 
 ## Contributing
 

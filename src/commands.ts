@@ -20,7 +20,7 @@ import {
 	loadSlashCommands,
 	parseSkillInvocation,
 	type Skill,
-} from "./omp";
+} from "./omp/prompts";
 import type { CompletionItem } from "./shared";
 
 /** Discovery reads disk; reuse it briefly so typing does not rescan, but new skills still show up. */
@@ -52,10 +52,13 @@ async function buildCatalog(cwd: string): Promise<Catalog> {
  */
 function catalogFor(instanceId: string | null, cwd: string): Promise<Catalog> {
 	const key = `${instanceId ?? ""}\u0000${cwd}`;
+	const now = Date.now();
+	// Entries nobody asks for again (every cwd a new-session draft once named) would otherwise stay for good.
+	for (const [other, entry] of catalogs) if (now - entry.at >= CATALOG_TTL_MS) catalogs.delete(other);
 	const cached = catalogs.get(key);
-	if (cached && Date.now() - cached.at < CATALOG_TTL_MS) return cached.loading;
+	if (cached) return cached.loading;
 	const loading = buildCatalog(cwd);
-	catalogs.set(key, { loading, at: Date.now() });
+	catalogs.set(key, { loading, at: now });
 	loading.catch(() => {
 		if (catalogs.get(key)?.loading === loading) catalogs.delete(key);
 	});

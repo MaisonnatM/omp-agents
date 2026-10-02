@@ -1,5 +1,5 @@
-import { ArrowUpRight, Brain, CircleStop, ListEnd, MessageCircle, Sparkles } from "lucide-react";
-import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { ArrowUpRight, Brain, CircleStop, ListEnd, MessageCircle } from "lucide-react";
+import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type {
 	AgentRow,
 	ControlPhase,
@@ -12,36 +12,27 @@ import type {
 	PastSession,
 	RosterHost,
 	UserAnswer,
-	View,
 } from "../../src/shared";
 import { Button } from "@/components/ui/button";
-import { ChatMessage } from "@/components/ui/chat-message";
 import { InputMessage } from "@/components/ui/input-message";
-import {
-	MessageScroller,
-	MessageScrollerButton,
-	MessageScrollerContent,
-	MessageScrollerItem,
-	MessageScrollerProvider,
-	MessageScrollerViewport,
-	useMessageScroller,
-} from "@/components/ui/message-scroller";
-import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
-import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
+import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
-import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import type { Completions, Fork, Resume } from "../use-dashboard";
-import { type ForkPoint, forkPoints, graphiteUrl, hashForInbox, pullRequestUrl, sameView, skillLabel, type ToolItem, toBlocks } from "../view-model";
+import { graphiteUrl, pullRequestUrl } from "../inbox-model";
+import { hostLabel, pastLabel, projectName } from "../labels";
+import { hashForInbox } from "../routing";
 import { chordLabel, SHORTCUTS, useShortcuts } from "../shortcuts";
+import type { ForkPoint } from "../transcript-view";
+import type { Completions } from "../pane-store";
+import type { StartOf } from "../starts";
 import { useCompletion } from "./completion-popup";
 import { ContextRing } from "./context-ring";
-import { MessageMarkdown } from "./message-markdown";
 import { Model, ModelPicker } from "./model-picker";
 import { OrgIcon } from "./org-icon";
-import { hostLabel, pastLabel, projectName, ShipStep } from "./roster";
+import { ShipStep } from "./ship-step";
 import { statusLabel } from "./status-dot";
 import { ThinkingPicker } from "./thinking-picker";
+import { NOTICE_TONE, Transcript } from "./transcript";
 import { UserRequestCard } from "./user-request";
 
 const CONTROL_LABEL: Record<ControlPhase["phase"], string> = {
@@ -50,8 +41,6 @@ const CONTROL_LABEL: Record<ControlPhase["phase"], string> = {
 	reconnecting: "Reconnecting…",
 	ended: "Disconnected",
 };
-
-const TOOL_ICON = { running: "loader", ok: "check", error: "x" } as const;
 
 /** omp's queues, in the order its Alt+↑ takes them back, with the tag each queued row shows. */
 const QUEUE_TAGS: [keyof MessageQueue, string][] = [
@@ -64,101 +53,6 @@ const FOLLOW_UP_KEYS = SHORTCUTS.filter(({ id }) => id === "followUp")
 	.join(" or ");
 const END_KEYS = chordLabel(SHORTCUTS.find(({ id }) => id === "end")!.chord);
 
-const NOTICE_TONE: Record<Extract<Item, { kind: "notice" }>["level"], string> = {
-	info: "text-muted-foreground",
-	warning: "text-amber-600 dark:text-amber-400",
-	error: "text-red-600 dark:text-red-400",
-};
-
-/** Whether finished tool groups show their steps. The tools shortcut flips it for every pane. */
-export const ToolsExpanded = createContext(false);
-
-function ToolGroup({ tools }: { tools: ToolItem[] }) {
-	const expanded = useContext(ToolsExpanded);
-	const running = tools.some(tool => tool.status === "running");
-	const failed = tools.filter(tool => tool.status === "error").length;
-	// Open while running, else as `expanded` says; a manual toggle wins until `expanded` flips.
-	const [toggle, setToggle] = useState<{ open: boolean; expanded: boolean } | null>(null);
-	const open = toggle?.expanded === expanded ? toggle.open : running || expanded;
-	const header = running
-		? "Working"
-		: `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`;
-	return (
-		<ThinkingSteps open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="w-full max-w-2xl self-start">
-			<ThinkingStepsHeader>{header}</ThinkingStepsHeader>
-			<ThinkingStepsContent>
-				{tools.map((tool, index) => (
-					<ThinkingStep
-						key={tool.id}
-						icon={TOOL_ICON[tool.status]}
-						label={tool.name}
-						description={tool.summary || undefined}
-						status={tool.status === "running" ? "active" : "complete"}
-						isLast={index === tools.length - 1}
-					/>
-				))}
-			</ThinkingStepsContent>
-		</ThinkingSteps>
-	);
-}
-
-function CopyButton({ text }: { text: string }) {
-	const [copied, setCopied] = useState(false);
-	const CopyIcon = useIcon("copy");
-	const CheckIcon = useIcon("check");
-	useEffect(() => {
-		if (!copied) return;
-		const timer = setTimeout(() => setCopied(false), 1500);
-		return () => clearTimeout(timer);
-	}, [copied]);
-	const Icon = copied ? CheckIcon : CopyIcon;
-	return (
-		<Button
-			variant="ghost"
-			size="icon-compact"
-			aria-label={copied ? "Copied" : "Copy message"}
-			title={copied ? "Copied" : "Copy message"}
-			data-copied={copied || undefined}
-			onClick={() => navigator.clipboard.writeText(text).then(() => setCopied(true))}
-		>
-			<Icon />
-		</Button>
-	);
-}
-
-function ForkButton({ point, forking, disabled, onFork }: { point: ForkPoint; forking: boolean; disabled: boolean; onFork: () => void }) {
-	const BranchIcon = useIcon("git-branch");
-	const LoaderIcon = useIcon("loader");
-	const title = forking
-		? "Forking…"
-		: point.prefill
-			? "Fork from here: a new session with the history before this prompt, ready to edit and resend it"
-			: "Fork from here: a new session with the history through this reply";
-	return (
-		<Button
-			variant="ghost"
-			size="icon-compact"
-			aria-label={forking ? "Forking" : "Fork from here"}
-			title={title}
-			aria-busy={forking || undefined}
-			disabled={disabled}
-			data-fork={point.prefill ? "prompt" : "reply"}
-			onClick={onFork}
-		>
-			{forking ? <LoaderIcon className="animate-spin" /> : <BranchIcon />}
-		</Button>
-	);
-}
-
-interface TranscriptProps {
-	view: View;
-	items: Item[];
-	working: boolean;
-	fork: Fork;
-	onFork: (itemId: string, point: ForkPoint) => void;
-	/** Shown in place of the transcript until its first item or turn. */
-	empty?: ReactNode;
-}
 
 interface HeaderProps {
 	title: string;
@@ -227,26 +121,6 @@ export function EmptyConversation({ title, children }: { title: string; children
 		</div>
 	);
 }
-
-/** The skill a prompt invoked, as a pill ahead of the user's words. */
-function SkillBadge({ name }: { name: string }) {
-	return (
-		<span
-			title={`/skill:${name}`}
-			className="inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-xs font-medium text-foreground ring-1 ring-border"
-			data-skill={name}
-		>
-			<Sparkles aria-hidden className="size-3 text-violet-500 dark:text-violet-400" />
-			<span className="sr-only">Skill:</span>
-			{skillLabel(name)}
-		</span>
-	);
-}
-
-/** What a prompt's copy button copies: a skill prompt as the user typed it, not the skill's text. */
-const typedText = (item: Exclude<Item, ToolItem>): string =>
-	item.kind === "user" && item.skill ? [`/skill:${item.skill}`, item.text].filter(Boolean).join(" ") : item.text;
-
 /**
  * The PRs a session submitted or worked on, after a separator. The number opens the PR's details in the inbox, the
  * arrow after it opens the PR on GitHub, and the Graphite mark opens it on Graphite.
@@ -289,100 +163,15 @@ function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 	});
 }
 
-/** The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end. */
-function Transcript({ view, items, working, fork, onFork, empty }: TranscriptProps) {
-	const last = items.at(-1);
-	const streaming = last?.kind === "assistant" && last.streaming;
-	const forks = forkPoints(items);
-	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
-	const here = fork.phase !== "idle" && sameView(fork.view, view) ? fork : null;
-
-	return (
-		<MessageScroller className="flex-1">
-			<MessageScrollerViewport>
-				<MessageScrollerContent className="mx-auto max-w-3xl gap-3 px-6 py-6" aria-relevant="additions text" data-transcript>
-					{toBlocks(items).map(block => {
-						if (block.kind === "tools") {
-							return (
-								<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
-									<ToolGroup tools={block.tools} />
-								</MessageScrollerItem>
-							);
-						}
-						const item = block.item;
-						if (item.kind === "notice") {
-							return (
-								<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
-									<p className={cn("self-center text-center text-xs", NOTICE_TONE[item.level])} data-item="notice">
-										{item.text}
-									</p>
-								</MessageScrollerItem>
-							);
-						}
-						const copyable = !(item.kind === "assistant" && item.streaming) && typedText(item).trim() !== "";
-						const point = forks.get(item.id);
-						const failed = here?.phase === "failed" && here.itemId === item.id ? here.error : null;
-						return (
-							<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
-								<ChatMessage
-									from={item.kind}
-									time={item.kind === "user" ? (item.from ?? undefined) : undefined}
-									actions={
-										copyable || point ? (
-											<>
-												{copyable && <CopyButton text={typedText(item)} />}
-												{point && (
-													<ForkButton
-														point={point}
-														forking={here?.phase === "forking" && here.itemId === item.id}
-														disabled={fork.phase === "forking"}
-														onFork={() => onFork(item.id, point)}
-													/>
-												)}
-											</>
-										) : undefined
-									}
-									data-item={item.kind}
-									data-streaming={item.kind === "assistant" ? item.streaming : undefined}
-								>
-									{item.kind === "user" && item.skill ? (
-										<div className="flex flex-col items-start gap-1.5">
-											<SkillBadge name={item.skill} />
-											{item.text && <MessageMarkdown text={item.text} />}
-										</div>
-									) : (
-										<MessageMarkdown text={item.text} />
-									)}
-								</ChatMessage>
-								{failed && (
-									<p role="alert" className={cn(item.kind === "user" ? "self-end" : "self-start", "text-xs", NOTICE_TONE.error)}>
-										{failed}
-									</p>
-								)}
-							</MessageScrollerItem>
-						);
-					})}
-					{items.length === 0 && !working && empty}
-					{working && !streaming && (
-						<MessageScrollerItem messageId="thinking" className="flex flex-col">
-							<ThinkingIndicator className="self-start" />
-						</MessageScrollerItem>
-					)}
-				</MessageScrollerContent>
-			</MessageScrollerViewport>
-			<MessageScrollerButton />
-		</MessageScroller>
-	);
-}
 
 interface PastConversationProps {
 	sessionId: string;
 	/** The listed row, or `null` when the session is no longer listed. */
 	session: PastSession | null;
 	items: Item[];
-	fork: Fork;
+	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
-	resume: Resume;
+	resume: StartOf<"resume"> | null;
 	onResume: () => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
@@ -390,6 +179,7 @@ interface PastConversationProps {
 
 /** A past session's saved transcript. It follows the file; **Resume** continues it in a session this dashboard starts. */
 export function PastConversation({ sessionId, session, items, fork, onFork, resume, onResume, actions }: PastConversationProps) {
+	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
 	const meta = session ? (
 		<>
 			<ShipStep ship={session.ship} />{" "}
@@ -399,8 +189,8 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 	) : (
 		sessionId
 	);
-	const resuming = resume.phase === "resuming" && resume.sessionId === sessionId;
-	const failed = resume.phase === "failed" && resume.sessionId === sessionId ? resume.error : null;
+	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
+	const failed = resume?.phase === "failed" && resume.op.sessionId === sessionId ? resume.error : null;
 	return (
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
@@ -410,7 +200,7 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 							variant="secondary"
 							size="compact"
 							onClick={onResume}
-							disabled={resume.phase === "resuming"}
+							disabled={resume?.phase === "starting"}
 							aria-busy={resuming || undefined}
 							title="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here."
 						>
@@ -424,7 +214,7 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 						{failed}
 					</p>
 				)}
-				<Transcript view={{ kind: "past", sessionId }} items={items} working={false} fork={fork} onFork={onFork} />
+				<Transcript view={view} items={items} working={false} fork={fork} onFork={onFork} />
 			</div>
 		</MessageScrollerProvider>
 	);
@@ -441,7 +231,7 @@ interface ConversationProps {
 	loaded: boolean;
 	/** Composer text on mount, from a fork. */
 	initialDraft: string;
-	fork: Fork;
+	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
 	completions: Completions | null;
 	onComplete: (reqId: number, text: string, cursor: number) => void;

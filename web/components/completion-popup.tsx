@@ -2,7 +2,7 @@ import { File, Folder, Slash, Sparkles } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type TextareaHTMLAttributes, useId, useRef, useState } from "react";
 import type { CompletionItem } from "../../src/shared";
 import { completionTrigger } from "../completion-trigger";
-import type { Completions } from "../use-dashboard";
+import type { Completions } from "../pane-store";
 
 const ICON = { command: Slash, skill: Sparkles, file: File, directory: Folder };
 

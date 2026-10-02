@@ -1,5 +1,9 @@
-import { describe, expect, test } from "bun:test";
-import { parseDetailAnswer, parseInboxAnswer, parseRemote } from "./inbox";
+import { describe, expect, setSystemTime, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { parseDetailAnswer, parseInboxAnswer, parseRemote, repoOf } from "./inbox";
+import { runChecked } from "./proc";
 
 const repo = { owner: "acme", repo: "webapp" };
 const me = { login: "me", avatarUrl: "https://avatars.example/me" };
@@ -29,6 +33,22 @@ describe("parseRemote", () => {
 		expect(parseRemote("github.com:acme/webapp.git")).toEqual({ owner: "acme", repo: "webapp" });
 		expect(parseRemote("https://gitlab.com/acme/webapp.git")).toBeNull();
 	});
+});
+
+test("a workspace without a GitHub origin is retried after its negative cache expires", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-inbox-"));
+	try {
+		await runChecked(["git", "init", "-q", dir]);
+		setSystemTime(new Date("2026-10-02T12:00:00Z"));
+		expect(await repoOf(dir)).toBeNull();
+		await runChecked(["git", "-C", dir, "remote", "add", "origin", "git@github.com:acme/webapp.git"]);
+		expect(await repoOf(dir)).toBeNull();
+		setSystemTime(new Date("2026-10-02T12:10:01Z"));
+		expect(await repoOf(dir)).toEqual({ owner: "acme", repo: "webapp" });
+	} finally {
+		setSystemTime();
+		rmSync(dir, { recursive: true, force: true });
+	}
 });
 
 describe("parseInboxAnswer", () => {

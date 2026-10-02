@@ -4,7 +4,7 @@ import { SidebarFooter } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DashboardState } from "../use-dashboard";
-import { providerOrg } from "../view-model";
+import { providerOrg } from "../labels";
 import { OrgIcon } from "./org-icon";
 
 /** Below this fraction left, a window reads as running low. */

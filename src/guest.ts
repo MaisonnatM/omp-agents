@@ -5,58 +5,21 @@
  * registry, and live agent events. Transcripts never wait on it; they are read
  * from the session files, so the welcome snapshot the host sends is ignored.
  */
-import { existsSync } from "node:fs";
-import { stat } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp";
-import type { AgentRow, AgentStatus, ContextUsage, ControlPhase, Delivery, MessageQueue, UserAnswer, UserRequest } from "./shared";
-import { isObject, oneLine } from "./transcript";
+import { expandPrompt } from "./commands";
+import { errorText, isObject, nonEmptyStr } from "./json";
+import type { LiveSession, LiveUpdate } from "./live-session";
+import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp/collab";
+import { displayPath } from "./paths";
+import type { SessionFacts } from "./live-session";
+import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, RosterHost, UserAnswer, UserRequest } from "./shared";
+import { type HostAgent, parseAgents, SubagentFiles } from "./subagents";
+import { oneLine } from "./transcript";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
-
-export type LiveUpdate =
-	/** Its roster row changed: control phase, subagents, or what a subagent is doing. */
-	| { kind: "roster" }
-	/** A live agent event of the session; it streams what the session file does not hold yet. */
-	| { kind: "event"; event: unknown }
-	/** An out-of-band line for the session (`agentId` null) or one of its subagents. */
-	| { kind: "note"; agentId: string | null; level: "warning" | "error"; text: string };
 
 const DISPLAY_NAME = "omp-agents";
 const LINK_ATTEMPTS = 3;
-
-const AGENT_STATUSES: Record<string, AgentStatus> = { running: "running", idle: "idle", parked: "parked", aborted: "aborted" };
-
-interface HostAgent {
-	id: string;
-	type: string;
-	isMain: boolean;
-	parentId: string | null;
-	status: AgentStatus;
-	/** ms since the epoch. */
-	createdAt: number;
-}
-
-function parseAgents(value: unknown): HostAgent[] {
-	if (!Array.isArray(value)) return [];
-	return value.flatMap(raw => {
-		if (!isObject(raw)) return [];
-		const { id, displayName, kind, parentId, status, createdAt } = raw;
-		const parsed = typeof status === "string" ? AGENT_STATUSES[status] : undefined;
-		if (typeof id !== "string" || !parsed) return [];
-		return [
-			{
-				id,
-				type: typeof displayName === "string" ? displayName : "agent",
-				isMain: kind === "main",
-				parentId: typeof parentId === "string" ? parentId : null,
-				status: parsed,
-				createdAt: typeof createdAt === "number" ? createdAt : 0,
-			},
-		];
-	});
-}
-
-const nonEmpty = (value: unknown): string | undefined => (typeof value === "string" && value.trim() ? value : undefined);
+/** Wait this long before rejoining a host whose room dropped us while it stays listed. */
+const REJOIN_MS = 5000;
 
 export const SUBAGENT_LIFECYCLE = "task:subagent:lifecycle";
 export const SUBAGENT_PROGRESS = "task:subagent:progress";
@@ -65,18 +28,18 @@ export const SUBAGENT_PROGRESS = "task:subagent:progress";
 export function activityOf(channel: unknown, payload: unknown): { id: string; activity: string } | null {
 	if (!isObject(payload)) return null;
 	if (channel === SUBAGENT_LIFECYCLE) {
-		const description = nonEmpty(payload.description);
+		const description = nonEmptyStr(payload.description);
 		return typeof payload.id === "string" && description ? { id: payload.id, activity: oneLine(description) } : null;
 	}
 	if (channel !== SUBAGENT_PROGRESS || !isObject(payload.progress)) return null;
 	const progress = payload.progress;
 	if (typeof progress.id !== "string") return null;
 	const text =
-		nonEmpty(progress.currentToolIntent) ??
-		nonEmpty(progress.lastIntent) ??
-		nonEmpty(progress.description) ??
-		nonEmpty(payload.assignment) ??
-		nonEmpty(progress.task);
+		nonEmptyStr(progress.currentToolIntent) ??
+		nonEmptyStr(progress.lastIntent) ??
+		nonEmptyStr(progress.description) ??
+		nonEmptyStr(payload.assignment) ??
+		nonEmptyStr(progress.task);
 	return text ? { id: progress.id, activity: oneLine(text) } : null;
 }
 
@@ -102,7 +65,7 @@ function parseState(value: unknown): HostState | null {
 	const { model, thinkingLevel } = value;
 	return {
 		model: isObject(model) && typeof model.provider === "string" && typeof model.id === "string" ? `${model.provider}/${model.id}` : null,
-		thinkingLevel: nonEmpty(thinkingLevel) ?? null,
+		thinkingLevel: nonEmptyStr(thinkingLevel) ?? null,
 		context: contextOf(value.contextUsage),
 		streaming: value.isStreaming === true,
 	};
@@ -132,7 +95,14 @@ async function openFreshRoom(host: HostSnapshot): Promise<Room> {
 	}
 }
 
-export class SessionGuest {
+function statusOf(host: HostSnapshot): HostStatus {
+	if (host.inputRequired) return "needs-input";
+	if (host.busy === null) return "unknown";
+	return host.busy ? "working" : "idle";
+}
+
+/** A terminal session, joined through its Collab room. Its registry row is the guest's snapshot of it. */
+export class SessionGuest implements LiveSession {
 	readonly instanceId: string;
 	/** Room generation this guest is joined to; `null` until the link resolves. */
 	generation: number | null = null;
@@ -142,14 +112,14 @@ export class SessionGuest {
 	/** The host's last status-line snapshot; `null` until the welcome arrives. */
 	state: HostState | null = null;
 
+	/** The registry's latest listing of this session, replaced on every poll. */
+	#host: HostSnapshot;
 	#socket: CollabSocket | null = null;
 	#readOnly = true;
 	#closed = false;
 	#agents: HostAgent[] = [];
 	#activity = new Map<string, string>();
-	/** Transcripts found away from where {@link agentFile} expects them, and the agents already looked for. */
-	#foundFiles = new Map<string, string>();
-	#searched = new Set<string>();
+	readonly #subagentFiles = new SubagentFiles(() => this.#emit({ kind: "roster" }));
 	readonly #emit: (update: LiveUpdate) => void;
 	/** The host's `ui-request`s; the host sends them to writable guests only. */
 	readonly #requests = new PendingRequests(() => this.#emit({ kind: "roster" }));
@@ -167,12 +137,67 @@ export class SessionGuest {
 
 	constructor(host: HostSnapshot, emit: (update: LiveUpdate) => void) {
 		this.instanceId = host.instanceId;
+		this.#host = host;
 		this.#emit = emit;
 		void this.#start(host);
 	}
 
+	get cwd(): string {
+		return this.#host.cwd;
+	}
+
+	get sessionId(): string {
+		return this.#host.sessionId;
+	}
+
 	get canWrite(): boolean {
 		return this.control.phase === "live" && !this.#readOnly;
+	}
+
+	row(facts: SessionFacts): RosterHost {
+		const host = this.#host;
+		return {
+			source: "terminal",
+			instanceId: host.instanceId,
+			pid: host.pid,
+			sessionId: host.sessionId,
+			sessionName: host.sessionName,
+			cwd: host.cwd,
+			cwdDisplay: displayPath(host.cwd),
+			// The room's status-line snapshot, else the registry row until the guest is welcomed.
+			model: this.state?.model ?? (host.model ? `${host.model.provider}/${host.model.id}` : null),
+			thinkingLevel: this.state?.thinkingLevel ?? null,
+			context: this.state?.context ?? null,
+			startedAt: host.startedAt,
+			participants: host.participants,
+			relayConnected: host.relayConnected,
+			status: statusOf(host),
+			control: this.control,
+			agents: this.agents(),
+			...facts,
+			requests: this.requests(),
+			queue: this.queue(null),
+		};
+	}
+
+	transcriptPath(agentId: string | null, savedFile: (sessionId: string) => string | null): string | null {
+		const sessionFile = savedFile(this.#host.sessionId);
+		if (!sessionFile || !agentId) return sessionFile;
+		return this.#subagentFiles.pathOf(sessionFile, agentId, this.#agents);
+	}
+
+	follow(listed: ReadonlyMap<string, HostSnapshot>): boolean {
+		const host = listed.get(this.instanceId);
+		if (!host) {
+			this.disconnect("This session is no longer running.");
+			return false;
+		}
+		if (this.generation !== null && this.generation !== host.generation) {
+			this.disconnect("The session switched rooms; rejoining.");
+			return false;
+		}
+		this.#host = host;
+		return this.endedAt === null || Date.now() - this.endedAt <= REJOIN_MS;
 	}
 
 	agents(): AgentRow[] {
@@ -198,42 +223,10 @@ export class SessionGuest {
 		return this.#requests.list();
 	}
 
-	/**
-	 * Where omp writes a subagent's transcript: `<id>.jsonl` in its parent's artifacts
-	 * directory, which is the parent's transcript path without `.jsonl`. A subagent that
-	 * outlived a `/new` or `/resume` stays registered but wrote beside the session it
-	 * started in; when the expected file is missing, the guest looks for it among the
-	 * project's sessions and reports a roster change once found.
-	 */
-	agentFile(sessionFile: string, agentId: string): string | null {
-		const found = this.#foundFiles.get(agentId);
-		if (found) return found;
-		const byId = new Map(this.#agents.filter(agent => !agent.isMain).map(agent => [agent.id, agent]));
-		const agent = byId.get(agentId);
-		if (!agent) return null;
-		const ancestors: string[] = [];
-		for (let parent = agent.parentId ? byId.get(agent.parentId) : undefined; parent; parent = parent.parentId ? byId.get(parent.parentId) : undefined) {
-			ancestors.unshift(parent.id);
-		}
-		const expected = join(sessionFile.replace(/\.jsonl$/, ""), ...ancestors, `${agentId}.jsonl`);
-		if (!existsSync(expected) && !this.#searched.has(agentId)) {
-			this.#searched.add(agentId);
-			void this.#findAgentFile(dirname(sessionFile), agent);
-		}
-		return expected;
-	}
-
-	/** The newest `<id>.jsonl` under the project's sessions written since the subagent registered. */
-	async #findAgentFile(projectDir: string, agent: HostAgent): Promise<void> {
-		let newest: { path: string; mtimeMs: number } | null = null;
-		for await (const rel of new Bun.Glob(`*/**/${agent.id}.jsonl`).scan({ cwd: projectDir })) {
-			const path = join(projectDir, rel);
-			const { mtimeMs } = await stat(path);
-			if (mtimeMs >= agent.createdAt && (!newest || mtimeMs > newest.mtimeMs)) newest = { path, mtimeMs };
-		}
-		if (!newest || this.#closed) return;
-		this.#foundFiles.set(agent.id, newest.path);
-		this.#emit({ kind: "roster" });
+	/** Prepare `text` as the terminal would, expanding a skill or file command, then {@link send} it. */
+	async prompt(agentId: string | null, text: string, delivery: Delivery): Promise<void> {
+		const payload = await expandPrompt(this.instanceId, this.#host.cwd, text, agentId ? "subagent" : "session");
+		this.send(agentId, { text, payload }, delivery);
 	}
 
 	/**
@@ -254,8 +247,12 @@ export class SessionGuest {
 		}
 	}
 
-	/** Take a held follow-up back. False when it is no longer held: its turn ended and the guest sent it. */
-	dequeue(agentId: string | null, text: string): boolean {
+	/**
+	 * Take a held follow-up back. False when it is no longer held: its turn ended and the guest sent it. Collab shows no
+	 * guest the host's queue, so a terminal session's queue holds only this guest's own follow-ups.
+	 */
+	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean> {
+		if (queue !== "followUp") return false;
 		const key = agentId ?? "";
 		const held = this.#followUps.get(key) ?? [];
 		const index = held.findIndex(message => message.text === text);
@@ -302,14 +299,34 @@ export class SessionGuest {
 		this.#socket?.send({ t: "ui-response", reqId: Number(requestId), value: answer.kind === "value" ? answer.value : undefined });
 	}
 
+	/**
+	 * Stop the terminal session's omp as closing its terminal would; it leaves the registry on exit, and its file stays
+	 * resumable. A room shared read-only grants no control, ending it included.
+	 */
+	async end(): Promise<void> {
+		const { pid } = this.#host;
+		// `kill` with 0, 1, or a negative pid signals process groups or every process; only one omp process is meant.
+		if (!this.canWrite || !Number.isInteger(pid) || pid <= 1 || pid === process.pid) return;
+		try {
+			process.kill(pid, "SIGTERM");
+		} catch {
+			// The process already exited; the next registry poll drops it.
+		}
+	}
+
+	async dispose(): Promise<void> {
+		this.disconnect("Dashboard shut down.");
+	}
+
 	/** Terminal: the host vanished or rotated rooms, the relay gave up, or the dashboard shut down. */
-	end(reason: string): void {
+	disconnect(reason: string): void {
 		if (this.#closed) return;
 		this.#closed = true;
 		this.endedAt = Date.now();
 		this.#socket?.close();
 		this.#socket = null;
 		this.#requests.clear();
+		this.#subagentFiles.close();
 		for (const [key, held] of this.#followUps) {
 			if (held.length === 0) continue;
 			const texts = held.map(message => message.text).join("\n");
@@ -324,7 +341,7 @@ export class SessionGuest {
 		try {
 			room = await openFreshRoom(host);
 		} catch (err) {
-			this.end(err instanceof Error ? err.message : String(err));
+			this.disconnect(errorText(err));
 			return;
 		}
 		if (this.#closed) return;
@@ -338,7 +355,7 @@ export class SessionGuest {
 		socket.onFrame = frame => this.#onFrame(frame);
 		socket.onClose = (reason, willReconnect) => {
 			if (willReconnect) this.#setControl({ phase: "reconnecting", reason });
-			else this.end(reason);
+			else this.disconnect(reason);
 		};
 		socket.connect();
 	}
@@ -354,7 +371,7 @@ export class SessionGuest {
 		switch (frame.t) {
 			case "welcome":
 				this.#readOnly = this.#readOnly || frame.readOnly === true;
-				this.#agents = parseAgents(frame.agents);
+				this.#setAgents(parseAgents(frame.agents));
 				this.state = parseState(frame.state);
 				// The host replays its pending questions after every welcome.
 				this.#requests.clear();
@@ -378,7 +395,7 @@ export class SessionGuest {
 				return;
 			}
 			case "agents":
-				this.#agents = parseAgents(frame.agents);
+				this.#setAgents(parseAgents(frame.agents));
 				this.#emit({ kind: "roster" });
 				return;
 			case "bus": {
@@ -405,11 +422,18 @@ export class SessionGuest {
 				return;
 			}
 			case "bye":
-				this.end(`Host ended the room: ${String(frame.reason)}`);
+				this.disconnect(`Host ended the room: ${String(frame.reason)}`);
 				return;
 			default:
 				return;
 		}
+	}
+
+	/** Replace the host's agent list; what the guest learned of an agent that left goes with it. */
+	#setAgents(agents: HostAgent[]): void {
+		for (const { id } of this.#agents) if (!agents.some(agent => agent.id === id)) this.#activity.delete(id);
+		this.#subagentFiles.update(this.#agents, agents);
+		this.#agents = agents;
 	}
 
 	#setControl(control: ControlPhase): void {

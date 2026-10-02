@@ -2,8 +2,9 @@
  * Links from a pull request's description back to the dashboard sessions that submitted or worked on it. The
  * dashboard writes them only when the user asks, inside one marked block that a rerun replaces.
  */
+import { isObject } from "./json";
+import { runChecked } from "./proc";
 import type { PullRequest, PullRequestLink, SessionLinksResult } from "./shared";
-import { isObject } from "./transcript";
 
 const GH_TIMEOUT_MS = 20_000;
 const START = "<!-- omp-sessions -->";
@@ -36,21 +37,9 @@ export function mergeSessionLinks(body: string, block: string): string {
 	return `${before ? `${before}\n\n` : ""}${block}${after}`;
 }
 
-async function gh(args: string[], input?: string): Promise<string> {
-	const child = Bun.spawn(["gh", ...args], {
-		stdin: input === undefined ? "ignore" : new Blob([input]),
-		stdout: "pipe",
-		stderr: "pipe",
-		timeout: GH_TIMEOUT_MS,
-	});
-	const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
-	if (code !== 0) throw new Error(stderr.trim() || `gh exited with code ${code}`);
-	return stdout;
-}
-
 /** The pull request's description as GitHub holds it now; empty when it has none. */
 export async function readDescription(pr: PullRequest): Promise<string> {
-	const answer: unknown = JSON.parse(await gh(["api", `repos/${pr.owner}/${pr.repo}/pulls/${pr.number}`]));
+	const answer: unknown = JSON.parse(await runChecked(["gh", "api", `repos/${pr.owner}/${pr.repo}/pulls/${pr.number}`], { timeoutMs: GH_TIMEOUT_MS }));
 	const body = isObject(answer) ? answer.body : null;
 	return typeof body === "string" ? body : "";
 }
@@ -60,6 +49,9 @@ export async function linkSessions(pr: PullRequest, sessions: readonly SessionEn
 	const body = await readDescription(pr);
 	const next = mergeSessionLinks(body, sessionLinksBlock(origin, sessions));
 	if (next === body) return { changed: false };
-	await gh(["api", "--method", "PATCH", `repos/${pr.owner}/${pr.repo}/pulls/${pr.number}`, "--input", "-"], JSON.stringify({ body: next }));
+	await runChecked(["gh", "api", "--method", "PATCH", `repos/${pr.owner}/${pr.repo}/pulls/${pr.number}`, "--input", "-"], {
+		input: JSON.stringify({ body: next }),
+		timeoutMs: GH_TIMEOUT_MS,
+	});
 	return { changed: true };
 }

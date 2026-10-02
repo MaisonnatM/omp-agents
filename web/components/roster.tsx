@@ -1,6 +1,6 @@
 import { AppWindow, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, MessagesSquare, Play, Plus, Settings } from "lucide-react";
-import { type CSSProperties, type MouseEvent, type ReactElement, type ReactNode, useState } from "react";
-import type { PastSession, PullRequest, RosterHost, ShipProgress, View } from "../../src/shared";
+import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
+import type { PastSession, PullRequest, RosterHost, View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -32,21 +32,14 @@ import {
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { IS_MAC, useShortcuts } from "../shortcuts";
-import type { Resume } from "../use-dashboard";
+import { type InboxTarget, inboxRepoKey, inboxSectionId, inboxSections, pullRequestUrl } from "../inbox-model";
+import { age, hostLabel, modeOf, pastLabel, projectName, SPLIT_CLICK } from "../labels";
+import { hashForInbox, hashForSettings, type OpenMode, sameView } from "../routing";
+import { workspaces } from "../sessions";
+import { useShortcuts } from "../shortcuts";
+import type { StartOf } from "../starts";
 import { useInbox } from "../use-inbox";
-import {
-	hashForInbox,
-	hashForSettings,
-	type InboxTarget,
-	inboxRepoKey,
-	inboxSectionId,
-	inboxSections,
-	type OpenMode,
-	pullRequestUrl,
-	sameView,
-	workspaces,
-} from "../view-model";
+import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
@@ -64,48 +57,15 @@ export function useProject(projects: { cwd: string }[]): [string | null, (cwd: s
 	return [projects.some(({ cwd }) => cwd === stored) ? stored : null, pick];
 }
 
-/** ⌘-click on macOS, where Ctrl-click opens the context menu, and Ctrl-click elsewhere, opens a row in a new pane. */
-export const modeOf = (event: MouseEvent): OpenMode => ((IS_MAC ? event.metaKey : event.ctrlKey) ? "split" : "replace");
-
-/** The gesture {@link modeOf} reads as a split, as hints name it. */
-export const SPLIT_CLICK = IS_MAC ? "⌘-click" : "Ctrl-click";
-
 const SIDEBAR_TABS = [
 	{ value: "inbox", label: "Inbox", icon: Inbox },
 	{ value: "sessions", label: "Sessions", icon: MessagesSquare },
 ] as const;
 
-export function age(startedAt: number): string {
-	const minutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60_000));
-	if (minutes < 60) return `${minutes}m`;
-	if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-	return `${Math.floor(minutes / 1440)}d`;
-}
-
-/** The project a directory holds, its last segment: `~/code/webapp` reads `webapp`. */
-export const projectName = (cwdDisplay: string): string | undefined => cwdDisplay.split("/").filter(Boolean).pop();
-
-export const hostLabel = (host: RosterHost): string => host.sessionName ?? projectName(host.cwdDisplay) ?? host.cwdDisplay;
-
-export const pastLabel = (session: PastSession): string => session.title ?? projectName(session.cwdDisplay) ?? "Untitled session";
-
 /** The project a titled row ran in, before its title. An untitled row's label is already the project's name. */
 function ProjectBadge({ cwdDisplay }: { cwdDisplay: string }) {
 	const name = projectName(cwdDisplay);
 	return name ? <Badge size="compact" className="shrink-0 self-center">{name}</Badge> : null;
-}
-
-const SHIP_STAGES: ShipProgress["stage"][] = ["ticket", "implement", "draft_pr", "thermonuclear", "ready_gate", "live", "merged"];
-const SHIP_NAMES: Record<ShipProgress["stage"] | NonNullable<ShipProgress["work"]>, string> = {
-	ticket: "Ticket", implement: "Implement", draft_pr: "Draft PR", thermonuclear: "Thermonuclear",
-	ready_gate: "Ready gate", live: "Live for review", merged: "Merged",
-	rebase: "Rebase", fix_comments: "Fix comments", fix_ci: "Fix CI",
-};
-
-export function ShipStep({ ship }: { ship: ShipProgress | null }) {
-	if (!ship) return null;
-	const text = `${SHIP_STAGES.indexOf(ship.stage) + 1}/7 · ${SHIP_NAMES[ship.work ?? ship.stage]}`;
-	return <span className="inline-block max-w-36 shrink-0 truncate rounded bg-muted px-1.5 text-xs text-muted-foreground" title={`${ship.issue ?? "Ship"} · ${text}`}>{text}</span>;
 }
 
 interface RowMenuProps {
@@ -327,7 +287,7 @@ interface RosterProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** Open the new-session draft; no omp starts until its first message. */
 	onNewSession: () => void;
-	resume: Resume;
+	resume: StartOf<"resume"> | null;
 	/** Continue past session `sessionId`, in the pane that shows it. */
 	onResume: (sessionId: string) => void;
 	/** End running session `instanceId`, as its pane's End session does. */
@@ -481,9 +441,9 @@ export function Roster({
 										items={
 											<>
 												{/* One resume runs at a time, as the pane's Resume button allows. */}
-												<MenuItem disabled={resume.phase === "resuming"} onClick={() => onResume(session.sessionId)}>
+												<MenuItem disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
 													<Play />
-													{resume.phase === "resuming" && resume.sessionId === session.sessionId ? "Resuming…" : "Resume"}
+													{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
 												</MenuItem>
 												<SessionItems row={session} />
 											</>
