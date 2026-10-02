@@ -29,6 +29,7 @@ import { useCompletion } from "./completion-popup";
 import { ContextRing } from "./context-ring";
 import { Model, ModelPicker } from "./model-picker";
 import { OrgIcon } from "./org-icon";
+import { ShipStep } from "./ship-step";
 import { statusLabel } from "./status-dot";
 import { ThinkingPicker } from "./thinking-picker";
 import { NOTICE_TONE, Transcript } from "./transcript";
@@ -152,6 +153,7 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
 	const meta = session ? (
 		<>
+			<ShipStep ship={session.ship} />{" "}
 			<Project cwdDisplay={session.cwdDisplay} /> · last active {new Date(session.modifiedAt).toLocaleString()}
 			<PullRequests pullRequests={session.pullRequests} />
 		</>
@@ -324,6 +326,7 @@ function LiveConversation({
 		? [`${agent.kind} subagent of ${shown ? hostLabel(shown) : "a session"}`, agent.activity].filter(Boolean).join(" · ")
 		: shown && (
 				<>
+					<ShipStep ship={shown.ship} />{" "}
 					<Project cwdDisplay={shown.cwdDisplay} /> · {shown.model ? <Model selector={shown.model} /> : "no model"} · pid {shown.pid}
 					<PullRequests pullRequests={shown.pullRequests} />
 				</>

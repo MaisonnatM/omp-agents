@@ -1,6 +1,9 @@
 /** What the server asks of a running session, whether it is a terminal session it joined or one it started itself. */
 import type { HostSnapshot } from "./omp/collab";
-import type { Delivery, LinkedPullRequest, MessageQueue, ModelOption, RosterHost, UserAnswer } from "./shared";
+import type { Delivery, MessageQueue, ModelOption, RosterHost, UserAnswer } from "./shared";
+
+/** What the index of session files knows of a session: the pull requests it worked on and its /ship stage. */
+export type SessionFacts = Pick<RosterHost, "pullRequests" | "ship">;
 
 /** What a live session reports as it runs. */
 export type LiveUpdate =
@@ -16,8 +19,8 @@ export interface LiveSession {
 	readonly instanceId: string;
 	readonly cwd: string;
 	readonly sessionId: string;
-	/** The session's roster row; `pullRequests` is what the pull-request index knows of it. */
-	row(pullRequests: LinkedPullRequest[]): RosterHost;
+	/** The session's roster row, with what the session files' index knows of it. */
+	row(facts: SessionFacts): RosterHost;
 	/**
 	 * The file the main agent (`agentId` null) or a subagent writes, or `null` while it is not known.
 	 * `savedFile` resolves a session id to its file among the files on disk.

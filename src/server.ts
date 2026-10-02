@@ -66,7 +66,7 @@ let usageJson = "";
 /** Directories sessions ran in: live ones first, then saved ones newest first. */
 const knownCwds = (): string[] => [...new Set([...sessions.cwds(), ...files.cwds()].filter(Boolean))];
 
-const rosterMsg = (): ServerMsg => ({ t: "roster", hosts: sessions.rows(files.pullRequestsOf), error: rosterError });
+const rosterMsg = (): ServerMsg => ({ t: "roster", hosts: sessions.rows(files.factsOf), error: rosterError });
 const pastMsg = (): ServerMsg => ({ t: "past", sessions: files.past(sessions.sessionIds()) });
 
 /** Whether any socket listens. Pushes, and the work to compare them with the last one, wait for the first. */

@@ -7,11 +7,11 @@ import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
 import { activityOf, contextOf, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
 import { errorText, isObject } from "./json";
-import type { LiveSession, LiveUpdate } from "./live-session";
+import type { LiveSession, LiveUpdate, SessionFacts } from "./live-session";
 import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
 import { displayPath } from "./paths";
-import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type LinkedPullRequest, type MessageQueue, type ModelOption, type RosterHost, type UserAnswer, type UserRequest } from "./shared";
+import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type RosterHost, type UserAnswer, type UserRequest } from "./shared";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
 /** omp's subagent lifecycle and progress statuses, as the roster's agent statuses. */
@@ -163,7 +163,12 @@ export class DashboardSession implements LiveSession {
 		prepare: (client: RpcClient) => Promise<void>,
 	): Promise<DashboardSession> {
 		const requests = new PendingRequests(() => emit({ kind: "roster" }));
+		let session: DashboardSession | undefined;
 		const child = await startRpc(cwd, frame => {
+			if (frame.type === "session_info_update") {
+				if (session) session.#refresh();
+				return;
+			}
 			const change = parseRpcRequest(frame, Date.now());
 			if (change?.kind === "add") requests.add(change.request);
 			else if (change?.kind === "cancel") requests.remove(change.id);
@@ -171,7 +176,7 @@ export class DashboardSession implements LiveSession {
 		try {
 			await child.client.setSubagentSubscription("progress");
 			await prepare(child.client);
-			const session = new DashboardSession(instanceId, cwd, child, requests, await child.client.getState(), emit);
+			session = new DashboardSession(instanceId, cwd, child, requests, await child.client.getState(), emit);
 			session.thinkingLevels = await child.client.getAvailableThinkingLevels();
 			return session;
 		} catch (err) {
@@ -182,7 +187,7 @@ export class DashboardSession implements LiveSession {
 		}
 	}
 
-	row(pullRequests: LinkedPullRequest[]): RosterHost {
+	row(facts: SessionFacts): RosterHost {
 		return {
 			source: "dashboard",
 			instanceId: this.instanceId,
@@ -199,7 +204,7 @@ export class DashboardSession implements LiveSession {
 			status: this.status,
 			control: { phase: "live", readOnly: false },
 			agents: this.agents(),
-			pullRequests,
+			...facts,
 			requests: this.requests(),
 			queue: this.queue,
 		};
@@ -314,6 +319,9 @@ export class DashboardSession implements LiveSession {
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });
+		} else if (event.type === "message_end" && isObject(event.message) && event.message.role === "user" && this.sessionName === null) {
+			// omp's RPC mode titles no prompt itself; a bare `/rename` makes omp title the session from the prompt it now holds.
+			this.#child.client.prompt("/rename").catch((err: unknown) => this.#fail("Titling failed", err));
 		} else if (typeof event.type === "string" && STATE_EVENTS.has(event.type)) this.#refresh();
 	}
 

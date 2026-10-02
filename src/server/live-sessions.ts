@@ -2,9 +2,9 @@
 import { forgetSession } from "../commands";
 import { type DashboardUpdate, newInstanceId } from "../dashboard-session";
 import { SessionGuest } from "../guest";
-import type { LiveSession, LiveUpdate } from "../live-session";
+import type { LiveSession, LiveUpdate, SessionFacts } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
-import type { LinkedPullRequest, RosterHost } from "../shared";
+import type { RosterHost } from "../shared";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
 
@@ -34,8 +34,8 @@ export class LiveSessions {
 		if (this.#sessions.delete(instanceId)) forgetSession(instanceId);
 	}
 
-	rows(pullRequestsOf: (sessionId: string) => LinkedPullRequest[]): RosterHost[] {
-		return [...this.#sessions.values()].map(session => session.row(pullRequestsOf(session.sessionId)));
+	rows(factsOf: (sessionId: string) => SessionFacts): RosterHost[] {
+		return [...this.#sessions.values()].map(session => session.row(factsOf(session.sessionId)));
 	}
 
 	/** The ids of the sessions that run now, which are not past sessions. */

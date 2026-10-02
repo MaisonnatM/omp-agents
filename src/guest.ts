@@ -10,7 +10,8 @@ import { errorText, isObject, nonEmptyStr } from "./json";
 import type { LiveSession, LiveUpdate } from "./live-session";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp/collab";
 import { displayPath } from "./paths";
-import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, LinkedPullRequest, MessageQueue, RosterHost, UserAnswer, UserRequest } from "./shared";
+import type { SessionFacts } from "./live-session";
+import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, RosterHost, UserAnswer, UserRequest } from "./shared";
 import { type HostAgent, parseAgents, SubagentFiles } from "./subagents";
 import { oneLine } from "./transcript";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
@@ -153,7 +154,7 @@ export class SessionGuest implements LiveSession {
 		return this.control.phase === "live" && !this.#readOnly;
 	}
 
-	row(pullRequests: LinkedPullRequest[]): RosterHost {
+	row(facts: SessionFacts): RosterHost {
 		const host = this.#host;
 		return {
 			source: "terminal",
@@ -173,7 +174,7 @@ export class SessionGuest implements LiveSession {
 			status: statusOf(host),
 			control: this.control,
 			agents: this.agents(),
-			pullRequests,
+			...facts,
 			requests: this.requests(),
 			queue: this.queue(null),
 		};

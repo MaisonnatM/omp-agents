@@ -168,6 +168,13 @@ export interface AgentRow {
 	queue: MessageQueue;
 }
 
+export interface ShipProgress {
+	stage: "ticket" | "implement" | "draft_pr" | "thermonuclear" | "ready_gate" | "live" | "merged";
+	work?: "rebase" | "fix_comments" | "fix_ci";
+	issue?: string;
+	pr?: number;
+}
+
 interface RosterHostBase {
 	/** Collab instance id for terminal sessions, a dashboard-assigned id for dashboard sessions. Stable across `/new`. */
 	instanceId: string;
@@ -188,6 +195,7 @@ interface RosterHostBase {
 	agents: AgentRow[];
 	/** What the session and its subagents submitted or worked on; the session's own first. */
 	pullRequests: LinkedPullRequest[];
+	ship: ShipProgress | null;
 	/** Questions the session waits on, oldest first. */
 	requests: UserRequest[];
 	/** What waits on the main agent's turn. */
@@ -218,6 +226,7 @@ export interface PastSession {
 	modifiedAt: number;
 	/** What the session and its subagents submitted or worked on; the session's own first. */
 	pullRequests: LinkedPullRequest[];
+	ship: ShipProgress | null;
 }
 
 export interface LiveView {

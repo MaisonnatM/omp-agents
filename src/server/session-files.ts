@@ -4,6 +4,7 @@ import { repoOf } from "../inbox";
 import { listSessionFiles, readSessionFile, type SavedSession, sessionsDir } from "../omp/sessions";
 import { displayPath } from "../paths";
 import { PullRequestIndex } from "../pull-requests";
+import type { SessionFacts } from "../live-session";
 import type { LinkedPullRequest, PastSession } from "../shared";
 
 /** omp's `.<file>.jsonl.lock` sidecars: on macOS a burst of writes to a session file can surface only as events for these. */
@@ -48,6 +49,16 @@ export class SessionFiles {
 		const path = this.pathOf(sessionId);
 		return path ? this.pullRequests.of(path) : [];
 	};
+
+	/** What the index knows of session `sessionId`: its pull requests and /ship stage. */
+	readonly factsOf = (sessionId: string): SessionFacts => {
+		const path = this.pathOf(sessionId);
+		return path ? this.#factsAt(path) : { pullRequests: [], ship: null };
+	};
+
+	#factsAt(path: string): SessionFacts {
+		return { pullRequests: this.pullRequests.of(path), ship: this.pullRequests.shipOf(path) };
+	}
 
 	/** Directories sessions ran in, newest first. Sessions from old omp versions recorded none. */
 	cwds(): string[] {
@@ -127,7 +138,7 @@ export class SessionFiles {
 				cwd: session.cwd,
 				cwdDisplay: displayPath(session.cwd),
 				modifiedAt: session.modifiedAt,
-				pullRequests: this.pullRequests.of(session.path),
+				...this.#factsAt(session.path),
 			}));
 	}
 }

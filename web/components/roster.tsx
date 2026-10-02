@@ -38,6 +38,7 @@ import { workspaces } from "../sessions";
 import { useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
 import { useInbox } from "../use-inbox";
+import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
@@ -59,6 +60,7 @@ const SIDEBAR_TABS = [
 	{ value: "inbox", label: "Inbox", icon: Inbox },
 	{ value: "sessions", label: "Sessions", icon: MessagesSquare },
 ] as const;
+
 
 interface RowMenuProps {
 	view: View;
@@ -396,6 +398,7 @@ export function Roster({
 											<StatusDot status={host.status} />
 											<span className="flex min-w-0 flex-1 items-baseline gap-2">
 												<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
+												<ShipStep ship={host.ship} />
 												{(host.pullRequests.length > 0 || (host.source === "terminal" && !host.relayConnected)) && (
 													<span className="shrink-0 text-xs text-muted-foreground">
 														{[
@@ -446,6 +449,7 @@ export function Roster({
 										>
 											<span className="flex min-w-0 flex-1 items-baseline gap-2">
 												<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
+												<ShipStep ship={session.ship} />
 												{session.pullRequests.length > 0 && (
 													<span className="shrink-0 text-xs text-muted-foreground">
 														{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}
