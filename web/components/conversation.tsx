@@ -32,12 +32,13 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import type { Completions, Fork, Resume } from "../use-dashboard";
-import { type ForkPoint, forkPoints, hashForInbox, pullRequestUrl, sameView, skillLabel, type ToolItem, toBlocks } from "../view-model";
+import { type ForkPoint, forkPoints, graphiteUrl, hashForInbox, pullRequestUrl, sameView, skillLabel, type ToolItem, toBlocks } from "../view-model";
 import { chordLabel, SHORTCUTS, useShortcuts } from "../shortcuts";
 import { useCompletion } from "./completion-popup";
 import { ContextRing } from "./context-ring";
 import { MessageMarkdown } from "./message-markdown";
 import { Model, ModelPicker } from "./model-picker";
+import { OrgIcon } from "./org-icon";
 import { hostLabel, pastLabel, projectName } from "./roster";
 import { statusLabel } from "./status-dot";
 import { ThinkingPicker } from "./thinking-picker";
@@ -216,8 +217,8 @@ const typedText = (item: Exclude<Item, ToolItem>): string =>
 	item.kind === "user" && item.skill ? [`/skill:${item.skill}`, item.text].filter(Boolean).join(" ") : item.text;
 
 /**
- * The PRs a session submitted or worked on, after a separator. The number opens the PR's row in the inbox, and the
- * arrow after it opens the PR on GitHub.
+ * The PRs a session submitted or worked on, after a separator. The number opens the PR's row in the inbox, the
+ * arrow after it opens the PR on GitHub, and the Graphite mark opens it on Graphite.
  */
 function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 	return pullRequests.map(pr => {
@@ -241,6 +242,16 @@ function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 					className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
 				>
 					<ArrowUpRight aria-hidden className="inline size-3 align-[-0.125em]" />
+				</a>
+				<a
+					href={graphiteUrl(pr)}
+					target="_blank"
+					rel="noreferrer"
+					title={`${name} on Graphite`}
+					aria-label={`${name} on Graphite`}
+					className="ml-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<OrgIcon org="graphite" className="inline align-[-0.125em]" />
 				</a>
 			</Fragment>
 		);
@@ -492,6 +503,10 @@ function LiveConversation({
 		setDraft(current => (current ? `${text}\n${current}` : text));
 		completion.composerRef.current?.querySelector("textarea")?.focus();
 	}, [dequeued, dequeueId]);
+	// The focused pane's composer takes the keyboard once it can be typed in: when the view opens, and when it goes live.
+	useEffect(() => {
+		if (focused && writable) completion.composerRef.current?.querySelector("textarea")?.focus();
+	}, [writable]);
 	// As omp's Esc does, the session's queued messages come back into the composer instead of running after the interrupt.
 	const interrupt = (): void => {
 		take(queued, true);
