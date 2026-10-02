@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useSyncExternalStore } from "react";
 import type { ClientMsg, CompletionItem, Item, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
 import {
 	applyItems,
@@ -11,7 +11,17 @@ import {
 	type OpenMode,
 	openView,
 	sameView,
+	sessionFromHash,
+	viewForSession,
 } from "./view-model";
+
+const subscribeHash = (onChange: () => void): (() => void) => {
+	window.addEventListener("hashchange", onChange);
+	return () => window.removeEventListener("hashchange", onChange);
+};
+
+/** The URL hash, rendering again whenever it changes. */
+export const useHash = (): string => useSyncExternalStore(subscribeHash, () => location.hash);
 
 /** The New session form: closed, open for a directory (with the last attempt's error), or waiting for the session to start. */
 export type Launch = { phase: "closed" } | { phase: "editing"; error: string | null } | { phase: "starting" };
@@ -264,6 +274,16 @@ export function useDashboard(): Dashboard {
 		window.addEventListener("hashchange", onHash);
 		return () => window.removeEventListener("hashchange", onHash);
 	}, []);
+
+	// A `#session/<id>` link opens where that session runs, once the server has listed the sessions.
+	const hash = useHash();
+	useEffect(() => {
+		const sessionId = sessionFromHash(location.hash);
+		if (sessionId === null || !state.listed) return;
+		const layout = openView(layoutRef.current, viewForSession(sessionId, state.hosts), "replace");
+		history.replaceState(null, "", hashForLayout(layout));
+		dispatch({ t: "layout", layout });
+	}, [hash, state.listed, state.hosts]);
 
 	useEffect(() => {
 		send({ t: "watch", views: state.layout.panes });

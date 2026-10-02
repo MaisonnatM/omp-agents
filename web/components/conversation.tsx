@@ -1,14 +1,14 @@
-import { Brain } from "lucide-react";
+import { ArrowUpRight, Brain } from "lucide-react";
 import { createContext, Fragment, type ReactNode, useContext, useEffect, useId, useRef, useState } from "react";
 import type {
 	AgentRow,
 	CompletionItem,
 	ControlPhase,
 	Item,
+	LinkedPullRequest,
 	LiveView,
 	ModelOption,
 	PastSession,
-	PullRequest,
 	RosterHost,
 	UserAnswer,
 	View,
@@ -30,7 +30,7 @@ import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader 
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import type { Fork } from "../use-dashboard";
-import { type ForkPoint, forkPoints, modelName, modelOrg, pullRequestUrl, sameView, type ToolItem, toBlocks } from "../view-model";
+import { type ForkPoint, forkPoints, hashForInbox, modelName, modelOrg, pullRequestUrl, sameView, type ToolItem, toBlocks } from "../view-model";
 import { useShortcuts } from "../shortcuts";
 import { completionTrigger } from "../completion-trigger";
 import { CompletionPopup } from "./completion-popup";
@@ -186,22 +186,36 @@ export function Model({ selector }: { selector: string }) {
 	);
 }
 
-/** The PRs a session submitted, after a separator, each linking to GitHub. */
-function PullRequests({ pullRequests }: { pullRequests: PullRequest[] }) {
-	return pullRequests.map(pr => (
-		<Fragment key={pullRequestUrl(pr)}>
-			{" · "}
-			<a
-				href={pullRequestUrl(pr)}
-				target="_blank"
-				rel="noreferrer"
-				title={`${pr.owner}/${pr.repo}#${pr.number} on GitHub`}
-				className="underline-offset-2 hover:text-foreground hover:underline"
-			>
-				#{pr.number}
-			</a>
-		</Fragment>
-	));
+/**
+ * The PRs a session submitted or worked on, after a separator. The number opens the PR's row in the inbox, and the
+ * arrow after it opens the PR on GitHub.
+ */
+function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
+	return pullRequests.map(pr => {
+		const name = `${pr.owner}/${pr.repo}#${pr.number}`;
+		return (
+			<Fragment key={name}>
+				{" · "}
+				<a
+					href={hashForInbox(pr)}
+					title={`${name}, which this session ${pr.link === "submitted" ? "submitted" : "worked on"}, in the inbox`}
+					className="underline-offset-2 hover:text-foreground hover:underline"
+				>
+					#{pr.number}
+				</a>
+				<a
+					href={pullRequestUrl(pr)}
+					target="_blank"
+					rel="noreferrer"
+					title={`${name} on GitHub`}
+					aria-label={`${name} on GitHub`}
+					className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<ArrowUpRight aria-hidden className="inline size-3 align-[-0.125em]" />
+				</a>
+			</Fragment>
+		);
+	});
 }
 
 /** The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end. */
