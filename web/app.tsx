@@ -108,9 +108,9 @@ export function App() {
 	/** The live session whose subagents the right sidebar lists. Over a past session or a page, it has none. */
 	const subagentsHost = page ? undefined : viewHost;
 	const toggleSidebar = (side: SidebarSide): void => sidebars.setOpen(side, !sidebars.panels[side].open);
-	/** While the subagents sidebar is hidden, the button that shows it again ends the header of the pane at the top right. */
-	const showSubagents = subagentsHost && !sidebars.panels.right.open && (
-		<SidebarToggle side="right" open={false} onToggle={() => toggleSidebar("right")} />
+	/** The button that shows or hides the subagents sidebar ends the header of the pane at the top right, open or not. */
+	const subagentsToggle = subagentsHost && (
+		<SidebarToggle side="right" open={sidebars.panels.right.open} onToggle={() => toggleSidebar("right")} />
 	);
 	const topRightPane = maximized ? layout.focus : Math.min(1, layout.panes.length - 1);
 
@@ -257,7 +257,7 @@ export function App() {
 										</Button>
 									</>
 								)}
-								{index === topRightPane && showSubagents}
+								{index === topRightPane && subagentsToggle}
 							</>,
 						)}
 					</section>
@@ -314,12 +314,7 @@ export function App() {
 			</SidebarInset>
 			{subagentsHost && (
 				<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-					<SubagentsSidebar
-						host={subagentsHost}
-						open={layout.panes}
-						onOpen={open}
-						toggle={<SidebarToggle side="right" open onToggle={() => toggleSidebar("right")} />}
-					/>
+					<SubagentsSidebar host={subagentsHost} open={layout.panes} onOpen={open} />
 				</DashboardSidebar>
 			)}
 			<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />

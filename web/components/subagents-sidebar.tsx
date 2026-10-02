@@ -1,5 +1,4 @@
 import { Columns2, ExternalLink } from "lucide-react";
-import type { ReactNode } from "react";
 import type { RosterHost, View } from "../../src/shared";
 import { ContextMenuLinkItem } from "@/components/ui/context-menu";
 import {
@@ -25,12 +24,10 @@ interface SubagentsSidebarProps {
 	/** Views on screen, highlighted in the list. */
 	open: View[];
 	onOpen: (view: View, mode: OpenMode) => void;
-	/** The button that hides the sidebar, last in the header. */
-	toggle: ReactNode;
 }
 
 /** The right sidebar's content: the subagents of the focused live session, nested by parent. */
-export function SubagentsSidebar({ host, open, onOpen, toggle }: SubagentsSidebarProps) {
+export function SubagentsSidebar({ host, open, onOpen }: SubagentsSidebarProps) {
 	const label = hostLabel(host);
 	const count = host.agents.length;
 	return (
@@ -39,7 +36,6 @@ export function SubagentsSidebar({ host, open, onOpen, toggle }: SubagentsSideba
 				<h2 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={host.cwd}>
 					{label}
 				</h2>
-				{toggle}
 			</SidebarHeader>
 			<SidebarContent>
 				<SidebarGroup>

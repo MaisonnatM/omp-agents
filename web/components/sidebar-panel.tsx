@@ -106,7 +106,7 @@ interface SidebarToggleProps {
 	onToggle: () => void;
 }
 
-/** Hides the sidebar from its header, or shows it again: from the strip left in its place, or for the right one, from the page header. */
+/** Shows or hides a sidebar: the left one's from its header or the strip left in its place, the right one's from the pane header. */
 export function SidebarToggle({ side, open, onToggle }: SidebarToggleProps) {
 	const { name, id, shortcut, hideIcon: Hide, showIcon: Show } = SIDEBARS[side];
 	const chord = SHORTCUTS.find(({ id }) => id === shortcut)?.chord;
@@ -205,7 +205,7 @@ interface DashboardSidebarProps {
 
 /**
  * A sidebar with its resize handle. While the left one is hidden, a strip holds the button that shows it again; the
- * right one's button moves into the page header instead (see `App`). The hidden sidebar stays mounted, so its filter
+ * right one's button always sits in the pane header instead (see `App`). The hidden sidebar stays mounted, so its filter
  * and scroll survive.
  */
 export function DashboardSidebar({ side, panel, onResize, onToggle, children }: DashboardSidebarProps) {
