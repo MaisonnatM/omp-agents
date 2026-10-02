@@ -1,11 +1,14 @@
-import type { StartRequest, StartResult, View } from "../src/shared";
+import type { PullRequest, StartRequest, StartResult, View } from "../src/shared";
+import type { QuickActionId } from "./quick-actions";
+import type { OpenMode } from "./routing";
 import type { ForkPoint } from "./transcript-view";
 
-/** What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. */
+/** What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. A quick action keeps its pull request and action, which the inbox shows progress and failure for. */
 export type StartOp =
 	| { kind: "new"; cwd: string; prompt: string }
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
-	| { kind: "resume"; sessionId: string };
+	| { kind: "resume"; sessionId: string }
+	| { kind: "quick"; cwd: string; prompt: string; pr: PullRequest; action: QuickActionId; mode: OpenMode };
 
 export type StartKind = StartOp["kind"];
 
@@ -20,6 +23,7 @@ export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 export const requestOf = (op: StartOp): StartRequest => {
 	switch (op.kind) {
 		case "new":
+		case "quick":
 			return { kind: "new", cwd: op.cwd, prompt: op.prompt };
 		case "fork":
 			return { kind: "fork", view: op.view, entryId: op.point.entryId };
@@ -55,6 +59,7 @@ const LOST: Record<StartKind, string> = {
 	new: "Lost the dashboard server while the session was starting. It may still appear.",
 	fork: "Lost the dashboard server while forking. The fork may still appear.",
 	resume: "Lost the dashboard server while resuming. The session may still appear.",
+	quick: "Lost the dashboard server while the session was starting. It may still appear.",
 };
 
 /** The answer to every start under way went to the socket that just closed. */

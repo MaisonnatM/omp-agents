@@ -14,6 +14,7 @@ const node = (number: number, fields: Record<string, unknown>) => ({
 	isDraft: false,
 	state: "OPEN",
 	reviewDecision: "REVIEW_REQUIRED",
+	mergeable: "MERGEABLE",
 	headRefName: `me/branch-${number}`,
 	baseRefName: "main",
 	updatedAt: "2026-10-01T10:00:00Z",
@@ -58,7 +59,12 @@ describe("parseInboxAnswer", () => {
 				data: {
 					authored: {
 						nodes: [
-							node(1, { baseRefName: "me/branch-0", reviewDecision: "APPROVED", commits: { nodes: [{ commit: { statusCheckRollup: { state: "FAILURE" } } }] } }),
+							node(1, {
+								baseRefName: "me/branch-0",
+								reviewDecision: "APPROVED",
+								mergeable: "CONFLICTING",
+								commits: { nodes: [{ commit: { statusCheckRollup: { state: "FAILURE" } } }] },
+							}),
 							node(2, { isDraft: true, reviewDecision: null, commits: { nodes: [{ commit: { statusCheckRollup: null } }] } }),
 						],
 					},
@@ -79,6 +85,7 @@ describe("parseInboxAnswer", () => {
 				state: "open",
 				review: "approved",
 				checks: "failing",
+				conflicts: true,
 				head: "me/branch-1",
 				stackedOn: "me/branch-0",
 				unresolved: { count: 0, exact: true },
@@ -94,6 +101,7 @@ describe("parseInboxAnswer", () => {
 				state: "draft",
 				review: "none",
 				checks: "none",
+				conflicts: false,
 				head: "me/branch-2",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
@@ -109,6 +117,7 @@ describe("parseInboxAnswer", () => {
 				state: "open",
 				review: "changes-requested",
 				checks: "passing",
+				conflicts: false,
 				head: "me/branch-3",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
@@ -124,6 +133,7 @@ describe("parseInboxAnswer", () => {
 				state: "merged",
 				review: "review-required",
 				checks: "passing",
+				conflicts: false,
 				head: "me/branch-4",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },

@@ -112,8 +112,8 @@ function Checks({ checks }: { checks: PullRequestCheck[] }) {
 	);
 }
 
-/** A pull request read from GitHub, as the inbox's sheet shows it: a header that names it, then its details. */
-export function PullRequestSheetContent({ pr }: { pr: PullRequest }) {
+/** A pull request read from GitHub, as the inbox's sheet shows it: a header that names it, with `actions` below, then its details. */
+export function PullRequestSheetContent({ pr, actions }: { pr: PullRequest; actions?: ReactNode }) {
 	const { detail, error } = usePullRequest(pr);
 	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
 	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking GitHub for the pull request…</p>;
@@ -154,6 +154,7 @@ export function PullRequestSheetContent({ pr }: { pr: PullRequest }) {
 						<OutLink href={graphiteUrl(pr)}>Graphite</OutLink>
 					</span>
 				</p>
+				{actions}
 			</header>
 			<div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">{body}</div>
 		</>

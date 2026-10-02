@@ -15,7 +15,7 @@ import {
 	swapView,
 	viewForSession,
 } from "./routing";
-import { beginStart, dismissFailed, dropHidden, loseStarts, requestOf, settleStart, type StartOp, type Starts } from "./starts";
+import { beginStart, dismissFailed, dropHidden, loseStarts, requestOf, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
 
 const subscribeHash = (onChange: () => void): (() => void) => {
 	window.addEventListener("hashchange", onChange);
@@ -64,8 +64,8 @@ type Action =
 	| { t: "server"; msg: Exclude<ServerMsg, PaneMsg> }
 	| { t: "layout"; layout: Layout }
 	| { t: "start"; reqId: number; op: StartOp }
-	/** A failed new session's error goes away with its draft; a start under way keeps waiting for its answer. */
-	| { t: "dismiss-new-session" };
+	/** A failed start's error goes away; a start under way keeps waiting for its answer. */
+	| { t: "dismiss-start"; kind: StartKind };
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
 
@@ -115,8 +115,8 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 		}
 		case "start":
 			return { ...state, starts: beginStart(state.starts, action.reqId, action.op) };
-		case "dismiss-new-session":
-			return { ...state, starts: dismissFailed(state.starts, "new") };
+		case "dismiss-start":
+			return { ...state, starts: dismissFailed(state.starts, action.kind) };
 		case "server": {
 			const msg = action.msg;
 			switch (msg.t) {
@@ -165,7 +165,9 @@ export interface Dashboard {
 	show: (layout: Layout) => void;
 	/** Open the new-session draft in the default directory, clearing a failed start's error. */
 	openNewSession: () => void;
-	/** Start a session; it opens in the focused pane once ready, and a resumed one in the pane of the past session it continues. */
+	/** Forget the error of a failed start of `kind`. */
+	dismissStart: (kind: StartKind) => void;
+	/** Start a session; it opens in the focused pane once ready (a quick action's in the pane its mode says), and a resumed one in the pane of the past session it continues. */
 	start: (op: StartOp) => void;
 }
 
@@ -237,7 +239,7 @@ export function useDashboard(): Dashboard {
 					const op = startsRef.current.get(msg.reqId)?.op;
 					const live: LiveView = { kind: "live", instanceId: msg.result.instanceId, agentId: null };
 					if (op?.kind === "resume") show(swapView(layoutRef.current, { kind: "past", sessionId: op.sessionId }, live));
-					else if (op) open(live, "replace");
+					else if (op) open(live, op.kind === "quick" ? op.mode : "replace");
 				}
 			};
 			ws.onclose = () => {
@@ -280,8 +282,10 @@ export function useDashboard(): Dashboard {
 		send({ t: "watch", views: watched });
 	}, [send, watched]);
 
+	const dismissStart = useCallback((kind: StartKind) => dispatch({ t: "dismiss-start", kind }), []);
+
 	const openNewSession = useCallback(() => {
-		dispatch({ t: "dismiss-new-session" });
+		dispatch({ t: "dismiss-start", kind: "new" });
 		location.hash = hashForNewSession(null);
 	}, []);
 
@@ -295,5 +299,5 @@ export function useDashboard(): Dashboard {
 		[send],
 	);
 
-	return { state, send, open, focus, show, openNewSession, start };
+	return { state, send, open, focus, show, openNewSession, dismissStart, start };
 }

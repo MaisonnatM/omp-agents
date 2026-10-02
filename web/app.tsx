@@ -72,10 +72,11 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 }
 
 export function App() {
-	const { state, send, open, focus, show, openNewSession, start } = useDashboard();
+	const { state, send, open, focus, show, openNewSession, dismissStart, start } = useDashboard();
 	const launch = startOf(state.starts, "new");
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
+	const quick = startOf(state.starts, "quick");
 	const sidebars = useSidebarPanels();
 	const hash = useHash();
 	const settings = settingsFromHash(hash);
@@ -165,7 +166,17 @@ export function App() {
 	} else if (inbox) {
 		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
 		main = state.listed ? (
-			<InboxPage project={project} hosts={state.hosts} past={state.past} target={inbox.target} onOpen={open} section={inboxTarget} />
+			<InboxPage
+				project={project}
+				hosts={state.hosts}
+				past={state.past}
+				target={inbox.target}
+				onOpen={open}
+				section={inboxTarget}
+				quick={quick}
+				onQuickAction={start}
+				onDismissQuick={() => dismissStart("quick")}
+			/>
 		) : (
 			<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
 		);

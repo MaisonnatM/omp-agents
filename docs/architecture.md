@@ -104,7 +104,7 @@ The server lives in `src/`:
 - `src/transcript.ts`: folds session-file lines and live events into display items.
 - `src/pull-requests.ts`: finds the pull requests each session submitted or worked on.
 - `src/session-links.ts`: writes the session block into a pull request's description.
-- `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
+- `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more. A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
 - `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory. `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`.
@@ -112,9 +112,10 @@ The server lives in `src/`:
 The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
 - `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, settings, and new-session pages, and focus handling.
-- `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, or resumed.
+- `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, or started by an inbox quick action.
 - `web/pane-store.ts`: each open view's transcript and completions, outside the page state, so a token in one pane re-renders only that pane.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
+- `web/quick-actions.ts`: the inbox's quick actions, which pull requests each applies to and the prompt that starts its session.
 - `web/api.ts`: every HTTP request the page makes. `web/settings-api.ts` holds the settings page's requests.
 - `web/use-inbox.ts`: the inbox cache that the sidebar and the inbox page share, one entry per project.
 - `web/use-pull-request.ts`: reads the details of the pull request that the inbox's sheet shows.
