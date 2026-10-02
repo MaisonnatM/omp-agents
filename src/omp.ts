@@ -563,16 +563,16 @@ export interface RpcChild {
 	write(frame: object): void;
 }
 
-/**
- * omp's `RpcClient` parses `extension_ui_request` frames but hands them only to its own login
- * flow, so this reads a copy of omp's stdout for them, through omp's own JSONL reader and chunk decoder.
- */
-async function readUiRequests(stdout: ReadableStream<Uint8Array>, onUiRequest: (frame: Record<string, unknown>) => void): Promise<void> {
+/** Frames `RpcClient` drops: dialogs, which it hands only to its own login flow, and title changes. */
+const UNROUTED_FRAMES = new Set(["extension_ui_request", "session_info_update"]);
+
+/** Reads a copy of omp's stdout for {@link UNROUTED_FRAMES}, through omp's own JSONL reader and chunk decoder. */
+async function readUnroutedFrames(stdout: ReadableStream<Uint8Array>, onFrame: (frame: Record<string, unknown>) => void): Promise<void> {
 	const decoder = new rpcFrames.RpcFrameDecoder();
 	try {
 		for await (const line of utils.readJsonl(stdout)) {
 			const frame = decoder.push(line);
-			if (isObject(frame) && frame.type === "extension_ui_request") onUiRequest(frame);
+			if (isObject(frame) && typeof frame.type === "string" && UNROUTED_FRAMES.has(frame.type)) onFrame(frame);
 		}
 	} catch {
 		// The client reads the other copy and reports a broken stream.
@@ -581,10 +581,10 @@ async function readUiRequests(stdout: ReadableStream<Uint8Array>, onUiRequest: (
 
 /**
  * Start this same package's CLI in RPC mode (NDJSON over stdio) in `cwd`, through
- * omp's own `RpcClient`. Resolves once omp reports ready. `onUiRequest` gets every
- * `extension_ui_request` frame from spawn on, so a dialog raised while the session opens is not lost.
+ * omp's own `RpcClient`. Resolves once omp reports ready. `onFrame` gets every
+ * frame of {@link UNROUTED_FRAMES} from spawn on, so a dialog raised while the session opens is not lost.
  */
-export async function startRpc(cwd: string, onUiRequest: (frame: Record<string, unknown>) => void): Promise<RpcChild> {
+export async function startRpc(cwd: string, onFrame: (frame: Record<string, unknown>) => void): Promise<RpcChild> {
 	let child: RpcProcess | undefined;
 	const client = new rpc.RpcClient({
 		// `rpc-ui` routes tool dialogs such as `ask` over the protocol; under plain `rpc` omp offers no `ask` tool.
@@ -592,8 +592,8 @@ export async function startRpc(cwd: string, onUiRequest: (frame: Record<string, 
 		args: ["--mode", "rpc-ui"],
 		spawn: agentArgs => {
 			const proc = utils.ptree.spawn([...ompCommand, ...agentArgs], { cwd, stdin: "pipe" });
-			const [forClient, forDialogs] = proc.stdout.tee();
-			void readUiRequests(forDialogs, onUiRequest);
+			const [forClient, forFrames] = proc.stdout.tee();
+			void readUnroutedFrames(forFrames, onFrame);
 			child = proc;
 			// ptree's ChildProcess keeps its state in private fields, so the copy forwards to it rather than inheriting.
 			return {

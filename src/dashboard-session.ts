@@ -155,7 +155,12 @@ export class DashboardSession {
 		prepare: (client: RpcClient) => Promise<void>,
 	): Promise<DashboardSession> {
 		const requests = new PendingRequests(() => emit({ kind: "roster" }));
+		let session: DashboardSession | undefined;
 		const child = await startRpc(cwd, frame => {
+			if (frame.type === "session_info_update") {
+				if (session) session.#refresh();
+				return;
+			}
 			const change = parseRpcRequest(frame, Date.now());
 			if (change?.kind === "add") requests.add(change.request);
 			else if (change?.kind === "cancel") requests.remove(change.id);
@@ -163,7 +168,7 @@ export class DashboardSession {
 		try {
 			await child.client.setSubagentSubscription("progress");
 			await prepare(child.client);
-			const session = new DashboardSession(cwd, child, requests, await child.client.getState(), emit);
+			session = new DashboardSession(cwd, child, requests, await child.client.getState(), emit);
 			session.thinkingLevels = await child.client.getAvailableThinkingLevels();
 			return session;
 		} catch (err) {
@@ -265,6 +270,9 @@ export class DashboardSession {
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });
+		} else if (event.type === "message_end" && isObject(event.message) && event.message.role === "user" && this.sessionName === null) {
+			// omp's RPC mode titles no prompt itself; a bare `/rename` makes omp title the session from the prompt it now holds.
+			this.#child.client.prompt("/rename").catch((err: unknown) => this.#fail("Titling failed", err));
 		} else if (typeof event.type === "string" && STATE_EVENTS.has(event.type)) this.#refresh();
 	}
 
