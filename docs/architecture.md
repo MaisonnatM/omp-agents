@@ -111,6 +111,7 @@ The page lives in `web/`. Bun's HTML import bundles `web/index.html` and `web/ma
 - `web/use-pull-request.ts`: reads the details of the pull request that the inbox's sheet shows.
 - `web/settings-api.ts`: the settings page's requests.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
+- `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/components/roster.tsx`: the left sidebar's session and inbox lists, and the project picker.
 - `web/components/conversation.tsx`: a pane, with its header, transcript, and composer.
 - `web/components/inbox-page.tsx`, `settings-page.tsx`, and `new-session.tsx`: the other pages.
