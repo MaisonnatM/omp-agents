@@ -1,6 +1,7 @@
 /** What every HTTP route shares: refusals, answers, and the checks that keep other sites and programs' pages out. */
 import { errorText } from "../json";
 import type { SettingsError } from "../shared";
+import { COOKIE, cookieValue, fetchSiteAllowed, tokenMatches } from "./auth";
 
 /** A request the server refuses, with the HTTP status it answers. `conflict`: the file changed on disk since it was read. */
 export class Rejected extends Error {
@@ -26,27 +27,53 @@ export async function answer(run: () => Promise<unknown>): Promise<Response> {
 	}
 }
 
+/** How a request shows it holds the access token: a login cookie, or the `?token=` of the printed URL. */
+export type Credential = "cookie" | "login";
+
 export interface Guards {
 	/** Whether the request names a host this server answers to. DNS rebinding cannot pass it. */
 	allowedHost(req: Request): boolean;
-	/** Whether the request came from a page this server served: the Host check plus an Origin that matches it. */
-	sameOrigin(req: Request): boolean;
+	/** What proves the request holds the token, or `null`. */
+	credential(req: Request): Credential | null;
+	/**
+	 * The response refusing an API or asset request, or `null` to answer it: the Host check, then `Sec-Fetch-Site`
+	 * (403), then the login cookie (401).
+	 */
+	admit(req: Request): Response | null;
+	/** `admit` plus an Origin that matches the Host, for the socket upgrade, which carries full control of every session. */
+	admitSocket(req: Request): Response | null;
 	/** A write's JSON body, or the response refusing it. Only this app's own page may write, and only with a JSON body, which a cross-site form cannot send. */
 	writeBody(req: Request): Promise<{ body: unknown } | Response>;
 }
 
 /**
- * Only pages served by this app on `port` may open the socket, which carries full control of every session, or read omp's files.
- * DNS rebinding cannot pass the Host check; a cross-site page cannot pass the Origin check that also guards writes.
+ * Only the page this app served on `port`, logged in with `token`, may open the socket or read omp's files.
+ * DNS rebinding cannot pass the Host check; a cross-site page cannot pass the `Sec-Fetch-Site` or Origin checks,
+ * and its requests carry no `Strict` cookie. A local program must hold the token, which only the user can read.
  */
-export function guardsFor(port: number): Guards {
+export function guardsFor(port: number, token: string): Guards {
 	const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
 	const allowedHost = (req: Request): boolean => hosts.has(req.headers.get("host") ?? "");
 	const sameOrigin = (req: Request): boolean => allowedHost(req) && req.headers.get("origin") === `http://${req.headers.get("host")}`;
+	const credential = (req: Request): Credential | null =>
+		tokenMatches(token, cookieValue(req.headers.get("cookie"), COOKIE))
+			? "cookie"
+			: tokenMatches(token, new URL(req.url).searchParams.get("token"))
+				? "login"
+				: null;
+	const admit = (req: Request): Response | null => {
+		if (!allowedHost(req)) return fail(403, "forbidden host");
+		if (!fetchSiteAllowed(req.headers.get("sec-fetch-site"), false)) return fail(403, "forbidden origin");
+		return credential(req) === "cookie" ? null : fail(401, "Not signed in: open the URL that the server printed");
+	};
 	return {
 		allowedHost,
-		sameOrigin,
+		credential,
+		admit,
+		admitSocket: req => admit(req) ?? (sameOrigin(req) ? null : fail(403, "forbidden origin")),
 		async writeBody(req) {
+			const refused = admit(req);
+			if (refused) return refused;
 			if (!sameOrigin(req)) return fail(403, "forbidden origin");
 			if (req.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") {
 				return fail(415, "Expected a JSON body");

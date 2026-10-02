@@ -63,6 +63,14 @@ function userPrompt(text: string): { text: string; skill: string | null } {
 	return match ? { text: match[2]?.trim() ?? "", skill: match[1] } : { text, skill: null };
 }
 
+/** Whether two items show the same thing. Every field of an item is a primitive, so a shallow comparison covers them all. */
+function sameItem(a: Item, b: Item): boolean {
+	const x: Json = a;
+	const y: Json = b;
+	const keys = Object.keys(x);
+	return keys.length === Object.keys(y).length && keys.every(key => x[key] === y[key]);
+}
+
 export class Transcript {
 	/** Display order: by message time, then first seen. */
 	#items = new Map<string, Item>();
@@ -256,7 +264,7 @@ export class Transcript {
 
 	#upsert(item: Item): Item[] {
 		const prev = this.#items.get(item.id);
-		if (prev && JSON.stringify(prev) === JSON.stringify(item)) return [];
+		if (prev && sameItem(prev, item)) return [];
 		this.#items.set(item.id, item);
 		if (!prev) {
 			this.#times.set(item.id, this.#now);

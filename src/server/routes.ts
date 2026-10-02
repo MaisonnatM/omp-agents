@@ -36,14 +36,16 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 
 	/** `GET /api/settings[?cwd=<dir>]`: omp's model routing and files, user-level only without `cwd`. */
 	const settings: Handler = async req => {
-		if (!guards.allowedHost(req)) return fail(403, "forbidden host");
+		const refused = guards.admit(req);
+		if (refused) return refused;
 		const cwd = workspaceCwd(req);
 		return cwd instanceof Response ? cwd : answer(() => loadOmpSettings(cwd));
 	};
 
 	/** `GET /api/models`: the models omp lists, for the settings page's pickers. */
 	const models: Handler = async req => {
-		if (!guards.allowedHost(req)) return fail(403, "forbidden host");
+		const refused = guards.admit(req);
+		if (refused) return refused;
 		return answer(async () => ({ models: await listModels() }));
 	};
 
@@ -52,7 +54,8 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	 * Each answer also tells the pull-request index which branch heads which PR, which links the sessions that pushed them.
 	 */
 	const inbox: Handler = async req => {
-		if (!guards.allowedHost(req)) return fail(403, "forbidden host");
+		const refused = guards.admit(req);
+		if (refused) return refused;
 		const cwd = workspaceCwd(req);
 		if (cwd instanceof Response) return cwd;
 		const fresh = new URL(req.url).searchParams.has("fresh");
@@ -67,7 +70,8 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 
 	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for the inbox's sheet. */
 	const pullRequest: Handler = async req => {
-		if (!guards.allowedHost(req)) return fail(403, "forbidden host");
+		const refused = guards.admit(req);
+		if (refused) return refused;
 		const pr = parsePullRequestQuery(new URL(req.url).searchParams);
 		return pr ? answer(() => loadPullRequestDetail(pr)) : fail(400, "Expected ?owner=&repo=&number=");
 	};

@@ -44,8 +44,14 @@ export interface SessionInfo {
 	firstMessage: string;
 }
 export interface ListingModule {
-	listAllSessions(): Promise<SessionInfo[]>;
+	listAllSessions(storage: unknown, sessionsRoot: string): Promise<SessionInfo[]>;
+	/** Scans the `*.jsonl` files `storage` lists in `sessionDir`; omp's scan cache skips files whose stat did not change. */
+	listSessionsReadOnly(sessionDir: string, storage: unknown): Promise<SessionInfo[]>;
 	isEmptySession(session: SessionInfo): boolean;
+}
+/** omp's `FileSessionStorage` (src/session/session-storage.ts); the listing's scan cache recognises it by class. */
+export interface StorageModule {
+	FileSessionStorage: new () => { listFilesSync(dir: string, pattern: string): string[] };
 }
 export interface DirsModule {
 	getSessionsDir(): string;
@@ -211,8 +217,10 @@ export const relay = await load<RelayModule>(join(srcDir, "collab", "relay-clien
 
 export const listing = await load<ListingModule>(join(srcDir, "session", "session-listing.ts"), {
 	listAllSessions: "function",
+	listSessionsReadOnly: "function",
 	isEmptySession: "function",
 });
+export const storage = await load<StorageModule>(join(srcDir, "session", "session-storage.ts"), { FileSessionStorage: "function" });
 export const loader = await load<LoaderModule>(join(srcDir, "session", "session-loader.ts"), { loadEntriesFromFile: "function" });
 export const exitDiagnostics = await load<ExitDiagnosticsModule>(join(srcDir, "session", "exit-diagnostics.ts"), {
 	createInterruptedTurnAbortMessage: "function",

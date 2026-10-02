@@ -1,14 +1,16 @@
 /** The dashboard server: wires the registries, the HTTP API, and the socket together, then follows omp's files and registry. */
 import { mkdirSync, watch as watchFiles } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { Server } from "bun";
-import index from "../web/index.html";
 import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
+import { displayPath, tokenFile } from "./paths";
+import { loadToken } from "./server/auth";
 import { fail, guardsFor } from "./server/http";
 import { LiveSessions, type SessionUpdate } from "./server/live-sessions";
+import { buildPage, servePage } from "./server/page";
 import { createRoutes } from "./server/routes";
 import { SessionFiles } from "./server/session-files";
 import { createClientHandler } from "./server/socket";
@@ -24,12 +26,16 @@ const HOSTNAME = "127.0.0.1";
 const POLL_MS = 1500;
 /** Coalesce bursts of subagent progress into one roster push. */
 const ROSTER_PUSH_MS = 150;
-/** Re-list session files at most this often while sessions write. */
+/** Re-read the session files the watcher reported at most this often while sessions write. */
 const LIST_THROTTLE_MS = 500;
+/** List every session file this often, in case the watcher missed a change. */
+const RESCAN_MS = 60_000;
 /** `omp usage` caches provider reports itself; each run still costs a process and up to one network round trip per provider. */
 const USAGE_POLL_MS = 60_000;
 
-const guards = guardsFor(PORT);
+const token = loadToken(tokenFile);
+const guards = guardsFor(PORT, token);
+const page = await buildPage();
 const files = new SessionFiles();
 const sessions = new LiveSessions(onLiveUpdate);
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
@@ -52,6 +58,8 @@ let rosterJson = "";
 let rosterPush: NodeJS.Timeout | undefined;
 let pastJson = "";
 let listTimer: NodeJS.Timeout | undefined;
+/** Whether the registry was listed since the last poll tick found no listener. */
+let registryFresh = false;
 /** The last `usage` message, empty until the first `omp usage` run finishes. */
 let usageJson = "";
 
@@ -61,9 +69,19 @@ const knownCwds = (): string[] => [...new Set([...sessions.cwds(), ...files.cwds
 const rosterMsg = (): ServerMsg => ({ t: "roster", hosts: sessions.rows(files.pullRequestsOf), error: rosterError });
 const pastMsg = (): ServerMsg => ({ t: "past", sessions: files.past(sessions.sessionIds()) });
 
+/** Whether any socket listens. Pushes, and the work to compare them with the last one, wait for the first. */
+const hasSubscribers = (): boolean => server.subscriberCount("roster") > 0;
+
+/** Debounced through {@link ROSTER_PUSH_MS}: a burst of roster updates costs one sync and one push. */
 function pushRoster(): void {
 	clearTimeout(rosterPush);
 	rosterPush = undefined;
+	if (!hasSubscribers()) {
+		rosterJson = "";
+		return;
+	}
+	// A subagent may have registered for a view that waits on its file.
+	views.sync();
 	const json = JSON.stringify(rosterMsg());
 	if (json === rosterJson) return;
 	rosterJson = json;
@@ -71,6 +89,10 @@ function pushRoster(): void {
 }
 
 function pushPast(): void {
+	if (!hasSubscribers()) {
+		pastJson = "";
+		return;
+	}
 	const json = JSON.stringify(pastMsg());
 	if (json === pastJson) return;
 	pastJson = json;
@@ -92,9 +114,8 @@ async function pollUsage(): Promise<void> {
 	setTimeout(pollUsage, USAGE_POLL_MS);
 }
 
-async function refreshFiles(): Promise<void> {
-	await files.scan();
-	listTimer = undefined;
+/** The session list changed: views may now find their file, and the past list is out of date. */
+function onFilesChanged(): void {
 	views.sync();
 	pushPast();
 	// The first scan reads every transcript; the list shows before it finishes.
@@ -105,12 +126,22 @@ async function refreshFiles(): Promise<void> {
 	});
 }
 
+/** Read again the session files the watcher reported. */
+async function refreshFiles(): Promise<void> {
+	listTimer = undefined;
+	if (await files.refresh()) onFilesChanged();
+}
+
+/** List every session file again, for the changes the watcher did not report. */
+async function rescanFiles(): Promise<void> {
+	if (await files.scan()) onFilesChanged();
+}
+
 function onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 	switch (update.kind) {
 		case "roster":
+			// The push also points views at subagent files that registered since.
 			rosterPush ??= setTimeout(pushRoster, ROSTER_PUSH_MS);
-			// A subagent may have registered for a view that waits on its file.
-			views.sync();
 			return;
 		case "event":
 			views.applyEvent(instanceId, update.event);
@@ -120,14 +151,14 @@ function onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 			return;
 		case "exited":
 			sessions.remove(instanceId);
-			views.sync();
 			pushRoster();
 			void refreshFiles();
 			return;
 	}
 }
 
-async function pollRegistry(): Promise<void> {
+/** Lists the registry and follows it; its changes reach every socket. */
+async function listRegistry(): Promise<void> {
 	let hosts: HostSnapshot[];
 	try {
 		hosts = await listHosts();
@@ -136,21 +167,27 @@ async function pollRegistry(): Promise<void> {
 		hosts = [];
 		rosterError = errorText(err);
 	}
+	registryFresh = true;
 	sessions.follow(hosts);
-	views.sync();
 	pushRoster();
 	pushPast();
+}
+
+/** One tick of the registry poll, which only runs while a socket listens. */
+async function pollRegistry(): Promise<void> {
+	if (hasSubscribers()) await listRegistry();
+	else registryFresh = false;
 	setTimeout(pollRegistry, POLL_MS);
 }
 
 function onFileChange(path: string): void {
 	views.poke(path);
-	// Session files sit one directory below the root; deeper files belong to subagents.
-	if (dirname(dirname(path)) === sessionsDir) listTimer ??= setTimeout(refreshFiles, LIST_THROTTLE_MS);
+	if (files.touch(path)) listTimer ??= setTimeout(refreshFiles, LIST_THROTTLE_MS);
 }
 
 function upgrade(req: Request, srv: Server<SocketData>): Response | undefined {
-	if (!guards.sameOrigin(req)) return new Response("forbidden origin", { status: 403 });
+	const refused = guards.admitSocket(req);
+	if (refused) return refused;
 	if (srv.upgrade(req, { data: { views: new Map() } })) return undefined;
 	return new Response("expected a websocket", { status: 426 });
 }
@@ -162,7 +199,6 @@ try {
 		port: PORT,
 		development: false,
 		routes: {
-			"/": index,
 			...createRoutes({
 				guards,
 				origin: `http://${HOSTNAME}:${PORT}`,
@@ -178,12 +214,14 @@ try {
 		fetch(req, srv) {
 			const { pathname } = new URL(req.url);
 			if (pathname === "/ws") return upgrade(req, srv);
-			if (pathname.startsWith("/api/")) return fail(404, `No ${req.method} ${pathname}`);
-			return new Response("not found", { status: 404 });
+			if (pathname.startsWith("/api/")) return guards.admit(req) ?? fail(404, `No ${req.method} ${pathname}`);
+			return servePage(req, guards, token, page);
 		},
 		websocket: {
 			open(ws) {
 				ws.subscribe("roster");
+				// The registry was not polled while nobody listened; list it now rather than at the next tick.
+				if (!registryFresh) void listRegistry();
 				send(ws, rosterMsg());
 				send(ws, pastMsg());
 				if (usageJson) ws.send(usageJson);
@@ -208,10 +246,14 @@ mkdirSync(sessionsDir, { recursive: true });
 watchFiles(sessionsDir, { recursive: true }, (_event, name) => {
 	if (name) onFileChange(join(sessionsDir, String(name)));
 });
-await refreshFiles();
-await pollRegistry();
+await rescanFiles();
+await listRegistry();
+setTimeout(pollRegistry, POLL_MS);
+setInterval(() => void rescanFiles(), RESCAN_MS);
 void pollUsage();
 console.log(`omp-agents (omp v${ompVersion}) on http://${HOSTNAME}:${PORT}`);
+console.log(`Sign in at http://${HOSTNAME}:${PORT}/?token=${token}`);
+console.log(`The access token is in ${displayPath(tokenFile)}; delete the file and restart to rotate it.`);
 
 /** SIGINT and SIGTERM may both arrive; the second finds the shutdown already under way. */
 let shuttingDown: Promise<void> | undefined;

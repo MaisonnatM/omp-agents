@@ -1,6 +1,7 @@
 /** omp's session files: listing them and reading whether a process left one mid-turn. */
+import { dirname } from "node:path";
 import { oneLine } from "../transcript";
-import { dirs, exitDiagnostics, type FileEntry, listing, loader } from "./modules";
+import { dirs, exitDiagnostics, type FileEntry, listing, loader, type SessionInfo, storage } from "./modules";
 
 /** omp's sessions root: one directory per working directory, each holding `<time>_<id>.jsonl` files. */
 export const sessionsDir: string = dirs.getSessionsDir();
@@ -17,10 +18,8 @@ export interface SavedSession {
 	empty: boolean;
 }
 
-/** Every session file under omp's sessions directory, newest first. */
-export async function listSessionFiles(): Promise<SavedSession[]> {
-	const sessions = await listing.listAllSessions();
-	return sessions.map(session => ({
+function saved(session: SessionInfo): SavedSession {
+	return {
 		id: session.id,
 		path: session.path,
 		cwd: session.cwd,
@@ -30,7 +29,32 @@ export async function listSessionFiles(): Promise<SavedSession[]> {
 			(session.firstMessage && session.firstMessage !== "(no messages)" ? oneLine(session.firstMessage) : null),
 		modifiedAt: session.modified.getTime(),
 		empty: listing.isEmptySession(session),
-	}));
+	};
+}
+
+/** Every session file under omp's sessions directory (or `root`, one directory per working directory), newest first. */
+export async function listSessionFiles(root: string = sessionsDir): Promise<SavedSession[]> {
+	return (await listing.listAllSessions(new storage.FileSessionStorage(), root)).map(saved);
+}
+
+/** omp's file storage that sees one file in a directory, so that omp's own scan (and its cache) reads just that file. */
+class OneFileStorage extends storage.FileSessionStorage {
+	readonly #path: string;
+
+	constructor(path: string) {
+		super();
+		this.#path = path;
+	}
+
+	override listFilesSync(): string[] {
+		return [this.#path];
+	}
+}
+
+/** One session file as {@link listSessionFiles} would list it; `null` when it is gone or no longer holds a session. */
+export async function readSessionFile(path: string): Promise<SavedSession | null> {
+	const [session] = await listing.listSessionsReadOnly(dirname(path), new OneFileStorage(path));
+	return session ? saved(session) : null;
 }
 
 /**
