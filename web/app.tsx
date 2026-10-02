@@ -146,6 +146,7 @@ export function App() {
 	});
 
 
+
 	let main: ReactNode;
 	if (newSession) {
 		const cwd = newSession.cwd ?? defaultCwd(view, state.hosts, state.past, project);

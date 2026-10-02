@@ -4,7 +4,7 @@ import { projectName } from "../labels";
 import type { Completions } from "../pane-store";
 import type { StartOf } from "../starts";
 import { useCompletion } from "./completion-popup";
-import { DirectCommandNote, directCommandOf, Header } from "./conversation";
+import { DirectCommandNote, directCommandOf, EmptyConversation, Header } from "./conversation";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
@@ -37,7 +37,9 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					{launch.error}
 				</p>
 			)}
-			<p className="m-auto max-w-sm px-6 text-center text-sm text-muted-foreground">omp starts in {name} when you send the first message.</p>
+			<EmptyConversation title={`Start omp in ${name}`}>
+				It starts when you send the first message, so leaving this draft leaves nothing running.
+			</EmptyConversation>
 			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
 				{completion.popup}
 				<InputMessage

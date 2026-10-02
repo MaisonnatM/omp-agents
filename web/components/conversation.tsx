@@ -1,4 +1,4 @@
-import { ArrowUpRight, Brain, ListEnd } from "lucide-react";
+import { ArrowUpRight, Brain, CircleStop, ListEnd, MessageCircle } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type {
 	AgentRow,
@@ -53,6 +53,7 @@ const FOLLOW_UP_KEYS = SHORTCUTS.filter(({ id }) => id === "followUp")
 	.join(" or ");
 const END_KEYS = chordLabel(SHORTCUTS.find(({ id }) => id === "end")!.chord);
 
+
 interface HeaderProps {
 	title: string;
 	meta: ReactNode;
@@ -93,6 +94,33 @@ export const DirectCommandNote = ({ kind }: { kind: "Python" | "shell" }) => (
 	</p>
 );
 
+/** A conversation with no messages yet: what sending the first one does, and the composer's completions. */
+export function EmptyConversation({ title, children }: { title: string; children: ReactNode }) {
+	return (
+		<div className="m-auto flex max-w-sm flex-col items-center gap-4 px-6 py-8 text-center" data-empty-conversation>
+			<span className="flex size-10 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground">
+				<MessageCircle aria-hidden="true" className="size-5" />
+			</span>
+			<div className="space-y-1">
+				<h2 className="text-sm font-medium">{title}</h2>
+				<p className="text-sm text-pretty text-muted-foreground">{children}</p>
+			</div>
+			<ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+				{[
+					["/", "commands and skills"],
+					["@", "files"],
+				].map(([key, label]) => (
+					<li key={key} className="flex items-center gap-1.5">
+						<kbd className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-[5px] border border-border bg-background px-1.5 font-sans text-xs text-foreground">
+							{key}
+						</kbd>
+						{label}
+					</li>
+				))}
+			</ul>
+		</div>
+	);
+}
 /**
  * The PRs a session submitted or worked on, after a separator. The number opens the PR's details in the inbox, the
  * arrow after it opens the PR on GitHub, and the Graphite mark opens it on Graphite.
@@ -134,6 +162,7 @@ function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 		);
 	});
 }
+
 
 interface PastConversationProps {
 	sessionId: string;
@@ -198,6 +227,8 @@ interface ConversationProps {
 	/** Last known row, for the header after the session ended. */
 	lastHost: RosterHost | null;
 	items: Item[];
+	/** Whether `items` arrived, so an empty list is a conversation with no messages and not one still loading. */
+	loaded: boolean;
 	/** Composer text on mount, from a fork. */
 	initialDraft: string;
 	fork: StartOf<"fork"> | null;
@@ -236,6 +267,7 @@ function LiveConversation({
 	host,
 	lastHost,
 	items,
+	loaded,
 	initialDraft,
 	fork,
 	onFork,
@@ -428,8 +460,9 @@ function LiveConversation({
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
 				{endable && host && (
 					<Button
-						variant="secondary"
+						variant="primary"
 						size="compact"
+						leadingIcon={CircleStop}
 						onClick={onEnd}
 						title={`${
 							host.source === "dashboard"
@@ -442,7 +475,23 @@ function LiveConversation({
 				)}
 				{actions}
 			</Header>
-			<Transcript view={view} items={items} working={working === true} fork={fork} onFork={onFork} />
+			<Transcript
+				view={view}
+				items={items}
+				working={working === true}
+				fork={fork}
+				onFork={onFork}
+				empty={
+					loaded &&
+					view.agentId === null &&
+					writable &&
+					shown && (
+						<EmptyConversation title="No messages yet">
+							omp is running in {projectName(shown.cwdDisplay) ?? shown.cwdDisplay}. Send a message to start its first turn.
+						</EmptyConversation>
+					)
+				}
+			/>
 			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
 				{requests[0] && (
 					<UserRequestCard

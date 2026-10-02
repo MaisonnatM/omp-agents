@@ -12,12 +12,14 @@ export interface Completions {
 /** What the server sent for one open view. */
 export interface PaneData {
 	items: Item[];
+	/** Whether the server sent the view's transcript yet, so an empty `items` means an empty conversation. */
+	loaded: boolean;
 	completions: Completions | null;
 	/** The last texts the server took out of the view's queue, answering the composer's `dequeue` `reqId`. */
 	dequeued: { reqId: number; texts: string[] } | null;
 }
 
-export const EMPTY_PANE: PaneData = { items: [], completions: null, dequeued: null };
+export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, dequeued: null };
 
 /** The server messages that belong to one open view: its transcript, its composer's suggestions, and its dequeued texts. */
 export type PaneMsg =
@@ -48,7 +50,7 @@ export function applyPaneMessage(msg: PaneMsg): void {
 	const pane = panes.get(key) ?? EMPTY_PANE;
 	switch (msg.t) {
 		case "items":
-			panes.set(key, { ...pane, items: applyItems(pane.items, msg.reset, msg.items) });
+			panes.set(key, { ...pane, items: applyItems(pane.items, msg.reset, msg.items), loaded: true });
 			break;
 		case "completions":
 			panes.set(key, { ...pane, completions: { reqId: msg.reqId, items: msg.items, error: msg.error } });

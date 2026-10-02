@@ -32,6 +32,7 @@ export interface Models {
 	error: string | null;
 }
 
+
 export interface DashboardState {
 	connected: boolean;
 	hosts: RosterHost[];

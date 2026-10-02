@@ -1,6 +1,7 @@
 import { AppWindow, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, MessagesSquare, Play, Plus, Settings } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
 import type { PastSession, PullRequest, RosterHost, View } from "../../src/shared";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -61,6 +62,11 @@ const SIDEBAR_TABS = [
 	{ value: "sessions", label: "Sessions", icon: MessagesSquare },
 ] as const;
 
+/** The project a titled row ran in, before its title. An untitled row's label is already the project's name. */
+function ProjectBadge({ cwdDisplay }: { cwdDisplay: string }) {
+	const name = projectName(cwdDisplay);
+	return name ? <Badge size="compact" className="shrink-0 self-center">{name}</Badge> : null;
+}
 
 interface RowMenuProps {
 	view: View;
@@ -397,6 +403,7 @@ export function Roster({
 										>
 											<StatusDot status={host.status} />
 											<span className="flex min-w-0 flex-1 items-baseline gap-2">
+												{host.sessionName !== null && <ProjectBadge cwdDisplay={host.cwdDisplay} />}
 												<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
 												<ShipStep ship={host.ship} />
 												{(host.pullRequests.length > 0 || (host.source === "terminal" && !host.relayConnected)) && (
@@ -448,6 +455,7 @@ export function Roster({
 											title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
 										>
 											<span className="flex min-w-0 flex-1 items-baseline gap-2">
+												{session.title !== null && <ProjectBadge cwdDisplay={session.cwdDisplay} />}
 												<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
 												<ShipStep ship={session.ship} />
 												{session.pullRequests.length > 0 && (

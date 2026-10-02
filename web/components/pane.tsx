@@ -42,7 +42,7 @@ export const Pane = memo(function Pane({
 	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models,
 	fork, resume, send, startSession, focus, onEnd, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
-	const { items, completions, dequeued } = usePane(view);
+	const { items, loaded, completions, dequeued } = usePane(view);
 	const onFork = useCallback((itemId: string, point: ForkPoint) => startSession({ kind: "fork", view, itemId, point }), [startSession, view]);
 	const onResume = useCallback(() => view.kind === "past" && startSession({ kind: "resume", sessionId: view.sessionId }), [startSession, view]);
 	const onMaximize = useCallback(() => onLayout(index, "max"), [index, onLayout]);
@@ -95,6 +95,7 @@ export const Pane = memo(function Pane({
 			host={host}
 			lastHost={lastHost}
 			items={items}
+			loaded={loaded}
 			initialDraft={initialDraft}
 			fork={fork}
 			onFork={onFork}

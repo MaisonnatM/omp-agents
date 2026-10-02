@@ -1,5 +1,5 @@
 import { Sparkles } from "lucide-react";
-import { createContext, memo, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, memo, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import type { Item, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
@@ -114,6 +114,8 @@ interface TranscriptProps {
 	working: boolean;
 	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
+	/** Shown in place of the transcript until its first item or turn. */
+	empty?: ReactNode;
 }
 
 /** The skill a prompt invoked, as a pill ahead of the user's words. */
@@ -139,7 +141,7 @@ const typedText = (item: Exclude<Item, ToolItem>): string =>
  * The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end.
  * It renders again only when its own items, fork state, or callbacks change, not with the page around it.
  */
-export const Transcript = memo(function Transcript({ view, items, working, fork, onFork }: TranscriptProps) {
+export const Transcript = memo(function Transcript({ view, items, working, fork, onFork, empty }: TranscriptProps) {
 	const last = items.at(-1);
 	const streaming = last?.kind === "assistant" && last.streaming;
 	const forks = useMemo(() => forkPoints(items), [items]);
@@ -212,6 +214,7 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 							</MessageScrollerItem>
 						);
 					})}
+					{items.length === 0 && !working && empty}
 					{working && !streaming && (
 						<MessageScrollerItem messageId="thinking" className="flex flex-col">
 							<ThinkingIndicator className="self-start" />
