@@ -74,6 +74,10 @@ const pullRequestsOf = (sessionId: string): LinkedPullRequest[] => {
 	const path = fileById.get(sessionId)?.path;
 	return path ? pullRequestIndex.of(path) : [];
 };
+const shipOf = (sessionId: string): RosterHost["ship"] => {
+	const path = fileById.get(sessionId)?.path;
+	return path ? pullRequestIndex.shipOf(path) : null;
+};
 
 function statusOf(host: HostSnapshot): HostStatus {
 	if (host.inputRequired) return "needs-input";
@@ -103,6 +107,7 @@ function rosterHosts(): RosterHost[] {
 			control: guest?.control ?? { phase: "connecting" },
 			agents: guest?.agents() ?? [],
 			pullRequests: pullRequestsOf(host.sessionId),
+			ship: shipOf(host.sessionId),
 			requests: guest?.requests() ?? [],
 			queue: guest?.queue(null) ?? EMPTY_QUEUE,
 		};
@@ -125,6 +130,7 @@ function rosterHosts(): RosterHost[] {
 			control: { phase: "live", readOnly: false },
 			agents: session.agents(),
 			pullRequests: pullRequestsOf(session.sessionId),
+			ship: shipOf(session.sessionId),
 			requests: session.requests(),
 			queue: session.queue,
 		}),
@@ -143,6 +149,7 @@ function pastMsg(): ServerMsg {
 			cwdDisplay: displayPath(session.cwd),
 			modifiedAt: session.modifiedAt,
 			pullRequests: pullRequestIndex.of(session.path),
+			ship: pullRequestIndex.shipOf(session.path),
 		}));
 	return { t: "past", sessions };
 }

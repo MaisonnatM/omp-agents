@@ -1,6 +1,6 @@
 import { AppWindow, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, MessagesSquare, Play, Plus, Settings } from "lucide-react";
 import { type CSSProperties, type MouseEvent, type ReactElement, type ReactNode, useState } from "react";
-import type { PastSession, PullRequest, RosterHost, View } from "../../src/shared";
+import type { PastSession, PullRequest, RosterHost, ShipProgress, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -87,6 +87,18 @@ export const projectName = (cwdDisplay: string): string | undefined => cwdDispla
 export const hostLabel = (host: RosterHost): string => host.sessionName ?? projectName(host.cwdDisplay) ?? host.cwdDisplay;
 
 export const pastLabel = (session: PastSession): string => session.title ?? projectName(session.cwdDisplay) ?? "Untitled session";
+const SHIP_STAGES: ShipProgress["stage"][] = ["ticket", "implement", "draft_pr", "thermonuclear", "ready_gate", "live", "merged"];
+const SHIP_NAMES: Record<ShipProgress["stage"] | NonNullable<ShipProgress["work"]>, string> = {
+	ticket: "Ticket", implement: "Implement", draft_pr: "Draft PR", thermonuclear: "Thermonuclear",
+	ready_gate: "Ready gate", live: "Live for review", merged: "Merged",
+	rebase: "Rebase", fix_comments: "Fix comments", fix_ci: "Fix CI",
+};
+
+export function ShipStep({ ship }: { ship: ShipProgress | null }) {
+	if (!ship) return null;
+	const text = `${SHIP_STAGES.indexOf(ship.stage) + 1}/7 · ${SHIP_NAMES[ship.work ?? ship.stage]}`;
+	return <span className="inline-block max-w-36 shrink-0 truncate rounded bg-muted px-1.5 text-xs text-muted-foreground" title={`${ship.issue ?? "Ship"} · ${text}`}>{text}</span>;
+}
 
 interface RowMenuProps {
 	view: View;
@@ -424,6 +436,7 @@ export function Roster({
 											<StatusDot status={host.status} />
 											<span className="flex min-w-0 flex-1 items-baseline gap-2">
 												<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
+												<ShipStep ship={host.ship} />
 												{(host.pullRequests.length > 0 || (host.source === "terminal" && !host.relayConnected)) && (
 													<span className="shrink-0 text-xs text-muted-foreground">
 														{[
@@ -474,6 +487,7 @@ export function Roster({
 										>
 											<span className="flex min-w-0 flex-1 items-baseline gap-2">
 												<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
+												<ShipStep ship={session.ship} />
 												{session.pullRequests.length > 0 && (
 													<span className="shrink-0 text-xs text-muted-foreground">
 														{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}
