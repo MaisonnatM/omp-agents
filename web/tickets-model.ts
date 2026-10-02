@@ -1,15 +1,6 @@
 /** The tickets page's status groups, in Linear's My issues order. */
-import type { Ticket, TicketPriority, TicketStatusType } from "../src/shared";
-
-/** Where each state type's groups sit on the page, as Linear lists them. */
-const STATUS_TYPE_RANK: Record<TicketStatusType, number> = {
-	triage: 0,
-	started: 1,
-	unstarted: 2,
-	backlog: 3,
-	completed: 4,
-	canceled: 5,
-};
+import { TICKET_STATUS_TYPES, type Ticket, type TicketPriority, type TicketStatusType } from "../src/shared";
+import { type SectionTarget, sectionId } from "./section";
 
 export const PRIORITY_LABEL: Record<TicketPriority, string> = {
 	0: "No priority",
@@ -39,13 +30,8 @@ export function ticketGroups(tickets: Ticket[]): TicketGroup[] {
 		if (group) group.tickets.push(ticket);
 		else groups.set(ticket.status, { status: ticket.status, statusType: ticket.statusType, tickets: [ticket] });
 	}
-	return [...groups.values()].sort((a, b) => STATUS_TYPE_RANK[a.statusType] - STATUS_TYPE_RANK[b.statusType] || a.status.localeCompare(b.status));
+	return [...groups.values()].sort((a, b) => TICKET_STATUS_TYPES.indexOf(a.statusType) - TICKET_STATUS_TYPES.indexOf(b.statusType) || a.status.localeCompare(b.status));
 }
 
-/** A status group of the tickets page, which a sidebar link scrolls to. Each click makes a new one, so choosing a group again scrolls back to it. */
-export interface TicketsTarget {
-	status: string;
-}
-
-/** The id of a group on the tickets page, which a sidebar link scrolls to. It holds no spaces, since `aria-controls` lists ids separated by spaces. */
-export const ticketGroupId = (status: string): string => `tickets-${status.toLowerCase().replaceAll(" ", "-")}`;
+/** A status group of the tickets page, which a sidebar link scrolls to. */
+export const ticketSection = (status: string): SectionTarget => ({ id: sectionId("tickets", status), folds: [status] });

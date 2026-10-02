@@ -1,5 +1,6 @@
 /** Pull request links and the inbox page's sections. */
 import type { InboxPullRequest, PullRequest } from "../src/shared";
+import { type SectionTarget, sectionId } from "./section";
 
 export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
 
@@ -36,11 +37,8 @@ export function inboxSections(pullRequests: InboxPullRequest[]): InboxSection[] 
 /** A repository's key in the inbox's folds and section links: `owner/repo`, lowercased. */
 export const inboxRepoKey = ({ owner, repo }: { owner: string; repo: string }): string => `${owner}/${repo}`.toLowerCase();
 
-/** A section of the inbox page, by {@link inboxRepoKey} and title, which a sidebar link scrolls to. */
-export interface InboxTarget {
-	repo: string;
-	title: string;
-}
-
-/** The id of a section on the inbox page. It holds no spaces, since `aria-controls` lists ids separated by spaces. */
-export const inboxSectionId = ({ repo, title }: InboxTarget): string => `inbox-${repo}-${title.toLowerCase().replaceAll(" ", "-")}`;
+/** A section of the inbox page, by {@link inboxRepoKey} and title, which a sidebar link scrolls to. Its title is folded under the repository. */
+export const inboxSection = (repo: string, title: string): SectionTarget => ({
+	id: sectionId("inbox", repo, title),
+	folds: [repo, `${repo}:${title}`],
+});

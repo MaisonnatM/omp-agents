@@ -15,16 +15,17 @@ import {
 	SignalLow,
 	SignalMedium,
 } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import type { Ticket, TicketPriority, TicketStatusType } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { age, readTime } from "../../labels";
-import { PRIORITY_LABEL, type TicketGroup, type TicketsTarget, ticketGroupId, ticketGroups } from "../../tickets-model";
+import type { SectionTarget } from "../../section";
+import { PRIORITY_LABEL, type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { refreshTickets, useTickets } from "../../use-tickets";
 import { Header } from "../conversation";
-import { FoldButton, useCollapsed } from "../fold";
+import { FoldButton, useCollapsed, useRevealSection } from "../fold";
 import { IconTip } from "../inbox/avatars";
 
 /** Folded status groups, by status name. */
@@ -96,7 +97,7 @@ function TicketRow({ ticket }: { ticket: Ticket }) {
 }
 
 function GroupSection({ group, open, onToggle }: { group: TicketGroup; open: boolean; onToggle: () => void }) {
-	const id = ticketGroupId(group.status);
+	const { id } = ticketSection(group.status);
 	const [Icon, color] = STATUS_ICON[group.statusType];
 	return (
 		// Focused when its sidebar link is chosen.
@@ -121,33 +122,20 @@ function GroupSection({ group, open, onToggle }: { group: TicketGroup; open: boo
 
 interface TicketsPageProps {
 	/** The group a sidebar link last chose, to unfold, scroll to, and focus. */
-	group: TicketsTarget | null;
+	section: SectionTarget | null;
 }
 
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
-export function TicketsPage({ group }: TicketsPageProps) {
+export function TicketsPage({ section }: TicketsPageProps) {
 	const { read, error, refreshing } = useTickets(true);
 	const [collapsed, toggleCollapsed, expand] = useCollapsed(COLLAPSED_KEY);
-	/** The sidebar group the page already unfolded, scrolled to, and focused. */
-	const revealed = useRef<TicketsTarget | null>(null);
-
-	// Waits for the group to unfold, and for tickets that have it to load.
-	useEffect(() => {
-		if (!group || revealed.current === group) return;
-		if (collapsed.has(group.status)) return expand([group.status]);
-		const element = document.getElementById(ticketGroupId(group.status));
-		if (!element) return;
-		revealed.current = group;
-		element.scrollIntoView({ block: "start" });
-		element.focus({ preventScroll: true });
-	});
+	useRevealSection(section, collapsed, expand);
 
 	let body: ReactNode;
 	if (!read && error) body = <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot load the tickets: {error}</p>;
 	else if (!read) body = <p className="text-sm text-muted-foreground">Asking Linear for your issues…</p>;
-	else if ("error" in read.answer) body = <p role="alert" className="text-sm text-red-600 dark:text-red-400">{read.answer.error}</p>;
 	else {
-		const groups = ticketGroups(read.answer.tickets);
+		const groups = ticketGroups(read.data.tickets);
 		body = (
 			<>
 				{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the tickets: {error}</p>}

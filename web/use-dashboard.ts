@@ -5,9 +5,9 @@ import {
 	EMPTY_LAYOUT,
 	hashForLayout,
 	hashForNewSession,
-	isPageHash,
 	type Layout,
 	layoutFromHash,
+	pageFromHash,
 	type OpenMode,
 	openView,
 	sameView,
@@ -225,7 +225,7 @@ export function useDashboard(): Dashboard {
 	startsRef.current = state.starts;
 	// A page covering the panes shows none of them, so the server stops streaming them until the panes return.
 	const hash = useHash();
-	const watched = isPageHash(hash) ? NO_VIEWS : state.layout.panes;
+	const watched = pageFromHash(hash) ? NO_VIEWS : state.layout.panes;
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
 

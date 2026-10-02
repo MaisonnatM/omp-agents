@@ -27,12 +27,7 @@ export function inboxFromHash(hash: string): InboxRoute | null {
 export const hashForInbox = (target: PullRequest | null): string =>
 	target ? `#${INBOX}/${target.owner}/${target.repo}/${target.number}` : `#${INBOX}`;
 
-/** `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues. Any `#tickets/…` opens it too. */
-export function ticketsFromHash(hash: string): boolean {
-	const raw = hash.replace(/^#/, "");
-	return raw === TICKETS || raw.startsWith(`${TICKETS}/`);
-}
-
+/** `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues. */
 export const hashForTickets = (): string => `#${TICKETS}`;
 
 /** `#session/<id>` names a session by its id, which outlives the host running it, for links from outside the page. */
@@ -135,7 +130,7 @@ export function hashForLayout({ panes, focus, maximized }: Layout): string {
  * `#session/<id>` link, which names no layout until the session lists show where that session runs.
  */
 export function layoutFromHash(hash: string): Layout | null {
-	if (settingsFromHash(hash) || inboxFromHash(hash) || ticketsFromHash(hash) || newSessionFromHash(hash) || sessionFromHash(hash) !== null) return null;
+	if (pageFromHash(hash) || sessionFromHash(hash) !== null) return null;
 	const marked = hash.replace(/^#/, "");
 	const maximized = marked.endsWith(MAXIMIZED);
 	const raw = maximized ? marked.slice(0, -MAXIMIZED.length) : marked;
@@ -213,6 +208,20 @@ export function adjacentSession(listed: View[], current: View | null, step: 1 | 
 	return listed[at + step] ?? null;
 }
 
-/** Whether the hash names a page that covers the panes: settings, inbox, tickets, or the new-session draft. */
-export const isPageHash = (hash: string): boolean =>
-	settingsFromHash(hash) !== null || inboxFromHash(hash) !== null || ticketsFromHash(hash) || newSessionFromHash(hash) !== null;
+/** A page that covers the panes. */
+export type Page =
+	| ({ kind: "settings" } & SettingsRoute)
+	| ({ kind: "inbox" } & InboxRoute)
+	| { kind: "tickets" }
+	| ({ kind: "new" } & NewSessionRoute);
+
+/** The page a hash names: settings, inbox, tickets, or the new-session draft; `null` for the panes. */
+export function pageFromHash(hash: string): Page | null {
+	const settings = settingsFromHash(hash);
+	if (settings) return { kind: "settings", ...settings };
+	const inbox = inboxFromHash(hash);
+	if (inbox) return { kind: "inbox", ...inbox };
+	if (hash.replace(/^#/, "") === TICKETS) return { kind: "tickets" };
+	const newSession = newSessionFromHash(hash);
+	return newSession && { kind: "new", ...newSession };
+}

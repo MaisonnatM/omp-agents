@@ -15,7 +15,6 @@ import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/
 import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
 import { TicketsPage } from "./components/tickets/tickets-page";
 import { ToolsExpanded } from "./components/transcript";
-import { type InboxTarget } from "./inbox-model";
 import { SPLIT_CLICK } from "./labels";
 import {
 	adjacentSession,
@@ -26,16 +25,13 @@ import {
 	hashForInbox,
 	hashForTickets,
 	hashForView,
-	inboxFromHash,
-	newSessionFromHash,
+	pageFromHash,
 	sameView,
-	settingsFromHash,
-	ticketsFromHash,
 } from "./routing";
+import type { SectionTarget } from "./section";
 import { defaultCwd, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
-import type { TicketsTarget } from "./tickets-model";
 import { useDashboard, useHash } from "./use-dashboard";
 
 
@@ -68,11 +64,7 @@ export function App() {
 	const quick = startOf(state.starts, "quick");
 	const sidebars = useSidebarPanels();
 	const hash = useHash();
-	const settings = settingsFromHash(hash);
-	const inbox = inboxFromHash(hash);
-	const tickets = ticketsFromHash(hash);
-	const newSession = newSessionFromHash(hash);
-	const page = settings || inbox || tickets || newSession;
+	const page = pageFromHash(hash);
 	const [project, pickProject] = useProject(workspaces(state.hosts, state.past));
 	const { started } = state;
 	// A session started in another directory than the selected project would be missing from the sidebar.
@@ -117,13 +109,12 @@ export function App() {
 	const toggleRight = useCallback(() => toggleSidebar("right"), [toggleSidebar]);
 	const topRightPane = maximized ? layout.focus : Math.min(1, layout.panes.length - 1);
 
-	const settingsHref = hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null);
+	const settingsHref = hashForSettings(page?.kind === "settings" ? page.cwd : (viewHost ?? viewPast)?.cwd || null);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [switcherOpen, setSwitcherOpen] = useState(false);
-	const [inboxTarget, setInboxTarget] = useState<InboxTarget | null>(null);
-	const [ticketsTarget, setTicketsTarget] = useState<TicketsTarget | null>(null);
-	const tab: SidebarTab = inbox ? "inbox" : tickets ? "tickets" : "sessions";
+	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
+	const tab: SidebarTab = page?.kind === "inbox" || page?.kind === "tickets" ? page.kind : "sessions";
 	const showTab = (next: SidebarTab): void => {
 		if (next === "sessions") show(layout);
 		else location.hash = next === "inbox" ? hashForInbox(null) : hashForTickets();
@@ -146,15 +137,15 @@ export function App() {
 			toggleSidebar("right");
 		},
 		settings: () => {
-			if (settings) show(layout);
+			if (page?.kind === "settings") show(layout);
 			else location.hash = settingsHref;
 		},
 		inbox: () => {
-			if (inbox) return false;
+			if (page?.kind === "inbox") return false;
 			showTab("inbox");
 		},
 		tickets: () => {
-			if (tickets) return false;
+			if (page?.kind === "tickets") return false;
 			showTab("tickets");
 		},
 		sessions: () => {
@@ -170,90 +161,98 @@ export function App() {
 
 
 	let main: ReactNode;
-	if (newSession) {
-		const cwd = newSession.cwd ?? defaultCwd(view, state.hosts, state.past, project);
-		main = (
-			<NewSession
-				cwd={cwd}
-				launch={launch}
-				connected={state.connected}
-				completions={state.newSessionCompletions}
-				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
-				onStart={(prompt, branch) => start({ kind: "new", cwd, prompt, branch })}
-			/>
-		);
-	} else if (settings) {
-		main = <SettingsPage cwd={settings.cwd} workspaces={workspaces(state.hosts, state.past)} />;
-	} else if (inbox) {
-		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
-		main = state.listed ? (
-			<InboxPage
-				project={project}
-				hosts={state.hosts}
-				past={state.past}
-				target={inbox.target}
-				onOpen={open}
-				section={inboxTarget}
-				quick={quick}
-				onQuickAction={start}
-				onDismissQuick={() => dismissStart("quick")}
-			/>
-		) : (
-			<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
-		);
-	} else if (tickets) {
-		main = <TicketsPage group={ticketsTarget} />;
-	} else if (layout.panes.length > 0) {
-		main = (
-			<div
-				className="relative grid h-svh min-h-0 gap-px bg-border"
-				style={{
-					gridTemplateColumns: split ? `${splitAt(columns)} minmax(0, 1fr)` : "minmax(0, 1fr)",
-					gridTemplateRows: layout.panes.length > 2 ? `${splitAt(rows)} minmax(0, 1fr)` : "minmax(0, 1fr)",
-				}}
-			>
-				{layout.panes.map((pane, index) => (
-					// Keyed by view: moving to another cell keeps a pane's draft and scroll; another view resets them.
-					// A maximized pane covers the whole grid; the rest stay mounted, at their size, under it.
-					<Pane
-						key={hashForView(pane)}
-						view={pane}
-						index={index}
-						count={layout.panes.length}
-						focused={index === layout.focus}
-						maximized={maximized}
-						topRight={index === topRightPane && planView !== null}
-						host={pane.kind === "live" ? state.hosts.find(h => h.instanceId === pane.instanceId) ?? null : null}
-						lastHost={pane.kind === "live" ? state.lastHosts.get(pane.instanceId) ?? null : null}
-						session={pane.kind === "past" ? state.past.find(s => s.sessionId === pane.sessionId) ?? null : null}
-						initialDraft={state.draft && sameView(state.draft.view, pane) ? state.draft.text : ""}
-						models={pane.kind === "live" ? state.models.get(pane.instanceId) ?? null : null}
-						fork={fork}
-						resume={resume}
-						send={send}
-						startSession={start}
-						focus={focus}
-						open={open}
-						onEnd={endHost}
-						onLayout={onPaneLayout}
-						toggleRight={toggleRight}
-						rightOpen={sidebars.panels.right.open}
-					/>
-				))}
-				{split && !maximized && (
-					<SplitResizeHandle axis="columns" ratio={columns} onRatio={setColumns} span={layout.panes.length === 3 ? rows : 1} />
-				)}
-				{layout.panes.length > 2 && !maximized && <SplitResizeHandle axis="rows" ratio={rows} onRatio={setRows} />}
-			</div>
-		);
-	} else if (state.hosts.length === 0) {
-		main = <EmptyState rosterError={state.rosterError} />;
-	} else {
-		main = (
-			<p className="m-auto max-w-sm text-center text-sm text-muted-foreground">
-				Select a session to see its conversation. {SPLIT_CLICK} more to see up to four side by side.
-			</p>
-		);
+	switch (page?.kind) {
+		case "new": {
+			const cwd = page.cwd ?? defaultCwd(view, state.hosts, state.past, project);
+			main = (
+				<NewSession
+					cwd={cwd}
+					launch={launch}
+					connected={state.connected}
+					completions={state.newSessionCompletions}
+					onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
+					onStart={(prompt, branch) => start({ kind: "new", cwd, prompt, branch })}
+				/>
+			);
+			break;
+		}
+		case "settings":
+			main = <SettingsPage cwd={page.cwd} workspaces={workspaces(state.hosts, state.past)} />;
+			break;
+		case "inbox":
+			// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
+			main = state.listed ? (
+				<InboxPage
+					project={project}
+					hosts={state.hosts}
+					past={state.past}
+					target={page.target}
+					onOpen={open}
+					section={sectionTarget}
+					quick={quick}
+					onQuickAction={start}
+					onDismissQuick={() => dismissStart("quick")}
+				/>
+			) : (
+				<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
+			);
+			break;
+		case "tickets":
+			main = <TicketsPage section={sectionTarget} />;
+			break;
+		default:
+			if (layout.panes.length > 0) {
+				main = (
+					<div
+						className="relative grid h-svh min-h-0 gap-px bg-border"
+						style={{
+							gridTemplateColumns: split ? `${splitAt(columns)} minmax(0, 1fr)` : "minmax(0, 1fr)",
+							gridTemplateRows: layout.panes.length > 2 ? `${splitAt(rows)} minmax(0, 1fr)` : "minmax(0, 1fr)",
+						}}
+					>
+						{layout.panes.map((pane, index) => (
+							// Keyed by view: moving to another cell keeps a pane's draft and scroll; another view resets them.
+							// A maximized pane covers the whole grid; the rest stay mounted, at their size, under it.
+							<Pane
+								key={hashForView(pane)}
+								view={pane}
+								index={index}
+								count={layout.panes.length}
+								focused={index === layout.focus}
+								maximized={maximized}
+								topRight={index === topRightPane && planView !== null}
+								host={pane.kind === "live" ? state.hosts.find(h => h.instanceId === pane.instanceId) ?? null : null}
+								lastHost={pane.kind === "live" ? state.lastHosts.get(pane.instanceId) ?? null : null}
+								session={pane.kind === "past" ? state.past.find(s => s.sessionId === pane.sessionId) ?? null : null}
+								initialDraft={state.draft && sameView(state.draft.view, pane) ? state.draft.text : ""}
+								models={pane.kind === "live" ? state.models.get(pane.instanceId) ?? null : null}
+								fork={fork}
+								resume={resume}
+								send={send}
+								startSession={start}
+								focus={focus}
+								open={open}
+								onEnd={endHost}
+								onLayout={onPaneLayout}
+								toggleRight={toggleRight}
+								rightOpen={sidebars.panels.right.open}
+							/>
+						))}
+						{split && !maximized && (
+							<SplitResizeHandle axis="columns" ratio={columns} onRatio={setColumns} span={layout.panes.length === 3 ? rows : 1} />
+						)}
+						{layout.panes.length > 2 && !maximized && <SplitResizeHandle axis="rows" ratio={rows} onRatio={setRows} />}
+					</div>
+				);
+			} else if (state.hosts.length === 0) {
+				main = <EmptyState rosterError={state.rosterError} />;
+			} else {
+				main = (
+					<p className="m-auto max-w-sm text-center text-sm text-muted-foreground">
+						Select a session to see its conversation. {SPLIT_CLICK} more to see up to four side by side.
+					</p>
+				);
+			}
 	}
 
 	return (
@@ -264,15 +263,13 @@ export function App() {
 					past={state.past}
 					open={page ? [] : layout.panes}
 					connected={state.connected}
-					newSessionOpen={newSession !== null}
+					newSessionOpen={page?.kind === "new"}
 					settingsHref={settingsHref}
-					settingsOpen={settings !== null}
+					settingsOpen={page?.kind === "settings"}
 					tab={tab}
 					onTab={showTab}
-					inboxTarget={inboxTarget}
-					onInboxTarget={setInboxTarget}
-					ticketsTarget={ticketsTarget}
-					onTicketsTarget={setTicketsTarget}
+					sectionTarget={sectionTarget}
+					onSectionTarget={setSectionTarget}
 					project={project}
 					onPickProject={pickProject}
 					onOpen={open}

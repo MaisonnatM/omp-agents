@@ -2,7 +2,7 @@
  * The inbox page's pull requests, per GitHub repository, live from `gh`: as Graphite's inbox gathers them, the
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
-import { type Cache, cached } from "./cache";
+import { createCache } from "./cache";
 import { errorText, isObject, num, str } from "./json";
 import { run, runJson } from "./proc";
 import type {
@@ -26,8 +26,7 @@ import type {
 } from "./shared";
 
 const GH_TIMEOUT_MS = 20_000;
-/** How many days back the inbox lists merged pull requests, and the tickets page closed issues. */
-export const MERGED_DAYS = 7;
+const MERGED_DAYS = 7;
 
 export interface Repo {
 	owner: string;
@@ -242,7 +241,7 @@ async function queryRepo(repo: Repo): Promise<InboxPullRequest[]> {
 	return parseInboxAnswer(answer, repo);
 }
 
-const loaded: Cache<InboxPullRequest[]> = new Map();
+const loaded = createCache<InboxPullRequest[]>();
 
 const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
 
@@ -382,11 +381,11 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 	};
 }
 
-const details: Cache<PullRequestDetail> = new Map();
+const details = createCache<PullRequestDetail>();
 
 /** One pull request in full, live from `gh`. */
 export function loadPullRequestDetail(pr: PullRequest): Promise<PullRequestDetail> {
-	return cached(details, `${pr.owner}/${pr.repo}#${pr.number}`.toLowerCase(), false, async () =>
+	return details.get(`${pr.owner}/${pr.repo}#${pr.number}`.toLowerCase(), async () =>
 		parseDetailAnswer(
 			await runJson(
 				["gh", "api", "graphql", "-f", `query=${DETAIL_QUERY}`, "-f", `owner=${pr.owner}`, "-f", `repo=${pr.repo}`, "-F", `number=${pr.number}`],
@@ -415,7 +414,7 @@ export async function loadInbox(cwds: string[], fresh: boolean): Promise<Inbox> 
 	const repos = await Promise.all(
 		[...byRepo.values()].map(async (entry): Promise<RepoInbox> => {
 			try {
-				const pullRequests = await cached(loaded, `${entry.owner}/${entry.repo}`.toLowerCase(), fresh, () => queryRepo(entry));
+				const pullRequests = await loaded.get(`${entry.owner}/${entry.repo}`.toLowerCase(), () => queryRepo(entry), fresh);
 				return { ...entry, pullRequests };
 			} catch (err) {
 				return { ...entry, error: errorText(err) };

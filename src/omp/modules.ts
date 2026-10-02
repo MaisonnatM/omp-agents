@@ -177,6 +177,40 @@ export interface ConfigFilesModule {
 	findConfigFile(subpath: string, options: { user?: boolean; project?: boolean; cwd?: string }): string | undefined;
 }
 
+/** Subset of omp's `JsonRpcResponse` (src/mcp/types.ts). */
+export interface McpResponse {
+	result?: unknown;
+	error?: { code: number; message: string };
+}
+export interface McpRpcModule {
+	/** JSON-RPC 2.0 over HTTP, reading a JSON or `text/event-stream` answer; `onHttpError` maps a non-2xx response to the error thrown. */
+	callMCP(
+		url: string,
+		method: string,
+		params: Record<string, unknown>,
+		options: { headers?: Record<string, string>; signal?: AbortSignal; onHttpError?: (response: Response, body: string) => Error },
+	): Promise<McpResponse>;
+}
+/** Subset of omp's `MCPServerConfig` (src/mcp/types.ts) this app reads. */
+export interface McpServerConfig {
+	type?: string;
+	url?: string;
+	auth?: { type: string; credentialId?: string };
+}
+export interface McpConfigModule {
+	/** The MCP servers omp would start in `cwd`: disabled ones (`disabledServers`, `enabled: false`) left out, `url` env vars not yet expanded. */
+	loadAllMCPConfigs(cwd: string, options?: { enableProjectConfig?: boolean }): Promise<{ configs: Record<string, McpServerConfig> }>;
+}
+export interface McpCredentialsModule {
+	/** The credential ids omp looks a server's OAuth sign-in up under when its config names none. */
+	mcpOAuthCredentialIdsForServerUrl(serverUrl: string | undefined): string[];
+}
+
+export interface DiscoveryHelpersModule {
+	/** Expands `${VAR}` references in a string the way omp does for an MCP server's `url`. */
+	expandEnvVarsDeep<T>(value: T): T;
+}
+
 type Kind = "function" | "number";
 
 /** The value at a dotted export path such as `Settings.loadReadOnly`. */
@@ -274,3 +308,9 @@ export const settingsRegistry = await load<SettingsRegistryModule>(join(srcDir, 
 export const discovery = await load<DiscoveryModule>(join(srcDir, "discovery", "index.ts"), { loadCapability: "function" });
 export const agentDiscovery = await load<AgentDiscoveryModule>(join(srcDir, "task", "discovery.ts"), { discoverAgents: "function" });
 export const configFiles = await load<ConfigFilesModule>(join(srcDir, "config.ts"), { findConfigFile: "function" });
+export const mcpRpc = await load<McpRpcModule>(join(srcDir, "mcp", "json-rpc.ts"), { callMCP: "function" });
+export const mcpConfig = await load<McpConfigModule>(join(srcDir, "mcp", "config.ts"), { loadAllMCPConfigs: "function" });
+export const mcpCredentials = await load<McpCredentialsModule>(join(srcDir, "mcp", "oauth-credentials.ts"), {
+	mcpOAuthCredentialIdsForServerUrl: "function",
+});
+export const discoveryHelpers = await load<DiscoveryHelpersModule>(join(srcDir, "discovery", "helpers.ts"), { expandEnvVarsDeep: "function" });

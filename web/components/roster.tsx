@@ -32,13 +32,14 @@ import {
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { type InboxTarget, inboxRepoKey, inboxSectionId, inboxSections, pullRequestUrl } from "../inbox-model";
+import { inboxRepoKey, inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, SPLIT_CLICK } from "../labels";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";
+import type { SectionTarget } from "../section";
 import { workspaces } from "../sessions";
 import { shortcutKeys, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
-import { type TicketsTarget, ticketGroupId, ticketGroups } from "../tickets-model";
+import { ticketGroups, ticketSection } from "../tickets-model";
 import type { ResumeAll } from "../use-dashboard";
 import { useInbox } from "../use-inbox";
 import { useTickets } from "../use-tickets";
@@ -216,30 +217,32 @@ function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 interface SectionLinkProps {
 	/** The page the section is on. */
 	href: string;
-	/** The id of the section on the page. */
-	controls: string;
-	chosen: boolean;
+	section: SectionTarget;
+	/** The section a link last chose. */
+	chosen: SectionTarget | null;
 	title: string;
 	label: string;
 	count: number;
-	onChoose: () => void;
+	/** Gets a new target each time, so choosing a section again scrolls back to it. */
+	onChoose: (target: SectionTarget) => void;
 }
 
 /** A link to a section of a page, with its count. A plain click scrolls there; the page listens for `onChoose`. */
-function SectionLink({ href, controls, chosen, title, label, count, onChoose }: SectionLinkProps) {
+function SectionLink({ href, section, chosen, title, label, count, onChoose }: SectionLinkProps) {
+	const isChosen = chosen?.id === section.id;
 	return (
 		<SidebarMenuItem>
-			<SidebarMenuButton asChild isActive={chosen}>
+			<SidebarMenuButton asChild isActive={isChosen}>
 				<a
 					href={href}
-					aria-controls={controls}
-					aria-current={chosen ? "location" : undefined}
+					aria-controls={section.id}
+					aria-current={isChosen ? "location" : undefined}
 					aria-label={label}
 					onClick={event => {
 						// Modified and middle clicks keep the link's own new-tab behavior.
 						if (event.button !== 0 || event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return;
 						event.preventDefault();
-						onChoose();
+						onChoose({ ...section });
 					}}
 				>
 					{title}
@@ -254,15 +257,15 @@ const navNote = (text: string) => <p className="px-2 py-1 text-xs text-muted-for
 
 interface InboxNavProps {
 	project: string | null;
-	target: InboxTarget | null;
-	onTarget: (target: InboxTarget) => void;
+	target: SectionTarget | null;
+	onTarget: (target: SectionTarget) => void;
 }
 
 /** The inbox page's sections with their pull request counts, per repository, each a link to its section on the page. */
 function InboxNav({ project, target, onTarget }: InboxNavProps) {
 	const { read, error } = useInbox(project, false);
 	if (!read) return <SidebarGroup>{navNote(error ? `Cannot load the inbox: ${error}` : "Asking GitHub for pull requests…")}</SidebarGroup>;
-	const { repos } = read.inbox;
+	const { repos } = read.data;
 	if (repos.length === 0) return <SidebarGroup>{navNote("No session ran in a GitHub repository.")}</SidebarGroup>;
 	return repos.map(repo => {
 		const name = `${repo.owner}/${repo.repo}`;
@@ -278,12 +281,12 @@ function InboxNav({ project, target, onTarget }: InboxNavProps) {
 						<SectionLink
 							key={title}
 							href={hashForInbox(null)}
-							controls={inboxSectionId({ repo: key, title })}
-							chosen={target?.repo === key && target.title === title}
+							section={inboxSection(key, title)}
+							chosen={target}
 							title={title}
 							label={`${title}, ${length} pull request${length === 1 ? "" : "s"}`}
 							count={length}
-							onChoose={() => onTarget({ repo: key, title })}
+							onChoose={onTarget}
 						/>
 					))}
 				</SidebarMenu>
@@ -298,16 +301,15 @@ function InboxNav({ project, target, onTarget }: InboxNavProps) {
 }
 
 interface TicketsNavProps {
-	target: TicketsTarget | null;
-	onTarget: (target: TicketsTarget) => void;
+	target: SectionTarget | null;
+	onTarget: (target: SectionTarget) => void;
 }
 
 /** The tickets page's status groups with their issue counts, each a link to its group on the page. */
 function TicketsNav({ target, onTarget }: TicketsNavProps) {
 	const { read, error } = useTickets(false);
 	if (!read) return <SidebarGroup>{navNote(error ? `Cannot load the tickets: ${error}` : "Asking Linear for your issues…")}</SidebarGroup>;
-	if ("error" in read.answer) return <SidebarGroup>{navNote("Cannot read your issues from Linear.")}</SidebarGroup>;
-	const groups = ticketGroups(read.answer.tickets);
+	const groups = ticketGroups(read.data.tickets);
 	if (groups.length === 0) return <SidebarGroup>{navNote("No issues assigned to you.")}</SidebarGroup>;
 	return (
 		<SidebarGroup>
@@ -316,12 +318,12 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 					<SectionLink
 						key={status}
 						href={hashForTickets()}
-						controls={ticketGroupId(status)}
-						chosen={target?.status === status}
+						section={ticketSection(status)}
+						chosen={target}
 						title={status}
 						label={`${status}, ${length} issue${length === 1 ? "" : "s"}`}
 						count={length}
-						onChoose={() => onTarget({ status })}
+						onChoose={onTarget}
 					/>
 				))}
 			</SidebarMenu>
@@ -343,12 +345,9 @@ interface RosterProps {
 	/** The sidebar's tab, which follows the page: the inbox, the tickets, or the sessions over the panes. */
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
-	/** The inbox section a sidebar link last chose. */
-	inboxTarget: InboxTarget | null;
-	onInboxTarget: (target: InboxTarget) => void;
-	/** The tickets group a sidebar link last chose. */
-	ticketsTarget: TicketsTarget | null;
-	onTicketsTarget: (target: TicketsTarget) => void;
+	/** The inbox or tickets section a sidebar link last chose. */
+	sectionTarget: SectionTarget | null;
+	onSectionTarget: (target: SectionTarget) => void;
 	/** The selected project's `cwd`, or `null` for all projects. */
 	project: string | null;
 	onPickProject: (cwd: string | null) => void;
@@ -382,10 +381,8 @@ export function Roster({
 	settingsOpen,
 	tab,
 	onTab,
-	inboxTarget,
-	onInboxTarget,
-	ticketsTarget,
-	onTicketsTarget,
+	sectionTarget,
+	onSectionTarget,
 	project,
 	onPickProject,
 	onOpen,
@@ -598,12 +595,12 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="inbox" asChild>
 				<SidebarContent>
-					<InboxNav project={project} target={inboxTarget} onTarget={onInboxTarget} />
+					<InboxNav project={project} target={sectionTarget} onTarget={onSectionTarget} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="tickets" asChild>
 				<SidebarContent>
-					<TicketsNav target={ticketsTarget} onTarget={onTicketsTarget} />
+					<TicketsNav target={sectionTarget} onTarget={onSectionTarget} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>

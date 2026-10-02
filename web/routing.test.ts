@@ -11,15 +11,14 @@ import {
 	hashForTickets,
 	hashForView,
 	inboxFromHash,
-	isPageHash,
 	type Layout,
 	layoutFromHash,
 	newSessionFromHash,
 	openView,
+	pageFromHash,
 	sessionFromHash,
 	settingsFromHash,
 	swapView,
-	ticketsFromHash,
 	viewForSession,
 } from "./routing";
 
@@ -105,15 +104,18 @@ describe("layout hash", () => {
 	});
 
 	test("the tickets hash opens the tickets page, which covers the panes instead of naming a layout", () => {
-		expect(ticketsFromHash(hashForTickets())).toBe(true);
-		expect(ticketsFromHash("#tickets/ENG-1")).toBe(true);
-		expect(ticketsFromHash("#ticketsx")).toBe(false);
-		expect(ticketsFromHash("#7c51f77b2a1bf7ba")).toBe(false);
-		for (const hash of [hashForTickets(), "#tickets/ENG-1"]) {
-			expect(layoutFromHash(hash)).toBeNull();
-			expect(isPageHash(hash)).toBe(true);
-		}
-		expect(isPageHash("#7c51f77b2a1bf7ba")).toBe(false);
+		expect(pageFromHash(hashForTickets())).toEqual({ kind: "tickets" });
+		expect(layoutFromHash(hashForTickets())).toBeNull();
+		expect(pageFromHash("#ticketsx")).toBeNull();
+		expect(pageFromHash("#7c51f77b2a1bf7ba")).toBeNull();
+	});
+
+	test("every page hash names its page and route, and a session or layout hash names none", () => {
+		expect(pageFromHash(hashForSettings("/work/app"))).toEqual({ kind: "settings", cwd: "/work/app" });
+		expect(pageFromHash(hashForInbox(null))).toEqual({ kind: "inbox", target: null });
+		expect(pageFromHash(hashForNewSession(null))).toEqual({ kind: "new", cwd: null });
+		expect(pageFromHash("#session/01a0f6a5-181e")).toBeNull();
+		expect(pageFromHash("#7c51f77b2a1bf7ba,past/9d2e0000")).toBeNull();
 	});
 
 	test("a session link names the session by id and opens the host that runs it, else its saved transcript", () => {
