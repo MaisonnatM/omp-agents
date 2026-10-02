@@ -8,6 +8,7 @@ import { Pane } from "./components/pane";
 import { PlanUsageFooter } from "./components/plan-usage";
 import { Roster, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings/settings-page";
+import { SessionSwitcher } from "./components/session-switcher";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { SubagentsSidebar } from "./components/subagents-sidebar";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
@@ -16,6 +17,7 @@ import { ToolsExpanded } from "./components/transcript";
 import { type InboxTarget } from "./inbox-model";
 import { SPLIT_CLICK } from "./labels";
 import {
+	adjacentSession,
 	closePane,
 	endSession,
 	focusedView,
@@ -32,24 +34,6 @@ import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { useDashboard, useHash } from "./use-dashboard";
 
-/**
- * omp's Agent Hub key: into the sidebars at the open row (a session on the left, a subagent on the right),
- * and from there back to the focused pane's composer. A hidden sessions sidebar shows first.
- */
-function toggleSessionsFocus(showSessions: () => void): void {
-	const sidebars = [...document.querySelectorAll<HTMLElement>('[data-sidebar="sidebar"]')];
-	if (sidebars.some(sidebar => sidebar.contains(document.activeElement))) {
-		const pane = document.querySelector<HTMLElement>("[data-pane][data-focused]");
-		(pane?.querySelector<HTMLElement>("textarea:not(:disabled)") ?? pane)?.focus();
-		return;
-	}
-	showSessions();
-	// The kept-mounted sessions list stays in the DOM, hidden, while the Inbox tab shows; so does a hidden subagents sidebar.
-	const row =
-		document.querySelector<HTMLElement>('[data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active]:not([hidden] *)') ??
-		document.querySelector<HTMLElement>('[data-slot="sidebar"][data-side="left"] [data-sidebar="menu-button"]:not([hidden] *)');
-	row?.focus();
-}
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
 		<section className="m-auto max-w-lg space-y-3 p-8 text-sm">
@@ -97,8 +81,14 @@ export function App() {
 	const [columns, setColumns] = useState(() => storedSplitRatio("columns"));
 	const [rows, setRows] = useState(() => storedSplitRatio("rows"));
 	const maximized = layout.maximized && !page;
+	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
 	// The running sessions the sidebar lists, in its order, which ending a session moves its panes along.
-	const listedHosts = state.hosts.filter(host => project === null || host.cwd === project).map(host => host.instanceId);
+	const listedHosts = state.hosts.filter(inProject).map(host => host.instanceId);
+	/** Every row of the sidebar's sessions list, running then past, which the previous and next session keys walk. */
+	const listedViews: View[] = [
+		...listedHosts.map((instanceId): View => ({ kind: "live", instanceId, agentId: null })),
+		...state.past.filter(inProject).map(({ sessionId }): View => ({ kind: "past", sessionId })),
+	];
 	const latest = useRef({ layout, listedHosts, sidebars });
 	latest.current = { layout, listedHosts, sidebars };
 	const endHost = useCallback((instanceId: string): void => {
@@ -121,15 +111,24 @@ export function App() {
 	const settingsHref = hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
+	const [switcherOpen, setSwitcherOpen] = useState(false);
 	const [inboxTarget, setInboxTarget] = useState<InboxTarget | null>(null);
 	const showInbox = (open: boolean): void => {
 		if (open) location.hash = hashForInbox(null);
 		else show(layout);
 	};
+	const step = (by: 1 | -1): boolean | void => {
+		const next = adjacentSession(listedViews, view, by);
+		if (!next) return false;
+		open(next, "replace");
+	};
 	useShortcuts({
 		help: () => setShortcutsOpen(open => !open),
+		switcher: () => setSwitcherOpen(open => !open),
+		newSession: openNewSession,
+		previousSession: () => step(-1),
+		nextSession: () => step(1),
 		tools: () => setToolsExpanded(expanded => !expanded),
-		sessions: () => toggleSessionsFocus(() => sidebars.setOpen("left", true)),
 		sessionsSidebar: () => toggleSidebar("left"),
 		subagentsSidebar: () => {
 			if (!subagentsHost) return false;
@@ -139,7 +138,14 @@ export function App() {
 			if (settings) show(layout);
 			else location.hash = settingsHref;
 		},
-		inbox: () => showInbox(inbox === null),
+		inbox: () => {
+			if (inbox) return false;
+			showInbox(true);
+		},
+		sessions: () => {
+			if (!page) return false;
+			show(layout);
+		},
 		restore: () => {
 			if (!maximized) return false;
 			show({ ...layout, maximized: false });
@@ -272,6 +278,17 @@ export function App() {
 				</DashboardSidebar>
 			)}
 			<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+			<SessionSwitcher
+				open={switcherOpen}
+				onOpenChange={setSwitcherOpen}
+				hosts={state.hosts}
+				past={state.past}
+				onPick={(picked, cwd) => {
+					// As a started session does, a session from another project switches the sidebar to its project.
+					if (project !== null && cwd !== project) pickProject(cwd);
+					open(picked, "replace");
+				}}
+			/>
 		</SidebarProvider>
 	);
 }

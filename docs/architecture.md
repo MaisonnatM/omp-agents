@@ -119,7 +119,7 @@ The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web
 - `web/api.ts`: every HTTP request the page makes. `web/settings-api.ts` holds the settings page's requests.
 - `web/use-inbox.ts`: the inbox cache that the sidebar and the inbox page share, one entry per project.
 - `web/use-pull-request.ts`: reads the details of the pull request that the inbox's sheet shows.
-- `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
+- `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read. `web/components/session-switcher.tsx` is the Cmd+K search over every session.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/components/roster.tsx`: the left sidebar's session and inbox lists, and the project picker.
 - `web/components/pane.tsx`: a pane. `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript.

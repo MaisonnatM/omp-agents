@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { RosterHost, View } from "../src/shared";
 import {
+	adjacentSession,
 	closePane,
 	endSession,
 	hashForInbox,
@@ -177,5 +178,30 @@ describe("opening and closing panes", () => {
 		expect(endSession(split([a], 0), "a", ["a"])).toEqual(split([a], 0));
 		expect(endSession(split([a, b], 0), "a", ["a", "b"])).toEqual(split([a, b], 0));
 		expect(endSession(split([a], 0), "a", ["b", "c"])).toEqual(split([a], 0));
+	});
+});
+
+describe("stepping through the sidebar's sessions", () => {
+	const a: View = { kind: "live", instanceId: "a", agentId: null };
+	const b: View = { kind: "live", instanceId: "b", agentId: null };
+	const old: View = { kind: "past", sessionId: "old" };
+	const listed = [a, b, old];
+
+	test("steps to the neighboring row, from running into past sessions, and stops at either end", () => {
+		expect(adjacentSession(listed, b, 1)).toEqual(old);
+		expect(adjacentSession(listed, b, -1)).toEqual(a);
+		expect(adjacentSession(listed, old, 1)).toBe(null);
+		expect(adjacentSession(listed, a, -1)).toBe(null);
+	});
+
+	test("a subagent steps from its session's row", () => {
+		expect(adjacentSession(listed, { kind: "live", instanceId: "a", agentId: "x" }, 1)).toEqual(b);
+	});
+
+	test("from a view the sidebar does not list, or none, steps onto the first or last row", () => {
+		const elsewhere: View = { kind: "live", instanceId: "other project", agentId: null };
+		expect(adjacentSession(listed, elsewhere, 1)).toEqual(a);
+		expect(adjacentSession(listed, null, -1)).toEqual(old);
+		expect(adjacentSession([], null, 1)).toBe(null);
 	});
 });

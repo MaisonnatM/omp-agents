@@ -4,7 +4,7 @@ import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { chordLabel, type ShortcutId, SHORTCUTS } from "../shortcuts";
+import { type ShortcutId, shortcutKeys } from "../shortcuts";
 
 /**
  * The dashboard's two sidebars, each one resizable and closeable on its own. Fluid's provider holds a single width
@@ -109,7 +109,6 @@ interface SidebarToggleProps {
 /** Shows or hides a sidebar: the left one's from its header or the strip left in its place, the right one's from the pane header. */
 export function SidebarToggle({ side, open, onToggle }: SidebarToggleProps) {
 	const { name, id, shortcut, hideIcon: Hide, showIcon: Show } = SIDEBARS[side];
-	const chord = SHORTCUTS.find(({ id }) => id === shortcut)?.chord;
 	const action = `${open ? "Hide" : "Show"} the ${name.toLowerCase()} sidebar`;
 	return (
 		<Button
@@ -119,7 +118,7 @@ export function SidebarToggle({ side, open, onToggle }: SidebarToggleProps) {
 			aria-label={`${name} sidebar`}
 			aria-expanded={open}
 			aria-controls={id}
-			title={chord ? `${action} (${chordLabel(chord)})` : action}
+			title={`${action} (${shortcutKeys(shortcut)})`}
 			onClick={onToggle}
 		>
 			{open ? <Hide /> : <Show />}
