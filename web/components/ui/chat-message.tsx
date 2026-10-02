@@ -84,7 +84,7 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
         {children != null && children !== "" && (
           <div
             className={cn(
-              "whitespace-pre-wrap break-words",
+              "max-w-full whitespace-pre-wrap break-words",
               compact ? "py-1.5 text-[13px]" : "py-2 text-[14px]",
               // User keeps the bubble chrome (rounded fill + horizontal padding);
               // the assistant reply is flush-left plain text with no background.
