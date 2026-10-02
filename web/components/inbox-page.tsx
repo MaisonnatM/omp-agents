@@ -3,9 +3,12 @@ import {
 	ChevronRight,
 	CircleCheck,
 	CircleDashed,
+	CircleSlash,
 	CircleX,
+	ExternalLink,
 	GitMerge,
 	GitPullRequest,
+	GitPullRequestClosed,
 	GitPullRequestDraft,
 	Link2,
 	type LucideIcon,
@@ -14,12 +17,17 @@ import {
 } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type {
+	CheckRunState,
 	CheckState,
 	Inbox,
 	InboxPullRequest,
 	PastSession,
 	Person,
 	PullRequest,
+	PullRequestCheck,
+	PullRequestComment,
+	PullRequestDetail,
+	PullRequestEvent,
 	PullRequestLink,
 	RepoInbox,
 	ReviewDecision,
@@ -35,23 +43,42 @@ import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { readJson } from "../settings-api";
 import { refreshInbox, useInbox } from "../use-inbox";
-import { graphiteUrl, type InboxTarget, inboxRepoKey, inboxSectionId, inboxSections, type OpenMode, pullRequestUrl, samePullRequest } from "../view-model";
+import { usePullRequest } from "../use-pull-request";
+import { graphiteUrl, hashForInbox, type InboxTarget, inboxRepoKey, inboxSectionId, inboxSections, type OpenMode, pullRequestUrl, samePullRequest } from "../view-model";
 import { Header } from "./conversation";
+import { MessageMarkdown } from "./message-markdown";
 import { age, hostLabel, modeOf, pastLabel, projectName, SPLIT_CLICK } from "./roster";
 
 /** Folded repositories and sections: `owner/repo`, and `owner/repo:<section title>`. */
 const COLLAPSED_KEY = "omp-agents.inbox-collapsed";
 
-const STATE_ICON: Record<InboxPullRequest["state"], [LucideIcon, string, string]> = {
+const STATE_ICON: Record<PullRequestDetail["state"], [LucideIcon, string, string]> = {
 	open: [GitPullRequest, "text-emerald-600 dark:text-emerald-400", "Open pull request"],
 	draft: [GitPullRequestDraft, "text-muted-foreground", "Draft pull request, not ready for review"],
 	merged: [GitMerge, "text-violet-600 dark:text-violet-400", "Merged pull request"],
+	closed: [GitPullRequestClosed, "text-red-600 dark:text-red-400", "Closed pull request"],
 };
 
 const CHECK_ICON: Record<Exclude<CheckState, "none">, [LucideIcon, string, string]> = {
 	passing: [CircleCheck, "text-emerald-600 dark:text-emerald-400", "Checks on the latest commit passed"],
 	failing: [CircleX, "text-red-600 dark:text-red-400", "Checks on the latest commit failed"],
 	pending: [CircleDashed, "text-amber-600 dark:text-amber-400", "Checks on the latest commit are still running"],
+};
+
+const CHECK_RUN_ICON: Record<CheckRunState, [LucideIcon, string]> = {
+	passing: [CircleCheck, "text-emerald-600 dark:text-emerald-400"],
+	failing: [CircleX, "text-red-600 dark:text-red-400"],
+	pending: [CircleDashed, "text-amber-600 dark:text-amber-400"],
+	skipped: [CircleSlash, "text-muted-foreground"],
+};
+
+/** What a comment or review did, after its author's name. */
+const EVENT_ACTION: Record<NonNullable<PullRequestEvent["review"]> | "comment", string> = {
+	approved: "approved",
+	"changes-requested": "requested changes",
+	commented: "reviewed",
+	dismissed: "reviewed, since dismissed",
+	comment: "commented",
 };
 
 const REVIEW_LABEL: Record<Exclude<ReviewDecision, "none">, [string, string]> = {
@@ -259,71 +286,298 @@ function LinkSessionsButton({ pr, sessions }: { pr: PullRequest; sessions: Sessi
 interface RowProps {
 	pr: InboxPullRequest;
 	sessions: SessionLink[];
-	/** The PR the inbox link named, highlighted. */
+	/** The PR the inbox link named: highlighted, with its details open below it. */
 	targeted: boolean;
+	/** Changes when the page's Refresh asks GitHub again. */
+	reload: number;
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
-function PullRequestRow({ pr, sessions, targeted, onOpen }: RowProps) {
+function PullRequestRow({ pr, sessions, targeted, reload, onOpen }: RowProps) {
 	const review = pr.state === "merged" || pr.review === "none" ? null : REVIEW_LABEL[pr.review];
+	const detailsId = `${rowId(pr)}-details`;
 	return (
-		<li
-			id={rowId(pr)}
-			data-targeted={targeted || undefined}
-			className={cn("flex scroll-my-6 items-start gap-3 px-3 py-2.5 hover:bg-muted/50", targeted && "bg-accent/60 ring-2 ring-inset ring-ring hover:bg-accent/60")}
-		>
-			<IconTip icon={STATE_ICON[pr.state]} className="mt-0.5" />
-			<Avatar person={pr.author} label={`Opened by ${pr.author.login}`} className="mt-px" />
-			<div className="min-w-0 flex-1 space-y-0.5">
-				<div className="flex min-w-0 items-baseline gap-2">
-					<a
-						href={graphiteUrl(pr)}
-						target="_blank"
-						rel="noreferrer"
-						title={`${pr.owner}/${pr.repo}#${pr.number} on Graphite`}
-						className="truncate text-sm font-medium underline-offset-2 hover:underline"
-					>
-						{pr.title}
-					</a>
-					<span className="shrink-0 text-xs tabular-nums text-muted-foreground">#{pr.number}</span>
-				</div>
-				<p className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-					<span className="truncate font-mono" title={pr.head}>
-						{pr.head}
-					</span>
-					{pr.stackedOn && (
-						<span className="truncate" title={`Stacked on ${pr.stackedOn}`}>
-							on <span className="font-mono">{pr.stackedOn}</span>
-						</span>
-					)}
-					{pr.role === "reviewer" && <span>· by {pr.author.login}</span>}
-					{sessions.slice(0, 3).map(session => (
-						<button
-							key={session.sessionId}
-							type="button"
-							title={`Open the session that ${session.link === "submitted" ? "submitted" : "worked on"} it (${SPLIT_CLICK} to split)`}
-							onClick={event => onOpen(session.view, modeOf(event))}
-							className={cn(
-								"max-w-48 truncate rounded px-1.5 py-px text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
-								session.link === "submitted" ? "bg-muted" : "ring-1 ring-inset ring-border",
-							)}
+		<li id={rowId(pr)} data-targeted={targeted || undefined} className={cn("scroll-my-6", targeted && "ring-2 ring-inset ring-ring")}>
+			<div className={cn("flex items-start gap-3 px-3 py-2.5", targeted ? "bg-accent/60" : "hover:bg-muted/50")}>
+				<IconTip icon={STATE_ICON[pr.state]} className="mt-0.5" />
+				<Avatar person={pr.author} label={`Opened by ${pr.author.login}`} className="mt-px" />
+				<div className="min-w-0 flex-1 space-y-0.5">
+					<div className="flex min-w-0 items-baseline gap-2">
+						<a
+							href={hashForInbox(targeted ? null : pr)}
+							aria-expanded={targeted}
+							aria-controls={targeted ? detailsId : undefined}
+							title={targeted ? "Hide the details" : `Show the details of ${pr.owner}/${pr.repo}#${pr.number}`}
+							className="truncate rounded-sm text-sm font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
 						>
-							{session.label}
-						</button>
-					))}
-				</p>
+							{pr.title}
+						</a>
+						<span className="shrink-0 text-xs tabular-nums text-muted-foreground">#{pr.number}</span>
+					</div>
+					<p className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+						<span className="truncate font-mono" title={pr.head}>
+							{pr.head}
+						</span>
+						{pr.stackedOn && (
+							<span className="truncate" title={`Stacked on ${pr.stackedOn}`}>
+								on <span className="font-mono">{pr.stackedOn}</span>
+							</span>
+						)}
+						{pr.role === "reviewer" && <span>· by {pr.author.login}</span>}
+						{sessions.slice(0, 3).map(session => (
+							<button
+								key={session.sessionId}
+								type="button"
+								title={`Open the session that ${session.link === "submitted" ? "submitted" : "worked on"} it (${SPLIT_CLICK} to split)`}
+								onClick={event => onOpen(session.view, modeOf(event))}
+								className={cn(
+									"max-w-48 truncate rounded px-1.5 py-px text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
+									session.link === "submitted" ? "bg-muted" : "ring-1 ring-inset ring-border",
+								)}
+							>
+								{session.label}
+							</button>
+						))}
+					</p>
+				</div>
+				<div className="flex shrink-0 items-center gap-3 text-xs">
+					<Reviewers reviewers={pr.reviewers} />
+					{review && <span className={review[1]}>{review[0]}</span>}
+					<Unresolved unresolved={pr.unresolved} />
+					{pr.checks !== "none" && <IconTip icon={CHECK_ICON[pr.checks]} />}
+					{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
+					<span className="w-14 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={new Date(pr.updatedAt).toLocaleString()}>
+						{age(pr.updatedAt)}
+					</span>
+				</div>
 			</div>
-			<div className="flex shrink-0 items-center gap-3 text-xs">
-				<Reviewers reviewers={pr.reviewers} />
-				{review && <span className={review[1]}>{review[0]}</span>}
-				<Unresolved unresolved={pr.unresolved} />
-				{pr.checks !== "none" && <IconTip icon={CHECK_ICON[pr.checks]} />}
-				{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
-				<span className="w-14 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={new Date(pr.updatedAt).toLocaleString()}>
-					{age(pr.updatedAt)}
-				</span>
-			</div>
+			{targeted && (
+				// Indented under the title, past the state icon and the author's picture.
+				<div id={detailsId} className="py-4 pr-3 pl-[3.75rem]">
+					<PullRequestDetails pr={pr} reload={reload} withTitle={false} />
+				</div>
+			)}
 		</li>
+	);
+}
+
+/** A titled part of a pull request's details. */
+function DetailSection({ title, children }: { title: ReactNode; children: ReactNode }) {
+	return (
+		<section className="space-y-2">
+			<h5 className="flex items-baseline gap-2 text-xs font-medium text-muted-foreground">{title}</h5>
+			{children}
+		</section>
+	);
+}
+
+/** An external link that says where it goes. */
+function OutLink({ href, children }: { href: string; children: ReactNode }) {
+	return (
+		<a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:text-foreground hover:underline">
+			{children}
+			<ExternalLink aria-hidden className="size-3" />
+		</a>
+	);
+}
+
+function Comment({ comment: { author, body, at, url }, action }: { comment: PullRequestComment; action: string }) {
+	const when = `${age(at)} ago`;
+	return (
+		<li className="space-y-1.5">
+			<p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+				<Avatar person={author} label={author.login} className="mr-0.5" />
+				<span className="font-medium text-foreground">{author.login}</span>
+				{action}
+				<span title={new Date(at).toLocaleString()}>{url ? <OutLink href={url}>{when}</OutLink> : when}</span>
+			</p>
+			{body.trim() && (
+				<div className="pl-7 text-sm [&_img]:max-w-full">
+					<MessageMarkdown text={body} github />
+				</div>
+			)}
+		</li>
+	);
+}
+
+function CheckRow({ check: { name, state, url } }: { check: PullRequestCheck }) {
+	const [Icon, color] = CHECK_RUN_ICON[state];
+	return (
+		<li className="flex min-w-0 items-center gap-2">
+			<Icon aria-label={state} className={cn("size-3.5 shrink-0", color)} />
+			{url ? (
+				<a href={url} target="_blank" rel="noreferrer" className="truncate underline-offset-2 hover:underline">
+					{name}
+				</a>
+			) : (
+				<span className="truncate">{name}</span>
+			)}
+		</li>
+	);
+}
+
+/** Failing and pending checks in full; passing and skipped ones folded behind their counts. */
+function Checks({ checks }: { checks: PullRequestCheck[] }) {
+	const waiting = checks.filter(check => check.state === "failing" || check.state === "pending");
+	const settled = checks.filter(check => check.state === "passing" || check.state === "skipped");
+	const passing = settled.filter(check => check.state === "passing").length;
+	const skipped = settled.length - passing;
+	return (
+		<div className="space-y-1.5 text-xs">
+			{waiting.length > 0 && (
+				<ul className="space-y-1">
+					{waiting.map((check, index) => (
+						// GitHub can name two runs alike.
+						<CheckRow key={index} check={check} />
+					))}
+				</ul>
+			)}
+			{settled.length > 0 && (
+				<details>
+					<summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+						{[passing > 0 && `${passing} passing`, skipped > 0 && `${skipped} skipped`].filter(Boolean).join(", ")}
+					</summary>
+					<ul className="mt-1.5 space-y-1">
+						{settled.map((check, index) => (
+							<CheckRow key={index} check={check} />
+						))}
+					</ul>
+				</details>
+			)}
+		</div>
+	);
+}
+
+interface DetailsProps {
+	pr: PullRequest;
+	/** Changes when the page's Refresh asks GitHub again. */
+	reload: number;
+	/** Shows the title and state, which a row already shows. */
+	withTitle: boolean;
+}
+
+/** A pull request's description, checks, unresolved comments, conversation, and files, read from GitHub in place of opening it there. */
+function PullRequestDetails({ pr, reload, withTitle }: DetailsProps) {
+	const { detail, error } = usePullRequest(pr, reload);
+	if (!detail) {
+		return error ? (
+			<p role="alert" className="text-sm text-red-600 dark:text-red-400">
+				Cannot load the pull request: {error}
+			</p>
+		) : (
+			<p className="text-sm text-muted-foreground">Asking GitHub for the pull request…</p>
+		);
+	}
+	const { body, checks, threads, conversation, files } = detail;
+	return (
+		<div className="space-y-5">
+			{withTitle && (
+				<div className="flex items-start gap-3">
+					<IconTip icon={STATE_ICON[detail.state]} className="mt-0.5" />
+					<h4 className="min-w-0 text-sm font-medium">
+						{detail.title} <span className="text-xs font-normal tabular-nums text-muted-foreground">#{detail.number}</span>
+					</h4>
+				</div>
+			)}
+			{error && (
+				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
+					Cannot refresh the pull request: {error}
+				</p>
+			)}
+			<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+				<span className="min-w-0 truncate">
+					<span className="font-mono">{detail.head}</span> into <span className="font-mono">{detail.base}</span>
+				</span>
+				<span className="tabular-nums">
+					<span className="text-emerald-600 dark:text-emerald-400">+{detail.additions}</span>{" "}
+					<span className="text-red-600 dark:text-red-400">−{detail.deletions}</span> in {detail.changedFiles}{" "}
+					{detail.changedFiles === 1 ? "file" : "files"}
+				</span>
+				<span title={new Date(detail.createdAt).toLocaleString()}>
+					opened by {detail.author.login} {age(detail.createdAt)} ago
+				</span>
+				<span className="ml-auto flex gap-3">
+					<OutLink href={pullRequestUrl(detail)}>GitHub</OutLink>
+					<OutLink href={graphiteUrl(detail)}>Graphite</OutLink>
+				</span>
+			</p>
+			<DetailSection title="Description">
+				{body.trim() ? (
+					<div className="text-sm [&_img]:max-w-full">
+						<MessageMarkdown text={body} github />
+					</div>
+				) : (
+					<p className="text-sm text-muted-foreground">No description.</p>
+				)}
+			</DetailSection>
+			{checks.length > 0 && (
+				<DetailSection title="Checks">
+					<Checks checks={checks} />
+				</DetailSection>
+			)}
+			{threads.length > 0 && (
+				<DetailSection
+					title={
+						<>
+							Unresolved comments <span className="tabular-nums">{threads.length}</span>
+						</>
+					}
+				>
+					<ul className="space-y-3">
+						{threads.map((thread, index) => (
+							<li key={index} className="space-y-3 rounded-md border border-border p-3">
+								<p className="truncate font-mono text-xs text-muted-foreground" title={thread.path}>
+									{thread.path}
+									{thread.line !== null && `:${thread.line}`}
+								</p>
+								<ul className="space-y-3">
+									{thread.comments.map((comment, at) => (
+										<Comment key={at} comment={comment} action={at === 0 ? "commented" : "replied"} />
+									))}
+								</ul>
+							</li>
+						))}
+					</ul>
+				</DetailSection>
+			)}
+			{conversation.length > 0 && (
+				<DetailSection title="Conversation">
+					<ul className="space-y-4">
+						{conversation.map((event, index) => (
+							<Comment key={index} comment={event} action={EVENT_ACTION[event.review ?? "comment"]} />
+						))}
+					</ul>
+				</DetailSection>
+			)}
+			{files.length > 0 && (
+				<DetailSection
+					title={
+						<>
+							Files <span className="tabular-nums">{detail.changedFiles}</span>
+						</>
+					}
+				>
+					<ul className="max-h-72 divide-y divide-border overflow-y-auto rounded-md border border-border font-mono text-xs">
+						{files.map(file => (
+							<li key={file.path} className="flex min-w-0 items-center gap-3 px-2.5 py-1">
+								<span className="min-w-0 flex-1 truncate" title={`${file.path} (${file.change})`}>
+									{file.path}
+								</span>
+								<span className="shrink-0 tabular-nums">
+									<span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>{" "}
+									<span className="text-red-600 dark:text-red-400">−{file.deletions}</span>
+								</span>
+							</li>
+						))}
+					</ul>
+					{detail.changedFiles > files.length && (
+						<p className="text-xs text-muted-foreground">
+							And {detail.changedFiles - files.length} more files, which <OutLink href={`${pullRequestUrl(detail)}/files`}>GitHub</OutLink> lists.
+						</p>
+					)}
+				</DetailSection>
+			)}
+		</div>
 	);
 }
 
@@ -332,12 +586,13 @@ interface RepoProps {
 	hosts: RosterHost[];
 	past: PastSession[];
 	target: PullRequest | null;
+	reload: number;
 	collapsed: ReadonlySet<string>;
 	onToggle: (key: string) => void;
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
-function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen }: RepoProps) {
+function RepoSection({ inbox, hosts, past, target, reload, collapsed, onToggle, onOpen }: RepoProps) {
 	const name = `${inbox.owner}/${inbox.repo}`;
 	const key = inboxRepoKey(inbox);
 	const headingId = `inbox-${name}`;
@@ -376,6 +631,7 @@ function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen }
 									pr={pr}
 									sessions={sessionsFor(pr, hosts, past)}
 									targeted={target !== null && samePullRequest(pr, target)}
+									reload={reload}
 									onOpen={onOpen}
 								/>
 							))}
@@ -415,23 +671,23 @@ function placeOf(inbox: Inbox, pr: PullRequest): { repo: string; section: string
 	return null;
 }
 
-/** Why the inbox does not list the PR a link named, and the way to it on GitHub. `allProjects`: the sidebar shows every project. */
-function MissingTarget({ target, inbox, allProjects }: { target: PullRequest; inbox: Inbox; allProjects: boolean }) {
+/** Why the inbox does not list the PR a link named, then that PR's details. `allProjects`: the sidebar shows every project. */
+function MissingTarget({ target, inbox, allProjects, reload }: { target: PullRequest; inbox: Inbox; allProjects: boolean; reload: number }) {
 	const repo = `${target.owner}/${target.repo}`;
 	const covered = inbox.repos.some(other => `${other.owner}/${other.repo}`.toLowerCase() === repo.toLowerCase());
-	let reason = `${repo}#${target.number} is not in this inbox, which covers only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}. `;
+	let reason = `${repo}#${target.number} is not in this inbox, which covers only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}.`;
 	if (covered) {
-		reason = `${repo}#${target.number} is not in this inbox. The inbox lists your open pull requests, your merges from the last seven days, and the pull requests that wait for your review. `;
+		reason = `${repo}#${target.number} is not in this inbox. The inbox lists your open pull requests, your merges from the last seven days, and the pull requests that wait for your review.`;
 	} else if (allProjects) {
-		reason = `${repo}#${target.number} is not in this inbox, because no session ran in ${repo}. `;
+		reason = `${repo}#${target.number} is not in this inbox, because no session ran in ${repo}.`;
 	}
 	return (
-		<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-			{reason}
-			<a href={pullRequestUrl(target)} target="_blank" rel="noreferrer" className="text-foreground underline underline-offset-2">
-				Open it on GitHub
-			</a>
-		</p>
+		<div className="space-y-4 rounded-md border border-border p-4 ring-2 ring-inset ring-ring">
+			<p role="status" className="text-sm text-muted-foreground">
+				{reason}
+			</p>
+			<PullRequestDetails key={rowId(target)} pr={target} reload={reload} withTitle />
+		</div>
 	);
 }
 
@@ -440,7 +696,7 @@ interface InboxPageProps {
 	project: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The PR an inbox link named: its row unfolds, scrolls into view, and stays highlighted. */
+	/** The PR an inbox link named: its row unfolds, scrolls into view, stays highlighted, and shows its details. */
 	target: PullRequest | null;
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The section a sidebar link last chose, to unfold, scroll to, and focus. */
@@ -451,6 +707,8 @@ interface InboxPageProps {
 export function InboxPage({ project, hosts, past, target, onOpen, section }: InboxPageProps) {
 	const { read, error, refreshing } = useInbox(project, true);
 	const [collapsed, toggleCollapsed, expand] = useCollapsed();
+	/** Counts the Refresh button's presses, which read the open pull request's details again too. */
+	const [reload, setReload] = useState(0);
 	const place = read && target ? placeOf(read.inbox, target) : null;
 	const targetKey = target && rowId(target);
 	/** The target whose row the page already unfolded and scrolled to; folding it again afterwards stays folded. */
@@ -467,7 +725,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 			return;
 		}
 		shown.current = targetKey;
-		document.getElementById(targetKey)?.scrollIntoView({ block: "center", behavior: "smooth" });
+		document.getElementById(targetKey)?.scrollIntoView({ block: "start", behavior: "smooth" });
 	}, [place?.repo, place?.section, targetKey, collapsed]);
 
 	// Waits for the section to unfold, and for an inbox that has it to load.
@@ -490,7 +748,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 		body = (
 			<>
 				{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the inbox: {error}</p>}
-				{target && !place && <MissingTarget target={target} inbox={read.inbox} allProjects={project === null} />}
+				{target && !place && <MissingTarget target={target} inbox={read.inbox} allProjects={project === null} reload={reload} />}
 				{repos.length === 0 && <p className="text-sm text-muted-foreground">No session ran in a GitHub repository.</p>}
 				{repos.map(repo => (
 					<RepoSection
@@ -499,6 +757,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 						hosts={hosts}
 						past={past}
 						target={target}
+						reload={reload}
 						collapsed={collapsed}
 						onToggle={toggleCollapsed}
 						onOpen={onOpen}
@@ -527,7 +786,16 @@ export function InboxPage({ project, hosts, past, target, onOpen, section }: Inb
 						: "Your pull requests and review requests on GitHub"
 				}
 			>
-				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void refreshInbox(project, true)}>
+				<Button
+					variant="ghost"
+					size="compact"
+					leadingIcon={RefreshCw}
+					disabled={refreshing}
+					onClick={() => {
+						void refreshInbox(project, true);
+						setReload(count => count + 1);
+					}}
+				>
 					{refreshing ? "Refreshing…" : "Refresh"}
 				</Button>
 			</Header>

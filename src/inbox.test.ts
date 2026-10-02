@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseInboxAnswer, parseRemote } from "./inbox";
+import { parseDetailAnswer, parseInboxAnswer, parseRemote } from "./inbox";
 
 const repo = { owner: "acme", repo: "webapp" };
 const me = { login: "me", avatarUrl: "https://avatars.example/me" };
@@ -174,5 +174,103 @@ describe("parseInboxAnswer", () => {
 
 	test("an answer without data reports GitHub's errors", () => {
 		expect(() => parseInboxAnswer({ errors: [{ message: "Could not resolve to a Repository" }] }, repo)).toThrow("Could not resolve to a Repository");
+	});
+});
+
+describe("parseDetailAnswer", () => {
+	const pr = { ...repo, number: 7 };
+	const teammate = { login: "teammate", avatarUrl: null };
+	const answer = (fields: Record<string, unknown>) => ({
+		data: {
+			repository: {
+				pullRequest: {
+					number: 7,
+					title: "PR 7",
+					body: "Fixes it",
+					isDraft: false,
+					state: "OPEN",
+					reviewDecision: null,
+					headRefName: "me/branch-7",
+					baseRefName: "main",
+					createdAt: "2026-09-30T08:00:00Z",
+					additions: 3,
+					deletions: 1,
+					changedFiles: 1,
+					author: me,
+					...fields,
+				},
+			},
+		},
+	});
+
+	test("lists failing checks first, an unfinished run as pending, and a commit status by its context", () => {
+		const { checks } = parseDetailAnswer(
+			answer({
+				commits: {
+					nodes: [
+						{
+							commit: {
+								statusCheckRollup: {
+									contexts: {
+										nodes: [
+											{ name: "lint", status: "COMPLETED", conclusion: "SUCCESS", detailsUrl: "https://ci.example/lint" },
+											{ name: "docs", status: "COMPLETED", conclusion: "SKIPPED", detailsUrl: null },
+											{ name: "build", status: "IN_PROGRESS", conclusion: null, detailsUrl: null },
+											{ context: "deploy", state: "ERROR", targetUrl: "https://ci.example/deploy" },
+											{ name: "test", status: "COMPLETED", conclusion: "TIMED_OUT", detailsUrl: null },
+										],
+									},
+								},
+							},
+						},
+					],
+				},
+			}),
+			pr,
+		);
+		expect(checks).toEqual([
+			{ name: "deploy", state: "failing", url: "https://ci.example/deploy" },
+			{ name: "test", state: "failing", url: null },
+			{ name: "build", state: "pending", url: null },
+			{ name: "lint", state: "passing", url: "https://ci.example/lint" },
+			{ name: "docs", state: "skipped", url: null },
+		]);
+	});
+
+	test("merges comments and reviews by time, leaves out bare comment reviews and resolved threads", () => {
+		const detail = parseDetailAnswer(
+			answer({
+				state: "CLOSED",
+				comments: { nodes: [{ author: teammate, body: "Why?", createdAt: "2026-09-30T10:00:00Z", url: "https://github.example/c1" }] },
+				reviews: {
+					nodes: [
+						{ state: "APPROVED", submittedAt: "2026-09-30T11:00:00Z", author: teammate, body: "", url: null },
+						{ state: "COMMENTED", submittedAt: "2026-09-30T09:00:00Z", author: teammate, body: "", url: null },
+						{ state: "PENDING", submittedAt: null, author: me, body: "draft", url: null },
+						{ state: "CHANGES_REQUESTED", submittedAt: "2026-09-30T09:30:00Z", author: teammate, body: "Not yet", url: null },
+					],
+				},
+				reviewThreads: {
+					nodes: [
+						{ isResolved: true, path: "a.ts", line: 1, comments: { nodes: [] } },
+						{ isResolved: false, path: "b.ts", line: null, comments: { nodes: [{ author: null, body: "Gone line", createdAt: "2026-09-30T09:00:00Z", url: null }] } },
+					],
+				},
+			}),
+			pr,
+		);
+		expect(detail.state).toBe("closed");
+		expect(detail.conversation.map(event => [event.review, event.body])).toEqual([
+			["changes-requested", "Not yet"],
+			[null, "Why?"],
+			["approved", ""],
+		]);
+		expect(detail.threads).toEqual([
+			{ path: "b.ts", line: null, comments: [{ author: { login: "ghost", avatarUrl: null }, body: "Gone line", at: Date.parse("2026-09-30T09:00:00Z"), url: null }] },
+		]);
+	});
+
+	test("a repository without that pull request is an error, not an empty one", () => {
+		expect(() => parseDetailAnswer({ data: { repository: { pullRequest: null } } }, pr)).toThrow("GitHub has no pull request acme/webapp#7");
 	});
 });

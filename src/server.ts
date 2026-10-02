@@ -8,7 +8,7 @@ import { DashboardSession, type DashboardUpdate, type ForkedSession } from "./da
 import { type LiveUpdate, SessionGuest } from "./guest";
 import { FileTail } from "./tail";
 import { displayPath, type HostSnapshot, listHosts, listModels, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
-import { loadInbox, repoOf } from "./inbox";
+import { loadInbox, loadPullRequestDetail, repoOf } from "./inbox";
 import { PullRequestIndex } from "./pull-requests";
 import { linkSessions, type SessionEntry } from "./session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "./settings";
@@ -708,6 +708,19 @@ async function inbox(req: Request): Promise<Response> {
 	});
 }
 
+/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>[&fresh]`: that pull request in full, for the inbox to show in place. */
+async function pullRequest(req: Request): Promise<Response> {
+	if (!allowedHost(req)) return fail(403, "forbidden host");
+	const params = new URL(req.url).searchParams;
+	const owner = params.get("owner") ?? "";
+	const repo = params.get("repo") ?? "";
+	const number = Number(params.get("number"));
+	if (!/^[\w.-]+$/.test(owner) || !/^[\w.-]+$/.test(repo) || !Number.isSafeInteger(number) || number < 1) {
+		return fail(400, "Expected ?owner=&repo=&number=");
+	}
+	return answer(() => loadPullRequestDetail({ owner, repo, number }, params.has("fresh")));
+}
+
 /** A write's JSON body, or the response refusing it. Only this app's own page may write, and only with a JSON body, which a cross-site form cannot send. */
 async function writeBody(req: Request): Promise<{ body: unknown } | Response> {
 	if (!sameOrigin(req)) return fail(403, "forbidden origin");
@@ -778,6 +791,7 @@ try {
 			"/api/models": { GET: models },
 			"/api/pull-request/sessions": { PUT: sessionLinks },
 			"/api/inbox": { GET: inbox },
+			"/api/pull-request": { GET: pullRequest },
 		},
 		fetch(req, srv) {
 			const { pathname } = new URL(req.url);

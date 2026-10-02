@@ -2,7 +2,25 @@
  * The inbox page's pull requests, per GitHub repository, live from `gh`: as Graphite's inbox gathers them, the
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
-import type { CheckState, Inbox, InboxPullRequest, InboxRole, Person, RepoInbox, ReviewDecision, Reviewer, ReviewerState } from "./shared";
+import type {
+	CheckRunState,
+	CheckState,
+	Inbox,
+	InboxPullRequest,
+	InboxRole,
+	Person,
+	PullRequest,
+	PullRequestCheck,
+	PullRequestComment,
+	PullRequestDetail,
+	PullRequestEvent,
+	PullRequestFile,
+	PullRequestThread,
+	RepoInbox,
+	ReviewDecision,
+	Reviewer,
+	ReviewerState,
+} from "./shared";
 import { isObject } from "./transcript";
 
 const GH_TIMEOUT_MS = 20_000;
@@ -160,14 +178,17 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole)
 	};
 }
 
+/** The data of a `gh api graphql` answer, or GitHub's errors thrown. */
+function dataOf(answer: unknown): Record<string, unknown> {
+	if (isObject(answer) && isObject(answer.data)) return answer.data;
+	const errors = isObject(answer) && Array.isArray(answer.errors) ? answer.errors : [];
+	const message = errors.map(error => (isObject(error) ? text(error.message) : null)).filter(Boolean).join("; ");
+	throw new Error(message || "GitHub answered without data");
+}
+
 /** The pull requests in `gh api graphql`'s answer to `QUERY`, each once, in search order. */
 export function parseInboxAnswer(answer: unknown, repo: Repo): InboxPullRequest[] {
-	const data = isObject(answer) && isObject(answer.data) ? answer.data : null;
-	if (!data) {
-		const errors = isObject(answer) && Array.isArray(answer.errors) ? answer.errors : [];
-		const message = errors.map(error => (isObject(error) ? text(error.message) : null)).filter(Boolean).join("; ");
-		throw new Error(message || "GitHub answered without data");
-	}
+	const data = dataOf(answer);
 	const found = new Map<number, InboxPullRequest>();
 	for (const [alias, role] of SEARCHES) {
 		for (const node of nodesOf(data[alias])) {
@@ -178,46 +199,192 @@ export function parseInboxAnswer(answer: unknown, repo: Repo): InboxPullRequest[
 	return [...found.values()];
 }
 
-async function queryRepo(repo: Repo): Promise<InboxPullRequest[]> {
-	const scope = `repo:${repo.owner}/${repo.repo} is:pr`;
-	const since = new Date(Date.now() - MERGED_DAYS * 86_400_000).toISOString().slice(0, 10);
-	const child = Bun.spawn(
-		[
-			"gh",
-			"api",
-			"graphql",
-			"-f",
-			`query=${QUERY}`,
-			"-f",
-			`authored=${scope} is:open author:@me sort:updated-desc`,
-			"-f",
-			`reviewing=${scope} is:open review-requested:@me sort:updated-desc`,
-			"-f",
-			`merged=${scope} is:merged author:@me merged:>=${since} sort:updated-desc`,
-		],
-		{ stdout: "pipe", stderr: "pipe", timeout: GH_TIMEOUT_MS },
-	);
+/** `gh api graphql` with `args`, its `-f`/`-F` fields, answering the parsed JSON. */
+async function graphql(args: string[]): Promise<unknown> {
+	const child = Bun.spawn(["gh", "api", "graphql", ...args], { stdout: "pipe", stderr: "pipe", timeout: GH_TIMEOUT_MS });
 	const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
-	let answer: unknown;
 	try {
-		answer = JSON.parse(stdout);
+		return JSON.parse(stdout);
 	} catch {
 		throw new Error(stderr.trim() || `gh exited with code ${code}`);
 	}
+}
+
+async function queryRepo(repo: Repo): Promise<InboxPullRequest[]> {
+	const scope = `repo:${repo.owner}/${repo.repo} is:pr`;
+	const since = new Date(Date.now() - MERGED_DAYS * 86_400_000).toISOString().slice(0, 10);
+	const answer = await graphql([
+		"-f",
+		`query=${QUERY}`,
+		"-f",
+		`authored=${scope} is:open author:@me sort:updated-desc`,
+		"-f",
+		`reviewing=${scope} is:open review-requested:@me sort:updated-desc`,
+		"-f",
+		`merged=${scope} is:merged author:@me merged:>=${since} sort:updated-desc`,
+	]);
 	return parseInboxAnswer(answer, repo);
+}
+
+/** Answers kept for {@link FRESH_MS}, by key; a failure is not kept, so the next load asks again. */
+function cached<T>(cache: Map<string, { at: number; answer: Promise<T> }>, key: string, fresh: boolean, load: () => Promise<T>): Promise<T> {
+	const hit = cache.get(key);
+	if (hit && !fresh && Date.now() - hit.at < FRESH_MS) return hit.answer;
+	const answer = load();
+	cache.set(key, { at: Date.now(), answer });
+	answer.catch(() => cache.get(key)?.answer === answer && cache.delete(key));
+	return answer;
 }
 
 const loaded = new Map<string, { at: number; answer: Promise<InboxPullRequest[]> }>();
 
-function pullRequestsOf(repo: Repo, fresh: boolean): Promise<InboxPullRequest[]> {
-	const key = `${repo.owner}/${repo.repo}`.toLowerCase();
-	const hit = loaded.get(key);
-	if (hit && !fresh && Date.now() - hit.at < FRESH_MS) return hit.answer;
-	const answer = queryRepo(repo);
-	loaded.set(key, { at: Date.now(), answer });
-	// A failure is not kept: the next load asks again.
-	answer.catch(() => loaded.get(key)?.answer === answer && loaded.delete(key));
-	return answer;
+const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
+
+const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
+	repository(owner: $owner, name: $repo) { pullRequest(number: $number) {
+		number title body isDraft state reviewDecision headRefName baseRefName createdAt additions deletions changedFiles
+		author { login ${AVATAR} }
+		reviewRequests(first: 10) { nodes { requestedReviewer {
+			... on User { login ${AVATAR} } ... on Bot { login ${AVATAR} } ... on Mannequin { login ${AVATAR} } ... on Team { slug ${AVATAR} }
+		} } }
+		latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }
+		commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
+			... on CheckRun { name status conclusion detailsUrl }
+			... on StatusContext { context state targetUrl }
+		} } } } } }
+		files(first: 100) { nodes { path additions deletions changeType } }
+		comments(last: 50) { nodes { ${COMMENT_FIELDS} } }
+		reviews(last: 50) { nodes { state submittedAt author { login ${AVATAR} } body url } }
+		reviewThreads(first: ${THREADS}) { nodes { isResolved path line comments(first: 20) { nodes { ${COMMENT_FIELDS} } } } }
+	} }
+}`;
+
+/** A check run's conclusion once it completes; any other status is pending. */
+const CHECK_RUN: Record<string, CheckRunState> = {
+	SUCCESS: "passing",
+	FAILURE: "failing",
+	TIMED_OUT: "failing",
+	CANCELLED: "failing",
+	ACTION_REQUIRED: "failing",
+	STARTUP_FAILURE: "failing",
+	NEUTRAL: "skipped",
+	SKIPPED: "skipped",
+	STALE: "skipped",
+};
+
+/** A commit status's state. */
+const STATUS: Record<string, CheckRunState> = { SUCCESS: "passing", FAILURE: "failing", ERROR: "failing", PENDING: "pending", EXPECTED: "pending" };
+
+const CHECK_ORDER: CheckRunState[] = ["failing", "pending", "passing", "skipped"];
+
+/** A submitted review's state; a pending review is the viewer's unsent draft. */
+const REVIEW_EVENT: Record<string, NonNullable<PullRequestEvent["review"]>> = {
+	APPROVED: "approved",
+	CHANGES_REQUESTED: "changes-requested",
+	COMMENTED: "commented",
+	DISMISSED: "dismissed",
+};
+
+const CHANGE: Record<string, PullRequestFile["change"]> = {
+	ADDED: "added",
+	DELETED: "deleted",
+	MODIFIED: "modified",
+	RENAMED: "renamed",
+	COPIED: "copied",
+	CHANGED: "changed",
+};
+
+const count = (value: unknown): number => (typeof value === "number" ? value : 0);
+
+function parseCheck(node: unknown): PullRequestCheck | null {
+	if (!isObject(node)) return null;
+	const run = text(node.name);
+	if (run !== null) {
+		const state = node.status === "COMPLETED" ? (CHECK_RUN[text(node.conclusion) ?? ""] ?? "skipped") : "pending";
+		return { name: run, state, url: text(node.detailsUrl) };
+	}
+	const context = text(node.context);
+	return context === null ? null : { name: context, state: STATUS[text(node.state) ?? ""] ?? "pending", url: text(node.targetUrl) };
+}
+
+function parseComment(node: unknown, at: unknown): PullRequestComment | null {
+	if (!isObject(node)) return null;
+	const posted = Date.parse(text(at) ?? "");
+	if (Number.isNaN(posted)) return null;
+	return { author: parsePerson(node.author) ?? { login: "ghost", avatarUrl: null }, body: text(node.body) ?? "", at: posted, url: text(node.url) };
+}
+
+/** The pull request in `gh api graphql`'s answer to `DETAIL_QUERY`; throws when GitHub has no such PR. */
+export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequestDetail {
+	const data = dataOf(answer);
+	const repository = isObject(data.repository) ? data.repository : {};
+	const node = repository.pullRequest;
+	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
+	if (!isObject(node)) throw new Error(`GitHub has no pull request ${name}`);
+	const title = text(node.title);
+	const head = text(node.headRefName);
+	const base = text(node.baseRefName);
+	const createdAt = Date.parse(text(node.createdAt) ?? "");
+	if (title === null || head === null || base === null || Number.isNaN(createdAt)) throw new Error(`GitHub answered an incomplete ${name}`);
+	const author = parsePerson(node.author) ?? { login: "ghost", avatarUrl: null };
+	const commits = nodesOf(node.commits);
+	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
+	const rollup = isObject(commit.statusCheckRollup) ? commit.statusCheckRollup.contexts : null;
+	const checks = nodesOf(rollup)
+		.map(parseCheck)
+		.filter(check => check !== null)
+		.toSorted((a, b) => CHECK_ORDER.indexOf(a.state) - CHECK_ORDER.indexOf(b.state) || a.name.localeCompare(b.name));
+	const files = nodesOf(node.files).flatMap((file): PullRequestFile[] =>
+		isObject(file) && typeof file.path === "string"
+			? [{ path: file.path, additions: count(file.additions), deletions: count(file.deletions), change: CHANGE[text(file.changeType) ?? ""] ?? "changed" }]
+			: [],
+	);
+	const comments = nodesOf(node.comments).flatMap((comment): PullRequestEvent[] => {
+		const parsed = parseComment(comment, isObject(comment) ? comment.createdAt : null);
+		return parsed ? [{ ...parsed, review: null }] : [];
+	});
+	// A review that only comments carries its words in its review threads.
+	const reviews = nodesOf(node.reviews).flatMap((review): PullRequestEvent[] => {
+		if (!isObject(review)) return [];
+		const state = REVIEW_EVENT[text(review.state) ?? ""];
+		const parsed = parseComment(review, review.submittedAt);
+		return state && parsed && (parsed.body.trim() || state !== "commented") ? [{ ...parsed, review: state }] : [];
+	});
+	const threads = nodesOf(node.reviewThreads).flatMap((thread): PullRequestThread[] => {
+		if (!isObject(thread) || thread.isResolved !== false || typeof thread.path !== "string") return [];
+		const threadComments = nodesOf(thread.comments).flatMap(comment => parseComment(comment, isObject(comment) ? comment.createdAt : null) ?? []);
+		return [{ path: thread.path, line: typeof thread.line === "number" ? thread.line : null, comments: threadComments }];
+	});
+	return {
+		owner: pr.owner,
+		repo: pr.repo,
+		number: pr.number,
+		title,
+		body: text(node.body) ?? "",
+		author,
+		reviewers: parseReviewers(node, author.login),
+		state: node.state === "MERGED" ? "merged" : node.state === "CLOSED" ? "closed" : node.isDraft === true ? "draft" : "open",
+		review: REVIEW[text(node.reviewDecision) ?? ""] ?? "none",
+		head,
+		base,
+		additions: count(node.additions),
+		deletions: count(node.deletions),
+		changedFiles: count(node.changedFiles),
+		files,
+		checks,
+		threads,
+		conversation: [...comments, ...reviews].toSorted((a, b) => a.at - b.at),
+		createdAt,
+	};
+}
+
+const details = new Map<string, { at: number; answer: Promise<PullRequestDetail> }>();
+
+/** One pull request in full, live from `gh`. `fresh` skips the cache. */
+export function loadPullRequestDetail(pr: PullRequest, fresh: boolean): Promise<PullRequestDetail> {
+	return cached(details, `${pr.owner}/${pr.repo}#${pr.number}`.toLowerCase(), fresh, async () =>
+		parseDetailAnswer(await graphql(["-f", `query=${DETAIL_QUERY}`, "-f", `owner=${pr.owner}`, "-f", `repo=${pr.repo}`, "-F", `number=${pr.number}`]), pr),
+	);
 }
 
 /** The inbox for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache. */
@@ -238,7 +405,8 @@ export async function loadInbox(cwds: string[], fresh: boolean): Promise<Inbox> 
 	const repos = await Promise.all(
 		[...byRepo.values()].map(async (entry): Promise<RepoInbox> => {
 			try {
-				return { ...entry, pullRequests: await pullRequestsOf(entry, fresh) };
+				const pullRequests = await cached(loaded, `${entry.owner}/${entry.repo}`.toLowerCase(), fresh, () => queryRepo(entry));
+				return { ...entry, pullRequests };
 			} catch (err) {
 				return { ...entry, error: err instanceof Error ? err.message : String(err) };
 			}
