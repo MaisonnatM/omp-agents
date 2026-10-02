@@ -100,6 +100,10 @@ export function App() {
 	const maximized = layout.maximized && !page;
 	// The running sessions the sidebar lists, in its order, which ending a session moves its panes along.
 	const listedHosts = state.hosts.filter(host => project === null || host.cwd === project).map(host => host.instanceId);
+	const endHost = (instanceId: string): void => {
+		send({ t: "end", instanceId });
+		show(endSession(layout, instanceId, listedHosts));
+	};
 
 	const settingsHref = hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
@@ -161,10 +165,7 @@ export function App() {
 				dequeued={dequeued}
 				onDequeue={(reqId, messages) => send({ t: "dequeue", reqId, view: pane, messages })}
 				onAbort={() => send({ t: "abort", instanceId })}
-				onEnd={() => {
-					send({ t: "end", instanceId });
-					show(endSession(layout, instanceId, listedHosts));
-				}}
+				onEnd={() => endHost(instanceId)}
 				onAnswer={(requestId, answer) => send({ t: "answer", instanceId, requestId, answer })}
 				actions={actions}
 				focused={focused}
@@ -277,6 +278,13 @@ export function App() {
 					onPickProject={pickProject}
 					onOpen={open}
 					onNewSession={openNewSession}
+					resume={state.resume}
+					onResume={sessionId => {
+						// The pane shows the resume's progress and failure, and the live session takes it over.
+						open({ kind: "past", sessionId }, "replace");
+						resume(sessionId);
+					}}
+					onEnd={endHost}
 					onShowShortcuts={() => setShortcutsOpen(true)}
 				/>
 				<PlanUsageFooter usage={state.usage} />

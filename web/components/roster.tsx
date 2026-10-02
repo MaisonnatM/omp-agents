@@ -1,9 +1,18 @@
-import { Check, ChevronsUpDown, Columns2, Folder, Inbox, Keyboard, MessagesSquare, Plus, Settings } from "lucide-react";
-import { type MouseEvent, type ReactNode, useState } from "react";
-import type { PastSession, RosterHost, View } from "../../src/shared";
+import { AppWindow, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Folder, GitPullRequest, Inbox, Keyboard, MessagesSquare, Play, Plus, Settings } from "lucide-react";
+import { type MouseEvent, type ReactElement, type ReactNode, useState } from "react";
+import type { PastSession, PullRequest, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuLinkItem,
+	ContextMenuSeparator,
+	ContextMenuShortcut,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
 	SidebarContent,
 	SidebarGroup,
@@ -21,9 +30,11 @@ import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { IS_MAC, useShortcuts } from "../shortcuts";
+import type { Resume } from "../use-dashboard";
 import { useInbox } from "../use-inbox";
 import {
 	hashForInbox,
+	hashForSettings,
 	type InboxTarget,
 	inboxRepoKey,
 	inboxSectionId,
@@ -31,6 +42,7 @@ import {
 	MAX_PANES,
 	matchesFilter,
 	type OpenMode,
+	pullRequestUrl,
 	sameView,
 	workspaces,
 } from "../view-model";
@@ -76,6 +88,67 @@ export const hostLabel = (host: RosterHost): string => host.sessionName ?? proje
 
 export const pastLabel = (session: PastSession): string => session.title ?? projectName(session.cwdDisplay) ?? "Untitled session";
 
+interface RowMenuProps {
+	view: View;
+	/** `view` is on screen, which leaves out Open in split, as the row's own split button does. */
+	isOpen: boolean;
+	onOpen: (view: View, mode: OpenMode) => void;
+	/** The row's `SidebarMenuItem`, which right-click and the context-menu key open the menu on. */
+	children: ReactElement;
+	/** The row's own items, after Open and Open in split. */
+	items?: ReactNode;
+}
+
+/** A sidebar row with its quick actions on right-click. */
+export function RowMenu({ view, isOpen, onOpen, children, items }: RowMenuProps) {
+	return (
+		<ContextMenu>
+			<ContextMenuTrigger render={children} />
+			<ContextMenuContent>
+				<ContextMenuItem onClick={() => onOpen(view, "replace")}>
+					<AppWindow />
+					Open
+				</ContextMenuItem>
+				{!isOpen && (
+					<ContextMenuItem onClick={() => onOpen(view, "split")}>
+						<Columns2 />
+						Open in split
+						<ContextMenuShortcut>{SPLIT_CLICK}</ContextMenuShortcut>
+					</ContextMenuItem>
+				)}
+				{items}
+			</ContextMenuContent>
+		</ContextMenu>
+	);
+}
+
+/** Items a running or past session's menu shares: its pull requests, its workspace's settings, and copying its ids. */
+function SessionItems({ row }: { row: { cwd: string; sessionId: string; pullRequests: PullRequest[] } }) {
+	return (
+		<>
+			<ContextMenuSeparator />
+			{row.pullRequests.map(pr => (
+				<ContextMenuLinkItem key={pullRequestUrl(pr)} href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
+					<GitPullRequest />
+					Open {pr.repo}#{pr.number}
+				</ContextMenuLinkItem>
+			))}
+			<ContextMenuLinkItem href={hashForSettings(row.cwd)}>
+				<Settings />
+				Workspace settings
+			</ContextMenuLinkItem>
+			<ContextMenuSeparator />
+			<ContextMenuItem onClick={() => void navigator.clipboard.writeText(row.cwd)}>
+				<Folder />
+				Copy path
+			</ContextMenuItem>
+			<ContextMenuItem onClick={() => void navigator.clipboard.writeText(row.sessionId)}>
+				<Copy />
+				Copy session ID
+			</ContextMenuItem>
+		</>
+	);
+}
 interface ProjectPickerProps {
 	/** Directories sessions ran in, as {@link workspaces} lists them. */
 	projects: { cwd: string; cwdDisplay: string }[];
@@ -220,6 +293,11 @@ interface RosterProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** Open the new-session draft; no omp starts until its first message. */
 	onNewSession: () => void;
+	resume: Resume;
+	/** Continue past session `sessionId`, in the pane that shows it. */
+	onResume: (sessionId: string) => void;
+	/** End running session `instanceId`, as its pane's End session does. */
+	onEnd: (instanceId: string) => void;
 	onShowShortcuts: () => void;
 }
 
@@ -239,6 +317,9 @@ export function Roster({
 	onPickProject,
 	onOpen,
 	onNewSession,
+	resume,
+	onResume,
+	onEnd,
 	onShowShortcuts,
 }: RosterProps) {
 	const [runningOpen, setRunningOpen] = useState(true);
@@ -311,32 +392,54 @@ export function Roster({
 							{shownHosts.map(host => {
 								const hostView: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 								return (
-									<SidebarMenuItem key={host.instanceId}>
-										<SidebarMenuButton
-											size="lg"
-											isActive={isOpen(hostView)}
-											onClick={event => onOpen(hostView, modeOf(event))}
-											title={`${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-										>
-											<StatusDot status={host.status} />
-											<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-												<span className="flex items-baseline gap-2">
-													<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
-													<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
+									<RowMenu
+										key={host.instanceId}
+										view={hostView}
+										isOpen={isOpen(hostView)}
+										onOpen={onOpen}
+										items={
+											<>
+												<SessionItems row={host} />
+												{/* The server ends only what it controls: a dashboard session, or a terminal room shared writable. */}
+												{host.control.phase === "live" && !host.control.readOnly && (
+													<>
+														<ContextMenuSeparator />
+														<ContextMenuItem variant="destructive" onClick={() => onEnd(host.instanceId)}>
+															<CircleStop />
+															End session
+														</ContextMenuItem>
+													</>
+												)}
+											</>
+										}
+									>
+										<SidebarMenuItem>
+											<SidebarMenuButton
+												size="lg"
+												isActive={isOpen(hostView)}
+												onClick={event => onOpen(hostView, modeOf(event))}
+												title={`${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
+											>
+												<StatusDot status={host.status} />
+												<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+													<span className="flex items-baseline gap-2">
+														<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
+														<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
+													</span>
+													<span className="truncate text-xs text-muted-foreground">
+														{[
+															statusLabel(host.status),
+															host.source === "terminal" && !host.relayConnected && "relay offline",
+															host.pullRequests.map(pr => `#${pr.number}`).join(" "),
+														]
+															.filter(Boolean)
+															.join(" · ")}
+													</span>
 												</span>
-												<span className="truncate text-xs text-muted-foreground">
-													{[
-														statusLabel(host.status),
-														host.source === "terminal" && !host.relayConnected && "relay offline",
-														host.pullRequests.map(pr => `#${pr.number}`).join(" "),
-													]
-														.filter(Boolean)
-														.join(" · ")}
-												</span>
-											</span>
-										</SidebarMenuButton>
-										{splitAction(hostView, hostLabel(host))}
-									</SidebarMenuItem>
+											</SidebarMenuButton>
+											{splitAction(hostView, hostLabel(host))}
+										</SidebarMenuItem>
+									</RowMenu>
 								);
 							})}
 						</SidebarMenu>
@@ -366,30 +469,47 @@ export function Roster({
 							{shownPast.map(session => {
 								const pastView: View = { kind: "past", sessionId: session.sessionId };
 								return (
-									<SidebarMenuItem key={session.sessionId}>
-										<SidebarMenuButton
-											size="lg"
-											isActive={isOpen(pastView)}
-											onClick={event => onOpen(pastView, modeOf(event))}
-											title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-										>
-											<span className="size-4 shrink-0" aria-hidden />
-											<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-												<span className="flex items-baseline gap-2">
-													<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
-													<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
-														{age(session.modifiedAt)}
+									<RowMenu
+										key={session.sessionId}
+										view={pastView}
+										isOpen={isOpen(pastView)}
+										onOpen={onOpen}
+										items={
+											<>
+												{/* One resume runs at a time, as the pane's Resume button allows. */}
+												<ContextMenuItem disabled={resume.phase === "resuming"} onClick={() => onResume(session.sessionId)}>
+													<Play />
+													{resume.phase === "resuming" && resume.sessionId === session.sessionId ? "Resuming…" : "Resume"}
+												</ContextMenuItem>
+												<SessionItems row={session} />
+											</>
+										}
+									>
+										<SidebarMenuItem>
+											<SidebarMenuButton
+												size="lg"
+												isActive={isOpen(pastView)}
+												onClick={event => onOpen(pastView, modeOf(event))}
+												title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
+											>
+												<span className="size-4 shrink-0" aria-hidden />
+												<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+													<span className="flex items-baseline gap-2">
+														<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
+														<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
+															{age(session.modifiedAt)}
+														</span>
 													</span>
+													{session.pullRequests.length > 0 && (
+														<span className="truncate text-xs text-muted-foreground">
+															{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}
+														</span>
+													)}
 												</span>
-												{session.pullRequests.length > 0 && (
-													<span className="truncate text-xs text-muted-foreground">
-														{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}
-													</span>
-												)}
-											</span>
-										</SidebarMenuButton>
-										{splitAction(pastView, pastLabel(session))}
-									</SidebarMenuItem>
+											</SidebarMenuButton>
+											{splitAction(pastView, pastLabel(session))}
+										</SidebarMenuItem>
+									</RowMenu>
 								);
 							})}
 						</SidebarMenu>
