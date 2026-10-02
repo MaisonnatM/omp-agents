@@ -121,6 +121,8 @@ describe("the page", () => {
 		expect(response.headers.get("location")).toBe("/");
 		expect(response.headers.get("set-cookie")).toBe(loginCookie(TOKEN));
 		expect(loginCookie(TOKEN)).toMatch(/; HttpOnly; SameSite=Strict; Path=\/; Max-Age=\d{7,}$/);
+		// A browser already signed in still gets the redirect, so the token leaves its address bar and history.
+		expect(serve(`/?token=${TOKEN}`, { ...signedIn, "sec-fetch-site": "none" }).status).toBe(302);
 	});
 
 	test("with the cookie `/` serves the app, and assets come from the build", async () => {

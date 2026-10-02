@@ -55,11 +55,12 @@ export function guardsFor(port: number, token: string): Guards {
 	const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
 	const allowedHost = (req: Request): boolean => hosts.has(req.headers.get("host") ?? "");
 	const sameOrigin = (req: Request): boolean => allowedHost(req) && req.headers.get("origin") === `http://${req.headers.get("host")}`;
+	// The printed URL wins over a cookie, so its redirect always takes the token out of the address bar and history.
 	const credential = (req: Request): Credential | null =>
-		tokenMatches(token, cookieValue(req.headers.get("cookie"), COOKIE))
-			? "cookie"
-			: tokenMatches(token, new URL(req.url).searchParams.get("token"))
-				? "login"
+		tokenMatches(token, new URL(req.url).searchParams.get("token"))
+			? "login"
+			: tokenMatches(token, cookieValue(req.headers.get("cookie"), COOKIE))
+				? "cookie"
 				: null;
 	const admit = (req: Request): Response | null => {
 		if (!allowedHost(req)) return fail(403, "forbidden host");
