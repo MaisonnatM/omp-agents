@@ -35,6 +35,20 @@ describe("Transcript", () => {
 		]);
 	});
 
+	test("a replayed message reports only what changed in it", () => {
+		const t = new Transcript();
+		const update = (reply: string, ...blocks: unknown[]) =>
+			t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant(200, [text(reply), ...blocks]) } });
+		const call = { type: "toolCall", id: "c1", name: "bash", arguments: { command: "ls" } };
+
+		expect(update("po", call).map(item => item.id)).toEqual(["m200:0", "tool:c1"]);
+		expect(update("po", call)).toEqual([]);
+		expect(update("pong", call)).toEqual([{ id: "m200:0", kind: "assistant", text: "pong", streaming: true }]);
+		expect(t.applyEvent({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", isError: true })).toEqual([
+			{ id: "tool:c1", kind: "tool", name: "bash", summary: "ls", status: "error" },
+		]);
+	});
+
 	test("a collab prompt renders from its file entry only: the entry carries no message timestamp to merge on", () => {
 		const t = new Transcript();
 		const prompt = { role: "custom", customType: "collab-prompt", timestamp: 300, content: "hi", details: { from: "probe" } };

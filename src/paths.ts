@@ -4,6 +4,9 @@ import { join, resolve } from "node:path";
 
 export const HOME = homedir();
 
+/** Where the dashboard keeps its access token: `$XDG_CONFIG_HOME/omp-agents/token`, else `~/.config/omp-agents/token`. */
+export const tokenFile = join(process.env.XDG_CONFIG_HOME || join(HOME, ".config"), "omp-agents", "token");
+
 /** `path` with the home directory shortened to `~`. */
 export const displayPath = (path: string): string =>
 	path === HOME || path.startsWith(`${HOME}/`) ? `~${path.slice(HOME.length)}` : path;

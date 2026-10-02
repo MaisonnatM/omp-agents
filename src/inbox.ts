@@ -243,10 +243,12 @@ async function queryRepo(repo: Repo): Promise<InboxPullRequest[]> {
 
 /** Answers kept for {@link FRESH_MS}, by key; a failure is not kept, so the next load asks again. */
 function cached<T>(cache: Map<string, { at: number; answer: Promise<T> }>, key: string, fresh: boolean, load: () => Promise<T>): Promise<T> {
+	const now = Date.now();
+	for (const [other, entry] of cache) if (now - entry.at >= FRESH_MS) cache.delete(other);
 	const hit = cache.get(key);
-	if (hit && !fresh && Date.now() - hit.at < FRESH_MS) return hit.answer;
+	if (hit && !fresh) return hit.answer;
 	const answer = load();
-	cache.set(key, { at: Date.now(), answer });
+	cache.set(key, { at: now, answer });
 	answer.catch(() => cache.get(key)?.answer === answer && cache.delete(key));
 	return answer;
 }
