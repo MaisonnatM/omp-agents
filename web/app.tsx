@@ -1,41 +1,35 @@
-import { Maximize2, Minimize2, X } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { View } from "../src/shared";
-import { Button } from "@/components/ui/button";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { Conversation, PastConversation, ToolsExpanded } from "./components/conversation";
-import { InboxPage } from "./components/inbox-page";
-import { PlanUsageFooter } from "./components/plan-usage";
+import { InboxPage } from "./components/inbox/inbox-page";
 import { NewSession } from "./components/new-session";
-import { Roster, SPLIT_CLICK, useProject } from "./components/roster";
-import { SettingsPage } from "./components/settings-page";
+import { Pane } from "./components/pane";
+import { PlanUsageFooter } from "./components/plan-usage";
+import { Roster, useProject } from "./components/roster";
+import { SettingsPage } from "./components/settings/settings-page";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { SubagentsSidebar } from "./components/subagents-sidebar";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
 import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
-import { useShortcuts } from "./shortcuts";
-import { EMPTY_PANE, useDashboard, useHash } from "./use-dashboard";
+import { ToolsExpanded } from "./components/transcript";
+import { type InboxTarget } from "./inbox-model";
+import { SPLIT_CLICK } from "./labels";
 import {
 	closePane,
-	defaultCwd,
 	endSession,
-	type ForkPoint,
 	focusedView,
 	hashForSettings,
 	hashForInbox,
 	hashForView,
 	inboxFromHash,
-	type InboxTarget,
 	newSessionFromHash,
 	sameView,
 	settingsFromHash,
-	workspaces,
-} from "./view-model";
-
-/** A pane's cell in the 2x2 grid; the third of three spans the bottom row. */
-const paneArea = (index: number, count: number): string =>
-	count === 3 && index === 2 ? "2 / 1 / 3 / 3" : `${Math.floor(index / 2) + 1} / ${(index % 2) + 1}`;
+} from "./routing";
+import { defaultCwd, workspaces } from "./sessions";
+import { useShortcuts } from "./shortcuts";
+import { useDashboard, useHash } from "./use-dashboard";
 
 /**
  * omp's Agent Hub key: into the sidebars at the open row (a session on the left, a subagent on the right),
@@ -100,17 +94,23 @@ export function App() {
 	const maximized = layout.maximized && !page;
 	// The running sessions the sidebar lists, in its order, which ending a session moves its panes along.
 	const listedHosts = state.hosts.filter(host => project === null || host.cwd === project).map(host => host.instanceId);
-	const endHost = (instanceId: string): void => {
+	const latest = useRef({ layout, listedHosts, sidebars });
+	latest.current = { layout, listedHosts, sidebars };
+	const endHost = useCallback((instanceId: string): void => {
 		send({ t: "end", instanceId });
-		show(endSession(layout, instanceId, listedHosts));
-	};
+		show(endSession(latest.current.layout, instanceId, latest.current.listedHosts));
+	}, [send, show]);
+	const onPaneLayout = useCallback((index: number, kind: "max" | "close") => {
+		const current = latest.current.layout;
+		show(kind === "max" ? { ...current, focus: index, maximized: !current.maximized } : closePane(current, index));
+	}, [show]);
 	/** The live session whose subagents the right sidebar lists. Over a past session or a page, it has none. */
 	const subagentsHost = page ? undefined : viewHost;
-	const toggleSidebar = (side: SidebarSide): void => sidebars.setOpen(side, !sidebars.panels[side].open);
-	/** The button that shows or hides the subagents sidebar ends the header of the pane at the top right, open or not. */
-	const subagentsToggle = subagentsHost && (
-		<SidebarToggle side="right" open={sidebars.panels.right.open} onToggle={() => toggleSidebar("right")} />
-	);
+	const toggleSidebar = useCallback((side: SidebarSide): void => {
+		const { sidebars } = latest.current;
+		sidebars.setOpen(side, !sidebars.panels[side].open);
+	}, []);
+	const toggleRight = useCallback(() => toggleSidebar("right"), [toggleSidebar]);
 	const topRightPane = maximized ? layout.focus : Math.min(1, layout.panes.length - 1);
 
 	const settingsHref = hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null);
@@ -141,50 +141,6 @@ export function App() {
 		},
 	});
 
-	const paneContent = (pane: View, focused: boolean, actions: ReactNode): ReactNode => {
-		const { items, completions, dequeued } = state.panes.get(hashForView(pane)) ?? EMPTY_PANE;
-		const onFork = (itemId: string, point: ForkPoint) => fork(pane, itemId, point);
-		if (pane.kind === "past") {
-			return (
-				<PastConversation
-					sessionId={pane.sessionId}
-					session={state.past.find(s => s.sessionId === pane.sessionId) ?? null}
-					items={items}
-					fork={state.fork}
-					onFork={onFork}
-					resume={state.resume}
-					onResume={() => resume(pane.sessionId)}
-					actions={actions}
-				/>
-			);
-		}
-		const { instanceId } = pane;
-		return (
-			<Conversation
-				view={pane}
-				host={state.hosts.find(h => h.instanceId === instanceId) ?? null}
-				lastHost={state.lastHosts.get(instanceId) ?? null}
-				items={items}
-				initialDraft={state.draft && sameView(state.draft.view, pane) ? state.draft.text : ""}
-				fork={state.fork}
-				onFork={onFork}
-				completions={completions}
-				onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "live", view: pane }, text, cursor })}
-				models={state.models.get(instanceId) ?? null}
-				onListModels={() => send({ t: "list-models", instanceId })}
-				onSetModel={model => send({ t: "set-model", instanceId, model })}
-				onSetThinking={level => send({ t: "set-thinking", instanceId, level })}
-				onPrompt={(text, delivery) => send({ t: "prompt", view: pane, text, delivery })}
-				dequeued={dequeued}
-				onDequeue={(reqId, messages) => send({ t: "dequeue", reqId, view: pane, messages })}
-				onAbort={() => send({ t: "abort", instanceId })}
-				onEnd={() => endHost(instanceId)}
-				onAnswer={(requestId, answer) => send({ t: "answer", instanceId, requestId, answer })}
-				actions={actions}
-				focused={focused}
-			/>
-		);
-	};
 
 	let main: ReactNode;
 	if (newSession) {
@@ -220,44 +176,30 @@ export function App() {
 				{layout.panes.map((pane, index) => (
 					// Keyed by view: moving to another cell keeps a pane's draft and scroll; another view resets them.
 					// A maximized pane covers the whole grid; the rest stay mounted, at their size, under it.
-					<section
+					<Pane
 						key={hashForView(pane)}
-						tabIndex={-1}
-						aria-label={`Pane ${index + 1} of ${layout.panes.length}${index === layout.focus ? ", focused" : ""}`}
-						data-pane={index}
-						data-focused={index === layout.focus || undefined}
-						onPointerDownCapture={() => index !== layout.focus && focus(index)}
-						onFocusCapture={() => index !== layout.focus && focus(index)}
-						style={{ gridArea: maximized && index === layout.focus ? "1 / 1 / -1 / -1" : paneArea(index, layout.panes.length) }}
-						className={cn(
-							"relative flex min-h-0 min-w-0 flex-col bg-background outline-none",
-							maximized && (index === layout.focus ? "z-10" : "invisible"),
-						)}
-					>
-						{paneContent(
-							pane,
-							index === layout.focus,
-							<>
-								{split && (
-									<>
-										<Button
-											variant="ghost"
-											size="icon-compact"
-											title={maximized ? "Restore split" : "Maximize pane"}
-											aria-label={maximized ? "Restore split" : "Maximize pane"}
-											onClick={() => show({ ...layout, focus: index, maximized: !maximized })}
-										>
-											{maximized ? <Minimize2 /> : <Maximize2 />}
-										</Button>
-										<Button variant="ghost" size="icon-compact" title="Close pane" aria-label="Close pane" onClick={() => show(closePane(layout, index))}>
-											<X />
-										</Button>
-									</>
-								)}
-								{index === topRightPane && subagentsToggle}
-							</>,
-						)}
-					</section>
+						view={pane}
+						index={index}
+						count={layout.panes.length}
+						focused={index === layout.focus}
+						maximized={maximized}
+						topRight={index === topRightPane && subagentsHost !== undefined}
+						host={pane.kind === "live" ? state.hosts.find(h => h.instanceId === pane.instanceId) ?? null : null}
+						lastHost={pane.kind === "live" ? state.lastHosts.get(pane.instanceId) ?? null : null}
+						session={pane.kind === "past" ? state.past.find(s => s.sessionId === pane.sessionId) ?? null : null}
+						initialDraft={state.draft && sameView(state.draft.view, pane) ? state.draft.text : ""}
+						models={pane.kind === "live" ? state.models.get(pane.instanceId) ?? null : null}
+						fork={state.fork}
+						resume={state.resume}
+						send={send}
+						forkSession={fork}
+						resumeSession={resume}
+						focus={focus}
+						onEnd={endHost}
+						onLayout={onPaneLayout}
+						toggleRight={toggleRight}
+						rightOpen={sidebars.panels.right.open}
+					/>
 				))}
 				{split && !maximized && (
 					<SplitResizeHandle axis="columns" ratio={columns} onRatio={setColumns} span={layout.panes.length === 3 ? rows : 1} />

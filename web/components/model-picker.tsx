@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { modelLabel, modelOrg, providerLabel, providerOrg } from "../view-model";
+import { modelLabel, modelOrg, providerLabel, providerOrg } from "../labels";
 import { OrgIcon } from "./org-icon";
 
 /** `anthropic/claude-opus-5-5` as the Anthropic logo and `Opus 5.5`, with the full selector on hover. */

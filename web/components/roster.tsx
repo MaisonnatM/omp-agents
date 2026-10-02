@@ -1,5 +1,5 @@
 import { AppWindow, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, MessagesSquare, Play, Plus, Settings } from "lucide-react";
-import { type CSSProperties, type MouseEvent, type ReactElement, type ReactNode, useState } from "react";
+import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
 import type { PastSession, PullRequest, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -31,21 +31,13 @@ import {
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { IS_MAC, useShortcuts } from "../shortcuts";
+import { type InboxTarget, inboxRepoKey, inboxSectionId, inboxSections, pullRequestUrl } from "../inbox-model";
+import { age, hostLabel, modeOf, pastLabel, projectName, SPLIT_CLICK } from "../labels";
+import { hashForInbox, hashForSettings, type OpenMode, sameView } from "../routing";
+import { workspaces } from "../sessions";
+import { useShortcuts } from "../shortcuts";
 import type { Resume } from "../use-dashboard";
 import { useInbox } from "../use-inbox";
-import {
-	hashForInbox,
-	hashForSettings,
-	type InboxTarget,
-	inboxRepoKey,
-	inboxSectionId,
-	inboxSections,
-	type OpenMode,
-	pullRequestUrl,
-	sameView,
-	workspaces,
-} from "../view-model";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
@@ -63,30 +55,10 @@ export function useProject(projects: { cwd: string }[]): [string | null, (cwd: s
 	return [projects.some(({ cwd }) => cwd === stored) ? stored : null, pick];
 }
 
-/** ⌘-click on macOS, where Ctrl-click opens the context menu, and Ctrl-click elsewhere, opens a row in a new pane. */
-export const modeOf = (event: MouseEvent): OpenMode => ((IS_MAC ? event.metaKey : event.ctrlKey) ? "split" : "replace");
-
-/** The gesture {@link modeOf} reads as a split, as hints name it. */
-export const SPLIT_CLICK = IS_MAC ? "⌘-click" : "Ctrl-click";
-
 const SIDEBAR_TABS = [
 	{ value: "inbox", label: "Inbox", icon: Inbox },
 	{ value: "sessions", label: "Sessions", icon: MessagesSquare },
 ] as const;
-
-export function age(startedAt: number): string {
-	const minutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60_000));
-	if (minutes < 60) return `${minutes}m`;
-	if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-	return `${Math.floor(minutes / 1440)}d`;
-}
-
-/** The project a directory holds, its last segment: `~/code/webapp` reads `webapp`. */
-export const projectName = (cwdDisplay: string): string | undefined => cwdDisplay.split("/").filter(Boolean).pop();
-
-export const hostLabel = (host: RosterHost): string => host.sessionName ?? projectName(host.cwdDisplay) ?? host.cwdDisplay;
-
-export const pastLabel = (session: PastSession): string => session.title ?? projectName(session.cwdDisplay) ?? "Untitled session";
 
 interface RowMenuProps {
 	view: View;

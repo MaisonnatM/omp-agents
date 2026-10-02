@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { PullRequest, PullRequestDetail } from "../src/shared";
-import { readJson } from "./settings-api";
+import { getJson } from "./api";
 
 export interface PullRequestRead {
 	detail: PullRequestDetail | null;
@@ -12,8 +12,7 @@ export function usePullRequest({ owner, repo, number }: PullRequest): PullReques
 	const [read, setRead] = useState<PullRequestRead>({ detail: null, error: null });
 	useEffect(() => {
 		const controller = new AbortController();
-		fetch(`/api/pull-request?${new URLSearchParams({ owner, repo, number: String(number) })}`, { signal: controller.signal })
-			.then(response => readJson<PullRequestDetail>(response))
+		getJson<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner, repo, number: String(number) })}`, controller.signal)
 			.then(
 				detail => setRead({ detail, error: null }),
 				(err: unknown) => {

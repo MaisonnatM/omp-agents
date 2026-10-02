@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useReducer, useRef, useSyncExternalStore } from "react";
-import type { ClientMsg, CompletionItem, Item, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
+import type { ClientMsg, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
+import { applyPaneMessage, type Completions, isPaneMsg, type PaneMsg, retainPanes } from "./pane-store";
 import {
-	applyItems,
 	EMPTY_LAYOUT,
-	type ForkPoint,
 	hashForLayout,
 	hashForNewSession,
-	hashForView,
+	isPageHash,
 	type Layout,
 	layoutFromHash,
 	type OpenMode,
@@ -15,7 +14,8 @@ import {
 	sessionFromHash,
 	swapView,
 	viewForSession,
-} from "./view-model";
+} from "./routing";
+import type { ForkPoint } from "./transcript-view";
 
 const subscribeHash = (onChange: () => void): (() => void) => {
 	window.addEventListener("hashchange", onChange);
@@ -24,6 +24,8 @@ const subscribeHash = (onChange: () => void): (() => void) => {
 
 /** The URL hash, rendering again whenever it changes. */
 export const useHash = (): string => useSyncExternalStore(subscribeHash, () => location.hash);
+
+const NO_VIEWS: View[] = [];
 
 /** Starting a session from the new-session draft: none, waiting for omp to start and take the first message, or failed with the reason. */
 export type Launch = { phase: "idle" } | { phase: "starting" } | { phase: "failed"; error: string };
@@ -37,26 +39,10 @@ export type Fork =
 /** Resuming a past session: none, waiting for its omp, or failed with the reason. One runs at a time. */
 export type Resume = { phase: "idle" } | { phase: "resuming"; sessionId: string } | { phase: "failed"; sessionId: string; error: string };
 
-export interface Completions {
-	reqId: number;
-	items: CompletionItem[];
-	error: string | null;
-}
-
 export interface Models {
 	models: ModelOption[];
 	error: string | null;
 }
-
-/** What the server sent for one open view. */
-export interface PaneData {
-	items: Item[];
-	completions: Completions | null;
-	/** The last texts the server took out of the view's queue, answering the composer's `dequeue` `reqId`. */
-	dequeued: { reqId: number; texts: string[] } | null;
-}
-
-export const EMPTY_PANE: PaneData = { items: [], completions: null, dequeued: null };
 
 export interface DashboardState {
 	connected: boolean;
@@ -67,8 +53,6 @@ export interface DashboardState {
 	/** Whether the server has sent its session lists, the roster and then the past sessions, since the page loaded. */
 	listed: boolean;
 	layout: Layout;
-	/** Per open view, by {@link hashForView}. */
-	panes: Map<string, PaneData>;
 	/** Last roster row seen for each open live session, by instance id, kept after it leaves the roster. */
 	lastHosts: Map<string, RosterHost>;
 	launch: Launch;
@@ -88,7 +72,8 @@ export interface DashboardState {
 
 type Action =
 	| { t: "connected"; connected: boolean }
-	| { t: "server"; msg: ServerMsg }
+	/** Everything the server sends except what {@link isPaneMsg} says belongs to one view, which the pane store takes. */
+	| { t: "server"; msg: Exclude<ServerMsg, PaneMsg> }
 	| { t: "layout"; layout: Layout }
 	| { t: "launch"; launch: Launch }
 	/** A failed start's error goes away with its draft; a start under way keeps waiting for its answer. */
@@ -116,11 +101,13 @@ function rememberHosts(prev: Map<string, RosterHost>, hosts: RosterHost[], layou
 	return next;
 }
 
-const updatePane = (state: DashboardState, view: View, update: (pane: PaneData) => PaneData): DashboardState => {
-	const key = hashForView(view);
-	if (!state.layout.panes.some(pane => sameView(pane, view))) return state;
-	return { ...state, panes: new Map(state.panes).set(key, update(state.panes.get(key) ?? EMPTY_PANE)) };
-};
+/** `next` with each item that is unchanged since `prev` kept as it was, so what renders from it can skip the update. */
+function keepUnchanged<T extends { instanceId: string }>(prev: T[], next: T[]): T[] {
+	return next.map(row => {
+		const before = prev.find(other => other.instanceId === row.instanceId);
+		return before && JSON.stringify(before) === JSON.stringify(row) ? before : row;
+	});
+}
 
 function reduce(state: DashboardState, action: Action): DashboardState {
 	switch (action.t) {
@@ -141,14 +128,13 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, connected: action.connected, launch, fork, resume };
 		}
 		case "layout": {
-			const { layout } = action;
-			if (hashForLayout(layout) === hashForLayout(state.layout)) return state;
+			if (hashForLayout(action.layout) === hashForLayout(state.layout)) return state;
+			// A view that stays open stays the same object, so its pane can skip the update.
+			const layout = { ...action.layout, panes: action.layout.panes.map(view => state.layout.panes.find(pane => sameView(pane, view)) ?? view) };
 			const shown = (view: View): boolean => layout.panes.some(pane => sameView(pane, view));
 			return {
 				...state,
 				layout,
-				// Views that stay open keep their transcript: the server streams only new views from the start.
-				panes: pick(state.panes, layout.panes.map(hashForView)),
 				lastHosts: rememberHosts(state.lastHosts, state.hosts, layout),
 				models: pick(state.models, liveIds(layout)),
 				fork: state.fork.phase === "failed" && !shown(state.fork.view) ? { phase: "idle" } : state.fork,
@@ -170,14 +156,12 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 				case "roster":
 					return {
 						...state,
-						hosts: msg.hosts,
+						hosts: keepUnchanged(state.hosts, msg.hosts),
 						rosterError: msg.error,
 						lastHosts: rememberHosts(state.lastHosts, msg.hosts, state.layout),
 					};
 				case "past":
 					return { ...state, past: msg.sessions, listed: true };
-				case "items":
-					return updatePane(state, msg.view, pane => ({ ...pane, items: applyItems(pane.items, msg.reset, msg.items) }));
 				case "created":
 					if (state.launch.phase !== "starting") return state;
 					if (!msg.result.ok) return { ...state, launch: { phase: "failed", error: msg.result.error } };
@@ -200,19 +184,13 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 					if (!msg.result.ok) return { ...state, resume: { phase: "failed", sessionId: msg.sessionId, error: msg.result.error } };
 					return { ...state, resume: { phase: "idle" }, started: { instanceId: msg.result.instanceId, cwd: msg.result.cwd } };
 				}
-				case "completions": {
-					const completions = { reqId: msg.reqId, items: msg.items, error: msg.error };
-					return msg.scope.kind === "new"
-						? { ...state, newSessionCompletions: completions }
-						: updatePane(state, msg.scope.view, pane => ({ ...pane, completions }));
-				}
+				case "completions":
+					return { ...state, newSessionCompletions: { reqId: msg.reqId, items: msg.items, error: msg.error } };
 				case "usage":
 					return { ...state, usage: { plans: msg.plans, error: msg.error } };
 				case "models":
 					if (!liveIds(state.layout).includes(msg.instanceId)) return state;
 					return { ...state, models: new Map(state.models).set(msg.instanceId, { models: msg.models, error: msg.error }) };
-				case "dequeued":
-					return updatePane(state, msg.view, pane => ({ ...pane, dequeued: { reqId: msg.reqId, texts: msg.texts } }));
 			}
 		}
 	}
@@ -246,7 +224,6 @@ export function useDashboard(): Dashboard {
 		past: [],
 		listed: false,
 		layout: layoutFromHash(location.hash) ?? EMPTY_LAYOUT,
-		panes: new Map(),
 		lastHosts: new Map(),
 		launch: { phase: "idle" },
 		newSessionCompletions: null,
@@ -260,6 +237,11 @@ export function useDashboard(): Dashboard {
 	const socketRef = useRef<WebSocket | null>(null);
 	const layoutRef = useRef(state.layout);
 	layoutRef.current = state.layout;
+	// A page covering the panes shows none of them, so the server stops streaming them until the panes return.
+	const hash = useHash();
+	const watched = isPageHash(hash) ? NO_VIEWS : state.layout.panes;
+	const watchedRef = useRef(watched);
+	watchedRef.current = watched;
 
 	const send = useCallback((msg: ClientMsg) => {
 		const ws = socketRef.current;
@@ -290,11 +272,12 @@ export function useDashboard(): Dashboard {
 			ws.onopen = () => {
 				retryMs = 500;
 				dispatch({ t: "connected", connected: true });
-				ws.send(JSON.stringify({ t: "watch", views: layoutRef.current.panes } satisfies ClientMsg));
+				ws.send(JSON.stringify({ t: "watch", views: watchedRef.current } satisfies ClientMsg));
 			};
 			ws.onmessage = event => {
 				const msg = JSON.parse(String(event.data)) as ServerMsg;
-				dispatch({ t: "server", msg });
+				if (isPaneMsg(msg)) applyPaneMessage(msg);
+				else dispatch({ t: "server", msg });
 				if ((msg.t === "created" || msg.t === "forked") && msg.result.ok) {
 					open({ kind: "live", instanceId: msg.result.instanceId, agentId: null }, "replace");
 				}
@@ -327,7 +310,6 @@ export function useDashboard(): Dashboard {
 	}, []);
 
 	// A `#session/<id>` link opens where that session runs, once the server has listed the sessions.
-	const hash = useHash();
 	useEffect(() => {
 		const sessionId = sessionFromHash(location.hash);
 		if (sessionId === null || !state.listed) return;
@@ -336,9 +318,12 @@ export function useDashboard(): Dashboard {
 		dispatch({ t: "layout", layout });
 	}, [hash, state.listed, state.hosts]);
 
+	// Declared before the watch, so a view's data is kept when its transcript arrives.
+	useEffect(() => retainPanes(state.layout.panes), [state.layout.panes]);
+
 	useEffect(() => {
-		send({ t: "watch", views: state.layout.panes });
-	}, [send, state.layout.panes]);
+		send({ t: "watch", views: watched });
+	}, [send, watched]);
 
 	const openNewSession = useCallback(() => {
 		dispatch({ t: "dismiss-launch" });

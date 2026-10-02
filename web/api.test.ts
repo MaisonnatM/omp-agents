@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readJson } from "./settings-api";
+import { readJson } from "./api";
 
 test("a body that is not JSON reports its status and text, not a JSON parse error", async () => {
 	await expect(readJson(new Response("not found", { status: 404, statusText: "Not Found" }))).rejects.toThrow("HTTP 404 Not Found: not found");

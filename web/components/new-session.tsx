@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { InputMessage } from "@/components/ui/input-message";
-import type { Completions, Launch } from "../use-dashboard";
+import { projectName } from "../labels";
+import type { Completions } from "../pane-store";
+import type { Launch } from "../use-dashboard";
 import { useCompletion } from "./completion-popup";
 import { DirectCommandNote, directCommandOf, Header } from "./conversation";
-import { projectName } from "./roster";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
