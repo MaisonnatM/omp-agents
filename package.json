@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "bun src/server.ts",
+    "omp-template": "bun templates/omp/install.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

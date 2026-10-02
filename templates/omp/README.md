@@ -1,0 +1,54 @@
+# omp starter kit
+
+An opinionated omp setup to start from: model roles with fallback chains across four providers, agent rules, a reply format, a review agent, a `/ship` workflow, and UI design skills. It is the setup this project is built with.
+
+## Install
+
+From the repository root:
+
+```sh
+bun run omp-template --dry-run   # list what would change
+bun run omp-template             # install
+```
+
+The installer:
+
+- copies every file under [`agent/`](agent) into your omp agent directory, `~/.omp/agent` (or `PI_CODING_AGENT_DIR` when set);
+- applies each setting in [`config.yml`](config.yml) with `omp config set`, so omp writes it and every other key in your `config.yml` stays as it is;
+- adds the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace and installs its `pstack` plugin, unless they are already there.
+
+A file or a setting that you already have keeps your version, and the installer lists it as `keep yours`. Pass `--force` to overwrite those with the kit's version. Running the installer again changes nothing that already matches.
+
+Restart running omp sessions to pick up the new files and settings.
+
+## What's inside
+
+Settings, in `config.yml`:
+
+- `modelRoles`: an Anthropic model for every role.
+- `retry.fallbackChains`: per role, OpenAI Codex, then Cursor, then OpenRouter (open-weight models only), with `retry.usageAwareFallback` on so that a plan with no quota left is skipped.
+- `modelProviderOrder`: the same four providers in the same order.
+- `task.isolation`: subagents work in their own worktree, and successful changes apply back as a patch. At most two subagents run at once.
+- `collab.autoStart: control`: every terminal session publishes itself so that the omp-agents dashboard can drive it.
+
+Files, in `agent/`:
+
+- `AGENTS.md`: rules for every session: work in a git worktree, push `main` after a local merge, register branches with Graphite, keep the provider order, run thermonuclear reviews on the `plan` role, and keep markdown tables out of PR bodies.
+- `APPEND_SYSTEM.md`: final replies in three parts (Résumé, Action, What next), and `isolated: true` for every subagent that touches a git repo.
+- `agents/thermonuclear-reviewer.md`: a read-only reviewer that runs the thermo-nuclear code quality review on the `plan` role's model.
+- `commands/ship.md` and `extensions/ship.ts`: `/ship <Linear issue>` drives an issue from ticket to draft PR, thermonuclear review, and live review. The extension adds the `ship_stage` tool and shows the stage and the PR's needs in the session.
+- `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.
+
+## Requirements
+
+- omp, on your `PATH`.
+- Accounts for the providers you want to use: Anthropic, OpenAI Codex, Cursor, and OpenRouter. omp skips a provider that it cannot reach and uses the next one in the chain. Edit `config.yml` before you install to drop a provider, or change the roles later in the dashboard's **Settings**.
+- For `/ship`: the [GitHub CLI](https://cli.github.com) signed in, and the Linear MCP server connected to omp. [Graphite](https://graphite.dev) is used when a repository is set up for it.
+
+## Customize
+
+The kit is a starting point. Edit the files here before you install, or edit your own copies afterwards; the dashboard's **Settings** page edits the model routing and every file above in place. The model ids in `config.yml` are the ones `omp models` listed when the kit was written; replace any that your omp no longer lists.
+
+## Licenses
+
+The kit is MIT-licensed with the rest of the repository. The `apple-design`, `emil-design-eng`, `beautiful-shadows`, and `thermo-nuclear-code-quality-review` skills are copies of MIT-licensed skills by their authors; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

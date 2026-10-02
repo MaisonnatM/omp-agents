@@ -31,6 +31,7 @@ omp-agents lists the sessions that run in your terminals and the ones it starts 
 - **Settings editor.** Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place.
 - **Plan quota.** Remaining quota per provider plan, from `omp usage`.
 - **Keyboard-first.** Shortcuts that follow omp's terminal keys; press `?` to list them.
+- **omp starter kit.** An optional, ready-made omp setup (model routing, agent rules, a review agent, a `/ship` workflow, skills) that one command installs.
 
 ## Requirements
 
@@ -76,6 +77,17 @@ Only sessions that start hosting after the change appear. Restart a session that
 ```sh
 PORT=5000 bun start
 ```
+
+### omp starter kit
+
+[`templates/omp`](templates/omp) holds the omp setup this project is built with: model roles and fallback chains across Anthropic, OpenAI Codex, Cursor, and OpenRouter, an `AGENTS.md`, a review agent, a `/ship` command, and skills. It also turns on `collab.autoStart`. Install it with:
+
+```sh
+bun run omp-template --dry-run   # list what would change
+bun run omp-template
+```
+
+Files and settings that you already have keep your version unless you pass `--force`. See the [kit's README](templates/omp/README.md) for what it contains.
 
 ## Usage
 
