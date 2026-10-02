@@ -17,6 +17,7 @@ const node = (number: number, fields: Record<string, unknown>) => ({
 	author: me,
 	repository: { defaultBranchRef: { name: "main" } },
 	commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
+	reviewThreads: { totalCount: 0, nodes: [] },
 	...fields,
 });
 
@@ -59,6 +60,7 @@ describe("parseInboxAnswer", () => {
 				checks: "failing",
 				head: "me/branch-1",
 				stackedOn: "me/branch-0",
+				unresolved: { count: 0, exact: true },
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -73,6 +75,7 @@ describe("parseInboxAnswer", () => {
 				checks: "none",
 				head: "me/branch-2",
 				stackedOn: null,
+				unresolved: { count: 0, exact: true },
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -87,6 +90,7 @@ describe("parseInboxAnswer", () => {
 				checks: "passing",
 				head: "me/branch-3",
 				stackedOn: null,
+				unresolved: { count: 0, exact: true },
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
 			},
 			{
@@ -101,6 +105,7 @@ describe("parseInboxAnswer", () => {
 				checks: "passing",
 				head: "me/branch-4",
 				stackedOn: null,
+				unresolved: { count: 0, exact: true },
 				updatedAt: Date.parse("2026-09-30T08:00:00Z"),
 			},
 		]);
@@ -138,6 +143,31 @@ describe("parseInboxAnswer", () => {
 			{ login: "bsaintot", avatarUrl: "https://avatars.example/bsaintot", state: "requested" },
 			{ login: "frontend", avatarUrl: "https://avatars.example/frontend", state: "requested" },
 			{ login: "lencshu", avatarUrl: "https://avatars.example/lencshu", state: "approved" },
+		]);
+	});
+
+	test("counts unresolved review threads, as a floor when GitHub lists only the first page", () => {
+		const threads = (resolved: boolean[], totalCount = resolved.length) => ({ totalCount, nodes: resolved.map(isResolved => ({ isResolved })) });
+		const prs = parseInboxAnswer(
+			{
+				data: {
+					authored: {
+						nodes: [
+							node(1, {}),
+							node(2, { reviewThreads: threads([true, false, true, false, false]) }),
+							node(3, { reviewThreads: threads(Array(100).fill(false), 130) }),
+							node(4, { reviewThreads: threads(Array(100).fill(true), 101) }),
+						],
+					},
+				},
+			},
+			repo,
+		);
+		expect(prs.map(pr => [pr.number, pr.unresolved])).toEqual([
+			[1, { count: 0, exact: true }],
+			[2, { count: 3, exact: true }],
+			[3, { count: 100, exact: false }],
+			[4, { count: 0, exact: false }],
 		]);
 	});
 

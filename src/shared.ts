@@ -46,6 +46,8 @@ export interface InboxPullRequest extends PullRequest {
 	head: string;
 	/** The branch it merges into when that is not the repository's default branch: the PR below it in a stack. */
 	stackedOn: string | null;
+	/** Review threads not yet resolved. `exact` is false when GitHub listed only some threads, so `count` is a floor. */
+	unresolved: { count: number; exact: boolean };
 	/** Last update, or the merge for a merged PR, in ms since the epoch. */
 	updatedAt: number;
 }

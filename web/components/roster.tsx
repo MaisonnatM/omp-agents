@@ -20,6 +20,7 @@ import {
 	SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import { useShortcuts } from "../shortcuts";
 import type { Launch } from "../use-dashboard";
 import { agentTree, hashForView, INBOX_HASH, MAX_PANES, matchesFilter, type OpenMode, sameView, workspaces } from "../view-model";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -118,6 +119,7 @@ interface ProjectPickerProps {
 /** Scopes the roster to one directory's running and past sessions. */
 function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 	const [open, setOpen] = useState(false);
+	useShortcuts({ project: () => setOpen(shown => !shown) });
 	const selected = projects.find(project => project.cwd === current);
 	const label = selected ? (projectName(selected.cwdDisplay) ?? selected.cwdDisplay) : "All projects";
 	const pick = (cwd: string | null): void => {

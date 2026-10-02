@@ -1,6 +1,6 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef } from "react";
 
-export type ShortcutId = "interrupt" | "dequeue" | "model" | "thinking" | "tools" | "sessions" | "settings" | "restore" | "help";
+export type ShortcutId = "interrupt" | "dequeue" | "model" | "thinking" | "tools" | "sessions" | "settings" | "project" | "inbox" | "restore" | "help";
 
 /**
  * Where a chord fires. `composer`: from the composer's textarea, before any page-wide chord sees the key.
@@ -47,6 +47,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		omp: { action: "app.agents.hub", chord: "Alt+A" },
 	},
 	{ id: "settings", chord: { key: "m", alt: true }, scope: "anywhere", label: "Open or close model role settings", omp: { action: "app.model.select", chord: "Alt+M" } },
+	{ id: "project", chord: { key: "w", alt: true }, scope: "anywhere", label: "Choose the sidebar's project", omp: null },
+	{ id: "inbox", chord: { key: "g", alt: true }, scope: "anywhere", label: "Switch between the pull request inbox and the sessions", omp: null },
 	{ id: "restore", chord: { key: "Escape" }, scope: "anywhere", label: "Restore the split from a maximized pane", omp: null },
 	{ id: "help", chord: { key: "?" }, scope: "outside-fields", label: "Show keyboard shortcuts", omp: { action: "/hotkeys", chord: "/hotkeys" } },
 ];

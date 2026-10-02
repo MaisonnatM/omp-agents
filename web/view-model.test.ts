@@ -141,6 +141,7 @@ describe("inbox sections", () => {
 		checks: "passing",
 		head: `me/branch-${number}`,
 		stackedOn: null,
+		unresolved: { count: 0, exact: true },
 		updatedAt: number,
 		...fields,
 	});

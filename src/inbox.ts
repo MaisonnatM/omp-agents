@@ -47,6 +47,8 @@ function repoOf(cwd: string): Promise<Repo | null> {
 }
 
 const AVATAR = "avatarUrl(size: 48)";
+/** The most review threads one page lists; a PR with more counts its unresolved threads as a floor. */
+const THREADS = 100;
 
 const PR_FIELDS = `... on PullRequest {
 	number title isDraft state reviewDecision headRefName baseRefName updatedAt mergedAt
@@ -57,6 +59,7 @@ const PR_FIELDS = `... on PullRequest {
 	latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+	reviewThreads(first: ${THREADS}) { totalCount nodes { isResolved } }
 }`;
 
 const QUERY = `query($authored: String!, $reviewing: String!, $merged: String!) {
@@ -119,6 +122,12 @@ function parseReviewers(node: Record<string, unknown>, author: string): Reviewer
 	return [...reviewers.values()];
 }
 
+function parseUnresolved(threads: unknown): InboxPullRequest["unresolved"] {
+	const nodes = nodesOf(threads);
+	const total = isObject(threads) && typeof threads.totalCount === "number" ? threads.totalCount : nodes.length;
+	return { count: nodes.filter(thread => isObject(thread) && thread.isResolved === false).length, exact: total <= nodes.length };
+}
+
 function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole): InboxPullRequest | null {
 	if (!isObject(node) || typeof node.number !== "number") return null;
 	const title = text(node.title);
@@ -146,6 +155,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole)
 		checks: CHECKS[rollup ?? ""] ?? "none",
 		head,
 		stackedOn: defaultBranch !== null && base !== defaultBranch ? base : null,
+		unresolved: parseUnresolved(node.reviewThreads),
 		updatedAt,
 	};
 }

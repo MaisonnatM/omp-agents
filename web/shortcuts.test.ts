@@ -8,6 +8,8 @@ test("Alt chords match by physical key when macOS Option composes a character", 
 	expect(press("π", "KeyP", { alt: true })).toEqual(["model"]);
 	expect(press("p", "KeyP", { alt: true })).toEqual(["model"]);
 	expect(press("†", "KeyT", { alt: true })).toEqual(["thinking"]);
+	expect(press("∑", "KeyW", { alt: true })).toEqual(["project"]);
+	expect(press("©", "KeyG", { alt: true })).toEqual(["inbox"]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true })).toEqual(["dequeue"]);
 });
 
