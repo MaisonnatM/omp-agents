@@ -106,6 +106,32 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([{ id: "tool:c2", kind: "tool", name: "bash", summary: "sleep 40", status: "error" }]);
 	});
 
+	test("a steer and a follow-up show where the agent took them, though omp stamps them when they were queued", () => {
+		const t = new Transcript();
+		const call = { type: "toolCall", id: "c1", name: "bash", arguments: { command: "sleep 60" } };
+		const user = (timestamp: number, content: string) => ({ role: "user", timestamp, content });
+		t.applyLines(
+			[
+				{ type: "message", id: "e1", message: user(100, "sleep, then say DONE") },
+				{ type: "message", id: "e2", message: assistant(101, [call], { stopReason: "toolUse" }) },
+				{ type: "message", id: "e3", message: { role: "toolResult", timestamp: 110, toolCallId: "c1", toolName: "bash", isError: false } },
+				{ type: "message", id: "e4", message: user(102, "steer: add apple") },
+				{ type: "message", id: "e5", message: assistant(111, [text("DONE apple")], { stopReason: "stop" }) },
+				{ type: "message", id: "e6", message: user(103, "follow-up: say banana") },
+				{ type: "message", id: "e7", message: assistant(120, [text("banana")], { stopReason: "stop" }) },
+			].map(line => JSON.stringify(line)),
+		);
+		expect(t.items().map(item => item.id)).toEqual(["m100", "tool:c1", "m102", "m111:0", "m103", "m120:0"]);
+	});
+
+	test("a follow-up omp starts live goes after the reply it waited on", () => {
+		const t = new Transcript();
+		t.applyEvent({ type: "message_end", message: assistant(111, [text("DONE")], { stopReason: "stop" }) });
+		t.applyEvent({ type: "message_start", message: { role: "user", timestamp: 103, content: "follow-up: say banana" } });
+		expect(t.takeReordered()).toBe(false);
+		expect(t.items().map(item => item.id)).toEqual(["m111:0", "m103"]);
+	});
+
 	test("file lines render prompts, replies, and settled tool calls; other custom messages stay hidden", () => {
 		const t = new Transcript();
 		const lines = [

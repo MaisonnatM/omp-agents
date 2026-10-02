@@ -60,6 +60,8 @@ export class Transcript {
 	/** Time given to items created by the entry or event being applied. */
 	#now = 0;
 	#latest = 0;
+	/** The latest time a file message got. The file holds messages in the order the agent took them. */
+	#fileLatest = 0;
 	#reordered = false;
 
 	items(): Item[] {
@@ -84,6 +86,11 @@ export class Transcript {
 		const written = typeof entry.timestamp === "string" ? Date.parse(entry.timestamp) : Number.NaN;
 		const sent = isObject(entry.message) ? entry.message.timestamp : undefined;
 		this.#now = typeof sent === "number" ? sent : Number.isNaN(written) ? this.#latest : written;
+		// omp stamps a queued steer or follow-up when it was sent, but the agent takes it later, after what the file holds before it.
+		if (entry.type === "message" && typeof sent === "number") {
+			this.#now = Math.max(this.#now, this.#fileLatest);
+			this.#fileLatest = this.#now;
+		}
 		switch (entry.type) {
 			case "message": {
 				if (!isObject(entry.message)) return [];
@@ -118,6 +125,8 @@ export class Transcript {
 			? event.assistantMessageEvent.partial
 			: event.message;
 		this.#now = isObject(message) && typeof message.timestamp === "number" ? message.timestamp : Date.now();
+		// A user message starts when the agent takes it, so a queued one goes after everything already shown.
+		if (isObject(message) && message.role === "user") this.#now = Math.max(this.#now, this.#latest);
 		switch (event.type) {
 			case "message_start":
 			case "message_update":
