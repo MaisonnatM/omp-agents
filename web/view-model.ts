@@ -201,6 +201,21 @@ export function swapView(layout: Layout, from: View, to: View): Layout {
 }
 
 /**
+ * The layout once live session `instanceId` ends. Each pane showing it, or one of its subagents, shows the next
+ * session in `listed` (the sidebar's running sessions, in order), else the previous, skipping sessions already open.
+ * A pane left without one keeps the ended session.
+ */
+export function endSession(layout: Layout, instanceId: string, listed: string[]): Layout {
+	const at = listed.indexOf(instanceId);
+	if (at < 0) return layout;
+	const neighbors = [...listed.slice(at + 1), ...listed.slice(0, at).reverse()]
+		.map((id): View => ({ kind: "live", instanceId: id, agentId: null }))
+		.filter(view => !layout.panes.some(pane => sameView(pane, view)));
+	const panes = layout.panes.map(pane => (pane.kind === "live" && pane.instanceId === instanceId ? (neighbors.shift() ?? pane) : pane));
+	return { ...layout, panes };
+}
+
+/**
  * Where a new session starts unless the user picks another directory: the open session's,
  * else the newest live one's, else the newest past one's, each only from `project` when one is selected.
  */

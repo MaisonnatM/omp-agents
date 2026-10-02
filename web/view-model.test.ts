@@ -5,6 +5,7 @@ import {
 	applyItems,
 	closePane,
 	defaultCwd,
+	endSession,
 	forkPoints,
 	hashForInbox,
 	hashForLayout,
@@ -276,6 +277,26 @@ describe("opening and closing panes", () => {
 		const past: View = { kind: "past", sessionId: "s" };
 		expect(swapView(split([a, past, b], 2), past, c)).toEqual(split([a, c, b], 1));
 		expect(swapView(split([a, b], 1), past, c)).toEqual(split([a, c], 1));
+	});
+
+	test("ending a session shows the next listed session in its pane, else the previous, skipping open ones", () => {
+		const listed = ["a", "b", "c", "d"];
+		expect(endSession(split([b], 0), "b", listed)).toEqual(split([c], 0));
+		expect(endSession(split([d], 0), "d", listed)).toEqual(split([c], 0));
+		expect(endSession(maximized([b, c], 0), "b", listed)).toEqual(maximized([d, c], 0));
+		expect(endSession(split([a, d, c], 1), "d", listed)).toEqual(split([a, b, c], 1));
+	});
+
+	test("each pane of the ended session, its subagents included, takes its own neighbor while any are left", () => {
+		const subagent: View = { kind: "live", instanceId: "b", agentId: "x" };
+		expect(endSession(split([b, subagent], 1), "b", ["a", "b", "c"])).toEqual(split([c, a], 1));
+		expect(endSession(split([b, subagent], 1), "b", ["b", "c"])).toEqual(split([c, subagent], 1));
+	});
+
+	test("ending a session with no other listed session, or one the sidebar leaves out, keeps its pane", () => {
+		expect(endSession(split([a], 0), "a", ["a"])).toEqual(split([a], 0));
+		expect(endSession(split([a, b], 0), "a", ["a", "b"])).toEqual(split([a, b], 0));
+		expect(endSession(split([a], 0), "a", ["b", "c"])).toEqual(split([a], 0));
 	});
 });
 
