@@ -1,6 +1,6 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef } from "react";
 
-export type ShortcutId = "interrupt" | "dequeue" | "model" | "thinking" | "tools" | "sessions" | "settings" | "project" | "inbox" | "restore" | "help";
+export type ShortcutId = "interrupt" | "followUp" | "dequeue" | "model" | "thinking" | "tools" | "sessions" | "settings" | "project" | "inbox" | "restore" | "help";
 
 /**
  * Where a chord fires. `composer`: from the composer's textarea, before any page-wide chord sees the key.
@@ -29,6 +29,13 @@ export interface Shortcut {
 /** Every dashboard shortcut, in the order a key tries them. The reference dialog lists exactly these. */
 export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "interrupt", chord: { key: "Escape" }, scope: "composer", label: "Interrupt the running turn", omp: { action: "Esc", chord: "Esc" } },
+	{
+		id: "followUp",
+		chord: { key: "Enter", ctrl: true },
+		scope: "composer",
+		label: "Send once the running turn finishes, as a follow-up (Enter steers it)",
+		omp: { action: "app.message.followUp", chord: "Ctrl+Enter" },
+	},
 	{
 		id: "dequeue",
 		chord: { key: "ArrowUp", alt: true },
@@ -77,7 +84,7 @@ const IS_MAC =
 	typeof navigator !== "undefined" &&
 	/mac/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || "");
 
-const KEY_LABEL: Record<string, string> = { Escape: "Esc", ArrowUp: "↑" };
+const KEY_LABEL: Record<string, string> = { Escape: "Esc", ArrowUp: "↑", Enter: IS_MAC ? "↩" : "Enter" };
 
 /** `⌥P` on macOS, `Alt+P` elsewhere. */
 export function chordLabel({ key, ctrl, alt }: Chord): string {

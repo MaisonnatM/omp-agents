@@ -7,7 +7,7 @@ import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
 import { activityOf, contextOf, type LiveUpdate, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
 import { endsMidTurn, type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp";
-import type { AgentRow, AgentStatus, ContextUsage, HostStatus, ModelOption, UserAnswer, UserRequest } from "./shared";
+import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type UserAnswer, type UserRequest } from "./shared";
 import { isObject } from "./transcript";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
@@ -59,6 +59,8 @@ async function recordedCwd(sessionFile: string): Promise<string> {
 /** Session events after which the model, thinking level, or context size can have changed. */
 const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_changed", "auto_compaction_end"]);
 
+const isTexts = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === "string");
+
 export class DashboardSession {
 	/** Same shape as a Collab instance id, so the page's hash routing treats both alike. */
 	readonly instanceId = randomBytes(8).toString("hex");
@@ -73,6 +75,8 @@ export class DashboardSession {
 	/** Levels the current model accepts, `off` first. */
 	thinkingLevels: string[] = [];
 	context: ContextUsage | null = null;
+	/** omp's own queues, from `get_state` and then each `queue_update`. */
+	queue: MessageQueue;
 	/** Whether a turn runs; {@link status} reports `needs-input` over it while a question waits. */
 	#activity: "working" | "idle" = "idle";
 	readonly #child: RpcChild;
@@ -97,6 +101,7 @@ export class DashboardSession {
 		this.sessionId = state.sessionId;
 		this.sessionFile = state.sessionFile ?? null;
 		this.#applyState(state);
+		this.queue = state.queuedMessages;
 
 		const { client } = child;
 		client.onSessionEvent(event => this.#onEvent(event));
@@ -188,6 +193,7 @@ export class DashboardSession {
 			activity: agent.activity,
 			// omp's RPC mode has no command that reaches a subagent.
 			canMessage: false,
+			queue: EMPTY_QUEUE,
 		}));
 	}
 
@@ -195,9 +201,19 @@ export class DashboardSession {
 		return this.#agents.get(agentId)?.sessionFile ?? null;
 	}
 
-	/** A prompt sent while a turn runs waits for it to end, as omp's own queue does. */
-	prompt(text: string): void {
-		this.#child.client.prompt(text, undefined, "followUp").catch((err: unknown) => this.#fail("Prompt failed", err));
+	/** omp queues a prompt sent while a turn runs, as a steer or a follow-up, and starts one sent while idle. */
+	prompt(text: string, delivery: Delivery): void {
+		this.#child.client.prompt(text, undefined, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
+	}
+
+	/** Whether omp still held the message; it may have delivered it since the page saw the queue. */
+	async dequeue(queue: keyof MessageQueue, text: string): Promise<boolean> {
+		try {
+			return (await this.#child.client.removeQueuedMessage(text, queue)).removed;
+		} catch (err) {
+			this.#fail("Dequeue failed", err);
+			return false;
+		}
 	}
 
 	abort(): void {
@@ -239,6 +255,9 @@ export class DashboardSession {
 		else if (event.type === "agent_end" && event.isTerminal !== false) {
 			this.#setActivity("idle");
 			this.#refresh();
+		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
+			this.queue = { steering: event.steering, followUp: event.followUp };
+			this.#emit({ kind: "roster" });
 		} else if (typeof event.type === "string" && STATE_EVENTS.has(event.type)) this.#refresh();
 	}
 

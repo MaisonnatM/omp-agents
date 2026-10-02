@@ -22,6 +22,14 @@ test("chords need exactly their modifiers and never take ⌘", () => {
 	expect(press("Escape", "Escape", { meta: true })).toEqual([]);
 });
 
+test("Ctrl+Enter sends a follow-up as in omp, while Enter, Alt+Enter, and ⌘Enter stay the composer's own keys", () => {
+	expect(press("Enter", "Enter", { ctrl: true })).toEqual(["followUp"]);
+	expect(press("Enter", "Enter")).toEqual([]);
+	expect(press("Enter", "Enter", { alt: true })).toEqual([]);
+	expect(press("Enter", "Enter", { meta: true })).toEqual([]);
+	expect(press("Enter", "Enter", { ctrl: true, shift: true })).toEqual([]);
+});
+
 test("? matches whichever key types it on the layout", () => {
 	expect(press("?", "Slash", { shift: true })).toEqual(["help"]);
 	expect(press("?", "Comma", { shift: true })).toEqual(["help"]);

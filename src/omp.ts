@@ -109,6 +109,8 @@ export interface RpcState {
 	thinkingLevel?: string;
 	/** omp's `ContextUsage`: estimated tokens in the context window. */
 	contextUsage?: { tokens: number; contextWindow: number };
+	/** omp's displayable steering and follow-up queues, as its `queue_update` event reports them. */
+	queuedMessages: { steering: string[]; followUp: string[] };
 }
 /** Subset of omp's `RpcSubagentSnapshot` this app reads. */
 export interface RpcSubagent {
@@ -125,6 +127,8 @@ export interface RpcClient {
 	stop(): Promise<void>;
 	getState(): Promise<RpcState>;
 	prompt(message: string, images?: undefined, streamingBehavior?: "steer" | "followUp"): Promise<string>;
+	/** Takes the first queued message with this text out of `queue`; `removed` is false once omp has delivered it. */
+	removeQueuedMessage(message: string, queue: "steering" | "followUp"): Promise<{ removed: boolean }>;
 	abort(): Promise<void>;
 	/** omp's `ModelInfo` carries more fields; this app reads the selector parts. */
 	getAvailableModels(): Promise<{ provider: string; id: string }[]>;

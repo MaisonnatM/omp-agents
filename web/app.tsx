@@ -104,7 +104,7 @@ export function App() {
 	});
 
 	const paneContent = (pane: View, focused: boolean, actions: ReactNode): ReactNode => {
-		const { items, completions } = state.panes.get(hashForView(pane)) ?? EMPTY_PANE;
+		const { items, completions, dequeued } = state.panes.get(hashForView(pane)) ?? EMPTY_PANE;
 		const onFork = (itemId: string, point: ForkPoint) => fork(pane, itemId, point);
 		if (pane.kind === "past") {
 			return (
@@ -134,7 +134,9 @@ export function App() {
 				onListModels={() => send({ t: "list-models", instanceId })}
 				onSetModel={model => send({ t: "set-model", instanceId, model })}
 				onSetThinking={level => send({ t: "set-thinking", instanceId, level })}
-				onPrompt={text => send({ t: "prompt", view: pane, text })}
+				onPrompt={(text, delivery) => send({ t: "prompt", view: pane, text, delivery })}
+				dequeued={dequeued}
+				onDequeue={(reqId, messages) => send({ t: "dequeue", reqId, view: pane, messages })}
 				onAbort={() => send({ t: "abort", instanceId })}
 				onEnd={() => send({ t: "end", instanceId })}
 				onAnswer={(requestId, answer) => send({ t: "answer", instanceId, requestId, answer })}

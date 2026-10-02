@@ -12,7 +12,7 @@ import { loadInbox, repoOf } from "./inbox";
 import { PullRequestIndex } from "./pull-requests";
 import { linkSessions, type SessionEntry } from "./session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "./settings";
-import type { ClientMsg, HostStatus, Item, LinkedPullRequest, LiveView, RosterHost, ServerMsg, SettingsError, UserAnswer, View } from "./shared";
+import { type ClientMsg, EMPTY_QUEUE, type HostStatus, type Item, type LinkedPullRequest, type LiveView, type RosterHost, type ServerMsg, type SettingsError, type UserAnswer, type View } from "./shared";
 import { isObject } from "./transcript";
 import { fetchPlanUsage } from "./usage";
 
@@ -104,6 +104,7 @@ function rosterHosts(): RosterHost[] {
 			agents: guest?.agents() ?? [],
 			pullRequests: pullRequestsOf(host.sessionId),
 			requests: guest?.requests() ?? [],
+			queue: guest?.queue(null) ?? EMPTY_QUEUE,
 		};
 	});
 	const started = [...dashboards.values()].map(
@@ -125,6 +126,7 @@ function rosterHosts(): RosterHost[] {
 			agents: session.agents(),
 			pullRequests: pullRequestsOf(session.sessionId),
 			requests: session.requests(),
+			queue: session.queue,
 		}),
 	);
 	return [...terminal, ...started];
@@ -406,8 +408,17 @@ function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 		}
 		case "prompt": {
 			const view = parseLiveView(value.view);
-			const text = value.text;
-			return view && typeof text === "string" && text.trim() ? { t: "prompt", view, text } : null;
+			const { text, delivery } = value;
+			return view && typeof text === "string" && text.trim() && (delivery === "steer" || delivery === "followUp")
+				? { t: "prompt", view, text, delivery } : null;
+		}
+		case "dequeue": {
+			const view = parseLiveView(value.view);
+			const { reqId, messages } = value;
+			return view && typeof reqId === "number" && Number.isSafeInteger(reqId) && reqId >= 0 && Array.isArray(messages) &&
+				messages.every((m): m is { queue: "steering" | "followUp"; text: string } =>
+					isObject(m) && (m.queue === "steering" || m.queue === "followUp") && typeof m.text === "string")
+				? { t: "dequeue", reqId, view, messages } : null;
 		}
 		case "complete": {
 			const view = parseLiveView(value.view);
@@ -472,21 +483,38 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			const dashboard = dashboards.get(msg.view.instanceId);
 			if (dashboard) {
 				// omp's RPC prompt runs the session's own slash-command and skill pipeline.
-				if (!msg.view.agentId) dashboard.prompt(msg.text);
+				if (!msg.view.agentId) dashboard.prompt(msg.text, msg.delivery);
 				return;
 			}
 			const host = hosts.find(row => row.instanceId === msg.view.instanceId);
 			const guest = guests.get(msg.view.instanceId);
 			if (!host || !guest || !watching(ws, msg.view.instanceId)) return;
 			try {
-				const text = await expandPrompt(host.instanceId, host.cwd, msg.text, msg.view.agentId ? "subagent" : "session");
-				if (msg.view.agentId) guest.chat(msg.view.agentId, text);
-				else guest.prompt(text);
+				const payload = await expandPrompt(host.instanceId, host.cwd, msg.text, msg.view.agentId ? "subagent" : "session");
+				guest.send(msg.view.agentId, { text: msg.text, payload }, msg.delivery);
 			} catch (error) {
 				send(ws, { t: "items", view: msg.view, reset: false, items: [
 					{ id: `error:${Date.now()}`, kind: "notice", level: "error", text: `Could not prepare prompt: ${String(error)}` },
 				] });
 			}
+			return;
+		}
+		case "dequeue": {
+			const { view, messages } = msg;
+			if (!watching(ws, view.instanceId)) return;
+			const dashboard = dashboards.get(view.instanceId);
+			const guest = guests.get(view.instanceId);
+			// Every removal reaches omp before an abort sent right after this, so none of them runs after the interrupt.
+			// Collab shows no guest the host's queue, so a terminal session's queue holds only the guest's own follow-ups.
+			const taken = await Promise.all(
+				messages.map(({ queue, text }) =>
+					dashboard
+						? view.agentId === null && dashboard.dequeue(queue, text)
+						: queue === "followUp" && guest?.dequeue(view.agentId, text) === true,
+				),
+			);
+			const texts = messages.filter((_, index) => taken[index]).map(({ text }) => text);
+			if (texts.length > 0) send(ws, { t: "dequeued", view, reqId: msg.reqId, texts });
 			return;
 		}
 		case "abort":

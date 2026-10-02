@@ -16,7 +16,7 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
-import { AnimatePresence, motion, Reorder, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { fontWeights } from "@/lib/font-weight";
 import { spring } from "@/lib/springs";
@@ -101,13 +101,12 @@ type InputMessageSlot =
   | ReactNode
   | ((ctx: InputMessageSlotContext) => ReactNode);
 
-/** A message held in the queue while the assistant is responding. Carries the
- *  trimmed text plus a snapshot of the files attached when it was queued, so
- *  double-click-to-edit can restore both. `id` is a stable key minted on enqueue. */
+/** A message that waits on the running turn, owned by the consumer. `tag`
+ *  names how it will be delivered (e.g. "Follow-up"); `id` is a stable key. */
 interface QueuedMessage {
   id: string;
   text: string;
-  files: File[];
+  tag?: string;
 }
 
 interface InputMessageProps
@@ -119,16 +118,9 @@ interface InputMessageProps
   value: string;
   /** Called with the new value on every textarea change. */
   onValueChange: (value: string) => void;
-  /** Fired when the user submits (Enter or the send button) and when a queued
-   *  message auto-dispatches. Receives the trimmed value, the attached files,
-   *  and — for auto-dispatched queue items — `meta.queuedId` (the originating
-   *  QueuedMessage id), so a consumer can e.g. morph the queued item into the
-   *  sent message via a shared-layout (`layoutId`) transition. */
-  onSend?: (
-    value: string,
-    files: File[],
-    meta?: { queuedId?: string }
-  ) => void;
+  /** Fired when the user submits (Enter or the send button), with the
+   *  trimmed value and the attached files. */
+  onSend?: (value: string, files: File[]) => void;
   /** Placeholder text shown when the value is empty. */
   placeholder?: string;
   /** Content rendered in the bottom-left action area. Can be a function that
@@ -164,22 +156,18 @@ interface InputMessageProps
     "value" | "onChange" | "disabled" | "placeholder"
   >;
   /** Assistant response state. When `"streaming"`, the send button becomes a
-   *  Stop control (empty draft) or a Queue action (non-empty draft); on the
-   *  `streaming → idle` edge the next queued message auto-dispatches via `onSend`.
-   *  Leave undefined to keep the legacy send-immediately behavior. */
+   *  Stop control while the draft is empty; a draft still sends at once.
+   *  Leave undefined to keep the plain send button. */
   status?: "idle" | "streaming";
-  /** Fired when the Stop control is pressed (streaming, empty draft). The
-   *  consumer should halt the current response and flip `status` to `"idle"`,
-   *  which immediately dispatches the next queued message. */
+  /** Fired when the Stop control is pressed (streaming, empty draft). */
   onStop?: () => void;
-  /** Controlled queue of pending messages. Requires `status` to be controlled. */
+  /** Messages waiting on the running turn, owned by the consumer and shown as
+   *  rows above the textarea, the next to be delivered on top. */
   queue?: QueuedMessage[];
-  /** Called when the queue changes (enqueue, edit, delete, reorder, dispatch). */
-  onQueueChange?: (queue: QueuedMessage[]) => void;
-  /** Render the built-in reorderable queue rows above the textarea. Set to
-   *  `false` to suppress them and render the queue yourself (e.g. as full-width
-   *  rows above the composer) — enqueue + auto-dispatch still run. */
-  showQueue?: boolean;
+  /** Double-click, Enter, or F2 on a queued row: take it back for editing. */
+  onEditQueued?: (item: QueuedMessage) => void;
+  /** The row's × or Delete: drop it from the queue. */
+  onRemoveQueued?: (item: QueuedMessage) => void;
   /** Previously-sent messages, oldest first. When the textarea is focused,
    *  ArrowUp (caret on the first line) recalls the previous one and walks
    *  backward through history; ArrowDown (caret on the last line) walks forward
@@ -250,19 +238,18 @@ function FilePreviewTile({ file, onRemove, size }: FilePreviewTileProps) {
 }
 
 // ─── Queued message row ───────────────────────────────────────────────────
-// A pending message in the queue: a recessed, draggable row that reads as
-// "staged, not live". Double-click (or Enter/F2) edits it back into the
-// composer; the hover-revealed × (or Delete) removes it; drag — or Alt+↑/↓ —
-// reorders. Top of the list is next to dispatch.
+// A message waiting on the running turn: a recessed row that reads as
+// "staged, not live", led by its tag. Double-click (or Enter/F2) edits it
+// back into the composer; the hover-revealed × (or Delete) removes it. Top
+// of the list is delivered first.
 interface QueuedRowProps {
   item: QueuedMessage;
   index: number;
   total: number;
   reduceMotion: boolean;
   isTouch: boolean;
-  onEdit: (item: QueuedMessage) => void;
-  onRemove: (item: QueuedMessage) => void;
-  onMove: (item: QueuedMessage, dir: -1 | 1) => void;
+  onEdit?: (item: QueuedMessage) => void;
+  onRemove?: (item: QueuedMessage) => void;
 }
 
 function QueuedRow({
@@ -273,18 +260,13 @@ function QueuedRow({
   isTouch,
   onEdit,
   onRemove,
-  onMove,
 }: QueuedRowProps) {
   const XIcon = useIcon("x");
-  const ImageIcon = useIcon("image");
   const compactStep = useSize().variant === "compact";
-  const fileCount = item.files.length;
-  const label =
-    item.text || `${fileCount} attachment${fileCount === 1 ? "" : "s"}`;
+  const kind = item.tag ? `${item.tag.toLowerCase()} ` : "";
 
   return (
-    <Reorder.Item
-      value={item}
+    <motion.li
       layout
       // Enter: spring-fast chip category. Exit slightly faster (0.06s linear),
       // per motion-guidelines.md. Reduced-motion drops the scale.
@@ -296,19 +278,16 @@ function QueuedRow({
           : { opacity: 0, scale: 0.97, transition: spring.fast.exit }
       }
       transition={spring.fast}
-      aria-label={`Queued message ${index + 1} of ${total}: ${label}`}
+      aria-label={`Queued ${kind}message ${index + 1} of ${total}: ${item.text}`}
       tabIndex={0}
-      onDoubleClick={() => onEdit(item)}
+      onDoubleClick={() => onEdit?.(item)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === "F2") {
           e.preventDefault();
-          onEdit(item);
+          onEdit?.(item);
         } else if (e.key === "Delete" || e.key === "Backspace") {
           e.preventDefault();
-          onRemove(item);
-        } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
-          e.preventDefault();
-          onMove(item, e.key === "ArrowUp" ? -1 : 1);
+          onRemove?.(item);
         }
       }}
       className={cn(
@@ -319,47 +298,48 @@ function QueuedRow({
           ? "h-7 px-2 text-[12px]"
           : "h-8 px-2.5 text-[13px]",
         "text-foreground/85 select-none outline-none",
-        "cursor-grab active:cursor-grabbing",
         "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
       )}
       style={{ fontVariationSettings: fontWeights.normal }}
     >
-      {fileCount > 0 && (
-        <span className="flex shrink-0 items-center gap-0.5 text-muted-foreground">
-          <ImageIcon size={13} />
-          {item.text && <span className="tabular-nums">{fileCount}</span>}
+      {item.tag && (
+        <span
+          className="shrink-0 text-muted-foreground [text-box:trim-both_cap_alphabetic]"
+          style={{ fontVariationSettings: fontWeights.medium }}
+        >
+          {item.tag}
         </span>
       )}
       {/* py-1/-my-1 keeps truncate's overflow:hidden from clipping
           ascenders/descenders outside the trimmed box. */}
-      <span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{label}</span>
-      <Tooltip content="Remove" side="top">
-        <button
-          type="button"
-          // Stop the pointer-down from starting a Reorder drag, and the click
-          // from bubbling to the row's double-click/edit handler.
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove(item);
-          }}
-          aria-label={`Remove queued message: ${label}`}
-          className={cn(
-            "shrink-0 flex h-5 w-5 items-center justify-center rounded-full",
-            "text-muted-foreground hover:text-foreground hover:bg-hover",
-            // Hover devices reveal × on row-hover; touch has no hover, so keep
-            // it persistently visible there.
-            isTouch
-              ? "opacity-100"
-              : "opacity-0 group-hover/qrow:opacity-100 focus-visible:opacity-100",
-            "transition-opacity duration-80 cursor-pointer outline-none",
-            "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
-          )}
-        >
-          <XIcon size={13} strokeWidth={2.5} />
-        </button>
-      </Tooltip>
-    </Reorder.Item>
+      <span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{item.text}</span>
+      {onRemove && (
+        <Tooltip content="Remove" side="top">
+          <button
+            type="button"
+            // Keep the click from bubbling to the row's double-click/edit handler.
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove(item);
+            }}
+            aria-label={`Remove queued message: ${item.text}`}
+            className={cn(
+              "shrink-0 flex h-5 w-5 items-center justify-center rounded-full",
+              "text-muted-foreground hover:text-foreground hover:bg-hover",
+              // Hover devices reveal × on row-hover; touch has no hover, so keep
+              // it persistently visible there.
+              isTouch
+                ? "opacity-100"
+                : "opacity-0 group-hover/qrow:opacity-100 focus-visible:opacity-100",
+              "transition-opacity duration-80 cursor-pointer outline-none",
+              "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
+            )}
+          >
+            <XIcon size={13} strokeWidth={2.5} />
+          </button>
+        </Tooltip>
+      )}
+    </motion.li>
   );
 }
 
@@ -467,8 +447,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       status,
       onStop,
       queue,
-      onQueueChange,
-      showQueue = true,
+      onEditQueued,
+      onRemoveQueued,
       history = [],
       placeholderSuggestion,
       suggestions,
@@ -503,17 +483,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     const filesArr = useMemo(() => files ?? [], [files]);
     const supportsFiles = onFilesChange !== undefined;
 
-    // Queue is active only when both the status is controlled and a change
-    // handler is wired — same opt-in shape as `supportsFiles`.
     const queueArr = useMemo(() => queue ?? [], [queue]);
-    // Always-current view of the queue, so enqueue/edit/remove/move read the
-    // latest value even if a handler closure is stale (e.g. two submits land
-    // before the controlled `queue` prop round-trips back).
-    const queueRef = useRef(queueArr);
-    queueRef.current = queueArr;
-    const supportsQueue = status !== undefined && onQueueChange !== undefined;
     const streaming = status === "streaming";
-    const [liveMsg, setLiveMsg] = useState("");
 
     // Sent-message history navigation (readline-style). `historyIndex` is null
     // when not browsing; `draftBeforeHistory` stashes the in-progress text so
@@ -641,122 +612,16 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     const handleSend = useCallback(() => {
       if (!canSend) return;
       setHistoryIndex(null);
-      // While the assistant is streaming, a submit enqueues instead of sending:
-      // snapshot the draft (text + currently-attached files) into a queue item,
-      // then clear the composer and keep focus.
-      if (streaming && supportsQueue) {
-        const item: QueuedMessage = {
-          id: crypto.randomUUID(),
-          text: trimmed,
-          files: filesArr,
-        };
-        onQueueChange?.([...queueRef.current, item]);
-        onValueChange("");
-        if (supportsFiles) onFilesChange?.([]);
-        requestAnimationFrame(() => textareaRef.current?.focus());
-        return;
-      }
       onSend?.(trimmed, filesArr);
-    }, [
-      canSend,
-      streaming,
-      supportsQueue,
-      onSend,
-      trimmed,
-      filesArr,
-      onQueueChange,
-      onValueChange,
-      supportsFiles,
-      onFilesChange,
-    ]);
+    }, [canSend, onSend, trimmed, filesArr]);
 
     const handleStop = useCallback(() => onStop?.(), [onStop]);
 
-    // Auto-dispatch: on the streaming → idle edge (whether the response
-    // finished on its own or the user pressed Stop), fire the head of the
-    // queue and drop it. The consumer is expected to set status back to
-    // "streaming" inside onSend, which re-arms this for the next item.
-    const prevStatusRef = useRef(status);
-    useEffect(() => {
-      const prev = prevStatusRef.current;
-      prevStatusRef.current = status;
-      if (!supportsQueue) return;
-      if (prev === "streaming" && status === "idle" && queueArr.length > 0) {
-        const [next, ...rest] = queueArr;
-        onQueueChange?.(rest);
-        onSend?.(next.text, next.files, { queuedId: next.id });
-        setLiveMsg(
-          `Message sent.${rest.length ? ` ${rest.length} still queued.` : ""}`
-        );
-      }
-    }, [status, supportsQueue, queueArr, onQueueChange, onSend]);
-
-    // ── Queue item actions ────────────────────────────────────────────
-    const editQueued = useCallback(
-      (item: QueuedMessage) => {
-        if (!supportsQueue) return;
-        // Silent replace: pull the item out of the queue into the composer,
-        // overwriting any current draft. Re-sending re-queues it to the end.
-        setHistoryIndex(null);
-        onValueChange(item.text);
-        if (supportsFiles) {
-          onFilesChange?.(
-            maxFiles != null ? item.files.slice(0, maxFiles) : item.files
-          );
-        }
-        onQueueChange?.(queueRef.current.filter((q) => q.id !== item.id));
-        requestAnimationFrame(() => {
-          const el = textareaRef.current;
-          if (!el) return;
-          el.focus();
-          el.setSelectionRange(el.value.length, el.value.length);
-        });
-      },
-      [
-        supportsQueue,
-        supportsFiles,
-        onValueChange,
-        onFilesChange,
-        maxFiles,
-        onQueueChange,
-      ]
-    );
-
-    const removeQueued = useCallback(
-      (item: QueuedMessage) =>
-        onQueueChange?.(queueRef.current.filter((q) => q.id !== item.id)),
-      [onQueueChange]
-    );
-
-    const moveQueued = useCallback(
-      (item: QueuedMessage, dir: -1 | 1) => {
-        const cur = queueRef.current;
-        const i = cur.findIndex((q) => q.id === item.id);
-        const j = i + dir;
-        if (i < 0 || j < 0 || j >= cur.length) return;
-        const next = [...cur];
-        [next[i], next[j]] = [next[j], next[i]];
-        onQueueChange?.(next);
-      },
-      [onQueueChange]
-    );
-
-    // Send button morph: Stop (streaming + empty draft) → Queue (streaming +
-    // draft) → Send (idle). Send and Queue share the arrow-up glyph; only the
+    // Send button morph: Stop (streaming + empty draft) → Send. Only the
     // Stop⇄arrow swap animates.
-    const buttonMode: "send" | "queue" | "stop" = !streaming
-      ? "send"
-      : canSend && supportsQueue
-        ? "queue"
-        : onStop
-          ? "stop"
-          : "send";
-    const buttonLabel =
-      buttonMode === "stop"
-        ? "Stop"
-        : buttonMode === "queue"
-          ? "Queue message"
-          : sendLabel;
+    const buttonMode: "send" | "stop" =
+      streaming && !canSend && onStop ? "stop" : "send";
+    const buttonLabel = buttonMode === "stop" ? "Stop" : sendLabel;
 
     const setCaretEnd = useCallback(() => {
       requestAnimationFrame(() => {
@@ -1102,49 +967,43 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
             )}
           </AnimatePresence>
 
-          {/* Queued messages — reorderable rows above the textarea. The outer
-              motion.div collapses the region height when the queue empties;
-              the Reorder.Group handles drag-reorder (top = next to dispatch)
-              and AnimatePresence handles per-row enter/exit. */}
-          {supportsQueue && showQueue && (
-            <AnimatePresence initial={false}>
-              {queueArr.length > 0 && (
-                <motion.div
-                  key="queue-row"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: queueRegionHeight ?? 0, opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ ...spring.moderate, bounce: 0 }}
-                  className="overflow-hidden"
+          {/* Queued messages — rows above the textarea. The outer motion.div
+              collapses the region height when the queue empties, and
+              AnimatePresence handles per-row enter/exit. */}
+          <AnimatePresence initial={false}>
+            {queueArr.length > 0 && (
+              <motion.div
+                key="queue-row"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: queueRegionHeight ?? 0, opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ ...spring.moderate, bounce: 0 }}
+                className="overflow-hidden"
+              >
+                <ul
+                  ref={queueRegionRef}
+                  aria-label="Queued messages"
+                  data-im-queue
+                  className="flex flex-col gap-1 pb-1"
                 >
-                  <Reorder.Group
-                    ref={queueRegionRef}
-                    axis="y"
-                    values={queueArr}
-                    onReorder={(next) => onQueueChange?.(next)}
-                    data-im-queue
-                    className="flex flex-col gap-1 pb-1"
-                  >
-                    <AnimatePresence initial={false}>
-                      {queueArr.map((item, i) => (
-                        <QueuedRow
-                          key={item.id}
-                          item={item}
-                          index={i}
-                          total={queueArr.length}
-                          reduceMotion={reduceMotion}
-                          isTouch={isTouch}
-                          onEdit={editQueued}
-                          onRemove={removeQueued}
-                          onMove={moveQueued}
-                        />
-                      ))}
-                    </AnimatePresence>
-                  </Reorder.Group>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          )}
+                  <AnimatePresence initial={false}>
+                    {queueArr.map((item, i) => (
+                      <QueuedRow
+                        key={item.id}
+                        item={item}
+                        index={i}
+                        total={queueArr.length}
+                        reduceMotion={reduceMotion}
+                        isTouch={isTouch}
+                        onEdit={onEditQueued}
+                        onRemove={onRemoveQueued}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </ul>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="relative">
             <textarea
@@ -1368,10 +1227,6 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
               )}
             </AnimatePresence>
           )}
-          {/* Politely announces auto-dispatch of queued messages. */}
-          <span className="sr-only" role="status" aria-live="polite">
-            {liveMsg}
-          </span>
         </SurfaceProvider>
       </div>
     );

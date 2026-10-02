@@ -1,12 +1,14 @@
-import { ArrowUpRight, Brain } from "lucide-react";
+import { ArrowUpRight, Brain, ListEnd } from "lucide-react";
 import { createContext, Fragment, type ReactNode, useContext, useEffect, useId, useRef, useState } from "react";
 import type {
 	AgentRow,
 	CompletionItem,
 	ControlPhase,
+	Delivery,
 	Item,
 	LinkedPullRequest,
 	LiveView,
+	MessageQueue,
 	ModelOption,
 	PastSession,
 	RosterHost,
@@ -15,7 +17,7 @@ import type {
 } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
-import { InputMessage, type QueuedMessage } from "@/components/ui/input-message";
+import { InputMessage } from "@/components/ui/input-message";
 import {
 	MessageScroller,
 	MessageScrollerButton,
@@ -27,11 +29,12 @@ import {
 } from "@/components/ui/message-scroller";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import type { Fork } from "../use-dashboard";
 import { type ForkPoint, forkPoints, hashForInbox, modelName, modelOrg, pullRequestUrl, sameView, type ToolItem, toBlocks } from "../view-model";
-import { useShortcuts } from "../shortcuts";
+import { chordLabel, SHORTCUTS, useShortcuts } from "../shortcuts";
 import { completionTrigger } from "../completion-trigger";
 import { CompletionPopup } from "./completion-popup";
 import { ContextRing } from "./context-ring";
@@ -51,6 +54,16 @@ const CONTROL_LABEL: Record<ControlPhase["phase"], string> = {
 };
 
 const TOOL_ICON = { running: "loader", ok: "check", error: "x" } as const;
+
+/** omp's queues, in the order its Alt+↑ takes them back, with the tag each queued row shows. */
+const QUEUE_TAGS: [keyof MessageQueue, string][] = [
+	["steering", "Steer"],
+	["followUp", "Follow-up"],
+];
+
+const FOLLOW_UP_KEYS = SHORTCUTS.filter(({ id }) => id === "followUp")
+	.map(({ chord }) => chordLabel(chord))
+	.join(" or ");
 
 const NOTICE_TONE: Record<Extract<Item, { kind: "notice" }>["level"], string> = {
 	info: "text-muted-foreground",
@@ -347,7 +360,10 @@ interface ConversationProps {
 	onListModels: () => void;
 	onSetModel: (model: ModelOption) => void;
 	onSetThinking: (level: string) => void;
-	onPrompt: (text: string) => void;
+	onPrompt: (text: string, delivery: Delivery) => void;
+	/** The server's last answer to this view's `dequeue`. */
+	dequeued: { reqId: number; texts: string[] } | null;
+	onDequeue: (reqId: number, messages: { queue: keyof MessageQueue; text: string }[]) => void;
 	onAbort: () => void;
 	onEnd: () => void;
 	onAnswer: (requestId: string, answer: UserAnswer) => void;
@@ -381,6 +397,8 @@ function LiveConversation({
 	onSetModel,
 	onSetThinking,
 	onPrompt,
+	dequeued,
+	onDequeue,
 	onAbort,
 	onEnd,
 	onAnswer,
@@ -389,7 +407,8 @@ function LiveConversation({
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const [draft, setDraft] = useState(initialDraft);
-	const [queue, setQueue] = useState<QueuedMessage[]>([]);
+	/** The `dequeue` whose text goes back into the draft; a removed row asks for none. */
+	const [dequeueId, setDequeueId] = useState<number | null>(null);
 	const [requestId, setRequestId] = useState<number | null>(null);
 	const [active, setActive] = useState(0);
 	const nextId = useRef(0);
@@ -433,6 +452,41 @@ function LiveConversation({
 	// Questions belong to the session's main agent, and only a writer can answer them.
 	const requests = view.agentId === null && live && host ? host.requests : [];
 
+	const waiting = view.agentId === null ? host?.queue : agent?.queue;
+	// Each id counts the earlier rows with the same text, so a row keeps its key when the one ahead of it is delivered.
+	const queued = QUEUE_TAGS.flatMap(([queue, tag]) =>
+		(waiting?.[queue] ?? []).map((text, index, texts) => ({
+			queue,
+			item: { id: `${queue}:${texts.slice(0, index).filter(t => t === text).length}:${text}`, text, tag },
+		})),
+	);
+	/** Take queued rows out before the agent gets them; edited ones come back into the draft once the server took them. */
+	const take = (entries: typeof queued, edit: boolean): boolean | void => {
+		if (entries.length === 0) return false;
+		const id = ++nextId.current;
+		if (edit) setDequeueId(id);
+		onDequeue(id, entries.map(({ queue, item }) => ({ queue, text: item.text })));
+	};
+	useEffect(() => {
+		if (!dequeued || dequeued.reqId !== dequeueId) return;
+		setDequeueId(null);
+		const text = dequeued.texts.join("\n");
+		setDraft(current => (current ? `${text}\n${current}` : text));
+		composerRef.current?.querySelector("textarea")?.focus();
+	}, [dequeued, dequeueId]);
+	// As omp's Esc does, the session's queued messages come back into the composer instead of running after the interrupt.
+	const interrupt = (): void => {
+		take(queued, true);
+		onAbort();
+	};
+
+	const submit = (text: string, delivery: Delivery): void => {
+		onPrompt(text, delivery);
+		setRequestId(null);
+		setDraft("");
+		scrollToEnd();
+	};
+
 	let status = CONTROL_LABEL[phase.phase];
 	if (phase.phase === "live") {
 		const activity = agent ? statusLabel(agent.status) : host ? statusLabel(host.status) : "";
@@ -454,13 +508,13 @@ function LiveConversation({
 		? phase.phase === "live" && agent && !agent.canMessage
 			? "This subagent cannot be messaged."
 			: "Messaging is unavailable for this view."
-		: agent
-			? agent.status === "running"
-				? "Steer this subagent…"
-				: agent.status === "parked"
+		: working
+			? `Steer ${agent ? "this subagent" : "the running turn"}… ${FOLLOW_UP_KEYS} sends once it finishes`
+			: agent
+				? agent.status === "parked"
 					? "Message to revive this subagent…"
 					: "Message this subagent…"
-			: "Message this session…";
+				: "Message this session…";
 
 	const directCommand = draft.startsWith("$") ? "Python" : draft.startsWith("!") ? "shell" : null;
 	const shownModel = shown?.model ?? null;
@@ -492,18 +546,24 @@ function LiveConversation({
 		) : null;
 	const contextSlot = view.agentId === null && shown?.context ? <ContextRing context={shown.context} /> : null;
 
-	const onComposerKey = useShortcuts(
-		focused
+	const followUp = (): boolean | void => {
+		const text = draft.trim();
+		if (!writable || !text || directCommand) return false;
+		submit(text, "followUp");
+	};
+	const onComposerKey = useShortcuts({
+		// The textarea's own key, so it needs no focused pane.
+		followUp,
+		...(focused
 			? {
 					interrupt: () => {
 						if (view.agentId !== null || !writable || !working) return false;
-						onAbort();
+						interrupt();
 					},
 					dequeue: () => {
-						const last = queue.at(-1);
-						if (!last) return false;
-						setQueue(queue.slice(0, -1));
-						setDraft(draft ? `${last.text}\n${draft}` : last.text);
+						// omp takes back its last steer before its last follow-up.
+						const last = queued.findLast(entry => entry.queue === "steering") ?? queued.at(-1);
+						return take(last ? [last] : [], true);
 					},
 					model: () => {
 						if (!switchable) return false;
@@ -515,7 +575,14 @@ function LiveConversation({
 						onSetThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
 					},
 				}
-			: {},
+			: {}),
+	});
+	const followUpButton = writable && working && (
+		<Tooltip content={`Send once the turn finishes · ${FOLLOW_UP_KEYS}`} side="top">
+			<Button variant="ghost" size="icon-sm" aria-label="Send once the turn finishes" disabled={!draft.trim() || directCommand !== null} onClick={followUp}>
+				<ListEnd aria-hidden="true" />
+			</Button>
+		</Tooltip>
 	);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
@@ -579,27 +646,25 @@ function LiveConversation({
 							}
 						},
 					}}
-					onSend={(text, _files, meta) => {
-						if (directCommand) return;
-						onPrompt(text);
-						setRequestId(null);
-						// A queued message dispatching on its own must not wipe the draft being typed.
-						if (!meta?.queuedId) {
-							setDraft("");
-							scrollToEnd();
-						}
+					onSend={text => {
+						if (!directCommand) submit(text, "steer");
 					}}
 					leftSlot={modelSlot}
-					rightSlot={contextSlot}
+					rightSlot={
+						<>
+							{contextSlot}
+							{followUpButton}
+						</>
+					}
 					placeholder={placeholder}
 					disabled={!writable}
-					// Session prompts sent mid-turn queue until the turn ends; Stop interrupts it.
-					// Subagent chat steers a running turn, so it always sends at once.
-					status={view.agentId === null ? (working ? "streaming" : "idle") : undefined}
-					onStop={onAbort}
-					queue={queue}
-					onQueueChange={setQueue}
-					sendLabel={agent ? "Send to subagent" : "Send to session"}
+					// While a turn runs, Enter and the send button steer it, and Stop interrupts a session's turn.
+					status={working ? "streaming" : "idle"}
+					onStop={view.agentId === null ? interrupt : undefined}
+					queue={queued.map(({ item }) => item)}
+					onEditQueued={item => take(queued.filter(entry => entry.item.id === item.id), true)}
+					onRemoveQueued={item => take(queued.filter(entry => entry.item.id === item.id), false)}
+					sendLabel={`${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
 				/>
 				{directCommand && (
 					<p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">

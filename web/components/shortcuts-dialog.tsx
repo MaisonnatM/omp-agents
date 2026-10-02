@@ -3,10 +3,10 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { chordLabel, type Shortcut, SHORTCUTS } from "../shortcuts";
 
+const LIST = new Intl.ListFormat("en", { type: "conjunction" });
+
 const chordsIn = (where: Shortcut["scope"]): string =>
-	SHORTCUTS.filter(({ scope }) => scope === where)
-		.map(({ chord }) => chordLabel(chord))
-		.join(" and ");
+	LIST.format(SHORTCUTS.filter(({ scope }) => scope === where).map(({ chord }) => chordLabel(chord)));
 
 /** The dashboard's `/hotkeys`: every shortcut next to the omp chord it mirrors. */
 export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {

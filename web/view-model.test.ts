@@ -32,6 +32,7 @@ const agent = (id: string, parentId: string | null): AgentRow => ({
 	status: "running",
 	activity: null,
 	canMessage: true,
+	queue: { steering: [], followUp: [] },
 });
 
 describe("model labels", () => {

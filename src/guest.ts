@@ -9,7 +9,7 @@ import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp";
-import type { AgentRow, AgentStatus, ContextUsage, ControlPhase, UserAnswer, UserRequest } from "./shared";
+import type { AgentRow, AgentStatus, ContextUsage, ControlPhase, Delivery, MessageQueue, UserAnswer, UserRequest } from "./shared";
 import { isObject, oneLine } from "./transcript";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
 
@@ -89,11 +89,12 @@ export function contextOf(value: unknown): ContextUsage | null {
 		: null;
 }
 
-/** Model, thinking level, and context from the host's status-line snapshot. */
+/** Model, thinking level, context, and whether a turn runs, from the host's status-line snapshot. */
 interface HostState {
 	model: string | null;
 	thinkingLevel: string | null;
 	context: ContextUsage | null;
+	streaming: boolean;
 }
 
 function parseState(value: unknown): HostState | null {
@@ -103,6 +104,7 @@ function parseState(value: unknown): HostState | null {
 		model: isObject(model) && typeof model.provider === "string" && typeof model.id === "string" ? `${model.provider}/${model.id}` : null,
 		thinkingLevel: nonEmpty(thinkingLevel) ?? null,
 		context: contextOf(value.contextUsage),
+		streaming: value.isStreaming === true,
 	};
 }
 
@@ -110,7 +112,14 @@ const sameState = (a: HostState | null, b: HostState | null): boolean =>
 	a?.model === b?.model &&
 	a?.thinkingLevel === b?.thinkingLevel &&
 	a?.context?.tokens === b?.context?.tokens &&
-	a?.context?.window === b?.context?.window;
+	a?.context?.window === b?.context?.window &&
+	a?.streaming === b?.streaming;
+
+/** A message as the user typed it, which the queue shows, and as the host receives it once its skill or file command expanded. */
+export interface Outgoing {
+	text: string;
+	payload: string;
+}
 
 /** Resolve a link, re-listing on `stale_generation` (the host switched sessions mid-request). */
 async function openFreshRoom(host: HostSnapshot): Promise<Room> {
@@ -144,6 +153,17 @@ export class SessionGuest {
 	readonly #emit: (update: LiveUpdate) => void;
 	/** The host's `ui-request`s; the host sends them to writable guests only. */
 	readonly #requests = new PendingRequests(() => this.#emit({ kind: "roster" }));
+	/**
+	 * Follow-ups waiting for a turn to end, by agent id, `""` for the main agent. Collab has no follow-up frame and the
+	 * host steers every guest message, so the guest holds them and sends one per finished turn, as omp's default
+	 * `followUpMode` delivers them.
+	 */
+	readonly #followUps = new Map<string, Outgoing[]>();
+	/**
+	 * Whether the main agent's turn was interrupted, by this guest's Stop or by a reply cut off mid-stream. omp's Esc puts
+	 * its queue back in the editor rather than run it after an interrupt, so held follow-ups wait for the next turn.
+	 */
+	#interrupted = false;
 
 	constructor(host: HostSnapshot, emit: (update: LiveUpdate) => void) {
 		this.instanceId = host.instanceId;
@@ -165,7 +185,13 @@ export class SessionGuest {
 			status: agent.status,
 			activity: this.#activity.get(agent.id) ?? null,
 			canMessage: !this.#readOnly && agent.status !== "aborted",
+			queue: this.queue(agent.id),
 		}));
+	}
+
+	/** What waits on the turn of the main agent (`null`) or a subagent. The host shows no guest its own queue. */
+	queue(agentId: string | null): MessageQueue {
+		return { steering: [], followUp: (this.#followUps.get(agentId ?? "") ?? []).map(message => message.text) };
 	}
 
 	requests(): UserRequest[] {
@@ -210,19 +236,62 @@ export class SessionGuest {
 		this.#emit({ kind: "roster" });
 	}
 
-	prompt(text: string): void {
-		if (this.canWrite) this.#socket?.send({ t: "prompt", text });
+	/**
+	 * Prompt the main agent (`agentId` null) or chat to a subagent. The host steers a running agent, prompts an idle
+	 * one, and revives a parked subagent. A follow-up waits here while the agent's turn runs.
+	 */
+	send(agentId: string | null, message: Outgoing, delivery: Delivery): void {
+		if (!this.canWrite) return;
+		const key = agentId ?? "";
+		if (delivery === "followUp" && this.#running(key)) {
+			this.#followUps.set(key, [...(this.#followUps.get(key) ?? []), message]);
+			this.#emit({ kind: "roster" });
+			return;
+		}
+		if (!key) this.#socket?.send({ t: "prompt", text: message.payload });
+		else if (this.#agents.some(a => a.id === key && !a.isMain && a.status !== "aborted")) {
+			this.#socket?.send({ t: "agent-cmd", cmd: "chat", agentId: key, text: message.payload });
+		}
+	}
+
+	/** Take a held follow-up back. False when it is no longer held: its turn ended and the guest sent it. */
+	dequeue(agentId: string | null, text: string): boolean {
+		const key = agentId ?? "";
+		const held = this.#followUps.get(key) ?? [];
+		const index = held.findIndex(message => message.text === text);
+		if (index < 0) return false;
+		this.#followUps.set(key, held.toSpliced(index, 1));
+		this.#emit({ kind: "roster" });
+		return true;
 	}
 
 	abort(): void {
-		if (this.canWrite) this.#socket?.send({ t: "abort" });
+		if (!this.canWrite) return;
+		this.#interrupted = true;
+		this.#socket?.send({ t: "abort" });
 	}
 
-	/** Steer a running subagent, prompt an idle one, or revive a parked one; the host picks. */
-	chat(agentId: string, text: string): void {
-		const agent = this.#agents.find(a => a.id === agentId && !a.isMain);
-		if (this.canWrite && agent && agent.status !== "aborted") {
-			this.#socket?.send({ t: "agent-cmd", cmd: "chat", agentId, text });
+	/** Whether the agent's turn runs, as the host last reported it: its `state` frames for the main agent, its registry for subagents. */
+	#running(key: string): boolean {
+		return key ? this.#agents.some(a => a.id === key && !a.isMain && a.status === "running") : this.state?.streaming === true;
+	}
+
+	/** Send the next follow-up of each agent in `running` whose turn has ended since. A subagent that stopped takes none. */
+	#release(running: string[]): void {
+		if (!this.canWrite) return;
+		for (const key of running) {
+			if (this.#running(key) || (!key && this.#interrupted)) continue;
+			const [next, ...rest] = this.#followUps.get(key) ?? [];
+			if (!next) continue;
+			if (key && !this.#agents.some(a => a.id === key && !a.isMain && a.status !== "aborted")) {
+				this.#followUps.delete(key);
+				const texts = [next, ...rest].map(message => message.text).join("\n");
+				this.#emit({ kind: "note", agentId: key, level: "warning", text: `Not sent, the subagent stopped before its turn ended:\n${texts}` });
+			} else {
+				this.#followUps.set(key, rest);
+				this.send(key || null, next, "steer");
+			}
+			this.#emit({ kind: "roster" });
 		}
 	}
 
@@ -241,6 +310,12 @@ export class SessionGuest {
 		this.#socket?.close();
 		this.#socket = null;
 		this.#requests.clear();
+		for (const [key, held] of this.#followUps) {
+			if (held.length === 0) continue;
+			const texts = held.map(message => message.text).join("\n");
+			this.#emit({ kind: "note", agentId: key || null, level: "warning", text: `Not sent, the room closed before the turn ended:\n${texts}` });
+		}
+		this.#followUps.clear();
 		this.#setControl({ phase: "ended", reason });
 	}
 
@@ -270,6 +345,12 @@ export class SessionGuest {
 
 	#onFrame(frame: Frame): void {
 		if (this.#closed) return;
+		const running = [...this.#followUps.keys()].filter(key => this.#running(key));
+		this.#apply(frame);
+		this.#release(running);
+	}
+
+	#apply(frame: Frame): void {
 		switch (frame.t) {
 			case "welcome":
 				this.#readOnly = this.#readOnly || frame.readOnly === true;
@@ -280,9 +361,15 @@ export class SessionGuest {
 				// Rows carry `canMessage`, which depends on the welcome's read-only verdict.
 				this.#setControl({ phase: "live", readOnly: this.#readOnly });
 				return;
-			case "event":
-				this.#emit({ kind: "event", event: frame.event });
+			case "event": {
+				const event = frame.event;
+				if (isObject(event) && event.type === "agent_start") this.#interrupted = false;
+				else if (isObject(event) && event.type === "message_end" && isObject(event.message) && event.message.stopReason === "aborted") {
+					this.#interrupted = true;
+				}
+				this.#emit({ kind: "event", event });
 				return;
+			}
 			case "state": {
 				const state = parseState(frame.state);
 				if (sameState(state, this.state)) return;

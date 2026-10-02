@@ -4,6 +4,25 @@ export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
 
 export type AgentStatus = "running" | "idle" | "parked" | "aborted";
 
+/**
+ * How a message sent while a turn runs reaches the agent, as omp's terminal sends it. Enter steers, and omp delivers a
+ * `steer` after the current tool call. Ctrl+Enter sends a `followUp`, which omp delivers once the agent finishes its
+ * turn. An idle agent takes either as a new prompt.
+ */
+export type Delivery = "steer" | "followUp";
+
+/**
+ * Messages waiting on a running turn, oldest first, in omp's two queues. A dashboard session reports omp's own queues.
+ * Collab reports neither, so in a terminal session `steering` stays empty and `followUp` holds what the dashboard
+ * keeps back until the turn ends.
+ */
+export interface MessageQueue {
+	steering: string[];
+	followUp: string[];
+}
+
+export const EMPTY_QUEUE: MessageQueue = { steering: [], followUp: [] };
+
 /** A GitHub pull request. */
 export interface PullRequest {
 	owner: string;
@@ -84,6 +103,7 @@ export interface AgentRow {
 	activity: string | null;
 	/** Whether the dashboard can message it: a writable terminal room and an agent that is not aborted. */
 	canMessage: boolean;
+	queue: MessageQueue;
 }
 
 interface RosterHostBase {
@@ -108,6 +128,8 @@ interface RosterHostBase {
 	pullRequests: LinkedPullRequest[];
 	/** Questions the session waits on, oldest first. */
 	requests: UserRequest[];
+	/** What waits on the main agent's turn. */
+	queue: MessageQueue;
 }
 
 export type RosterHost = RosterHostBase &
@@ -348,13 +370,17 @@ export type ServerMsg =
 	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */
 	| { t: "usage"; plans: PlanUsage[]; error: string | null }
 	/** Answers `list-models`. `error` is set when the session cannot list or switch models. */
-	| { t: "models"; instanceId: string; models: ModelOption[]; error: string | null };
+	| { t: "models"; instanceId: string; models: ModelOption[]; error: string | null }
+	/** Answers this socket's `dequeue` with the texts it took out of the queue, oldest first. Nothing answers when every message had gone. */
+	| { t: "dequeued"; view: LiveView; reqId: number; texts: string[] };
 
 export type ClientMsg =
 	/** The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming. */
 	| { t: "watch"; views: View[] }
-	/** A prompt to the session, or chat to the subagent (steer if running, prompt if idle, revive if parked). */
-	| { t: "prompt"; view: LiveView; text: string }
+	/** A prompt to the session, or chat to the subagent (prompt if idle, revive if parked); `delivery` applies while a turn runs. */
+	| { t: "prompt"; view: LiveView; text: string; delivery: Delivery }
+	/** Take `messages` out of the view's queue before the agent gets them. `reqId` counts per view, as for `complete`. */
+	| { t: "dequeue"; reqId: number; view: LiveView; messages: { queue: keyof MessageQueue; text: string }[] }
 	| { t: "abort"; instanceId: string }
 	/** Suggestions for the composer text with the caret at `cursor`, resolved against the view's session cwd. */
 	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number }
