@@ -2,20 +2,18 @@
  * Questions a live session waits on, from either transport: omp's RPC `extension_ui_request`
  * frames for dashboard sessions and Collab `ui-request` frames for terminal sessions.
  */
+import { isObject, str } from "./json";
 import type { RequestOption, UserAnswer, UserRequest } from "./shared";
-import { isObject } from "./transcript";
-
-const text = (value: unknown): string | null => (typeof value === "string" ? value : null);
 
 function parseOptions(options: unknown, details: unknown): RequestOption[] | null {
 	if (!Array.isArray(options)) return null;
 	const rows: RequestOption[] = [];
 	for (const [index, option] of options.entries()) {
 		// Collab rows are a label or `{ label, description }`; RPC rows are labels with descriptions alongside.
-		const label = typeof option === "string" ? option : isObject(option) ? text(option.label) : null;
-		if (label === null) return null;
+		const label = typeof option === "string" ? option : isObject(option) ? str(option.label) : undefined;
+		if (label === undefined) return null;
 		const detail = isObject(option) ? option : Array.isArray(details) && isObject(details[index]) ? details[index] : null;
-		const description = detail ? text(detail.description)?.trim() || null : null;
+		const description = detail ? str(detail.description)?.trim() || null : null;
 		rows.push({ label, description });
 	}
 	return rows;
@@ -26,14 +24,14 @@ export type RpcRequestChange = { kind: "add"; request: UserRequest } | { kind: "
 
 /** omp's `RpcExtensionUIRequest` (src/modes/rpc/rpc-types.ts), received at `now`. */
 export function parseRpcRequest(frame: Record<string, unknown>, now: number): RpcRequestChange {
-	const id = text(frame.id);
-	if (id === null) return null;
+	const id = str(frame.id);
+	if (id === undefined) return null;
 	if (frame.method === "cancel") {
-		const target = text(frame.targetId);
-		return target === null ? null : { kind: "cancel", id: target };
+		const target = str(frame.targetId);
+		return target === undefined ? null : { kind: "cancel", id: target };
 	}
-	const title = text(frame.title);
-	if (title === null) return null;
+	const title = str(frame.title);
+	if (title === undefined) return null;
 	const deadline = typeof frame.timeout === "number" && frame.timeout > 0 ? now + frame.timeout : null;
 	const base = { id, title, deadline };
 	switch (frame.method) {
@@ -42,16 +40,16 @@ export function parseRpcRequest(frame: Record<string, unknown>, now: number): Rp
 			return options ? { kind: "add", request: { ...base, kind: "select", options, checked: [] } } : null;
 		}
 		case "confirm":
-			return { kind: "add", request: { ...base, kind: "confirm", message: text(frame.message) ?? "" } };
+			return { kind: "add", request: { ...base, kind: "confirm", message: str(frame.message) ?? "" } };
 		case "input":
 			return {
 				kind: "add",
-				request: { ...base, kind: "text", multiline: false, placeholder: text(frame.placeholder), prefill: "" },
+				request: { ...base, kind: "text", multiline: false, placeholder: str(frame.placeholder) ?? null, prefill: "" },
 			};
 		case "editor":
 			return {
 				kind: "add",
-				request: { ...base, kind: "text", multiline: true, placeholder: null, prefill: text(frame.prefill) ?? "" },
+				request: { ...base, kind: "text", multiline: true, placeholder: null, prefill: str(frame.prefill) ?? "" },
 			};
 		default:
 			return null;
@@ -73,11 +71,11 @@ export function rpcResponse(id: string, answer: UserAnswer): Record<string, unkn
 /** A Collab `CollabUiRequest` (pi-wire); only writable guests receive one. */
 export function parseCollabRequest(value: unknown): UserRequest | null {
 	if (!isObject(value) || typeof value.reqId !== "number") return null;
-	const title = text(value.title);
-	if (title === null) return null;
+	const title = str(value.title);
+	if (title === undefined) return null;
 	const base = { id: String(value.reqId), title, deadline: null };
 	if (value.kind === "editor") {
-		return { ...base, kind: "text", multiline: true, placeholder: null, prefill: text(value.prefill) ?? "" };
+		return { ...base, kind: "text", multiline: true, placeholder: null, prefill: str(value.prefill) ?? "" };
 	}
 	if (value.kind !== "select") return null;
 	const options = parseOptions(value.options, null);

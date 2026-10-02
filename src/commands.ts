@@ -20,7 +20,7 @@ import {
 	loadSlashCommands,
 	parseSkillInvocation,
 	type Skill,
-} from "./omp";
+} from "./omp/prompts";
 import type { CompletionItem } from "./shared";
 
 /** Discovery reads disk; reuse it briefly so typing does not rescan, but new skills still show up. */

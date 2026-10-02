@@ -7,6 +7,7 @@
  * a message by its `timestamp`, which omp writes to the file unchanged, so the
  * file's copy replaces the streamed one in place and a late event cannot undo it.
  */
+import { isObject, str } from "./json";
 import type { Item } from "./shared";
 
 type Json = Record<string, unknown>;
@@ -23,9 +24,6 @@ const SKILL_PROMPT = "skill-prompt";
 const SKILL_INVOCATION =
 	/^\[IMPORTANT: User invoked the "([^"]+)" skill; follow its instructions\. Full skill below\.\]\n[\s\S]*\n\[Skill directory: [^\n]*\]\n[^\n]*(?:\nUser: ([\s\S]*))?$/;
 const SUMMARY_MAX = 160;
-
-export const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null;
-const str = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined);
 
 export function textOf(content: unknown): string {
 	if (typeof content === "string") return content;

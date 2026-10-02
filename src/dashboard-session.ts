@@ -6,9 +6,10 @@
 import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
 import { activityOf, contextOf, type LiveUpdate, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
-import { endsMidTurn, type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp";
+import { errorText, isObject } from "./json";
+import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rpc";
+import { endsMidTurn } from "./omp/sessions";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type UserAnswer, type UserRequest } from "./shared";
-import { isObject } from "./transcript";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
 /** omp's subagent lifecycle and progress statuses, as the roster's agent statuses. */
@@ -251,7 +252,7 @@ export class DashboardSession {
 	}
 
 	#fail(what: string, err: unknown): void {
-		this.#emit({ kind: "note", agentId: null, level: "error", text: `${what}: ${err instanceof Error ? err.message : String(err)}` });
+		this.#emit({ kind: "note", agentId: null, level: "error", text: `${what}: ${errorText(err)}` });
 	}
 
 	#onEvent(event: unknown): void {

@@ -7,8 +7,9 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { parseRemote, type Repo } from "./inbox";
+import { isObject } from "./json";
 import type { LinkedPullRequest, PullRequest, PullRequestLink } from "./shared";
-import { isObject, textOf } from "./transcript";
+import { textOf } from "./transcript";
 
 const NEWLINE = 0x0a;
 const decoder = new TextDecoder();

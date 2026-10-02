@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildSkillPromptMessage } from "./omp";
+import { buildSkillPromptMessage } from "./omp/prompts";
 import { Transcript } from "./transcript";
 
 const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({

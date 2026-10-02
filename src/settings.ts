@@ -1,23 +1,13 @@
 /** The settings page: omp's model routing and the files omp reads, as a session in a workspace would load them, and the edits it saves. */
-import { mkdir, stat } from "node:fs/promises";
-import { homedir } from "node:os";
-import { dirname, extname, join } from "node:path";
-import {
-	agentDir,
-	assertRetryValue,
-	discoverOmpFiles,
-	displayPath,
-	expandDefaultRetryFallbackChains,
-	type FoundFile,
-	listModels,
-	loadOmpConfig,
-	type OmpConfig,
-	parseRetryFallbackSelector,
-	retryChoices,
-	writeRouting,
-} from "./omp";
+import { randomBytes } from "node:crypto";
+import { mkdir, open, realpath, rename, rm, stat } from "node:fs/promises";
+import { basename, dirname, extname, join } from "node:path";
+import { errorText, isObject } from "./json";
+import { agentDir, assertRetryValue, expandDefaultRetryFallbackChains, loadOmpConfig, type OmpConfig, parseRetryFallbackSelector, retryChoices, writeRouting } from "./omp/config";
+import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
+import { listModels } from "./omp/models";
+import { displayPath, HOME } from "./paths";
 import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared";
-import { isObject } from "./transcript";
 
 /** A request the server refuses, with the HTTP status it answers. `conflict`: the file changed on disk since it was read. */
 export class Rejected extends Error {
@@ -29,8 +19,6 @@ export class Rejected extends Error {
 		super(message);
 	}
 }
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /**
  * Every role omp knows a model or a chain for, in config order, with the fallbacks omp walks for it.
@@ -78,7 +66,7 @@ const USER_FILES: FoundFile[] = [
  * A config omp cannot load still lists the files, so the page can show the broken `config.yml`.
  */
 async function loadSession(cwd: string | null): Promise<{ routing: OmpSettings["routing"]; found: FoundFile[] }> {
-	const sessionCwd = cwd ?? homedir();
+	const sessionCwd = cwd ?? HOME;
 	let routing: OmpSettings["routing"];
 	let disabledExtensions: string[] = [];
 	try {
@@ -202,7 +190,7 @@ function serialized<T>(save: () => Promise<T>): Promise<T> {
 /** Applies a routing edit to the user's `config.yml` and answers with the settings as they now load. */
 export function saveRouting(cwd: string | null, raw: unknown): Promise<OmpSettings> {
 	return serialized(async () => {
-		const sessionCwd = cwd ?? homedir();
+		const sessionCwd = cwd ?? HOME;
 		let config: OmpConfig;
 		try {
 			config = await loadOmpConfig(sessionCwd);
@@ -265,9 +253,24 @@ export function saveOmpFile(cwd: string | null, raw: unknown): Promise<OmpSettin
 			throw new Rejected(409, `${pathDisplay} changed on disk since this page read it`, true);
 		}
 		checkSyntax(file, edit.text);
-		await mkdir(dirname(file.path), { recursive: true });
-		// In place, so a symlinked file stays a link and keeps its permissions.
-		await Bun.write(file.path, edit.text);
+		// Write next to the target, not the symlink: replacing the symlink would strand omp's config elsewhere.
+		const target = body.state === "read" ? await realpath(file.path) : file.path;
+		await mkdir(dirname(target), { recursive: true });
+		const mode = body.state === "read" ? (await stat(target)).mode & 0o777 : undefined;
+		const temp = join(dirname(target), `.${basename(target)}.${randomBytes(8).toString("hex")}.tmp`);
+		const handle = await open(temp, "wx", mode);
+		let replaced = false;
+		try {
+			try {
+				await handle.writeFile(edit.text);
+			} finally {
+				await handle.close();
+			}
+			await rename(temp, target);
+			replaced = true;
+		} finally {
+			if (!replaced) await rm(temp, { force: true });
+		}
 		return loadOmpSettings(cwd);
 	});
 }

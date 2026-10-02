@@ -1,7 +1,8 @@
 /** Plan quota left per provider, read from `omp usage --json` of this same omp package. */
-import { ompCommand } from "./omp";
+import { isObject, num, str } from "./json";
+import { ompCommand } from "./omp/install";
+import { run } from "./proc";
 import type { PlanUsage, PlanWindow } from "./shared";
-import { isObject } from "./transcript";
 
 const TIMEOUT_MS = 30_000;
 
@@ -10,9 +11,6 @@ const PROVIDER_NAMES: Record<string, string> = {
 	"openai-codex": "OpenAI Codex",
 	cursor: "Cursor",
 };
-
-const num = (value: unknown): number | undefined => (typeof value === "number" && Number.isFinite(value) ? value : undefined);
-const str = (value: unknown): string | undefined => (typeof value === "string" && value ? value : undefined);
 
 /** Some providers report only the used fraction, some only absolute amounts. */
 function remainingOf(amount: Record<string, unknown>): number | undefined {
@@ -28,12 +26,12 @@ function remainingOf(amount: Record<string, unknown>): number | undefined {
 function parseLimit(raw: unknown): PlanWindow | null {
 	if (!isObject(raw) || !isObject(raw.window) || !isObject(raw.amount)) return null;
 	const remaining = remainingOf(raw.amount);
-	const window = str(raw.window.id) ?? str(raw.window.label);
+	const window = str(raw.window.id) || str(raw.window.label);
 	if (remaining === undefined || !window) return null;
 	const tier = isObject(raw.scope) ? str(raw.scope.tier) : undefined;
 	return {
 		label: tier ? `${window} ${tier}` : window,
-		title: str(raw.label) ?? window,
+		title: str(raw.label) || window,
 		remaining: Math.min(1, Math.max(0, remaining)),
 		resetsAt: num(raw.window.resetsAt) ?? null,
 	};
@@ -61,7 +59,7 @@ export function parsePlanUsage(stdout: string): PlanUsage[] {
 					.split(/[-_]/)
 					.map(part => part.charAt(0).toUpperCase() + part.slice(1))
 					.join(" "),
-			account: str(metadata.email) ?? str(metadata.accountId) ?? null,
+			account: str(metadata.email) || str(metadata.accountId) || null,
 			windows: windows.map(window =>
 				windows.some(other => other !== window && other.label === window.label) ? { ...window, label: window.title } : window,
 			),
@@ -72,12 +70,7 @@ export function parsePlanUsage(stdout: string): PlanUsage[] {
 
 /** omp exits non-zero when some provider fails, after printing the reports it did get. */
 export async function fetchPlanUsage(): Promise<PlanUsage[]> {
-	const child = Bun.spawn([...ompCommand, "usage", "--json"], { stdout: "pipe", stderr: "pipe", timeout: TIMEOUT_MS });
-	const [stdout, stderr, code] = await Promise.all([
-		new Response(child.stdout).text(),
-		new Response(child.stderr).text(),
-		child.exited,
-	]);
+	const { stdout, stderr, code } = await run([...ompCommand, "usage", "--json"], { timeoutMs: TIMEOUT_MS });
 	try {
 		return parsePlanUsage(stdout);
 	} catch {

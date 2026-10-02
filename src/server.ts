@@ -1,5 +1,4 @@
 import { mkdirSync, statSync, watch as watchFiles } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import type { Server, ServerWebSocket } from "bun";
 import index from "../web/index.html";
@@ -7,13 +6,17 @@ import { complete, expandPrompt, forgetSession } from "./commands";
 import { DashboardSession, type DashboardUpdate, type ForkedSession } from "./dashboard-session";
 import { type LiveUpdate, SessionGuest } from "./guest";
 import { FileTail } from "./tail";
-import { displayPath, type HostSnapshot, listHosts, listModels, listSessionFiles, ompVersion, type SavedSession, sessionsDir } from "./omp";
 import { loadInbox, loadPullRequestDetail, repoOf } from "./inbox";
+import { errorText, isObject } from "./json";
+import { type HostSnapshot, listHosts } from "./omp/collab";
+import { ompVersion } from "./omp/install";
+import { listModels } from "./omp/models";
+import { type SavedSession, listSessionFiles, sessionsDir } from "./omp/sessions";
+import { displayPath, HOME } from "./paths";
 import { PullRequestIndex } from "./pull-requests";
 import { linkSessions, type SessionEntry } from "./session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "./settings";
 import { type ClientMsg, type CompletionScope, EMPTY_QUEUE, type HostStatus, type Item, type LaunchResult, type LinkedPullRequest, type LiveView, type RosterHost, type ServerMsg, type SettingsError, type UserAnswer, type View } from "./shared";
-import { isObject } from "./transcript";
 import { fetchPlanUsage } from "./usage";
 
 const PORT = Number(process.env.PORT ?? 4317);
@@ -28,7 +31,6 @@ const ROSTER_PUSH_MS = 150;
 const LIST_THROTTLE_MS = 500;
 /** `omp usage` caches provider reports itself; each run still costs a process and up to one network round trip per provider. */
 const USAGE_POLL_MS = 60_000;
-const HOME = homedir();
 /**
  * Only pages served by this app may open the socket, which carries full control of every session, or read omp's files.
  * DNS rebinding cannot pass the Host check; a cross-site page cannot pass the Origin check that also guards writes.
@@ -168,7 +170,7 @@ async function pollUsage(): Promise<void> {
 	try {
 		msg = { t: "usage", plans: await fetchPlanUsage(), error: null };
 	} catch (err) {
-		msg = { t: "usage", plans: [], error: err instanceof Error ? err.message : String(err) };
+		msg = { t: "usage", plans: [], error: errorText(err) };
 	}
 	const json = JSON.stringify(msg);
 	if (json !== usageJson) {
@@ -286,7 +288,7 @@ async function pollRegistry(): Promise<void> {
 		rosterError = null;
 	} catch (err) {
 		hosts = [];
-		rosterError = err instanceof Error ? err.message : String(err);
+		rosterError = errorText(err);
 	}
 	reconcileGuests();
 	syncTails();
@@ -317,7 +319,7 @@ async function launch(ws: Socket, input: string, prompt: string): Promise<void> 
 	try {
 		session = await DashboardSession.start(cwd, update => onLiveUpdate(session.instanceId, update));
 	} catch (err) {
-		send(ws, { t: "created", result: { ok: false, error: `Cannot start omp: ${err instanceof Error ? err.message : String(err)}` } });
+		send(ws, { t: "created", result: { ok: false, error: `Cannot start omp: ${errorText(err)}` } });
 		return;
 	}
 	dashboards.set(session.instanceId, session);
@@ -337,7 +339,7 @@ async function fork(ws: Socket, view: View, entryId: string): Promise<void> {
 	try {
 		forked = await DashboardSession.fork(source, entryId, update => onLiveUpdate(forked.session.instanceId, update));
 	} catch (err) {
-		send(ws, { t: "forked", result: { ok: false, error: `Cannot fork: ${err instanceof Error ? err.message : String(err)}` } });
+		send(ws, { t: "forked", result: { ok: false, error: `Cannot fork: ${errorText(err)}` } });
 		return;
 	}
 	dashboards.set(forked.session.instanceId, forked.session);
@@ -361,7 +363,7 @@ async function resume(ws: Socket, sessionId: string): Promise<void> {
 	try {
 		session = await DashboardSession.resume(path, update => onLiveUpdate(session.instanceId, update));
 	} catch (err) {
-		return reply({ ok: false, error: `Cannot resume: ${err instanceof Error ? err.message : String(err)}` });
+		return reply({ ok: false, error: `Cannot resume: ${errorText(err)}` });
 	} finally {
 		resuming.delete(sessionId);
 	}
@@ -545,7 +547,7 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 				const items = await complete(instanceId, cwd, msg.text, msg.cursor);
 				if (instanceId === null || watching(ws, instanceId)) send(ws, { t: "completions", scope, reqId, items, error: null });
 			} catch (error) {
-				send(ws, { t: "completions", scope, reqId, items: [], error: String(error) });
+				send(ws, { t: "completions", scope, reqId, items: [], error: errorText(error) });
 			}
 			return;
 		}
@@ -564,7 +566,7 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 				guest.send(msg.view.agentId, { text: msg.text, payload }, msg.delivery);
 			} catch (error) {
 				send(ws, { t: "items", view: msg.view, reset: false, items: [
-					{ id: `error:${Date.now()}`, kind: "notice", level: "error", text: `Could not prepare prompt: ${String(error)}` },
+					{ id: `error:${Date.now()}`, kind: "notice", level: "error", text: `Could not prepare prompt: ${errorText(error)}` },
 				] });
 			}
 			return;
@@ -621,7 +623,7 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 			try {
 				send(ws, { t: "models", instanceId: msg.instanceId, models: await dashboard.models(), error: null });
 			} catch (error) {
-				send(ws, { t: "models", instanceId: msg.instanceId, models: [], error: String(error) });
+				send(ws, { t: "models", instanceId: msg.instanceId, models: [], error: errorText(error) });
 			}
 			return;
 		}
@@ -670,7 +672,7 @@ async function answer(run: () => Promise<unknown>): Promise<Response> {
 		return Response.json(await run());
 	} catch (err) {
 		if (err instanceof Rejected) return fail(err.status, err.message, err.conflict);
-		return fail(500, err instanceof Error ? err.message : String(err));
+		return fail(500, errorText(err));
 	}
 }
 
@@ -816,7 +818,7 @@ try {
 		},
 	});
 } catch (err) {
-	console.error(`omp-agents: cannot listen on ${HOSTNAME}:${PORT}: ${err instanceof Error ? err.message : String(err)}`);
+	console.error(`omp-agents: cannot listen on ${HOSTNAME}:${PORT}: ${errorText(err)}`);
 	console.error("Set PORT to use another port.");
 	process.exit(1);
 }

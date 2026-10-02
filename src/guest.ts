@@ -8,9 +8,10 @@
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp";
+import { errorText, isObject, nonEmptyStr } from "./json";
+import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp/collab";
 import type { AgentRow, AgentStatus, ContextUsage, ControlPhase, Delivery, MessageQueue, UserAnswer, UserRequest } from "./shared";
-import { isObject, oneLine } from "./transcript";
+import { oneLine } from "./transcript";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
 
 export type LiveUpdate =
@@ -56,8 +57,6 @@ function parseAgents(value: unknown): HostAgent[] {
 	});
 }
 
-const nonEmpty = (value: unknown): string | undefined => (typeof value === "string" && value.trim() ? value : undefined);
-
 export const SUBAGENT_LIFECYCLE = "task:subagent:lifecycle";
 export const SUBAGENT_PROGRESS = "task:subagent:progress";
 
@@ -65,18 +64,18 @@ export const SUBAGENT_PROGRESS = "task:subagent:progress";
 export function activityOf(channel: unknown, payload: unknown): { id: string; activity: string } | null {
 	if (!isObject(payload)) return null;
 	if (channel === SUBAGENT_LIFECYCLE) {
-		const description = nonEmpty(payload.description);
+		const description = nonEmptyStr(payload.description);
 		return typeof payload.id === "string" && description ? { id: payload.id, activity: oneLine(description) } : null;
 	}
 	if (channel !== SUBAGENT_PROGRESS || !isObject(payload.progress)) return null;
 	const progress = payload.progress;
 	if (typeof progress.id !== "string") return null;
 	const text =
-		nonEmpty(progress.currentToolIntent) ??
-		nonEmpty(progress.lastIntent) ??
-		nonEmpty(progress.description) ??
-		nonEmpty(payload.assignment) ??
-		nonEmpty(progress.task);
+		nonEmptyStr(progress.currentToolIntent) ??
+		nonEmptyStr(progress.lastIntent) ??
+		nonEmptyStr(progress.description) ??
+		nonEmptyStr(payload.assignment) ??
+		nonEmptyStr(progress.task);
 	return text ? { id: progress.id, activity: oneLine(text) } : null;
 }
 
@@ -102,7 +101,7 @@ function parseState(value: unknown): HostState | null {
 	const { model, thinkingLevel } = value;
 	return {
 		model: isObject(model) && typeof model.provider === "string" && typeof model.id === "string" ? `${model.provider}/${model.id}` : null,
-		thinkingLevel: nonEmpty(thinkingLevel) ?? null,
+		thinkingLevel: nonEmptyStr(thinkingLevel) ?? null,
 		context: contextOf(value.contextUsage),
 		streaming: value.isStreaming === true,
 	};
@@ -324,7 +323,7 @@ export class SessionGuest {
 		try {
 			room = await openFreshRoom(host);
 		} catch (err) {
-			this.end(err instanceof Error ? err.message : String(err));
+			this.end(errorText(err));
 			return;
 		}
 		if (this.#closed) return;
