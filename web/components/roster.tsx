@@ -1,5 +1,6 @@
-import { Check, ChevronsUpDown, Columns2, Folder, Inbox, Keyboard, Plus, Settings } from "lucide-react";
-import { type MouseEvent, useState } from "react";
+import { Tabs } from "@base-ui/react/tabs";
+import { Check, ChevronsUpDown, Columns2, Folder, Keyboard, Plus, Settings } from "lucide-react";
+import { type MouseEvent, type ReactNode, useState } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -13,6 +14,7 @@ import {
 	SidebarInput,
 	SidebarMenu,
 	SidebarMenuAction,
+	SidebarMenuBadge,
 	SidebarMenuButton,
 	SidebarMenuItem,
 	SidebarMenuSub,
@@ -22,7 +24,21 @@ import {
 import { cn } from "@/lib/utils";
 import { useShortcuts } from "../shortcuts";
 import type { Launch } from "../use-dashboard";
-import { agentTree, hashForInbox, hashForView, MAX_PANES, matchesFilter, type OpenMode, sameView, workspaces } from "../view-model";
+import { useInbox } from "../use-inbox";
+import {
+	agentTree,
+	hashForInbox,
+	hashForView,
+	type InboxTarget,
+	inboxRepoKey,
+	inboxSectionId,
+	inboxSections,
+	MAX_PANES,
+	matchesFilter,
+	type OpenMode,
+	sameView,
+	workspaces,
+} from "../view-model";
 import { StatusDot, statusLabel } from "./status-dot";
 
 /** Pixels of extra indent per nesting level below the first subagent level. */
@@ -171,6 +187,64 @@ function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 	);
 }
 
+interface InboxNavProps {
+	project: string | null;
+	target: InboxTarget | null;
+	onTarget: (target: InboxTarget) => void;
+}
+
+/** The inbox page's sections with their pull request counts, per repository, each a link to its section on the page. */
+function InboxNav({ project, target, onTarget }: InboxNavProps) {
+	const { read, error } = useInbox(project, false);
+	const note = (text: string) => <p className="px-2 py-1 text-xs text-muted-foreground">{text}</p>;
+	if (!read) return <SidebarGroup>{note(error ? `Cannot load the inbox: ${error}` : "Asking GitHub for pull requests…")}</SidebarGroup>;
+	const { repos } = read.inbox;
+	if (repos.length === 0) return <SidebarGroup>{note("No session ran in a GitHub repository.")}</SidebarGroup>;
+	return repos.map(repo => {
+		const name = `${repo.owner}/${repo.repo}`;
+		const key = inboxRepoKey(repo);
+		const sections = "error" in repo ? [] : inboxSections(repo.pullRequests);
+		let body: ReactNode;
+		if ("error" in repo) body = note(`Cannot read ${name} from GitHub.`);
+		else if (sections.length === 0) body = note("No open pull requests and no reviews waiting.");
+		else
+			body = (
+				<SidebarMenu aria-label={repos.length > 1 ? `Inbox sections of ${name}` : "Inbox sections"}>
+					{sections.map(({ title, pullRequests: { length } }) => {
+						const chosen = target?.repo === key && target.title === title;
+						return (
+							<SidebarMenuItem key={title}>
+								<SidebarMenuButton asChild isActive={chosen}>
+									<a
+										href={hashForInbox(null)}
+										aria-controls={inboxSectionId({ repo: key, title })}
+										aria-current={chosen ? "location" : undefined}
+										aria-label={`${title}, ${length} pull request${length === 1 ? "" : "s"}`}
+										onClick={event => {
+											// Modified and middle clicks keep the link's own new-tab behavior.
+											if (event.button !== 0 || event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) return;
+											event.preventDefault();
+											onTarget({ repo: key, title });
+										}}
+									>
+										{title}
+									</a>
+								</SidebarMenuButton>
+								<SidebarMenuBadge aria-hidden>{length}</SidebarMenuBadge>
+							</SidebarMenuItem>
+						);
+					})}
+				</SidebarMenu>
+			);
+		return (
+			<SidebarGroup key={key}>
+				{repos.length > 1 && <SidebarGroupLabel>{name}</SidebarGroupLabel>}
+				{body}
+			</SidebarGroup>
+		);
+	});
+}
+
 interface RosterProps {
 	hosts: RosterHost[];
 	past: PastSession[];
@@ -182,7 +256,12 @@ interface RosterProps {
 	/** The settings page, for the open session's workspace. */
 	settingsHref: string;
 	settingsOpen: boolean;
+	/** The inbox page is open, which selects the sidebar's Inbox tab. */
 	inboxOpen: boolean;
+	onInboxOpen: (open: boolean) => void;
+	/** The inbox section a sidebar link last chose. */
+	inboxTarget: InboxTarget | null;
+	onInboxTarget: (target: InboxTarget) => void;
 	/** The selected project's `cwd`, or `null` for all projects. */
 	project: string | null;
 	onPickProject: (cwd: string | null) => void;
@@ -202,6 +281,9 @@ export function Roster({
 	settingsHref,
 	settingsOpen,
 	inboxOpen,
+	onInboxOpen,
+	inboxTarget,
+	onInboxTarget,
 	project,
 	onPickProject,
 	onOpen,
@@ -228,30 +310,38 @@ export function Roster({
 			</SidebarMenuAction>
 		);
 	return (
-		<>
+		<Tabs.Root value={inboxOpen ? "inbox" : "sessions"} onValueChange={value => onInboxOpen(value === "inbox")} className="flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
 				<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
 					<Keyboard />
 				</Button>
-				<Button asChild variant="ghost" size="icon-compact" active={inboxOpen} className="shrink-0 text-muted-foreground">
-					<a href={hashForInbox(null)} title="Pull request inbox" aria-label="Pull request inbox" aria-current={inboxOpen ? "page" : undefined}>
-						<Inbox />
-					</a>
-				</Button>
+
 				<Button asChild variant="ghost" size="icon-compact" active={settingsOpen} className="shrink-0 text-muted-foreground">
 					<a href={settingsHref} title="Settings" aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
 						<Settings />
 					</a>
 				</Button>
 			</SidebarHeader>
+			<Tabs.List aria-label="Sidebar" className="mx-2 flex border-b border-border">
+				{(["Inbox", "Sessions"] as const).map(label => (
+					<Tabs.Tab
+						key={label}
+						value={label.toLowerCase()}
+						className="-mb-px flex-1 rounded-t-md border-b-2 border-transparent px-3 py-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[active]:border-foreground data-[active]:text-foreground"
+					>
+						{label}
+					</Tabs.Tab>
+				))}
+			</Tabs.List>
 			{!connected && (
-				<p className="mx-3 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
+				<p className="mx-3 mt-2 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
 					Lost the dashboard server. Retrying…
 				</p>
 			)}
-			<SidebarContent>
+			{/* SidebarContent puts `hidden` on its inner element, so the class hides its scroll frame too. */}
+			<Tabs.Panel value="sessions" keepMounted render={<SidebarContent />} className={({ hidden }) => (hidden ? "hidden" : "")}>
 				<SidebarGroup collapsible open={runningOpen} onOpenChange={setRunningOpen}>
 					<SidebarGroupLabel>
 						{hosts.length === 0
@@ -407,7 +497,10 @@ export function Roster({
 						})}
 					</SidebarMenu>
 				</SidebarGroup>
-			</SidebarContent>
-		</>
+			</Tabs.Panel>
+			<Tabs.Panel value="inbox" render={<SidebarContent />}>
+				<InboxNav project={project} target={inboxTarget} onTarget={onInboxTarget} />
+			</Tabs.Panel>
+		</Tabs.Root>
 	);
 }

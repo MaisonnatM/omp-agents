@@ -23,6 +23,7 @@ import {
 	hashForInbox,
 	hashForView,
 	inboxFromHash,
+	type InboxTarget,
 	sameView,
 	settingsFromHash,
 	workspaces,
@@ -40,9 +41,11 @@ function toggleSessionsFocus(): void {
 		(pane?.querySelector<HTMLElement>("textarea:not(:disabled)") ?? pane)?.focus();
 		return;
 	}
+	// The kept-mounted sessions list stays in the DOM, hidden, while the Inbox tab shows.
 	const row =
-		sidebar?.querySelector<HTMLElement>('[data-sidebar="menu-button"][data-active], [data-sidebar="menu-sub-button"][data-active]') ??
-		sidebar?.querySelector<HTMLElement>('[data-sidebar="menu-button"]');
+		sidebar?.querySelector<HTMLElement>(
+			':is([data-sidebar="menu-button"], [data-sidebar="menu-sub-button"])[data-active]:not([hidden] *)',
+		) ?? sidebar?.querySelector<HTMLElement>('[data-sidebar="menu-button"]:not([hidden] *)');
 	row?.focus();
 }
 function EmptyState({ rosterError }: { rosterError: string | null }) {
@@ -85,6 +88,11 @@ export function App() {
 	const settingsHref = hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
+	const [inboxTarget, setInboxTarget] = useState<InboxTarget | null>(null);
+	const showInbox = (open: boolean): void => {
+		if (open) location.hash = hashForInbox(null);
+		else show(layout);
+	};
 	useShortcuts({
 		help: () => setShortcutsOpen(open => !open),
 		tools: () => setToolsExpanded(expanded => !expanded),
@@ -93,10 +101,7 @@ export function App() {
 			if (settings) show(layout);
 			else location.hash = settingsHref;
 		},
-		inbox: () => {
-			if (inbox) show(layout);
-			else location.hash = hashForInbox(null);
-		},
+		inbox: () => showInbox(inbox === null),
 		restore: () => {
 			if (!maximized) return false;
 			show({ ...layout, maximized: false });
@@ -152,7 +157,7 @@ export function App() {
 	} else if (inbox) {
 		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
 		main = state.listed ? (
-			<InboxPage project={project} hosts={state.hosts} past={state.past} target={inbox.target} onOpen={open} />
+			<InboxPage project={project} hosts={state.hosts} past={state.past} target={inbox.target} onOpen={open} section={inboxTarget} />
 		) : (
 			<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
 		);
@@ -233,6 +238,9 @@ export function App() {
 					settingsHref={settingsHref}
 					settingsOpen={settings !== null}
 					inboxOpen={inbox !== null}
+					onInboxOpen={showInbox}
+					inboxTarget={inboxTarget}
+					onInboxTarget={setInboxTarget}
 					project={project}
 					onPickProject={pickProject}
 					onOpen={open}
