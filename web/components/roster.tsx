@@ -1,4 +1,3 @@
-import { Tabs } from "@base-ui/react/tabs";
 import { Check, ChevronsUpDown, Columns2, Folder, Keyboard, Plus, Settings } from "lucide-react";
 import { type MouseEvent, type ReactNode, useState } from "react";
 import type { PastSession, RosterHost, View } from "../../src/shared";
@@ -21,6 +20,7 @@ import {
 	SidebarMenuSubButton,
 	SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useShortcuts } from "../shortcuts";
 import type { Launch } from "../use-dashboard";
@@ -310,7 +310,7 @@ export function Roster({
 			</SidebarMenuAction>
 		);
 	return (
-		<Tabs.Root value={inboxOpen ? "inbox" : "sessions"} onValueChange={value => onInboxOpen(value === "inbox")} className="flex min-h-0 flex-1 flex-col">
+		<Tabs value={inboxOpen ? "inbox" : "sessions"} onValueChange={value => onInboxOpen(value === "inbox")} className="flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
@@ -324,183 +324,181 @@ export function Roster({
 					</a>
 				</Button>
 			</SidebarHeader>
-			<Tabs.List aria-label="Sidebar" className="mx-2 flex border-b border-border">
+			<TabsList aria-label="Sidebar" className="mx-2 flex">
 				{(["Inbox", "Sessions"] as const).map(label => (
-					<Tabs.Tab
-						key={label}
-						value={label.toLowerCase()}
-						className="-mb-px flex-1 rounded-t-md border-b-2 border-transparent px-3 py-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring data-[active]:border-foreground data-[active]:text-foreground"
-					>
-						{label}
-					</Tabs.Tab>
+					<TabItem key={label} value={label.toLowerCase()} label={label} className="flex-1 justify-center" />
 				))}
-			</Tabs.List>
+			</TabsList>
 			{!connected && (
 				<p className="mx-3 mt-2 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
 					Lost the dashboard server. Retrying…
 				</p>
 			)}
 			{/* SidebarContent puts `hidden` on its inner element, so the class hides its scroll frame too. */}
-			<Tabs.Panel value="sessions" keepMounted render={<SidebarContent />} className={({ hidden }) => (hidden ? "hidden" : "")}>
-				<SidebarGroup collapsible open={runningOpen} onOpenChange={setRunningOpen}>
-					<SidebarGroupLabel>
-						{hosts.length === 0
-							? "No sessions"
-							: project
-								? `${shownHosts.length} of ${hosts.length} running`
-								: `${hosts.length} running`}
-					</SidebarGroupLabel>
-					<SidebarGroupAction
-						title="New session"
-						aria-label="New session"
-						aria-expanded={launch.phase !== "closed"}
-						onClick={() => {
-							if (launch.phase === "closed") setRunningOpen(true);
-							onLaunchOpen(launch.phase === "closed");
-						}}
-					>
-						<Plus />
-					</SidebarGroupAction>
-					{launch.phase !== "closed" && (
-						<NewSessionForm
-							launch={launch}
-							defaultCwd={defaultCwd}
-							connected={connected}
-							onCreate={onCreate}
-							onCancel={() => onLaunchOpen(false)}
-						/>
-					)}
-					<SidebarMenu aria-label="Running omp sessions">
-						{shownHosts.map(host => {
-							const hostView: View = { kind: "live", instanceId: host.instanceId, agentId: null };
-							return (
-								<SidebarMenuItem key={host.instanceId}>
-									<SidebarMenuButton
-										size="lg"
-										isActive={isOpen(hostView)}
-										onClick={event => onOpen(hostView, modeOf(event))}
-										title={`${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-									>
-										<StatusDot status={host.status} />
-										<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-											<span className="flex items-baseline gap-2">
-												<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
-												<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
-											</span>
-											<span className="truncate text-xs text-muted-foreground">
-												{[
-													host.cwdDisplay,
-													host.model ?? "no model",
-													statusLabel(host.status),
-													host.source === "terminal" && !host.relayConnected && "relay offline",
-													host.pullRequests.map(pr => `#${pr.number}`).join(" "),
-												]
-													.filter(Boolean)
-													.join(" · ")}
-											</span>
-										</span>
-									</SidebarMenuButton>
-									{splitAction(hostView, hostLabel(host))}
-									{host.agents.length > 0 && (
-										<SidebarMenuSub aria-label={`Subagents of ${hostLabel(host)}`}>
-											{agentTree(host.agents).map(({ agent, depth }) => {
-												const agentView: View = { kind: "live", instanceId: host.instanceId, agentId: agent.id };
-												return (
-													<SidebarMenuSubItem key={agent.id}>
-														<SidebarMenuSubButton
-															href={hashForView(agentView)}
-															onClick={event => {
-																// Shift- and middle-clicks keep the link's own new-window behavior.
-																if (event.button !== 0 || event.shiftKey || event.altKey) return;
-																event.preventDefault();
-																onOpen(agentView, modeOf(event));
-															}}
-															isActive={isOpen(agentView)}
-															className="h-auto min-h-7 py-1"
-															style={{ marginInlineStart: depth * NEST_INDENT }}
-															title={agent.activity ?? undefined}
-														>
-															<StatusDot status={agent.status} />
-															<span className="flex min-w-0 flex-1 flex-col">
-																<span className="flex items-baseline gap-1.5">
-																	<span className="truncate text-foreground">{agent.id}</span>
-																	<span className="shrink-0 text-xs text-muted-foreground">
-																		{agent.kind} · {statusLabel(agent.status)}
-																	</span>
-																</span>
-																{agent.activity && (
-																	<span className="truncate text-xs text-muted-foreground">{agent.activity}</span>
-																)}
-															</span>
-														</SidebarMenuSubButton>
-														{splitAction(agentView, agent.id)}
-													</SidebarMenuSubItem>
-												);
-											})}
-										</SidebarMenuSub>
-									)}
-								</SidebarMenuItem>
-							);
-						})}
-					</SidebarMenu>
-				</SidebarGroup>
-				<SidebarGroup collapsible>
-					<SidebarGroupLabel>
-						{past.length === 0
-							? "No past sessions"
-							: filter.trim() || project
-								? `${shownPast.length} of ${past.length} past`
-								: `${past.length} past`}
-					</SidebarGroupLabel>
-					{past.length > 0 && (
-						<div className="px-2 pb-2">
-							<SidebarInput
-								type="search"
-								value={filter}
-								onChange={event => setFilter(event.target.value)}
-								placeholder="Filter, or paste a PR link"
-								aria-label="Filter past sessions"
-								spellCheck={false}
-								className="text-xs"
+			<TabPanel value="sessions" forceMount asChild className={inboxOpen ? "hidden" : undefined}>
+				<SidebarContent>
+					<SidebarGroup collapsible open={runningOpen} onOpenChange={setRunningOpen}>
+						<SidebarGroupLabel>
+							{hosts.length === 0
+								? "No sessions"
+								: project
+									? `${shownHosts.length} of ${hosts.length} running`
+									: `${hosts.length} running`}
+						</SidebarGroupLabel>
+						<SidebarGroupAction
+							title="New session"
+							aria-label="New session"
+							aria-expanded={launch.phase !== "closed"}
+							onClick={() => {
+								if (launch.phase === "closed") setRunningOpen(true);
+								onLaunchOpen(launch.phase === "closed");
+							}}
+						>
+							<Plus />
+						</SidebarGroupAction>
+						{launch.phase !== "closed" && (
+							<NewSessionForm
+								launch={launch}
+								defaultCwd={defaultCwd}
+								connected={connected}
+								onCreate={onCreate}
+								onCancel={() => onLaunchOpen(false)}
 							/>
-						</div>
-					)}
-					<SidebarMenu aria-label="Past omp sessions">
-						{shownPast.map(session => {
-							const pastView: View = { kind: "past", sessionId: session.sessionId };
-							return (
-								<SidebarMenuItem key={session.sessionId}>
-									<SidebarMenuButton
-										size="lg"
-										isActive={isOpen(pastView)}
-										onClick={event => onOpen(pastView, modeOf(event))}
-										title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-									>
-										<span className="size-4 shrink-0" aria-hidden />
-										<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-											<span className="flex items-baseline gap-2">
-												<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
-												<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
-													{age(session.modifiedAt)}
+						)}
+						<SidebarMenu aria-label="Running omp sessions">
+							{shownHosts.map(host => {
+								const hostView: View = { kind: "live", instanceId: host.instanceId, agentId: null };
+								return (
+									<SidebarMenuItem key={host.instanceId}>
+										<SidebarMenuButton
+											size="lg"
+											isActive={isOpen(hostView)}
+											onClick={event => onOpen(hostView, modeOf(event))}
+											title={`${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
+										>
+											<StatusDot status={host.status} />
+											<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+												<span className="flex items-baseline gap-2">
+													<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
+													<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
+												</span>
+												<span className="truncate text-xs text-muted-foreground">
+													{[
+														host.cwdDisplay,
+														host.model ?? "no model",
+														statusLabel(host.status),
+														host.source === "terminal" && !host.relayConnected && "relay offline",
+														host.pullRequests.map(pr => `#${pr.number}`).join(" "),
+													]
+														.filter(Boolean)
+														.join(" · ")}
 												</span>
 											</span>
-											<span className="truncate text-xs text-muted-foreground">
-												{[session.cwdDisplay || "unknown directory", session.pullRequests.map(pr => `#${pr.number}`).join(" ")]
-													.filter(Boolean)
-													.join(" · ")}
+										</SidebarMenuButton>
+										{splitAction(hostView, hostLabel(host))}
+										{host.agents.length > 0 && (
+											<SidebarMenuSub aria-label={`Subagents of ${hostLabel(host)}`}>
+												{agentTree(host.agents).map(({ agent, depth }) => {
+													const agentView: View = { kind: "live", instanceId: host.instanceId, agentId: agent.id };
+													return (
+														<SidebarMenuSubItem key={agent.id}>
+															<SidebarMenuSubButton
+																href={hashForView(agentView)}
+																onClick={event => {
+																	// Shift- and middle-clicks keep the link's own new-window behavior.
+																	if (event.button !== 0 || event.shiftKey || event.altKey) return;
+																	event.preventDefault();
+																	onOpen(agentView, modeOf(event));
+																}}
+																isActive={isOpen(agentView)}
+																className="h-auto min-h-7 py-1"
+																style={{ marginInlineStart: depth * NEST_INDENT }}
+																title={agent.activity ?? undefined}
+															>
+																<StatusDot status={agent.status} />
+																<span className="flex min-w-0 flex-1 flex-col">
+																	<span className="flex items-baseline gap-1.5">
+																		<span className="truncate text-foreground">{agent.id}</span>
+																		<span className="shrink-0 text-xs text-muted-foreground">
+																			{agent.kind} · {statusLabel(agent.status)}
+																		</span>
+																	</span>
+																	{agent.activity && (
+																		<span className="truncate text-xs text-muted-foreground">{agent.activity}</span>
+																	)}
+																</span>
+															</SidebarMenuSubButton>
+															{splitAction(agentView, agent.id)}
+														</SidebarMenuSubItem>
+													);
+												})}
+											</SidebarMenuSub>
+										)}
+									</SidebarMenuItem>
+								);
+							})}
+						</SidebarMenu>
+					</SidebarGroup>
+					<SidebarGroup collapsible>
+						<SidebarGroupLabel>
+							{past.length === 0
+								? "No past sessions"
+								: filter.trim() || project
+									? `${shownPast.length} of ${past.length} past`
+									: `${past.length} past`}
+						</SidebarGroupLabel>
+						{past.length > 0 && (
+							<div className="px-2 pb-2">
+								<SidebarInput
+									type="search"
+									value={filter}
+									onChange={event => setFilter(event.target.value)}
+									placeholder="Filter, or paste a PR link"
+									aria-label="Filter past sessions"
+									spellCheck={false}
+									className="text-xs"
+								/>
+							</div>
+						)}
+						<SidebarMenu aria-label="Past omp sessions">
+							{shownPast.map(session => {
+								const pastView: View = { kind: "past", sessionId: session.sessionId };
+								return (
+									<SidebarMenuItem key={session.sessionId}>
+										<SidebarMenuButton
+											size="lg"
+											isActive={isOpen(pastView)}
+											onClick={event => onOpen(pastView, modeOf(event))}
+											title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
+										>
+											<span className="size-4 shrink-0" aria-hidden />
+											<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+												<span className="flex items-baseline gap-2">
+													<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
+													<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">
+														{age(session.modifiedAt)}
+													</span>
+												</span>
+												<span className="truncate text-xs text-muted-foreground">
+													{[session.cwdDisplay || "unknown directory", session.pullRequests.map(pr => `#${pr.number}`).join(" ")]
+														.filter(Boolean)
+														.join(" · ")}
+												</span>
 											</span>
-										</span>
-									</SidebarMenuButton>
-									{splitAction(pastView, pastLabel(session))}
-								</SidebarMenuItem>
-							);
-						})}
-					</SidebarMenu>
-				</SidebarGroup>
-			</Tabs.Panel>
-			<Tabs.Panel value="inbox" render={<SidebarContent />}>
-				<InboxNav project={project} target={inboxTarget} onTarget={onInboxTarget} />
-			</Tabs.Panel>
-		</Tabs.Root>
+										</SidebarMenuButton>
+										{splitAction(pastView, pastLabel(session))}
+									</SidebarMenuItem>
+								);
+							})}
+						</SidebarMenu>
+					</SidebarGroup>
+				</SidebarContent>
+			</TabPanel>
+			<TabPanel value="inbox" asChild>
+				<SidebarContent>
+					<InboxNav project={project} target={inboxTarget} onTarget={onInboxTarget} />
+				</SidebarContent>
+			</TabPanel>
+		</Tabs>
 	);
 }
