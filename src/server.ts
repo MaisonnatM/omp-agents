@@ -362,6 +362,17 @@ async function resume(ws: Socket, sessionId: string): Promise<void> {
 	reply({ ok: true, instanceId: session.instanceId, cwd: session.cwd });
 }
 
+/** Stop a terminal session's omp as closing its terminal would; it leaves the registry on exit, and its file stays resumable. */
+function endTerminal(host: HostSnapshot): void {
+	// `kill` with 0, 1, or a negative pid signals process groups or every process; only one omp process is meant.
+	if (!Number.isInteger(host.pid) || host.pid <= 1 || host.pid === process.pid) return;
+	try {
+		process.kill(host.pid, "SIGTERM");
+	} catch {
+		// The process already exited; the next registry poll drops it.
+	}
+}
+
 const watching = (ws: Socket, instanceId: string): boolean =>
 	[...ws.data.views.values()].some(view => view.kind === "live" && view.instanceId === instanceId);
 
@@ -559,9 +570,18 @@ async function onClientMsg(ws: Socket, msg: ClientMsg): Promise<void> {
 		case "resume":
 			void resume(ws, msg.sessionId);
 			return;
-		case "end":
-			void dashboards.get(msg.instanceId)?.end();
+		case "end": {
+			const dashboard = dashboards.get(msg.instanceId);
+			if (dashboard) {
+				void dashboard.end();
+				return;
+			}
+			const host = hosts.find(row => row.instanceId === msg.instanceId);
+			const control = guests.get(msg.instanceId)?.control;
+			// A room shared read-only grants no control, ending it included.
+			if (host && control?.phase === "live" && !control.readOnly) endTerminal(host);
 			return;
+		}
 		case "list-models": {
 			const dashboard = dashboards.get(msg.instanceId);
 			if (!dashboard) {

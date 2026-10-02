@@ -608,12 +608,16 @@ function LiveConversation({
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
-				{view.agentId === null && host?.source === "dashboard" && (
+				{view.agentId === null && host && live && (
 					<Button
 						variant="secondary"
 						size="compact"
 						onClick={onEnd}
-						title="Stop the omp process this dashboard started. Its transcript moves to Past sessions."
+						title={
+							host.source === "dashboard"
+								? "Stop the omp process this dashboard started. Its transcript moves to Past sessions, where Resume continues it."
+								: `Stop the omp process running in its terminal (pid ${host.pid}). Its transcript moves to Past sessions, where Resume continues it.`
+						}
 					>
 						End session
 					</Button>

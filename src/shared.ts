@@ -389,7 +389,7 @@ export type ClientMsg =
 	| { t: "complete"; reqId: number; view: LiveView; text: string; cursor: number }
 	/** Start a new omp session in `cwd` (absolute, or starting with `~`). */
 	| { t: "create"; cwd: string }
-	/** End a session this dashboard started. */
+	/** End a live session: stop the omp process this dashboard started, or send SIGTERM to a terminal session's omp. */
 	| { t: "end"; instanceId: string }
 	/** Start a dashboard session holding the view's history before the user prompt `entryId`. The view's file stays untouched. */
 	| { t: "fork"; view: View; entryId: string }
