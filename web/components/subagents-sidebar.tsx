@@ -1,8 +1,8 @@
 import { Columns2, ExternalLink } from "lucide-react";
+import type { ReactNode } from "react";
 import type { RosterHost, View } from "../../src/shared";
 import { ContextMenuLinkItem } from "@/components/ui/context-menu";
 import {
-	Sidebar,
 	SidebarContent,
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -25,18 +25,21 @@ interface SubagentsSidebarProps {
 	/** Views on screen, highlighted in the list. */
 	open: View[];
 	onOpen: (view: View, mode: OpenMode) => void;
+	/** The button that hides the sidebar, last in the header. */
+	toggle: ReactNode;
 }
 
-/** The right sidebar: the subagents of the focused live session, nested by parent. */
-export function SubagentsSidebar({ host, open, onOpen }: SubagentsSidebarProps) {
+/** The right sidebar's content: the subagents of the focused live session, nested by parent. */
+export function SubagentsSidebar({ host, open, onOpen, toggle }: SubagentsSidebarProps) {
 	const label = hostLabel(host);
 	const count = host.agents.length;
 	return (
-		<Sidebar side="right" collapsible="none" className="relative" style={{ width: "18rem" }}>
-			<SidebarHeader className="px-3 pt-4">
-				<h2 className="truncate text-sm font-medium text-foreground" title={host.cwd}>
+		<>
+			<SidebarHeader className="flex-row items-center gap-2 px-3 pt-4">
+				<h2 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={host.cwd}>
 					{label}
 				</h2>
+				{toggle}
 			</SidebarHeader>
 			<SidebarContent>
 				<SidebarGroup>
@@ -99,6 +102,6 @@ export function SubagentsSidebar({ host, open, onOpen }: SubagentsSidebarProps) 
 					)}
 				</SidebarGroup>
 			</SidebarContent>
-		</Sidebar>
+		</>
 	);
 }
