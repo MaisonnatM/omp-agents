@@ -1,7 +1,21 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef } from "react";
 
 export type ShortcutId =
-	"interrupt" | "followUp" | "dequeue" | "model" | "thinking" | "tools" | "sessions" | "sessionsSidebar" | "subagentsSidebar" | "settings" | "project" | "inbox" | "restore" | "help";
+	| "interrupt"
+	| "followUp"
+	| "dequeue"
+	| "end"
+	| "model"
+	| "thinking"
+	| "tools"
+	| "sessions"
+	| "sessionsSidebar"
+	| "subagentsSidebar"
+	| "settings"
+	| "project"
+	| "inbox"
+	| "restore"
+	| "help";
 
 /**
  * Where a chord fires. `composer`: from the composer's textarea, before any page-wide chord sees the key.
@@ -10,12 +24,14 @@ export type ShortcutId =
  */
 type Scope = "composer" | "outside-fields" | "anywhere";
 
-/** A key plus the modifiers it needs. ⌘ is never part of a chord: the browser owns those. */
+/** A key plus the modifiers it needs. ⌘ is part of a chord only as `mod`: the browser owns every other ⌘ key. */
 interface Chord {
 	/** A lowercase letter, a printable symbol, or a `KeyboardEvent.key` name such as `Escape`. */
 	key: string;
 	ctrl?: true;
 	alt?: true;
+	/** ⌘ on macOS, Ctrl elsewhere. For a key whose Ctrl chord macOS takes, as Ctrl+Enter opens a context menu there. */
+	mod?: true;
 }
 
 export interface Shortcut {
@@ -32,7 +48,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "interrupt", chord: { key: "Escape" }, scope: "composer", label: "Interrupt the running turn", omp: { action: "Esc", chord: "Esc" } },
 	{
 		id: "followUp",
-		chord: { key: "Enter", ctrl: true },
+		chord: { key: "Enter", mod: true },
 		scope: "composer",
 		label: "Send once the running turn finishes, as a follow-up (Enter steers it)",
 		omp: { action: "app.message.followUp", chord: "Ctrl+Enter" },
@@ -43,6 +59,13 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		scope: "composer",
 		label: "Move the last queued message back into the composer",
 		omp: { action: "app.message.dequeue", chord: "Alt+Up" },
+	},
+	{
+		id: "end",
+		chord: { key: "d", ctrl: true },
+		scope: "composer",
+		label: "End the session, from its empty composer",
+		omp: { action: "app.exit", chord: "Ctrl+D" },
 	},
 	{ id: "model", chord: { key: "p", alt: true }, scope: "anywhere", label: "Choose the session's model", omp: { action: "app.model.selectTemporary", chord: "Alt+P" } },
 	{ id: "thinking", chord: { key: "t", alt: true }, scope: "anywhere", label: "Cycle the thinking level", omp: { action: "app.thinking.cycle", chord: "Shift+Tab" } },
@@ -72,28 +95,32 @@ function keyOf({ key, code }: KeyEvent): string {
 	return /^Key[A-Z]$/.test(code) ? code.slice(3).toLowerCase() : key;
 }
 
-/** The shortcuts `event` presses, in {@link SHORTCUTS} order. */
-export function shortcutsFor(event: KeyEvent): Shortcut[] {
-	if (event.metaKey) return [];
-	const key = keyOf(event);
-	// Which symbols need Shift depends on the layout (`?` is Shift+/ in US, Shift+, in AZERTY), so symbols ignore it.
-	const symbol = key.length === 1 && !/[a-z]/.test(key);
-	return SHORTCUTS.filter(
-		({ chord }) => chord.key === key && event.ctrlKey === !!chord.ctrl && event.altKey === !!chord.alt && (symbol || !event.shiftKey),
-	);
-}
-
 export const IS_MAC =
 	typeof navigator !== "undefined" &&
 	/mac/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || "");
 
+/** The shortcuts `event` presses, in {@link SHORTCUTS} order. `mac` reads ⌘ as `mod` instead of Ctrl. */
+export function shortcutsFor(event: KeyEvent, mac = IS_MAC): Shortcut[] {
+	const key = keyOf(event);
+	// Which symbols need Shift depends on the layout (`?` is Shift+/ in US, Shift+, in AZERTY), so symbols ignore it.
+	const symbol = key.length === 1 && !/[a-z]/.test(key);
+	return SHORTCUTS.filter(
+		({ chord }) =>
+			chord.key === key &&
+			event.metaKey === (mac && !!chord.mod) &&
+			event.ctrlKey === (!!chord.ctrl || (!mac && !!chord.mod)) &&
+			event.altKey === !!chord.alt &&
+			(symbol || !event.shiftKey),
+	);
+}
+
 const KEY_LABEL: Record<string, string> = { Escape: "Esc", ArrowUp: "↑", Enter: IS_MAC ? "↩" : "Enter" };
 
 /** `⌥P` on macOS, `Alt+P` elsewhere. */
-export function chordLabel({ key, ctrl, alt }: Chord): string {
+export function chordLabel({ key, ctrl, alt, mod }: Chord): string {
 	const name = KEY_LABEL[key] ?? key.toUpperCase();
-	if (IS_MAC) return `${ctrl ? "⌃" : ""}${alt ? "⌥" : ""}${name}`;
-	return [ctrl && "Ctrl", alt && "Alt", name].filter(Boolean).join("+");
+	if (IS_MAC) return `${ctrl ? "⌃" : ""}${alt ? "⌥" : ""}${mod ? "⌘" : ""}${name}`;
+	return [(ctrl || mod) && "Ctrl", alt && "Alt", name].filter(Boolean).join("+");
 }
 
 const typing = (target: EventTarget | null): boolean =>
