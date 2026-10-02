@@ -2,7 +2,7 @@ import { useState } from "react";
 import { InputMessage } from "@/components/ui/input-message";
 import type { Completions, Launch } from "../use-dashboard";
 import { useCompletion } from "./completion-popup";
-import { DirectCommandNote, directCommandOf, Header } from "./conversation";
+import { DirectCommandNote, directCommandOf, EmptyConversation, Header } from "./conversation";
 import { projectName } from "./roster";
 
 interface NewSessionProps {
@@ -36,7 +36,9 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					{launch.error}
 				</p>
 			)}
-			<p className="m-auto max-w-sm px-6 text-center text-sm text-muted-foreground">omp starts in {name} when you send the first message.</p>
+			<EmptyConversation title={`Start omp in ${name}`}>
+				It starts when you send the first message, so leaving this draft leaves nothing running.
+			</EmptyConversation>
 			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
 				{completion.popup}
 				<InputMessage

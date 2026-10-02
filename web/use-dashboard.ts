@@ -51,12 +51,14 @@ export interface Models {
 /** What the server sent for one open view. */
 export interface PaneData {
 	items: Item[];
+	/** Whether the server sent the view's transcript yet, so an empty `items` means an empty conversation. */
+	loaded: boolean;
 	completions: Completions | null;
 	/** The last texts the server took out of the view's queue, answering the composer's `dequeue` `reqId`. */
 	dequeued: { reqId: number; texts: string[] } | null;
 }
 
-export const EMPTY_PANE: PaneData = { items: [], completions: null, dequeued: null };
+export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, dequeued: null };
 
 export interface DashboardState {
 	connected: boolean;
@@ -177,7 +179,7 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 				case "past":
 					return { ...state, past: msg.sessions, listed: true };
 				case "items":
-					return updatePane(state, msg.view, pane => ({ ...pane, items: applyItems(pane.items, msg.reset, msg.items) }));
+					return updatePane(state, msg.view, pane => ({ ...pane, items: applyItems(pane.items, msg.reset, msg.items), loaded: true }));
 				case "created":
 					if (state.launch.phase !== "starting") return state;
 					if (!msg.result.ok) return { ...state, launch: { phase: "failed", error: msg.result.error } };
