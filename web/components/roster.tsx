@@ -380,11 +380,7 @@ export function Roster({
 				<SidebarContent>
 					<SidebarGroup collapsible open={runningOpen} onOpenChange={setRunningOpen}>
 						<SidebarGroupLabel>
-							{hosts.length === 0
-								? "No sessions"
-								: project
-									? `${shownHosts.length} of ${hosts.length} running`
-									: `${hosts.length} running`}
+							{shownHosts.length === 0 ? "No sessions" : `${shownHosts.length} running`}
 						</SidebarGroupLabel>
 						<SidebarGroupAction
 							title={newSessionLabel}
@@ -448,7 +444,7 @@ export function Roster({
 					</SidebarGroup>
 					<SidebarGroup collapsible>
 						<SidebarGroupLabel>
-							{past.length === 0 ? "No past sessions" : project ? `${shownPast.length} of ${past.length} past` : `${past.length} past`}
+							{shownPast.length === 0 ? "No past sessions" : `${shownPast.length} past`}
 						</SidebarGroupLabel>
 						<SidebarMenu aria-label="Past omp sessions">
 							{shownPast.map(session => {
