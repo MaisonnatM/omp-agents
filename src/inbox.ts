@@ -2,7 +2,7 @@
  * The inbox page's pull requests, per GitHub repository, live from `gh`: as Graphite's inbox gathers them, the
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
-import type { CheckState, Inbox, InboxPullRequest, InboxRole, RepoInbox, ReviewDecision } from "./shared";
+import type { CheckState, Inbox, InboxPullRequest, InboxRole, Person, RepoInbox, ReviewDecision, Reviewer, ReviewerState } from "./shared";
 import { isObject } from "./transcript";
 
 const GH_TIMEOUT_MS = 20_000;
@@ -46,9 +46,15 @@ function repoOf(cwd: string): Promise<Repo | null> {
 	return repo;
 }
 
+const AVATAR = "avatarUrl(size: 48)";
+
 const PR_FIELDS = `... on PullRequest {
 	number title isDraft state reviewDecision headRefName baseRefName updatedAt mergedAt
-	author { login }
+	author { login ${AVATAR} }
+	reviewRequests(first: 10) { nodes { requestedReviewer {
+		... on User { login ${AVATAR} } ... on Bot { login ${AVATAR} } ... on Mannequin { login ${AVATAR} } ... on Team { slug ${AVATAR} }
+	} } }
+	latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 }`;
@@ -80,7 +86,38 @@ const CHECKS: Record<string, CheckState> = {
 	EXPECTED: "pending",
 };
 
+/** A latest review's state; a dismissed or pending review leaves its author out. */
+const REVIEWER: Record<string, ReviewerState> = {
+	APPROVED: "approved",
+	CHANGES_REQUESTED: "changes-requested",
+	COMMENTED: "commented",
+};
+
 const text = (value: unknown): string | null => (typeof value === "string" ? value : null);
+
+const nodesOf = (connection: unknown): unknown[] => (isObject(connection) && Array.isArray(connection.nodes) ? connection.nodes : []);
+
+/** A user, bot, or mannequin by `login`, a team by `slug`. */
+function parsePerson(value: unknown): Person | null {
+	if (!isObject(value)) return null;
+	const login = text(value.login) ?? text(value.slug);
+	return login === null ? null : { login, avatarUrl: text(value.avatarUrl) };
+}
+
+/** Pending requests first, then latest reviews, each person once; the author's own comments are left out. */
+function parseReviewers(node: Record<string, unknown>, author: string): Reviewer[] {
+	const reviewers = new Map<string, Reviewer>();
+	for (const request of nodesOf(node.reviewRequests)) {
+		const person = isObject(request) ? parsePerson(request.requestedReviewer) : null;
+		if (person) reviewers.set(person.login, { ...person, state: "requested" });
+	}
+	for (const review of nodesOf(node.latestReviews)) {
+		const person = isObject(review) ? parsePerson(review.author) : null;
+		const state = isObject(review) ? REVIEWER[text(review.state) ?? ""] : undefined;
+		if (person && state && person.login !== author && !reviewers.has(person.login)) reviewers.set(person.login, { ...person, state });
+	}
+	return [...reviewers.values()];
+}
 
 function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole): InboxPullRequest | null {
 	if (!isObject(node) || typeof node.number !== "number") return null;
@@ -91,15 +128,18 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole)
 	if (title === null || head === null || base === null || Number.isNaN(updatedAt)) return null;
 	const repository = isObject(node.repository) ? node.repository : {};
 	const defaultBranch = isObject(repository.defaultBranchRef) ? text(repository.defaultBranchRef.name) : null;
-	const commits = isObject(node.commits) && Array.isArray(node.commits.nodes) ? node.commits.nodes : [];
+	const commits = nodesOf(node.commits);
 	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
 	const rollup = isObject(commit.statusCheckRollup) ? text(commit.statusCheckRollup.state) : null;
+	// A deleted account leaves no author; GitHub shows it as `ghost`.
+	const author = parsePerson(node.author) ?? { login: "ghost", avatarUrl: null };
 	return {
 		owner,
 		repo,
 		number: node.number,
 		title,
-		author: (isObject(node.author) && text(node.author.login)) || "ghost",
+		author,
+		reviewers: parseReviewers(node, author.login),
 		role,
 		state: node.state === "MERGED" ? "merged" : node.isDraft === true ? "draft" : "open",
 		review: REVIEW[text(node.reviewDecision) ?? ""] ?? "none",
@@ -120,9 +160,7 @@ export function parseInboxAnswer(answer: unknown, repo: Repo): InboxPullRequest[
 	}
 	const found = new Map<number, InboxPullRequest>();
 	for (const [alias, role] of SEARCHES) {
-		const search = data[alias];
-		const nodes = isObject(search) && Array.isArray(search.nodes) ? search.nodes : [];
-		for (const node of nodes) {
+		for (const node of nodesOf(data[alias])) {
 			const pr = parsePullRequest(node, repo, role);
 			if (pr && !found.has(pr.number)) found.set(pr.number, pr);
 		}
