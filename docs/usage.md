@@ -17,6 +17,7 @@ The full reference for the dashboard's interface. For installation, see the [REA
 ## Sessions sidebar
 
 - The dot before each session or subagent shows its state. Green means a turn is running, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
+- A session row with a title starts with a badge that names its project, the last segment of its working directory. A row without a title shows the project's name as its label, with no badge.
 - The project picker in the sidebar header shows only the running and past sessions from one working directory. It lists every directory that a live or saved session ran in, live sessions' directories first. The session counts then count that directory's sessions only, such as `2 running` and `9 past`. Choose **All projects** to list every session again. The choice is saved in the browser's localStorage. If no session from the saved directory is left, the sidebar lists every session.
 - The past sessions list every saved session that has no live host, newest first, with its title (else its first prompt) and how long ago it last changed; hover a row to see its working directory. Select one to read its transcript. The page cannot write to it until you resume it. A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.
 - The sidebar list fades at its edges only after you scroll it: the top fades once rows pass under the header, and the bottom fades while more rows sit below.
@@ -25,7 +26,7 @@ The full reference for the dashboard's interface. For installation, see the [REA
 
 ## Subagents sidebar
 
-- The right sidebar lists the subagents of the live session that owns the focused pane, indented by parent, under that session's name. It shows while a live session or one of its subagents has focus, and hides for a past session, the inbox, and **Settings**. Each row shows the subagent's id, then its type, its status (`running`, `idle`, `parked`, or `aborted`), and what it is doing. The left sidebar's session rows leave out the working directory and the model; the pane header shows both.
+- The right sidebar lists the subagents of the live session that owns the focused pane, indented by parent, under that session's name. It shows while a live session or one of its subagents has focus, and hides for a past session, the inbox, and **Settings**. Each row shows the subagent's id, then its type, its status (`running`, `idle`, `parked`, or `aborted`), and what it is doing. The left sidebar's session rows leave out the full working directory and the model; the pane header shows both.
 - In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one. A follow-up (Ctrl+Enter, or Cmd+Enter on macOS) waits in the dashboard until the subagent stops running. The composer is disabled for aborted subagents, read-only rooms, and the subagents of sessions that the dashboard started, because omp's RPC mode has no command that reaches a subagent.
 
 ## Panes, splits, and links
