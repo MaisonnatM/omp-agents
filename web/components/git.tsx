@@ -97,7 +97,7 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 					</span>
 				</Button>
 			</PopoverTrigger>
-			<PopoverContent align="end" className="w-[min(24rem,calc(100vw-2rem))] p-0">
+			<PopoverContent side="top" align="start" className="w-[min(24rem,calc(100vw-2rem))] p-0" onMouseDown={event => event.stopPropagation()}>
 				<Command>
 					<CommandInput aria-label="Search or create a branch" placeholder="Search or create a branch…" value={search} onValueChange={setSearch} />
 					<CommandList>

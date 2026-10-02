@@ -25,7 +25,7 @@ interface NewSessionProps {
 /**
  * A session not started yet, with the same composer a live session has. omp starts in `cwd` only when the first message
  * is sent, so leaving the draft leaves nothing running. The message stays in the composer until the session opens.
- * In a git checkout, the header picks the branch; another branch than `cwd`'s runs in its own worktree.
+ * In a git checkout, the composer picks the branch; another branch than `cwd`'s runs in its own worktree.
  */
 export function NewSession({ cwd, launch, connected, completions, onComplete, onStart }: NewSessionProps) {
 	const [draft, setDraft] = useState("");
@@ -56,9 +56,7 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 	);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<Header title="New session" meta={meta} status={starting ? "Starting omp…" : undefined}>
-				{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
-			</Header>
+			<Header title="New session" meta={meta} status={starting ? "Starting omp…" : undefined} />
 			{launch?.phase === "failed" && (
 				<p role="alert" className="border-b border-border px-6 py-2 text-xs text-red-600 dark:text-red-400">
 					{launch.error}
@@ -81,6 +79,7 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 						onStart(text, choice);
 					}}
 					placeholder="Message this session…"
+					leftSlot={checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 					disabled={starting || !connected}
 					sendLabel="Start session"
 					textareaProps={{ ...completion.textareaProps, autoFocus: true }}
