@@ -1,8 +1,8 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { View } from "../src/shared";
 import { Button } from "@/components/ui/button";
-import { Sidebar, SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { Conversation, PastConversation, ToolsExpanded } from "./components/conversation";
 import { InboxPage } from "./components/inbox-page";
@@ -12,7 +12,7 @@ import { Roster, SPLIT_CLICK, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings-page";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { SubagentsSidebar } from "./components/subagents-sidebar";
-import { SidebarResizeHandle, storedSidebarWidth } from "./components/sidebar-resize-handle";
+import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
 import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
 import { useShortcuts } from "./shortcuts";
 import { EMPTY_PANE, useDashboard, useHash } from "./use-dashboard";
@@ -40,16 +40,17 @@ const paneArea = (index: number, count: number): string =>
 
 /**
  * omp's Agent Hub key: into the sidebars at the open row (a session on the left, a subagent on the right),
- * and from there back to the focused pane's composer.
+ * and from there back to the focused pane's composer. A hidden sessions sidebar shows first.
  */
-function toggleSessionsFocus(): void {
+function toggleSessionsFocus(showSessions: () => void): void {
 	const sidebars = [...document.querySelectorAll<HTMLElement>('[data-sidebar="sidebar"]')];
 	if (sidebars.some(sidebar => sidebar.contains(document.activeElement))) {
 		const pane = document.querySelector<HTMLElement>("[data-pane][data-focused]");
 		(pane?.querySelector<HTMLElement>("textarea:not(:disabled)") ?? pane)?.focus();
 		return;
 	}
-	// The kept-mounted sessions list stays in the DOM, hidden, while the Inbox tab shows.
+	showSessions();
+	// The kept-mounted sessions list stays in the DOM, hidden, while the Inbox tab shows; so does a hidden subagents sidebar.
 	const row =
 		document.querySelector<HTMLElement>('[data-sidebar="sidebar"] [data-sidebar="menu-button"][data-active]:not([hidden] *)') ??
 		document.querySelector<HTMLElement>('[data-slot="sidebar"][data-side="left"] [data-sidebar="menu-button"]:not([hidden] *)');
@@ -78,7 +79,7 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 
 export function App() {
 	const { state, send, open, focus, show, openNewSession, create, fork, resume } = useDashboard();
-	const initialWidth = useMemo(storedSidebarWidth, []);
+	const sidebars = useSidebarPanels();
 	const hash = useHash();
 	const settings = settingsFromHash(hash);
 	const inbox = inboxFromHash(hash);
@@ -104,6 +105,9 @@ export function App() {
 		send({ t: "end", instanceId });
 		show(endSession(layout, instanceId, listedHosts));
 	};
+	/** The live session whose subagents the right sidebar lists. Over a past session or a page, it has none. */
+	const subagentsHost = page ? undefined : viewHost;
+	const toggleSidebar = (side: SidebarSide): void => sidebars.setOpen(side, !sidebars.panels[side].open);
 
 	const settingsHref = hashForSettings(settings ? settings.cwd : (viewHost ?? viewPast)?.cwd || null);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
@@ -116,7 +120,12 @@ export function App() {
 	useShortcuts({
 		help: () => setShortcutsOpen(open => !open),
 		tools: () => setToolsExpanded(expanded => !expanded),
-		sessions: toggleSessionsFocus,
+		sessions: () => toggleSessionsFocus(() => sidebars.setOpen("left", true)),
+		sessionsSidebar: () => toggleSidebar("left"),
+		subagentsSidebar: () => {
+			if (!subagentsHost) return false;
+			toggleSidebar("right");
+		},
 		settings: () => {
 			if (settings) show(layout);
 			else location.hash = settingsHref;
@@ -260,8 +269,8 @@ export function App() {
 	}
 
 	return (
-		<SidebarProvider width={initialWidth} persist={false} shortcut={null} className="h-svh">
-			<Sidebar collapsible="none" className="relative">
+		<SidebarProvider persist={false} shortcut={null} className="h-svh">
+			<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
 				<Roster
 					hosts={state.hosts}
 					past={state.past}
@@ -286,14 +295,23 @@ export function App() {
 					}}
 					onEnd={endHost}
 					onShowShortcuts={() => setShortcutsOpen(true)}
+					toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
 				/>
 				<PlanUsageFooter usage={state.usage} />
-				<SidebarResizeHandle />
-			</Sidebar>
+			</DashboardSidebar>
 			<SidebarInset>
 				<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
 			</SidebarInset>
-			{viewHost && !page && <SubagentsSidebar host={viewHost} open={layout.panes} onOpen={open} />}
+			{subagentsHost && (
+				<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
+					<SubagentsSidebar
+						host={subagentsHost}
+						open={layout.panes}
+						onOpen={open}
+						toggle={<SidebarToggle side="right" open onToggle={() => toggleSidebar("right")} />}
+					/>
+				</DashboardSidebar>
+			)}
 			<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 		</SidebarProvider>
 	);

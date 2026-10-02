@@ -1,6 +1,7 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef } from "react";
 
-export type ShortcutId = "interrupt" | "followUp" | "dequeue" | "model" | "thinking" | "tools" | "sessions" | "settings" | "project" | "inbox" | "restore" | "help";
+export type ShortcutId =
+	"interrupt" | "followUp" | "dequeue" | "model" | "thinking" | "tools" | "sessions" | "sessionsSidebar" | "subagentsSidebar" | "settings" | "project" | "inbox" | "restore" | "help";
 
 /**
  * Where a chord fires. `composer`: from the composer's textarea, before any page-wide chord sees the key.
@@ -53,6 +54,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		label: "Focus the session list, or go back to the pane",
 		omp: { action: "app.agents.hub", chord: "Alt+A" },
 	},
+	{ id: "sessionsSidebar", chord: { key: "l", alt: true }, scope: "anywhere", label: "Show or hide the sessions sidebar, on the left", omp: null },
+	{ id: "subagentsSidebar", chord: { key: "r", alt: true }, scope: "anywhere", label: "Show or hide the subagents sidebar, on the right", omp: null },
 	{ id: "settings", chord: { key: "m", alt: true }, scope: "anywhere", label: "Open or close model role settings", omp: { action: "app.model.select", chord: "Alt+M" } },
 	{ id: "project", chord: { key: "w", alt: true }, scope: "anywhere", label: "Choose the sidebar's project", omp: null },
 	{ id: "inbox", chord: { key: "g", alt: true }, scope: "anywhere", label: "Switch between the pull request inbox and the sessions", omp: null },
