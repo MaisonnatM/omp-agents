@@ -2,7 +2,7 @@
 import type { InboxPullRequest } from "../src/shared";
 import { pullRequestUrl } from "./inbox-model";
 
-export type QuickActionId = "fix-ci" | "resolve-conflicts" | "address-comments" | "review";
+export type QuickActionId = "fix-ci" | "resolve-conflicts" | "address-comments" | "review" | "thermonuclear-review";
 
 interface QuickAction {
 	label: string;
@@ -19,6 +19,10 @@ function context(pr: InboxPullRequest): string {
 }
 
 const ownOpen = (pr: InboxPullRequest): boolean => pr.role === "author" && pr.state !== "merged";
+
+/** How a session runs the thermo-nuclear review of `pr`: on the `plan` role, through the kit's reviewer agent. */
+const thermonuclear = (pr: InboxPullRequest): string =>
+	`Run a thermo-nuclear code quality review of its diff: spawn \`task\` with \`agent: "thermonuclear-reviewer"\` on \`pr://${pr.owner}/${pr.repo}/${pr.number}/diff\` (run the \`thermo-nuclear-code-quality-review\` skill yourself when that agent is missing).`;
 
 /** Quick actions by id, in the order they are offered. */
 export const QUICK_ACTIONS: Record<QuickActionId, QuickAction> = {
@@ -53,6 +57,15 @@ export const QUICK_ACTIONS: Record<QuickActionId, QuickAction> = {
 		applies: pr => pr.role === "reviewer" && pr.state !== "merged",
 		prompt: pr =>
 			`${context(pr)} ${pr.author.login} asked you to review it. Read the description and the diff, check it for correctness, regressions, and missing tests, and report your findings here with file and line references. Do not post anything on GitHub.`,
+	},
+	"thermonuclear-review": {
+		label: "Thermonuclear review",
+		description: "Start a session that runs a thermo-nuclear code quality review",
+		applies: pr => pr.state !== "merged",
+		prompt: pr =>
+			pr.role === "author"
+				? `${context(pr)} ${thermonuclear(pr)} Apply the valid findings in a git worktree on the PR's branch, run the project's checks, then commit and push to the PR's branch. Only once the fixes are pushed, add the line \`- [x] Thermo-nuclear code quality review\` to the PR's description (\`gh pr edit ${pr.number} -R ${pr.owner}/${pr.repo} --body-file\` from its current body, never a blind overwrite), unless it is already there. Report each finding and what you did with it.`
+				: `${context(pr)} ${pr.author.login} asked you to review it. ${thermonuclear(pr)} Report its findings here with file and line references. Do not change the PR's branch or post anything on GitHub.`,
 	},
 };
 

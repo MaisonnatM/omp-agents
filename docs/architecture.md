@@ -129,7 +129,7 @@ The server lives in `src/`:
 The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
 - `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, settings, and new-session pages, and focus handling.
-- `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, or started by an inbox quick action.
+- `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, or started by an inbox quick action, which stays in the background and is kept as started so the inbox can offer it.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
 - `web/quick-actions.ts`: the inbox's quick actions, which pull requests each applies to and the prompt that starts its session.
