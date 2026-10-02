@@ -256,6 +256,18 @@ export function inboxSections(pullRequests: InboxPullRequest[]): InboxSection[] 
 	return sections.filter(section => section.pullRequests.length > 0);
 }
 
+/** A repository's key in the inbox's folds and section links: `owner/repo`, lowercased. */
+export const inboxRepoKey = ({ owner, repo }: { owner: string; repo: string }): string => `${owner}/${repo}`.toLowerCase();
+
+/** A section of the inbox page, by {@link inboxRepoKey} and title, which a sidebar link scrolls to. */
+export interface InboxTarget {
+	repo: string;
+	title: string;
+}
+
+/** The id of a section on the inbox page. It holds no spaces, since `aria-controls` lists ids separated by spaces. */
+export const inboxSectionId = ({ repo, title }: InboxTarget): string => `inbox-${repo}-${title.toLowerCase().replaceAll(" ", "-")}`;
+
 /** A pull request link from GitHub or Graphite: `owner`, `repo`, `number`. */
 const PR_LINK = /(?:github\.com\/([\w.-]+)\/([\w.-]+)\/pull|app\.graphite\.com\/github\/pr\/([\w.-]+)\/([\w.-]+))\/(\d+)/;
 

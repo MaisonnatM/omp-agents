@@ -12,7 +12,7 @@ import {
 	MessageSquare,
 	RefreshCw,
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type {
 	CheckState,
 	Inbox,
@@ -34,17 +34,13 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { readJson } from "../settings-api";
-import { graphiteUrl, inboxSections, type OpenMode, pullRequestUrl, samePullRequest } from "../view-model";
+import { refreshInbox, useInbox } from "../use-inbox";
+import { graphiteUrl, type InboxTarget, inboxRepoKey, inboxSectionId, inboxSections, type OpenMode, pullRequestUrl, samePullRequest } from "../view-model";
 import { Header } from "./conversation";
 import { age, hostLabel, modeOf, pastLabel, projectName } from "./roster";
 
-/** How often the open page asks again; the server answers from its cache in between. */
-const POLL_MS = 60_000;
-
 /** Folded repositories and sections: `owner/repo`, and `owner/repo:<section title>`. */
 const COLLAPSED_KEY = "omp-agents.inbox-collapsed";
-
-type Load = { phase: "loading" } | { phase: "loaded"; inbox: Inbox; at: number } | { phase: "failed"; error: string };
 
 const STATE_ICON: Record<InboxPullRequest["state"], [LucideIcon, string, string]> = {
 	open: [GitPullRequest, "text-emerald-600 dark:text-emerald-400", "Open pull request"],
@@ -343,7 +339,7 @@ interface RepoProps {
 
 function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen }: RepoProps) {
 	const name = `${inbox.owner}/${inbox.repo}`;
-	const key = name.toLowerCase();
+	const key = inboxRepoKey(inbox);
 	const headingId = `inbox-${name}`;
 	const bodyId = `${headingId}-body`;
 	const open = !collapsed.has(key);
@@ -361,10 +357,11 @@ function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen }
 		body = sections.map(section => {
 			const sectionKey = `${key}:${section.title}`;
 			const sectionOpen = !collapsed.has(sectionKey);
-			// An id holds no spaces, since `aria-controls` lists ids separated by spaces.
-			const listId = `${bodyId}-${section.title.toLowerCase().replaceAll(" ", "-")}`;
+			const sectionId = inboxSectionId({ repo: key, title: section.title });
+			const listId = `${sectionId}-list`;
 			return (
-				<div key={section.title} className="space-y-1.5">
+				// Focused when its sidebar link is chosen.
+				<div key={section.title} id={sectionId} tabIndex={-1} className="scroll-mt-6 space-y-1.5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
 					<h4 className="text-xs font-medium text-muted-foreground">
 						<FoldButton open={sectionOpen} onToggle={() => onToggle(sectionKey)} controls={listId}>
 							{section.title}
@@ -446,18 +443,20 @@ interface InboxPageProps {
 	/** The PR an inbox link named: its row unfolds, scrolls into view, and stays highlighted. */
 	target: PullRequest | null;
 	onOpen: (view: View, mode: OpenMode) => void;
+	/** The section a sidebar link last chose, to unfold, scroll to, and focus. */
+	section: InboxTarget | null;
 }
 
 /** The pull requests of the sidebar's project, or of every project, in Graphite's inbox sections, read from GitHub. */
-export function InboxPage({ project, hosts, past, target, onOpen }: InboxPageProps) {
-	const [load, setLoad] = useState<Load>({ phase: "loading" });
-	const [refreshing, setRefreshing] = useState(false);
-	const controller = useRef<AbortController | null>(null);
+export function InboxPage({ project, hosts, past, target, onOpen, section }: InboxPageProps) {
+	const { read, error, refreshing } = useInbox(project, true);
 	const [collapsed, toggleCollapsed, expand] = useCollapsed();
-	const place = load.phase === "loaded" && target ? placeOf(load.inbox, target) : null;
+	const place = read && target ? placeOf(read.inbox, target) : null;
 	const targetKey = target && rowId(target);
 	/** The target whose row the page already unfolded and scrolled to; folding it again afterwards stays folded. */
 	const shown = useRef<string | null>(null);
+	/** The sidebar section the page already unfolded, scrolled to, and focused. */
+	const revealed = useRef<InboxTarget | null>(null);
 
 	useEffect(() => {
 		if (!place || !targetKey || shown.current === targetKey) return;
@@ -471,45 +470,27 @@ export function InboxPage({ project, hosts, past, target, onOpen }: InboxPagePro
 		document.getElementById(targetKey)?.scrollIntoView({ block: "center", behavior: "smooth" });
 	}, [place?.repo, place?.section, targetKey, collapsed]);
 
-	const fetchInbox = useCallback(
-		async (fresh: boolean): Promise<void> => {
-			controller.current?.abort();
-			const current = new AbortController();
-			controller.current = current;
-			const params = new URLSearchParams();
-			if (project !== null) params.set("cwd", project);
-			if (fresh) params.set("fresh", "");
-			setRefreshing(true);
-			try {
-				const inbox = await readJson<Inbox>(await fetch(`/api/inbox${params.size ? `?${params}` : ""}`, { signal: current.signal }));
-				setLoad({ phase: "loaded", inbox, at: Date.now() });
-			} catch (err) {
-				if (!current.signal.aborted) setLoad({ phase: "failed", error: err instanceof Error ? err.message : String(err) });
-			} finally {
-				if (controller.current === current) setRefreshing(false);
-			}
-		},
-		[project],
-	);
-
+	// Waits for the section to unfold, and for an inbox that has it to load.
 	useEffect(() => {
-		setLoad({ phase: "loading" });
-		void fetchInbox(false);
-		const timer = setInterval(() => void fetchInbox(false), POLL_MS);
-		return () => {
-			clearInterval(timer);
-			controller.current?.abort();
-		};
-	}, [fetchInbox]);
+		if (!section || revealed.current === section) return;
+		const folds = [section.repo, `${section.repo}:${section.title}`];
+		if (folds.some(key => collapsed.has(key))) return expand(folds);
+		const element = document.getElementById(inboxSectionId(section));
+		if (!element) return;
+		revealed.current = section;
+		element.scrollIntoView({ block: "start" });
+		element.focus({ preventScroll: true });
+	});
 
 	let body: ReactNode;
-	if (load.phase === "loading") body = <p className="text-sm text-muted-foreground">Asking GitHub for pull requests…</p>;
-	else if (load.phase === "failed") body = <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot load the inbox: {load.error}</p>;
+	if (!read && error) body = <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot load the inbox: {error}</p>;
+	else if (!read) body = <p className="text-sm text-muted-foreground">Asking GitHub for pull requests…</p>;
 	else {
-		const { repos, unmatched } = load.inbox;
+		const { repos, unmatched } = read.inbox;
 		body = (
 			<>
-				{target && !place && <MissingTarget target={target} inbox={load.inbox} allProjects={project === null} />}
+				{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the inbox: {error}</p>}
+				{target && !place && <MissingTarget target={target} inbox={read.inbox} allProjects={project === null} />}
 				{repos.length === 0 && <p className="text-sm text-muted-foreground">No session ran in a GitHub repository.</p>}
 				{repos.map(repo => (
 					<RepoSection
@@ -537,12 +518,16 @@ export function InboxPage({ project, hosts, past, target, onOpen }: InboxPagePro
 			<Header
 				title="Inbox"
 				meta={
-					load.phase === "loaded"
-						? `Your pull requests and review requests on GitHub · updated ${new Date(load.at).toLocaleTimeString()}`
+					read
+						? `Your pull requests and review requests on GitHub · updated ${
+								new Date(read.at).toDateString() === new Date().toDateString()
+									? new Date(read.at).toLocaleTimeString()
+									: new Date(read.at).toLocaleString()
+							}`
 						: "Your pull requests and review requests on GitHub"
 				}
 			>
-				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void fetchInbox(true)}>
+				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void refreshInbox(project, true)}>
 					{refreshing ? "Refreshing…" : "Refresh"}
 				</Button>
 			</Header>
