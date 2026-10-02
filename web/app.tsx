@@ -5,12 +5,12 @@ import { cn } from "@/lib/utils";
 import { InboxPage } from "./components/inbox/inbox-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
+import { PlanPanel } from "./components/plan-panel";
 import { PlanUsageFooter } from "./components/plan-usage";
 import { Roster, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings/settings-page";
 import { SessionSwitcher } from "./components/session-switcher";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
-import { SubagentsSidebar } from "./components/subagents-sidebar";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
 import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
 import { ToolsExpanded } from "./components/transcript";
@@ -33,6 +33,7 @@ import { defaultCwd, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { useDashboard, useHash } from "./use-dashboard";
+
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
@@ -99,8 +100,8 @@ export function App() {
 		const current = latest.current.layout;
 		show(kind === "max" ? { ...current, focus: index, maximized: !current.maximized } : closePane(current, index));
 	}, [show]);
-	/** The live session whose subagents the right sidebar lists. Over a past session or a page, it has none. */
-	const subagentsHost = page ? undefined : viewHost;
+	/** The view whose plan and changes the right sidebar shows; a page has none. */
+	const planView = page ? null : view;
 	const toggleSidebar = useCallback((side: SidebarSide): void => {
 		const { sidebars } = latest.current;
 		sidebars.setOpen(side, !sidebars.panels[side].open);
@@ -130,8 +131,8 @@ export function App() {
 		nextSession: () => step(1),
 		tools: () => setToolsExpanded(expanded => !expanded),
 		sessionsSidebar: () => toggleSidebar("left"),
-		subagentsSidebar: () => {
-			if (!subagentsHost) return false;
+		planSidebar: () => {
+			if (!planView) return false;
 			toggleSidebar("right");
 		},
 		settings: () => {
@@ -205,7 +206,7 @@ export function App() {
 						count={layout.panes.length}
 						focused={index === layout.focus}
 						maximized={maximized}
-						topRight={index === topRightPane && subagentsHost !== undefined}
+						topRight={index === topRightPane && planView !== null}
 						host={pane.kind === "live" ? state.hosts.find(h => h.instanceId === pane.instanceId) ?? null : null}
 						lastHost={pane.kind === "live" ? state.lastHosts.get(pane.instanceId) ?? null : null}
 						session={pane.kind === "past" ? state.past.find(s => s.sessionId === pane.sessionId) ?? null : null}
@@ -216,6 +217,7 @@ export function App() {
 						send={send}
 						startSession={start}
 						focus={focus}
+						open={open}
 						onEnd={endHost}
 						onLayout={onPaneLayout}
 						toggleRight={toggleRight}
@@ -272,9 +274,9 @@ export function App() {
 			<SidebarInset>
 				<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
 			</SidebarInset>
-			{subagentsHost && (
+			{planView && (
 				<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-					<SubagentsSidebar host={subagentsHost} open={layout.panes} onOpen={open} onCancel={view => send({ t: "cancel-agent", view })} />
+					<PlanPanel key={hashForView(planView)} view={planView} />
 				</DashboardSidebar>
 			)}
 			<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />

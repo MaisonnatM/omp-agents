@@ -1,6 +1,6 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
-import { memo, useCallback } from "react";
-import type { RosterHost, PastSession, View, ModelOption, Delivery, MessageQueue, UserAnswer } from "../../src/shared";
+import { memo, useCallback, useMemo } from "react";
+import type { RosterHost, PastSession, View, LiveView, ModelOption, Delivery, MessageQueue, UserAnswer } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePane } from "../pane-store";
@@ -9,6 +9,7 @@ import type { ForkPoint } from "../transcript-view";
 import type { Dashboard } from "../use-dashboard";
 import { Conversation, PastConversation } from "./conversation";
 import { SidebarToggle } from "./sidebar-panel";
+import { SubagentLinks } from "./transcript";
 
 interface PaneProps {
 	view: View;
@@ -27,6 +28,8 @@ interface PaneProps {
 	send: Dashboard["send"];
 	startSession: Dashboard["start"];
 	focus: Dashboard["focus"];
+	/** Opens a subagent from its `task` row. */
+	open: Dashboard["open"];
 	onEnd: (instanceId: string) => void;
 	onLayout: (index: number, kind: "max" | "close") => void;
 	toggleRight: () => void;
@@ -40,16 +43,25 @@ const paneArea = (index: number, count: number): string =>
 /** Its own external-store subscription means another pane's token never asks this pane to render. */
 export const Pane = memo(function Pane({
 	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models,
-	fork, resume, send, startSession, focus, onEnd, onLayout, toggleRight, rightOpen,
+	fork, resume, send, startSession, focus, open, onEnd, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
 	const { items, loaded, completions, dequeued } = usePane(view);
+	const instanceId = view.kind === "live" ? view.instanceId : null;
+	const agents = host?.agents;
+	const writable = host?.control.phase === "live" && !host.control.readOnly;
+	const links = useMemo(
+		() =>
+			instanceId
+				? { instanceId, agents: agents ?? [], onOpen: open, onCancel: writable ? (agent: LiveView & { agentId: string }) => send({ t: "cancel-agent", view: agent }) : null }
+				: null,
+		[instanceId, agents, open, writable, send],
+	);
 	const onFork = useCallback((itemId: string, point: ForkPoint) => startSession({ kind: "fork", view, itemId, point }), [startSession, view]);
 	const onResume = useCallback(() => view.kind === "past" && startSession({ kind: "resume", sessionId: view.sessionId }), [startSession, view]);
 	const onMaximize = useCallback(() => onLayout(index, "max"), [index, onLayout]);
 	const onClose = useCallback(() => onLayout(index, "close"), [index, onLayout]);
 	const onFocus = useCallback(() => !focused && focus(index), [focus, focused, index]);
 
-	const instanceId = view.kind === "live" ? view.instanceId : null;
 	const onComplete = useCallback((reqId: number, text: string, cursor: number) => {
 		if (view.kind === "live") send({ t: "complete", reqId, scope: { kind: "live", view }, text, cursor });
 	}, [send, view]);
@@ -127,7 +139,7 @@ export const Pane = memo(function Pane({
 			style={{ gridArea: maximized && focused ? "1 / 1 / -1 / -1" : paneArea(index, count) }}
 			className={cn("relative flex min-h-0 min-w-0 flex-col bg-background outline-none", maximized && (focused ? "z-10" : "invisible"))}
 		>
-			{content}
+			<SubagentLinks.Provider value={links}>{content}</SubagentLinks.Provider>
 		</section>
 	);
 });

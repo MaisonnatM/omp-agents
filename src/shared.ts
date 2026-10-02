@@ -253,8 +253,40 @@ export type Item =
 	 */
 	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null }
 	| { id: string; kind: "assistant"; text: string; streaming: boolean }
-	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error" }
+	/** `agents`: the subagents a `task` call spawned, by id, in the order they appeared; empty for every other tool. */
+	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[] }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
+
+/** omp's todo statuses (`pi-tui/src/tools/todo.ts`). */
+export type TodoStatus = "pending" | "in_progress" | "completed" | "abandoned" | "blocked";
+
+export interface TodoItem {
+	content: string;
+	status: TodoStatus;
+}
+
+export interface TodoPhase {
+	name: string;
+	tasks: TodoItem[];
+}
+
+/** A file the agent's `edit` and `write` calls changed. */
+export interface ChangedFile {
+	/** Relative to the transcript's working directory when inside it, else absolute with the home directory as `~`. */
+	path: string;
+	/** Successful `edit` and `write` results that touched it. */
+	edits: number;
+	/** The latest edit's diff, in omp's numbered-line form; `null` after a write, which records none. */
+	diff: string | null;
+}
+
+/** What one transcript planned and changed: its latest todo list, and the files it touched in first-touch order. */
+export interface SessionWork {
+	phases: TodoPhase[];
+	files: ChangedFile[];
+}
+
+export const EMPTY_WORK: SessionWork = { phases: [], files: [] };
 
 /** One row of a select request. */
 export interface RequestOption {
@@ -448,6 +480,8 @@ export type ServerMsg =
 	| { t: "past"; sessions: PastSession[] }
 	/** `reset` replaces the view's transcript; otherwise `items` are upserts by id, new ids appended. */
 	| { t: "items"; view: View; reset: boolean; items: Item[] }
+	/** The view's plan and changed files, whole, sent with its transcript and again whenever either changes. */
+	| { t: "work"; view: View; work: SessionWork }
 	/** Answers this socket's `start` with `reqId` once the session is ready, or once starting it failed. */
 	| { t: "started"; reqId: number; result: StartResult }
 	/** Answers this socket's `complete` for `scope`; `reqId` counts per composer. */

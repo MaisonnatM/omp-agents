@@ -23,7 +23,7 @@ omp-agents lists the sessions that run in your terminals and the ones it starts 
 ## Features
 
 - **Live roster.** Every running and past session, with a status dot (running, idle, or waiting on a question), filtered by project.
-- **Subagent tree.** The subagents of the focused session, indented by parent, with their status and current activity.
+- **Plan and changes.** The focused conversation's todo list and the files its agent changed, with each file's latest diff; subagents open from the `task` call that spawned them.
 - **Live conversations.** Streaming Markdown transcripts, tool calls, and context-window usage, in up to four split panes.
 - **Full control.** Prompt, steer, queue follow-ups, interrupt, answer `ask` questions and extension dialogs, message and cancel subagents, run `!` shell and built-in `/` commands in dashboard sessions, switch model and thinking level, end sessions.
 - **Session lifecycle.** Start a session in any project, resume a past one, or fork a conversation from any prompt or reply.

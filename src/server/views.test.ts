@@ -20,20 +20,23 @@ const streamed = (timestamp: number, reply: string) => ({ type: "message_update"
 const main = (instanceId: string): LiveView => ({ kind: "live", instanceId, agentId: null });
 const sub = (instanceId: string, agentId: string): LiveView => ({ kind: "live", instanceId, agentId });
 
-/** A socket that records what the server sends it, and the topics it follows. */
+/** A socket that records the transcripts the server sends it, and the topics it follows. `work` messages, which go along with each, are left out. */
 function socket() {
 	const sent: ServerMsg[] = [];
 	const topics = new Set<string>();
 	const ws = {
 		data: { views: new Map() } as SocketData,
-		send: (raw: string) => void sent.push(JSON.parse(raw)),
+		send: (raw: string) => {
+			const msg: ServerMsg = JSON.parse(raw);
+			if (msg.t !== "work") sent.push(msg);
+		},
 		subscribe: (topic: string) => void topics.add(topic),
 		unsubscribe: (topic: string) => void topics.delete(topic),
 	};
 	return { ws: ws as unknown as Socket, sent, topics };
 }
 
-/** Views over files that tests name per view, publishing into a list that a test can wait on. */
+/** Views over files that tests name per view, publishing their transcripts into a list that a test can wait on; `work` messages are left out. */
 function setup() {
 	const root = mkdtempSync(join(tmpdir(), "omp-agents-views-"));
 	roots.push(root);
@@ -43,6 +46,7 @@ function setup() {
 	const views = new Views(
 		view => (view.kind === "live" ? (paths.get(`${view.instanceId}:${view.agentId ?? ""}`) ?? null) : null),
 		(topic, msg) => {
+			if (msg.t === "work") return;
 			published.push({ topic, msg });
 			if (waiter && published.length >= waiter.count) waiter.resolve();
 		},
@@ -140,8 +144,8 @@ describe("Views", () => {
 		await untilPublished(4);
 
 		expect(published.slice(2).map(({ topic, msg }) => [topic, msg.t === "items" ? msg.items.map(item => item.kind) : []])).toEqual([
-			["items:live:a:", ["user"]],
-			["items:live:a:s1", ["notice"]],
+			["view:live:a:", ["user"]],
+			["view:live:a:s1", ["notice"]],
 		]);
 	});
 
@@ -186,7 +190,7 @@ describe("Views", () => {
 
 		paths.set("a:", null);
 		views.sync();
-		expect(published.at(-1)).toEqual({ topic: "items:live:a:", msg: { t: "items", view: main("a"), reset: true, items: [] } });
+		expect(published.at(-1)).toEqual({ topic: "view:live:a:", msg: { t: "items", view: main("a"), reset: true, items: [] } });
 	});
 
 	test("a socket that joins a view another socket already shows gets its current items at once, and the view stops when the last socket leaves", async () => {
@@ -203,7 +207,7 @@ describe("Views", () => {
 		expect(second.sent).toEqual([
 			{ t: "items", view: main("a"), reset: true, items: [{ id: "m100", kind: "user", text: "hello", skill: null, from: null, entryId: "e1" }] },
 		]);
-		expect(second.topics).toEqual(new Set(["items:live:a:"]));
+		expect(second.topics).toEqual(new Set(["view:live:a:"]));
 		expect(published).toHaveLength(1);
 
 		// One socket leaving keeps the view going for the other.
@@ -237,7 +241,7 @@ describe("Views", () => {
 		views.poke(join(root, "project", ".one.jsonl.lock"));
 		await untilPublished(4);
 
-		expect(published.slice(2).map(({ topic }) => topic).sort()).toEqual(["items:live:a:", "items:live:b:"]);
+		expect(published.slice(2).map(({ topic }) => topic).sort()).toEqual(["view:live:a:", "view:live:b:"]);
 		expect([itemsOf(2), itemsOf(3)].flatMap(({ items }) => items.map(item => item.id)).sort()).toEqual(["m300", "m400"]);
 	});
 });

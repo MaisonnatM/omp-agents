@@ -1,6 +1,6 @@
-import { Sparkles } from "lucide-react";
+import { CircleStop, Sparkles } from "lucide-react";
 import { createContext, memo, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
-import type { Item, View } from "../../src/shared";
+import type { AgentRow, Item, LiveView, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import {
@@ -14,11 +14,12 @@ import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import { skillLabel } from "../labels";
-import { sameView } from "../routing";
+import { modeOf, skillLabel, SPLIT_CLICK } from "../labels";
+import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { type ForkPoint, forkPoints, type ToolItem, toBlocks } from "../transcript-view";
 import { MessageMarkdown } from "./message-markdown";
+import { StatusDot, statusLabel } from "./status-dot";
 
 const TOOL_ICON = { running: "loader", ok: "check", error: "x" } as const;
 
@@ -31,13 +32,79 @@ export const NOTICE_TONE: Record<Extract<Item, { kind: "notice" }>["level"], str
 /** Whether finished tool groups show their steps. The tools shortcut flips it for every pane. */
 export const ToolsExpanded = createContext(false);
 
+/**
+ * Where a `task` row's subagents open: the live session the transcript belongs to, its registered subagents for their
+ * status, and the page's open. `onCancel` stops a running subagent for good; `null` in a room the dashboard cannot
+ * write to. The context is `null` in a past session, whose subagents have no view of their own.
+ */
+export const SubagentLinks = createContext<{
+	instanceId: string;
+	agents: AgentRow[];
+	onOpen: (view: View, mode: OpenMode) => void;
+	onCancel: ((view: LiveView & { agentId: string }) => void) | null;
+} | null>(null);
+
+/** The subagents a `task` call spawned, each a link to its own view with its status. */
+function SpawnedAgents({ ids }: { ids: string[] }) {
+	const links = useContext(SubagentLinks);
+	const chip = "inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs ring-1 ring-border";
+	return (
+		<span className="mt-1 flex flex-wrap gap-1.5" data-subagents>
+			{ids.map(id => {
+				if (!links) {
+					return (
+						<span key={id} className={cn(chip, "text-muted-foreground")}>
+							<span className="truncate">{id}</span>
+						</span>
+					);
+				}
+				const view = { kind: "live", instanceId: links.instanceId, agentId: id } as const;
+				const agent = links.agents.find(row => row.id === id);
+				const facts = agent ? [agent.kind, statusLabel(agent.status), agent.activity].filter(Boolean).join(" · ") : "not registered";
+				return (
+					<span key={id} className="inline-flex max-w-full items-center gap-0.5">
+						<a
+							href={hashForView(view)}
+							title={`${facts}\n${SPLIT_CLICK} to open in a split`}
+							className={cn(chip, "text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring")}
+							onClick={event => {
+								// Shift- and middle-clicks keep the link's own new-window behavior.
+								if (event.button !== 0 || event.shiftKey || event.altKey) return;
+								event.preventDefault();
+								links.onOpen(view, modeOf(event));
+							}}
+						>
+							{agent && <StatusDot status={agent.status} />}
+							<span className="truncate">{id}</span>
+						</a>
+						{links.onCancel && agent?.status === "running" && (
+							<Button
+								variant="ghost"
+								size="icon"
+								className="size-6 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+								aria-label={`Cancel subagent ${id}`}
+								title="Cancel subagent: stop it for good, leaving the session's turn running"
+								onClick={() => links.onCancel?.(view)}
+							>
+								<CircleStop className="size-3.5" />
+							</Button>
+						)}
+					</span>
+				);
+			})}
+		</span>
+	);
+}
+
 function ToolGroup({ tools }: { tools: ToolItem[] }) {
 	const expanded = useContext(ToolsExpanded);
 	const running = tools.some(tool => tool.status === "running");
 	const failed = tools.filter(tool => tool.status === "error").length;
+	// A group that spawned subagents stays open, so their links stay one click away.
+	const spawned = tools.some(tool => tool.agents.length > 0);
 	// Open while running, else as `expanded` says; a manual toggle wins until `expanded` flips.
 	const [toggle, setToggle] = useState<{ open: boolean; expanded: boolean } | null>(null);
-	const open = toggle?.expanded === expanded ? toggle.open : running || expanded;
+	const open = toggle?.expanded === expanded ? toggle.open : running || expanded || spawned;
 	const header = running
 		? "Working"
 		: `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`;
@@ -53,7 +120,9 @@ function ToolGroup({ tools }: { tools: ToolItem[] }) {
 						description={tool.summary || undefined}
 						status={tool.status === "running" ? "active" : "complete"}
 						isLast={index === tools.length - 1}
-					/>
+					>
+						{tool.agents.length > 0 && <SpawnedAgents ids={tool.agents} />}
+					</ThinkingStep>
 				))}
 			</ThinkingStepsContent>
 		</ThinkingSteps>

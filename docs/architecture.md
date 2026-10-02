@@ -24,6 +24,8 @@ Every transcript comes from the session files on this machine, not from a networ
 - A past session reads the same way, so a session that runs without publishing itself keeps updating.
 - Live agent events only add what the file does not hold yet: the reply as it streams, and the running state of tool calls. omp keeps a message's `timestamp` when it writes the message, so the file's copy replaces the streamed copy in place, and a late event cannot undo it. omp writes a fresh session's file only with its first reply. Until then the prompt shows from its live event, except a prompt sent from the dashboard to a terminal session, whose file entry has no message timestamp to merge on. A queued steer or follow-up keeps the time it was sent, though the agent takes it later. So a message from the file never goes ahead of the file messages before it, and a live user message goes after everything already shown.
 - A reply that streams and a tool call that runs change with every token. Each open transcript sends those changes to the page at most every 50 ms; a message that finishes, a tool call that ends, a prompt, or a notice goes out at once, together with what was held back.
+- The same read folds each line into the view's plan and changes as well: the latest todo list, from a `todo` result's `details.phases` or a `user_todo_edit` entry, and the files changed, from each `edit` result's `details.path` and `diff` (one per entry of `perFileResults` for a multi-file edit) and each `write` result's `details.resolvedPath`, which omp sets only for a file. The view's socket topic carries them as a `work` message, whole, once with the transcript and again after each read that changes them. A subagent's view folds its own file, so it shows its own plan and changes.
+- A `task` result names the subagents it spawned in `details.progress` and `details.results`; the tool item lists their ids, which name each subagent's view. A running `task` reports them sooner through `tool_execution_update` events.
 - The server lists the session files through omp's session listing, the code behind omp's session picker, at startup and then once a minute, in case the watcher missed a change. Between listings it reads again only the session files the watcher reported, at most twice a second, so a session that streams costs one file read, not a listing of every session. The past list skips the empty sessions that omp's picker hides. The server looks up files by session id in this listing, so the page never sends a path. While no page is connected, it skips building the roster and the past list.
 - Whenever the list changes, the server also scans for pull requests in each session file whose modification time changed, plus the subagent files in its artifacts directory. Like an open transcript, each file reads only the bytes appended since its last scan. The first scan reads every session file. On 460 MB across 367 sessions it takes under a second, and the sidebar shows before it finishes. A session that names a PR by number alone costs one `git remote get-url origin` in its working directory. A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
 - Each inbox answer tells the server which branch heads which pull request in that repository. The server then links each session whose `git push` updated one of those branches to that PR, and sends the sidebar the new links.
@@ -48,7 +50,7 @@ The cost is visible on each host and on its relay (`collab.relayUrl`, by default
 
 - Each listed session counts `omp-agents` as one more participant for as long as the dashboard runs. The terminal shows that the guest joined.
 - Each session sends its full transcript snapshot through the relay when the dashboard joins it, and every live event after that. The dashboard ignores the snapshot. Transcripts never travel through the relay.
-- The text that says what a subagent is doing comes from live progress events. After the dashboard restarts, a subagent row shows only its status until that subagent reports progress again.
+- The text that says what a subagent is doing comes from live progress events. After the dashboard restarts, a subagent's link shows only its status until that subagent reports progress again.
 
 Stop the dashboard to leave every room.
 
@@ -95,15 +97,16 @@ The server lives in `src/`:
 - `src/server/socket.ts`: handles each socket message. `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` request.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`. It builds the roster rows.
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list. `src/server/views.ts` points each open view at its file and folds live events into it.
-- `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `ServerMsg`, `ClientMsg`, the inbox and pull request shapes).
+- `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, the inbox and pull request shapes).
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `config.ts`, `discovery.ts`, `models.ts`, and `prompts.ts` wrap one area each.
 - `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON, and `src/paths.ts` names the home directory and the token file.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
 - `src/guest.ts`: runs one Collab guest per terminal session. `src/subagents.ts` finds each subagent's transcript file.
 - `src/user-requests.ts`: parses the RPC and Collab question frames into one request shape, writes the answers back, and keeps each session's pending questions.
 - `src/commands.ts`: the composer's `/` and `@` completions, and the expansion of file commands and skills before a guest prompt.
-- `src/tail.ts`: reads one transcript file incrementally.
+- `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below.
 - `src/transcript.ts`: folds session-file lines and live events into display items.
+- `src/work.ts`: folds session-file lines into the plan and changes: the latest todo list and the files changed.
 - `src/pull-requests.ts`: finds the pull requests each session submitted or worked on.
 - `src/session-links.ts`: writes the session block into a pull request's description.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more. A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
@@ -115,7 +118,7 @@ The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web
 
 - `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, settings, and new-session pages, and focus handling.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, or started by an inbox quick action.
-- `web/pane-store.ts`: each open view's transcript and completions, outside the page state, so a token in one pane re-renders only that pane.
+- `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
 - `web/quick-actions.ts`: the inbox's quick actions, which pull requests each applies to and the prompt that starts its session.
 - `web/api.ts`: every HTTP request the page makes. `web/settings-api.ts` holds the settings page's requests.
@@ -124,7 +127,8 @@ The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read. `web/components/session-switcher.tsx` is the Cmd+K search over every session.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/components/roster.tsx`: the left sidebar's session and inbox lists, and the project picker.
-- `web/components/pane.tsx`: a pane. `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript.
+- `web/components/pane.tsx`: a pane. `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript, whose `task` rows link to their subagents.
+- `web/components/plan-panel.tsx`: the right sidebar's plan and changes for the focused pane.
 - `web/components/inbox/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
 - `web/components/ui`, `web/lib`, and `web/hooks`: mostly files from the Fluid registry; see below.
 

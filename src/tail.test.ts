@@ -2,7 +2,7 @@ import { afterEach, describe, expect, jest, test } from "bun:test";
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Item } from "./shared";
+import type { Item, SessionWork } from "./shared";
 import { FileTail } from "./tail";
 
 const dirs: string[] = [];
@@ -20,18 +20,23 @@ function setup() {
 	dirs.push(dir);
 	const path = join(dir, "session.jsonl");
 	const emits: { reset: boolean; items: Item[] }[] = [];
+	const works: SessionWork[] = [];
 	let settle: () => void = () => {};
-	const tail = new FileTail(path, (reset, items) => {
-		emits.push({ reset, items });
-		settle();
-	});
+	const tail = new FileTail(
+		path,
+		(reset, items) => {
+			emits.push({ reset, items });
+			settle();
+		},
+		work => works.push(work),
+	);
 	const read = (): Promise<void> => {
 		const { promise, resolve } = Promise.withResolvers<void>();
 		settle = resolve;
 		tail.poke();
 		return promise;
 	};
-	return { path, emits, read, tail };
+	return { path, emits, works, read, tail };
 }
 
 describe("FileTail", () => {
@@ -67,6 +72,24 @@ describe("FileTail", () => {
 		writeFileSync(path, user(5, "new"));
 		await read();
 		expect(emits.at(-1)).toEqual({ reset: true, items: [{ id: "m5", kind: "user", text: "new", skill: null, from: null, entryId: "e5" }] });
+	});
+
+	test("the plan and changed files publish with the first read, then only after a read that changes them", async () => {
+		const { path, emits, works, read } = setup();
+		const todo = (phases: unknown) =>
+			`${JSON.stringify({ type: "message", id: "t1", message: { role: "toolResult", toolCallId: "c1", toolName: "todo", details: { op: "init", phases } } })}\n`;
+		writeFileSync(path, user(1, "plan it"));
+		await read();
+		appendFileSync(path, `{not json\n${user(2, "go on")}`);
+		await read();
+		appendFileSync(path, todo([{ name: "Build", tasks: [{ content: "Write it", status: "pending" }] }]));
+		await read();
+
+		expect(emits.at(-2)).toEqual({ reset: false, items: [{ id: "m2", kind: "user", text: "go on", skill: null, from: null, entryId: "e2" }] });
+		expect(works).toEqual([
+			{ phases: [], files: [] },
+			{ phases: [{ name: "Build", tasks: [{ content: "Write it", status: "pending" }] }], files: [] },
+		]);
 	});
 
 	describe("streamed updates", () => {

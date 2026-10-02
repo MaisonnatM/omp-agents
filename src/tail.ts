@@ -1,10 +1,11 @@
 /**
  * Incremental reader of one omp JSONL transcript (a session or a subagent): it
- * folds each appended line into a {@link Transcript}. The server pokes it when
- * its file changes.
+ * folds each appended line into a {@link Transcript} and a {@link Work}. The
+ * server pokes it when its file changes.
  */
-import type { Item } from "./shared";
+import type { Item, SessionWork } from "./shared";
 import { Transcript } from "./transcript";
+import { Work } from "./work";
 
 const NEWLINE = 0x0a;
 /** Streamed text arrives as one update per token; its updates are published at most this often. */
@@ -14,9 +15,21 @@ const decoder = new TextDecoder();
 /** Whether a message is still being written, so that another update of it is likely to follow within the window. */
 const inFlux = (item: Item): boolean => (item.kind === "assistant" && item.streaming) || (item.kind === "tool" && item.status === "running");
 
+/** The entries of complete JSONL lines; a line that does not parse is skipped. */
+function entriesOf(text: string): unknown[] {
+	return text.split("\n").flatMap(line => {
+		try {
+			return line ? [JSON.parse(line)] : [];
+		} catch {
+			return [];
+		}
+	});
+}
+
 /** Incremental reader of one JSONL transcript. A file that does not exist yet reads as empty until it appears. */
 export class FileTail {
 	transcript = new Transcript();
+	work = new Work();
 	readonly path: string;
 	#offset = 0;
 	#loaded = false;
@@ -28,10 +41,13 @@ export class FileTail {
 	#pendingReset = false;
 	#window: Timer | undefined;
 	readonly #emit: (reset: boolean, items: Item[]) => void;
+	readonly #emitWork: (work: SessionWork) => void;
 
-	constructor(path: string, emit: (reset: boolean, items: Item[]) => void) {
+	/** `emitWork` gets the whole {@link Work} once the first read finishes, then again each time a read changes it. */
+	constructor(path: string, emit: (reset: boolean, items: Item[]) => void, emitWork: (work: SessionWork) => void) {
 		this.path = path;
 		this.#emit = emit;
+		this.#emitWork = emitWork;
 	}
 
 	get loaded(): boolean {
@@ -94,6 +110,7 @@ export class FileTail {
 			// Rewritten in place (omp rewrites a file on some migrations): start over.
 			this.#discardPending();
 			this.transcript = new Transcript();
+			this.work = new Work();
 			this.#offset = 0;
 			this.#loaded = false;
 		}
@@ -101,14 +118,19 @@ export class FileTail {
 		// Only complete lines: omp may be halfway through writing the last one.
 		const end = bytes.lastIndexOf(NEWLINE) + 1;
 		this.#offset += end;
-		const changed = end > 0 ? this.transcript.applyLines(decoder.decode(bytes.subarray(0, end)).split("\n")) : [];
+		const entries = end > 0 ? entriesOf(decoder.decode(bytes.subarray(0, end))) : [];
+		const changed = entries.flatMap(entry => this.transcript.applyEntry(entry));
+		// Every entry goes through both folds, so `some` would skip the rest.
+		const worked = entries.reduce<boolean>((any, entry) => this.work.applyEntry(entry) || any, false);
 		if (!this.#loaded) {
 			this.#loaded = true;
 			this.#discardPending();
 			this.transcript.takeReordered();
 			this.#emit(true, this.transcript.items());
+			this.#emitWork(this.work.snapshot());
 		} else {
 			this.#publish(changed);
+			if (worked) this.#emitWork(this.work.snapshot());
 		}
 	}
 }

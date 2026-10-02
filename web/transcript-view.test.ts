@@ -4,7 +4,7 @@ import { applyItems, forkPoints, toBlocks } from "./transcript-view";
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
-	const tool = (id: string, status: "running" | "ok"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status });
+	const tool = (id: string, status: "running" | "ok"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status, agents: [] });
 
 	test("upserts keep position and append new ids", () => {
 		const items = applyItems([user, tool("t1", "running")], false, [tool("t1", "ok"), tool("t2", "running")]);
@@ -24,7 +24,7 @@ describe("transcript rendering", () => {
 describe("forkPoints", () => {
 	const prompt = (id: string, entryId: string | null): Item => ({ id, kind: "user", text: id, skill: null, from: null, entryId });
 	const reply = (id: string, streaming = false): Item => ({ id, kind: "assistant", text: id, streaming });
-	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok" };
+	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] };
 
 	test("a prompt forks at itself; a turn's last reply forks at the next prompt, keeping the whole turn", () => {
 		const items = [prompt("p1", "e1"), reply("r1a"), tool, reply("r1b"), prompt("p2", "e2"), reply("r2")];

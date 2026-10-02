@@ -72,7 +72,26 @@ function shellRun(message: Json): string {
 	return [`${fence}sh\n${run}\n${fence}`, ended].filter(Boolean).join("\n\n");
 }
 
-/** Whether two items show the same thing. Every field of an item is a primitive, so a shallow comparison covers them all. */
+/**
+ * The subagents a `task` result names: `progress` while they run (async spawns report only it), `results` once they
+ * finished. These ids, not the call's task names, open their views: omp suffixes a name that repeats (`Name2`).
+ */
+function spawnedAgents(toolName: unknown, result: unknown): string[] {
+	if (toolName !== "task" || !isObject(result) || !isObject(result.details)) return [];
+	const rows = [result.details.progress, result.details.results].flatMap(list => (Array.isArray(list) ? list : []));
+	return [...new Set(rows.flatMap(row => (isObject(row) && typeof row.id === "string" && row.id ? [row.id] : [])))];
+}
+
+/** `next` merged after `prev`, without repeats; `prev` itself when `next` adds nothing. */
+function union(prev: string[], next: string[]): string[] {
+	const added = next.filter(id => !prev.includes(id));
+	return added.length === 0 ? prev : [...prev, ...added];
+}
+
+/**
+ * Whether two items show the same thing. Every field of an item is a primitive except a tool's `agents`, which keeps its
+ * identity until it grows (see {@link union}), so a shallow comparison covers them all.
+ */
 function sameItem(a: Item, b: Item): boolean {
 	const x: Json = a;
 	const y: Json = b;
@@ -137,17 +156,6 @@ export class Transcript {
 		}
 	}
 
-	/** Complete JSONL lines of a session file. */
-	applyLines(lines: string[]): Item[] {
-		return lines.flatMap(line => {
-			try {
-				return line ? this.applyEntry(JSON.parse(line)) : [];
-			} catch {
-				return [];
-			}
-		});
-	}
-
 	/** Live agent event. Returns the items it created or changed. */
 	applyEvent(event: unknown): Item[] {
 		if (!isObject(event)) return [];
@@ -165,8 +173,11 @@ export class Transcript {
 				return this.#applyLive(message, false);
 			case "tool_execution_start":
 				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), toolSummary(event.args, event.intent), "running");
+			case "tool_execution_update":
+				// A running `task` reports its subagents as they spawn, long before its result reaches the file.
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, undefined, spawnedAgents(event.toolName, event.partialResult));
 			case "tool_execution_end":
-				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok");
+				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", spawnedAgents(event.toolName, event.result));
 			case "agent_end":
 				// An interrupted turn ends without tool_execution_end for the call it cut off.
 				return [...this.#items.values()].flatMap(item =>
@@ -226,7 +237,7 @@ export class Transcript {
 			case "toolResult": {
 				const callId = str(message.toolCallId);
 				if (callId) this.#settled.add(`tool:${callId}`);
-				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok");
+				return this.#upsertTool(callId, str(message.toolName), undefined, message.isError ? "error" : "ok", spawnedAgents(message.toolName, message));
 			}
 			case "bashExecution":
 				return this.#upsert({ id: key, kind: "user", text: shellRun(message), skill: null, from: null, entryId: null });
@@ -243,7 +254,7 @@ export class Transcript {
 			if (block.type === "text" && typeof block.text === "string" && block.text) {
 				changed.push(...this.#upsert({ id: `${key}:${index}`, kind: "assistant", text: block.text, streaming }));
 			} else if (block.type === "toolCall") {
-				changed.push(...this.#upsertTool(str(block.id), str(block.name), toolSummary(block.arguments, block.intent), undefined));
+				changed.push(...this.#upsertTool(str(block.id), str(block.name), toolSummary(block.arguments, block.intent), undefined, []));
 			}
 		});
 		if (!streaming && (message.stopReason === "error" || message.stopReason === "aborted")) {
@@ -253,23 +264,37 @@ export class Transcript {
 		return changed;
 	}
 
-	#upsertLiveTool(callId: string | undefined, name: string | undefined, summary: string | undefined, status: ToolItem["status"]): Item[] {
+	#upsertLiveTool(
+		callId: string | undefined,
+		name: string | undefined,
+		summary: string | undefined,
+		status: ToolItem["status"] | undefined,
+		agents: string[] = [],
+	): Item[] {
 		if (!callId || this.#settled.has(`tool:${callId}`)) return [];
-		return this.#upsertTool(callId, name, summary, status);
+		return this.#upsertTool(callId, name, summary, status, agents);
 	}
 
 	/** Tool calls show up as content blocks, execution events, and result messages; merge them by call id. */
-	#upsertTool(callId: string | undefined, name: string | undefined, summary: string | undefined, status: ToolItem["status"] | undefined): Item[] {
+	#upsertTool(
+		callId: string | undefined,
+		name: string | undefined,
+		summary: string | undefined,
+		status: ToolItem["status"] | undefined,
+		agents: string[],
+	): Item[] {
 		if (!callId) return [];
 		const id = `tool:${callId}`;
 		const prev = this.#items.get(id);
-		const base: ToolItem = prev?.kind === "tool" ? prev : { id, kind: "tool", name: name ?? "tool", summary: "", status: "running" };
+		const base: ToolItem = prev?.kind === "tool" ? prev : { id, kind: "tool", name: name ?? "tool", summary: "", status: "running", agents: [] };
 		return this.#upsert({
 			...base,
 			name: name ?? base.name,
 			summary: summary || base.summary,
 			// A finished call stays finished when a later content-block replay reports no status.
 			status: status ?? base.status,
+			// Each report names the subagents it knows of; a workpool update names only the one that moved.
+			agents: union(base.agents, agents),
 		});
 	}
 

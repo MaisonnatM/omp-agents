@@ -12,7 +12,7 @@ export type ShortcutId =
 	| "thinking"
 	| "tools"
 	| "sessionsSidebar"
-	| "subagentsSidebar"
+	| "planSidebar"
 	| "settings"
 	| "help"
 	| "restore"
@@ -65,8 +65,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "tools", label: "Expand or collapse tool calls", keys: [{ chord: { key: "e", mod: true }, scope: "anywhere" }] },
 	{ id: "sessionsSidebar", label: "Show or hide the sessions sidebar, on the left", keys: [{ chord: { key: "b", mod: true }, scope: "anywhere" }] },
 	{
-		id: "subagentsSidebar",
-		label: "Show or hide the subagents sidebar, on the right",
+		id: "planSidebar",
+		label: "Show or hide the plan and changes sidebar, on the right",
 		keys: [{ chord: { key: "b", mod: true, shift: true }, scope: "anywhere" }],
 	},
 	{ id: "settings", label: "Open or close settings", keys: [{ chord: { key: ",", mod: true }, scope: "anywhere" }] },

@@ -1,11 +1,5 @@
-/** What the roster and past-session lists say about where sessions ran and how subagents nest. */
-import type { AgentRow, PastSession, RosterHost, View } from "../src/shared";
-
-export interface AgentNode {
-	agent: AgentRow;
-	/** 0 for subagents of the main agent, 1 for their children, and so on. */
-	depth: number;
-}
+/** What the roster and past-session lists say about where sessions ran. */
+import type { PastSession, RosterHost, View } from "../src/shared";
 
 /**
  * Where a new session starts unless the user picks another directory: the open session's,
@@ -30,23 +24,4 @@ export function workspaces(hosts: RosterHost[], past: PastSession[]): { cwd: str
 		if (row.cwd && !byCwd.has(row.cwd)) byCwd.set(row.cwd, row.cwdDisplay);
 	}
 	return [...byCwd].map(([cwd, cwdDisplay]) => ({ cwd, cwdDisplay }));
-}
-
-/** Depth-first parent/child order. Rows whose parent is not listed start a top-level branch. */
-export function agentTree(agents: AgentRow[]): AgentNode[] {
-	const ids = new Set(agents.map(agent => agent.id));
-	const children = new Map<string | null, AgentRow[]>();
-	for (const agent of agents) {
-		const parent = agent.parentId !== null && ids.has(agent.parentId) ? agent.parentId : null;
-		children.set(parent, [...(children.get(parent) ?? []), agent]);
-	}
-	const out: AgentNode[] = [];
-	const visit = (parent: string | null, depth: number): void => {
-		for (const agent of children.get(parent) ?? []) {
-			out.push({ agent, depth });
-			visit(agent.id, depth + 1);
-		}
-	};
-	visit(null, 0);
-	return out;
 }
