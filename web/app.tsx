@@ -171,7 +171,7 @@ export function App() {
 					connected={state.connected}
 					completions={state.newSessionCompletions}
 					onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
-					onStart={(prompt, branch) => start({ kind: "new", cwd, prompt, branch })}
+					onStart={(prompt, branch, model) => start({ kind: "new", cwd, prompt, branch, model })}
 				/>
 			);
 			break;

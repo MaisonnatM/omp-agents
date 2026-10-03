@@ -153,6 +153,20 @@ export interface SessionSettingsModule {
 export interface ModelSettingsModule {
 	cfgModelProviderOrder: SettingsReader<string[]>;
 }
+/** Subset of omp's `AuthStorage` (pi-ai src/auth-storage.ts) this app reads. */
+export interface AuthStorage {
+	/** Where `provider`'s credential comes from (a login, a stored key, an environment variable), `undefined` with none. */
+	keys: { source(provider: string): unknown };
+	close(): void;
+}
+export interface AuthModule {
+	/** omp's credential store, through its auth broker when one is configured. */
+	discoverAuthStorage(): Promise<AuthStorage>;
+}
+export interface OAuthModule {
+	/** Every provider omp's `/login` offers. */
+	getOAuthProviders(): { id: string }[];
+}
 export interface FallbackChainsModule {
 	/** Gives every chat role without a chain of its own the `default` chain. */
 	expandDefaultRetryFallbackChains(configured: Record<string, string[]>, roleNames: readonly string[]): Record<string, string[]>;
@@ -298,6 +312,10 @@ export const sessionSettings = await load<SessionSettingsModule>(join(srcDir, "s
 });
 export const modelSettings = await load<ModelSettingsModule>(join(srcDir, "config", "model-settings.ts"), {
 	"cfgModelProviderOrder.get": "function",
+});
+export const auth = await load<AuthModule>(join(srcDir, "session", "auth-broker-config.ts"), { discoverAuthStorage: "function" });
+export const oauth = await load<OAuthModule>(join(dirname(packageDir), "pi-ai", "src", "registry", "oauth", "index.ts"), {
+	getOAuthProviders: "function",
 });
 export const fallbackChains = await load<FallbackChainsModule>(join(srcDir, "session", "retry-fallback-chains.ts"), {
 	expandDefaultRetryFallbackChains: "function",

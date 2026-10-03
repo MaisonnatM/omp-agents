@@ -46,7 +46,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 				if (!dir) return { error: `${request.cwd.trim()} is not a directory.` };
 				// omp writes a fresh session's file only with its first reply, so a first `!` command would show nowhere.
 				if (request.prompt.startsWith("!")) return { error: "Start the session with a prompt. A ! command runs once omp has replied." };
-				const { branch } = request;
+				const { branch, model } = request;
 				let cwd = dir;
 				if (branch) {
 					try {
@@ -55,7 +55,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 						return { error: `Cannot check out ${branch.name}: ${errorText(err)}` };
 					}
 				}
-				return launch("Cannot start omp", async (id, emit) => ({ session: await DashboardSession.start(id, cwd, emit), prompt: null }));
+				return launch("Cannot start omp", async (id, emit) => ({ session: await DashboardSession.start(id, cwd, model, emit), prompt: null }));
 			}
 			case "fork": {
 				const source = env.pathFor(request.view);

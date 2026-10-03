@@ -1,13 +1,16 @@
 import { useState } from "react";
-import type { BranchChoice } from "../../src/shared";
+import type { BranchChoice, ModelOption } from "../../src/shared";
 import { InputMessage } from "@/components/ui/input-message";
+import { getJson } from "../api";
 import { projectName } from "../labels";
 import type { Completions } from "../pane-store";
+import { useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, EmptyConversation, Header, ShortcutNote } from "./conversation";
 import { BranchPicker, chosenBranch, GitRef, targetOf } from "./git";
+import { ModelPicker } from "./model-picker";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
@@ -18,18 +21,21 @@ interface NewSessionProps {
 	completions: Completions | null;
 	/** Ask for `/` and `@` suggestions, resolved as a session started in `cwd` would resolve them. */
 	onComplete: (reqId: number, text: string, cursor: number) => void;
-	/** Start omp with `prompt` as its first message: in `cwd`, or on `branch` when it names one. */
-	onStart: (prompt: string, branch: BranchChoice | null) => void;
+	/** Start omp with `prompt` as its first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default. */
+	onStart: (prompt: string, branch: BranchChoice | null, model: ModelOption | null) => void;
 }
 
 /**
  * A session not started yet, with the same composer a live session has. omp starts in `cwd` only when the first message
  * is sent, so leaving the draft leaves nothing running. The message stays in the composer until the session opens.
- * In a git checkout, the composer picks the branch; another branch than `cwd`'s runs in its own worktree.
+ * The composer picks the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  */
 export function NewSession({ cwd, launch, connected, completions, onComplete, onStart }: NewSessionProps) {
 	const [draft, setDraft] = useState("");
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
+	const [model, setModel] = useState<ModelOption | null>(null);
+	const [models, setModels] = useState<{ models: ModelOption[]; error: string | null } | null>(null);
+	const [modelsOpen, setModelsOpen] = useState(false);
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
 	const checkout = useGitCheckout(cwd, launch?.phase === "failed" ? launch : null);
 	const pickedChoice = picked.cwd === cwd ? picked.choice : null;
@@ -40,6 +46,21 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 			: pickedChoice;
 	const completion = useCompletion({ draft, setDraft, completions, onComplete });
 	const starting = launch?.phase === "starting";
+	// As in a live session, the list refreshes on every open, so a login since the last one shows.
+	const openModels = (open: boolean): void => {
+		setModelsOpen(open);
+		if (!open) return;
+		getJson<{ models: ModelOption[] }>("/api/models/connected").then(
+			({ models }) => setModels({ models, error: null }),
+			(err: unknown) => setModels({ models: [], error: err instanceof Error ? err.message : String(err) }),
+		);
+	};
+	useShortcuts({
+		model: () => {
+			if (starting) return false;
+			openModels(true);
+		},
+	});
 	const directCommand = blockedShortcut(draft, "new");
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
 	const name = projectName(target.dir) ?? target.dir;
@@ -76,10 +97,23 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					onSend={text => {
 						if (directCommand) return;
 						completion.close();
-						onStart(text, choice);
+						onStart(text, choice, model);
 					}}
 					placeholder="Message this session…"
-					leftSlot={checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
+					leftSlot={
+						<>
+							<ModelPicker
+								current={model && `${model.provider}/${model.id}`}
+								unset="Default model"
+								list={models}
+								open={modelsOpen}
+								onOpenChange={openModels}
+								onPick={setModel}
+								disabled={starting}
+							/>
+							{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
+						</>
+					}
 					disabled={starting || !connected}
 					sendLabel="Start session"
 					textareaProps={{ ...completion.textareaProps, autoFocus: true }}

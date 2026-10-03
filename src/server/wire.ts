@@ -3,7 +3,7 @@
  * Each parser returns a typed value, or `null` for anything else, so no caller casts what it received.
  */
 import { isObject } from "../json";
-import type { BranchChoice, ClientMsg, CompletionScope, LiveView, PullRequest, SessionLinksEdit, StartRequest, UserAnswer, View } from "../shared";
+import type { BranchChoice, ClientMsg, CompletionScope, LiveView, ModelOption, PullRequest, SessionLinksEdit, StartRequest, UserAnswer, View } from "../shared";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
@@ -51,12 +51,18 @@ function parseBranchChoice(value: unknown): BranchChoice | null | undefined {
 	return value.kind === "new" && isNonEmpty(value.base) ? { kind: "new", name: value.name, base: value.base } : undefined;
 }
 
+function parseModel(value: unknown): ModelOption | null {
+	return isObject(value) && isNonEmpty(value.provider) && isNonEmpty(value.id) ? { provider: value.provider, id: value.id } : null;
+}
+
 function parseStartRequest(value: Record<string, unknown>): StartRequest | null {
 	switch (value.kind) {
 		case "new": {
 			const { cwd, prompt } = value;
 			const branch = parseBranchChoice(value.branch);
-			return isNonEmpty(cwd) && isNonEmpty(prompt) && branch !== undefined ? { kind: "new", cwd, prompt, branch } : null;
+			// `null` starts on omp's default model.
+			const model = value.model === null || value.model === undefined ? null : (parseModel(value.model) ?? undefined);
+			return isNonEmpty(cwd) && isNonEmpty(prompt) && branch !== undefined && model !== undefined ? { kind: "new", cwd, prompt, branch, model } : null;
 		}
 		case "fork": {
 			const view = parseView(value.view);
@@ -128,10 +134,9 @@ export function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 			return isCounter(value.reqId) && request ? { t: "start", reqId: value.reqId, ...request } : null;
 		}
 		case "set-model": {
-			const { instanceId, model } = value;
-			return typeof instanceId === "string" && isObject(model) && typeof model.provider === "string" && typeof model.id === "string"
-				? { t: "set-model", instanceId, model: { provider: model.provider, id: model.id } }
-				: null;
+			const { instanceId } = value;
+			const model = parseModel(value.model);
+			return typeof instanceId === "string" && model ? { t: "set-model", instanceId, model } : null;
 		}
 		case "set-thinking": {
 			const { instanceId, level } = value;
