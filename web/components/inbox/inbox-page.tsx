@@ -11,9 +11,10 @@ import { inboxRepoKey, inboxSection, inboxSections, samePullRequest } from "../.
 import { hashForInbox, type OpenMode } from "../../routing";
 import type { SectionTarget } from "../../section";
 import type { QuickOp, StartOf } from "../../starts";
+import { useStoredKeys } from "../../stored-keys";
 import { refreshInbox, useInbox } from "../../use-inbox";
 import { Header } from "../conversation";
-import { FoldButton, useCollapsed, useRevealSection } from "../fold";
+import { FoldButton, useRevealSection } from "../fold";
 import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
 import { PullRequestSheetContent } from "./pr-details";
 import { PullRequestRow, rowId, sessionsFor } from "./pr-row";
@@ -165,7 +166,7 @@ interface InboxPageProps {
 /** The pull requests of the sidebar's project, or of every project, in Graphite's inbox sections, read from GitHub. */
 export function InboxPage({ project, hosts, past, target, onOpen, section, quick, onQuickAction, onDismissQuick }: InboxPageProps) {
 	const { read, error, refreshing } = useInbox(project, true);
-	const [collapsed, toggleCollapsed, expand] = useCollapsed(COLLAPSED_KEY);
+	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
 	const place = read && target ? placeOf(read.data, target) : null;
 	const targetKey = target && rowId(target);
 	/** The target whose row the page already unfolded and scrolled to; folding it again afterwards stays folded. */

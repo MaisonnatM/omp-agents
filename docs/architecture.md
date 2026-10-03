@@ -141,10 +141,11 @@ The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header. `web/components/git.tsx` holds the branch picker and the repository and branch in a header's meta line.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read. `web/components/session-switcher.tsx` is the Cmd+K search over every session.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
+- `web/stored-keys.ts`: a set of keys kept in localStorage, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections. `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
 - `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
 - `web/components/pane.tsx`: a pane. `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript, whose `task` rows link to their subagents.
 - `web/components/plan-panel.tsx`: the right sidebar's plan and changes for the focused pane.
-- `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages. `web/components/fold.tsx` holds the foldable sections that the inbox and tickets pages share, and the hook that reveals the section a sidebar link chose; `web/section.ts` names such a section target.
+- `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages. `web/components/fold.tsx` holds the fold button that the inbox and tickets pages share, and the hook that reveals the section a sidebar link chose; `web/section.ts` names such a section target.
 - `web/components/ui`, `web/lib`, and `web/hooks`: mostly files from the Fluid registry; see below.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`). Its `agent/` files are copies of the maintainer's `~/.omp/agent` files, except for `AGENTS.md`, which is a generic version. After you edit one of those live files, copy it back. `bun run omp-template --dry-run` shows a copy that has drifted as `keep yours`.

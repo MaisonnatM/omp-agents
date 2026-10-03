@@ -9,10 +9,11 @@ import { type TicketActionId, ticketActions, ticketStart } from "../../quick-act
 import { hashForTickets, type OpenMode } from "../../routing";
 import type { SectionTarget } from "../../section";
 import type { QuickOp, StartOf } from "../../starts";
+import { useStoredKeys } from "../../stored-keys";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { refreshTickets, useTickets } from "../../use-tickets";
 import { Header } from "../conversation";
-import { FoldButton, useCollapsed, useRevealSection } from "../fold";
+import { FoldButton, useRevealSection } from "../fold";
 import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
 import { TicketSheetContent } from "./ticket-details";
 import { STATUS_ICON, TicketRow, ticketRowId } from "./ticket-row";
@@ -86,7 +87,7 @@ interface TicketsPageProps {
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
 export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDismissQuick, onOpen }: TicketsPageProps) {
 	const { read, error, refreshing } = useTickets(true);
-	const [collapsed, toggleCollapsed, expand] = useCollapsed(COLLAPSED_KEY);
+	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
 	const tickets = read?.data.tickets ?? [];
 	const targetGroup = target === null ? null : (tickets.find(ticket => ticket.id === target)?.status ?? null);
 	/** The target whose row the page already unfolded and scrolled to; folding it again afterwards stays folded. */

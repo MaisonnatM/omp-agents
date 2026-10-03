@@ -29,11 +29,14 @@ import {
 	sameView,
 } from "./routing";
 import type { SectionTarget } from "./section";
-import { defaultCwd, workspaces } from "./sessions";
+import { defaultCwd, listedViews, sidebarSessions, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
+import { useStoredKeys } from "./stored-keys";
 import { useDashboard, useHash } from "./use-dashboard";
 
+/** The session ids the sidebar lists under Pinned. */
+const PINNED_KEY = "omp-agents.pinned-sessions";
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
@@ -66,6 +69,7 @@ export function App() {
 	const hash = useHash();
 	const page = pageFromHash(hash);
 	const [project, pickProject] = useProject(workspaces(state.hosts, state.past));
+	const [pinned, togglePin] = useStoredKeys(PINNED_KEY);
 	const { started } = state;
 	// A session started in another directory than the selected project would be missing from the sidebar.
 	useEffect(() => {
@@ -79,17 +83,10 @@ export function App() {
 	const [columns, setColumns] = useState(() => storedSplitRatio("columns"));
 	const [rows, setRows] = useState(() => storedSplitRatio("rows"));
 	const maximized = layout.maximized && !page;
-	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
+	const lists = sidebarSessions(state.hosts, state.past, project, pinned);
 	// The running sessions the sidebar lists, in its order, which ending a session moves its panes along.
-	const listedHosts = state.hosts.filter(inProject).map(host => host.instanceId);
-	/** Every row of the sidebar's sessions list, running, then interrupted, then past, which the previous and next session keys walk. */
-	const listedViews: View[] = [
-		...listedHosts.map((instanceId): View => ({ kind: "live", instanceId, agentId: null })),
-		...state.past
-			.filter(inProject)
-			.toSorted((a, b) => Number(b.interrupted) - Number(a.interrupted))
-			.map(({ sessionId }): View => ({ kind: "past", sessionId })),
-	];
+	const listedHosts = [...lists.pinned.hosts, ...lists.running].map(host => host.instanceId);
+	const listed = listedViews(lists);
 	const latest = useRef({ layout, listedHosts, sidebars });
 	latest.current = { layout, listedHosts, sidebars };
 	const endHost = useCallback((instanceId: string): void => {
@@ -120,7 +117,7 @@ export function App() {
 		else location.hash = next === "inbox" ? hashForInbox(null) : hashForTickets(null);
 	};
 	const step = (by: 1 | -1): boolean | void => {
-		const next = adjacentSession(listedViews, view, by);
+		const next = adjacentSession(listed, view, by);
 		if (!next) return false;
 		open(next, "replace");
 	};
@@ -274,6 +271,8 @@ export function App() {
 				<Roster
 					hosts={state.hosts}
 					past={state.past}
+					lists={lists}
+					onTogglePin={togglePin}
 					open={page ? [] : layout.panes}
 					connected={state.connected}
 					newSessionOpen={page?.kind === "new"}
