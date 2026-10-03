@@ -1,4 +1,4 @@
-import { Circle, CircleAlert, CircleCheck, CircleDot, CircleSlash, type LucideIcon } from "lucide-react";
+import { Circle, CircleAlert, CircleCheck, CircleDot, CircleSlash, FileDiff, ListTodo, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import type { ChangedFile, TodoPhase, TodoStatus, View } from "../../src/shared";
 import {
@@ -11,6 +11,8 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
+import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { usePane } from "../pane-store";
 
@@ -97,31 +99,60 @@ function FileRow({ file }: { file: ChangedFile }) {
 	);
 }
 
-/** The right sidebar's content: the focused view's latest todo list, then the files its agent changed. */
+/** The right sidebar's tab, which localStorage keeps across views. */
+const TAB_KEY = "omp-agents.plan-tab";
+
+type PlanTab = "plan" | "files";
+
+function useStoredTab(): [PlanTab, (tab: PlanTab) => void] {
+	const [tab, setTab] = useState<PlanTab>(() => (localStorage.getItem(TAB_KEY) === "files" ? "files" : "plan"));
+	const pick = (next: PlanTab): void => {
+		setTab(next);
+		if (next === "plan") localStorage.removeItem(TAB_KEY);
+		else localStorage.setItem(TAB_KEY, next);
+	};
+	return [tab, pick];
+}
+
+/** The right sidebar's content: the focused view's latest todo list and the files its agent changed, each in its own tab. */
 export function PlanPanel({ view }: { view: View }) {
 	const { work } = usePane(view);
-	const empty = work !== null && work.phases.length === 0 && work.files.length === 0;
+	const [tab, setTab] = useStoredTab();
+	const files = work?.files ?? [];
 	return (
-		<>
-			<SidebarHeader className="flex-row items-center gap-2 px-3 pt-4">
-				<h2 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">Plan and changes</h2>
+		<Tabs value={tab} onValueChange={value => setTab(value as PlanTab)} className="flex min-h-0 flex-1 flex-col">
+			<SidebarHeader className="flex-row items-center gap-2 px-2 pt-4">
+				<h2 className="sr-only">Plan and changes</h2>
+				<SizeProvider size="compact">
+					<TabsList aria-label="Plan and changes">
+						<TabItem value="plan" label="Plan" icon={ListTodo} />
+						<TabItem value="files" label={files.length > 0 ? `Files (${files.length})` : "Files"} icon={FileDiff} />
+					</TabsList>
+				</SizeProvider>
 			</SidebarHeader>
-			<SidebarContent>
-				{empty && <p className="px-4 py-2 text-sm text-muted-foreground">No plan or file changes yet.</p>}
-				{work?.phases.map((phase, index) => <Phase key={`${index}:${phase.name}`} phase={phase} />)}
-				{work && work.files.length > 0 && (
-					<SidebarGroup>
-						<SidebarGroupLabel>
-							{work.files.length} {work.files.length === 1 ? "file" : "files"} changed
-						</SidebarGroupLabel>
-						<SidebarMenu aria-label="Files changed">
-							{work.files.map(file => (
-								<FileRow key={file.path} file={file} />
-							))}
-						</SidebarMenu>
-					</SidebarGroup>
-				)}
-			</SidebarContent>
-		</>
+			<TabPanel value="plan" asChild>
+				<SidebarContent>
+					{work?.phases.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">No plan yet.</p>}
+					{work?.phases.map((phase, index) => <Phase key={`${index}:${phase.name}`} phase={phase} />)}
+				</SidebarContent>
+			</TabPanel>
+			<TabPanel value="files" asChild>
+				<SidebarContent>
+					{work && files.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p>}
+					{files.length > 0 && (
+						<SidebarGroup>
+							<SidebarGroupLabel>
+								{files.length} {files.length === 1 ? "file" : "files"} changed
+							</SidebarGroupLabel>
+							<SidebarMenu aria-label="Files changed">
+								{files.map(file => (
+									<FileRow key={file.path} file={file} />
+								))}
+							</SidebarMenu>
+						</SidebarGroup>
+					)}
+				</SidebarContent>
+			</TabPanel>
+		</Tabs>
 	);
 }

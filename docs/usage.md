@@ -29,9 +29,10 @@ The full reference for the dashboard's interface. For installation, see the [REA
 ## Plan and changes sidebar
 
 - The right sidebar shows what the focused pane's agent planned and changed: a live session, one of its subagents, or a past session, each from its own transcript file. It hides for the inbox, the tickets, **Settings**, and the new-session page.
-- On top is the agent's latest todo list, by phase, with how many of each phase's tasks are done (`2/5`). The task in progress is highlighted, a completed task is struck through, an abandoned one is dimmed, and a blocked one has an amber mark. The latest list wins, whether the agent's `todo` call wrote it or you edited it in omp's terminal.
-- Below it are the files the agent's `edit` and `write` calls changed, in the order it first touched them, with how many times it changed each. A path inside the session's working directory shows relative to it. Click a file to show its latest diff, as omp recorded it with line numbers. A file the latest change wrote whole has no diff to show. A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
-- With neither a todo list nor a changed file, the sidebar says so.
+- Two tabs split it, **Plan** and **Files**. The sidebar remembers the tab you chose, for every view. The **Files** tab names how many files changed, as in `Files (3)`.
+- **Plan** shows the agent's latest todo list, by phase, with how many of each phase's tasks are done (`2/5`). The task in progress is highlighted, a completed task is struck through, an abandoned one is dimmed, and a blocked one has an amber mark. The latest list wins, whether the agent's `todo` call wrote it or you edited it in omp's terminal.
+- **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them, with how many times it changed each. A path inside the session's working directory shows relative to it. Click a file to show its latest diff, as omp recorded it with line numbers. A file the latest change wrote whole has no diff to show. A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
+- A tab with nothing to show says so.
 
 ## Panes, splits, and links
 
