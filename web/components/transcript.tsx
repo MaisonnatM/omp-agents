@@ -1,4 +1,45 @@
-import { CircleStop, Sparkles } from "lucide-react";
+import {
+	AppWindow,
+	Bot,
+	Braces,
+	Brain,
+	Bug,
+	CircleStop,
+	Code,
+	CornerDownLeft,
+	Cpu,
+	FilePen,
+	FilePlus,
+	FileText,
+	Flag,
+	FolderSearch,
+	GitPullRequest,
+	Globe,
+	GraduationCap,
+	History,
+	Hourglass,
+	Image,
+	Lightbulb,
+	Link,
+	ListTodo,
+	type LucideIcon,
+	MessageCircleQuestion,
+	MessageSquareWarning,
+	Monitor,
+	OctagonX,
+	Plug,
+	RefreshCcw,
+	Replace,
+	SearchCode,
+	ShieldCheck,
+	Ship,
+	Sparkles,
+	SquareTerminal,
+	StickyNote,
+	Target,
+	TextSearch,
+	Wrench,
+} from "lucide-react";
 import { createContext, memo, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import type { AgentRow, Item, LiveView, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
@@ -21,7 +62,50 @@ import { type ForkPoint, forkPoints, type ToolItem, toBlocks } from "../transcri
 import { MessageMarkdown } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 
-const TOOL_ICON = { running: "loader", ok: "check", error: "x" } as const;
+/** omp's tool names (`pi-coding-agent/src/tools/builtin-names.ts`, plus its optional and extension tools). */
+const TOOL_ICON: Record<string, LucideIcon> = {
+	read: FileText,
+	write: FilePlus,
+	edit: FilePen,
+	ast_edit: Replace,
+	ast_grep: SearchCode,
+	bash: SquareTerminal,
+	eval: Code,
+	grep: TextSearch,
+	glob: FolderSearch,
+	find: FolderSearch,
+	lsp: Braces,
+	debug: Bug,
+	ida: Cpu,
+	ask: MessageCircleQuestion,
+	task: Bot,
+	wait: Hourglass,
+	yield: CornerDownLeft,
+	todo: ListTodo,
+	goal: Target,
+	think: Lightbulb,
+	web_search: Globe,
+	web_fetch: Link,
+	fetch: Link,
+	browser: AppWindow,
+	computer: Monitor,
+	generate_image: Image,
+	github: GitPullRequest,
+	ship_stage: Ship,
+	checkpoint: Flag,
+	rewind: History,
+	context_notes: StickyNote,
+	new_context: RefreshCcw,
+	security_scan: ShieldCheck,
+	memory_edit: Brain,
+	retain: Brain,
+	recall: Brain,
+	reflect: Brain,
+	learn: GraduationCap,
+	manage_skill: Sparkles,
+	proc_kill: OctagonX,
+	report_issue: MessageSquareWarning,
+};
 
 export const NOTICE_TONE: Record<Extract<Item, { kind: "notice" }>["level"], string> = {
 	info: "text-muted-foreground",
@@ -115,7 +199,8 @@ function ToolGroup({ tools }: { tools: ToolItem[] }) {
 				{tools.map((tool, index) => (
 					<ThinkingStep
 						key={tool.id}
-						icon={TOOL_ICON[tool.status]}
+						icon={Object.hasOwn(TOOL_ICON, tool.name) ? TOOL_ICON[tool.name] : tool.name.startsWith("mcp__") ? Plug : Wrench}
+						iconClassName={tool.status === "error" ? "text-red-600 dark:text-red-400" : undefined}
 						label={tool.name}
 						description={tool.summary || undefined}
 						status={tool.status === "running" ? "active" : "complete"}

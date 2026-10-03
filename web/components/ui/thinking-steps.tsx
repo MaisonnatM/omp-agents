@@ -20,7 +20,7 @@ const useIsoLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 import { cn } from "@/lib/utils";
 import { useIcon } from "@/lib/icon-context";
-import type { IconName } from "@/lib/icon-context";
+import type { IconComponent, IconName } from "@/lib/icon-context";
 import { spring } from "@/lib/springs";
 import { fontWeights } from "@/lib/font-weight";
 import { useShape } from "@/lib/shape-context";
@@ -324,7 +324,9 @@ ThinkingStepsContent.displayName = "ThinkingStepsContent";
 type StepStatus = "complete" | "active" | "pending";
 
 interface ThinkingStepProps {
-  icon?: IconName;
+  /** A name from the icon set, or a component of its own. */
+  icon?: IconName | IconComponent;
+  iconClassName?: string;
   showIcon?: boolean;
   label: string;
   description?: string;
@@ -361,6 +363,7 @@ function useStepHeight() {
 
 function ThinkingStep({
   icon = "dot",
+  iconClassName,
   showIcon = true,
   label,
   description,
@@ -370,7 +373,8 @@ function ThinkingStep({
   children,
   className,
 }: ThinkingStepProps) {
-    const Icon = useIcon(icon);
+    const Named = useIcon(typeof icon === "string" ? icon : "dot");
+    const Icon = typeof icon === "string" ? Named : icon;
     const shape = useShape();
     const sizeClasses = useSize();
     const [stepRef, stepHeight] = useStepHeight();
@@ -404,7 +408,7 @@ function ThinkingStep({
                   <Icon
                     size={sizeClasses.variant === "compact" ? 12 : 14}
                     strokeWidth={1.5}
-                    className="text-muted-foreground"
+                    className={cn("text-muted-foreground", iconClassName)}
                   />
                 ) : (
                   <div className="w-[14px] h-[14px] flex items-center justify-center">
