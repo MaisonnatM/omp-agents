@@ -1,4 +1,4 @@
-import { AppWindow, Archive, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, Loader, MessagesSquare, Play, Plus, Settings, SquareKanban } from "lucide-react";
+import { AppWindow, Archive, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
 import type { PastSession, PullRequest, RosterHost, View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,7 @@ import { inboxRepoKey, inboxSection, inboxSections, pullRequestUrl } from "../in
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";
 import type { SectionTarget } from "../section";
-import { workspaces } from "../sessions";
+import { type SidebarSessions, workspaces } from "../sessions";
 import { shortcutKeys, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
 import { ticketGroups, ticketSection } from "../tickets-model";
@@ -124,10 +124,20 @@ export function RowMenu({ view, label, isOpen, onOpen, children, items, style }:
 	);
 }
 
-/** Items a running or past session's menu shares: its pull requests, its workspace's settings, and copying its ids. */
-function SessionItems({ row }: { row: { cwd: string; sessionId: string; pullRequests: PullRequest[] } }) {
+interface SessionItemsProps {
+	row: { cwd: string; sessionId: string; pullRequests: PullRequest[] };
+	pinned: boolean;
+	onTogglePin: (sessionId: string) => void;
+}
+
+/** Items a running or past session's menu shares: pinning it, its pull requests, its workspace's settings, and copying its ids. */
+function SessionItems({ row, pinned, onTogglePin }: SessionItemsProps) {
 	return (
 		<>
+			<MenuItem onClick={() => onTogglePin(row.sessionId)}>
+				{pinned ? <PinOff /> : <Pin />}
+				{pinned ? "Unpin" : "Pin"}
+			</MenuItem>
 			<MenuSeparator />
 			{row.pullRequests.map(pr => (
 				<MenuLinkItem key={pullRequestUrl(pr)} href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
@@ -334,6 +344,10 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 interface RosterProps {
 	hosts: RosterHost[];
 	past: PastSession[];
+	/** The sessions tab's lists, under the selected project. */
+	lists: SidebarSessions;
+	/** Pin session `sessionId`, or unpin it when it is pinned. */
+	onTogglePin: (sessionId: string) => void;
 	/** Views on screen, highlighted in the list. */
 	open: View[];
 	connected: boolean;
@@ -374,6 +388,8 @@ interface RosterProps {
 export function Roster({
 	hosts,
 	past,
+	lists,
+	onTogglePin,
 	open,
 	connected,
 	newSessionOpen,
@@ -399,16 +415,13 @@ export function Roster({
 }: RosterProps) {
 	const [runningOpen, setRunningOpen] = useState(true);
 	const projects = workspaces(hosts, past);
-	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
-	const shownHosts = hosts.filter(inProject);
-	const shownPast = past.filter(inProject);
-	const shownInterrupted = shownPast.filter(session => session.interrupted);
-	const shownEnded = shownPast.filter(session => !session.interrupted);
+	const { pinned, running, interrupted, ended } = lists;
 	const resumingAll = resumeAll?.phase === "starting";
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	const selectedProject = projects.find(({ cwd }) => cwd === project);
 	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
-	const pastRow = (session: PastSession, items?: ReactNode) => {
+	/** A past session's row; `isPinned` lists it under Pinned, where an interrupted one says so, as its own group does not. */
+	const pastRow = (session: PastSession, isPinned: boolean) => {
 		const pastView: View = { kind: "past", sessionId: session.sessionId };
 		return (
 			<RowMenu
@@ -424,8 +437,13 @@ export function Roster({
 							<Play />
 							{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
 						</MenuItem>
-						{items}
-						<SessionItems row={session} />
+						{session.interrupted && (
+							<MenuItem onClick={() => onDismissInterrupted(session.sessionId)}>
+								<Archive />
+								Move to past
+							</MenuItem>
+						)}
+						<SessionItems row={session} pinned={isPinned} onTogglePin={onTogglePin} />
 					</>
 				}
 			>
@@ -438,12 +456,65 @@ export function Roster({
 						{project === null && session.title !== null && <ProjectBadge cwdDisplay={session.cwdDisplay} />}
 						<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
 						<ShipStep ship={session.ship} />
-						{session.pullRequests.length > 0 && (
-							<span className="shrink-0 text-xs text-muted-foreground" title={session.pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n")}>
-								{pullRequestsLabel(session.pullRequests)}
+						{((isPinned && session.interrupted) || session.pullRequests.length > 0) && (
+							<span className="shrink-0 text-xs text-muted-foreground" title={session.pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n") || undefined}>
+								{[isPinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)]
+									.filter(Boolean)
+									.join(" · ")}
 							</span>
 						)}
 						<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(session.modifiedAt)}</span>
+					</span>
+				</SidebarMenuButton>
+			</RowMenu>
+		);
+	};
+	const hostRow = (host: RosterHost, isPinned: boolean) => {
+		const hostView: View = { kind: "live", instanceId: host.instanceId, agentId: null };
+		return (
+			<RowMenu
+				key={host.instanceId}
+				view={hostView}
+				label={hostLabel(host)}
+				isOpen={isOpen(hostView)}
+				onOpen={onOpen}
+				items={
+					<>
+						<SessionItems row={host} pinned={isPinned} onTogglePin={onTogglePin} />
+						{/* The server ends only what it controls: a dashboard session, or a terminal room shared writable. */}
+						{host.control.phase === "live" && !host.control.readOnly && (
+							<>
+								<MenuSeparator />
+								<MenuItem variant="destructive" onClick={() => onEnd(host.instanceId)}>
+									<CircleStop />
+									End session
+								</MenuItem>
+							</>
+						)}
+					</>
+				}
+			>
+				<SidebarMenuButton
+					isActive={isOpen(hostView)}
+					onClick={event => onOpen(hostView, modeOf(event))}
+					title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
+				>
+					<StatusDot status={host.status} />
+					<span className="flex min-w-0 flex-1 items-baseline gap-2">
+						{project === null && host.sessionName !== null && <ProjectBadge cwdDisplay={host.cwdDisplay} />}
+						<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
+						<ShipStep ship={host.ship} />
+						{(host.pullRequests.length > 0 || (host.source === "terminal" && !host.relayConnected)) && (
+							<span className="shrink-0 text-xs text-muted-foreground" title={host.pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n") || undefined}>
+								{[
+									host.source === "terminal" && !host.relayConnected && "relay offline",
+									host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests),
+								]
+									.filter(Boolean)
+									.join(" · ")}
+							</span>
+						)}
+						<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
 					</span>
 				</SidebarMenuButton>
 			</RowMenu>
@@ -487,9 +558,18 @@ export function Roster({
 			{/* SidebarContent puts `hidden` on its inner element, so the class hides its scroll frame too. */}
 			<TabPanel value="sessions" forceMount asChild className={tab === "sessions" ? undefined : "hidden"}>
 				<SidebarContent>
+					{pinned.hosts.length + pinned.past.length > 0 && (
+						<SidebarGroup collapsible>
+							<SidebarGroupLabel>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
+							<SidebarMenu aria-label="Pinned omp sessions">
+								{pinned.hosts.map(host => hostRow(host, true))}
+								{pinned.past.map(session => pastRow(session, true))}
+							</SidebarMenu>
+						</SidebarGroup>
+					)}
 					<SidebarGroup collapsible open={runningOpen} onOpenChange={setRunningOpen}>
 						<SidebarGroupLabel>
-							{shownHosts.length === 0 ? "No sessions" : `${shownHosts.length} running`}
+							{running.length > 0 ? `${running.length} running` : pinned.hosts.length > 0 ? "No other sessions running" : "No sessions"}
 						</SidebarGroupLabel>
 						<SidebarGroupAction
 							title={`${newSessionLabel} (${shortcutKeys("newSession")})`}
@@ -500,62 +580,12 @@ export function Roster({
 							<Plus />
 						</SidebarGroupAction>
 						<SidebarMenu aria-label="Running omp sessions">
-							{shownHosts.map(host => {
-								const hostView: View = { kind: "live", instanceId: host.instanceId, agentId: null };
-								return (
-									<RowMenu
-										key={host.instanceId}
-										view={hostView}
-										label={hostLabel(host)}
-										isOpen={isOpen(hostView)}
-										onOpen={onOpen}
-										items={
-											<>
-												<SessionItems row={host} />
-												{/* The server ends only what it controls: a dashboard session, or a terminal room shared writable. */}
-												{host.control.phase === "live" && !host.control.readOnly && (
-													<>
-														<MenuSeparator />
-														<MenuItem variant="destructive" onClick={() => onEnd(host.instanceId)}>
-															<CircleStop />
-															End session
-														</MenuItem>
-													</>
-												)}
-											</>
-										}
-									>
-										<SidebarMenuButton
-											isActive={isOpen(hostView)}
-											onClick={event => onOpen(hostView, modeOf(event))}
-											title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-										>
-											<StatusDot status={host.status} />
-											<span className="flex min-w-0 flex-1 items-baseline gap-2">
-												{project === null && host.sessionName !== null && <ProjectBadge cwdDisplay={host.cwdDisplay} />}
-												<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
-												<ShipStep ship={host.ship} />
-												{(host.pullRequests.length > 0 || (host.source === "terminal" && !host.relayConnected)) && (
-													<span className="shrink-0 text-xs text-muted-foreground" title={host.pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n") || undefined}>
-														{[
-															host.source === "terminal" && !host.relayConnected && "relay offline",
-															host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests),
-														]
-															.filter(Boolean)
-															.join(" · ")}
-													</span>
-												)}
-												<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
-											</span>
-										</SidebarMenuButton>
-									</RowMenu>
-								);
-							})}
+							{running.map(host => hostRow(host, false))}
 						</SidebarMenu>
 					</SidebarGroup>
-					{shownInterrupted.length > 0 && (
+					{interrupted.length > 0 && (
 						<SidebarGroup collapsible>
-							<SidebarGroupLabel>{`${shownInterrupted.length} interrupted`}</SidebarGroupLabel>
+							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
 							{/* The group action's props carry no `disabled`, so it styles a native button that does. */}
 							<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
 								<button
@@ -563,7 +593,7 @@ export function Roster({
 									title={resumingAll ? "Resuming…" : "Resume all"}
 									aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
 									disabled={resumingAll || !connected}
-									onClick={() => onResumeAll(shownInterrupted.map(session => session.sessionId))}
+									onClick={() => onResumeAll(interrupted.map(session => session.sessionId))}
 								>
 									{resumingAll ? <Loader className="animate-spin" /> : <ListRestart />}
 								</button>
@@ -577,21 +607,13 @@ export function Roster({
 								</p>
 							)}
 							<SidebarMenu aria-label="Interrupted omp sessions">
-								{shownInterrupted.map(session =>
-									pastRow(
-										session,
-										<MenuItem onClick={() => onDismissInterrupted(session.sessionId)}>
-											<Archive />
-											Move to past
-										</MenuItem>,
-									),
-								)}
+								{interrupted.map(session => pastRow(session, false))}
 							</SidebarMenu>
 						</SidebarGroup>
 					)}
 					<SidebarGroup collapsible>
-						<SidebarGroupLabel>{shownEnded.length === 0 ? "No past sessions" : `${shownEnded.length} past`}</SidebarGroupLabel>
-						<SidebarMenu aria-label="Past omp sessions">{shownEnded.map(session => pastRow(session))}</SidebarMenu>
+						<SidebarGroupLabel>{ended.length === 0 ? "No past sessions" : `${ended.length} past`}</SidebarGroupLabel>
+						<SidebarMenu aria-label="Past omp sessions">{ended.map(session => pastRow(session, false))}</SidebarMenu>
 					</SidebarGroup>
 				</SidebarContent>
 			</TabPanel>

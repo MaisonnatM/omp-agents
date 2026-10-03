@@ -1,37 +1,8 @@
 /** Foldable sections that a page keeps folded across reloads: the inbox's and the tickets page's. */
 import { ChevronRight } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { SectionTarget } from "../section";
-
-function storedCollapsed(storageKey: string): Set<string> {
-	try {
-		const keys: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
-		return new Set(Array.isArray(keys) ? keys.filter(key => typeof key === "string") : []);
-	} catch {
-		return new Set();
-	}
-}
-
-/** The folded sections, a toggle, and an unfold for a section the page must show; localStorage keeps them under `storageKey`. */
-export function useCollapsed(storageKey: string): [ReadonlySet<string>, (key: string) => void, (keys: string[]) => void] {
-	const [collapsed, setCollapsed] = useState(() => storedCollapsed(storageKey));
-	const store = (next: Set<string>): void => {
-		setCollapsed(next);
-		if (next.size === 0) localStorage.removeItem(storageKey);
-		else localStorage.setItem(storageKey, JSON.stringify([...next]));
-	};
-	const toggle = (key: string): void => {
-		const next = new Set(collapsed);
-		if (!next.delete(key)) next.add(key);
-		store(next);
-	};
-	const expand = (keys: string[]): void => {
-		const next = new Set(collapsed);
-		if (keys.filter(key => next.delete(key)).length > 0) store(next);
-	};
-	return [collapsed, toggle, expand];
-}
 
 /**
  * Unfolds, scrolls to, and focuses the section a sidebar link last chose, once. It waits for the section to unfold,
