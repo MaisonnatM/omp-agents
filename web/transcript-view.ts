@@ -34,6 +34,24 @@ export function toBlocks(items: Item[]): Block[] {
 	return blocks;
 }
 
+/**
+ * The reply each turn ends on: its last assistant message with text. The copy button shows only on these,
+ * not on the replies a turn writes between tool calls. A turn still running has no reply yet.
+ */
+export function turnReplies(items: Item[], working: boolean): Set<string> {
+	const replies = new Set<string>();
+	let replyFound = working;
+	for (let i = items.length - 1; i >= 0; i--) {
+		const item = items[i];
+		if (item.kind === "user") replyFound = false;
+		else if (item.kind === "assistant" && !replyFound && item.text.trim() !== "") {
+			replyFound = true;
+			replies.add(item.id);
+		}
+	}
+	return replies;
+}
+
 /** Where a message forks. omp branches only at a user prompt, keeping the history before it. */
 export interface ForkPoint {
 	entryId: string;
