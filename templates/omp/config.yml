@@ -6,7 +6,7 @@
 modelRoles:
   default: anthropic/claude-opus-5-5:high
   slow: anthropic/claude-opus-5-5:high
-  plan: anthropic/claude-opus-5-5:high
+  plan: anthropic/claude-fable-5-1:high
   advisor: anthropic/claude-sonnet-5-5:medium
   vision: anthropic/claude-sonnet-5-5:medium
   smol: anthropic/claude-haiku-4-5
