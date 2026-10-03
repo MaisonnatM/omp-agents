@@ -64,6 +64,8 @@ Sessions started from the dashboard are omp child processes in RPC mode with too
 
 A subagent of a dashboard session takes a message through omp's `steer_subagent` command and stops with `cancel_subagent`; both reach only a subagent that runs, so the server offers them only for rows whose status is `running`. A prompt that starts with `!` goes to omp's `bash` command, which runs it in the session's directory and records a `bashExecution` message in the session file; the transcript shows that message as the user's command and output. omp appends that record without the lock churn that the watcher reports on macOS, so the server re-reads the file itself once `bash` answers. A built-in slash command runs from a plain `prompt`, and omp sends what it prints as `command_output` frames and a model switch as `config_update`. `RpcClient` drops both, so the same stdout copy reads them: the server shows the output as a notice when the user's last prompt was a `/` command, which leaves out what the titling `/rename` prints, and reads omp's state again after a model switch.
 
+A `prompt` message, and a `start` of kind `new`, carry `images`, each `{ data, mimeType }` with the file's bytes in base64, as omp's `ImageContent` takes them. `src/server/wire.ts` accepts PNG, JPEG, GIF, and WebP, up to `MAX_PROMPT_IMAGE_BYTES` (32 MB) per prompt, and a prompt of images with no text. The socket's `maxPayloadLength` is 64 MB so such a message fits. A dashboard session passes the images to omp's RPC `prompt`; a terminal session's guest puts them on its Collab `prompt` frame, a held follow-up included. omp's `steer_subagent` and Collab's `agent-cmd` `chat` take text only, so a subagent's prompt with images is refused. omp writes a prompt's images inline into the session file and then moves each to its blob store, `~/.omp/agent/blobs/<sha256>`, leaving `blob:sha256:<hash>` in the file. A user item's `images` holds a `data:` URL for an inline image and `/api/image?hash=<sha256>&type=<image type>` for a moved one; that route serves the blob file as `type`, which must be one of the four prompt image types, since the store keeps none.
+
 ## Plan quota
 
 Plan quota comes from `omp usage --json`, run through this same package's CLI. omp builds those reports from its auth storage, extensions, and credential broker, so the server reads the command's output instead of rebuilding that setup. omp can exit non-zero after it prints the reports it did get, so the server reads the output whatever the exit code. When the output is not a usage report, the footer shows the last line omp wrote to stderr.
@@ -146,7 +148,7 @@ The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/stored-keys.ts`: a set of keys kept in localStorage, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections. `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
 - `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
-- `web/components/pane.tsx`: a pane. `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript, whose `task` rows link to their subagents.
+- `web/components/pane.tsx`: a pane. `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript, whose `task` rows link to their subagents. `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
 - `web/components/plan-panel.tsx`: the right sidebar's plan and changes for the focused pane.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages. `web/components/fold.tsx` holds the fold button that the inbox and tickets pages share, and the hook that reveals the section a sidebar link chose; `web/section.ts` names such a section target.
 - `web/components/ui`, `web/lib`, and `web/hooks`: mostly files from the Fluid registry; see below.
@@ -155,7 +157,8 @@ The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web
 
 Changes the dashboard makes to Fluid's components:
 
-- It adds an `onKeyDown` hook to `InputMessage`, so the completion list can intercept arrow keys, Tab, Enter, and Esc before the normal submit behavior.
+- It adds an `onKeyDown` hook to `InputMessage`, so the completion list can intercept arrow keys, Tab, Enter, and Esc before the normal submit behavior, and makes a pasted file that `accept` takes attach instead of pasting as text.
+- It adds an `images` prop to `ChatMessage`, the addresses of the images a sent prompt carried, since `files` takes only `File`s held in the browser.
 - It replaces `InputMessage`'s queue, which held every message sent during a response in the browser, with rows that the page passes in, each with a tag and edit and remove callbacks, because omp or the server holds the queue.
 - It adds a `header` prop to `AskUserQuestions`, which replaces the `Question 1 of 1` line with the question's status and **Dismiss**, and a `description` field for a question, which shows a confirm's message.
 

@@ -334,6 +334,7 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 								<ChatMessage
 									from={item.kind}
 									time={item.kind === "user" ? (item.from ?? undefined) : undefined}
+									images={item.kind === "user" ? item.images : undefined}
 									actions={
 										copyable || point ? (
 											<>
@@ -357,9 +358,9 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 											<SkillBadge name={item.skill} />
 											{item.text && <MessageMarkdown text={item.text} />}
 										</div>
-									) : (
+									) : item.text ? (
 										<MessageMarkdown text={item.text} />
-									)}
+									) : null}
 								</ChatMessage>
 								{failed && (
 									<p role="alert" className={cn(item.kind === "user" ? "self-end" : "self-start", "text-xs", NOTICE_TONE.error)}>

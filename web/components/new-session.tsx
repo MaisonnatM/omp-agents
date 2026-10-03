@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { BranchChoice, ModelOption } from "../../src/shared";
+import type { BranchChoice, ModelOption, PromptImage } from "../../src/shared";
 import { InputMessage } from "@/components/ui/input-message";
 import { getJson } from "../api";
 import { projectName } from "../labels";
@@ -8,8 +8,9 @@ import { useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { useCompletion } from "./completion-popup";
-import { blockedShortcut, EmptyConversation, Header, ShortcutNote } from "./conversation";
+import { blockedShortcut, ComposerNote, EmptyConversation, Header } from "./conversation";
 import { BranchPicker, chosenBranch, GitRef, targetOf } from "./git";
+import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
 import { ModelPicker } from "./model-picker";
 
 interface NewSessionProps {
@@ -21,17 +22,18 @@ interface NewSessionProps {
 	completions: Completions | null;
 	/** Ask for `/` and `@` suggestions, resolved as a session started in `cwd` would resolve them. */
 	onComplete: (reqId: number, text: string, cursor: number) => void;
-	/** Start omp with `prompt` as its first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default. */
-	onStart: (prompt: string, branch: BranchChoice | null, model: ModelOption | null) => void;
+	/** Start omp with `prompt` and `images` as its first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default. */
+	onStart: (prompt: string, images: PromptImage[], branch: BranchChoice | null, model: ModelOption | null) => void;
 }
 
 /**
  * A session not started yet, with the same composer a live session has. omp starts in `cwd` only when the first message
- * is sent, so leaving the draft leaves nothing running. The message stays in the composer until the session opens.
+ * is sent, so leaving the draft leaves nothing running. The message and its images stay in the composer until the session opens.
  * The composer picks the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  */
 export function NewSession({ cwd, launch, connected, completions, onComplete, onStart }: NewSessionProps) {
 	const [draft, setDraft] = useState("");
+	const attachments = useImageAttachments();
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
 	const [model, setModel] = useState<ModelOption | null>(null);
 	const [models, setModels] = useState<{ models: ModelOption[]; error: string | null } | null>(null);
@@ -97,11 +99,15 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					onSend={text => {
 						if (directCommand) return;
 						completion.close();
-						onStart(text, choice, model);
+						attachments.read(images => onStart(text, images, choice, model));
 					}}
 					placeholder="Message this session…"
-					leftSlot={
+					files={attachments.files}
+					onFilesChange={attachments.onFilesChange}
+					accept={IMAGE_ACCEPT}
+					leftSlot={({ openFilePicker }) => (
 						<>
+							<AttachButton onClick={() => openFilePicker()} disabled={starting} />
 							<ModelPicker
 								current={model && `${model.provider}/${model.id}`}
 								unset="Default model"
@@ -113,12 +119,13 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 							/>
 							{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 						</>
-					}
+					)}
 					disabled={starting || !connected}
 					sendLabel="Start session"
 					textareaProps={{ ...completion.textareaProps, autoFocus: true }}
 				/>
-				{directCommand && <ShortcutNote text={directCommand} />}
+				{directCommand && <ComposerNote text={directCommand} />}
+				{attachments.note && <ComposerNote text={attachments.note} />}
 			</div>
 		</div>
 	);

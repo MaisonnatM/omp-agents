@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ClipboardEvent as ReactClipboardEvent,
   type DragEvent as ReactDragEvent,
   type HTMLAttributes,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -129,7 +130,7 @@ interface InputMessageProps
   /** Content rendered in the bottom-right action area, before the built-in
    *  send button. Same render-fn shape as leftSlot. */
   rightSlot?: InputMessageSlot;
-  /** Disables the textarea, send button, and drag-and-drop. */
+  /** Disables the textarea, send button, drag-and-drop, and pasting files. */
   disabled?: boolean;
   /** Minimum visible rows before the textarea grows. */
   minRows?: number;
@@ -140,9 +141,9 @@ interface InputMessageProps
   /** Accessible label for the send button. */
   sendLabel?: string;
   /** Controlled list of attached files. When undefined, attachment behavior
-   *  is disabled (no drag-drop, no file input). */
+   *  is disabled (no drag-drop, no paste, no file input). */
   files?: File[];
-  /** Called when files are added (drag-drop or picker) or removed. */
+  /** Called when files are added (drag-drop, paste, or picker) or removed. */
   onFilesChange?: (files: File[]) => void;
   /** Accepted MIME types as a comma-separated string. Defaults to PNG / JPEG / PDF. */
   accept?: string;
@@ -470,12 +471,13 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     const [dragOver, setDragOver] = useState(false);
     const [hovered, setHovered] = useState(false);
 
-    // Split out onFocus/onBlur so the rest-spread onto the textarea can't
-    // clobber the composed handlers below.
+    // Split out onFocus/onBlur/onPaste so the rest-spread onto the textarea
+    // can't clobber the composed handlers below.
     const {
       onFocus: _textareaOnFocus,
       onBlur: _textareaOnBlur,
       onKeyDown: _textareaOnKeyDown,
+      onPaste: textareaOnPaste,
       "aria-describedby": textareaDescribedBy,
       ...restTextareaProps
     } = textareaProps ?? {};
@@ -895,6 +897,20 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       [addFiles]
     );
 
+    // A pasted file the composer accepts (a screenshot, a copied image file)
+    // attaches instead of pasting its name as text.
+    const handlePaste = useCallback(
+      (e: ReactClipboardEvent<HTMLTextAreaElement>) => {
+        textareaOnPaste?.(e);
+        if (e.defaultPrevented || !supportsFiles || disabled) return;
+        const pasted = Array.from(e.clipboardData.files);
+        if (!pasted.some(matchesAccept)) return;
+        e.preventDefault();
+        addFiles(pasted);
+      },
+      [textareaOnPaste, supportsFiles, disabled, matchesAccept, addFiles]
+    );
+
     const composer = (
       <div
         ref={ref}
@@ -1018,6 +1034,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
                 onValueChange(e.target.value);
               }}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               // Compose the consumer's textareaProps handlers with the internal
               // focus-visible tracking (the spread below would otherwise
               // overwrite these).

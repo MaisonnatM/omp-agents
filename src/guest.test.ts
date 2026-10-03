@@ -114,6 +114,16 @@ describe("SessionGuest follow-ups", () => {
 		expect(guest.queue(null).followUp).toEqual([]);
 	});
 
+	test("a held follow-up goes out with its images once the turn ends", async () => {
+		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
+		const image = { data: "aGVsbG8=", mimeType: "image/png" };
+		guest.send(null, { text: "like this", payload: "like this", images: [image] }, "followUp");
+		expect(socket.messages).toEqual([]);
+
+		socket.frame(state(false));
+		expect(socket.messages).toEqual([{ t: "prompt", text: "like this", images: [{ type: "image", ...image }] }]);
+	});
+
 	test("a steer reaches a running turn at once, and a follow-up with no turn running is not held", async () => {
 		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
 		guest.send(null, { text: "stop that", payload: "stop that" }, "steer");
@@ -205,7 +215,7 @@ describe("SessionGuest follow-ups", () => {
 		writeFileSync(join(cwd, ".omp", "commands", "review.md"), "---\ndescription: Review\n---\nReview carefully: $ARGUMENTS\n");
 		const { guest, socket } = await joinRoom({ host: { cwd, instanceId: "inst-expand" }, welcome: { state: { isStreaming: true } } });
 
-		await guest.prompt(null, "/review src/a.ts", "followUp");
+		await guest.prompt(null, "/review src/a.ts", [], "followUp");
 		expect(guest.queue(null).followUp).toEqual(["/review src/a.ts"]);
 		socket.frame(state(false));
 		expect(socket.messages).toEqual([{ t: "prompt", text: "Review carefully: src/a.ts" }]);
@@ -215,7 +225,7 @@ describe("SessionGuest follow-ups", () => {
 		const cwd = mkdtempSync(join(tmpdir(), "omp-agents-guest-"));
 		dirs.push(cwd);
 		const { guest, socket } = await joinRoom({ host: { cwd, instanceId: "inst-unknown" } });
-		await expect(guest.prompt(null, "/definitely-not-a-command now", "steer")).rejects.toThrow("/definitely-not-a-command");
+		await expect(guest.prompt(null, "/definitely-not-a-command now", [], "steer")).rejects.toThrow("/definitely-not-a-command");
 		expect(socket.messages).toEqual([]);
 	});
 });

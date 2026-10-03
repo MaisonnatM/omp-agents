@@ -57,6 +57,16 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([{ id: "e3", kind: "user", text: "hi", skill: null, from: "probe", entryId: null }]);
 	});
 
+	test("a prompt's images show inline until omp moves them to its blob store, then through the image route", () => {
+		const t = new Transcript();
+		const hash = "a".repeat(64);
+		const image = (data: string, mimeType = "image/png") => ({ type: "image", data, mimeType });
+		const prompt = (data: string) => ({ role: "user", timestamp: 700, content: [text("like this"), image(data), image("PHN2Zz4=", "image/svg+xml")] });
+		expect(t.applyEvent({ type: "message_end", message: prompt("aGVsbG8=") })).toMatchObject([{ text: "like this", images: ["data:image/png;base64,aGVsbG8="] }]);
+		t.applyEntry({ type: "message", id: "e7", message: prompt(`blob:sha256:${hash}`) });
+		expect(t.items()).toMatchObject([{ id: "m700", images: [`/api/image?hash=${hash}&type=image%2Fpng`] }]);
+	});
+
 	test("a fresh session's first prompt shows at once and stays ahead of its reply when the file catches up", () => {
 		const t = new Transcript();
 		const prompt = { role: "user", timestamp: 600, content: "say pong" };

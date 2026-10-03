@@ -1,15 +1,19 @@
-/** The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, and Linear tickets through. */
+/** The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, Linear tickets, and prompt images through. */
+import { join } from "node:path";
 import { gitCheckout } from "../git";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
+import { blobsDir } from "../omp/config";
 import { connectedModels, listModels } from "../omp/models";
 import { directoryOf } from "../paths";
 import type { PullRequestIndex } from "../pull-requests";
 import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, saveOmpFile, saveRouting } from "../settings";
 import { loadTicketDetail, loadTickets } from "../tickets";
-import { type LinkedPullRequest, TICKET_ID } from "../shared";
+import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, TICKET_ID } from "../shared";
 import { answer, fail, type Guards } from "./http";
 import { parsePullRequestQuery, parseSessionLinks } from "./wire";
+
+const SHA256 = /^[0-9a-f]{64}$/;
 
 export interface RouteEnv {
 	guards: Guards;
@@ -114,6 +118,23 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	};
 
 	/**
+	 * `GET /api/image?hash=<sha256>&type=<image type>`: an image of a prompt that omp moved from its session file to its
+	 * blob store, served as `type`, one of the prompt image types, since the store keeps no type.
+	 */
+	const image: Handler = async req => {
+		const refused = guards.admit(req);
+		if (refused) return refused;
+		const params = new URL(req.url).searchParams;
+		const hash = params.get("hash") ?? "";
+		const type = params.get("type") ?? "";
+		if (!SHA256.test(hash) || !PROMPT_IMAGE_TYPES.includes(type)) return fail(400, "Expected ?hash= naming a blob and ?type= naming an image type");
+		const file = Bun.file(join(blobsDir, hash));
+		if (!(await file.exists())) return fail(404, `No image ${hash}`);
+		// The address names the bytes, so they never change.
+		return new Response(file, { headers: { "Content-Type": type, "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" } });
+	};
+
+	/**
 	 * A settings write: `PUT /api/settings/routing` or `/api/settings/file`, `?cwd=` as for reading.
 	 * Only this app's own page may write, with a JSON body; the answer is the settings as they load after the write.
 	 */
@@ -158,5 +179,6 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/ticket": { GET: ticket },
 		"/api/pull-request": { GET: pullRequest },
 		"/api/git": { GET: git },
+		"/api/image": { GET: image },
 	};
 }

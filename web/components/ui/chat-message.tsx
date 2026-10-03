@@ -18,6 +18,8 @@ interface ChatMessageProps
   files?: File[];
   /** Side length of each attachment thumbnail in pixels. Defaults to 64. */
   thumbnailSize?: number;
+  /** Addresses of images the message carried, shown above the bubble. */
+  images?: string[];
   /** Timestamp shown in the hover-revealed meta row, before the actions.
    *  User-message only — ignored on assistant replies. Caller pre-formats it
    *  (e.g. `"Wednesday 6:08 PM"`). */
@@ -39,7 +41,7 @@ interface ChatMessageProps
 // lets earlier messages slide up smoothly when a new one is appended.
 const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
   (
-    { from, files, thumbnailSize = 64, time, actions, children, size, className, ...props },
+    { from, files, thumbnailSize = 64, images, time, actions, children, size, className, ...props },
     ref
   ) => {
     const shape = useShape();
@@ -77,6 +79,28 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
                 key={`${file.name}-${file.size}-${file.lastModified}-${i}`}
                 file={file}
                 size={thumbnailSize}
+              />
+            ))}
+          </div>
+        )}
+        {images && images.length > 0 && (
+          <div
+            className={cn(
+              "flex flex-wrap gap-1.5",
+              isUser ? "justify-end" : "justify-start"
+            )}
+          >
+            {images.map((src, i) => (
+              // A message's images never change, so their order names them.
+              <img
+                key={i}
+                src={src}
+                alt={`Attached image ${i + 1}`}
+                loading="lazy"
+                className={cn(
+                  "max-h-60 max-w-full object-contain outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10",
+                  shape.bg
+                )}
               />
             ))}
           </div>

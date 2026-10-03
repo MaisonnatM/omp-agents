@@ -237,6 +237,8 @@ try {
 			return servePage(req, guards, token, page);
 		},
 		websocket: {
+			// A prompt's images travel as base64 in one message: MAX_PROMPT_IMAGE_BYTES of them, a third more as base64.
+			maxPayloadLength: 64 * 1024 * 1024,
 			open(ws) {
 				ws.subscribe("roster");
 				// The registry was not polled while nobody listened; list it now rather than at the next tick.

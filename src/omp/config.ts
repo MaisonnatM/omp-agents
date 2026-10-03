@@ -5,6 +5,8 @@ import { config, dirs, extensionSettings, fallbackChains, modelSettings, type Se
 
 /** omp's user config directory, `~/.omp/agent` unless `PI_CODING_AGENT_DIR` moves it. */
 export const agentDir: string = dirs.getAgentDir();
+/** Where omp keeps the images it moves out of session files, each in a file named by the SHA-256 of its bytes. */
+export const blobsDir: string = dirs.getBlobsDir();
 
 export const { expandDefaultRetryFallbackChains, parseRetryFallbackSelector } = fallbackChains;
 
