@@ -1,6 +1,6 @@
 /** Names the page gives things: sessions, models, providers, file kinds, and the click gestures that open rows. */
 import type { MouseEvent } from "react";
-import type { CatalogModel, OmpFile, OmpFileKind, PastSession, RosterHost } from "../src/shared";
+import type { CatalogModel, OmpFile, OmpFileKind, PastSession, PullRequest, RosterHost } from "../src/shared";
 import { IS_MAC } from "./shortcuts";
 import type { OpenMode } from "./routing";
 
@@ -124,6 +124,9 @@ export function age(startedAt: number): string {
 	if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 	return `${Math.floor(minutes / 1440)}d`;
 }
+
+/** A sidebar row's pull requests: the first one's number, then `+N` for the rest, which the row's tooltip and menu list. */
+export const pullRequestsLabel = ([first, ...rest]: PullRequest[]): string => (rest.length ? `#${first.number} +${rest.length}` : `#${first.number}`);
 
 /** When a page last read its data: the time alone today, else the date and time. */
 export const readTime = (at: number): string =>
