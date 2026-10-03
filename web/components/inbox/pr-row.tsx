@@ -116,7 +116,7 @@ interface RowProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The quick action whose session is starting for this PR, if any. */
 	pending: PullRequestActionId | null;
-	onQuickAction: (action: PullRequestActionId, mode: OpenMode) => void;
+	onQuickAction: (action: PullRequestActionId) => void;
 }
 
 export function PullRequestRow({ pr, sessions, targeted, onOpen, pending, onQuickAction }: RowProps) {
@@ -174,7 +174,7 @@ export function PullRequestRow({ pr, sessions, targeted, onOpen, pending, onQuic
 						actions={pullRequestActions(pr)}
 						pending={pending}
 						onRun={onQuickAction}
-						label="Quick actions: start a session that works on this pull request"
+						label="Quick actions: start a session in the background that works on this pull request"
 					/>
 					{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
 					<span className="w-14 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={new Date(pr.updatedAt).toLocaleString()}>

@@ -1,17 +1,20 @@
-import { CircleX, Eye, GitMerge, Hammer, ListChecks, type LucideIcon, MessageSquare, Zap } from "lucide-react";
+import { CircleX, Eye, GitMerge, Hammer, ListChecks, type LucideIcon, MessageSquare, Radiation, Zap } from "lucide-react";
+import type { View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { modeOf, SPLIT_CLICK } from "../labels";
 import { QUICK_ACTIONS, type QuickActionId } from "../quick-actions";
 import type { OpenMode } from "../routing";
-import type { QuickOp } from "../starts";
+import type { StartOf } from "../starts";
 
 const ICON: Record<QuickActionId, LucideIcon> = {
 	"fix-ci": CircleX,
 	"resolve-conflicts": GitMerge,
 	"address-comments": MessageSquare,
 	review: Eye,
+	"thermonuclear-review": Radiation,
 	work: Hammer,
 	plan: ListChecks,
 };
@@ -21,7 +24,7 @@ interface QuickActionsProps<Id extends QuickActionId> {
 	actions: Id[];
 	/** The action whose session is starting for it, if any. */
 	pending: Id | null;
-	onRun: (action: Id, mode: OpenMode) => void;
+	onRun: (action: Id) => void;
 }
 
 /** A row's menu of `actions`, named by `label`; nothing when there is none. */
@@ -38,7 +41,7 @@ export function QuickActionsMenu<Id extends QuickActionId>({ actions, pending, o
 				{actions.map(id => {
 					const Icon: LucideIcon = ICON[id];
 					return (
-						<MenuItem key={id} title={QUICK_ACTIONS[id].description} onClick={event => onRun(id, modeOf(event))}>
+						<MenuItem key={id} title={QUICK_ACTIONS[id].description} onClick={() => onRun(id)}>
 							<Icon />
 							{QUICK_ACTIONS[id].label}
 						</MenuItem>
@@ -55,15 +58,8 @@ export function QuickActionButtons<Id extends QuickActionId>({ actions, pending,
 	return (
 		<div className="flex flex-wrap gap-2">
 			{actions.map(id => (
-				<Tooltip key={id} content={`${QUICK_ACTIONS[id].description} (${SPLIT_CLICK} to split)`}>
-					<Button
-						variant="secondary"
-						size="compact"
-						leadingIcon={ICON[id]}
-						loading={pending === id}
-						disabled={pending !== null}
-						onClick={event => onRun(id, modeOf(event))}
-					>
+				<Tooltip key={id} content={QUICK_ACTIONS[id].description}>
+					<Button variant="secondary" size="compact" leadingIcon={ICON[id]} loading={pending === id} disabled={pending !== null} onClick={() => onRun(id)}>
 						{QUICK_ACTIONS[id].label}
 					</Button>
 				</Tooltip>
@@ -72,14 +68,36 @@ export function QuickActionButtons<Id extends QuickActionId>({ actions, pending,
 	);
 }
 
-/** Why a quick action's session did not start, with a button that forgets it. */
-export function QuickStartFailed({ op: { subject }, error, onDismiss }: { op: QuickOp; error: string; onDismiss: () => void }) {
+interface NoticeProps {
+	quick: StartOf<"quick">;
+	onOpen: (view: View, mode: OpenMode) => void;
+	onDismiss: () => void;
+}
+
+/** What became of the last quick action, with a button that forgets it: why its session did not start, or the session it started in the background, to open. */
+export function QuickStartNotice({ quick, onOpen, onDismiss }: NoticeProps) {
+	if (quick.phase === "starting") return null;
+	const { subject } = quick.op;
 	const name = subject.kind === "ticket" ? subject.id : `${subject.pr.owner}/${subject.pr.repo}#${subject.pr.number}`;
+	const what = `"${QUICK_ACTIONS[subject.action].label}" on ${name}`;
+	const failed = quick.phase === "failed";
 	return (
-		<p role="alert" className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
-			<span className="min-w-0">
-				Cannot start "{QUICK_ACTIONS[subject.action].label}" on {name}: {error}
-			</span>
+		<p role={failed ? "alert" : "status"} className={cn("flex items-center gap-2 text-sm", failed ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
+			<span className="min-w-0">{failed ? `Cannot start ${what}: ${quick.error}` : `Started ${what} in the background.`}</span>
+			{quick.phase === "started" && (
+				<Button
+					variant="secondary"
+					size="compact"
+					className="shrink-0"
+					title={`Open the session (${SPLIT_CLICK} to split)`}
+					onClick={event => {
+						onOpen(quick.view, modeOf(event));
+						onDismiss();
+					}}
+				>
+					Open session
+				</Button>
+			)}
 			<Button variant="ghost" size="compact" className="shrink-0" onClick={onDismiss}>
 				Dismiss
 			</Button>

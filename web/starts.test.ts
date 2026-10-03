@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { beginStart, dismissFailed, dropHidden, loseStarts, settleStart, startOf, type Starts } from "./starts";
+import { beginStart, dismissSettled, dropHidden, loseStarts, settleStart, startOf, type Starts } from "./starts";
 
 const point = { entryId: "e1", prefill: true };
 const fork = { kind: "fork", view: { kind: "past", sessionId: "s1" }, itemId: "u1", point } as const;
 const resume = { kind: "resume", sessionId: "s1" } as const;
+const quick = { kind: "quick", cwd: "/tmp", prompt: "fix", subject: { kind: "ticket", id: "ENG-7", action: "work" } } as const;
 const ok = { ok: true, instanceId: "i1", cwd: "/tmp", prompt: null } as const;
 
 describe("starts", () => {
@@ -41,7 +42,15 @@ describe("starts", () => {
 		const none = (): boolean => false;
 		const hidden = dropHidden(starts, none);
 		expect([...hidden.keys()]).toEqual([2, 3]);
-		expect(dismissFailed(hidden, "new").size).toBe(1);
-		expect(dismissFailed(hidden, "fork")).toBe(hidden);
+		expect(dismissSettled(hidden, "new").size).toBe(1);
+		expect(dismissSettled(hidden, "fork")).toBe(hidden);
+	});
+
+	test("a quick action's session stays as started, outlives the connection and every view, and goes on dismiss", () => {
+		const started = settleStart(beginStart(new Map(), 1, quick), 1, ok);
+		expect(startOf(started, "quick")).toMatchObject({ phase: "started", view: { kind: "live", instanceId: "i1", agentId: null } });
+		expect(loseStarts(started)).toBe(started);
+		expect(dropHidden(started, () => false)).toBe(started);
+		expect(dismissSettled(started, "quick").size).toBe(0);
 	});
 });

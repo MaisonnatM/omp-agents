@@ -1,6 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
-import type { Ticket } from "../../../src/shared";
+import type { Ticket, View } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,7 +13,7 @@ import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-mod
 import { refreshTickets, useTickets } from "../../use-tickets";
 import { Header } from "../conversation";
 import { FoldButton, useCollapsed, useRevealSection } from "../fold";
-import { QuickActionButtons, QuickStartFailed } from "../quick-actions";
+import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
 import { TicketSheetContent } from "./ticket-details";
 import { STATUS_ICON, TicketRow, ticketRowId } from "./ticket-row";
 
@@ -32,7 +32,7 @@ interface GroupProps {
 	onToggle: () => void;
 	target: string | null;
 	quick: StartOf<"quick"> | null;
-	onQuickAction: (ticket: Ticket, action: TicketActionId, mode: OpenMode) => void;
+	onQuickAction: (ticket: Ticket, action: TicketActionId) => void;
 }
 
 function GroupSection({ group, open, onToggle, target, quick, onQuickAction }: GroupProps) {
@@ -56,7 +56,7 @@ function GroupSection({ group, open, onToggle, target, quick, onQuickAction }: G
 							ticket={ticket}
 							targeted={ticket.id === target}
 							pending={pendingOf(quick, ticket.id)}
-							onQuickAction={(action, mode) => onQuickAction(ticket, action, mode)}
+							onQuickAction={action => onQuickAction(ticket, action)}
 						/>
 					))}
 				</ul>
@@ -75,14 +75,16 @@ interface TicketsPageProps {
 	 * project's workspace, as a new session would start in.
 	 */
 	cwd: string;
-	/** The quick action's start under way or failed, whichever the page last asked for. */
+	/** The quick action's start under way, failed, or started, whichever the page last asked for. */
 	quick: StartOf<"quick"> | null;
 	onQuickAction: (op: QuickOp) => void;
 	onDismissQuick: () => void;
+	/** Opens the session a quick action started. */
+	onOpen: (view: View, mode: OpenMode) => void;
 }
 
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
-export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDismissQuick }: TicketsPageProps) {
+export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDismissQuick, onOpen }: TicketsPageProps) {
 	const { read, error, refreshing } = useTickets(true);
 	const [collapsed, toggleCollapsed, expand] = useCollapsed(COLLAPSED_KEY);
 	const tickets = read?.data.tickets ?? [];
@@ -93,8 +95,7 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 	const sheetId = useRef<string | null>(null);
 	if (target) sheetId.current = target;
 	const sheetListed = tickets.find(ticket => ticket.id === sheetId.current) ?? null;
-	const failed = quick?.phase === "failed" && quick.op.subject.kind === "ticket" ? { op: quick.op, error: quick.error, id: quick.op.subject.id } : null;
-	const start = (ticket: Ticket, action: TicketActionId, mode: OpenMode) => onQuickAction(ticketStart(ticket, action, cwd, mode));
+	const start = (ticket: Ticket, action: TicketActionId) => onQuickAction(ticketStart(ticket, action, cwd));
 
 	useEffect(() => {
 		if (targetGroup === null || target === null || shown.current === target) return;
@@ -148,7 +149,7 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 			<div className="min-h-0 flex-1 overflow-y-auto">
 				<TooltipProvider>
 					<div className="mx-auto w-full max-w-5xl space-y-4 px-6 py-6">
-						{failed && <QuickStartFailed op={failed.op} error={failed.error} onDismiss={onDismissQuick} />}
+						{quick && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />}
 						{body}
 					</div>
 					{sheetId.current && (
@@ -163,9 +164,11 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 											<QuickActionButtons
 												actions={ticketActions(sheetListed)}
 												pending={pendingOf(quick, sheetListed.id)}
-												onRun={(action, mode) => start(sheetListed, action, mode)}
+												onRun={action => start(sheetListed, action)}
 											/>
-											{failed?.id === sheetListed.id && <QuickStartFailed op={failed.op} error={failed.error} onDismiss={onDismissQuick} />}
+											{quick && quick.op.subject.kind === "ticket" && quick.op.subject.id === sheetListed.id && (
+												<QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />
+											)}
 										</>
 									)
 								}

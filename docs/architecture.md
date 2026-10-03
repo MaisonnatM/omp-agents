@@ -131,10 +131,10 @@ The server lives in `src/`:
 The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
 - `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, settings, and new-session pages, and focus handling.
-- `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, or started by a quick action on a pull request or a Linear issue.
+- `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, or started by a quick action on a pull request or a Linear issue, which stays in the background and is kept as started so the inbox or the tickets page can offer it.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
-- `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it. `web/components/quick-actions.tsx` holds their row menu, sheet buttons, and failure note.
+- `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it. `web/components/quick-actions.tsx` holds their row menu, sheet buttons, and the note that names the session a start began in the background, or why it failed.
 - `web/api.ts`: every HTTP request the page makes. `web/settings-api.ts` holds the settings page's requests.
 - `web/polled-store.ts`: the store of server reads that a sidebar list and its page share, kept in localStorage and re-read every minute while the page is open. `web/use-inbox.ts` makes one for the inbox, with one entry per project, and `web/use-tickets.ts` one for the tickets, with one entry, since Linear is not per project.
 - `web/use-detail.ts`: reads the pull request or Linear issue in full that a sheet shows.

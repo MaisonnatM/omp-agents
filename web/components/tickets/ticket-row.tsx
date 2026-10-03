@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { age } from "../../labels";
 import { type TicketActionId, ticketActions } from "../../quick-actions";
-import { hashForTickets, type OpenMode } from "../../routing";
+import { hashForTickets } from "../../routing";
 import { PRIORITY_LABEL } from "../../tickets-model";
 import { IconTip } from "../inbox/avatars";
 import { QuickActionsMenu } from "../quick-actions";
@@ -54,7 +54,7 @@ interface TicketRowProps {
 	targeted: boolean;
 	/** The quick action whose session is starting for this issue, if any. */
 	pending: TicketActionId | null;
-	onQuickAction: (action: TicketActionId, mode: OpenMode) => void;
+	onQuickAction: (action: TicketActionId) => void;
 }
 
 export function TicketRow({ ticket, targeted, pending, onQuickAction }: TicketRowProps) {
@@ -97,7 +97,7 @@ export function TicketRow({ ticket, targeted, pending, onQuickAction }: TicketRo
 				)}
 			</a>
 			<div className="flex shrink-0 items-center gap-3 px-3 text-xs">
-				<QuickActionsMenu actions={ticketActions(ticket)} pending={pending} onRun={onQuickAction} label="Quick actions: start a session that works on this issue" />
+				<QuickActionsMenu actions={ticketActions(ticket)} pending={pending} onRun={onQuickAction} label="Quick actions: start a session in the background that works on this issue" />
 				<span className="w-10 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={`Updated ${new Date(ticket.updatedAt).toLocaleString()}`}>
 					{age(Date.parse(ticket.updatedAt))}
 				</span>

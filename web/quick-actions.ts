@@ -4,10 +4,9 @@
  */
 import type { InboxPullRequest, PullRequest, Ticket } from "../src/shared";
 import { pullRequestUrl } from "./inbox-model";
-import type { OpenMode } from "./routing";
 import type { QuickOp } from "./starts";
 
-export type PullRequestActionId = "fix-ci" | "resolve-conflicts" | "address-comments" | "review";
+export type PullRequestActionId = "fix-ci" | "resolve-conflicts" | "address-comments" | "review" | "thermonuclear-review";
 export type TicketActionId = "work" | "plan";
 export type QuickActionId = PullRequestActionId | TicketActionId;
 
@@ -29,6 +28,10 @@ function pullRequestContext(pr: InboxPullRequest): string {
 }
 
 const ownOpen = (pr: InboxPullRequest): boolean => pr.role === "author" && pr.state !== "merged";
+
+/** How a session runs the thermo-nuclear review of `pr`: on the `plan` role, through the kit's reviewer agent. */
+const thermonuclear = (pr: InboxPullRequest): string =>
+	`Run a thermo-nuclear code quality review of its diff: spawn \`task\` with \`agent: "thermonuclear-reviewer"\` on \`pr://${pr.owner}/${pr.repo}/${pr.number}/diff\` (run the \`thermo-nuclear-code-quality-review\` skill yourself when that agent is missing).`;
 
 /** The inbox's quick actions by id, in the order they are offered. */
 const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<InboxPullRequest>> = {
@@ -63,6 +66,15 @@ const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<InboxPullReq
 		applies: pr => pr.role === "reviewer" && pr.state !== "merged",
 		prompt: pr =>
 			`${pullRequestContext(pr)} ${pr.author.login} asked you to review it. Read the description and the diff, check it for correctness, regressions, and missing tests, and report your findings here with file and line references. Do not post anything on GitHub.`,
+	},
+	"thermonuclear-review": {
+		label: "Thermonuclear review",
+		description: "Start a session that runs a thermo-nuclear code quality review",
+		applies: pr => pr.state !== "merged",
+		prompt: pr =>
+			pr.role === "author"
+				? `${pullRequestContext(pr)} ${thermonuclear(pr)} Apply the valid findings in a git worktree on the PR's branch, run the project's checks, then commit and push to the PR's branch. Only once the fixes are pushed, add the line \`- [x] Thermo-nuclear code quality review\` to the PR's description (\`gh pr edit ${pr.number} -R ${pr.owner}/${pr.repo} --body-file\` from its current body, never a blind overwrite), unless it is already there. Report each finding and what you did with it.`
+				: `${pullRequestContext(pr)} ${pr.author.login} asked you to review it. ${thermonuclear(pr)} Report its findings here with file and line references. Do not change the PR's branch or post anything on GitHub.`,
 	},
 };
 
@@ -107,19 +119,17 @@ export const pullRequestActions = (pr: InboxPullRequest): PullRequestActionId[] 
 export const ticketActions = (ticket: Ticket): TicketActionId[] => TICKET_IDS.filter(id => TICKET_ACTIONS[id].applies(ticket));
 
 /** The start of `action` on `pr`, in `cwd`. */
-export const pullRequestStart = (pr: InboxPullRequest, action: PullRequestActionId, cwd: string, mode: OpenMode): QuickOp => ({
+export const pullRequestStart = (pr: InboxPullRequest, action: PullRequestActionId, cwd: string): QuickOp => ({
 	kind: "quick",
 	cwd,
 	prompt: PULL_REQUEST_ACTIONS[action].prompt(pr),
 	subject: { kind: "pull-request", pr: { owner: pr.owner, repo: pr.repo, number: pr.number }, action },
-	mode,
 });
 
 /** The start of `action` on `ticket`, in `cwd`. */
-export const ticketStart = (ticket: Ticket, action: TicketActionId, cwd: string, mode: OpenMode): QuickOp => ({
+export const ticketStart = (ticket: Ticket, action: TicketActionId, cwd: string): QuickOp => ({
 	kind: "quick",
 	cwd,
 	prompt: TICKET_ACTIONS[action].prompt(ticket),
 	subject: { kind: "ticket", id: ticket.id, action },
-	mode,
 });

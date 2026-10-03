@@ -207,6 +207,7 @@ export function App() {
 					quick={quick}
 					onQuickAction={start}
 					onDismissQuick={() => dismissStart("quick")}
+					onOpen={open}
 				/>
 			) : (
 				<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
