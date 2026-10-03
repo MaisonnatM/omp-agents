@@ -356,6 +356,8 @@ interface RosterProps {
 	/** The settings page, for the open session's workspace. */
 	settingsHref: string;
 	settingsOpen: boolean;
+	/** omp is signed in to Linear, so the Tickets tab shows. */
+	ticketsShown: boolean;
 	/** The sidebar's tab, which follows the page: the inbox, the tickets, or the sessions over the panes. */
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
@@ -395,6 +397,7 @@ export function Roster({
 	newSessionOpen,
 	settingsHref,
 	settingsOpen,
+	ticketsShown,
 	tab,
 	onTab,
 	sectionTarget,
@@ -545,7 +548,7 @@ export function Roster({
 			</SidebarHeader>
 			<SizeProvider size="compact">
 				<TabsList aria-label="Sidebar" className="mx-2 self-start">
-					{SIDEBAR_TABS.map(({ value, label, icon }) => (
+					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => (
 						<TabItem key={value} value={value} label={label} icon={icon} />
 					))}
 				</TabsList>

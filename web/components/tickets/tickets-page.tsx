@@ -15,6 +15,7 @@ import { refreshTickets, useTickets } from "../../use-tickets";
 import { Header } from "../conversation";
 import { FoldButton, useRevealSection } from "../fold";
 import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
+import { LinearConnection } from "../settings/linear-connection";
 import { TicketSheetContent } from "./ticket-details";
 import { STATUS_ICON, TicketRow, ticketRowId } from "./ticket-row";
 
@@ -177,6 +178,20 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 						</Sheet>
 					)}
 				</TooltipProvider>
+			</div>
+		</div>
+	);
+}
+
+/** The tickets page while omp is not signed in to Linear: the connection, to sign in from here as from the settings. */
+export function TicketsDisconnected() {
+	return (
+		<div className="flex h-svh min-h-0 flex-1 flex-col">
+			<Header title="Tickets" meta="Your assigned issues on Linear" />
+			<div className="min-h-0 flex-1 overflow-y-auto">
+				<div className="mx-auto w-full max-w-5xl px-6 py-6">
+					<LinearConnection />
+				</div>
 			</div>
 		</div>
 	);

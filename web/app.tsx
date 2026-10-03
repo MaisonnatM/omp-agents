@@ -13,7 +13,7 @@ import { SessionSwitcher } from "./components/session-switcher";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
 import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
-import { TicketsPage } from "./components/tickets/tickets-page";
+import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-page";
 import { ToolsExpanded } from "./components/transcript";
 import { SPLIT_CLICK } from "./labels";
 import {
@@ -34,6 +34,7 @@ import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { useStoredKeys } from "./stored-keys";
 import { useDashboard, useHash } from "./use-dashboard";
+import { useLinear } from "./use-linear";
 
 /** The session ids the sidebar lists under Pinned. */
 const PINNED_KEY = "omp-agents.pinned-sessions";
@@ -111,7 +112,10 @@ export function App() {
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [switcherOpen, setSwitcherOpen] = useState(false);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
-	const tab: SidebarTab = page?.kind === "inbox" || page?.kind === "tickets" ? page.kind : "sessions";
+	const linear = useLinear(true);
+	/** The Tickets tab and its shortcut show only once omp is signed in to Linear. */
+	const ticketsShown = linear.read?.data.connected === true;
+	const tab: SidebarTab = page?.kind === "inbox" ? "inbox" : page?.kind === "tickets" && ticketsShown ? "tickets" : "sessions";
 	const showTab = (next: SidebarTab): void => {
 		if (next === "sessions") show(layout);
 		else location.hash = next === "inbox" ? hashForInbox(null) : hashForTickets(null);
@@ -142,7 +146,7 @@ export function App() {
 			showTab("inbox");
 		},
 		tickets: () => {
-			if (page?.kind === "tickets") return false;
+			if (page?.kind === "tickets" || !ticketsShown) return false;
 			showTab("tickets");
 		},
 		sessions: () => {
@@ -195,20 +199,21 @@ export function App() {
 			);
 			break;
 		case "tickets":
+			if (linear.read && !ticketsShown) main = <TicketsDisconnected />;
 			// Until the sessions are listed, the workspace a quick action starts in is not known yet.
-			main = state.listed ? (
-				<TicketsPage
-					target={page.target}
-					section={sectionTarget}
-					cwd={defaultCwd(view, state.hosts, state.past, project)}
-					quick={quick}
-					onQuickAction={start}
-					onDismissQuick={() => dismissStart("quick")}
-					onOpen={open}
-				/>
-			) : (
-				<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
-			);
+			else if (state.listed) {
+				main = (
+					<TicketsPage
+						target={page.target}
+						section={sectionTarget}
+						cwd={defaultCwd(view, state.hosts, state.past, project)}
+						quick={quick}
+						onQuickAction={start}
+						onDismissQuick={() => dismissStart("quick")}
+						onOpen={open}
+					/>
+				);
+			} else main = <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
 			break;
 		default:
 			if (layout.panes.length > 0) {
@@ -278,6 +283,7 @@ export function App() {
 					newSessionOpen={page?.kind === "new"}
 					settingsHref={settingsHref}
 					settingsOpen={page?.kind === "settings"}
+					ticketsShown={ticketsShown}
 					tab={tab}
 					onTab={showTab}
 					sectionTarget={sectionTarget}

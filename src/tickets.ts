@@ -5,7 +5,8 @@
  */
 import { createCache } from "./cache";
 import { isObject, num, str } from "./json";
-import { callMcpTool, findMcpServer, type McpServer } from "./omp/mcp";
+import { linearServer } from "./linear";
+import { callMcpTool, type McpServer } from "./omp/mcp";
 import { TICKET_STATUS_TYPES, type Ticket, type TicketComment, type TicketDetail, type TicketPriority, type TicketsAnswer } from "./shared";
 
 /** Linear's page size cap for `list_issues`. */
@@ -14,8 +15,6 @@ const PAGE = 250;
 const MAX_PAGES = 20;
 /** How many days back the page lists closed issues. */
 const CLOSED_DAYS = 7;
-const LINEAR_HOST = "mcp.linear.app";
-const LINEAR_URL = `https://${LINEAR_HOST}/mcp`;
 
 const FIELDS = ["id", "title", "url", "priority", "status", "statusType", "labels", "project", "team", "dueDate", "updatedAt", "gitBranchName"];
 
@@ -148,12 +147,6 @@ async function listAll(server: McpServer, query: Record<string, unknown>): Promi
 	return found;
 }
 
-async function linearServer(): Promise<McpServer> {
-	const server = await findMcpServer(LINEAR_HOST);
-	if (!server) throw new Error(`Add Linear's MCP server to omp to see your tickets: run /mcp add in omp with the URL ${LINEAR_URL}, then sign in.`);
-	return server;
-}
-
 async function queryTickets(): Promise<Ticket[]> {
 	const server = await linearServer();
 	const lists = await Promise.all(QUERIES.map(query => listAll(server, query)));
@@ -164,7 +157,7 @@ const loaded = createCache<Ticket[]>();
 
 /** The viewer's assigned Linear issues; a failed read throws Linear's or omp's message. `fresh` skips the cache. */
 export async function loadTickets(fresh: boolean): Promise<TicketsAnswer> {
-	return { tickets: await loaded.get(LINEAR_HOST, queryTickets, fresh) };
+	return { tickets: await loaded.get("", queryTickets, fresh) };
 }
 
 /** Issue `id` (`ENG-2368`) in full, with its description and comments; a failed read throws Linear's or omp's message. */

@@ -126,6 +126,17 @@ export interface TicketsAnswer {
 	tickets: Ticket[];
 }
 
+/** A sign-in to Linear that the settings started: waiting for the browser at Linear's authorization `url`, or why it failed. */
+export type LinearSignIn = { phase: "waiting"; url: string } | { phase: "failed"; error: string } | null;
+
+/** `GET /api/linear`, and `PUT /api/linear/sign-in`, which starts a sign-in. */
+export interface LinearStatus {
+	/** omp has an MCP server for Linear and a sign-in for it, so the tickets page can read the issues. */
+	connected: boolean;
+	/** The latest sign-in, while it waits or after it failed; `null` when none ran or the last one succeeded. */
+	signIn: LinearSignIn;
+}
+
 /** A Linear issue's identifier as Linear shows it, `ENG-2368`: its team's key, a dash, and its number. */
 export const TICKET_ID = /^[A-Z][A-Z0-9_]*-\d+$/;
 
