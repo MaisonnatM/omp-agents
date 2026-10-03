@@ -90,7 +90,7 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					? "It starts when you send the first message, which adds the worktree, so leaving this draft leaves nothing running."
 					: "It starts when you send the first message, so leaving this draft leaves nothing running."}
 			</EmptyConversation>
-			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
+			<div className="relative mx-auto w-full max-w-3xl px-3 pb-5">
 				{completion.popup}
 				<InputMessage
 					ref={completion.composerRef}

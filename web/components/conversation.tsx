@@ -1,4 +1,4 @@
-import { ArrowUpRight, Brain, CircleStop, ListEnd, MessageCircle } from "lucide-react";
+import { ArrowUpRight, Brain, CircleStop, MessageCircle } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type {
 	AgentRow,
@@ -17,7 +17,6 @@ import type {
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
 import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
-import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestUrl } from "../inbox-model";
 import { hostLabel, pastLabel, projectName } from "../labels";
@@ -475,19 +474,6 @@ function LiveConversation({
 			: {}),
 	});
 	const completion = useCompletion({ draft, setDraft, completions, onComplete, onKeyDown: onComposerKey });
-	const followUpButton = writable && working && followUps && (
-		<Tooltip content={`Send once the turn finishes · ${FOLLOW_UP_KEYS}`} side="top">
-			<Button
-				variant="ghost"
-				size="icon-sm"
-				aria-label="Send once the turn finishes"
-				disabled={(!draft.trim() && (!attachable || attachments.files.length === 0)) || directCommand !== null}
-				onClick={followUp}
-			>
-				<ListEnd aria-hidden="true" />
-			</Button>
-		</Tooltip>
-	);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
@@ -525,7 +511,7 @@ function LiveConversation({
 					)
 				}
 			/>
-			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
+			<div className="relative mx-auto w-full max-w-3xl px-3 pb-5">
 				{requests[0] && (
 					<UserRequestCard
 						key={requests[0].id}
@@ -552,12 +538,7 @@ function LiveConversation({
 					files={attachable ? attachments.files : undefined}
 					onFilesChange={attachable ? attachments.onFilesChange : undefined}
 					accept={IMAGE_ACCEPT}
-					rightSlot={
-						<>
-							{contextSlot}
-							{followUpButton}
-						</>
-					}
+					rightSlot={contextSlot}
 					placeholder={placeholder}
 					disabled={!writable}
 					// While a turn runs, Enter and the send button steer it, and Stop interrupts a session's turn.
