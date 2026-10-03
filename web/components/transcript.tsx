@@ -307,7 +307,7 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 	return (
 		<MessageScroller className="flex-1">
 			<MessageScrollerViewport>
-				<MessageScrollerContent className="mx-auto max-w-3xl gap-3 px-6 py-6" aria-relevant="additions text" data-transcript>
+				<MessageScrollerContent className="mx-auto max-w-3xl gap-3 p-3" aria-relevant="additions text" data-transcript>
 					{blocks.map(block => {
 						if (block.kind === "tools") {
 							return (

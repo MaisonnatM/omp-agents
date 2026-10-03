@@ -530,7 +530,7 @@ function LiveConversation({
 					)
 				}
 			/>
-			<div className="relative mx-auto w-full max-w-3xl px-6 pb-5">
+			<div className="relative mx-auto w-full max-w-3xl px-3 pb-5">
 				{requests[0] && (
 					<UserRequestCard
 						key={requests[0].id}
