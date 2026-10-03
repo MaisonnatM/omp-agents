@@ -61,6 +61,7 @@ const handleClientMsg = createClientHandler({
 	dismissInterrupted(sessionId) {
 		if (interrupted.dismiss(sessionId)) pushPast();
 	},
+	stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
 });
 
 let rosterError: string | null = null;
@@ -150,6 +151,8 @@ async function rescanFiles(): Promise<void> {
 function onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 	switch (update.kind) {
 		case "roster":
+			// A turn that starts or ends is saved at once, so a crash right after still knows it.
+			interrupted.setRunning(sessions.startedHere());
 			// The push also points views at subagent files that registered since.
 			rosterPush ??= setTimeout(pushRoster, ROSTER_PUSH_MS);
 			return;

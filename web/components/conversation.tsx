@@ -34,14 +34,13 @@ import { GitRef } from "./git";
 import { Model, ModelPicker } from "./model-picker";
 import { OrgIcon } from "./org-icon";
 import { ShipStep } from "./ship-step";
-import { statusLabel } from "./status-dot";
 import { ThinkingPicker } from "./thinking-picker";
 import { NOTICE_TONE, Transcript } from "./transcript";
 import { UserRequestCard } from "./user-request";
 
-const CONTROL_LABEL: Record<ControlPhase["phase"], string> = {
+/** A live session shows no status: the header speaks up only while the connection is not live. */
+const CONTROL_LABEL: Record<Exclude<ControlPhase["phase"], "live">, string> = {
 	connecting: "Connecting…",
-	live: "Live",
 	reconnecting: "Reconnecting…",
 	ended: "Disconnected",
 };
@@ -365,12 +364,8 @@ function LiveConversation({
 		);
 	};
 
-	let status = CONTROL_LABEL[phase.phase];
-	if (phase.phase === "live") {
-		const activity = agent ? statusLabel(agent.status) : host ? statusLabel(host.status) : "";
-		status = `${phase.readOnly ? "Live, read-only" : "Live"} · ${activity}`;
-	}
-	if (phase.phase === "ended" || phase.phase === "reconnecting") status += ` · ${phase.reason}`;
+	const status =
+		phase.phase === "live" ? undefined : phase.phase === "connecting" ? CONTROL_LABEL.connecting : `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
 
 	const title = agent ? agent.id : shown ? hostLabel(shown) : view.instanceId;
 	const meta = agent

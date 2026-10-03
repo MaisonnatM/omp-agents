@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { InterruptedSessions } from "./interrupted";
 
 const dirs: string[] = [];
@@ -18,7 +18,7 @@ function fileIn(): string {
 describe("InterruptedSessions", () => {
 	test("the sessions that ran when the server went down are interrupted at its next start", () => {
 		const path = fileIn();
-		new InterruptedSessions(path).setRunning(new Set(["a", "b"]));
+		new InterruptedSessions(path).setRunning(new Map([["a", false], ["b", false]]));
 		// The server died without another write.
 		const next = new InterruptedSessions(path);
 		expect([next.has("a"), next.has("b"), next.has("c")]).toEqual([true, true, false]);
@@ -29,16 +29,42 @@ describe("InterruptedSessions", () => {
 	test("a session that stopped while the server ran stays interrupted across a restart, until it runs again", () => {
 		const path = fileIn();
 		const tracker = new InterruptedSessions(path);
-		tracker.setRunning(new Set(["a"]));
+		tracker.setRunning(new Map([["a", false]]));
 		tracker.interrupt("a");
-		tracker.setRunning(new Set());
+		tracker.setRunning(new Map());
 		expect(new InterruptedSessions(path).has("a")).toBe(true);
 
-		tracker.setRunning(new Set(["a"]));
+		tracker.setRunning(new Map([["a", false]]));
 		expect(tracker.has("a")).toBe(false);
 		// It still runs, so the next start would read it as interrupted again; End session clears it from the running list.
-		tracker.setRunning(new Set());
+		tracker.setRunning(new Map());
 		expect(new InterruptedSessions(path).has("a")).toBe(false);
+	});
+
+	test("a session keeps whether its turn ran when it stopped, across a crash and a restart", () => {
+		const path = fileIn();
+		const tracker = new InterruptedSessions(path);
+		tracker.setRunning(new Map([["busy", false], ["calm", false], ["exited", false]]));
+		// A turn that starts is saved at once, so a crash right after still knows it.
+		tracker.setRunning(new Map([["busy", true], ["calm", false], ["exited", true]]));
+		tracker.interrupt("exited");
+		tracker.setRunning(new Map([["busy", true], ["calm", false]]));
+		// The server died without another write.
+		const next = new InterruptedSessions(path);
+		expect(["busy", "calm", "exited"].map(id => next.stoppedMidTurn(id))).toEqual([true, false, true]);
+		expect(new InterruptedSessions(path).stoppedMidTurn("busy")).toBe(true);
+
+		// Resumed, it is no longer interrupted, whatever its turn did before.
+		next.setRunning(new Map([["busy", false]]));
+		expect(next.stoppedMidTurn("busy")).toBe(false);
+	});
+
+	test("a list written before turns were tracked reads its sessions as idle", () => {
+		const path = fileIn();
+		mkdirSync(dirname(path));
+		writeFileSync(path, '{"running": ["a"], "interrupted": ["b"]}');
+		const tracker = new InterruptedSessions(path);
+		expect([tracker.has("a"), tracker.has("b"), tracker.stoppedMidTurn("a"), tracker.stoppedMidTurn("b")]).toEqual([true, true, false, false]);
 	});
 
 	test("a dismissed session moves to the past sessions for good", () => {

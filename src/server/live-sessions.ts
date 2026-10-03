@@ -43,9 +43,9 @@ export class LiveSessions {
 		return new Set([...this.#sessions.values()].map(session => session.sessionId));
 	}
 
-	/** The ids of the running sessions that this dashboard started. */
-	startedHere(): Set<string> {
-		return new Set([...this.#sessions.values()].flatMap(session => (session instanceof DashboardSession ? [session.sessionId] : [])));
+	/** The running sessions that this dashboard started, each with whether its turn runs (or waits on a question). */
+	startedHere(): Map<string, boolean> {
+		return new Map([...this.#sessions.values()].flatMap(session => (session instanceof DashboardSession ? [[session.sessionId, session.status !== "idle"] as const] : [])));
 	}
 
 	/** The directories running sessions work in. */

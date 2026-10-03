@@ -12,6 +12,8 @@ export interface SocketEnv {
 	start(request: StartRequest): Promise<StartResult>;
 	/** Move interrupted session `sessionId` to the past sessions. */
 	dismissInterrupted(sessionId: string): void;
+	/** Whether interrupted session `sessionId` stopped while its turn ran. */
+	stoppedMidTurn(sessionId: string): boolean;
 }
 
 /**
@@ -23,7 +25,7 @@ function reply(ws: Socket, instanceId: string, msg: ServerMsg): void {
 }
 
 /** The handler of one socket message. A message naming a session that is gone does nothing. */
-export function createClientHandler({ sessions, views, start, dismissInterrupted }: SocketEnv): (ws: Socket, msg: ClientMsg) => Promise<void> {
+export function createClientHandler({ sessions, views, start, dismissInterrupted, stoppedMidTurn }: SocketEnv): (ws: Socket, msg: ClientMsg) => Promise<void> {
 	return async (ws, msg) => {
 		switch (msg.t) {
 			case "watch":
@@ -89,7 +91,16 @@ export function createClientHandler({ sessions, views, start, dismissInterrupted
 				send(ws, { t: "started", reqId: msg.reqId, result: await start(msg) });
 				return;
 			case "resume-all": {
-				const results = await Promise.all(msg.sessionIds.map(async sessionId => ({ sessionId, result: await start({ kind: "resume", sessionId }) })));
+				const results = await Promise.all(
+					msg.sessionIds.map(async sessionId => {
+						// Read before the resume, which takes the session off the interrupted list.
+						const midTurn = stoppedMidTurn(sessionId);
+						const result = await start({ kind: "resume", sessionId });
+						// omp records the cut-off turn as aborted on resume; a plain prompt picks the work back up.
+						if (result.ok && midTurn) void sessions.get(result.instanceId)?.prompt(null, "continue", [], "steer");
+						return { sessionId, result };
+					}),
+				);
 				send(ws, {
 					t: "resumed-all",
 					reqId: msg.reqId,
