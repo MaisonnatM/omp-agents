@@ -58,7 +58,7 @@ import { cn } from "@/lib/utils";
 import { modeOf, skillLabel, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
-import { type ForkPoint, forkPoints, type ToolItem, toBlocks } from "../transcript-view";
+import { type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies } from "../transcript-view";
 import { MessageMarkdown } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 
@@ -299,6 +299,7 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 	const last = items.at(-1);
 	const streaming = last?.kind === "assistant" && last.streaming;
 	const forks = useMemo(() => forkPoints(items), [items]);
+	const replies = useMemo(() => turnReplies(items, working), [items, working]);
 	const blocks = useMemo(() => toBlocks(items), [items]);
 	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
 	const here = fork && sameView(fork.op.view, view) ? fork : null;
@@ -325,7 +326,7 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 								</MessageScrollerItem>
 							);
 						}
-						const copyable = !(item.kind === "assistant" && item.streaming) && typedText(item).trim() !== "";
+						const copyable = item.kind === "assistant" ? replies.has(item.id) && !item.streaming : typedText(item).trim() !== "";
 						const point = forks.get(item.id);
 						const failed = here?.phase === "failed" && here.op.itemId === item.id ? here.error : null;
 						return (

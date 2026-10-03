@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared";
-import { applyItems, forkPoints, toBlocks } from "./transcript-view";
+import { applyItems, forkPoints, toBlocks, turnReplies } from "./transcript-view";
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
@@ -52,5 +52,20 @@ describe("forkPoints", () => {
 			p3: { entryId: "e3", prefill: true },
 			steer: { entryId: "e4", prefill: true },
 		});
+	});
+});
+
+describe("turnReplies", () => {
+	const prompt = (id: string): Item => ({ id, kind: "user", text: id, skill: null, from: null, entryId: id });
+	const reply = (id: string, text = id): Item => ({ id, kind: "assistant", text, streaming: false });
+	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] };
+	const items = [prompt("p1"), reply("r1a"), tool, reply("r1b"), reply("r1c", " "), prompt("p2"), reply("r2a"), tool, reply("r2b")];
+
+	test("each turn's last reply with text, skipping the replies between its tool calls", () => {
+		expect([...turnReplies(items, false)]).toEqual(["r2b", "r1b"]);
+	});
+
+	test("a turn still running has no reply yet", () => {
+		expect([...turnReplies(items, true)]).toEqual(["r1b"]);
 	});
 });
