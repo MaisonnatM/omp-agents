@@ -1,6 +1,7 @@
-/** The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, and Linear tickets through. */
+/** The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, Linear's connection, and Linear tickets through. */
 import { gitCheckout } from "../git";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
+import { loadLinearStatus, startLinearSignIn } from "../linear";
 import { listModels } from "../omp/models";
 import { directoryOf } from "../paths";
 import type { PullRequestIndex } from "../pull-requests";
@@ -79,6 +80,15 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return answer(() => loadTickets(fresh));
 	};
 
+	/** `GET /api/linear`: whether omp is signed in to Linear's MCP server, and the sign-in the settings last started. */
+	const linear: Handler = async req => guards.admit(req) ?? answer(loadLinearStatus);
+
+	/** `PUT /api/linear/sign-in`: starts a sign-in to Linear and answers with its authorization address to open. */
+	const linearSignIn: Handler = async req => {
+		const write = await guards.writeBody(req);
+		return write instanceof Response ? write : answer(startLinearSignIn);
+	};
+
 	/** `GET /api/ticket?id=<identifier>`: that Linear issue in full, for the tickets page's sheet. */
 	const ticket: Handler = async req => {
 		const refused = guards.admit(req);
@@ -147,6 +157,8 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/pull-request/sessions": { PUT: sessionLinks },
 		"/api/inbox": { GET: inbox },
 		"/api/tickets": { GET: tickets },
+		"/api/linear": { GET: linear },
+		"/api/linear/sign-in": { PUT: linearSignIn },
 		"/api/ticket": { GET: ticket },
 		"/api/pull-request": { GET: pullRequest },
 		"/api/git": { GET: git },

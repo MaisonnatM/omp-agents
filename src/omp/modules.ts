@@ -56,6 +56,8 @@ export interface StorageModule {
 export interface DirsModule {
 	getSessionsDir(): string;
 	getAgentDir(): string;
+	/** omp's user-level MCP config, `mcp.json` in the agent directory. */
+	getMCPConfigPath(scope: "user"): string;
 }
 /** Subset of omp's `SessionEntry` (src/session/session-entries.ts); the header has `type: "session"`. */
 export interface FileEntry {
@@ -205,6 +207,61 @@ export interface McpCredentialsModule {
 	/** The credential ids omp looks a server's OAuth sign-in up under when its config names none. */
 	mcpOAuthCredentialIdsForServerUrl(serverUrl: string | undefined): string[];
 }
+/** Subset of omp's `OAuthEndpoints` (src/mcp/oauth-discovery.ts). */
+export interface McpOAuthEndpoints {
+	authorizationUrl: string;
+	tokenUrl: string;
+	issuerUrl?: string;
+	clientId?: string;
+	/** Dynamic client registration endpoint, when the authorization server offers one. */
+	registrationUrl?: string;
+	scopes?: string;
+	resource?: string;
+}
+export interface McpOAuthDiscoveryModule {
+	/** The OAuth endpoints a server's well-known metadata names, or `null` when it names none. */
+	discoverOAuthEndpoints(serverUrl: string): Promise<McpOAuthEndpoints | null>;
+}
+/** Subset of omp's `MCPOAuthConfig` (src/mcp/oauth-flow.ts). */
+export interface McpOAuthConfig {
+	authorizationUrl: string;
+	tokenUrl: string;
+	issuerUrl?: string;
+	registrationUrl?: string;
+	clientId?: string;
+	scopes?: string;
+	resource?: string;
+	/** The `resource` is the server URL, not one the metadata advertised. */
+	stripSameOriginResource?: boolean;
+}
+/** omp's `MCPOAuthFlow` (src/mcp/oauth-flow.ts): an authorization-code flow with PKCE and a local callback server. */
+export interface McpOAuthFlow {
+	/** Waits for the browser to come back to the callback; resolves with pi-ai's `OAuthCredentials`. */
+	login(): Promise<Record<string, unknown>>;
+	readonly resolvedClientId: string | undefined;
+	readonly registeredClientSecret: string | undefined;
+	readonly resource: string | undefined;
+	readonly authorizationUrl: string;
+}
+export interface McpOAuthFlowModule {
+	MCPOAuthFlow: new (config: McpOAuthConfig, ctrl: { onAuth(info: { url: string }): void; signal: AbortSignal }) => McpOAuthFlow;
+}
+export interface McpConfigWriterModule {
+	/** Adds a server to an MCP config file; throws when the file already has one by that name. */
+	addMCPServer(filePath: string, name: string, config: { type: "http"; url: string }): Promise<void>;
+}
+/** Subset of pi-ai's `AuthStorage` (src/auth-storage.ts), the credential store `omp token` reads. */
+export interface AuthStorage {
+	credentials: {
+		reload(): Promise<void>;
+		hasOAuth(provider: string): boolean;
+		set(provider: string, credential: Record<string, unknown> & { type: "oauth" }): Promise<void>;
+	};
+}
+export interface AuthStorageModule {
+	/** omp's credential store: its auth broker when one is configured, else the local database. */
+	discoverAuthStorage(): Promise<AuthStorage>;
+}
 
 export interface DiscoveryHelpersModule {
 	/** Expands `${VAR}` references in a string the way omp does for an MCP server's `url`. */
@@ -259,7 +316,11 @@ export const loader = await load<LoaderModule>(join(srcDir, "session", "session-
 export const exitDiagnostics = await load<ExitDiagnosticsModule>(join(srcDir, "session", "exit-diagnostics.ts"), {
 	createInterruptedTurnAbortMessage: "function",
 });
-export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), { getSessionsDir: "function", getAgentDir: "function" });
+export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), {
+	getSessionsDir: "function",
+	getAgentDir: "function",
+	getMCPConfigPath: "function",
+});
 
 export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc-client.ts"), {
 	RpcClient: "function",
@@ -314,3 +375,11 @@ export const mcpCredentials = await load<McpCredentialsModule>(join(srcDir, "mcp
 	mcpOAuthCredentialIdsForServerUrl: "function",
 });
 export const discoveryHelpers = await load<DiscoveryHelpersModule>(join(srcDir, "discovery", "helpers.ts"), { expandEnvVarsDeep: "function" });
+export const mcpOAuthDiscovery = await load<McpOAuthDiscoveryModule>(join(srcDir, "mcp", "oauth-discovery.ts"), {
+	discoverOAuthEndpoints: "function",
+});
+export const mcpOAuthFlow = await load<McpOAuthFlowModule>(join(srcDir, "mcp", "oauth-flow.ts"), { MCPOAuthFlow: "function" });
+export const mcpConfigWriter = await load<McpConfigWriterModule>(join(srcDir, "mcp", "config-writer.ts"), { addMCPServer: "function" });
+export const authStorage = await load<AuthStorageModule>(join(srcDir, "session", "auth-broker-config.ts"), {
+	discoverAuthStorage: "function",
+});
