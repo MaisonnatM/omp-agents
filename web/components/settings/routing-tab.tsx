@@ -1,11 +1,11 @@
 import { ChevronsUpDown, Plus, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { CatalogModel, ModelChain, ModelRouting, RetrySettings, RoleRoute } from "../../../src/shared";
+import { type CatalogModel, type ModelChain, type ModelRouting, type RetrySettings, type RoleRoute, splitSelector } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { modelLabel, providerOrg, splitSelector } from "../../labels";
+import { modelLabel, providerOrg } from "../../labels";
 import { saveRouting } from "../../settings-api";
 import { Model, ModelRow, modelDescription, ProviderHeading } from "../model-picker";
 import { OrgIcon } from "../org-icon";

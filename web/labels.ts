@@ -1,6 +1,6 @@
 /** Names the page gives things: sessions, models, providers, file kinds, and the click gestures that open rows. */
 import type { MouseEvent } from "react";
-import type { CatalogModel, OmpFile, OmpFileKind, PastSession, PullRequest, RosterHost } from "../src/shared";
+import type { OmpFile, OmpFileKind, PastSession, PullRequest, RosterHost } from "../src/shared";
 import { IS_MAC } from "./shortcuts";
 import type { OpenMode } from "./routing";
 
@@ -34,6 +34,7 @@ const BRAND_WORDS: Record<string, string> = {
 	moonshotai: "Moonshot AI",
 	openai: "OpenAI",
 	openrouter: "OpenRouter",
+	opencode: "OpenCode",
 	oss: "OSS",
 	xai: "xAI",
 };
@@ -55,6 +56,9 @@ export const providerLabel = (provider: string): string => labelWords(provider.s
 
 /** A skill name as its title: `poteto-mode` reads `Poteto Mode`. */
 export const skillLabel = (name: string): string => labelWords(name.split(/[-_\s]+/));
+
+/** A model role as its name: `smol` reads `Smol`. */
+export const roleLabel = (role: string): string => labelWords([role]);
 
 /**
  * A model selector as people name the model, leaving its provider and org to the logo: `anthropic/claude-opus-5-5`
@@ -79,18 +83,8 @@ export function modelLabel(selector: string): string {
 	return colon < 0 ? label : `${label} (${id.slice(colon + 1)})`;
 }
 
-/**
- * A selector as the model `omp models` lists and its `:level` thinking suffix. Model ids can hold colons
- * (`minimax-m3:batch`), so the suffix splits off only when the rest is a listed model and the whole is not.
- */
-export function splitSelector(selector: string, models: ReadonlyMap<string, CatalogModel>): { model: string; level: string | null } {
-	const colon = selector.lastIndexOf(":");
-	if (colon < 0 || models.has(selector) || !models.has(selector.slice(0, colon))) return { model: selector, level: null };
-	return { model: selector.slice(0, colon), level: selector.slice(colon + 1) };
-}
-
 /** Providers whose id is not the org that makes their models. */
-const PROVIDER_ORGS: Record<string, string> = { "openai-codex": "openai" };
+const PROVIDER_ORGS: Record<string, string> = { "openai-codex": "openai", "opencode-go": "opencode", "opencode-zen": "opencode" };
 
 export const providerOrg = (provider: string): string => PROVIDER_ORGS[provider] ?? provider;
 

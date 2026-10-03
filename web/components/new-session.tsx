@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { BranchChoice, ModelOption, PromptImage } from "../../src/shared";
+import type { BranchChoice, ModelOption, ModelRole, PromptImage } from "../../src/shared";
 import { InputMessage } from "@/components/ui/input-message";
 import { getJson } from "../api";
 import { projectName } from "../labels";
@@ -7,11 +7,13 @@ import type { Completions } from "../pane-store";
 import { useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
+import { roleOf, useModelRoles } from "../use-model-roles";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation, Header } from "./conversation";
 import { BranchPicker, chosenBranch, GitRef, targetOf } from "./git";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
 import { ModelPicker } from "./model-picker";
+import { RolePicker } from "./role-picker";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
@@ -22,20 +24,33 @@ interface NewSessionProps {
 	completions: Completions | null;
 	/** Ask for `/` and `@` suggestions, resolved as a session started in `cwd` would resolve them. */
 	onComplete: (reqId: number, text: string, cursor: number) => void;
-	/** Start omp with `prompt` and `images` as its first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default. */
-	onStart: (prompt: string, images: PromptImage[], branch: BranchChoice | null, model: ModelOption | null) => void;
+	/** Start omp with `prompt` and `images` as its first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at `thinking` when it names a level. */
+	onStart: (prompt: string, images: PromptImage[], branch: BranchChoice | null, model: ModelOption | null, thinking: string | null) => void;
 }
 
 /**
  * A session not started yet, with the same composer a live session has. omp starts in `cwd` only when the first message
  * is sent, so leaving the draft leaves nothing running. The message and its images stay in the composer until the session opens.
- * The composer picks the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
+ * The composer picks the model role or the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  */
 export function NewSession({ cwd, launch, connected, completions, onComplete, onStart }: NewSessionProps) {
 	const [draft, setDraft] = useState("");
 	const attachments = useImageAttachments();
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
 	const [model, setModel] = useState<ModelOption | null>(null);
+	/** The thinking level of the role picked last; picking a model by itself leaves omp's level. */
+	const [thinking, setThinking] = useState<string | null>(null);
+	const roles = useModelRoles(cwd);
+	// Until a pick, omp starts on its `default` role.
+	const role = roles.list && (model ? roleOf(roles.list.roles, `${model.provider}/${model.id}`, thinking) : (roles.list.roles.find(other => other.role === "default") ?? null));
+	const pickRole = (next: ModelRole): void => {
+		setModel(next.model);
+		setThinking(next.thinking);
+	};
+	const pickModel = (next: ModelOption): void => {
+		setModel(next);
+		setThinking(null);
+	};
 	const [models, setModels] = useState<{ models: ModelOption[]; error: string | null } | null>(null);
 	const [modelsOpen, setModelsOpen] = useState(false);
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
@@ -99,7 +114,7 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					onSend={text => {
 						if (directCommand) return;
 						completion.close();
-						attachments.read(images => onStart(text, images, choice, model));
+						attachments.read(images => onStart(text, images, choice, model, thinking));
 					}}
 					placeholder="Message this session…"
 					files={attachments.files}
@@ -108,13 +123,14 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					leftSlot={({ openFilePicker }) => (
 						<>
 							<AttachButton onClick={() => openFilePicker()} disabled={starting} />
+							<RolePicker list={roles.list} current={role} onReload={roles.reload} onPick={pickRole} disabled={starting} />
 							<ModelPicker
 								current={model && `${model.provider}/${model.id}`}
 								unset="Default model"
 								list={models}
 								open={modelsOpen}
 								onOpenChange={openModels}
-								onPick={setModel}
+								onPick={pickModel}
 								disabled={starting}
 							/>
 							{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}

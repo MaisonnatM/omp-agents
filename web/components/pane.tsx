@@ -66,7 +66,10 @@ export const Pane = memo(function Pane({
 		if (view.kind === "live") send({ t: "complete", reqId, scope: { kind: "live", view }, text, cursor });
 	}, [send, view]);
 	const onListModels = useCallback(() => instanceId && send({ t: "list-models", instanceId }), [send, instanceId]);
-	const onSetModel = useCallback((model: ModelOption) => instanceId && send({ t: "set-model", instanceId, model }), [send, instanceId]);
+	const onSetModel = useCallback(
+		(model: ModelOption, thinking: string | null) => instanceId && send({ t: "set-model", instanceId, model, thinking }),
+		[send, instanceId],
+	);
 	const onSetThinking = useCallback((level: string) => instanceId && send({ t: "set-thinking", instanceId, level }), [send, instanceId]);
 	const onPrompt = useCallback((text: string, images: PromptImage[], delivery: Delivery) => {
 		if (view.kind === "live") send({ t: "prompt", view, text, images, delivery });

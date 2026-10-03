@@ -7,7 +7,7 @@ import { gitCheckout } from "../git";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
 import { loadLinearStatus, startLinearSignIn } from "../linear";
 import { blobsDir } from "../omp/config";
-import { connectedModels, listModels } from "../omp/models";
+import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { directoryOf } from "../paths";
 import type { PullRequestIndex } from "../pull-requests";
 import { linkSessions, type SessionEntry } from "../session-links";
@@ -65,6 +65,14 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		const refused = guards.admit(req);
 		if (refused) return refused;
 		return answer(async () => ({ models: await connectedModels() }));
+	};
+
+	/** `GET /api/models/roles?cwd=<dir>`: omp's model roles a session in that directory could switch to. Like a new session, `cwd` may name any directory. */
+	const roles: Handler = async req => {
+		const refused = guards.admit(req);
+		if (refused) return refused;
+		const cwd = directoryOf(new URL(req.url).searchParams.get("cwd") ?? "");
+		return cwd ? answer(async () => ({ roles: await connectedRoles(cwd) })) : fail(404, "Expected ?cwd= naming a directory");
 	};
 
 	/**
@@ -186,6 +194,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },
+		"/api/models/roles": { GET: roles },
 		"/api/pull-request/sessions": { PUT: sessionLinks },
 		"/api/inbox": { GET: inbox },
 		"/api/tickets": { GET: tickets },

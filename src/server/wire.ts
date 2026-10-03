@@ -75,6 +75,12 @@ function parseImages(value: unknown): PromptImage[] | null {
 	return size <= MAX_PROMPT_IMAGE_BASE64 ? images : null;
 }
 
+/** `null` for none, which keeps omp's thinking level; `undefined` for a value that is not a level. */
+function parseThinking(value: unknown): string | null | undefined {
+	if (value === null || value === undefined) return null;
+	return isNonEmpty(value) ? value : undefined;
+}
+
 function parseStartRequest(value: Record<string, unknown>): StartRequest | null {
 	switch (value.kind) {
 		case "new": {
@@ -83,8 +89,9 @@ function parseStartRequest(value: Record<string, unknown>): StartRequest | null 
 			const branch = parseBranchChoice(value.branch);
 			// `null` starts on omp's default model.
 			const model = value.model === null || value.model === undefined ? null : (parseModel(value.model) ?? undefined);
-			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || branch === undefined || model === undefined) return null;
-			return prompt.trim() || images.length > 0 ? { kind: "new", cwd, prompt, images, branch, model } : null;
+			const thinking = parseThinking(value.thinking);
+			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || branch === undefined || model === undefined || thinking === undefined) return null;
+			return prompt.trim() || images.length > 0 ? { kind: "new", cwd, prompt, images, branch, model, thinking } : null;
 		}
 		case "fork": {
 			const view = parseView(value.view);
@@ -160,7 +167,8 @@ export function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 		case "set-model": {
 			const { instanceId } = value;
 			const model = parseModel(value.model);
-			return typeof instanceId === "string" && model ? { t: "set-model", instanceId, model } : null;
+			const thinking = parseThinking(value.thinking);
+			return typeof instanceId === "string" && model && thinking !== undefined ? { t: "set-model", instanceId, model, thinking } : null;
 		}
 		case "set-thinking": {
 			const { instanceId, level } = value;

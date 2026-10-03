@@ -26,12 +26,14 @@ import type { ForkPoint } from "../transcript-view";
 import type { Completions } from "../pane-store";
 import type { StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
+import { roleOf, useModelRoles } from "../use-model-roles";
 import { useCompletion } from "./completion-popup";
 import { ContextRing } from "./context-ring";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
 import { GitRef } from "./git";
 import { Model, ModelPicker } from "./model-picker";
 import { OrgIcon } from "./org-icon";
+import { RolePicker } from "./role-picker";
 import { ShipStep } from "./ship-step";
 import { ThinkingPicker } from "./thinking-picker";
 import { NOTICE_TONE, Transcript } from "./transcript";
@@ -245,7 +247,8 @@ interface ConversationProps {
 	/** The last model list the server sent for this session, or `null` while none has arrived. */
 	models: { models: ModelOption[]; error: string | null } | null;
 	onListModels: () => void;
-	onSetModel: (model: ModelOption) => void;
+	/** Switch to `model` and, when `thinking` names one, thinking level. */
+	onSetModel: (model: ModelOption, thinking: string | null) => void;
 	onSetThinking: (level: string) => void;
 	/** Only the session's own agent takes `images`. */
 	onPrompt: (text: string, images: PromptImage[], delivery: Delivery) => void;
@@ -404,6 +407,7 @@ function LiveConversation({
 	const thinking = shown?.thinkingLevel ?? null;
 	// Collab rooms carry no model or thinking switch, so only sessions this dashboard started over RPC can change them.
 	const switchable = view.agentId === null && host?.source === "dashboard" && live ? host : null;
+	const roles = useModelRoles(switchable?.cwd ?? null);
 	// The list refreshes on every open, whether a click or the model shortcut opened it.
 	const openModels = (open: boolean): void => {
 		setModelsOpen(open);
@@ -412,7 +416,13 @@ function LiveConversation({
 	const modelSlot =
 		view.agentId !== null ? null : switchable ? (
 			<>
-				<ModelPicker current={shownModel} list={models} open={modelsOpen} onOpenChange={openModels} onPick={onSetModel} />
+				<RolePicker
+					list={roles.list}
+					current={roles.list && roleOf(roles.list.roles, shownModel, thinking)}
+					onReload={roles.reload}
+					onPick={role => onSetModel(role.model, role.thinking)}
+				/>
+				<ModelPicker current={shownModel} list={models} open={modelsOpen} onOpenChange={openModels} onPick={model => onSetModel(model, null)} />
 				{switchable.thinkingLevels.length > 0 && <ThinkingPicker current={thinking} levels={switchable.thinkingLevels} onPick={onSetThinking} />}
 			</>
 		) : shownModel || thinking ? (

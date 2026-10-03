@@ -130,10 +130,17 @@ export class DashboardSession implements LiveSession {
 		});
 	}
 
-	/** Spawn omp in `cwd`, on `model` when one is named, and wait until it accepts commands. `emit` hears `instanceId` from spawn on, before this resolves. */
-	static start(instanceId: string, cwd: string, model: ModelOption | null, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+	/** Spawn omp in `cwd`, on `model` and at `thinking` when they name one, and wait until it accepts commands. `emit` hears `instanceId` from spawn on, before this resolves. */
+	static start(
+		instanceId: string,
+		cwd: string,
+		model: ModelOption | null,
+		thinking: string | null,
+		emit: (update: DashboardUpdate) => void,
+	): Promise<DashboardSession> {
 		return DashboardSession.#spawn(instanceId, cwd, emit, async client => {
 			if (model) await client.setModel(model.provider, model.id);
+			if (thinking) await client.setThinkingLevel(thinking);
 		});
 	}
 
@@ -338,11 +345,16 @@ export class DashboardSession implements LiveSession {
 		return models.flatMap(({ provider, id }) => (connected.has(provider) ? [{ provider, id }] : []));
 	}
 
-	setModel({ provider, id }: ModelOption): void {
-		this.#child.client.setModel(provider, id).then(
-			() => this.#refresh(),
-			(err: unknown) => this.#fail("Model switch failed", err),
-		);
+	/** Switch to `model`, then to `thinking` when it names a level. */
+	setModel({ provider, id }: ModelOption, thinking: string | null): void {
+		const { client } = this.#child;
+		client
+			.setModel(provider, id)
+			.then(() => (thinking ? client.setThinkingLevel(thinking) : undefined))
+			.then(
+				() => this.#refresh(),
+				(err: unknown) => this.#fail("Model switch failed", err),
+			);
 	}
 
 	setThinking(level: string): void {

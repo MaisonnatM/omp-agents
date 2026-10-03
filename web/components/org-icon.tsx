@@ -37,6 +37,17 @@ const LOGOS: Record<string, Logo> = {
 			</g>
 		),
 	},
+	opencode: {
+		name: "OpenCode",
+		// svgl's mark without its background tile, cropped to the glyph.
+		viewBox: "96 96 320 320",
+		paths: (
+			<>
+				<path fill="currentColor" fillOpacity={0.4} d="M320 224V352H192V224H320Z" />
+				<path fill="currentColor" fillRule="evenodd" clipRule="evenodd" d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" />
+			</>
+		),
+	},
 	deepseek: {
 		name: "DeepSeek",
 		viewBox: "0 0 24 24",
