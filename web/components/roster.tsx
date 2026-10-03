@@ -33,7 +33,7 @@ import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { inboxRepoKey, inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
-import { age, hostLabel, modeOf, pastLabel, projectName, SPLIT_CLICK } from "../labels";
+import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";
 import type { SectionTarget } from "../section";
 import { workspaces } from "../sessions";
@@ -439,7 +439,9 @@ export function Roster({
 						<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
 						<ShipStep ship={session.ship} />
 						{session.pullRequests.length > 0 && (
-							<span className="shrink-0 text-xs text-muted-foreground">{session.pullRequests.map(pr => `#${pr.number}`).join(" ")}</span>
+							<span className="shrink-0 text-xs text-muted-foreground" title={session.pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n")}>
+								{pullRequestsLabel(session.pullRequests)}
+							</span>
 						)}
 						<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(session.modifiedAt)}</span>
 					</span>
@@ -534,10 +536,10 @@ export function Roster({
 												<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
 												<ShipStep ship={host.ship} />
 												{(host.pullRequests.length > 0 || (host.source === "terminal" && !host.relayConnected)) && (
-													<span className="shrink-0 text-xs text-muted-foreground">
+													<span className="shrink-0 text-xs text-muted-foreground" title={host.pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n") || undefined}>
 														{[
 															host.source === "terminal" && !host.relayConnected && "relay offline",
-															host.pullRequests.map(pr => `#${pr.number}`).join(" "),
+															host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests),
 														]
 															.filter(Boolean)
 															.join(" · ")}
