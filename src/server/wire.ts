@@ -55,6 +55,12 @@ function parseModel(value: unknown): ModelOption | null {
 	return isObject(value) && isNonEmpty(value.provider) && isNonEmpty(value.id) ? { provider: value.provider, id: value.id } : null;
 }
 
+/** `null` for none, which keeps omp's thinking level; `undefined` for a value that is not a level. */
+function parseThinking(value: unknown): string | null | undefined {
+	if (value === null || value === undefined) return null;
+	return isNonEmpty(value) ? value : undefined;
+}
+
 function parseStartRequest(value: Record<string, unknown>): StartRequest | null {
 	switch (value.kind) {
 		case "new": {
@@ -62,7 +68,10 @@ function parseStartRequest(value: Record<string, unknown>): StartRequest | null 
 			const branch = parseBranchChoice(value.branch);
 			// `null` starts on omp's default model.
 			const model = value.model === null || value.model === undefined ? null : (parseModel(value.model) ?? undefined);
-			return isNonEmpty(cwd) && isNonEmpty(prompt) && branch !== undefined && model !== undefined ? { kind: "new", cwd, prompt, branch, model } : null;
+			const thinking = parseThinking(value.thinking);
+			return isNonEmpty(cwd) && isNonEmpty(prompt) && branch !== undefined && model !== undefined && thinking !== undefined
+				? { kind: "new", cwd, prompt, branch, model, thinking }
+				: null;
 		}
 		case "fork": {
 			const view = parseView(value.view);
@@ -136,7 +145,8 @@ export function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 		case "set-model": {
 			const { instanceId } = value;
 			const model = parseModel(value.model);
-			return typeof instanceId === "string" && model ? { t: "set-model", instanceId, model } : null;
+			const thinking = parseThinking(value.thinking);
+			return typeof instanceId === "string" && model && thinking !== undefined ? { t: "set-model", instanceId, model, thinking } : null;
 		}
 		case "set-thinking": {
 			const { instanceId, level } = value;

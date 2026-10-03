@@ -119,7 +119,7 @@ export function createClientHandler({ sessions, views, start, dismissInterrupted
 				return;
 			}
 			case "set-model":
-				sessions.get(msg.instanceId)?.setModel?.(msg.model);
+				sessions.get(msg.instanceId)?.setModel?.(msg.model, msg.thinking);
 				return;
 			case "set-thinking":
 				sessions.get(msg.instanceId)?.setThinking?.(msg.level);

@@ -43,6 +43,6 @@ export interface LiveSession {
 	dispose(): Promise<void>;
 	/** Models the session can switch to; only a session this dashboard started offers them. */
 	models?(): Promise<ModelOption[]>;
-	setModel?(model: ModelOption): void;
+	setModel?(model: ModelOption, thinking: string | null): void;
 	setThinking?(level: string): void;
 }

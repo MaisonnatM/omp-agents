@@ -53,7 +53,8 @@ describe("parseClientMsg", () => {
 	});
 
 	test("start parses each kind and drops what the kind does not name", () => {
-		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", extra: 1 })).toEqual({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", branch: null, model: null });
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", extra: 1 })).toEqual({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", branch: null, model: null, thinking: null });
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", thinking: "high" })).toMatchObject({ thinking: "high" });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", model: { provider: "anthropic", id: "claude-opus-5-5", name: "Opus" } })).toMatchObject({
 			model: { provider: "anthropic", id: "claude-opus-5-5" },
 		});
@@ -83,6 +84,7 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", branch: "main" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", model: { provider: "anthropic" } })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", model: "anthropic/claude-opus-5-5" })).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", thinking: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "fork", view: live, entryId: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "resume", sessionId: "" })).toBeNull();
 	});
@@ -97,12 +99,15 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "answer", instanceId: "i1", requestId: 1, answer: { kind: "cancel" } })).toBeNull();
 	});
 
-	test("set-model keeps only the provider and id", () => {
+	test("set-model keeps only the provider and id, and a thinking level when it names one", () => {
 		expect(msg({ t: "set-model", instanceId: "i1", model: { provider: "anthropic", id: "opus", extra: true } })).toEqual({
 			t: "set-model",
 			instanceId: "i1",
 			model: { provider: "anthropic", id: "opus" },
+			thinking: null,
 		});
+		expect(msg({ t: "set-model", instanceId: "i1", model: { provider: "anthropic", id: "opus" }, thinking: "high" })).toMatchObject({ thinking: "high" });
+		expect(msg({ t: "set-model", instanceId: "i1", model: { provider: "anthropic", id: "opus" }, thinking: 3 })).toBeNull();
 		expect(msg({ t: "set-model", instanceId: "i1", model: { provider: "anthropic" } })).toBeNull();
 	});
 });

@@ -423,12 +423,13 @@ export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; n
 
 /**
  * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` as its first
- * message, on `branch` when it names one, else in `cwd` as it is, on `model` when it names one, else on omp's default;
+ * message, on `branch` when it names one, else in `cwd` as it is, on `model` when it names one, else on omp's default,
+ * at thinking level `thinking` when it names one;
  * a fork holding the view's history before the user prompt `entryId`, its file left untouched; or past session
  * `sessionId` continued in its own file, as `omp --resume` does.
  */
 export type StartRequest =
-	| { kind: "new"; cwd: string; prompt: string; branch: BranchChoice | null; model: ModelOption | null }
+	| { kind: "new"; cwd: string; prompt: string; branch: BranchChoice | null; model: ModelOption | null; thinking: string | null }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "resume"; sessionId: string };
 /** `cwd` is the absolute directory the session runs in. `prompt` is the text of the prompt a fork branched at, for the composer; `null` for the other kinds. */
@@ -467,6 +468,14 @@ export interface PlanUsage {
 export interface ModelOption {
 	provider: string;
 	id: string;
+}
+
+/** A role in omp's `modelRoles`, such as `plan`, as the model and thinking level its selector names. */
+export interface ModelRole {
+	role: string;
+	model: ModelOption;
+	/** The selector's `:level` suffix; `null` keeps the session's thinking level. */
+	thinking: string | null;
 }
 
 /** A model role: the selector omp uses for it and the fallbacks it walks after that selector, in order. */
@@ -514,6 +523,16 @@ export interface CatalogModel {
 	provider: string;
 	name: string;
 	thinking: string[];
+}
+
+/**
+ * A selector as the model `omp models` lists and its `:level` thinking suffix. Model ids can hold colons
+ * (`minimax-m3:batch`), so the suffix splits off only when the rest is a listed model and the whole is not.
+ */
+export function splitSelector(selector: string, models: ReadonlyMap<string, CatalogModel>): { model: string; level: string | null } {
+	const colon = selector.lastIndexOf(":");
+	if (colon < 0 || models.has(selector) || !models.has(selector.slice(0, colon))) return { model: selector, level: null };
+	return { model: selector.slice(0, colon), level: selector.slice(colon + 1) };
 }
 
 /**
@@ -613,8 +632,8 @@ export type ClientMsg =
 	| { t: "dismiss-interrupted"; sessionId: string }
 	/** Models a session this dashboard started can switch to. */
 	| { t: "list-models"; instanceId: string }
-	/** Switch a session this dashboard started to another model. */
-	| { t: "set-model"; instanceId: string; model: ModelOption }
+	/** Switch a session this dashboard started to another model and, when `thinking` names one, thinking level, as picking a model role does. */
+	| { t: "set-model"; instanceId: string; model: ModelOption; thinking: string | null }
 	/** Switch a session this dashboard started to another thinking level, one of its `thinkingLevels`. */
 	| { t: "set-thinking"; instanceId: string; level: string }
 	/** Reply to one of a live session's pending `requests`. */

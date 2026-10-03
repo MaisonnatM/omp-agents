@@ -1,6 +1,7 @@
 import { isObject } from "../json";
 import { runJson } from "../proc";
-import type { CatalogModel, ModelOption } from "../shared";
+import { type CatalogModel, type ModelOption, type ModelRole, splitSelector } from "../shared";
+import { loadOmpConfig } from "./config";
 import { ompCommand } from "./install";
 import { auth, oauth } from "./modules";
 
@@ -42,4 +43,39 @@ export async function connectedProviders(): Promise<Set<string>> {
 export async function connectedModels(): Promise<ModelOption[]> {
 	const [models, connected] = await Promise.all([listModels(), connectedProviders()]);
 	return models.flatMap(({ selector, provider }) => (connected.has(provider) ? [{ provider, id: selector.slice(provider.length + 1) }] : []));
+}
+
+/**
+ * omp's `modelRoles` in config order, each as the connected model its selector names. A role that names another
+ * (`@slow`, or `*` for `default`) takes that role's model, and its level unless it adds its own `:level`. Roles that
+ * name a model by a fuzzy pattern, or one on a provider you are not connected to, are left out: they could not switch.
+ */
+export function resolveRoles(roles: Record<string, string>, catalog: CatalogModel[], connected: ReadonlySet<string>): ModelRole[] {
+	const models = new Map(catalog.map(model => [model.selector, model]));
+	const resolve = (value: string, seen: ReadonlySet<string>): { model: CatalogModel; level: string | null } | null => {
+		const alias = value === "*" ? "default" : value.startsWith("@") ? value.slice(1) : null;
+		if (alias === null) {
+			const { model, level } = splitSelector(value, models);
+			const listed = models.get(model);
+			return listed ? { model: listed, level } : null;
+		}
+		const colon = alias.indexOf(":");
+		const name = colon < 0 ? alias : alias.slice(0, colon);
+		const target = roles[name];
+		if (target === undefined || seen.has(name)) return null;
+		const resolved = resolve(target.trim(), new Set(seen).add(name));
+		return resolved && { model: resolved.model, level: colon < 0 ? resolved.level : alias.slice(colon + 1) };
+	};
+	return Object.entries(roles).flatMap(([role, value]): ModelRole[] => {
+		const resolved = resolve(value.trim(), new Set([role]));
+		if (!resolved || !connected.has(resolved.model.provider)) return [];
+		const { selector, provider } = resolved.model;
+		return [{ role, model: { provider, id: selector.slice(provider.length + 1) }, thinking: resolved.level }];
+	});
+}
+
+/** The roles a session in `cwd` could switch to, from the config it would load: see {@link resolveRoles}. */
+export async function connectedRoles(cwd: string): Promise<ModelRole[]> {
+	const [config, catalog, connected] = await Promise.all([loadOmpConfig(cwd), listModels(), connectedProviders()]);
+	return resolveRoles(config.modelRoles, catalog, connected);
 }

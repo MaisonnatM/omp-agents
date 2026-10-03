@@ -37,7 +37,7 @@ describe("starts", () => {
 
 	test("a failure's reason leaves with its view, a start under way stays, and a draft's failure outlives any view", () => {
 		let starts = settleStart(beginStart(new Map(), 1, resume), 1, { ok: false, error: "no file" });
-		starts = settleStart(beginStart(starts, 2, { kind: "new", cwd: "~", prompt: "hi", branch: null, model: null }), 2, { ok: false, error: "not a directory" });
+		starts = settleStart(beginStart(starts, 2, { kind: "new", cwd: "~", prompt: "hi", branch: null, model: null, thinking: null }), 2, { ok: false, error: "not a directory" });
 		starts = beginStart(starts, 3, fork);
 		const none = (): boolean => false;
 		const hidden = dropHidden(starts, none);
