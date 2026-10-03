@@ -15,7 +15,7 @@ import {
 	swapView,
 	viewForSession,
 } from "./routing";
-import { beginStart, dismissFailed, dropHidden, loseStarts, requestOf, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
+import { beginStart, dismissSettled, dropHidden, loseStarts, requestOf, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
 
 const subscribeHash = (onChange: () => void): (() => void) => {
 	window.addEventListener("hashchange", onChange);
@@ -46,7 +46,7 @@ export interface DashboardState {
 	layout: Layout;
 	/** Last roster row seen for each open live session, by instance id, kept after it leaves the roster. */
 	lastHosts: Map<string, RosterHost>;
-	/** Starts of new, forked, and resumed sessions, by the `reqId` the server answers with. */
+	/** Starts of new, forked, resumed, and quick-action sessions, by the `reqId` the server answers with. */
 	starts: Starts;
 	/** The server's last answer to the new-session draft's `complete`. */
 	newSessionCompletions: Completions | null;
@@ -67,7 +67,7 @@ type Action =
 	| { t: "server"; msg: Exclude<ServerMsg, PaneMsg> }
 	| { t: "layout"; layout: Layout }
 	| { t: "start"; reqId: number; op: StartOp }
-	/** A failed start's error goes away; a start under way keeps waiting for its answer. */
+	/** A failed start's error, or a quick action's started session, goes away; a start under way keeps waiting for its answer. */
 	| { t: "dismiss-start"; kind: StartKind }
 	| { t: "resume-all"; reqId: number }
 	| { t: "dismiss-resume-all" };
@@ -129,7 +129,7 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 		case "start":
 			return { ...state, starts: beginStart(state.starts, action.reqId, action.op) };
 		case "dismiss-start":
-			return { ...state, starts: dismissFailed(state.starts, action.kind) };
+			return { ...state, starts: dismissSettled(state.starts, action.kind) };
 		case "resume-all":
 			return { ...state, resumeAll: { phase: "starting", reqId: action.reqId } };
 		case "dismiss-resume-all":
@@ -189,9 +189,9 @@ export interface Dashboard {
 	show: (layout: Layout) => void;
 	/** Open the new-session draft in the default directory, clearing a failed start's error. */
 	openNewSession: () => void;
-	/** Forget the error of a failed start of `kind`. */
+	/** Forget the error of a failed start of `kind`, or the session a quick action started. */
 	dismissStart: (kind: StartKind) => void;
-	/** Start a session; it opens in the focused pane once ready (a quick action's in the pane its mode says), and a resumed one in the pane of the past session it continues. */
+	/** Start a session; it opens in the focused pane once ready, and a resumed one in the pane of the past session it continues. A quick action's session runs in the background, and the page stays where it is. */
 	start: (op: StartOp) => void;
 	/** Resume these interrupted sessions; a pane that shows one of them shows it live once it runs. */
 	resumeAll: (sessionIds: string[]) => void;
@@ -268,7 +268,7 @@ export function useDashboard(): Dashboard {
 					const op = startsRef.current.get(msg.reqId)?.op;
 					const live: LiveView = { kind: "live", instanceId: msg.result.instanceId, agentId: null };
 					if (op?.kind === "resume") show(swapView(layoutRef.current, { kind: "past", sessionId: op.sessionId }, live));
-					else if (op) open(live, op.kind === "quick" ? op.mode : "replace");
+					else if (op && op.kind !== "quick") open(live, "replace");
 				}
 				if (msg.t === "resumed-all") {
 					const layout = layoutRef.current;

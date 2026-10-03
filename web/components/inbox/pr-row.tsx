@@ -116,7 +116,7 @@ interface RowProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The quick action whose session is starting for this PR, if any. */
 	pending: QuickActionId | null;
-	onQuickAction: (action: QuickActionId, mode: OpenMode) => void;
+	onQuickAction: (action: QuickActionId) => void;
 }
 
 export function PullRequestRow({ pr, sessions, targeted, onOpen, pending, onQuickAction }: RowProps) {

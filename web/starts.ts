@@ -1,19 +1,21 @@
-import type { BranchChoice, PullRequest, StartRequest, StartResult, View } from "../src/shared";
+import type { BranchChoice, LiveView, PullRequest, StartRequest, StartResult, View } from "../src/shared";
 import type { QuickActionId } from "./quick-actions";
-import type { OpenMode } from "./routing";
 import type { ForkPoint } from "./transcript-view";
 
-/** What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. A quick action keeps its pull request and action, which the inbox shows progress and failure for. */
+/** What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. A quick action keeps its pull request and action, which the inbox shows progress, the started session, and failure for. */
 export type StartOp =
 	| { kind: "new"; cwd: string; prompt: string; branch: BranchChoice | null }
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
 	| { kind: "resume"; sessionId: string }
-	| { kind: "quick"; cwd: string; prompt: string; pr: PullRequest; action: QuickActionId; mode: OpenMode };
+	| { kind: "quick"; cwd: string; prompt: string; pr: PullRequest; action: QuickActionId };
 
 export type StartKind = StartOp["kind"];
 
-/** A start waiting for the server's answer, or failed with the reason. A start that succeeded leaves {@link Starts}. */
-export type Start<Op extends StartOp = StartOp> = { op: Op } & ({ phase: "starting" } | { phase: "failed"; error: string });
+/**
+ * A start waiting for the server's answer, failed with the reason, or, for a quick action only, started: its session runs
+ * in the background while the inbox stays, so the inbox keeps it to offer the session. Any other start that succeeded leaves {@link Starts}.
+ */
+export type Start<Op extends StartOp = StartOp> = { op: Op } & ({ phase: "starting" } | { phase: "failed"; error: string } | { phase: "started"; view: LiveView });
 
 /** The starts of this page, by the `reqId` the server answers with. At most one per kind: a new start replaces the last of its kind. */
 export type Starts = ReadonlyMap<number, Start>;
@@ -46,13 +48,14 @@ export function beginStart(starts: Starts, reqId: number, op: StartOp): Starts {
 	return next.set(reqId, { op, phase: "starting" });
 }
 
-/** The server's answer to start `reqId`: a started session leaves the map, a failure stays with its reason. */
+/** The server's answer to start `reqId`: a failure stays with its reason, a quick action's session stays as started, and any other started session leaves the map. */
 export function settleStart(starts: Starts, reqId: number, result: StartResult): Starts {
 	const start = starts.get(reqId);
 	if (start?.phase !== "starting") return starts;
 	const next = new Map(starts);
-	if (result.ok) next.delete(reqId);
-	else next.set(reqId, { op: start.op, phase: "failed", error: result.error });
+	if (!result.ok) next.set(reqId, { op: start.op, phase: "failed", error: result.error });
+	else if (start.op.kind === "quick") next.set(reqId, { op: start.op, phase: "started", view: { kind: "live", instanceId: result.instanceId, agentId: null } });
+	else next.delete(reqId);
 	return next;
 }
 
@@ -75,9 +78,9 @@ const viewOf = (op: StartOp): View | null => {
 	return op.kind === "resume" ? { kind: "past", sessionId: op.sessionId } : null;
 };
 
-/** Forget the failed starts whose op `drop` selects; one under way keeps waiting for its answer. */
-function dropFailed(starts: Starts, drop: (op: StartOp) => boolean): Starts {
-	const dropped = [...starts].filter(([, start]) => start.phase === "failed" && drop(start.op));
+/** Forget the failed and started starts whose op `drop` selects; one under way keeps waiting for its answer. */
+function dropSettled(starts: Starts, drop: (start: Start) => boolean): Starts {
+	const dropped = [...starts].filter(([, start]) => start.phase !== "starting" && drop(start));
 	if (dropped.length === 0) return starts;
 	const next = new Map(starts);
 	for (const [reqId] of dropped) next.delete(reqId);
@@ -86,10 +89,11 @@ function dropFailed(starts: Starts, drop: (op: StartOp) => boolean): Starts {
 
 /** A failed start's reason goes away once no pane shows its view. */
 export const dropHidden = (starts: Starts, shown: (view: View) => boolean): Starts =>
-	dropFailed(starts, op => {
-		const view = viewOf(op);
+	dropSettled(starts, start => {
+		if (start.phase !== "failed") return false;
+		const view = viewOf(start.op);
 		return view !== null && !shown(view);
 	});
 
-/** The reason a failed start of `kind` gave goes away. */
-export const dismissFailed = (starts: Starts, kind: StartKind): Starts => dropFailed(starts, op => op.kind === kind);
+/** The failure, or the quick action's started session, that the last start of `kind` left goes away. */
+export const dismissSettled = (starts: Starts, kind: StartKind): Starts => dropSettled(starts, start => start.op.kind === kind);
