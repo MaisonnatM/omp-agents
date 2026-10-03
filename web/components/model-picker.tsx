@@ -44,14 +44,17 @@ export function ModelRow({ selector, id, selected }: { selector: string; id: str
 }
 
 interface ModelPickerProps {
-	/** The session's `provider/id`, or `null` before it reports one. */
+	/** The session's `provider/id`, or `null` before it reports one or, in the new-session draft, before you pick one. */
 	current: string | null;
-	/** The last list the server sent for this session, or `null` while none has arrived. */
+	/** What the button reads while `current` is `null`, `Choose model` when not given. */
+	unset?: string;
+	/** The last list the server sent, or `null` while none has arrived. */
 	list: { models: ModelOption[]; error: string | null } | null;
 	open: boolean;
 	/** The parent refreshes the list from omp whenever the picker opens. */
 	onOpenChange: (open: boolean) => void;
 	onPick: (model: ModelOption) => void;
+	disabled?: boolean;
 }
 
 function byProvider(models: ModelOption[]): [string, ModelOption[]][] {
@@ -64,13 +67,21 @@ function byProvider(models: ModelOption[]): [string, ModelOption[]][] {
 	return [...groups];
 }
 
-/** The composer's model switch: a searchable list of the session's models, grouped by provider. */
-export function ModelPicker({ current, list, open, onOpenChange, onPick }: ModelPickerProps) {
+/** The composer's model switch: a searchable list of the models of the providers you are connected to, grouped by provider. */
+export function ModelPicker({ current, unset, list, open, onOpenChange, onPick, disabled }: ModelPickerProps) {
 	return (
 		<Popover open={open} onOpenChange={onOpenChange}>
 			<PopoverTrigger asChild>
-				<Button variant="ghost" size="compact" trailingIcon={ChevronsUpDown} title={current ?? undefined} aria-label={`Choose model: ${current ? modelDescription(current) : "none selected"}`} active={open}>
-					<span className="max-w-56 truncate">{current ? <Model selector={current} /> : "Choose model"}</span>
+				<Button
+					variant="ghost"
+					size="compact"
+					trailingIcon={ChevronsUpDown}
+					title={current ?? undefined}
+					aria-label={`Choose model: ${current ? modelDescription(current) : (unset ?? "none selected")}`}
+					active={open}
+					disabled={disabled}
+				>
+					<span className="max-w-56 truncate">{current ? <Model selector={current} /> : (unset ?? "Choose model")}</span>
 				</Button>
 			</PopoverTrigger>
 			<PopoverContent side="top" align="start" className="w-[min(22rem,calc(100vw-2rem))] p-0" onMouseDown={event => event.stopPropagation()}>

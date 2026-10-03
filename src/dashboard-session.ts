@@ -8,6 +8,7 @@ import { statSync } from "node:fs";
 import { activityOf, contextOf, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
 import { errorText, isObject } from "./json";
 import type { LiveSession, LiveUpdate, SessionFacts } from "./live-session";
+import { connectedProviders } from "./omp/models";
 import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
 import { displayPath } from "./paths";
@@ -129,9 +130,11 @@ export class DashboardSession implements LiveSession {
 		});
 	}
 
-	/** Spawn omp in `cwd` and wait until it accepts commands. `emit` hears `instanceId` from spawn on, before this resolves. */
-	static start(instanceId: string, cwd: string, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
-		return DashboardSession.#spawn(instanceId, cwd, emit, async () => {});
+	/** Spawn omp in `cwd`, on `model` when one is named, and wait until it accepts commands. `emit` hears `instanceId` from spawn on, before this resolves. */
+	static start(instanceId: string, cwd: string, model: ModelOption | null, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+		return DashboardSession.#spawn(instanceId, cwd, emit, async client => {
+			if (model) await client.setModel(model.provider, model.id);
+		});
 	}
 
 	/**
@@ -324,9 +327,10 @@ export class DashboardSession implements LiveSession {
 		this.#child.client.cancelSubagent(agentId).catch((err: unknown) => this.#fail("Cancel failed", err, agentId));
 	}
 
+	/** The models omp offers this session, from the providers you are connected to. */
 	async models(): Promise<ModelOption[]> {
-		const models = await this.#child.client.getAvailableModels();
-		return models.map(({ provider, id }) => ({ provider, id }));
+		const [models, connected] = await Promise.all([this.#child.client.getAvailableModels(), connectedProviders()]);
+		return models.flatMap(({ provider, id }) => (connected.has(provider) ? [{ provider, id }] : []));
 	}
 
 	setModel({ provider, id }: ModelOption): void {

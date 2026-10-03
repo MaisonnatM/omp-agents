@@ -412,11 +412,12 @@ export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; n
 
 /**
  * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` as its first
- * message, on `branch` when it names one, else in `cwd` as it is; a fork holding the view's history before the user
- * prompt `entryId`, its file left untouched; or past session `sessionId` continued in its own file, as `omp --resume` does.
+ * message, on `branch` when it names one, else in `cwd` as it is, on `model` when it names one, else on omp's default;
+ * a fork holding the view's history before the user prompt `entryId`, its file left untouched; or past session
+ * `sessionId` continued in its own file, as `omp --resume` does.
  */
 export type StartRequest =
-	| { kind: "new"; cwd: string; prompt: string; branch: BranchChoice | null }
+	| { kind: "new"; cwd: string; prompt: string; branch: BranchChoice | null; model: ModelOption | null }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "resume"; sessionId: string };
 /** `cwd` is the absolute directory the session runs in. `prompt` is the text of the prompt a fork branched at, for the composer; `null` for the other kinds. */

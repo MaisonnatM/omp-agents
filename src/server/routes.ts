@@ -1,7 +1,7 @@
 /** The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, and Linear tickets through. */
 import { gitCheckout } from "../git";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
-import { listModels } from "../omp/models";
+import { connectedModels, listModels } from "../omp/models";
 import { directoryOf } from "../paths";
 import type { PullRequestIndex } from "../pull-requests";
 import { linkSessions, type SessionEntry } from "../session-links";
@@ -50,6 +50,13 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		const refused = guards.admit(req);
 		if (refused) return refused;
 		return answer(async () => ({ models: await listModels() }));
+	};
+
+	/** `GET /api/models/connected`: the models of the providers you are connected to, for the new-session draft's model picker. */
+	const connected: Handler = async req => {
+		const refused = guards.admit(req);
+		if (refused) return refused;
+		return answer(async () => ({ models: await connectedModels() }));
 	};
 
 	/**
@@ -144,6 +151,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
 		"/api/settings/file": { PUT: settingsWrite(saveOmpFile) },
 		"/api/models": { GET: models },
+		"/api/models/connected": { GET: connected },
 		"/api/pull-request/sessions": { PUT: sessionLinks },
 		"/api/inbox": { GET: inbox },
 		"/api/tickets": { GET: tickets },
