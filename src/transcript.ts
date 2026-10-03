@@ -8,7 +8,7 @@
  * file's copy replaces the streamed one in place and a late event cannot undo it.
  */
 import { isObject, str } from "./json";
-import type { Item } from "./shared";
+import { type Item, PROMPT_IMAGE_TYPES } from "./shared";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -32,6 +32,25 @@ export function textOf(content: unknown): string {
 		.filter(block => isObject(block) && block.type === "text")
 		.map(block => String(block.text))
 		.join("\n");
+}
+
+/** How omp's session files point at an image it moved to its blob store. */
+const BLOB_REF = /^blob:sha256:([0-9a-f]{64})$/;
+
+/**
+ * The images of a message's content, as the page shows them: inline as a `data:` URL, or through `/api/image` once omp
+ * moved them to its blob store. Types the page does not show are left out.
+ */
+function imagesOf(content: unknown): { images?: string[] } {
+	if (!Array.isArray(content)) return {};
+	const images = content.flatMap(block => {
+		if (!isObject(block) || block.type !== "image" || typeof block.data !== "string") return [];
+		const type = str(block.mimeType);
+		if (!type || !PROMPT_IMAGE_TYPES.includes(type)) return [];
+		const hash = BLOB_REF.exec(block.data)?.[1];
+		return [hash ? `/api/image?${new URLSearchParams({ hash, type })}` : `data:${type};base64,${block.data}`];
+	});
+	return images.length > 0 ? { images } : {};
 }
 
 export function oneLine(text: string): string {
@@ -219,7 +238,7 @@ export class Transcript {
 		switch (message.role) {
 			case "user": {
 				if (message.synthetic) return [];
-				return this.#upsert({ id: key, kind: "user", ...userPrompt(textOf(message.content)), from: null, entryId });
+				return this.#upsert({ id: key, kind: "user", ...userPrompt(textOf(message.content)), from: null, entryId, ...imagesOf(message.content) });
 			}
 			case "custom": {
 				const details = isObject(message.details) ? message.details : {};
@@ -230,7 +249,14 @@ export class Transcript {
 					return this.#upsert({ id: key, kind: "user", text: str(details.args) ?? "", skill, from: null, entryId: null });
 				}
 				if (message.customType !== COLLAB_PROMPT) return [];
-				return this.#upsert({ id: key, kind: "user", ...userPrompt(textOf(message.content)), from: str(details.from) ?? null, entryId: null });
+				return this.#upsert({
+					id: key,
+					kind: "user",
+					...userPrompt(textOf(message.content)),
+					from: str(details.from) ?? null,
+					entryId: null,
+					...imagesOf(message.content),
+				});
 			}
 			case "assistant":
 				return this.#applyAssistant(key, message, streaming);

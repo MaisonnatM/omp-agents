@@ -58,6 +58,7 @@ export interface DirsModule {
 	getAgentDir(): string;
 	/** omp's user-level MCP config, `mcp.json` in the agent directory. */
 	getMCPConfigPath(scope: "user"): string;
+	getBlobsDir(): string;
 }
 /** Subset of omp's `SessionEntry` (src/session/session-entries.ts); the header has `type: "session"`. */
 export interface FileEntry {
@@ -327,6 +328,7 @@ export const dirs = await load<DirsModule>(join(utilsSrc, "dirs.ts"), {
 	getSessionsDir: "function",
 	getAgentDir: "function",
 	getMCPConfigPath: "function",
+	getBlobsDir: "function",
 });
 
 export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc-client.ts"), {

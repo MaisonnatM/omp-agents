@@ -1,6 +1,6 @@
 /** What the server asks of a running session, whether it is a terminal session it joined or one it started itself. */
 import type { HostSnapshot } from "./omp/collab";
-import type { Delivery, MessageQueue, ModelOption, RosterHost, UserAnswer } from "./shared";
+import type { Delivery, MessageQueue, ModelOption, PromptImage, RosterHost, UserAnswer } from "./shared";
 
 /** What the index of session files knows of a session: the pull requests it worked on and its /ship stage. */
 export type SessionFacts = Pick<RosterHost, "pullRequests" | "ship">;
@@ -26,8 +26,11 @@ export interface LiveSession {
 	 * `savedFile` resolves a session id to its file among the files on disk.
 	 */
 	transcriptPath(agentId: string | null, savedFile: (sessionId: string) => string | null): string | null;
-	/** Send `text` to the main agent or chat to a subagent; `delivery` applies while a turn runs. Rejects when the text cannot be prepared. */
-	prompt(agentId: string | null, text: string, delivery: Delivery): Promise<void>;
+	/**
+	 * Send `text` and `images` to the main agent, or chat `text` to a subagent; `delivery` applies while a turn runs.
+	 * Rejects when the text cannot be prepared, and a subagent's message with images, which omp gives no subagent.
+	 */
+	prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void>;
 	/** Take a queued message back; whether the session still held it. */
 	dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean>;
 	abort(): void;

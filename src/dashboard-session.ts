@@ -12,7 +12,7 @@ import { connectedProviders } from "./omp/models";
 import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
 import { displayPath } from "./paths";
-import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type RosterHost, type UserAnswer, type UserRequest } from "./shared";
+import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type PromptImage, type RosterHost, type UserAnswer, type UserRequest } from "./shared";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
 /** omp's subagent lifecycle and progress statuses, as the roster's agent statuses. */
@@ -281,14 +281,19 @@ export class DashboardSession implements LiveSession {
 	 * the session's own slash-command and skill pipeline. A subagent takes every message as a steer: omp reaches only a
 	 * running one, so a follow-up held until it stopped could never be sent.
 	 */
-	async prompt(agentId: string | null, text: string, delivery: Delivery): Promise<void> {
+	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
 		if (agentId !== null) {
+			if (images.length > 0) throw new Error("omp sends a subagent text only.");
 			await this.#child.client.steerSubagent(agentId, text).catch((err: unknown) => this.#fail("Message failed", err, agentId));
 			return;
 		}
-		if (text.startsWith("!")) return this.#shell(text);
+		if (text.startsWith("!")) {
+			if (images.length > 0) throw new Error("A ! command takes no images.");
+			return this.#shell(text);
+		}
 		this.#userCommand = text.startsWith("/");
-		await this.#child.client.prompt(text, undefined, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
+		const content = images.map(image => ({ type: "image" as const, ...image }));
+		await this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
 	}
 
 	/** A `!` command, which omp runs in the session's directory and records in its file for the agent to see. */

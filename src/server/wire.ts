@@ -3,7 +3,8 @@
  * Each parser returns a typed value, or `null` for anything else, so no caller casts what it received.
  */
 import { isObject } from "../json";
-import type { BranchChoice, ClientMsg, CompletionScope, LiveView, ModelOption, PullRequest, SessionLinksEdit, StartRequest, UserAnswer, View } from "../shared";
+import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared";
+import type { BranchChoice, ClientMsg, CompletionScope, LiveView, ModelOption, PromptImage, PullRequest, SessionLinksEdit, StartRequest, UserAnswer, View } from "../shared";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
@@ -55,14 +56,35 @@ function parseModel(value: unknown): ModelOption | null {
 	return isObject(value) && isNonEmpty(value.provider) && isNonEmpty(value.id) ? { provider: value.provider, id: value.id } : null;
 }
 
+/** The longest base64 of {@link MAX_PROMPT_IMAGE_BYTES}. */
+const MAX_PROMPT_IMAGE_BASE64 = Math.ceil(MAX_PROMPT_IMAGE_BYTES / 3) * 4;
+const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+
+/** A prompt's images: `[]` when it sends none, `null` for anything but images of {@link PROMPT_IMAGE_TYPES} within the size limit. */
+function parseImages(value: unknown): PromptImage[] | null {
+	if (value === undefined) return [];
+	if (!Array.isArray(value)) return null;
+	const images: PromptImage[] = [];
+	let size = 0;
+	for (const image of value) {
+		if (!isObject(image) || typeof image.data !== "string" || typeof image.mimeType !== "string") return null;
+		if (!PROMPT_IMAGE_TYPES.includes(image.mimeType) || !BASE64.test(image.data)) return null;
+		size += image.data.length;
+		images.push({ data: image.data, mimeType: image.mimeType });
+	}
+	return size <= MAX_PROMPT_IMAGE_BASE64 ? images : null;
+}
+
 function parseStartRequest(value: Record<string, unknown>): StartRequest | null {
 	switch (value.kind) {
 		case "new": {
 			const { cwd, prompt } = value;
+			const images = parseImages(value.images);
 			const branch = parseBranchChoice(value.branch);
 			// `null` starts on omp's default model.
 			const model = value.model === null || value.model === undefined ? null : (parseModel(value.model) ?? undefined);
-			return isNonEmpty(cwd) && isNonEmpty(prompt) && branch !== undefined && model !== undefined ? { kind: "new", cwd, prompt, branch, model } : null;
+			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || branch === undefined || model === undefined) return null;
+			return prompt.trim() || images.length > 0 ? { kind: "new", cwd, prompt, images, branch, model } : null;
 		}
 		case "fork": {
 			const view = parseView(value.view);
@@ -96,7 +118,9 @@ export function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 		case "prompt": {
 			const view = parseLiveView(value.view);
 			const { text, delivery } = value;
-			return view && isNonEmpty(text) && (delivery === "steer" || delivery === "followUp") ? { t: "prompt", view, text, delivery } : null;
+			const images = parseImages(value.images);
+			if (!view || typeof text !== "string" || !images || (delivery !== "steer" && delivery !== "followUp")) return null;
+			return text.trim() || images.length > 0 ? { t: "prompt", view, text, images, delivery } : null;
 		}
 		case "dequeue": {
 			const view = parseLiveView(value.view);

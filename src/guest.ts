@@ -11,7 +11,7 @@ import type { LiveSession, LiveUpdate } from "./live-session";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp/collab";
 import { displayPath } from "./paths";
 import type { SessionFacts } from "./live-session";
-import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, RosterHost, UserAnswer, UserRequest } from "./shared";
+import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, PromptImage, RosterHost, UserAnswer, UserRequest } from "./shared";
 import { type HostAgent, parseAgents, SubagentFiles } from "./subagents";
 import { oneLine } from "./transcript";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
@@ -78,10 +78,14 @@ const sameState = (a: HostState | null, b: HostState | null): boolean =>
 	a?.context?.window === b?.context?.window &&
 	a?.streaming === b?.streaming;
 
-/** A message as the user typed it, which the queue shows, and as the host receives it once its skill or file command expanded. */
+/**
+ * A message as the user typed it, which the queue shows, and as the host receives it once its skill or file command
+ * expanded, with the images it carries to the main agent.
+ */
 export interface Outgoing {
 	text: string;
 	payload: string;
+	images?: PromptImage[];
 }
 
 /** Resolve a link, re-listing on `stale_generation` (the host switched sessions mid-request). */
@@ -223,10 +227,11 @@ export class SessionGuest implements LiveSession {
 		return this.#requests.list();
 	}
 
-	/** Prepare `text` as the terminal would, expanding a skill or file command, then {@link send} it. */
-	async prompt(agentId: string | null, text: string, delivery: Delivery): Promise<void> {
+	/** Prepare `text` as the terminal would, expanding a skill or file command, then {@link send} it with `images`. */
+	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
+		if (agentId && images.length > 0) throw new Error("omp sends a subagent text only.");
 		const payload = await expandPrompt(this.instanceId, this.#host.cwd, text, agentId ? "subagent" : "session");
-		this.send(agentId, { text, payload }, delivery);
+		this.send(agentId, { text, payload, images }, delivery);
 	}
 
 	/**
@@ -241,8 +246,10 @@ export class SessionGuest implements LiveSession {
 			this.#emit({ kind: "roster" });
 			return;
 		}
-		if (!key) this.#socket?.send({ t: "prompt", text: message.payload });
-		else if (this.#agents.some(a => a.id === key && !a.isMain && a.status !== "aborted")) {
+		if (!key) {
+			const images = message.images?.map(image => ({ type: "image", ...image }));
+			this.#socket?.send({ t: "prompt", text: message.payload, images: images?.length ? images : undefined });
+		} else if (this.#agents.some(a => a.id === key && !a.isMain && a.status !== "aborted")) {
 			this.#socket?.send({ t: "agent-cmd", cmd: "chat", agentId: key, text: message.payload });
 		}
 	}

@@ -1,6 +1,6 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
-import type { RosterHost, PastSession, View, LiveView, ModelOption, Delivery, MessageQueue, UserAnswer } from "../../src/shared";
+import type { RosterHost, PastSession, View, LiveView, ModelOption, Delivery, MessageQueue, PromptImage, UserAnswer } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { usePane } from "../pane-store";
@@ -68,8 +68,8 @@ export const Pane = memo(function Pane({
 	const onListModels = useCallback(() => instanceId && send({ t: "list-models", instanceId }), [send, instanceId]);
 	const onSetModel = useCallback((model: ModelOption) => instanceId && send({ t: "set-model", instanceId, model }), [send, instanceId]);
 	const onSetThinking = useCallback((level: string) => instanceId && send({ t: "set-thinking", instanceId, level }), [send, instanceId]);
-	const onPrompt = useCallback((text: string, delivery: Delivery) => {
-		if (view.kind === "live") send({ t: "prompt", view, text, delivery });
+	const onPrompt = useCallback((text: string, images: PromptImage[], delivery: Delivery) => {
+		if (view.kind === "live") send({ t: "prompt", view, text, images, delivery });
 	}, [send, view]);
 	const onDequeue = useCallback((reqId: number, messages: { queue: keyof MessageQueue; text: string }[]) => {
 		if (view.kind === "live") send({ t: "dequeue", reqId, view, messages });

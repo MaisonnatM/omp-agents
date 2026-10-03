@@ -58,7 +58,7 @@ export function createClientHandler({ sessions, views, start, dismissInterrupted
 			case "prompt": {
 				const { view } = msg;
 				try {
-					await sessions.get(view.instanceId)?.prompt(view.agentId, msg.text, msg.delivery);
+					await sessions.get(view.instanceId)?.prompt(view.agentId, msg.text, msg.images, msg.delivery);
 				} catch (error) {
 					reply(ws, view.instanceId, {
 						t: "items",

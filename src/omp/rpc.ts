@@ -32,7 +32,7 @@ export interface RpcClient {
 	start(): Promise<void>;
 	stop(): Promise<void>;
 	getState(): Promise<RpcState>;
-	prompt(message: string, images?: undefined, streamingBehavior?: "steer" | "followUp"): Promise<string>;
+	prompt(message: string, images?: { type: "image"; data: string; mimeType: string }[], streamingBehavior?: "steer" | "followUp"): Promise<string>;
 	/** Takes the first queued message with this text out of `queue`; `removed` is false once omp has delivered it. */
 	removeQueuedMessage(message: string, queue: "steering" | "followUp"): Promise<{ removed: boolean }>;
 	abort(): Promise<void>;

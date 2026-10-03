@@ -315,13 +315,25 @@ export interface PastView {
 /** What the conversation pane shows: a live session or one of its subagents, or a past session's saved transcript. */
 export type View = LiveView | PastView;
 
+/** The image types a prompt can carry: the ones every model omp sends images to reads. */
+export const PROMPT_IMAGE_TYPES: readonly string[] = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+/** The most image bytes one prompt carries. The server's socket takes messages big enough for their base64. */
+export const MAX_PROMPT_IMAGE_BYTES = 32 * 1024 * 1024;
+
+/** An image sent with a prompt, as omp's `ImageContent` takes it: the file's bytes in base64 and its type. */
+export interface PromptImage {
+	data: string;
+	mimeType: string;
+}
+
 export type Item =
 	/**
 	 * `skill`: the skill a `/skill:<name>` prompt invoked, with `text` holding only what the user typed after it; `null` for
 	 * any other prompt. `entryId`: the session-file entry omp can branch at; `null` for Collab and skill prompts and prompts
-	 * not yet in the file.
+	 * not yet in the file. `images`: the addresses of the images the prompt carried, a `data:` URL or `/api/image`; absent
+	 * when it carried none.
 	 */
-	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null }
+	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null; images?: string[] }
 	| { id: string; kind: "assistant"; text: string; streaming: boolean }
 	/** `agents`: the subagents a `task` call spawned, by id, in the order they appeared; empty for every other tool. */
 	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[] }
@@ -422,13 +434,13 @@ export const worktreeDir = (mainWorktree: string, branch: string): string => `${
 export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; name: string; base: string };
 
 /**
- * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` as its first
- * message, on `branch` when it names one, else in `cwd` as it is, on `model` when it names one, else on omp's default;
- * a fork holding the view's history before the user prompt `entryId`, its file left untouched; or past session
+ * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` and `images` as
+ * its first message, on `branch` when it names one, else in `cwd` as it is, on `model` when it names one, else on omp's
+ * default; a fork holding the view's history before the user prompt `entryId`, its file left untouched; or past session
  * `sessionId` continued in its own file, as `omp --resume` does.
  */
 export type StartRequest =
-	| { kind: "new"; cwd: string; prompt: string; branch: BranchChoice | null; model: ModelOption | null }
+	| { kind: "new"; cwd: string; prompt: string; images: PromptImage[]; branch: BranchChoice | null; model: ModelOption | null }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "resume"; sessionId: string };
 /** `cwd` is the absolute directory the session runs in. `prompt` is the text of the prompt a fork branched at, for the composer; `null` for the other kinds. */
@@ -596,8 +608,11 @@ export type ServerMsg =
 export type ClientMsg =
 	/** The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming. */
 	| { t: "watch"; views: View[] }
-	/** A prompt to the session, or chat to the subagent (prompt if idle, revive if parked); `delivery` applies while a turn runs. */
-	| { t: "prompt"; view: LiveView; text: string; delivery: Delivery }
+	/**
+	 * A prompt to the session, or chat to the subagent (prompt if idle, revive if parked); `delivery` applies while a turn
+	 * runs. Only the session's own agent takes `images`.
+	 */
+	| { t: "prompt"; view: LiveView; text: string; images: PromptImage[]; delivery: Delivery }
 	/** Take `messages` out of the view's queue before the agent gets them. `reqId` counts per view. */
 	| { t: "dequeue"; reqId: number; view: LiveView; messages: { queue: keyof MessageQueue; text: string }[] }
 	| { t: "abort"; instanceId: string }

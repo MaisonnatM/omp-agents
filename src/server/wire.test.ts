@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ClientMsg } from "../shared";
+import { type ClientMsg, MAX_PROMPT_IMAGE_BYTES } from "../shared";
 import { parseClientMsg, parsePullRequestQuery, parseSessionLinks } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
@@ -23,11 +23,23 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "watch", views: "all" })).toBeNull();
 	});
 
-	test("prompt needs a live view, non-blank text, and a known delivery", () => {
-		expect(msg({ t: "prompt", view: live, text: "go", delivery: "followUp" })).toMatchObject({ t: "prompt", delivery: "followUp" });
+	test("prompt needs a live view, non-blank text or images, and a known delivery", () => {
+		expect(msg({ t: "prompt", view: live, text: "go", delivery: "followUp" })).toMatchObject({ t: "prompt", images: [], delivery: "followUp" });
 		expect(msg({ t: "prompt", view: live, text: "  ", delivery: "steer" })).toBeNull();
 		expect(msg({ t: "prompt", view: live, text: "go", delivery: "later" })).toBeNull();
 		expect(msg({ t: "prompt", view: { kind: "past", sessionId: "s1" }, text: "go", delivery: "steer" })).toBeNull();
+	});
+
+	test("a prompt's images must be base64 of a type models read, within the size limit", () => {
+		const png = { data: "aGVsbG8=", mimeType: "image/png" };
+		const prompt = (images: unknown) => msg({ t: "prompt", view: live, text: "", images, delivery: "steer" });
+		expect(prompt([{ ...png, extra: 1 }])).toMatchObject({ text: "", images: [png] });
+		expect(prompt([])).toBeNull();
+		expect(prompt([{ ...png, mimeType: "image/svg+xml" }])).toBeNull();
+		expect(prompt([{ ...png, data: "not base64!" }])).toBeNull();
+		expect(prompt([{ ...png, data: "A".repeat(MAX_PROMPT_IMAGE_BYTES / 3 * 4 + 4) }])).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "", images: [png] })).toMatchObject({ prompt: "", images: [png] });
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "", images: [] })).toBeNull();
 	});
 
 	test("cancel-agent needs a live view of a subagent, not of the session", () => {
@@ -53,7 +65,7 @@ describe("parseClientMsg", () => {
 	});
 
 	test("start parses each kind and drops what the kind does not name", () => {
-		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", extra: 1 })).toEqual({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", branch: null, model: null });
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", extra: 1 })).toEqual({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", images: [], branch: null, model: null });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", model: { provider: "anthropic", id: "claude-opus-5-5", name: "Opus" } })).toMatchObject({
 			model: { provider: "anthropic", id: "claude-opus-5-5" },
 		});

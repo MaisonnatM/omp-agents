@@ -10,6 +10,7 @@ import type {
 	MessageQueue,
 	ModelOption,
 	PastSession,
+	PromptImage,
 	RosterHost,
 	UserAnswer,
 } from "../../src/shared";
@@ -28,6 +29,7 @@ import type { StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { useCompletion } from "./completion-popup";
 import { ContextRing } from "./context-ring";
+import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
 import { GitRef } from "./git";
 import { Model, ModelPicker } from "./model-picker";
 import { OrgIcon } from "./org-icon";
@@ -95,7 +97,7 @@ export function blockedShortcut(draft: string, shell: ShellReach): string | null
 	return draft.startsWith("!!") ? "omp's RPC mode cannot keep a command's output out of context. Use ! or the omp terminal." : null;
 }
 
-export const ShortcutNote = ({ text }: { text: string }) => (
+export const ComposerNote = ({ text }: { text: string }) => (
 	<p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">
 		{text}
 	</p>
@@ -247,7 +249,8 @@ interface ConversationProps {
 	onListModels: () => void;
 	onSetModel: (model: ModelOption) => void;
 	onSetThinking: (level: string) => void;
-	onPrompt: (text: string, delivery: Delivery) => void;
+	/** Only the session's own agent takes `images`. */
+	onPrompt: (text: string, images: PromptImage[], delivery: Delivery) => void;
 	/** The server's last answer to this view's `dequeue`. */
 	dequeued: { reqId: number; texts: string[] } | null;
 	onDequeue: (reqId: number, messages: { queue: keyof MessageQueue; text: string }[]) => void;
@@ -310,6 +313,9 @@ function LiveConversation({
 
 	const live = phase.phase === "live" && !phase.readOnly;
 	const writable = live && (view.agentId === null || agent?.canMessage === true);
+	// omp sends a subagent text only.
+	const attachable = writable && view.agentId === null;
+	const attachments = useImageAttachments();
 	const working = view.agentId === null ? host?.status === "working" : agent?.status === "running";
 	// Read again when a turn starts or ends, since a turn can switch the branch.
 	const checkout = useGitCheckout(view.agentId === null ? (shown?.cwd ?? null) : null, working);
@@ -349,10 +355,14 @@ function LiveConversation({
 	};
 
 	const submit = (text: string, delivery: Delivery): void => {
-		onPrompt(text, delivery);
 		completion.close();
 		setDraft("");
 		scrollToEnd();
+		if (!attachable) return onPrompt(text, [], delivery);
+		attachments.take(
+			images => onPrompt(text, images, delivery),
+			() => setDraft(current => current || text),
+		);
 	};
 
 	let status = CONTROL_LABEL[phase.phase];
@@ -431,7 +441,7 @@ function LiveConversation({
 
 	const followUp = (): boolean | void => {
 		const text = draft.trim();
-		if (!writable || !followUps || !text || directCommand) return false;
+		if (!writable || !followUps || (!text && (!attachable || attachments.files.length === 0)) || directCommand) return false;
 		submit(text, "followUp");
 	};
 	const endable = view.agentId === null && live;
@@ -472,7 +482,13 @@ function LiveConversation({
 	const completion = useCompletion({ draft, setDraft, completions, onComplete, onKeyDown: onComposerKey });
 	const followUpButton = writable && working && followUps && (
 		<Tooltip content={`Send once the turn finishes · ${FOLLOW_UP_KEYS}`} side="top">
-			<Button variant="ghost" size="icon-sm" aria-label="Send once the turn finishes" disabled={!draft.trim() || directCommand !== null} onClick={followUp}>
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				aria-label="Send once the turn finishes"
+				disabled={(!draft.trim() && (!attachable || attachments.files.length === 0)) || directCommand !== null}
+				onClick={followUp}
+			>
 				<ListEnd aria-hidden="true" />
 			</Button>
 		</Tooltip>
@@ -532,7 +548,15 @@ function LiveConversation({
 					onSend={text => {
 						if (!directCommand) submit(text, "steer");
 					}}
-					leftSlot={modelSlot}
+					leftSlot={({ openFilePicker }) => (
+						<>
+							{attachable && <AttachButton onClick={() => openFilePicker()} />}
+							{modelSlot}
+						</>
+					)}
+					files={attachable ? attachments.files : undefined}
+					onFilesChange={attachable ? attachments.onFilesChange : undefined}
+					accept={IMAGE_ACCEPT}
 					rightSlot={
 						<>
 							{contextSlot}
@@ -549,7 +573,8 @@ function LiveConversation({
 					onRemoveQueued={item => take(queued.filter(entry => entry.item.id === item.id), false)}
 					sendLabel={`${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
 				/>
-				{directCommand && <ShortcutNote text={directCommand} />}
+				{directCommand && <ComposerNote text={directCommand} />}
+				{attachable && attachments.note && <ComposerNote text={attachments.note} />}
 			</div>
 		</div>
 	);
