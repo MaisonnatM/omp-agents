@@ -178,10 +178,12 @@ interface InputMessageProps
    *  the draft is empty. Pressing Tab fills it into the composer — it doesn't
    *  send. Takes precedence over `placeholder`. */
   placeholderSuggestion?: string;
-  /** Suggested prompts listed under the action bar while the draft is empty.
-   *  ArrowDown moves a highlight into the list (focus stays in the textarea),
-   *  ArrowUp walks back up and out, Enter or click fills the highlighted
-   *  prompt into the composer. Typing collapses the list. */
+  /** Suggested prompts listed under the action bar while the draft is empty,
+   *  numbered from 1. A row's number key sends it, as do Enter on the
+   *  highlighted row and a click; Tab fills the highlighted row into the
+   *  composer to edit first. ArrowDown moves a highlight into the list (focus
+   *  stays in the textarea), ArrowUp walks back up and out. Typing collapses
+   *  the list. */
   suggestions?: string[];
 }
 
@@ -354,9 +356,6 @@ interface SuggestionRowProps {
   text: string;
   index: number;
   active: boolean;
-  /** Show a ↓ keycap hint in the icon slot — the first row displays it while
-   *  no row is highlighted, signposting that ArrowDown enters the list. */
-  keyHint: boolean;
   optionId: string;
   registerItem: (index: number, element: HTMLElement | null) => void;
   onSelect: () => void;
@@ -366,13 +365,11 @@ function SuggestionRow({
   text,
   index,
   active,
-  keyHint,
   optionId,
   registerItem,
   onSelect,
 }: SuggestionRowProps) {
   const EnterIcon = useIcon("corner-down-left");
-  const ArrowDownIcon = useIcon("arrow-down");
   const compactStep = useSize().variant === "compact";
   const ref = useRef<HTMLDivElement>(null);
 
@@ -396,28 +393,26 @@ function SuggestionRow({
       )}
       style={{ fontVariationSettings: fontWeights.normal }}
     >
+      {/* The number key that sends this row. */}
+      <kbd
+        aria-hidden="true"
+        className={cn(
+          "inline-flex shrink-0 items-center justify-center rounded-[5px] border border-border bg-background px-1 font-sans text-muted-foreground tabular-nums",
+          compactStep ? "h-4 min-w-4 text-[10px]" : "h-[18px] min-w-[18px] text-[11px]"
+        )}
+      >
+        {index + 1}
+      </kbd>
       {/* py-1/-my-1 keeps truncate's overflow:hidden from clipping
           ascenders/descenders outside the trimmed box. */}
       <span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">
         {text}
       </span>
-      {/* One icon slot: ↵ on the highlighted row; on the first row a muted ↓
-          takes the same slot while nothing is highlighted, signposting the
-          keyboard path into the list. */}
-      {!active && keyHint ? (
-        <ArrowDownIcon
-          size={13}
-          className="shrink-0 text-muted-foreground/70 transition-opacity duration-80"
-        />
-      ) : (
-        <EnterIcon
-          size={13}
-          className={cn(
-            "shrink-0 transition-opacity duration-80",
-            active ? "opacity-100" : "opacity-0"
-          )}
-        />
-      )}
+      {/* ↵ on the highlighted row: Enter sends it. */}
+      <EnterIcon
+        size={13}
+        className={cn("shrink-0 transition-opacity duration-80", active ? "opacity-100" : "opacity-0")}
+      />
     </div>
   );
 }
@@ -530,8 +525,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       if (!suggestionsOpen) setActiveSuggestion(null);
     }, [suggestionsOpen, setActiveSuggestion]);
 
-    // Fill a suggested prompt into the composer (Tab / Enter / click). Fills
-    // only — the user still reviews and sends.
+    // Fill a suggested prompt into the composer (Tab on a highlighted row) so
+    // the user can edit it before sending.
     const acceptSuggestion = useCallback(
       (text: string) => {
         setActiveSuggestion(null);
@@ -611,11 +606,22 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
           ? `0 0 0 1px var(--border), ${EDGE_DROP}`
           : undefined;
 
+    // The one send path: the draft, or a suggested prompt as it is (its
+    // number key, Enter on the highlighted row, or a click), with any
+    // attached files.
+    const send = useCallback(
+      (text: string) => {
+        if (disabled) return;
+        setActiveSuggestion(null);
+        setHistoryIndex(null);
+        onSend?.(text, filesArr);
+      },
+      [disabled, onSend, filesArr, setActiveSuggestion]
+    );
+
     const handleSend = useCallback(() => {
-      if (!canSend) return;
-      setHistoryIndex(null);
-      onSend?.(trimmed, filesArr);
-    }, [canSend, onSend, trimmed, filesArr]);
+      if (canSend) send(trimmed);
+    }, [canSend, send, trimmed]);
 
     const handleStop = useCallback(() => onStop?.(), [onStop]);
 
@@ -638,42 +644,49 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
         if (e.defaultPrevented) return;
         if (e.nativeEvent.isComposing) return;
 
-        // Suggested prompts: plain ArrowDown moves the highlight into / down
-        // the list, ArrowUp walks it back up (then out, returning to plain
-        // textarea behavior), Enter fills the highlighted prompt, Escape
-        // drops the highlight. With no highlight, ArrowUp still falls through
-        // to history recall below.
-        if (
-          suggestionsOpen &&
-          !e.shiftKey &&
-          !e.altKey &&
-          !e.metaKey &&
-          !e.ctrlKey
-        ) {
-          if (e.key === "ArrowDown") {
+        // Suggested prompts. A row's number key sends it, Shift allowed since
+        // some layouts type digits with it. A digit sends even with no row
+        // highlighted, so a message of your own that starts with one needs
+        // another character first: the user chose speed over that. Plain
+        // ArrowDown moves the highlight into / down the list, ArrowUp walks it
+        // back up and out, Enter sends the highlighted prompt, Tab fills it to
+        // edit first, Escape drops the highlight. With no highlight, ArrowUp
+        // falls through to history recall below.
+        if (suggestionsOpen && !e.altKey && !e.metaKey && !e.ctrlKey) {
+          const numbered = /^[1-9]$/.test(e.key) ? suggestionsArr[Number(e.key) - 1] : undefined;
+          if (numbered !== undefined) {
             e.preventDefault();
-            setActiveSuggestion((prev) =>
-              prev == null ? 0 : Math.min(prev + 1, suggestionsArr.length - 1)
-            );
+            send(numbered);
             return;
           }
-          if (activeSuggestion != null) {
-            if (e.key === "ArrowUp") {
+          if (!e.shiftKey) {
+            if (e.key === "ArrowDown") {
               e.preventDefault();
-              setActiveSuggestion(
-                activeSuggestion === 0 ? null : activeSuggestion - 1
-              );
+              setActiveSuggestion((prev) => (prev == null ? 0 : Math.min(prev + 1, suggestionsArr.length - 1)));
               return;
             }
-            if (e.key === "Enter") {
-              e.preventDefault();
-              acceptSuggestion(suggestionsArr[activeSuggestion]);
-              return;
-            }
-            if (e.key === "Escape") {
-              e.preventDefault();
-              setActiveSuggestion(null);
-              return;
+            if (activeSuggestion != null) {
+              const active = suggestionsArr[activeSuggestion];
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setActiveSuggestion(activeSuggestion === 0 ? null : activeSuggestion - 1);
+                return;
+              }
+              if (e.key === "Enter") {
+                e.preventDefault();
+                send(active);
+                return;
+              }
+              if (e.key === "Tab") {
+                e.preventDefault();
+                acceptSuggestion(active);
+                return;
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setActiveSuggestion(null);
+                return;
+              }
             }
           }
         }
@@ -755,6 +768,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
         textareaProps,
         setActiveSuggestion,
         acceptSuggestion,
+        send,
         placeholderSuggestion,
       ]
     );
@@ -1182,8 +1196,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
 
           {/* Suggested prompts — a listbox under the action bar, shown while
               the draft is empty. ↓/↑ move the highlight without moving focus
-              (the textarea's aria-activedescendant tracks it); Enter or click
-              fills the composer. The outer motion.div collapses the region's
+              (the textarea's aria-activedescendant tracks it); a number key,
+              Enter, or a click sends a row. The outer motion.div collapses the region's
               height once typing hides the list; -mx-2 cancels the container
               padding so the divider runs the composer's full width. Pointer
               and keyboard share one bg-hover overlay that springs between
@@ -1233,10 +1247,9 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
                         text={s}
                         index={i}
                         active={i === activeSuggestion}
-                        keyHint={i === 0 && activeSuggestion == null}
                         optionId={`${suggestionListId}-${i}`}
                         registerItem={registerSuggestion}
-                        onSelect={() => acceptSuggestion(s)}
+                        onSelect={() => send(s)}
                       />
                     ))}
                   </div>

@@ -107,15 +107,38 @@ function union(prev: string[], next: string[]): string[] {
 	return added.length === 0 ? prev : [...prev, ...added];
 }
 
-/**
- * Whether two items show the same thing. Every field of an item is a primitive except a tool's `agents`, which keeps its
- * identity until it grows (see {@link union}), so a shallow comparison covers them all.
- */
+/** Whether two field values are equal: primitives by value, string lists (a tool's `agents`, a reply's `suggestions`) item by item. */
+function sameValue(a: unknown, b: unknown): boolean {
+	if (a === b) return true;
+	return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, i) => value === b[i]);
+}
+
+/** Whether two items show the same thing, field by field. */
 function sameItem(a: Item, b: Item): boolean {
 	const x: Json = a;
 	const y: Json = b;
 	const keys = Object.keys(x);
-	return keys.length === Object.keys(y).length && keys.every(key => x[key] === y[key]);
+	return keys.length === Object.keys(y).length && keys.every(key => sameValue(x[key], y[key]));
+}
+
+/** The numbered list the reply ends on after a `Suggestions:` heading, or none. */
+const SUGGESTIONS_HEADING = /^\s*Suggestions:\s*$/;
+const SUGGESTION_LINE = /^\s*\d+\.\s+(.+?)\s*$/;
+
+/** Whether a reply ends on a numbered `Suggestions:` block and, if so, the lines the body keeps and the prompts it offers. */
+export function splitSuggestions(text: string): { body: string; suggestions: string[] } {
+	const suggestions: string[] = [];
+	for (let end = text.length; end > 0; ) {
+		const start = text.lastIndexOf("\n", end - 1) + 1;
+		const line = text.slice(start, end);
+		end = start - 1;
+		if (line.trim() === "") continue;
+		const match = SUGGESTION_LINE.exec(line);
+		if (match) suggestions.unshift(match[1]);
+		else if (suggestions.length > 0 && SUGGESTIONS_HEADING.test(line)) return { body: text.slice(0, start).trimEnd(), suggestions };
+		else break;
+	}
+	return { body: text, suggestions: [] };
 }
 
 export class Transcript {
@@ -278,7 +301,8 @@ export class Transcript {
 		content.forEach((block, index) => {
 			if (!isObject(block)) return;
 			if (block.type === "text" && typeof block.text === "string" && block.text) {
-				changed.push(...this.#upsert({ id: `${key}:${index}`, kind: "assistant", text: block.text, streaming }));
+				const { body, suggestions } = splitSuggestions(block.text);
+				changed.push(...this.#upsert({ id: `${key}:${index}`, kind: "assistant", text: body, streaming, suggestions }));
 			} else if (block.type === "toolCall") {
 				changed.push(...this.#upsertTool(str(block.id), str(block.name), toolSummary(block.arguments, block.intent), undefined, []));
 			}
