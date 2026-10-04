@@ -81,6 +81,12 @@ function parseThinking(value: unknown): string | null | undefined {
 	return isNonEmpty(value) ? value : undefined;
 }
 
+/** `null` for no pinned skill; `undefined` for a value that is not one token, as `/skill:<name>` takes a name. */
+function parseSkill(value: unknown): string | null | undefined {
+	if (value === null || value === undefined) return null;
+	return typeof value === "string" && /^\S+$/.test(value) ? value : undefined;
+}
+
 function parseStartRequest(value: Record<string, unknown>): StartRequest | null {
 	switch (value.kind) {
 		case "new": {
@@ -90,8 +96,9 @@ function parseStartRequest(value: Record<string, unknown>): StartRequest | null 
 			// `null` starts on omp's default model.
 			const model = value.model === null || value.model === undefined ? null : (parseModel(value.model) ?? undefined);
 			const thinking = parseThinking(value.thinking);
-			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || branch === undefined || model === undefined || thinking === undefined) return null;
-			return prompt.trim() || images.length > 0 ? { kind: "new", cwd, prompt, images, branch, model, thinking } : null;
+			const skill = parseSkill(value.skill);
+			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || branch === undefined || model === undefined || thinking === undefined || skill === undefined) return null;
+			return prompt.trim() || images.length > 0 ? { kind: "new", cwd, prompt, images, branch, model, thinking, skill } : null;
 		}
 		case "fork": {
 			const view = parseView(value.view);

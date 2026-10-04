@@ -2,6 +2,7 @@ import { RefreshCw } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import type { Inbox, InboxPullRequest, PastSession, PullRequest, RepoInbox, RosterHost, View } from "../../../src/shared";
 import { projectName, readTime } from "../../labels";
+import { readPinnedSkill } from "../../pinned-skill";
 import { type PullRequestActionId, pullRequestActions, pullRequestStart } from "../../quick-actions";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
@@ -81,7 +82,7 @@ function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen, 
 									targeted={target !== null && samePullRequest(pr, target)}
 									onOpen={onOpen}
 									pending={pendingOf(quick, pr)}
-									onQuickAction={action => onQuickAction(pullRequestStart(pr, action, inbox.cwds[0]!))}
+									onQuickAction={action => onQuickAction(pullRequestStart(pr, action, inbox.cwds[0]!, readPinnedSkill()))}
 								/>
 							))}
 						</ul>
@@ -250,7 +251,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 											<QuickActionButtons
 												actions={pullRequestActions(sheetListed.pr)}
 												pending={pendingOf(quick, sheetListed.pr)}
-												onRun={action => onQuickAction(pullRequestStart(sheetListed.pr, action, sheetListed.cwd))}
+												onRun={action => onQuickAction(pullRequestStart(sheetListed.pr, action, sheetListed.cwd, readPinnedSkill()))}
 											/>
 											{quick && quick.op.subject.kind === "pull-request" && samePullRequest(quick.op.subject.pr, sheetListed.pr) && (
 												<QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />

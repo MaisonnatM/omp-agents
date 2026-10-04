@@ -24,6 +24,7 @@ import { hashForInbox } from "../routing";
 import { shortcutKeys, useShortcuts } from "../shortcuts";
 import type { ForkPoint } from "../transcript-view";
 import type { Completions } from "../pane-store";
+import { pickedRoleOf, rememberPickedRole } from "../picked-roles";
 import type { StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { roleOf, useModelRoles } from "../use-model-roles";
@@ -303,6 +304,12 @@ function LiveConversation({
 	const [dequeueId, setDequeueId] = useState<number | null>(null);
 	const nextId = useRef(0);
 	const [modelsOpen, setModelsOpen] = useState(false);
+	/** The role picked last for this session; several roles can name its model, and only the pick tells them apart. */
+	const [pickedRole, setPickedRole] = useState(() => pickedRoleOf(view.instanceId));
+	const pickRole = (role: string | null): void => {
+		setPickedRole(role);
+		rememberPickedRole(view.instanceId, role);
+	};
 
 	const shown = host ?? lastHost;
 	const agent: AgentRow | null = view.agentId ? (shown?.agents.find(a => a.id === view.agentId) ?? null) : null;
@@ -418,11 +425,23 @@ function LiveConversation({
 			<>
 				<RolePicker
 					list={roles.list}
-					current={roles.list && roleOf(roles.list.roles, shownModel, thinking)}
+					current={roles.list && roleOf(roles.list.roles, shownModel, thinking, pickedRole)}
 					onReload={roles.reload}
-					onPick={role => onSetModel(role.model, role.thinking)}
+					onPick={role => {
+						pickRole(role.role);
+						onSetModel(role.model, role.thinking);
+					}}
 				/>
-				<ModelPicker current={shownModel} list={models} open={modelsOpen} onOpenChange={openModels} onPick={model => onSetModel(model, null)} />
+				<ModelPicker
+					current={shownModel}
+					list={models}
+					open={modelsOpen}
+					onOpenChange={openModels}
+					onPick={model => {
+						pickRole(null);
+						onSetModel(model, null);
+					}}
+				/>
 				{switchable.thinkingLevels.length > 0 && <ThinkingPicker current={thinking} levels={switchable.thinkingLevels} onPick={onSetThinking} />}
 			</>
 		) : shownModel || thinking ? (

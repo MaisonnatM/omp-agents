@@ -1,13 +1,18 @@
+import { Sparkles } from "lucide-react";
 import { useState } from "react";
-import type { BranchChoice, ModelOption, ModelRole, PromptImage } from "../../src/shared";
+import type { BranchChoice, ModelOption, ModelRole } from "../../src/shared";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { getJson } from "../api";
 import { projectName } from "../labels";
 import type { Completions } from "../pane-store";
+import { usePinnedSkill } from "../pinned-skill";
 import { useShortcuts } from "../shortcuts";
-import type { StartOf } from "../starts";
+import type { NewOp, StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { roleOf, useModelRoles } from "../use-model-roles";
+import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation, Header } from "./conversation";
 import { BranchPicker, chosenBranch, GitRef, targetOf } from "./git";
@@ -24,33 +29,64 @@ interface NewSessionProps {
 	completions: Completions | null;
 	/** Ask for `/` and `@` suggestions, resolved as a session started in `cwd` would resolve them. */
 	onComplete: (reqId: number, text: string, cursor: number) => void;
-	/** Start omp with `prompt` and `images` as its first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at `thinking` when it names a level. */
-	onStart: (prompt: string, images: PromptImage[], branch: BranchChoice | null, model: ModelOption | null, thinking: string | null) => void;
+	/** Start omp with the first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at `thinking` when it names a level; through `skill` when it names one. */
+	onStart: (op: Omit<NewOp, "kind" | "cwd">) => void;
+}
+
+/** What the draft starts on: omp's default, a role, or a model picked by itself at omp's thinking level. */
+type Selection = { kind: "default" } | { kind: "role"; role: ModelRole } | { kind: "model"; model: ModelOption };
+
+/** The model, thinking level, and role a start sends for `selection`; `null` leaves each to omp. */
+function startModel(selection: Selection): Pick<NewOp, "model" | "thinking" | "role"> {
+	switch (selection.kind) {
+		case "default":
+			return { model: null, thinking: null, role: null };
+		case "role":
+			return { model: selection.role.model, thinking: selection.role.thinking, role: selection.role.role };
+		case "model":
+			return { model: selection.model, thinking: null, role: null };
+		default: {
+			const unhandled: never = selection;
+			return unhandled;
+		}
+	}
 }
 
 /**
  * A session not started yet, with the same composer a live session has. omp starts in `cwd` only when the first message
  * is sent, so leaving the draft leaves nothing running. The message and its images stay in the composer until the session opens.
  * The composer picks the model role or the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
+ * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
 export function NewSession({ cwd, launch, connected, completions, onComplete, onStart }: NewSessionProps) {
 	const [draft, setDraft] = useState("");
 	const attachments = useImageAttachments();
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
-	const [model, setModel] = useState<ModelOption | null>(null);
-	/** The thinking level of the role picked last; picking a model by itself leaves omp's level. */
-	const [thinking, setThinking] = useState<string | null>(null);
+	const [selection, setSelection] = useState<Selection>({ kind: "default" });
 	const roles = useModelRoles(cwd);
-	// Until a pick, omp starts on its `default` role.
-	const role = roles.list && (model ? roleOf(roles.list.roles, `${model.provider}/${model.id}`, thinking) : (roles.list.roles.find(other => other.role === "default") ?? null));
-	const pickRole = (next: ModelRole): void => {
-		setModel(next.model);
-		setThinking(next.thinking);
-	};
-	const pickModel = (next: ModelOption): void => {
-		setModel(next);
-		setThinking(null);
-	};
+	// Until a pick, omp starts on its `default` role, so the pickers show that role and its model.
+	const defaultRole = roles.list?.roles.find(other => other.role === "default") ?? null;
+	const sent = startModel(selection);
+	const shownModel = sent.model ?? defaultRole?.model ?? null;
+	const role =
+		roles.list &&
+		(selection.kind === "role"
+			? selection.role
+			: selection.kind === "model"
+				? roleOf(roles.list.roles, `${selection.model.provider}/${selection.model.id}`, null, null)
+				: defaultRole);
+	const [pinnedSkill] = usePinnedSkill();
+	const [skipSkill, setSkipSkill] = useState(false);
+	const skills = useSkills(cwd);
+	// The server decides whether the skill applies; the toggle only shows what it will decide.
+	const skillState: SkillState =
+		skills !== null && !skills.skills.some(skill => skill.name === pinnedSkill)
+			? "missing"
+			: skipSkill
+				? "off"
+				: draft.trimStart().startsWith("/")
+					? "bypassed"
+					: "on";
 	const [models, setModels] = useState<{ models: ModelOption[]; error: string | null } | null>(null);
 	const [modelsOpen, setModelsOpen] = useState(false);
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
@@ -114,7 +150,7 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					onSend={text => {
 						if (directCommand) return;
 						completion.close();
-						attachments.read(images => onStart(text, images, choice, model, thinking));
+						attachments.read(images => onStart({ prompt: text, images, branch: choice, ...sent, skill: skipSkill ? null : pinnedSkill }));
 					}}
 					placeholder="Message this session…"
 					files={attachments.files}
@@ -123,17 +159,18 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					leftSlot={({ openFilePicker }) => (
 						<>
 							<AttachButton onClick={() => openFilePicker()} disabled={starting} />
-							<RolePicker list={roles.list} current={role} onReload={roles.reload} onPick={pickRole} disabled={starting} />
+							<RolePicker list={roles.list} current={role} onReload={roles.reload} onPick={next => setSelection({ kind: "role", role: next })} disabled={starting} />
 							<ModelPicker
-								current={model && `${model.provider}/${model.id}`}
+								current={shownModel && `${shownModel.provider}/${shownModel.id}`}
 								unset="Default model"
 								list={models}
 								open={modelsOpen}
 								onOpenChange={openModels}
-								onPick={pickModel}
+								onPick={next => setSelection({ kind: "model", model: next })}
 								disabled={starting}
 							/>
 							{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
+							{pinnedSkill !== null && <PinnedSkillToggle name={pinnedSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 						</>
 					)}
 					disabled={starting || !connected}
@@ -144,5 +181,43 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 				{attachments.note && <ComposerNote text={attachments.note} />}
 			</div>
 		</div>
+	);
+}
+
+/** Whether the pinned skill applies: `missing` when the directory has no such skill, `bypassed` when the message opens with its own command. */
+type SkillState = "on" | "off" | "missing" | "bypassed";
+
+function skillTitle(name: string, state: SkillState): string {
+	switch (state) {
+		case "on":
+			return `The first message goes through /skill:${name}. Click to start without it.`;
+		case "off":
+			return `Click to send the first message through /skill:${name}.`;
+		case "missing":
+			return `No skill named ${name} in this directory, so the session starts without it.`;
+		case "bypassed":
+			return `A message that starts with / runs its own command, so it skips /skill:${name}.`;
+		default: {
+			const unhandled: never = state;
+			return unhandled;
+		}
+	}
+}
+
+/** The skill pinned in the settings, as a toggle in the draft's composer: while on, the first message goes through it. */
+function PinnedSkillToggle({ name, state, onToggle, disabled }: { name: string; state: SkillState; onToggle: () => void; disabled: boolean }) {
+	return (
+		<Button
+			variant="ghost"
+			size="compact"
+			leadingIcon={Sparkles}
+			aria-pressed={state === "on"}
+			aria-label={`Pinned skill ${name}`}
+			title={skillTitle(name, state)}
+			onClick={onToggle}
+			disabled={disabled || state === "missing" || state === "bypassed"}
+		>
+			<span className={cn("max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
+		</Button>
 	);
 }

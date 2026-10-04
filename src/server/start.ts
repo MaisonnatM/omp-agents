@@ -1,15 +1,18 @@
 /** Starting a dashboard session: a new one, a fork of a transcript, or a past session resumed. All three spawn omp the same way. */
+import { withPinnedSkill } from "../commands";
 import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
 import { directoryOf } from "../paths";
-import type { StartRequest, StartResult, View } from "../shared";
+import type { PromptImage, StartRequest, StartResult, View } from "../shared";
 import type { LiveSessions } from "./live-sessions";
 
 interface Started {
 	session: DashboardSession;
 	/** The text of the prompt a fork branched at. */
 	prompt: string | null;
+	/** A new session's first message, sent once the session is in the registry. */
+	first?: { text: string; images: PromptImage[] };
 }
 
 type Spawn = (instanceId: string, emit: (update: DashboardUpdate) => void) => Promise<Started>;
@@ -46,7 +49,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 				if (!dir) return { error: `${request.cwd.trim()} is not a directory.` };
 				// omp writes a fresh session's file only with its first reply, so a first `!` command would show nowhere.
 				if (request.prompt.startsWith("!")) return { error: "Start the session with a prompt. A ! command runs once omp has replied." };
-				const { branch, model, thinking } = request;
+				const { branch, model, thinking, skill, images } = request;
 				let cwd = dir;
 				if (branch) {
 					try {
@@ -55,7 +58,17 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 						return { error: `Cannot check out ${branch.name}: ${errorText(err)}` };
 					}
 				}
-				return launch("Cannot start omp", async (id, emit) => ({ session: await DashboardSession.start(id, cwd, model, thinking, emit), prompt: null }));
+				let text: string;
+				try {
+					text = await withPinnedSkill(cwd, skill, request.prompt);
+				} catch (err) {
+					return { error: `Cannot read the skills in ${cwd}: ${errorText(err)}` };
+				}
+				return launch("Cannot start omp", async (id, emit) => ({
+					session: await DashboardSession.start(id, cwd, model, thinking, emit),
+					prompt: null,
+					first: { text, images },
+				}));
 			}
 			case "fork": {
 				const source = env.pathFor(request.view);
@@ -80,10 +93,10 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 	return async request => {
 		const outcome = await spawnFor(request);
 		if ("error" in outcome) return { ok: false, error: outcome.error };
-		const { session, prompt } = outcome.started;
+		const { session, prompt, first } = outcome.started;
 		sessions.add(session);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
-		if (request.kind === "new") void session.prompt(null, request.prompt, request.images, "steer");
+		if (first) void session.prompt(null, first.text, first.images, "steer");
 		env.onStarted();
 		return { ok: true, instanceId: session.instanceId, cwd: session.cwd, prompt };
 	};

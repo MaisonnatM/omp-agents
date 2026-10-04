@@ -21,7 +21,7 @@ import {
 	parseSkillInvocation,
 	type Skill,
 } from "./omp/prompts";
-import type { CompletionItem } from "./shared";
+import type { CompletionItem, SkillOption } from "./shared";
 
 /** Discovery reads disk; reuse it briefly so typing does not rescan, but new skills still show up. */
 const CATALOG_TTL_MS = 30_000;
@@ -117,6 +117,23 @@ export async function complete(instanceId: string | null, cwd: string, text: str
 		if (items.length >= MAX_ITEMS) break;
 	}
 	return items;
+}
+
+/** The skills `/skill:<name>` invokes in a session started in `cwd`; none when omp's `skills.enableSkillCommands` is off. */
+export async function listSkills(cwd: string): Promise<SkillOption[]> {
+	const { skills } = await catalogFor(null, cwd);
+	return [...(skills?.values() ?? [])].map(({ name, description }) => ({ name, description: description || null }));
+}
+
+/**
+ * A new session's first prompt with the pinned `skill` before it, as `/skill:<skill> <prompt>`, so omp invokes the skill
+ * with the prompt as its arguments. A session in `cwd` that has no such skill, or a prompt that opens with a command of
+ * its own, keeps the prompt as typed.
+ */
+export async function withPinnedSkill(cwd: string, skill: string | null, prompt: string): Promise<string> {
+	if (skill === null || prompt.trimStart().startsWith("/")) return prompt;
+	const { skills } = await catalogFor(null, cwd);
+	return skills?.has(skill) ? `/skill:${skill} ${prompt}`.trimEnd() : prompt;
 }
 
 /**

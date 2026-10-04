@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { readTime } from "../../labels";
+import { readPinnedSkill } from "../../pinned-skill";
 import { type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
 import { hashForTickets, type OpenMode } from "../../routing";
 import type { SectionTarget } from "../../section";
@@ -97,7 +98,7 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 	const sheetId = useRef<string | null>(null);
 	if (target) sheetId.current = target;
 	const sheetListed = tickets.find(ticket => ticket.id === sheetId.current) ?? null;
-	const start = (ticket: Ticket, action: TicketActionId) => onQuickAction(ticketStart(ticket, action, cwd));
+	const start = (ticket: Ticket, action: TicketActionId) => onQuickAction(ticketStart(ticket, action, cwd, readPinnedSkill()));
 
 	useEffect(() => {
 		if (targetGroup === null || target === null || shown.current === target) return;
