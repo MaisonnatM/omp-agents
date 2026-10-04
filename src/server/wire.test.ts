@@ -65,8 +65,20 @@ describe("parseClientMsg", () => {
 	});
 
 	test("start parses each kind and drops what the kind does not name", () => {
-		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", extra: 1 })).toEqual({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", images: [], branch: null, model: null, thinking: null });
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", extra: 1 })).toEqual({
+			t: "start",
+			reqId: 4,
+			kind: "new",
+			cwd: "~/code",
+			prompt: "hi",
+			images: [],
+			branch: null,
+			model: null,
+			thinking: null,
+			skill: null,
+		});
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", thinking: "high" })).toMatchObject({ thinking: "high" });
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", skill: "poteto-mode" })).toMatchObject({ skill: "poteto-mode" });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", model: { provider: "anthropic", id: "claude-opus-5-5", name: "Opus" } })).toMatchObject({
 			model: { provider: "anthropic", id: "claude-opus-5-5" },
 		});
@@ -97,6 +109,8 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", model: { provider: "anthropic" } })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", model: "anthropic/claude-opus-5-5" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", thinking: "" })).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", skill: "" })).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", skill: "two words" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "fork", view: live, entryId: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "resume", sessionId: "" })).toBeNull();
 	});

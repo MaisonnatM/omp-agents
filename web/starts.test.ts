@@ -4,7 +4,7 @@ import { beginStart, dismissSettled, dropHidden, loseStarts, settleStart, startO
 const point = { entryId: "e1", prefill: true };
 const fork = { kind: "fork", view: { kind: "past", sessionId: "s1" }, itemId: "u1", point } as const;
 const resume = { kind: "resume", sessionId: "s1" } as const;
-const quick = { kind: "quick", cwd: "/tmp", prompt: "fix", subject: { kind: "ticket", id: "ENG-7", action: "work" } } as const;
+const quick = { kind: "quick", cwd: "/tmp", prompt: "fix", subject: { kind: "ticket", id: "ENG-7", action: "work" }, skill: null } as const;
 const ok = { ok: true, instanceId: "i1", cwd: "/tmp", prompt: null } as const;
 
 describe("starts", () => {
@@ -37,7 +37,11 @@ describe("starts", () => {
 
 	test("a failure's reason leaves with its view, a start under way stays, and a draft's failure outlives any view", () => {
 		let starts = settleStart(beginStart(new Map(), 1, resume), 1, { ok: false, error: "no file" });
-		starts = settleStart(beginStart(starts, 2, { kind: "new", cwd: "~", prompt: "hi", images: [], branch: null, model: null, thinking: null }), 2, { ok: false, error: "not a directory" });
+		starts = settleStart(
+			beginStart(starts, 2, { kind: "new", cwd: "~", prompt: "hi", images: [], branch: null, model: null, thinking: null, role: null, skill: null }),
+			2,
+			{ ok: false, error: "not a directory" },
+		);
 		starts = beginStart(starts, 3, fork);
 		const none = (): boolean => false;
 		const hidden = dropHidden(starts, none);

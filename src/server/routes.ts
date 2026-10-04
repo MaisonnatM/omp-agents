@@ -3,6 +3,7 @@
  * Linear tickets, and prompt images through.
  */
 import { join } from "node:path";
+import { listSkills } from "../commands";
 import { gitCheckout } from "../git";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
 import { loadLinearStatus, startLinearSignIn } from "../linear";
@@ -73,6 +74,14 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		if (refused) return refused;
 		const cwd = directoryOf(new URL(req.url).searchParams.get("cwd") ?? "");
 		return cwd ? answer(async () => ({ roles: await connectedRoles(cwd) })) : fail(404, "Expected ?cwd= naming a directory");
+	};
+
+	/** `GET /api/skills?cwd=<dir>`: the skills a session started in that directory can invoke. Like a new session, `cwd` may name any directory. */
+	const skills: Handler = async req => {
+		const refused = guards.admit(req);
+		if (refused) return refused;
+		const cwd = directoryOf(new URL(req.url).searchParams.get("cwd") ?? "");
+		return cwd ? answer(async () => ({ skills: await listSkills(cwd) })) : fail(404, "Expected ?cwd= naming a directory");
 	};
 
 	/**
@@ -195,6 +204,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },
 		"/api/models/roles": { GET: roles },
+		"/api/skills": { GET: skills },
 		"/api/pull-request/sessions": { PUT: sessionLinks },
 		"/api/inbox": { GET: inbox },
 		"/api/tickets": { GET: tickets },

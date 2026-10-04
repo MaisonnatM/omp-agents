@@ -29,7 +29,7 @@ omp-agents lists the sessions that run in your terminals and the ones it starts 
 - **Session lifecycle.** Start a session in any project, on any branch or a new one in its own git worktree, resume a past one, or fork a conversation from any prompt or reply.
 - **Pull request inbox.** A Graphite-style inbox of your GitHub pull requests, linked to the sessions that submitted or worked on them.
 - **Linear tickets.** The Linear issues assigned to you, grouped by workflow state like Linear's My issues, read through omp's Linear MCP sign-in. Click one to read it in full, and start a session that works on it or plans it.
-- **Settings editor.** Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place.
+- **Settings editor.** Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place, and pin a skill that every new session starts through.
 - **Plan quota.** Remaining quota per provider plan, from `omp usage`.
 - **Keyboard-first.** Shortcuts that follow omp's terminal keys; press `?` to list them.
 - **omp starter kit.** An optional, ready-made omp setup (model routing, agent rules, a review agent, a `/ship` workflow, skills) that one command installs.
