@@ -21,6 +21,24 @@ const viewTopic = (key: string): string => `view:${key}`;
 export const watching = (ws: Socket, instanceId: string): boolean =>
 	[...ws.data.views.values()].some(view => view.kind === "live" && view.instanceId === instanceId);
 
+/**
+ * The messages that show `view` from scratch: `tail`'s items and work once read, empty without a tail.
+ * A tail still loading gives none: its first read publishes to every subscriber.
+ */
+function snapshot(view: View, tail: FileTail | undefined): ServerMsg[] {
+	if (!tail) {
+		return [
+			{ t: "items", view, reset: true, items: [] },
+			{ t: "work", view, work: EMPTY_WORK },
+		];
+	}
+	if (!tail.loaded) return [];
+	return [
+		{ t: "items", view, reset: true, items: tail.transcript.items() },
+		{ t: "work", view, work: tail.work.snapshot() },
+	];
+}
+
 export class Views {
 	/** Views some socket shows, with how many sockets show each; each has a tail while its file is known. */
 	readonly #watched = new Map<string, { view: View; sockets: number }>();
@@ -56,17 +74,7 @@ export class Views {
 			else this.#watched.set(key, { view, sockets: 1 });
 		}
 		this.sync();
-		for (const [key, view] of added) {
-			const tail = this.#tails.get(key);
-			// A tail still loading publishes its first read to every subscriber, this socket included.
-			if (tail?.loaded) {
-				send(ws, { t: "items", view, reset: true, items: tail.transcript.items() });
-				send(ws, { t: "work", view, work: tail.work.snapshot() });
-			} else if (!tail) {
-				send(ws, { t: "items", view, reset: true, items: [] });
-				send(ws, { t: "work", view, work: EMPTY_WORK });
-			}
-		}
+		for (const [key, view] of added) for (const msg of snapshot(view, this.#tails.get(key))) send(ws, msg);
 	}
 
 	/** Point every watched view's tail at its current file: the file shows up, the host switches sessions, a subagent registers. */
@@ -77,10 +85,7 @@ export class Views {
 			if (tail?.path === path) continue;
 			this.#tails.delete(key);
 			if (!path) {
-				if (tail) {
-					this.#publish(viewTopic(key), { t: "items", view, reset: true, items: [] });
-					this.#publish(viewTopic(key), { t: "work", view, work: EMPTY_WORK });
-				}
+				if (tail) for (const msg of snapshot(view, undefined)) this.#publish(viewTopic(key), msg);
 				continue;
 			}
 			const next = new FileTail(
