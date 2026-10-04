@@ -4,7 +4,7 @@
  */
 import { isObject, str } from "./json";
 import { displayPath } from "./paths";
-import type { SessionWork, TodoItem, TodoPhase, TodoStatus } from "./shared";
+import { type FileChange, parseDiffLine, type SessionWork, type TodoItem, type TodoPhase, type TodoStatus } from "./shared";
 
 /** omp's custom entry for a todo list the user edited in its terminal (`USER_TODO_EDIT_CUSTOM_TYPE`). */
 const USER_TODO_EDIT = "user_todo_edit";
@@ -29,22 +29,54 @@ function parsePhases(value: unknown): TodoPhase[] | null {
 	return phases;
 }
 
-/** The files one `edit` result changed: each of `perFileResults` for a multi-file edit, else the result itself. */
-function editedFiles(details: Record<string, unknown>): { path: string; diff: string | null }[] {
+/** omp's edit operations (`pi-tui/src/tools/edit.ts`); an edit without one updates the file. */
+const EDIT_KINDS: Record<string, "created" | "edited" | "deleted"> = { create: "created", update: "edited", delete: "deleted" };
+
+/** Lines in a written file; a trailing newline ends the last line rather than starting another. */
+const lineCount = (text: string): number => (text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0));
+
+/** Lines that omp's numbered diff adds and removes. */
+function diffCounts(diff: string): { added: number; removed: number } {
+	let added = 0;
+	let removed = 0;
+	for (const line of diff.split("\n")) {
+		const sign = parseDiffLine(line)?.sign;
+		if (sign === "+") added++;
+		else if (sign === "-") removed++;
+	}
+	return { added, removed };
+}
+
+/** The files one `edit` result changed: each of `perFileResults` that succeeded for a multi-file edit, else the result itself. */
+function editedFiles(details: Record<string, unknown>, at: number | null): [string, FileChange][] {
 	const results = Array.isArray(details.perFileResults) ? details.perFileResults : [details];
-	return results.flatMap(result => {
-		if (!isObject(result)) return [];
+	return results.flatMap((result): [string, FileChange][] => {
+		if (!isObject(result) || result.isError === true) return [];
 		const path = str(result.path);
-		return path ? [{ path, diff: str(result.diff) || null }] : [];
+		if (!path) return [];
+		const op = str(result.op);
+		const diff = str(result.diff) || null;
+		const kind = op && Object.hasOwn(EDIT_KINDS, op) ? EDIT_KINDS[op] : "edited";
+		return [[path, { tool: "edit", kind, at, ...diffCounts(diff ?? ""), diff }]];
 	});
+}
+
+/** An entry's ISO `timestamp` in ms since the epoch, or `null` when it has none. */
+function entryTime(entry: Record<string, unknown>): number | null {
+	const at = Date.parse(str(entry.timestamp) ?? "");
+	return Number.isFinite(at) ? at : null;
 }
 
 export class Work {
 	/** The transcript's working directory, from its `session` header. */
 	#cwd: string | null = null;
 	#phases: TodoPhase[] = [];
-	/** By the path omp reported, in first-touch order. */
-	readonly #files = new Map<string, { edits: number; diff: string | null }>();
+	/** Each file's changes, oldest first, by the path omp reported, in first-touch order. */
+	readonly #files = new Map<string, FileChange[]>();
+	/** Paths a `read` result named, so a later write to one rewrites the file rather than creates it. */
+	readonly #read = new Set<string>();
+	/** Lines of each `write` call's content, by tool call id, until its result arrives. */
+	readonly #writing = new Map<string, number>();
 
 	/** One session-file entry. Returns whether the plan or the changed files changed. */
 	applyEntry(entry: unknown): boolean {
@@ -56,17 +88,28 @@ export class Work {
 		if (entry.type === "custom" && entry.customType === USER_TODO_EDIT) return this.#plan(isObject(entry.data) ? entry.data.phases : undefined);
 		if (entry.type !== "message" || !isObject(entry.message)) return false;
 		const message = entry.message;
-		if (message.role !== "toolResult" || message.isError === true) return false;
+		if (message.role === "assistant") {
+			this.#noteWrites(message.content);
+			return false;
+		}
+		if (message.role !== "toolResult") return false;
+		const written = this.#takeWrite(message.toolCallId);
+		if (message.isError === true) return false;
 		const details = isObject(message.details) ? message.details : {};
 		switch (message.toolName) {
 			case "todo":
 				return details.op !== "view" && this.#plan(details.phases);
+			case "read": {
+				const path = str(details.resolvedPath);
+				if (path) this.#read.add(path);
+				return false;
+			}
 			case "edit":
-				return this.#touch(editedFiles(details));
+				return this.#touch(editedFiles(details, entryTime(entry)));
 			case "write": {
 				// Only a write to a file names one; a write to a device such as `xd://` or `agent://` does not.
 				const path = str(details.resolvedPath);
-				return path ? this.#touch([{ path, diff: null }]) : false;
+				return path ? this.#touch([[path, this.#written(path, written, entryTime(entry))]]) : false;
 			}
 			default:
 				return false;
@@ -74,7 +117,34 @@ export class Work {
 	}
 
 	snapshot(): SessionWork {
-		return { phases: this.#phases, files: [...this.#files].map(([path, file]) => ({ path: this.#display(path), ...file })) };
+		return { phases: this.#phases, files: [...this.#files].map(([path, changes]) => ({ path: this.#display(path), changes })) };
+	}
+
+	/** Keeps the line count of each `write` call in an assistant message, which its result does not repeat. */
+	#noteWrites(content: unknown): void {
+		if (!Array.isArray(content)) return;
+		for (const part of content) {
+			if (!isObject(part) || part.type !== "toolCall" || part.name !== "write" || !isObject(part.arguments)) continue;
+			const id = str(part.id);
+			const text = str(part.arguments.content);
+			if (id !== undefined && text !== undefined) this.#writing.set(id, lineCount(text));
+		}
+	}
+
+	/** The lines a `write` call carried, forgotten once its result arrives; `null` when the transcript lacks the call. */
+	#takeWrite(callId: unknown): number | null {
+		const id = str(callId);
+		if (id === undefined) return null;
+		const lines = this.#writing.get(id) ?? null;
+		this.#writing.delete(id);
+		return lines;
+	}
+
+	/** A write creates a file the transcript never read or changed, or one it deleted last; else it rewrites it. */
+	#written(path: string, lines: number | null, at: number | null): FileChange {
+		const last = this.#files.get(path)?.at(-1);
+		const created = last ? last.kind === "deleted" : !this.#read.has(path);
+		return { tool: "write", kind: created ? "created" : "rewritten", at, lines };
 	}
 
 	#plan(value: unknown): boolean {
@@ -84,12 +154,13 @@ export class Work {
 		return true;
 	}
 
-	#touch(changes: { path: string; diff: string | null }[]): boolean {
-		for (const { path, diff } of changes) {
-			const file = this.#files.get(path);
-			this.#files.set(path, { edits: (file?.edits ?? 0) + 1, diff });
+	#touch(touches: [string, FileChange][]): boolean {
+		for (const [path, change] of touches) {
+			const changes = this.#files.get(path);
+			if (changes) changes.push(change);
+			else this.#files.set(path, [change]);
 		}
-		return changes.length > 0;
+		return touches.length > 0;
 	}
 
 	#display(path: string): string {
