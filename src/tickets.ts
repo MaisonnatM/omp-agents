@@ -6,7 +6,7 @@
 import { createCache } from "./cache";
 import { isObject, num, str } from "./json";
 import { linearServer } from "./linear";
-import { callMcpTool, type McpServer } from "./omp/mcp";
+import { callMcpTool, type McpServer, toolJson } from "./omp/mcp";
 import { TICKET_STATUS_TYPES, type Ticket, type TicketComment, type TicketDetail, type TicketPriority, type TicketsAnswer } from "./shared";
 
 /** Linear's page size cap for `list_issues`. */
@@ -54,17 +54,9 @@ function parseIssue(raw: unknown): Ticket | null {
 	};
 }
 
-function parseJson(tool: string, toolText: string): unknown {
-	try {
-		return JSON.parse(toolText);
-	} catch {
-		throw new Error(`Linear's ${tool} answered something other than JSON: ${toolText.slice(0, 200)}`);
-	}
-}
-
 /** The tickets in one `list_issues` answer's text and the cursor of the next page, `null` on the last. */
 export function parseIssues(toolText: string): { issues: Ticket[]; next: string | null } {
-	const data = parseJson("list_issues", toolText);
+	const data = toolJson("Linear", "list_issues", toolText);
 	if (!isObject(data) || !Array.isArray(data.issues)) throw new Error("Linear's list_issues answered without issues");
 	return {
 		issues: data.issues.map(parseIssue).filter(issue => issue !== null),
@@ -94,7 +86,7 @@ export function linearMarkdown(text: string): string {
 
 /** The comments of one `list_comments` answer as threads, oldest first; a reply whose first comment is missing starts its own. */
 function parseThreads(toolText: string): TicketComment[][] {
-	const data = parseJson("list_comments", toolText);
+	const data = toolJson("Linear", "list_comments", toolText);
 	const raw = isObject(data) && Array.isArray(data.comments) ? data.comments.filter(isObject) : [];
 	const comments = raw
 		.map(comment => ({
@@ -116,7 +108,7 @@ function parseThreads(toolText: string): TicketComment[][] {
 
 /** One issue in full from the texts of its `get_issue` and `list_comments` answers. */
 export function parseIssueDetail(issueText: string, commentsText: string): TicketDetail {
-	const raw = parseJson("get_issue", issueText);
+	const raw = toolJson("Linear", "get_issue", issueText);
 	const ticket = parseIssue(raw);
 	if (!ticket || !isObject(raw)) throw new Error("Linear's get_issue answered without an issue");
 	const attachments = Array.isArray(raw.attachments) ? raw.attachments.filter(isObject) : [];

@@ -12,7 +12,7 @@ import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { directoryOf } from "../paths";
 import type { PullRequestIndex } from "../pull-requests";
 import { linkSessions, type SessionEntry } from "../session-links";
-import { loadOmpSettings, saveOmpFile, saveRouting } from "../settings";
+import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { loadTicketDetail, loadTickets } from "../tickets";
 import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, TICKET_ID } from "../shared";
 import { answer, fail, type Guards } from "./http";
@@ -166,7 +166,8 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 
 	/**
 	 * A settings write: `PUT /api/settings/routing` or `/api/settings/file`, `?cwd=` as for reading.
-	 * Only this app's own page may write, with a JSON body; the answer is the settings as they load after the write.
+	 * Only this app's own page may write, with a JSON body; the answer is the settings as they load after the write,
+	 * or the edit's refusal with its status.
 	 */
 	const settingsWrite =
 		(save: (cwd: string | null, body: unknown) => Promise<unknown>): Handler =>
@@ -174,7 +175,11 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 			const write = await guards.writeBody(req);
 			if (write instanceof Response) return write;
 			const cwd = workspaceCwd(req);
-			return cwd instanceof Response ? cwd : answer(() => save(cwd, write.body));
+			if (cwd instanceof Response) return cwd;
+			return answer(
+				() => save(cwd, write.body),
+				err => (err instanceof Rejected ? fail(err.status, err.message, err.conflict) : null),
+			);
 		};
 
 	/**

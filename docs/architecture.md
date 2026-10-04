@@ -121,7 +121,7 @@ The server lives in `src/`:
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list. `src/server/interrupted.ts` keeps which dashboard sessions were interrupted. `src/server/views.ts` points each open view at its file and folds live events into it.
 - `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, the inbox, pull request, and ticket shapes).
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
-- `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON, and `src/paths.ts` names the home directory, the token file, and the interrupted sessions' file.
+- `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON, `src/fs.ts` replaces a file through a temporary one beside it, and `src/paths.ts` names the home directory, the token file, and the interrupted sessions' file.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
 - `src/guest.ts`: runs one Collab guest per terminal session. `src/subagents.ts` finds each subagent's transcript file.
 - `src/user-requests.ts`: parses the RPC and Collab question frames into one request shape, writes the answers back, and keeps each session's pending questions.
@@ -136,7 +136,7 @@ The server lives in `src/`:
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, and one issue in full for its sheet. `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
-- `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
+- `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits. An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
 - `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory. `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`.
 
 The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:

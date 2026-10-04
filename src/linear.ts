@@ -3,7 +3,7 @@
  * and the sign-in the settings start, which adds the server to omp's user-level MCP config when omp has none.
  */
 import { errorText } from "./json";
-import { addMcpServer, findMcpServer, type McpServer, mcpCredentialId, mcpSignedIn, signInMcp } from "./omp/mcp";
+import { addMcpServer, findMcpServer, type McpServer, mcpSignedIn, signInMcp } from "./omp/mcp";
 import type { LinearSignIn, LinearStatus } from "./shared";
 
 const LINEAR_HOST = "mcp.linear.app";
@@ -40,10 +40,8 @@ export async function startLinearSignIn(): Promise<LinearStatus> {
 	const ready = Promise.withResolvers<void>();
 	const run = async (): Promise<void> => {
 		const found = await findMcpServer(LINEAR_HOST);
-		const credentialId = found?.credentialId ?? mcpCredentialId(LINEAR_URL);
-		if (!credentialId) throw new Error(`omp names no sign-in for ${LINEAR_URL}`);
 		await signInMcp(
-			{ url: found?.url ?? LINEAR_URL, credentialId },
+			found ?? { url: LINEAR_URL },
 			{
 				onAuth: url => {
 					attempt.signIn = { phase: "waiting", url };
