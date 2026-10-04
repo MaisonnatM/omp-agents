@@ -3,10 +3,10 @@ import { type ReactNode, useState } from "react";
 import { type CatalogModel, type ModelChain, type ModelRouting, type RetrySettings, type RoleRoute, splitSelector } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { modelLabel, providerOrg } from "../../labels";
+import { providerOrg } from "../../labels";
 import { saveRouting } from "../../settings-api";
 import { CommandPicker } from "../command-picker";
-import { Model, ModelRow, modelDescription, ProviderHeading } from "../model-picker";
+import { MODEL_LIST, Model, modelDescription, modelGroups } from "../model-picker";
 import { OrgIcon } from "../org-icon";
 import { type Catalog, EditBar, type Editing, OrderedList, SaveError, Section, useEditor } from "./editor";
 
@@ -55,22 +55,26 @@ function SelectorPicker({ value, catalog, label, onPick }: { value: string | nul
 		<div className="flex min-w-0 items-center gap-1">
 			<CommandPicker
 				trigger={<span className="max-w-56 truncate">{model ? <Model selector={model} /> : "Choose a model"}</span>}
-				button={{ "aria-label": `${label}: ${model ? modelDescription(model) : "none"}`, className: "min-w-0" }}
-				search={{ label: "Search models" }}
+				ariaLabel={`${label}: ${model ? modelDescription(model) : "none"}`}
+				className="min-w-0"
+				search={MODEL_LIST.search}
 				width="lg"
-				state={catalog.phase === "loading" ? { kind: "loading", message: "Loading models…" } : catalog.phase === "failed" ? { kind: "failed", error: catalog.error } : { kind: "ready" }}
-				empty="No model matches."
-				groups={(catalog.phase === "loaded" ? catalog.byProvider : []).map(([provider, group]) => ({
-					heading: <ProviderHeading provider={provider} />,
-					items: group.map(option => ({
-						value: option.selector,
-						label: <ModelRow selector={option.selector} id={option.selector.slice(provider.length + 1)} />,
-						keywords: [modelLabel(option.selector), option.name],
-						title: option.selector,
-						selected: option.selector === model,
-						onSelect: () => pickModel(option),
-					})),
-				}))}
+				list={
+					catalog.phase === "loading"
+						? { kind: "loading", message: MODEL_LIST.loading }
+						: catalog.phase === "failed"
+							? { kind: "failed", error: catalog.error }
+							: {
+									kind: "ready",
+									groups: modelGroups(
+										catalog.byProvider,
+										option => ({ selector: option.selector, id: option.selector.slice(option.provider.length + 1), keyword: option.name }),
+										model,
+										pickModel,
+									),
+								}
+				}
+				empty={MODEL_LIST.empty}
 			/>
 			{model && (levels.length > 0 || level) && (
 				<select
@@ -280,24 +284,30 @@ function ProviderPicker({ providers, onPick }: { providers: string[]; onPick: (p
 	return (
 		<CommandPicker
 			trigger="Add provider"
-			button={{ leadingIcon: Plus, trailingIcon: undefined, disabled: providers.length === 0 }}
+			icon={Plus}
+			chevron={false}
+			disabled={providers.length === 0}
 			search={{ label: "Search providers" }}
 			width="md"
+			list={{
+				kind: "ready",
+				groups: [
+					{
+						key: "providers",
+						items: providers.map(provider => ({
+							value: provider,
+							label: (
+								<>
+									<OrgIcon org={providerOrg(provider)} />
+									{provider}
+								</>
+							),
+							onSelect: () => onPick(provider),
+						})),
+					},
+				],
+			}}
 			empty="No provider matches."
-			groups={[
-				{
-					items: providers.map(provider => ({
-						value: provider,
-						label: (
-							<>
-								<OrgIcon org={providerOrg(provider)} />
-								{provider}
-							</>
-						),
-						onSelect: () => onPick(provider),
-					})),
-				},
-			]}
 		/>
 	);
 }

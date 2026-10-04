@@ -14,22 +14,27 @@ export function ThinkingPicker({ current, levels, onPick }: ThinkingPickerProps)
 	return (
 		<CommandPicker
 			trigger={current ?? "Thinking"}
-			button={{ leadingIcon: Brain, "aria-label": `Choose thinking level: ${current ?? "none selected"}` }}
+			icon={Brain}
+			ariaLabel={`Choose thinking level: ${current ?? "none selected"}`}
 			width="sm"
 			side="top"
-			groups={[
-				{
-					heading: "Thinking level",
-					items: levels.map(level => ({
-						value: level,
-						label: level,
-						selected: level === current,
-						onSelect: () => {
-							if (level !== current) onPick(level);
-						},
-					})),
-				},
-			]}
+			list={{
+				kind: "ready",
+				groups: [
+					{
+						key: "levels",
+						heading: "Thinking level",
+						items: levels.map(level => ({
+							value: level,
+							label: level,
+							selected: level === current,
+							onSelect: () => {
+								if (level !== current) onPick(level);
+							},
+						})),
+					},
+				],
+			}}
 		/>
 	);
 }

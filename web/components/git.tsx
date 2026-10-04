@@ -72,56 +72,60 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 					{choice?.kind === "new" && <span className="text-muted-foreground"> from {choice.base}</span>}
 				</span>
 			}
-			button={{
-				leadingIcon: choice?.kind === "new" ? GitBranchPlus : GitBranch,
-				"aria-label": `Branch: ${label}${choice?.kind === "new" ? `, new from ${choice.base}` : ""}`,
-				disabled,
-			}}
-			search={{ label: "Search or create a branch", value: search, onChange: setSearch }}
+			icon={choice?.kind === "new" ? GitBranchPlus : GitBranch}
+			ariaLabel={`Branch: ${label}${choice?.kind === "new" ? `, new from ${choice.base}` : ""}`}
+			disabled={disabled}
+			search={{ label: "Search or create a branch", query: { value: search, onChange: setSearch } }}
 			width="lg"
 			side="top"
 			onOpenChange={next => {
 				if (!next) setSearch("");
 			}}
+			list={{
+				kind: "ready",
+				groups: [
+					{
+						key: "branches",
+						heading: "Branches",
+						items: checkout.branches.map(branch => ({
+							value: branch.name,
+							label: (
+								<>
+									<span className="truncate">{branch.name}</span>
+									<span className="ml-auto shrink-0 text-xs text-muted-foreground" title={branch.worktree ?? undefined}>
+										{branch.name === checkout.branch ? "here" : branch.worktree ? projectName(branch.worktree) : "new worktree"}
+									</span>
+								</>
+							),
+							selected: branch.name === current && choice?.kind !== "new",
+							onSelect: () => onChoose(branch.name === checkout.branch ? null : { kind: "existing", name: branch.name }),
+						})),
+					},
+					...(creatable
+						? [
+								{
+									key: "create",
+									forceMount: true,
+									items: [
+										{
+											value: `create ${name}`,
+											label: (
+												<>
+													<GitBranchPlus aria-hidden />
+													<span className="truncate">
+														Create branch <strong className="font-medium">{name}</strong> from {base}
+													</span>
+												</>
+											),
+											onSelect: () => onChoose({ kind: "new", name, base }),
+										},
+									],
+								},
+							]
+						: []),
+				],
+			}}
 			empty={!creatable && "No branch matches."}
-			groups={[
-				{
-					heading: "Branches",
-					items: checkout.branches.map(branch => ({
-						value: branch.name,
-						label: (
-							<>
-								<span className="truncate">{branch.name}</span>
-								<span className="ml-auto shrink-0 text-xs text-muted-foreground" title={branch.worktree ?? undefined}>
-									{branch.name === checkout.branch ? "here" : branch.worktree ? projectName(branch.worktree) : "new worktree"}
-								</span>
-							</>
-						),
-						selected: branch.name === current && choice?.kind !== "new",
-						onSelect: () => onChoose(branch.name === checkout.branch ? null : { kind: "existing", name: branch.name }),
-					})),
-				},
-				{
-					forceMount: true,
-					items:
-						creatable
-							? [
-									{
-										value: `create ${name}`,
-										label: (
-											<>
-												<GitBranchPlus aria-hidden />
-												<span className="truncate">
-													Create branch <strong className="font-medium">{name}</strong> from {base}
-												</span>
-											</>
-										),
-										onSelect: () => onChoose({ kind: "new", name, base }),
-									},
-								]
-							: [],
-				},
-			]}
 		/>
 	);
 }

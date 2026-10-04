@@ -2,7 +2,7 @@ import { Bot } from "lucide-react";
 import type { ModelRole } from "../../src/shared";
 import { modelLabel, modelOrg, roleLabel } from "../labels";
 import type { RoleList } from "../use-model-roles";
-import { CommandPicker } from "./command-picker";
+import { CommandPicker, fromList } from "./command-picker";
 import { OrgIcon } from "./org-icon";
 
 interface RolePickerProps {
@@ -21,18 +21,19 @@ export function RolePicker({ list, current, onReload, onPick, disabled }: RolePi
 	return (
 		<CommandPicker
 			trigger={current ? roleLabel(current.role) : "Role"}
-			button={{ leadingIcon: Bot, "aria-label": `Choose model role: ${current ? roleLabel(current.role) : "none matches the model"}`, disabled }}
+			icon={Bot}
+			ariaLabel={`Choose model role: ${current ? roleLabel(current.role) : "none matches the model"}`}
+			disabled={disabled}
 			width="md"
 			side="top"
 			onOpenChange={next => {
 				if (next) onReload();
 			}}
-			state={list === null ? { kind: "loading", message: "Loading roles…" } : list.error ? { kind: "failed", error: list.error } : { kind: "ready" }}
-			empty={<span className="text-muted-foreground">No role in modelRoles names a model you are connected to.</span>}
-			groups={[
+			list={fromList(list, "Loading roles…", ({ roles }) => [
 				{
+					key: "roles",
 					heading: "Model role",
-					items: (list?.roles ?? []).map(role => {
+					items: roles.map(role => {
 						const selector = `${role.model.provider}/${role.model.id}`;
 						return {
 							value: role.role,
@@ -54,7 +55,8 @@ export function RolePicker({ list, current, onReload, onPick, disabled }: RolePi
 						};
 					}),
 				},
-			]}
+			])}
+			empty={<span className="text-muted-foreground">No role in modelRoles names a model you are connected to.</span>}
 		/>
 	);
 }

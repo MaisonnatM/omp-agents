@@ -179,30 +179,37 @@ function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 	return (
 		<CommandPicker
 			trigger={<span className="truncate">{label}</span>}
-			button={{ leadingIcon: Folder, title: selected?.cwdDisplay, "aria-label": `Show sessions from: ${label}`, className: "min-w-0 font-semibold" }}
+			icon={Folder}
+			title={selected?.cwdDisplay}
+			ariaLabel={`Show sessions from: ${label}`}
+			className="min-w-0 font-semibold"
 			search={{ label: "Search projects" }}
 			width="md"
 			open={open}
 			onOpenChange={setOpen}
+			list={{
+				kind: "ready",
+				groups: [
+					{ key: "all", items: [{ value: "All projects", label: "All projects", selected: current === null, onSelect: pick(null) }] },
+					{
+						key: "projects",
+						heading: "Projects",
+						items: projects.map(project => ({
+							value: project.cwd,
+							keywords: [project.cwdDisplay],
+							label: (
+								<span className="flex min-w-0 flex-col">
+									<span className="truncate">{projectName(project.cwdDisplay) ?? project.cwdDisplay}</span>
+									<span className="truncate text-xs text-muted-foreground">{project.cwdDisplay}</span>
+								</span>
+							),
+							selected: project.cwd === current,
+							onSelect: pick(project.cwd),
+						})),
+					},
+				],
+			}}
 			empty="No project matches."
-			groups={[
-				{ items: [{ value: "All projects", label: "All projects", selected: current === null, onSelect: pick(null) }] },
-				{
-					heading: "Projects",
-					items: projects.map(project => ({
-						value: project.cwd,
-						keywords: [project.cwdDisplay],
-						label: (
-							<span className="flex min-w-0 flex-col">
-								<span className="truncate">{projectName(project.cwdDisplay) ?? project.cwdDisplay}</span>
-								<span className="truncate text-xs text-muted-foreground">{project.cwdDisplay}</span>
-							</span>
-						),
-						selected: project.cwd === current,
-						onSelect: pick(project.cwd),
-					})),
-				},
-			]}
 		/>
 	);
 }
