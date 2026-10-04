@@ -125,7 +125,7 @@ describe("FileTail", () => {
 
 			jest.advanceTimersByTime(50);
 			jest.advanceTimersByTime(1000);
-			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "assistant", text: "x".repeat(30), streaming: true }] }]);
+			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "assistant", text: "x".repeat(30), streaming: true, suggestions: [] }] }]);
 		});
 
 		test("the reply that ends the stream publishes at once with the held text, and the window publishes nothing after it", async () => {
@@ -136,7 +136,7 @@ describe("FileTail", () => {
 
 			tail.live(t => t.applyEvent({ type: "message_end", message: reply("pong", { stopReason: "stop" }) }));
 			await applied();
-			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "assistant", text: "pong", streaming: false }] }]);
+			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] }] }]);
 
 			jest.advanceTimersByTime(1000);
 			expect(emits).toHaveLength(2);

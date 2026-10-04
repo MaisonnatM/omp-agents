@@ -334,7 +334,7 @@ export type Item =
 	 * when it carried none.
 	 */
 	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null; images?: string[] }
-	| { id: string; kind: "assistant"; text: string; streaming: boolean }
+	| { id: string; kind: "assistant"; text: string; streaming: boolean; suggestions: string[] }
 	/** `agents`: the subagents a `task` call spawned, by id, in the order they appeared; empty for every other tool. */
 	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[] }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
