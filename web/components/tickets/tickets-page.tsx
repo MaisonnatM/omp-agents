@@ -7,12 +7,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { readTime } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
+import { ticketsStore } from "../../reads";
 import { hashForTickets, type OpenMode } from "../../routing";
 import type { SectionTarget } from "../../section";
 import type { QuickOp, StartOf } from "../../starts";
-import { useStoredKeys } from "../../stored-keys";
+import { useStoredKeys } from "../../stored-state";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
-import { refreshTickets, useTickets } from "../../use-tickets";
 import { Header } from "../conversation";
 import { FoldButton, useRevealSection } from "../fold";
 import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
@@ -88,7 +88,7 @@ interface TicketsPageProps {
 
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
 export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDismissQuick, onOpen }: TicketsPageProps) {
-	const { read, error, refreshing } = useTickets(true);
+	const { read, error, refreshing } = ticketsStore.usePolling();
 	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
 	const tickets = read?.data.tickets ?? [];
 	const targetGroup = target === null ? null : (tickets.find(ticket => ticket.id === target)?.status ?? null);
@@ -145,7 +145,7 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 	return (
 		<div className="flex h-svh min-h-0 flex-1 flex-col">
 			<Header title="Tickets" meta={read ? `Your assigned issues on Linear · updated ${readTime(read.at)}` : "Your assigned issues on Linear"}>
-				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void refreshTickets(true)}>
+				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void ticketsStore.refresh(null, { fresh: true })}>
 					{refreshing ? "Refreshing…" : "Refresh"}
 				</Button>
 			</Header>

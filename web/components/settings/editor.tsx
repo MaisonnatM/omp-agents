@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, Pencil, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
-import { ApiError } from "../../api";
+import { ApiError, errorText } from "../../api";
 
 /** The models `omp models` lists, for the pickers; loaded once per page. */
 export type Catalog =
@@ -18,8 +18,6 @@ export interface Editing {
 	/** Re-read everything from disk, keeping the page as it is until the answer arrives. */
 	reload: () => Promise<void>;
 }
-
-export const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 type EditorState<T> =
 	| { phase: "viewing" }

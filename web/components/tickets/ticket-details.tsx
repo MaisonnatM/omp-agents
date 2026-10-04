@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { age } from "../../labels";
+import { useRead } from "../../reads";
 import { PRIORITY_LABEL } from "../../tickets-model";
-import { useDetail } from "../../use-detail";
 import { IconTip } from "../inbox/avatars";
 import { DetailSection, OutLink } from "../inbox/pr-details";
 import { MessageMarkdown } from "../message-markdown";
@@ -43,7 +43,7 @@ interface TicketSheetContentProps {
 
 /** A Linear issue, as the tickets page's sheet shows it: a header that names it, with `actions` below, then its description, links, and comments. */
 export function TicketSheetContent({ id, listed, actions }: TicketSheetContentProps) {
-	const { detail, error } = useDetail<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
+	const { data: detail, error } = useRead<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
 	const ticket = detail ?? listed;
 	const [PriorityIcon, priorityColor] = PRIORITY_ICON[ticket?.priority ?? 0];
 	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking Linear for the issue…</p>;

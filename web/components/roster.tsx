@@ -34,15 +34,15 @@ import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { inboxRepoKey, inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
+import { inboxStore, ticketsStore } from "../reads";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";
 import type { SectionTarget } from "../section";
 import { type SidebarSessions, workspaces } from "../sessions";
 import { shortcutKeys, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
+import { useStoredState } from "../stored-state";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import type { ResumeAll } from "../use-dashboard";
-import { useInbox } from "../use-inbox";
-import { useTickets } from "../use-tickets";
 import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
 
@@ -51,12 +51,7 @@ const PROJECT_KEY = "omp-agents.sidebar-project";
 
 /** The project `cwd` the sidebar and the inbox show, `null` for all projects, and its setter, which localStorage keeps. */
 export function useProject(projects: { cwd: string }[]): [string | null, (cwd: string | null) => void] {
-	const [stored, setStored] = useState(() => localStorage.getItem(PROJECT_KEY));
-	const pick = (cwd: string | null): void => {
-		setStored(cwd);
-		if (cwd === null) localStorage.removeItem(PROJECT_KEY);
-		else localStorage.setItem(PROJECT_KEY, cwd);
-	};
+	const [stored, pick] = useStoredState<string | null>(PROJECT_KEY, raw => raw, cwd => cwd ?? "");
 	// A stored project with no sessions left, or not yet loaded, shows all of them.
 	return [projects.some(({ cwd }) => cwd === stored) ? stored : null, pick];
 }
@@ -273,7 +268,7 @@ interface InboxNavProps {
 
 /** The inbox page's sections with their pull request counts, per repository, each a link to its section on the page. */
 function InboxNav({ project, target, onTarget }: InboxNavProps) {
-	const { read, error } = useInbox(project, false);
+	const { read, error } = inboxStore.use(project);
 	if (!read) return <SidebarGroup>{navNote(error ? `Cannot load the inbox: ${error}` : "Asking GitHub for pull requests…")}</SidebarGroup>;
 	const { repos } = read.data;
 	if (repos.length === 0) return <SidebarGroup>{navNote("No session ran in a GitHub repository.")}</SidebarGroup>;
@@ -317,7 +312,7 @@ interface TicketsNavProps {
 
 /** The tickets page's status groups with their issue counts, each a link to its group on the page. */
 function TicketsNav({ target, onTarget }: TicketsNavProps) {
-	const { read, error } = useTickets(false);
+	const { read, error } = ticketsStore.use();
 	if (!read) return <SidebarGroup>{navNote(error ? `Cannot load the tickets: ${error}` : "Asking Linear for your issues…")}</SidebarGroup>;
 	const groups = ticketGroups(read.data.tickets);
 	if (groups.length === 0) return <SidebarGroup>{navNote("No issues assigned to you.")}</SidebarGroup>;

@@ -11,6 +11,9 @@ export class ApiError extends Error {
 	}
 }
 
+/** What a failure says to the person reading the page. */
+export const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
 /** The JSON body of a successful response. A body that is not JSON, from a proxy or an older server, reports its status and text. */
 export async function readJson<T>(response: Response): Promise<T> {
 	const text = await response.text();

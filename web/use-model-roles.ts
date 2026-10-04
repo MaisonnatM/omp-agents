@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import type { ModelRole } from "../src/shared";
-import { useCwdRead } from "./use-cwd-read";
+import { useRead } from "./reads";
 
 export interface RoleList {
 	roles: ModelRole[];
@@ -13,9 +13,9 @@ export interface RoleList {
  */
 export function useModelRoles(cwd: string | null): { list: RoleList | null; reload: () => void } {
 	const [reads, setReads] = useState(0);
-	const read = useCwdRead<{ roles: ModelRole[] }>("/api/models/roles", cwd, reads);
+	const read = useRead<{ roles: ModelRole[] }>(cwd === null ? null : `/api/models/roles?cwd=${encodeURIComponent(cwd)}`, reads);
 	const reload = useCallback(() => setReads(count => count + 1), []);
-	return { list: read && (read.ok ? { roles: read.value.roles, error: null } : { roles: [], error: read.error }), reload };
+	return { list: read.error !== null ? { roles: [], error: read.error } : read.data && { roles: read.data.roles, error: null }, reload };
 }
 
 /**
