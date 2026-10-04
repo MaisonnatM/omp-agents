@@ -13,7 +13,7 @@ import type { PullRequestIndex } from "../pull-requests";
 import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, saveOmpFile, saveRouting } from "../settings";
 import { loadTicketDetail, loadTickets } from "../tickets";
-import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, TICKET_ID } from "../shared";
+import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, samePullRequest, TICKET_ID } from "../shared";
 import { answer, fail, type Guards } from "./http";
 import { parsePullRequestQuery, parseSessionLinks } from "./wire";
 
@@ -181,7 +181,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		const name = `${pr.owner}/${pr.repo}#${pr.number}`;
 		const sessions: SessionEntry[] = [];
 		for (const sessionId of new Set(sessionIds)) {
-			const linked = env.pullRequestsOf(sessionId).find(other => `${other.owner}/${other.repo}#${other.number}`.toLowerCase() === name.toLowerCase());
+			const linked = env.pullRequestsOf(sessionId).find(other => samePullRequest(other, pr));
 			if (!linked) return fail(404, `Session ${sessionId} did not submit or work on ${name}`);
 			sessions.push({ sessionId, link: linked.link });
 		}

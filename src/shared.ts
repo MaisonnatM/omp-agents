@@ -23,12 +23,32 @@ export interface MessageQueue {
 
 export const EMPTY_QUEUE: MessageQueue = { steering: [], followUp: [] };
 
-/** A GitHub pull request. */
-export interface PullRequest {
+/** A GitHub repository. */
+export interface Repo {
 	owner: string;
 	repo: string;
+}
+
+/** A GitHub pull request. */
+export interface PullRequest extends Repo {
 	number: number;
 }
+
+/** A GitHub repository's key in maps and lookups: `owner/repo`, lowercased, since GitHub matches names in any case. */
+export const repoKey = ({ owner, repo }: Repo): string => `${owner}/${repo}`.toLowerCase();
+
+/** A pull request's key: `owner/repo#number`, lowercased. */
+export const prKey = (pr: PullRequest): string => `${repoKey(pr)}#${pr.number}`;
+
+/** A branch's key: `owner/repo:branch`, the repository lowercased and the branch, which git keeps case-sensitive, as is. */
+export const headKey = (repo: Repo, branch: string): string => `${repoKey(repo)}:${branch}`;
+
+export const samePullRequest = (a: PullRequest, b: PullRequest): boolean => prKey(a) === prKey(b);
+
+/** What follows `#` in the page link to a session; the server writes such links into pull request descriptions. */
+export const SESSION_HASH_PREFIX = "session/";
+
+export const hashForSession = (sessionId: string): string => `#${SESSION_HASH_PREFIX}${encodeURIComponent(sessionId)}`;
 
 /**
  * How a session's tool calls touched a pull request: it submitted it with `gt submit` or `gh pr create`, or it
@@ -85,7 +105,7 @@ export interface InboxPullRequest extends PullRequest {
 }
 
 /** One GitHub repository's inbox, for the workspaces whose `origin` it is. */
-export type RepoInbox = { owner: string; repo: string; cwds: string[] } & ({ pullRequests: InboxPullRequest[] } | { error: string });
+export type RepoInbox = Repo & { cwds: string[] } & ({ pullRequests: InboxPullRequest[] } | { error: string });
 
 export interface Inbox {
 	repos: RepoInbox[];
@@ -474,7 +494,7 @@ export interface LocalBranch {
 /** The git checkout a directory is in: what the new-session draft's branch picker lists and a session's header names. */
 export interface GitCheckout {
 	/** The GitHub repository that `origin` names, `null` when `origin` is not on GitHub. */
-	github: { owner: string; repo: string } | null;
+	github: Repo | null;
 	/** The branch checked out in the directory, `null` when HEAD is detached. */
 	branch: string | null;
 	/** Every local branch, the checked-out one first, then the most recently committed to. */

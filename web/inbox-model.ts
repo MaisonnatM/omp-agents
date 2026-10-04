@@ -6,9 +6,6 @@ export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/$
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
 
-export const samePullRequest = (a: PullRequest, b: PullRequest): boolean =>
-	a.number === b.number && a.owner.toLowerCase() === b.owner.toLowerCase() && a.repo.toLowerCase() === b.repo.toLowerCase();
-
 /** Graphite's inbox sections, in page order. A pull request goes in the first section that takes it. */
 const INBOX_SECTIONS: [title: string, takes: (pr: InboxPullRequest) => boolean][] = [
 	["Needs your review", pr => pr.role === "reviewer" && pr.state !== "merged"],
@@ -34,10 +31,7 @@ export function inboxSections(pullRequests: InboxPullRequest[]): InboxSection[] 
 	return sections.filter(section => section.pullRequests.length > 0);
 }
 
-/** A repository's key in the inbox's folds and section links: `owner/repo`, lowercased. */
-export const inboxRepoKey = ({ owner, repo }: { owner: string; repo: string }): string => `${owner}/${repo}`.toLowerCase();
-
-/** A section of the inbox page, by {@link inboxRepoKey} and title, which a sidebar link scrolls to. Its title is folded under the repository. */
+/** A section of the inbox page, by `repoKey` and title, which a sidebar link scrolls to. Its title is folded under the repository. */
 export const inboxSection = (repo: string, title: string): SectionTarget => ({
 	id: sectionId("inbox", repo, title),
 	folds: [repo, `${repo}:${title}`],
