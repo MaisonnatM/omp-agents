@@ -495,13 +495,28 @@ export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; n
 /**
  * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` and `images` as
  * its first message, on `branch` when it names one, else in `cwd` as it is, on `model` when it names one, else on omp's
- * default, at thinking level `thinking` when it names one; a fork holding the view's history before the user prompt
- * `entryId`, its file left untouched; or past session `sessionId` continued in its own file, as `omp --resume` does.
+ * default, at thinking level `thinking` when it names one, and through skill `skill`, the one pinned in the settings,
+ * when it names one; a fork holding the view's history before the user prompt `entryId`, its file left untouched; or
+ * past session `sessionId` continued in its own file, as `omp --resume` does.
  */
 export type StartRequest =
-	| { kind: "new"; cwd: string; prompt: string; images: PromptImage[]; branch: BranchChoice | null; model: ModelOption | null; thinking: string | null }
+	| {
+			kind: "new";
+			cwd: string;
+			prompt: string;
+			images: PromptImage[];
+			branch: BranchChoice | null;
+			model: ModelOption | null;
+			thinking: string | null;
+			skill: string | null;
+	  }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "resume"; sessionId: string };
+/** `GET /api/skills?cwd=<dir>`: one skill a session started in that directory can invoke as `/skill:<name>`. */
+export interface SkillOption {
+	name: string;
+	description: string | null;
+}
 /** `cwd` is the absolute directory the session runs in. `prompt` is the text of the prompt a fork branched at, for the composer; `null` for the other kinds. */
 export type StartResult = { ok: true; instanceId: string; cwd: string; prompt: string | null } | { ok: false; error: string };
 /** Where `/` and `@` resolve: an open live view's session, or the directory the new-session draft will start omp in. */
