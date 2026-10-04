@@ -1,6 +1,6 @@
 import { Box, Calendar } from "lucide-react";
 import type { ReactNode } from "react";
-import type { Ticket, TicketComment, TicketDetail } from "../../../src/shared";
+import type { Ticket, TicketDetail } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -8,31 +8,10 @@ import { age } from "../../labels";
 import { PRIORITY_LABEL } from "../../tickets-model";
 import { useDetail } from "../../use-detail";
 import { IconTip } from "../inbox/avatars";
-import { DetailSection, OutLink } from "../inbox/pr-details";
-import { MessageMarkdown } from "../message-markdown";
+import { Comment, DetailSection, Markdown, OutLink } from "../sheet-details";
 import { dueLabel, PRIORITY_ICON, STATUS_ICON } from "./ticket-row";
 
 const ago = (at: string): string => `${age(Date.parse(at))} ago`;
-
-/** Linear's markdown can hold raw HTML too, which GitHub's sanitizing renders safely and whose unknown tags it unwraps. */
-const Markdown = ({ text }: { text: string }) => (
-	<div className="text-sm [&_img]:max-w-full">
-		<MessageMarkdown text={text} github />
-	</div>
-);
-
-function Comment({ comment: { author, body, createdAt }, action }: { comment: TicketComment; action: string }) {
-	return (
-		<li className="space-y-1.5">
-			<p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-				<span className="font-medium text-foreground">{author}</span>
-				{action}
-				<span title={new Date(createdAt).toLocaleString()}>{ago(createdAt)}</span>
-			</p>
-			{body.trim() && <Markdown text={body} />}
-		</li>
-	);
-}
 
 interface TicketSheetContentProps {
 	id: string;
@@ -156,8 +135,13 @@ function TicketSections({ detail: { description, attachments, threads, branch } 
 						{threads.map((thread, index) => (
 							<li key={index} className="rounded-md border border-border p-3">
 								<ul className="space-y-3">
-									{thread.map((comment, at) => (
-										<Comment key={at} comment={comment} action={at === 0 ? "commented" : "replied"} />
+									{thread.map(({ author, body, createdAt }, position) => (
+										<Comment
+											key={position}
+											comment={{ body, at: Date.parse(createdAt), url: null }}
+											author={author}
+											action={position === 0 ? "commented" : "replied"}
+										/>
 									))}
 								</ul>
 							</li>

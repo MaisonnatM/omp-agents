@@ -1,0 +1,65 @@
+/** The parts that the inbox's pull request sheet and the tickets page's issue sheet share. */
+import { ExternalLink } from "lucide-react";
+import type { ReactNode } from "react";
+import type { PullRequestComment } from "../../src/shared";
+import { cn } from "@/lib/utils";
+import { age } from "../labels";
+import { MessageMarkdown } from "./message-markdown";
+
+/** A titled part of a sheet's details. */
+export function DetailSection({ title, children }: { title: ReactNode; children: ReactNode }) {
+	return (
+		<section className="space-y-2">
+			<h5 className="flex items-baseline gap-2 text-xs font-medium text-muted-foreground">{title}</h5>
+			{children}
+		</section>
+	);
+}
+
+/** An external link that says where it goes. */
+export function OutLink({ href, children }: { href: string; children: ReactNode }) {
+	return (
+		<a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:text-foreground hover:underline">
+			{children}
+			<ExternalLink aria-hidden className="size-3" />
+		</a>
+	);
+}
+
+/**
+ * Markdown from GitHub or Linear. Linear's can hold raw HTML too, which GitHub's sanitizing renders safely and whose
+ * unknown tags it unwraps.
+ */
+export function Markdown({ text, className }: { text: string; className?: string }) {
+	return (
+		<div className={cn("text-sm [&_img]:max-w-full", className)}>
+			<MessageMarkdown text={text} github />
+		</div>
+	);
+}
+
+interface CommentProps {
+	/** What the comment says, when it was posted, and where it reads in full, which its time links to. */
+	comment: Pick<PullRequestComment, "body" | "at" | "url">;
+	/** The author's picture, before the name. */
+	avatar?: ReactNode;
+	author: string;
+	/** What the comment did, after the author's name: "commented", "replied", "approved". */
+	action: string;
+}
+
+/** A comment in a sheet's details: its author and what they did, when, then its markdown, indented by the avatar's width when there is one. */
+export function Comment({ comment: { body, at, url }, avatar, author, action }: CommentProps) {
+	const when = `${age(at)} ago`;
+	return (
+		<li className="space-y-1.5">
+			<p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+				{avatar}
+				<span className="font-medium text-foreground">{author}</span>
+				{action}
+				<span title={new Date(at).toLocaleString()}>{url ? <OutLink href={url}>{when}</OutLink> : when}</span>
+			</p>
+			{body.trim() && <Markdown text={body} className={avatar ? "pl-7" : undefined} />}
+		</li>
+	);
+}

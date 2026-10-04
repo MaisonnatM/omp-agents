@@ -1,12 +1,12 @@
-import { CircleCheck, CircleDashed, CircleSlash, CircleX, ExternalLink, type LucideIcon } from "lucide-react";
+import { CircleCheck, CircleDashed, CircleSlash, CircleX, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import type { CheckRunState, PullRequest, PullRequestCheck, PullRequestComment, PullRequestDetail, PullRequestEvent } from "../../../src/shared";
+import type { CheckRunState, PullRequest, PullRequestCheck, PullRequestDetail, PullRequestEvent } from "../../../src/shared";
 import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestUrl } from "../../inbox-model";
 import { age } from "../../labels";
 import { useDetail } from "../../use-detail";
-import { MessageMarkdown } from "../message-markdown";
+import { Comment, DetailSection, Markdown, OutLink } from "../sheet-details";
 import { Avatar, IconTip, STATE_ICON } from "./avatars";
 
 const CHECK_RUN_ICON: Record<CheckRunState, [LucideIcon, string]> = {
@@ -24,45 +24,6 @@ const EVENT_ACTION: Record<NonNullable<PullRequestEvent["review"]> | "comment", 
 	dismissed: "reviewed, since dismissed",
 	comment: "commented",
 };
-
-/** A titled part of a sheet's details. */
-export function DetailSection({ title, children }: { title: ReactNode; children: ReactNode }) {
-	return (
-		<section className="space-y-2">
-			<h5 className="flex items-baseline gap-2 text-xs font-medium text-muted-foreground">{title}</h5>
-			{children}
-		</section>
-	);
-}
-
-/** An external link that says where it goes. */
-export function OutLink({ href, children }: { href: string; children: ReactNode }) {
-	return (
-		<a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline-offset-2 hover:text-foreground hover:underline">
-			{children}
-			<ExternalLink aria-hidden className="size-3" />
-		</a>
-	);
-}
-
-function Comment({ comment: { author, body, at, url }, action }: { comment: PullRequestComment; action: string }) {
-	const when = `${age(at)} ago`;
-	return (
-		<li className="space-y-1.5">
-			<p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-				<Avatar person={author} label={author.login} className="mr-0.5" />
-				<span className="font-medium text-foreground">{author.login}</span>
-				{action}
-				<span title={new Date(at).toLocaleString()}>{url ? <OutLink href={url}>{when}</OutLink> : when}</span>
-			</p>
-			{body.trim() && (
-				<div className="pl-7 text-sm [&_img]:max-w-full">
-					<MessageMarkdown text={body} github />
-				</div>
-			)}
-		</li>
-	);
-}
 
 function CheckRow({ check: { name, state, url } }: { check: PullRequestCheck }) {
 	const [Icon, color] = CHECK_RUN_ICON[state];
@@ -167,13 +128,7 @@ function PullRequestSections({ detail }: { detail: PullRequestDetail }) {
 	return (
 		<>
 			<DetailSection title="Description">
-				{body.trim() ? (
-					<div className="text-sm [&_img]:max-w-full">
-						<MessageMarkdown text={body} github />
-					</div>
-				) : (
-					<p className="text-sm text-muted-foreground">No description.</p>
-				)}
+				{body.trim() ? <Markdown text={body} /> : <p className="text-sm text-muted-foreground">No description.</p>}
 			</DetailSection>
 			{checks.length > 0 && (
 				<DetailSection title="Checks">
@@ -196,8 +151,14 @@ function PullRequestSections({ detail }: { detail: PullRequestDetail }) {
 									{thread.line !== null && `:${thread.line}`}
 								</p>
 								<ul className="space-y-3">
-									{thread.comments.map((comment, at) => (
-										<Comment key={at} comment={comment} action={at === 0 ? "commented" : "replied"} />
+									{thread.comments.map((comment, position) => (
+										<Comment
+											key={position}
+											comment={comment}
+											avatar={<Avatar person={comment.author} label={comment.author.login} className="mr-0.5" />}
+											author={comment.author.login}
+											action={position === 0 ? "commented" : "replied"}
+										/>
 									))}
 								</ul>
 							</li>
@@ -209,7 +170,13 @@ function PullRequestSections({ detail }: { detail: PullRequestDetail }) {
 				<DetailSection title="Conversation">
 					<ul className="space-y-4">
 						{conversation.map((event, index) => (
-							<Comment key={index} comment={event} action={EVENT_ACTION[event.review ?? "comment"]} />
+							<Comment
+								key={index}
+								comment={event}
+								avatar={<Avatar person={event.author} label={event.author.login} className="mr-0.5" />}
+								author={event.author.login}
+								action={EVENT_ACTION[event.review ?? "comment"]}
+							/>
 						))}
 					</ul>
 				</DetailSection>

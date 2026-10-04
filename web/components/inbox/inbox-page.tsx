@@ -1,30 +1,19 @@
-import { RefreshCw } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import type { Inbox, InboxPullRequest, PastSession, PullRequest, RepoInbox, RosterHost, View } from "../../../src/shared";
-import { projectName, readTime } from "../../labels";
+import { projectName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
-import { type PullRequestActionId, pullRequestActions, pullRequestStart } from "../../quick-actions";
-import { Button } from "@/components/ui/button";
-import { Sheet } from "@/components/ui/sheet";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { pendingOf, pullRequestActions, pullRequestStart } from "../../quick-actions";
 import { inboxRepoKey, inboxSection, inboxSections, samePullRequest } from "../../inbox-model";
 import { hashForInbox, type OpenMode } from "../../routing";
 import type { SectionTarget } from "../../section";
 import type { QuickOp, StartOf } from "../../starts";
 import { useStoredKeys } from "../../stored-keys";
 import { refreshInbox, useInbox } from "../../use-inbox";
-import { Header } from "../conversation";
-import { FoldButton, useRevealSection } from "../fold";
-import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
+import { FoldButton, useRevealRow, useRevealSection } from "../fold";
+import { ListSheetPage, TargetSheet } from "../list-sheet-page";
+import { QuickStartNotice, SheetQuickActions } from "../quick-actions";
 import { PullRequestSheetContent } from "./pr-details";
 import { PullRequestRow, rowId, sessionsFor } from "./pr-row";
-
-/** The action of the quick start under way for `pr`, if any. */
-function pendingOf(quick: StartOf<"quick"> | null, pr: PullRequest): PullRequestActionId | null {
-	const subject = quick?.phase === "starting" ? quick.op.subject : null;
-	return subject?.kind === "pull-request" && samePullRequest(subject.pr, pr) ? subject.action : null;
-}
 
 /** Folded repositories and sections: `owner/repo`, and `owner/repo:<section title>`. */
 const COLLAPSED_KEY = "omp-agents.inbox-collapsed";
@@ -81,7 +70,7 @@ function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen, 
 									sessions={sessionsFor(pr, hosts, past)}
 									targeted={target !== null && samePullRequest(pr, target)}
 									onOpen={onOpen}
-									pending={pendingOf(quick, pr)}
+									pending={pendingOf(quick, { kind: "pull-request", pr })}
 									onQuickAction={action => onQuickAction(pullRequestStart(pr, action, inbox.cwds[0]!, readPinnedSkill()))}
 								/>
 							))}
@@ -132,20 +121,14 @@ function listedPullRequest(inbox: Inbox, pr: PullRequest): { pr: InboxPullReques
 }
 
 /** Why the inbox does not list the PR a link named. `allProjects`: the sidebar shows every project. */
-function MissingTarget({ target, inbox, allProjects }: { target: PullRequest; inbox: Inbox; allProjects: boolean }) {
+function whyMissing(target: PullRequest, inbox: Inbox, allProjects: boolean): string {
 	const repo = `${target.owner}/${target.repo}`;
 	const covered = inbox.repos.some(other => `${other.owner}/${other.repo}`.toLowerCase() === repo.toLowerCase());
-	let reason = `${repo}#${target.number} is not in this inbox, which covers only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}.`;
 	if (covered) {
-		reason = `${repo}#${target.number} is not in this inbox. The inbox lists your open pull requests, your merges from the last seven days, and the pull requests that wait for your review.`;
-	} else if (allProjects) {
-		reason = `${repo}#${target.number} is not in this inbox, because no session ran in ${repo}.`;
+		return `${repo}#${target.number} is not in this inbox. The inbox lists your open pull requests, your merges from the last seven days, and the pull requests that wait for your review.`;
 	}
-	return (
-		<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-			{reason}
-		</p>
-	);
+	if (allProjects) return `${repo}#${target.number} is not in this inbox, because no session ran in ${repo}.`;
+	return `${repo}#${target.number} is not in this inbox, which covers only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}.`;
 }
 
 interface InboxPageProps {
@@ -166,104 +149,74 @@ interface InboxPageProps {
 
 /** The pull requests of the sidebar's project, or of every project, in Graphite's inbox sections, read from GitHub. */
 export function InboxPage({ project, hosts, past, target, onOpen, section, quick, onQuickAction, onDismissQuick }: InboxPageProps) {
-	const { read, error, refreshing } = useInbox(project, true);
+	const poll = useInbox(project, true);
+	const { read } = poll;
 	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
 	const place = read && target ? placeOf(read.data, target) : null;
-	const targetKey = target && rowId(target);
-	/** The target whose row the page already unfolded and scrolled to; folding it again afterwards stays folded. */
-	const shown = useRef<string | null>(null);
-	/** The PR the sheet shows, kept after the hash drops it so the sheet's content stays through its exit slide. */
-	const sheetPr = useRef<PullRequest | null>(null);
-	if (target) sheetPr.current = target;
-	const sheetListed = read && sheetPr.current ? listedPullRequest(read.data, sheetPr.current) : null;
-
-	useEffect(() => {
-		if (!place || !targetKey || shown.current === targetKey) return;
-		const folded = [place.repo, place.section].filter(key => collapsed.has(key));
-		if (folded.length > 0) {
-			// Unfolding renders the row; this effect runs again and then scrolls to it.
-			expand(folded);
-			return;
-		}
-		shown.current = targetKey;
-		document.getElementById(targetKey)?.scrollIntoView({ block: "center", behavior: "smooth" });
-	}, [place?.repo, place?.section, targetKey, collapsed]);
-
+	useRevealRow(target && place && { id: rowId(target), folds: [place.repo, place.section] }, collapsed, expand);
 	useRevealSection(section, collapsed, expand);
 
-	let body: ReactNode;
-	if (!read && error) body = <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot load the inbox: {error}</p>;
-	else if (!read) body = <p className="text-sm text-muted-foreground">Asking GitHub for pull requests…</p>;
-	else {
-		const { repos, unmatched } = read.data;
-		body = (
-			<>
-				{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the inbox: {error}</p>}
-				{target && !place && <MissingTarget target={target} inbox={read.data} allProjects={project === null} />}
-				{repos.length === 0 && <p className="text-sm text-muted-foreground">No session ran in a GitHub repository.</p>}
-				{repos.map(repo => (
-					<RepoSection
-						key={`${repo.owner}/${repo.repo}`}
-						inbox={repo}
-						hosts={hosts}
-						past={past}
-						target={target}
-						collapsed={collapsed}
-						onToggle={toggleCollapsed}
-						onOpen={onOpen}
-						quick={quick}
-						onQuickAction={onQuickAction}
-					/>
-				))}
-				{unmatched.length > 0 && (
-					<p className="text-xs text-muted-foreground" title={unmatched.join("\n")}>
-						{unmatched.length === 1 ? "1 workspace has" : `${unmatched.length} workspaces have`} no GitHub origin and is left out.
-					</p>
-				)}
-			</>
-		);
-	}
-
 	return (
-		<div className="flex h-svh min-h-0 flex-1 flex-col">
-			<Header
-				title="Inbox"
-				meta={read ? `Your pull requests and review requests on GitHub · updated ${readTime(read.at)}` : "Your pull requests and review requests on GitHub"}
-			>
-				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void refreshInbox(project, true)}>
-					{refreshing ? "Refreshing…" : "Refresh"}
-				</Button>
-			</Header>
-			<div className="min-h-0 flex-1 overflow-y-auto">
-				<TooltipProvider>
-					<div className="mx-auto w-full max-w-5xl space-y-10 px-6 py-6">
-						{quick && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />}
-						{body}
-					</div>
-					{sheetPr.current && (
-						<Sheet open={target !== null} onClose={() => (location.hash = hashForInbox(null))}>
+		<ListSheetPage
+			title="Inbox"
+			meta="Your pull requests and review requests on GitHub"
+			noun="the inbox"
+			loading="Asking GitHub for pull requests…"
+			poll={poll}
+			onRefresh={() => void refreshInbox(project, true)}
+			missing={read && target && !place ? whyMissing(target, read.data, project === null) : null}
+			notice={quick && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />}
+			spacing="space-y-10"
+			sheet={
+				<TargetSheet target={target} onClose={() => (location.hash = hashForInbox(null))}>
+					{pr => {
+						const listed = read && listedPullRequest(read.data, pr);
+						return (
 							<PullRequestSheetContent
-								key={rowId(sheetPr.current)}
-								pr={sheetPr.current}
+								key={rowId(pr)}
+								pr={pr}
 								actions={
-									sheetListed && (
-										<>
-											<QuickActionButtons
-												actions={pullRequestActions(sheetListed.pr)}
-												pending={pendingOf(quick, sheetListed.pr)}
-												onRun={action => onQuickAction(pullRequestStart(sheetListed.pr, action, sheetListed.cwd, readPinnedSkill()))}
-											/>
-											{quick && quick.op.subject.kind === "pull-request" && samePullRequest(quick.op.subject.pr, sheetListed.pr) && (
-												<QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />
-											)}
-										</>
+									listed && (
+										<SheetQuickActions
+											item={{ kind: "pull-request", pr: listed.pr }}
+											actions={pullRequestActions(listed.pr)}
+											onRun={action => onQuickAction(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()))}
+											quick={quick}
+											onOpen={onOpen}
+											onDismiss={onDismissQuick}
+										/>
 									)
 								}
 							/>
-						</Sheet>
+						);
+					}}
+				</TargetSheet>
+			}
+		>
+			{({ repos, unmatched }) => (
+				<>
+					{repos.length === 0 && <p className="text-sm text-muted-foreground">No session ran in a GitHub repository.</p>}
+					{repos.map(repo => (
+						<RepoSection
+							key={`${repo.owner}/${repo.repo}`}
+							inbox={repo}
+							hosts={hosts}
+							past={past}
+							target={target}
+							collapsed={collapsed}
+							onToggle={toggleCollapsed}
+							onOpen={onOpen}
+							quick={quick}
+							onQuickAction={onQuickAction}
+						/>
+					))}
+					{unmatched.length > 0 && (
+						<p className="text-xs text-muted-foreground" title={unmatched.join("\n")}>
+							{unmatched.length === 1 ? "1 workspace has" : `${unmatched.length} workspaces have`} no GitHub origin and is left out.
+						</p>
 					)}
-				</TooltipProvider>
-			</div>
-		</div>
+				</>
+			)}
+		</ListSheetPage>
 	);
 }

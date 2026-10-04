@@ -35,6 +35,10 @@ function questionOf(request: UserRequest): AskUserQuestion {
 				freeTextPlaceholder: request.placeholder ?? undefined,
 				nextLabel: "Send",
 			};
+		default: {
+			const unhandled: never = request;
+			return unhandled;
+		}
 	}
 }
 
@@ -49,6 +53,10 @@ function answerOf(request: UserRequest, answer: AskUserAnswer | undefined): User
 			return picked === undefined ? null : { kind: "confirm", confirmed: picked === "yes" };
 		case "text":
 			return answer?.otherText === undefined ? null : { kind: "value", value: answer.otherText };
+		default: {
+			const unhandled: never = request;
+			return unhandled;
+		}
 	}
 }
 

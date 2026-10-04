@@ -1,21 +1,15 @@
-import { RefreshCw } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
 import type { Ticket, View } from "../../../src/shared";
-import { Button } from "@/components/ui/button";
-import { Sheet } from "@/components/ui/sheet";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { readTime } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
-import { type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
+import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
 import { hashForTickets, type OpenMode } from "../../routing";
 import type { SectionTarget } from "../../section";
 import type { QuickOp, StartOf } from "../../starts";
 import { useStoredKeys } from "../../stored-keys";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { refreshTickets, useTickets } from "../../use-tickets";
-import { Header } from "../conversation";
-import { FoldButton, useRevealSection } from "../fold";
-import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
+import { FoldButton, useRevealRow, useRevealSection } from "../fold";
+import { ListSheetPage, PageFrame, TargetSheet } from "../list-sheet-page";
+import { QuickStartNotice, SheetQuickActions } from "../quick-actions";
 import { LinearConnection } from "../settings/linear-connection";
 import { TicketSheetContent } from "./ticket-details";
 import { STATUS_ICON, TicketRow, ticketRowId } from "./ticket-row";
@@ -23,11 +17,8 @@ import { STATUS_ICON, TicketRow, ticketRowId } from "./ticket-row";
 /** Folded status groups, by status name. */
 const COLLAPSED_KEY = "omp-agents.tickets-collapsed";
 
-/** The action of the quick start under way for issue `id`, if any. */
-function pendingOf(quick: StartOf<"quick"> | null, id: string): TicketActionId | null {
-	const subject = quick?.phase === "starting" ? quick.op.subject : null;
-	return subject?.kind === "ticket" && subject.id === id ? subject.action : null;
-}
+const TITLE = "Tickets";
+const META = "Your assigned issues on Linear";
 
 interface GroupProps {
 	group: TicketGroup;
@@ -58,7 +49,7 @@ function GroupSection({ group, open, onToggle, target, quick, onQuickAction }: G
 							key={ticket.id}
 							ticket={ticket}
 							targeted={ticket.id === target}
-							pending={pendingOf(quick, ticket.id)}
+							pending={pendingOf(quick, { kind: "ticket", id: ticket.id })}
 							onQuickAction={action => onQuickAction(ticket, action)}
 						/>
 					))}
@@ -88,112 +79,86 @@ interface TicketsPageProps {
 
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
 export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDismissQuick, onOpen }: TicketsPageProps) {
-	const { read, error, refreshing } = useTickets(true);
+	const poll = useTickets(true);
+	const tickets = poll.read?.data.tickets ?? [];
 	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
-	const tickets = read?.data.tickets ?? [];
 	const targetGroup = target === null ? null : (tickets.find(ticket => ticket.id === target)?.status ?? null);
-	/** The target whose row the page already unfolded and scrolled to; folding it again afterwards stays folded. */
-	const shown = useRef<string | null>(null);
-	/** The issue the sheet shows, kept after the hash drops it so the sheet's content stays through its exit slide. */
-	const sheetId = useRef<string | null>(null);
-	if (target) sheetId.current = target;
-	const sheetListed = tickets.find(ticket => ticket.id === sheetId.current) ?? null;
 	const start = (ticket: Ticket, action: TicketActionId) => onQuickAction(ticketStart(ticket, action, cwd, readPinnedSkill()));
-
-	useEffect(() => {
-		if (targetGroup === null || target === null || shown.current === target) return;
-		if (collapsed.has(targetGroup)) {
-			// Unfolding renders the row; this effect runs again and then scrolls to it.
-			expand([targetGroup]);
-			return;
-		}
-		shown.current = target;
-		document.getElementById(ticketRowId(target))?.scrollIntoView({ block: "center", behavior: "smooth" });
-	}, [targetGroup, target, collapsed]);
-
+	useRevealRow(target !== null && targetGroup !== null ? { id: ticketRowId(target), folds: [targetGroup] } : null, collapsed, expand);
 	useRevealSection(section, collapsed, expand);
 
-	let body: ReactNode;
-	if (!read && error) body = <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot load the tickets: {error}</p>;
-	else if (!read) body = <p className="text-sm text-muted-foreground">Asking Linear for your issues…</p>;
-	else {
-		const groups = ticketGroups(tickets);
-		body = (
-			<>
-				{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the tickets: {error}</p>}
-				{target && targetGroup === null && (
-					<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-						{target} is not on this page, which lists the issues assigned to you that are open or closed in the last seven days.
-					</p>
-				)}
-				{groups.length === 0 && <p className="text-sm text-muted-foreground">No issues assigned to you.</p>}
-				{groups.map(group => (
-					<GroupSection
-						key={group.status}
-						group={group}
-						open={!collapsed.has(group.status)}
-						onToggle={() => toggleCollapsed(group.status)}
-						target={target}
-						quick={quick}
-						onQuickAction={start}
-					/>
-				))}
-			</>
-		);
-	}
-
 	return (
-		<div className="flex h-svh min-h-0 flex-1 flex-col">
-			<Header title="Tickets" meta={read ? `Your assigned issues on Linear · updated ${readTime(read.at)}` : "Your assigned issues on Linear"}>
-				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void refreshTickets(true)}>
-					{refreshing ? "Refreshing…" : "Refresh"}
-				</Button>
-			</Header>
-			<div className="min-h-0 flex-1 overflow-y-auto">
-				<TooltipProvider>
-					<div className="mx-auto w-full max-w-5xl space-y-4 px-6 py-6">
-						{quick && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />}
-						{body}
-					</div>
-					{sheetId.current && (
-						<Sheet open={target !== null} onClose={() => (location.hash = hashForTickets(null))}>
+		<ListSheetPage
+			title={TITLE}
+			meta={META}
+			noun="the tickets"
+			loading="Asking Linear for your issues…"
+			poll={poll}
+			onRefresh={() => void refreshTickets(true)}
+			missing={
+				target && targetGroup === null
+					? `${target} is not on this page, which lists the issues assigned to you that are open or closed in the last seven days.`
+					: null
+			}
+			notice={quick && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />}
+			spacing="space-y-4"
+			sheet={
+				<TargetSheet target={target} onClose={() => (location.hash = hashForTickets(null))}>
+					{id => {
+						const listed = tickets.find(ticket => ticket.id === id) ?? null;
+						return (
 							<TicketSheetContent
-								key={sheetId.current}
-								id={sheetId.current}
-								listed={sheetListed}
+								key={id}
+								id={id}
+								listed={listed}
 								actions={
-									sheetListed && (
-										<>
-											<QuickActionButtons
-												actions={ticketActions(sheetListed)}
-												pending={pendingOf(quick, sheetListed.id)}
-												onRun={action => start(sheetListed, action)}
-											/>
-											{quick && quick.op.subject.kind === "ticket" && quick.op.subject.id === sheetListed.id && (
-												<QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />
-											)}
-										</>
+									listed && (
+										<SheetQuickActions
+											item={{ kind: "ticket", id }}
+											actions={ticketActions(listed)}
+											onRun={action => start(listed, action)}
+											quick={quick}
+											onOpen={onOpen}
+											onDismiss={onDismissQuick}
+										/>
 									)
 								}
 							/>
-						</Sheet>
-					)}
-				</TooltipProvider>
-			</div>
-		</div>
+						);
+					}}
+				</TargetSheet>
+			}
+		>
+			{() => {
+				const groups = ticketGroups(tickets);
+				return (
+					<>
+						{groups.length === 0 && <p className="text-sm text-muted-foreground">No issues assigned to you.</p>}
+						{groups.map(group => (
+							<GroupSection
+								key={group.status}
+								group={group}
+								open={!collapsed.has(group.status)}
+								onToggle={() => toggleCollapsed(group.status)}
+								target={target}
+								quick={quick}
+								onQuickAction={start}
+							/>
+						))}
+					</>
+				);
+			}}
+		</ListSheetPage>
 	);
 }
 
 /** The tickets page while omp is not signed in to Linear: the connection, to sign in from here as from the settings. */
 export function TicketsDisconnected() {
 	return (
-		<div className="flex h-svh min-h-0 flex-1 flex-col">
-			<Header title="Tickets" meta="Your assigned issues on Linear" />
-			<div className="min-h-0 flex-1 overflow-y-auto">
-				<div className="mx-auto w-full max-w-5xl px-6 py-6">
-					<LinearConnection />
-				</div>
+		<PageFrame title={TITLE} meta={META}>
+			<div className="mx-auto w-full max-w-5xl px-6 py-6">
+				<LinearConnection />
 			</div>
-		</div>
+		</PageFrame>
 	);
 }
