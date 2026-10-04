@@ -1,11 +1,11 @@
-import type { BranchChoice, LiveView, ModelOption, PromptImage, StartRequest, StartResult, View } from "../src/shared";
+import type { BranchChoice, ClientMsg, LiveView, ModelOption, PromptImage, StartResult, View } from "../src/shared";
 import type { QuickSubject } from "./quick-actions";
 import type { ForkPoint } from "./transcript-view";
 
 /**
  * What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. A
  * quick action keeps its subject, the pull request or Linear issue with the action, which the inbox or the tickets page
- * shows progress, the started session, and failure for.
+ * shows progress, the started session, and failure for. A **Resume all** resumes each of the sidebar's interrupted sessions.
  */
 export type StartOp =
 	| {
@@ -24,7 +24,8 @@ export type StartOp =
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
 	| { kind: "resume"; sessionId: string }
 	/** `skill`: the skill pinned in the settings, `null` for none. */
-	| { kind: "quick"; cwd: string; prompt: string; subject: QuickSubject; skill: string | null };
+	| { kind: "quick"; cwd: string; prompt: string; subject: QuickSubject; skill: string | null }
+	| { kind: "resume-all"; sessionIds: string[] };
 
 export type NewOp = Extract<StartOp, { kind: "new" }>;
 
@@ -43,16 +44,23 @@ export type Starts = ReadonlyMap<number, Start>;
 
 export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 
-export const requestOf = (op: StartOp): StartRequest => {
+/** The message that asks the server for `op`, answered with `reqId`. */
+export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 	switch (op.kind) {
 		case "new":
-			return { kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill };
 		case "quick":
-			return { kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill };
 		case "fork":
-			return { kind: "fork", view: op.view, entryId: op.point.entryId };
+			return { t: "start", reqId, kind: "fork", view: op.view, entryId: op.point.entryId };
 		case "resume":
-			return { kind: "resume", sessionId: op.sessionId };
+			return { t: "start", reqId, kind: "resume", sessionId: op.sessionId };
+		case "resume-all":
+			return { t: "resume-all", reqId, sessionIds: op.sessionIds };
+		default: {
+			const never: never = op;
+			return never;
+		}
 	}
 };
 
@@ -69,14 +77,31 @@ export function beginStart(starts: Starts, reqId: number, op: StartOp): Starts {
 	return next.set(reqId, { op, phase: "starting" });
 }
 
+/** Start `reqId` while it waits for the server's answer; `null` once it settled, was replaced, or lost the connection. */
+export function pendingStart(starts: Starts, reqId: number): Start | null {
+	const start = starts.get(reqId);
+	return start?.phase === "starting" ? start : null;
+}
+
 /** The server's answer to start `reqId`: a failure stays with its reason, a quick action's session stays as started, and any other started session leaves the map. */
 export function settleStart(starts: Starts, reqId: number, result: StartResult): Starts {
-	const start = starts.get(reqId);
-	if (start?.phase !== "starting") return starts;
+	const start = pendingStart(starts, reqId);
+	if (!start) return starts;
 	const next = new Map(starts);
 	if (!result.ok) next.set(reqId, { op: start.op, phase: "failed", error: result.error });
 	else if (start.op.kind === "quick") next.set(reqId, { op: start.op, phase: "started", view: { kind: "live", instanceId: result.instanceId, agentId: null } });
 	else next.delete(reqId);
+	return next;
+}
+
+/** The server's answer to **Resume all** `reqId`: it leaves the map once every session resumed, else fails with the first reason. */
+export function settleResumeAll(starts: Starts, reqId: number, errors: string[]): Starts {
+	const start = pendingStart(starts, reqId);
+	if (!start) return starts;
+	const next = new Map(starts);
+	const [first] = errors;
+	if (first === undefined) next.delete(reqId);
+	else next.set(reqId, { op: start.op, phase: "failed", error: `Could not resume ${errors.length === 1 ? "1 session" : `${errors.length} sessions`}. ${first}` });
 	return next;
 }
 
@@ -85,6 +110,7 @@ const LOST: Record<StartKind, string> = {
 	fork: "Lost the dashboard server while forking. The fork may still appear.",
 	resume: "Lost the dashboard server while resuming. The session may still appear.",
 	quick: "Lost the dashboard server while the session was starting. It may still appear.",
+	"resume-all": "Lost the dashboard server while resuming. The sessions may still appear.",
 };
 
 /** The answer to every start under way went to the socket that just closed. */
