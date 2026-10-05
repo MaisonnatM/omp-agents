@@ -29,6 +29,8 @@ const LOG_LINES = 40;
 /** The error page's Retry link, which never loads: `will-navigate` catches it. */
 const RETRY_URL = "omp-agents:retry";
 const IS_MAC = process.platform === "darwin";
+/** `icon.svg` rendered at 1024 px; Electron reads no SVG. */
+const ICON = join(app.getAppPath(), "icon.png");
 
 // Each port is its own server, so each gets its own window state, cookie, and single-instance lock.
 if (process.env.PORT) app.setPath("userData", join(app.getPath("userData"), `port-${PORT}`));
@@ -177,6 +179,8 @@ function createWindow(): BrowserWindow {
 		...savedBounds(),
 		show: false,
 		title: "omp agents",
+		// macOS takes the app's icon from the Dock instead.
+		icon: ICON,
 		webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
 	});
 	win.once("ready-to-show", () => win.show());
@@ -289,6 +293,8 @@ if (!app.requestSingleInstanceLock()) {
 
 	void app.whenReady().then(() => {
 		Menu.setApplicationMenu(applicationMenu());
+		// The app runs from Electron's own bundle, so without this the Dock shows Electron's icon.
+		app.dock?.setIcon(ICON);
 		win = createWindow();
 		void connect(win);
 	});

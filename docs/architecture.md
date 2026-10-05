@@ -173,7 +173,7 @@ The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`). Its `agent/` files are copies of the maintainer's `~/.omp/agent` files, except for `AGENTS.md`, which is a generic version. After you edit one of those live files, copy it back. `bun run omp-template --dry-run` shows a copy that has drifted as `keep yours`.
 
-`desktop/` holds the desktop shell; see [Desktop shell](#desktop-shell). `desktop/main.ts` is its whole main process, and `bun run desktop` at the root installs the package and starts it.
+`desktop/` holds the desktop shell; see [Desktop shell](#desktop-shell). `desktop/main.ts` is its whole main process, and `bun run desktop` at the root installs the package and starts it. `desktop/icon.svg` is the app icon, the logo mark on a macOS-style tile, and `desktop/icon.png` is that SVG rendered at 1024 px, because Electron reads no SVG; render it again after you change the SVG. The page's favicon, `web/favicon.svg`, is the bare mark.
 
 Changes the dashboard makes to Fluid's components:
 
