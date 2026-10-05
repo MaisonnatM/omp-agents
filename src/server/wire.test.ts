@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type ClientMsg, MAX_PROMPT_IMAGE_BYTES } from "../shared";
+import { type ClientMsg, MAX_PROMPT_IMAGE_BYTES, type RoutineChange, type Schedule } from "../shared";
 import { parseClientMsg, parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
@@ -49,6 +49,55 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "edit-body", id: "a", body: "x".repeat(100_001) })).toBeNull();
 		expect(change({ op: "rename-category", id: "w", name: "  " })).toBeNull();
 		expect(change({ op: "move", id: "a" })).toBeNull();
+	});
+
+	describe("routine", () => {
+		const change = (value: unknown) => msg({ t: "routine", change: value });
+		const weekdays: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } };
+		const routine: Extract<RoutineChange, { op: "save" }>["routine"] = {
+			id: "r1",
+			name: "Reviews",
+			cwd: "/work/webapp",
+			schedule: weekdays,
+			task: { kind: "pull-requests", action: "review" },
+			skill: null,
+			enabled: true,
+		};
+		const save = (fields: Record<string, unknown>) => change({ op: "save", routine: { ...routine, ...fields } });
+
+		test("save takes a whole routine and drops what the server keeps or does not know", () => {
+			expect(save({ runs: [], done: { "acme/webapp#1": "x" }, createdAt: 1, extra: 1, schedule: { ...weekdays, extra: 1 } })).toEqual({ t: "routine", change: { op: "save", routine } });
+			expect(save({ schedule: { kind: "every", minutes: 90 }, task: { kind: "prompt", prompt: "Summarize" }, skill: "ship" })).toEqual({
+				t: "routine",
+				change: { op: "save", routine: { ...routine, schedule: { kind: "every", minutes: 90 }, task: { kind: "prompt", prompt: "Summarize" }, skill: "ship" } },
+			});
+			expect(change({ op: "enable", id: "r1", enabled: false })).toEqual({ t: "routine", change: { op: "enable", id: "r1", enabled: false } });
+			expect(change({ op: "run-now", id: "r1", at: 5 })).toEqual({ t: "routine", change: { op: "run-now", id: "r1" } });
+		});
+
+		test("save refuses a schedule that names no slot or one out of range", () => {
+			for (const schedule of [
+				{ kind: "every", minutes: 0 },
+				{ kind: "every", minutes: 1.5 },
+				{ kind: "weekly", days: [], time: { hour: 9, minute: 0 } },
+				{ kind: "weekly", days: [1, 1], time: { hour: 9, minute: 0 } },
+				{ kind: "weekly", days: [7], time: { hour: 9, minute: 0 } },
+				{ kind: "weekly", days: [1], time: { hour: 24, minute: 0 } },
+				{ kind: "weekly", days: [1], time: { hour: 9, minute: 60 } },
+				{ kind: "cron", expression: "0 9 * * 1-5" },
+			])
+				expect(save({ schedule })).toBeNull();
+		});
+
+		test("save refuses an action a routine may not run, and a blank name, workspace, or prompt", () => {
+			expect(save({ task: { kind: "pull-requests", action: "fix-ci" } })).toBeNull();
+			expect(save({ task: { kind: "pull-requests", action: "merge" } })).toBeNull();
+			expect(save({ task: { kind: "prompt", prompt: " " } })).toBeNull();
+			expect(save({ name: "" })).toBeNull();
+			expect(save({ cwd: "  " })).toBeNull();
+			expect(save({ enabled: "yes" })).toBeNull();
+			expect(change({ op: "enable", id: "r1" })).toBeNull();
+		});
 	});
 
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {

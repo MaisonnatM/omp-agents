@@ -1,8 +1,8 @@
 import { CircleCheck, CircleDashed, CircleSlash, CircleX, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import type { CheckRunState, PullRequest, PullRequestCheck, PullRequestDetail, PullRequestEvent } from "../../../src/shared";
+import { type CheckRunState, type PullRequest, type PullRequestCheck, type PullRequestDetail, type PullRequestEvent, pullRequestUrl } from "../../../src/shared";
 import { cn } from "@/lib/utils";
-import { graphiteUrl, pullRequestUrl } from "../../inbox-model";
+import { graphiteUrl } from "../../inbox-model";
 import { age } from "../../labels";
 import { useRead } from "../../reads";
 import { BranchName } from "../git";

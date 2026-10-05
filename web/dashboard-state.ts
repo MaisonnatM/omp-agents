@@ -1,5 +1,5 @@
 /** What the page holds of the dashboard, and how the server's messages and the page's own actions change it. */
-import type { LiveView, PastSession, PlanUsage, RosterHost, ServerMsg, UserTodoChange, UserTodoList, View } from "../src/shared";
+import type { LiveView, PastSession, PlanUsage, Routine, RosterHost, ServerMsg, UserTodoChange, UserTodoList, View } from "../src/shared";
 import { applyUserTodo } from "../src/user-todos";
 import type { Completions } from "./pane-store";
 import type { ModelList } from "./reads";
@@ -34,10 +34,12 @@ export interface DashboardState {
 	models: Map<string, ModelList>;
 	/** The Todo page's list, `null` until the server first sends it; a change shows here before the server answers. */
 	userTodos: UserTodoList | null;
+	/** Every routine, empty until the server first sends them. */
+	routines: Routine[];
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -142,6 +144,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, models: new Map(state.models).set(action.instanceId, { data: { models: action.models }, error: action.error }) };
 		case "user-todos":
 			return { ...state, userTodos: action.list };
+		case "routines":
+			return { ...state, routines: action.routines };
 		case "user-todo":
 			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
 		default: {
@@ -169,5 +173,6 @@ export function initialState(route: Route): DashboardState {
 		usage: null,
 		models: new Map(),
 		userTodos: null,
+		routines: [],
 	};
 }

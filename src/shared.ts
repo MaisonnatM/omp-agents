@@ -41,6 +41,8 @@ export const repoKey = ({ owner, repo }: Repo): string => `${owner}/${repo}`.toL
 /** A pull request's key: `owner/repo#number`, lowercased. */
 export const prKey = (pr: PullRequest): string => `${repoKey(pr)}#${pr.number}`;
 
+export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
+
 /** A branch's key: `owner/repo:branch`, the repository lowercased and the branch, which git keeps case-sensitive, as is. */
 export const headKey = (repo: Repo, branch: string): string => `${repoKey(repo)}:${branch}`;
 
@@ -97,6 +99,8 @@ export interface InboxPullRequest extends PullRequest {
 	/** True when GitHub reports the PR as `CONFLICTING` with its base branch; false for `MERGEABLE`, `UNKNOWN` (not computed yet), and merged PRs. */
 	conflicts: boolean;
 	head: string;
+	/** The head commit's SHA, which tells a routine whether a session already took this version of the PR. */
+	headOid: string;
 	/** The branch it merges into when that is not the repository's default branch: the PR below it in a stack. */
 	stackedOn: string | null;
 	/** Review threads not yet resolved. `exact` is false when GitHub listed only some threads, so `count` is a floor. */
@@ -833,6 +837,58 @@ export type UserTodoChange =
 	/** Its todos stay, in no category. */
 	| { op: "remove-category"; id: string };
 
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export type Schedule =
+	/** Every `minutes`, counted from the last run. The page offers minutes, hours, and days. */
+	| { kind: "every"; minutes: number }
+	/** At `time`, local wall-clock time, on each of `days` (0 is Sunday). Daily is all seven. */
+	| { kind: "weekly"; days: Weekday[]; time: { hour: number; minute: number } };
+
+/** The pull request actions a routine may run: both only report, so they post nothing to GitHub and change no branch. */
+export const ROUTINE_PR_ACTIONS = ["review", "thermonuclear-review"] as const;
+export type RoutinePullRequestAction = (typeof ROUTINE_PR_ACTIONS)[number];
+
+export type RoutineTask =
+	/** One session in `cwd` that takes `prompt`. */
+	| { kind: "prompt"; prompt: string }
+	/** One session per inbox pull request to review that `action` applies to, once per head commit. */
+	| { kind: "pull-requests"; action: RoutinePullRequestAction };
+
+/** A run claims its slot first, then drains its queue as session slots free up. */
+export interface RoutineRun {
+	at: number;
+	/** PR keys this run still has to start, in inbox order. Empty for a prompt task once its session started. */
+	queue: string[];
+	started: { label: string; instanceId: string; sessionId: string }[];
+	errors: string[];
+}
+
+/** A schedule that starts dashboard sessions on its own. */
+export interface Routine {
+	id: string;
+	name: string;
+	cwd: string;
+	schedule: Schedule;
+	task: RoutineTask;
+	/** Saved with the routine, since the page's pin lives in localStorage, which the server cannot read. */
+	skill: string | null;
+	enabled: boolean;
+	createdAt: number;
+	/** Newest first, the last 10. `runs[0].at` is the slot the next run counts from. */
+	runs: RoutineRun[];
+	/** `prKey` to the head commit a session already took, for the PRs still in the inbox. */
+	done: Record<string, string>;
+}
+
+/** One edit of the routines; the page picks a new routine's `id`, so a save sent twice saves once. */
+export type RoutineChange =
+	| { op: "save"; routine: Omit<Routine, "runs" | "done" | "createdAt"> }
+	| { op: "remove"; id: string }
+	| { op: "enable"; id: string; enabled: boolean }
+	/** Claims a run now, whatever the schedule says. */
+	| { op: "run-now"; id: string };
+
 export type ServerMsg =
 	| { t: "roster"; hosts: RosterHost[]; error: string | null }
 	/** Newest first. */
@@ -854,7 +910,9 @@ export type ServerMsg =
 	/** Answers this socket's `dequeue` with the texts it took out of the queue, oldest first. Nothing answers when every message had gone. */
 	| { t: "dequeued"; view: LiveView; reqId: number; texts: string[] }
 	/** The Todo page's list, whole, sent when a socket opens and after every change. */
-	| { t: "user-todos"; list: UserTodoList };
+	| { t: "user-todos"; list: UserTodoList }
+	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
+	| { t: "routines"; routines: Routine[] };
 
 export type ClientMsg =
 	/** The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming. */
@@ -888,4 +946,6 @@ export type ClientMsg =
 	/** Cancel a running subagent of a live session without stopping the session's turn; it cannot be revived after. */
 	| { t: "cancel-agent"; view: LiveView & { agentId: string } }
 	/** Change the Todo page's list; every socket then gets the list as it is after. */
-	| { t: "user-todo"; change: UserTodoChange };
+	| { t: "user-todo"; change: UserTodoChange }
+	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
+	| { t: "routine"; change: RoutineChange };

@@ -1,6 +1,6 @@
 import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import { type PastSession, type PullRequest, type RosterHost, repoKey, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
+import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, repoKey, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +31,7 @@ import {
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
-import { inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
+import { inboxSection, inboxSections } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";

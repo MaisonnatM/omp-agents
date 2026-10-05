@@ -2,8 +2,6 @@
 import type { InboxPullRequest, PullRequest } from "../src/shared";
 import { type SectionTarget, sectionId } from "./section";
 
-export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
-
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
 
 /** Graphite's inbox sections, in page order. A pull request goes in the first section that takes it. */

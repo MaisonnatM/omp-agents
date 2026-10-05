@@ -1,10 +1,11 @@
 /** The dashboard server: wires the registries, the HTTP API, and the socket together, then follows omp's files and registry. */
 import type { Server } from "bun";
+import { loadInbox } from "./inbox";
 import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
-import { displayPath, interruptedFile, tokenFile, userTodosFile } from "./paths";
+import { displayPath, interruptedFile, routinesFile, tokenFile, userTodosFile } from "./paths";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Broadcasts } from "./server/broadcasts";
@@ -14,6 +15,8 @@ import { LiveSessions, type SessionUpdate } from "./server/live-sessions";
 import { Loops } from "./server/loops";
 import { buildPage, servePage } from "./server/page";
 import { createRoutes } from "./server/routes";
+import { RoutineRunner } from "./server/routine-runner";
+import { RoutinesFile } from "./server/routines-file";
 import { SessionFiles } from "./server/session-files";
 import { createClientHandler } from "./server/socket";
 import { createStarter } from "./server/start";
@@ -31,6 +34,7 @@ const files = new SessionFiles();
 const sessions = new LiveSessions(onLiveUpdate);
 const interrupted = new InterruptedSessions(interruptedFile);
 const todos = new UserTodosFile(userTodosFile);
+const routines = new RoutinesFile(routinesFile);
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
 const pathFor = (view: View): string | null =>
 	view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -39,6 +43,7 @@ const broadcasts = new Broadcasts({
 	rosterMsg: () => ({ t: "roster", hosts: sessions.rows(files.factsOf), error: rosterError }),
 	pastMsg: () => ({ t: "past", sessions: files.past(sessions.sessionIds(), id => interrupted.has(id)) }),
 	userTodosMsg: () => ({ t: "user-todos", list: todos.list }),
+	routinesMsg: () => ({ t: "routines", routines: routines.routines }),
 	publish: (topic, json) => void server.publish(topic, json),
 	subscriberCount: topic => server.subscriberCount(topic),
 	beforeRosterPush: () => views.sync(),
@@ -58,12 +63,31 @@ const loops = new Loops(sessionsDir, {
 	},
 	onRescanTick: rescanFiles,
 	onUsageTick: () => broadcasts.refreshUsage(),
+	onRoutineTick: () => runner.tick(),
 });
 const startSession = createStarter({
 	sessions,
 	pathFor,
 	savedFile: files.pathOf,
 	onStarted: () => broadcasts.syncRoster(),
+});
+const runner = new RoutineRunner({
+	file: routines,
+	start: startSession,
+	async inbox(cwd) {
+		const inbox = await loadInbox([cwd], true);
+		if (inbox.unmatched.length > 0) throw new Error(`${displayPath(cwd)} has no GitHub origin.`);
+		return inbox.repos.flatMap(repo => {
+			if ("error" in repo) throw new Error(repo.error);
+			return repo.pullRequests;
+		});
+	},
+	session(instanceId) {
+		const session = sessions.get(instanceId);
+		return session ? { status: session.row().status, sessionId: session.sessionId, end: () => session.end() } : null;
+	},
+	now: Date.now,
+	onChange: () => broadcasts.pushRoutines(),
 });
 const handleClientMsg = createClientHandler({
 	sessions,
@@ -77,6 +101,11 @@ const handleClientMsg = createClientHandler({
 		if (todos.apply(change)) broadcasts.pushUserTodos();
 		else send(ws, { t: "user-todos", list: todos.list });
 	},
+	changeRoutine(ws, change) {
+		if (routines.apply(change, Date.now())) broadcasts.pushRoutines();
+		else send(ws, { t: "routines", routines: routines.routines });
+	},
+	runRoutine: id => runner.runNow(id),
 });
 
 /** Why the last registry listing failed, shown with the roster. */
@@ -105,6 +134,7 @@ async function rescanFiles(): Promise<void> {
 function onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 	switch (update.kind) {
 		case "roster":
+			runner.observe(instanceId);
 			broadcasts.rosterChanged();
 			return;
 		case "event":

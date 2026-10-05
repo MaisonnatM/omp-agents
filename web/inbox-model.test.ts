@@ -16,6 +16,7 @@ describe("inbox sections", () => {
 		checks: "passing",
 		conflicts: false,
 		head: `me/branch-${number}`,
+		headOid: `sha-${number}`,
 		stackedOn: null,
 		unresolved: { count: 0, exact: true },
 		updatedAt: number,

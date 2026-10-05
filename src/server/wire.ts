@@ -4,7 +4,7 @@
  * Socket parsers return `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller casts what it received.
  */
 import { isObject, oneOf } from "../json";
-import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, TICKET_ID, TICKET_PRIORITIES } from "../shared";
+import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, ROUTINE_PR_ACTIONS, TICKET_ID, TICKET_PRIORITIES } from "../shared";
 import type {
 	BranchChoice,
 	ClientMsg,
@@ -13,12 +13,16 @@ import type {
 	ModelOption,
 	PromptImage,
 	PullRequest,
+	RoutineChange,
+	RoutineTask,
+	Schedule,
 	SessionLinksEdit,
 	StartRequest,
 	TicketEdit,
 	UserAnswer,
 	UserTodoChange,
 	View,
+	Weekday,
 	WorkItem,
 } from "../shared";
 
@@ -160,6 +164,72 @@ function parseTodoChange(value: unknown): Parsed<UserTodoChange> {
 	}
 }
 
+const isIntIn = (value: unknown, min: number, max: number): value is number => Number.isSafeInteger(value) && (value as number) >= min && (value as number) <= max;
+const isWeekday = (value: unknown): value is Weekday => isIntIn(value, 0, 6);
+const isRoutineAction = oneOf(ROUTINE_PR_ACTIONS);
+
+function parseSchedule(value: unknown): Parsed<Schedule> {
+	if (!isObject(value)) return null;
+	switch (value.kind) {
+		case "every":
+			return isIntIn(value.minutes, 1, Number.MAX_SAFE_INTEGER) ? { ok: { kind: "every", minutes: value.minutes } } : null;
+		case "weekly": {
+			const { days, time } = value;
+			if (!Array.isArray(days) || days.length === 0 || !days.every(isWeekday) || new Set(days).size !== days.length) return null;
+			if (!isObject(time) || !isIntIn(time.hour, 0, 23) || !isIntIn(time.minute, 0, 59)) return null;
+			return { ok: { kind: "weekly", days, time: { hour: time.hour, minute: time.minute } } };
+		}
+		default:
+			return null;
+	}
+}
+
+function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
+	if (!isObject(value)) return null;
+	switch (value.kind) {
+		case "prompt":
+			return isNonEmpty(value.prompt) ? { ok: { kind: "prompt", prompt: value.prompt } } : null;
+		case "pull-requests":
+			return isRoutineAction(value.action) ? { ok: { kind: "pull-requests", action: value.action } } : null;
+		default:
+			return null;
+	}
+}
+
+/** What the page edits of a routine: all but its runs, its taken heads, and its creation time, which the server keeps. */
+export type RoutineSpec = Extract<RoutineChange, { op: "save" }>["routine"];
+
+/** A routine as the page saves it, or `null` when a field is missing, of the wrong type, or out of range; other fields drop. */
+export function parseRoutineSpec(value: unknown): RoutineSpec | null {
+	if (!isObject(value)) return null;
+	const { id, name, cwd, enabled } = value;
+	const schedule = parseSchedule(value.schedule);
+	const task = parseRoutineTask(value.task);
+	const skill = parseSkill(value.skill);
+	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedule || !task || !skill) return null;
+	return { id, name, cwd, schedule: schedule.ok, task: task.ok, skill: skill.ok, enabled };
+}
+
+function parseRoutineChange(value: unknown): Parsed<RoutineChange> {
+	if (!isObject(value)) return null;
+	const { op } = value;
+	if (op === "save") {
+		const routine = parseRoutineSpec(value.routine);
+		return routine && { ok: { op, routine } };
+	}
+	const { id } = value;
+	if (!isNonEmpty(id)) return null;
+	switch (op) {
+		case "enable":
+			return typeof value.enabled === "boolean" ? { ok: { op, id, enabled: value.enabled } } : null;
+		case "remove":
+		case "run-now":
+			return { ok: { op, id } };
+		default:
+			return null;
+	}
+}
+
 function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest> {
 	switch (value.kind) {
 		case "new": {
@@ -268,6 +338,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	"user-todo"(value) {
 		const change = parseTodoChange(value.change);
 		return change ? { ok: { t: "user-todo", change: change.ok } } : null;
+	},
+	routine(value) {
+		const change = parseRoutineChange(value.change);
+		return change ? { ok: { t: "routine", change: change.ok } } : null;
 	},
 };
 
