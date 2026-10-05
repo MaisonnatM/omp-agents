@@ -81,10 +81,17 @@ describe("layout hash", () => {
 	test("the new-session draft is not read as a layout, and its directory keeps its slashes and tilde", () => {
 		const hash = hashForNewSession("~/code/my app");
 		expect(hash).toBe("#new/~%2Fcode%2Fmy%20app");
-		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "new", cwd: "~/code/my app" } });
-		expect(routeFromHash("#new")).toEqual({ kind: "page", page: { kind: "new", cwd: null } });
+		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "new", cwd: "~/code/my app", todoId: null } });
+		expect(routeFromHash("#new")).toEqual({ kind: "page", page: { kind: "new", cwd: null, todoId: null } });
 		expect(routeFromHash("#newer").kind).toBe("panes");
 		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
+	});
+
+	test("a draft for a todo names it after the directory, or alone", () => {
+		expect(hashForNewSession("~/code", "t 1")).toBe("#new/~%2Fcode?todo=t%201");
+		expect(routeFromHash("#new/~%2Fcode?todo=t%201")).toEqual({ kind: "page", page: { kind: "new", cwd: "~/code", todoId: "t 1" } });
+		expect(hashForNewSession(null, "t1")).toBe("#new?todo=t1");
+		expect(routeFromHash("#new?todo=t1")).toEqual({ kind: "page", page: { kind: "new", cwd: null, todoId: "t1" } });
 	});
 
 	test("the inbox hash opens the page alone or at one pull request's row, and no inbox hash is read as a layout", () => {
@@ -109,19 +116,23 @@ describe("layout hash", () => {
 		for (const hash of ["#tickets", "#tickets/ENG-2368", "#tickets/x"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
-	test("the todo hash opens every todo or one category's, and no todo hash is read as a layout", () => {
-		expect(hashForTodo(null)).toBe("#todo");
-		expect(hashForTodo("a b/c")).toBe("#todo/a%20b%2Fc");
-		expect(routeFromHash("#todo")).toEqual({ kind: "page", page: { kind: "todo", category: null } });
-		expect(routeFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "page", page: { kind: "todo", category: "a b/c" } });
-		expect(routeFromHash("#todo/")).toEqual({ kind: "page", page: { kind: "todo", category: null } });
+	test("the todo hash opens every todo, a list that is not a category, or one category's, and no todo hash is read as a layout", () => {
+		expect(hashForTodo({ kind: "all" })).toBe("#todo");
+		expect(hashForTodo({ kind: "category", id: "a b/c" })).toBe("#todo/a%20b%2Fc");
+		expect(routeFromHash("#todo")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" } } });
+		expect(routeFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "category", id: "a b/c" } } });
+		expect(routeFromHash("#todo/")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" } } });
+		for (const kind of ["today", "agents", "done"] as const) {
+			expect(hashForTodo({ kind })).toBe(`#todo/${kind}`);
+			expect(routeFromHash(`#todo/${kind}`)).toEqual({ kind: "page", page: { kind: "todo", list: { kind } } });
+		}
 		for (const hash of ["#todo", "#todo/0b9e"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
 	test("every page hash names its page and route, and a session or layout hash names none", () => {
 		expect(routeFromHash(hashForSettings("/work/app"))).toEqual({ kind: "page", page: { kind: "settings", cwd: "/work/app" } });
 		expect(routeFromHash(hashForInbox(null))).toEqual({ kind: "page", page: { kind: "inbox", target: null } });
-		expect(routeFromHash(hashForNewSession(null))).toEqual({ kind: "page", page: { kind: "new", cwd: null } });
+		expect(routeFromHash(hashForNewSession(null))).toEqual({ kind: "page", page: { kind: "new", cwd: null, todoId: null } });
 		expect(routeFromHash("#session/01a0f6a5-181e")).toEqual({ kind: "session", sessionId: "01a0f6a5-181e" });
 		expect(routeFromHash("#7c51f77b2a1bf7ba,past/9d2e0000").kind).toBe("panes");
 	});

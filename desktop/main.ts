@@ -3,14 +3,15 @@
  * omp-agents server that already listens on the port, and opens every other address in the default browser.
  */
 import { type ChildProcess, spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { readFileSync, watch, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { createInterface, type Interface } from "node:readline";
 import type { Readable } from "node:stream";
 import {
 	app,
 	BrowserWindow,
 	type ContextMenuParams,
+	globalShortcut,
 	Menu,
 	type MenuItemConstructorOptions,
 	type Rectangle,
@@ -19,9 +20,11 @@ import {
 	type WebContents,
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
-import { tokenFile } from "../src/paths";
+import { tokenFile, userTodosFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv } from "../src/server/address";
 import { loadToken } from "../src/server/auth";
+import { parseUserTodoList } from "../src/server/user-todos-file";
+import { QUICK_TODO_EVENT } from "../src/shared";
 
 const PORT = portFromEnv();
 const ORIGIN = originOf(PORT);
@@ -42,6 +45,8 @@ const IS_MAC = process.platform === "darwin";
 /** `icon.svg` rendered at 1024 px; Electron reads no SVG. */
 const ICON = join(app.getAppPath(), "icon.png");
 const SEPARATOR: MenuItemConstructorOptions = { type: "separator" };
+/** Brings the window up on the Todo page with a new todo started, from any app. */
+const QUICK_TODO_SHORTCUT = "Alt+Shift+CommandOrControl+T";
 
 // Each port is its own server, so each gets its own cookie, localStorage, window bounds, and single-instance lock.
 app.setPath("userData", join(app.getPath("userData"), `port-${PORT}`));
@@ -259,6 +264,28 @@ function applicationMenu(): Menu {
 	]);
 }
 
+/** The Dock and taskbar badge counts the top-level todos left, as the Todo tab's **All** does; none clears it. */
+function showTodosLeft(): void {
+	let left = 0;
+	try {
+		const list = parseUserTodoList(JSON.parse(readFileSync(userTodosFile, "utf8")));
+		left = list?.todos.filter(todo => todo.doneAt === null).length ?? 0;
+	} catch {}
+	app.setBadgeCount(left);
+}
+
+/** The server replaces `todos.json` through a temporary file, so the watch is on its directory. */
+function watchTodosLeft(): void {
+	showTodosLeft();
+	try {
+		watch(dirname(userTodosFile), (_event, name) => {
+			if (name === basename(userTodosFile)) showTodosLeft();
+		});
+	} catch (err) {
+		console.error(`omp-agents: cannot watch ${userTodosFile}: ${errorText(err)}`);
+	}
+}
+
 if (!app.requestSingleInstanceLock()) {
 	app.quit();
 } else {
@@ -283,11 +310,19 @@ if (!app.requestSingleInstanceLock()) {
 	});
 	for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => app.quit());
 
+	app.on("will-quit", () => globalShortcut.unregisterAll());
+
 	void app.whenReady().then(() => {
 		Menu.setApplicationMenu(applicationMenu());
 		// The app runs from Electron's own bundle, so without this the Dock shows Electron's icon.
 		app.dock?.setIcon(ICON);
 		win = createWindow();
 		void connect(win);
+		watchTodosLeft();
+		const quickTodo = (): void => {
+			reveal();
+			void win?.webContents.executeJavaScript(`window.dispatchEvent(new Event(${JSON.stringify(QUICK_TODO_EVENT)}))`).catch(() => {});
+		};
+		if (!globalShortcut.register(QUICK_TODO_SHORTCUT, quickTodo)) console.error(`omp-agents: another app holds ${QUICK_TODO_SHORTCUT}`);
 	});
 }

@@ -13,11 +13,11 @@ import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { directoryOf } from "../paths";
 import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
-import { loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
+import { createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, type PullRequest, type Repo, samePullRequest, TICKET_ID } from "../shared";
 import { answer, fail, type Guards } from "./http";
-import { parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
+import { parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit } from "./wire";
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -121,6 +121,17 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return edit ? answer(() => saveTicket(edit)) : fail(400, "Expected { id } naming a Linear issue and at least one field to change");
 	};
 
+	/** `PUT /api/ticket/new`: `TicketDraft`, opened in Linear; answers `{ identifier }`. */
+	const ticketCreate: Handler = async req => {
+		const write = await guards.writeBody(req);
+		if (write instanceof Response) return write;
+		const draft = parseTicketDraft(write.body);
+		return draft ? answer(() => createTicket(draft)) : fail(400, "Expected { title, description, team } naming a Linear team by id");
+	};
+
+	/** `GET /api/linear/teams`: the workspace's Linear teams, `{ id, name }`, for the team a new issue goes in. */
+	const teams = get(() => answer(loadTeams));
+
 	/** `GET /api/ticket/options?team=<id>`: what the field pickers offer for an issue of that Linear team. */
 	const ticketOptions = get(params => {
 		const team = params.get("team") ?? "";
@@ -219,7 +230,9 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/tickets": { GET: tickets },
 		"/api/linear": { GET: linear },
 		"/api/linear/sign-in": { PUT: linearSignIn },
+		"/api/linear/teams": { GET: teams },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },
+		"/api/ticket/new": { PUT: ticketCreate },
 		"/api/ticket/options": { GET: ticketOptions },
 		"/api/ticket/media": { GET: ticketMedia },
 		"/api/pull-request": { GET: pullRequest },

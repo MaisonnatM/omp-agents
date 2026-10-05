@@ -25,6 +25,8 @@ export interface StartEnv {
 	savedFile(sessionId: string): string | null;
 	/** Called once a started session is in the registry. */
 	onStarted(): void;
+	/** Links todo `todoId` to session `sessionId`, which a new session started for it. */
+	linkTodo(todoId: string, sessionId: string): void;
 }
 
 /** Runs `start` requests; one ready session per success, none on failure. */
@@ -97,6 +99,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 		sessions.add(session, request.kind === "new" ? request.subject : null);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
 		if (first) void session.prompt(null, first.text, first.images, "steer");
+		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
 		env.onStarted();
 		return { ok: true, instanceId: session.instanceId, cwd: session.cwd, prompt };
 	};

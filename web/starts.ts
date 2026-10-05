@@ -19,6 +19,8 @@ export type StartOp =
 			thinking: string | null;
 			/** The pinned skill, `null` when none is pinned or the draft skips it. */
 			skill: string | null;
+			/** The todo the session works on, `null` for none. */
+			todoId: string | null;
 	  }
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
 	| { kind: "resume"; sessionId: string }
@@ -44,9 +46,9 @@ export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 	switch (op.kind) {
 		case "new":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, todoId: op.todoId };
 		case "quick":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill, subject: workItemOf(op.subject) };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill, subject: workItemOf(op.subject), todoId: null };
 		case "fork":
 			return { t: "start", reqId, kind: "fork", view: op.view, entryId: op.point.entryId };
 		case "resume":

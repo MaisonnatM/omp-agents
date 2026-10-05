@@ -172,7 +172,8 @@ A user item's `images` holds a `data:` URL for an inline image and `/api/image?h
 
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
 Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process, `bun src/server.ts`, and never imports it.
-It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, and `src/server/address.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
+It imports only `src/paths.ts`, `src/json.ts`, `src/shared.ts`, `src/server/auth.ts`, `src/server/address.ts`, and `src/server/user-todos-file.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
+It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching the file's directory since the server replaces the file, and its global quick-capture shortcut dispatches `QUICK_TODO_EVENT` in the page, which `web/app.tsx` answers by opening the Todo page with a new todo started.
 `src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
 
 - At launch it calls `loadToken`, as the server does, so whichever runs first creates the token file, and asks `GET /?token=<token>` on the port.
@@ -369,9 +370,15 @@ The server lives in `src/`:
   `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
 - `src/user-todos.ts`: the rules of the Todo page's list, `applyUserTodo`, which the server applies to its file and the page to what it shows before the server answers.
-  The list is `UserTodoList` in `src/shared.ts`: categories, then top-level todos, each with a title, markdown notes, a category or none, and todos of its own, which share its category.
-  `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token, and reads a file from before categories and notes with none of either.
+  The list is `UserTodoList` in `src/shared.ts`: categories, top-level todos, and the archive that **Clear done** fills, latest first.
+  A todo has a title, markdown notes, a check time (`doneAt`), and a due day; a top-level one also has a category or none, todos of its own, which share its category, links (`UserTodoLink`: a session, a pull request, or a Linear issue), and `addedBy`, the session whose agent added it.
+  `move` reorders, `restore` puts back what `remove` took for the page's **Undo**, and `unarchive` and `empty-archive` act on the archive.
+  `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token, and reads a file from before any of those fields with none of them, a `done: true` todo as checked when it loads.
   A `user-todo` socket message carries one change, and every socket hears the list after it as a `user-todos` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the list back to its own socket alone.
+  A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`.
+- `src/server/todo-inbox.ts`: applies the changes that omp's `user_todo` tool (`templates/omp/agent/extensions/todos.ts`) leaves in `todo-inbox/` beside `todos.json`, one JSON file each, written under a `.tmp` name then renamed.
+  It takes `add` and `toggle` only, deletes each file it applies, and moves any other to `<name>.invalid`, so the server stays the only writer of `todos.json`.
+- `src/tickets.ts` also lists the workspace's Linear teams (`loadTeams`, `GET /api/linear/teams`) and opens an issue from a todo (`createTicket`, `PUT /api/ticket/new`), assigned to the viewer.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
   An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
@@ -417,8 +424,9 @@ The page lives in `web/`.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
 - `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
   `SessionRow` is the one row a past session and a live host both render.
-  `web/components/todo-categories.tsx` holds its Todo tab, the categories.
-- `web/components/user-todos.tsx`: the Todo page, its lists, and the open todo, whose notes `web/components/markdown-editor.tsx` edits and previews through `message-markdown.tsx`.
+  `web/components/todo-categories.tsx` holds its Todo tab: **All**, **Today**, **From agents**, **Done**, then the categories.
+- `web/components/user-todos.tsx`: the Todo page, its lists, search, drag and keyboard moves, and **Undo**; `web/todo-views.ts` says which todos each list holds, for the page and the sidebar's counts.
+  `todo-detail.tsx` is the open todo, with its due day, links, **Start session**, and **Create Linear ticket**, whose notes `web/components/markdown-editor.tsx` edits and previews through `message-markdown.tsx`; `todo-links.tsx` draws a todo's link chips, and `add-to-todo.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
 - `web/components/pane.tsx`: a pane.
   `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button and the checkout read, `past-conversation.tsx` a past session's view, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` the project, pull request, and ticket chips of a header.

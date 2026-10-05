@@ -24,6 +24,7 @@ import { hashForInbox, type OpenMode } from "../../routing";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions, type QuickActionId } from "../../quick-actions";
 import { BranchName } from "../git";
+import { AddToTodo } from "../add-to-todo";
 import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";
@@ -244,6 +245,12 @@ export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen,
 							pending === null && "opacity-0",
 						)}
 					>
+						<AddToTodo
+							text={pr.title}
+							body={`Pull request https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`}
+							link={{ kind: "pull-request", owner: pr.owner, repo: pr.repo, number: pr.number }}
+							label={`Add ${pr.repo}#${pr.number} to your todo list`}
+						/>
 						<span data-row-actions className="flex">
 							<QuickActionsMenu
 								actions={pullRequestActions(pr)}

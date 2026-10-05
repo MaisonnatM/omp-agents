@@ -15,12 +15,15 @@ import type {
 	PullRequest,
 	SessionLinksEdit,
 	StartRequest,
+	TicketDraft,
 	TicketEdit,
 	UserAnswer,
 	UserTodoChange,
+	UserTodoLink,
 	View,
 	WorkItem,
 } from "../shared";
+import { parseTodo, parseTodoLink } from "./user-todos-file";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
@@ -123,28 +126,47 @@ function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
 	return pr && { ok: { kind: "pull-request", pr } };
 }
 
-function parseTodoChange(value: unknown): Parsed<UserTodoChange> {
+export function parseTodoChange(value: unknown): Parsed<UserTodoChange> {
 	if (!isObject(value)) return null;
 	const isId = (id: unknown): id is string => isNonEmpty(id) && id.length <= MAX_TODO_ID;
 	const isOptionalId = (id: unknown): id is string | null => id === null || isId(id);
 	const isText = (text: unknown): text is string => typeof text === "string" && text.length <= MAX_TODO_TEXT;
-	const { op, id, text, name, categoryId } = value;
+	const isBody = (body: unknown): body is string => typeof body === "string" && body.length <= MAX_TODO_BODY;
+	const isDue = (due: unknown): due is string | null => due === null || (typeof due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(due));
+	const { op, id, text, name, categoryId, afterId } = value;
 	if (op === "clear-done") return isOptionalId(categoryId) ? { ok: { op, categoryId } } : null;
+	if (op === "empty-archive") return { ok: { op } };
+	if (op === "restore") {
+		const todo = parseTodo(value.todo);
+		const { parentId } = value;
+		return todo && isId(todo.id) && isOptionalId(parentId) && isOptionalId(afterId) ? { ok: { op, todo, parentId, afterId } } : null;
+	}
 	if (!isId(id)) return null;
 	switch (op) {
 		case "add": {
-			const { parentId, afterId } = value;
-			if (!isText(text) || !isOptionalId(parentId) || !isOptionalId(afterId) || !isOptionalId(categoryId)) return null;
-			return { ok: { op, id, parentId, afterId, categoryId, text } };
+			const { parentId, body = "", due = null, links = [], addedBy = null } = value;
+			const parsed = Array.isArray(links) ? links.map(parseTodoLink) : [null];
+			const kept = parsed.filter((link): link is UserTodoLink => link !== null);
+			if (!isText(text) || !isOptionalId(parentId) || !isOptionalId(afterId) || !isOptionalId(categoryId) || !isBody(body) || !isDue(due) || !isOptionalId(addedBy)) return null;
+			return kept.length === parsed.length ? { ok: { op, id, parentId, afterId, categoryId, text, body, due, links: kept, addedBy } } : null;
 		}
 		case "edit":
 			return isText(text) ? { ok: { op, id, text } } : null;
-		case "edit-body": {
-			const { body } = value;
-			return typeof body === "string" && body.length <= MAX_TODO_BODY ? { ok: { op, id, body } } : null;
+		case "edit-body":
+			return isBody(value.body) ? { ok: { op, id, body: value.body } } : null;
+		case "toggle": {
+			const { doneAt } = value;
+			return doneAt === null || (typeof doneAt === "string" && !Number.isNaN(Date.parse(doneAt))) ? { ok: { op, id, doneAt } } : null;
 		}
-		case "toggle":
-			return typeof value.done === "boolean" ? { ok: { op, id, done: value.done } } : null;
+		case "move":
+			return isOptionalId(afterId) && isOptionalId(categoryId) ? { ok: { op, id, afterId, categoryId } } : null;
+		case "set-due":
+			return isDue(value.due) ? { ok: { op, id, due: value.due } } : null;
+		case "link":
+		case "unlink": {
+			const link = parseTodoLink(value.link);
+			return link && { ok: { op, id, link } };
+		}
 		case "categorize":
 			return isOptionalId(categoryId) ? { ok: { op, id, categoryId } } : null;
 		case "add-category":
@@ -153,6 +175,7 @@ function parseTodoChange(value: unknown): Parsed<UserTodoChange> {
 		case "remove":
 		case "indent":
 		case "outdent":
+		case "unarchive":
 		case "remove-category":
 			return { ok: { op, id } };
 		default:
@@ -163,7 +186,7 @@ function parseTodoChange(value: unknown): Parsed<UserTodoChange> {
 function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest> {
 	switch (value.kind) {
 		case "new": {
-			const { cwd, prompt } = value;
+			const { cwd, prompt, todoId = null } = value;
 			const images = parseImages(value.images);
 			const branch = parseBranchChoice(value.branch);
 			// `null` starts on omp's default model.
@@ -172,8 +195,9 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 			const skill = parseSkill(value.skill);
 			const subject = parseWorkItem(value.subject);
 			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !subject) return null;
+			if (todoId !== null && !(isNonEmpty(todoId) && todoId.length <= MAX_TODO_ID)) return null;
 			return prompt.trim() || images.ok.length > 0
-				? { ok: { kind: "new", cwd, prompt, images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok } }
+				? { ok: { kind: "new", cwd, prompt, images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId } }
 				: null;
 		}
 		case "fork": {
@@ -307,6 +331,14 @@ export function parseSessionLinks(body: unknown): SessionLinksEdit | null {
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const isTicketPriority = oneOf(TICKET_PRIORITIES);
+
+/** The body of `PUT /api/ticket/new`: a title, markdown, and a team by id. */
+export function parseTicketDraft(body: unknown): TicketDraft | null {
+	if (!isObject(body)) return null;
+	const { title, description, team } = body;
+	if (!isNonEmpty(title) || title.length > MAX_TODO_TEXT || typeof description !== "string" || description.length > MAX_TODO_BODY || !isNonEmpty(team)) return null;
+	return { title: title.trim(), description, team };
+}
 
 /** The body of `PUT /api/ticket`: an issue identifier and at least one field to change, each of its own type. */
 export function parseTicketEdit(body: unknown): TicketEdit | null {

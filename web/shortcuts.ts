@@ -25,7 +25,13 @@ export type ShortcutId =
 	| "nextPullRequest"
 	| "previousPullRequest"
 	| "pullRequestOnGitHub"
-	| "pullRequestActions";
+	| "pullRequestActions"
+	| "todoSearch"
+	| "todoNext"
+	| "todoPrevious"
+	| "todoCheck"
+	| "todoMoveUp"
+	| "todoMoveDown";
 
 /**
  * Where a binding fires. `composer`: from the composer's textarea, before any page-wide binding sees the key.
@@ -95,6 +101,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "previousPullRequest", label: "Inbox: move to the previous pull request, or show it in the open sheet", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
 	{ id: "pullRequestOnGitHub", label: "Inbox: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
 	{ id: "pullRequestActions", label: "Inbox: open the pull request's quick actions", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
+	{ id: "todoSearch", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
+	{ id: "todoNext", label: "Focus the next todo", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
+	{ id: "todoPrevious", label: "Focus the previous todo", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
+	{ id: "todoCheck", label: "Check or uncheck the focused todo", keys: [{ chord: { key: "x" }, scope: "outside-fields" }] },
+	{ id: "todoMoveUp", label: "Move the focused todo up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "todoMoveDown", label: "Move the focused todo down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
 ];
 
 const GO = "g";

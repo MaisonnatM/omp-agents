@@ -4,7 +4,7 @@ import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
-import { displayPath, interruptedFile, tokenFile, userTodosFile } from "./paths";
+import { displayPath, interruptedFile, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Broadcasts } from "./server/broadcasts";
@@ -17,6 +17,7 @@ import { createRoutes } from "./server/routes";
 import { SessionFiles } from "./server/session-files";
 import { createClientHandler } from "./server/socket";
 import { createStarter } from "./server/start";
+import { TodoInbox } from "./server/todo-inbox";
 import { UserTodosFile } from "./server/user-todos-file";
 import { type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
@@ -31,6 +32,9 @@ const files = new SessionFiles();
 const sessions = new LiveSessions(onLiveUpdate);
 const interrupted = new InterruptedSessions(interruptedFile);
 const todos = new UserTodosFile(userTodosFile);
+const inbox = new TodoInbox(userTodoInboxDir, change => {
+	if (todos.apply(change)) broadcasts.pushUserTodos();
+});
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
 const pathFor = (view: View): string | null =>
 	view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -64,6 +68,9 @@ const startSession = createStarter({
 	pathFor,
 	savedFile: files.pathOf,
 	onStarted: () => broadcasts.syncRoster(),
+	linkTodo(todoId, sessionId) {
+		if (todos.apply({ op: "link", id: todoId, link: { kind: "session", sessionId } })) broadcasts.pushUserTodos();
+	},
 });
 const handleClientMsg = createClientHandler({
 	sessions,
@@ -201,6 +208,7 @@ try {
 }
 
 loops.watch();
+inbox.watch();
 await rescanFiles();
 await listRegistry();
 loops.start();

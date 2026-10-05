@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { View } from "../src/shared";
+import { QUICK_TODO_EVENT, type UserTodoList, type View } from "../src/shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { DashboardContext } from "./components/dashboard-context";
 import { InboxPage } from "./components/inbox/inbox-page";
@@ -29,6 +29,7 @@ import {
 	hashForView,
 	type Page,
 	sameView,
+	type TodoListView,
 } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, discoverableSessions, listedViews, projectSwitch, sidebarSessions, workspaces } from "./sessions";
@@ -59,6 +60,14 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 			{rosterError && <p className="text-red-600 dark:text-red-400">Registry error: {rosterError}</p>}
 		</section>
 	);
+}
+
+/** What a new session for top-level todo `todoId` starts with: its title, then its notes. `null` while the list names no such todo. */
+function todoSeed(list: UserTodoList | null, todoId: string | null): { text: string; prompt: string } | null {
+	const todo = todoId === null ? undefined : list?.todos.find(({ id }) => id === todoId);
+	if (!todo) return null;
+	const body = todo.body.trim();
+	return { text: todo.text, prompt: body ? `${todo.text}\n\n${body}` : todo.text };
 }
 
 export function App() {
@@ -130,11 +139,25 @@ export function App() {
 	/** The Tickets tab and its shortcut show only once omp is signed in to Linear. */
 	const ticketsShown = linear.read?.data.connected === true;
 	const tab: SidebarTab = page?.kind === "inbox" || page?.kind === "todo" ? page.kind : page?.kind === "tickets" && ticketsShown ? "tickets" : "sessions";
-	/** The category the Todo page shows; one another window removed shows every todo. */
-	const todoCategory = page?.kind === "todo" && state.userTodos?.categories.some(({ id }) => id === page.category) ? page.category : null;
+	const routedTodoList = page?.kind === "todo" ? page.list : null;
+	/** The list the Todo page shows; a category another window removed shows every todo. */
+	const todoView: TodoListView =
+		routedTodoList === null || (routedTodoList.kind === "category" && !state.userTodos?.categories.some(({ id }) => id === routedTodoList.id))
+			? { kind: "all" }
+			: routedTodoList;
+	/** The desktop shell's quick-capture shortcut asked for a new todo, which the Todo page has not started yet. */
+	const [quickTodo, setQuickTodo] = useState(false);
+	useEffect(() => {
+		const onQuickTodo = (): void => {
+			navigate({ kind: "todo", list: { kind: "all" } });
+			setQuickTodo(true);
+		};
+		window.addEventListener(QUICK_TODO_EVENT, onQuickTodo);
+		return () => window.removeEventListener(QUICK_TODO_EVENT, onQuickTodo);
+	}, [navigate]);
 	const showTab = (next: SidebarTab): void => {
 		if (next === "sessions") show(layout);
-		else if (next === "todo") navigate({ kind: "todo", category: null });
+		else if (next === "todo") navigate({ kind: "todo", list: { kind: "all" } });
 		else navigate({ kind: next, target: null });
 	};
 	const step = (by: 1 | -1): boolean | void => {
@@ -186,8 +209,11 @@ export function App() {
 	switch (page?.kind) {
 		case "new": {
 			const cwd = page.cwd ?? defaultCwd(view, visible.hosts, visible.past, project);
+			const seed = todoSeed(state.userTodos, page.todoId);
 			main = (
 				<NewSession
+					// A todo's title and notes start the draft, so the draft mounts anew once the list names it.
+					key={seed ? `todo:${page.todoId}` : "new"}
 					cwd={cwd}
 					workspaces={projects}
 					launch={launch}
@@ -197,9 +223,10 @@ export function App() {
 					onPickCwd={next => {
 						// A failed start's error is about the directory left behind.
 						dismissStart("new");
-						location.hash = hashForNewSession(next);
+						location.hash = hashForNewSession(next, page.todoId);
 					}}
-					onStart={op => start({ kind: "new", cwd, ...op })}
+					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed ? page.todoId : null })}
+					todo={seed}
 				/>
 			);
 			break;
@@ -225,7 +252,21 @@ export function App() {
 			} else main = <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
 			break;
 		case "todo":
-			main = <TodoPage list={state.userTodos} category={todoCategory} disabled={!state.connected} onChange={changeTodo} />;
+			main = (
+				<TodoPage
+					list={state.userTodos}
+					view={todoView}
+					disabled={!state.connected}
+					onChange={changeTodo}
+					// A linked session resolves wherever it ran, even in a directory the sidebar does not list.
+					hosts={state.hosts}
+					past={state.past}
+					newSessionCwd={defaultCwd(view, visible.hosts, visible.past, project)}
+					linearConnected={ticketsShown}
+					quickTodo={quickTodo}
+					onQuickTodo={() => setQuickTodo(false)}
+				/>
+			);
 			break;
 		case undefined:
 			if (layout.panes.length > 0) {
@@ -296,7 +337,7 @@ export function App() {
 						tab={tab}
 						onTab={showTab}
 						userTodos={state.userTodos}
-						todoCategory={todoCategory}
+						todoView={todoView}
 						sectionTarget={sectionTarget}
 						onSectionTarget={setSectionTarget}
 						project={project}
