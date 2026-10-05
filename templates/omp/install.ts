@@ -1,9 +1,10 @@
 /**
  * Installs the omp starter kit: copies `agent/` into the omp agent directory and applies `config.yml` through
  * `omp config set`, so omp writes every setting and leaves the rest of your config alone. A file or a setting you
- * already have keeps your version unless you pass `--force`.
+ * already have keeps your version unless you pass `--force`. `--maintainer` copies `maintainer/` on top, and a
+ * file there replaces the `agent/` file with the same relative path.
  *
- *   bun run omp-template [--dry-run] [--force]
+ *   bun run omp-template [--dry-run] [--force] [--maintainer]
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -46,6 +47,18 @@ export function planSettings(settings: [string, unknown][], user: Json, force: b
 	return settings.map(([target, value]) => ({ target, value, action: planValue(valueAt(user, target), value, force) }));
 }
 
+export interface KitFile {
+	rel: string;
+	text: string;
+}
+
+/** Later layers replace the same relative path. The result is sorted by `rel`. */
+export function overlayFiles(layers: readonly (readonly KitFile[])[]): KitFile[] {
+	const byRel: Record<string, string> = {};
+	for (const layer of layers) for (const file of layer) byRel[file.rel] = file.text;
+	return Object.entries(byRel).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([rel, text]) => ({ rel, text }));
+}
+
 /** `current` is `undefined` when you have no such file or setting. */
 export function planValue(current: unknown, value: unknown, force: boolean): Action {
 	if (current === undefined) return "create";
@@ -84,21 +97,30 @@ function print(action: Action, what: string): void {
 	console.log(`  ${LABEL[action].padEnd(10)} ${what}`);
 }
 
+function layerFiles(root: string): KitFile[] {
+	if (!existsSync(root)) return [];
+	return [...new Glob("**/*").scanSync({ cwd: root, dot: true })].sort().map(rel => ({ rel, text: readFileSync(join(root, rel), "utf8") }));
+}
+
 async function main(argv: string[]): Promise<void> {
-	const unknown = argv.find(arg => arg !== "--dry-run" && arg !== "--force");
-	if (unknown) throw new Error(`unknown option ${unknown}; use --dry-run or --force`);
+	const knownFlags = ["--dry-run", "--force", "--maintainer"];
+	const unknown = argv.find(arg => !knownFlags.includes(arg));
+	if (unknown) throw new Error(`unknown option ${unknown}; use --dry-run, --force, or --maintainer`);
 	const dryRun = argv.includes("--dry-run");
 	const force = argv.includes("--force");
+	const maintainer = argv.includes("--maintainer");
 	if (!Bun.which("omp")) throw new Error("`omp` is not on PATH; install it with `bun install -g @oh-my-pi/pi-coding-agent`");
 
 	const kit = import.meta.dir;
 	const agentDir = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".omp", "agent");
-	console.log(`${dryRun ? "Would install" : "Installing"} the omp starter kit into ${agentDir}${force ? ", overwriting your versions" : ""}`);
+	const profile = maintainer ? " and the maintainer git profile" : "";
+	console.log(`${dryRun ? "Would install" : "Installing"} the omp starter kit${profile} into ${agentDir}${force ? ", overwriting your versions" : ""}`);
 
-	const files = [...new Glob("**/*").scanSync({ cwd: join(kit, "agent"), dot: true })].sort().map(rel => {
-		const dest = join(agentDir, rel);
-		const text = readFileSync(join(kit, "agent", rel), "utf8");
-		return { rel, dest, text, action: planValue(existsSync(dest) ? readFileSync(dest, "utf8") : undefined, text, force) };
+	const layers = [layerFiles(join(kit, "agent"))];
+	if (maintainer) layers.push(layerFiles(join(kit, "maintainer")));
+	const files = overlayFiles(layers).map(file => {
+		const dest = join(agentDir, file.rel);
+		return { ...file, dest, action: planValue(existsSync(dest) ? readFileSync(dest, "utf8") : undefined, file.text, force) };
 	});
 	for (const file of files) print(file.action, `file ${file.rel}`);
 

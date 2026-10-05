@@ -9,7 +9,7 @@ The session's ship widget and status show the stage and PR needs.
 Read it FIRST on each invocation; resume from the recorded stage and the actual Linear, git, and GitHub state rather than repeating completed work.
 Report the current stage at every stopping point.
 Keep this session available after the PR goes live so `/ship` can resume when new review feedback or conflicts arrive.
-Before creating a branch or registering a PR, read `~/.omp/agent/docs/git-workflow.md` for worktree-safe Graphite detection and registration.
+If `~/.omp/agent/docs/git-workflow.md` exists, read it before creating a branch or registering a PR.
 
 1. **Ticket.** If no workflow exists, call `ship_stage({stage:"ticket"})`.
    If `$ARGUMENTS` has a Linear issue ID or URL, fetch that issue with `get_issue`.

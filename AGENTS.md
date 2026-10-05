@@ -50,6 +50,8 @@ Read omp's docs before its source: `omp://rpc.md` (RPC frames and commands), `om
   The README only covers features, installation, and configuration.
 - [omp modules](docs/architecture.md#omp-modules) after you read omp's source to learn a subsystem: add its files and the exports you used, so the next agent starts there.
 - Every doc keeps one sentence per line; `src/docs.test.ts` checks root Markdown and all Markdown under `docs/` and `templates/omp/`, including nested agent instructions.
-- `templates/omp/agent/` copies the maintainer's `~/.omp/agent` files, except `AGENTS.md`, which is a generic version.
-  After you edit one of those live files, copy it into the template.
+- `templates/omp/agent/` is the default starter kit.
+  Its `AGENTS.md` keeps worktree and force-push safety and leaves out the maintainer git profile.
+- `templates/omp/maintainer/` is that profile, `AGENTS.md` and `docs/git-workflow.md`, installed only with `bun run omp-template --maintainer`.
+  After you edit one of those live files, copy it into the matching template.
   `bun run omp-template --dry-run` lists a copy that has drifted as `keep yours`.
