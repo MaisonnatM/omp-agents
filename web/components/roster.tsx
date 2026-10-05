@@ -1,4 +1,4 @@
-import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
+import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Keyboard, ListRestart, Loader, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
 import { type PastSession, type PullRequest, type RosterHost, repoKey, type UserTodoChange, type UserTodoList, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
@@ -26,10 +26,10 @@ import {
 	SidebarMenuBadge,
 	SidebarMenuButton,
 	SidebarMenuItem,
+	useSidebar,
 } from "@/components/ui/sidebar";
-import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
+import { TabPanel } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
-import { SizeProvider } from "@/lib/size-context";
 import { inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
@@ -38,15 +38,17 @@ import type { SectionTarget } from "../section";
 import { type SidebarSessions, workspaces } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
-import { useStoredState } from "../stored-state";
+import { useStoredKeys, useStoredState } from "../stored-state";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
+import { NavigationTabs, type SidebarTab } from "./navigation";
 import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TodoCategories } from "./todo-categories";
 
 /** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
 const PROJECT_KEY = "omp-agents.sidebar-project";
+const COLLAPSED_GROUPS_KEY = "omp-agents.sidebar-collapsed-groups";
 
 /** The project `cwd` the sidebar and the inbox show, `null` for all projects, and its setter, which localStorage keeps. */
 export function useProject(projects: { cwd: string }[]): [string | null, (cwd: string | null) => void] {
@@ -54,16 +56,6 @@ export function useProject(projects: { cwd: string }[]): [string | null, (cwd: s
 	// A stored project with no sessions left, or not yet loaded, shows all of them.
 	return [projects.some(({ cwd }) => cwd === stored) ? stored : null, pick];
 }
-
-const SIDEBAR_TABS = [
-	{ value: "inbox", label: "Inbox", icon: Inbox },
-	{ value: "tickets", label: "Tickets", icon: SquareKanban },
-	{ value: "sessions", label: "Sessions", icon: MessagesSquare },
-	{ value: "todo", label: "Todo", icon: ListTodo },
-] as const;
-
-/** The sidebar's tab; the inbox, tickets, and todo tabs go with their pages, sessions with the panes. */
-export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 /** The project a titled row ran in, before its title, shown only under all projects. An untitled row's label is already the project's name. */
 function ProjectBadge({ cwdDisplay }: { cwdDisplay: string }) {
@@ -355,9 +347,8 @@ interface RosterProps {
 	settingsOpen: boolean;
 	/** omp is signed in to Linear, so the Tickets tab shows. */
 	ticketsShown: boolean;
-	/** The sidebar's tab: the inbox, the tickets, or the todos with their pages, or the sessions over the panes. */
 	tab: SidebarTab;
-	onTab: (tab: SidebarTab) => void;
+	sidebarOpen: boolean;
 	/** The Todo page's list, `null` until the server sends it. */
 	userTodos: UserTodoList | null;
 	/** The category the Todo page shows, `null` for every todo. */
@@ -401,7 +392,7 @@ export function Roster({
 	settingsOpen,
 	ticketsShown,
 	tab,
-	onTab,
+	sidebarOpen,
 	userTodos,
 	todoCategory,
 	onTodoChange,
@@ -421,7 +412,8 @@ export function Roster({
 	onShowShortcuts,
 	toggle,
 }: RosterProps) {
-	const [runningOpen, setRunningOpen] = useState(true);
+	const { isMobile } = useSidebar();
+	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	const projects = workspaces(hosts, past);
 	const { pinned, running, interrupted, ended } = lists;
 	const resumingAll = resumeAll?.phase === "starting";
@@ -529,7 +521,7 @@ export function Roster({
 		);
 	};
 	return (
-		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="flex min-h-0 flex-1 flex-col">
+		<div className="flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
@@ -547,14 +539,7 @@ export function Roster({
 				</Tooltip>
 				{toggle}
 			</SidebarHeader>
-			<SizeProvider size="compact">
-				<TabsList aria-label="Sidebar" className="mx-2 self-start">
-					{/* Four tabs fit the sidebar's default width only with tighter padding than Fluid's. */}
-					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => (
-						<TabItem key={value} value={value} label={label} icon={icon} className="px-2" shortcut={shortcutLabels(value)} />
-					))}
-				</TabsList>
-			</SizeProvider>
+			{isMobile && sidebarOpen && <NavigationTabs ticketsShown={ticketsShown} compact className="mx-2 self-start" />}
 			{!connected && (
 				<p className="mx-3 mt-2 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
 					Lost the dashboard server. Retrying…
@@ -564,7 +549,7 @@ export function Roster({
 			<TabPanel value="sessions" forceMount asChild className={tab === "sessions" ? undefined : "hidden"}>
 				<SidebarContent>
 					{pinned.hosts.length + pinned.past.length > 0 && (
-						<SidebarGroup collapsible>
+						<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
 							<SidebarGroupLabel>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
 							<SidebarMenu aria-label="Pinned omp sessions">
 								{pinned.hosts.map(host => hostRow(host, true))}
@@ -572,7 +557,7 @@ export function Roster({
 							</SidebarMenu>
 						</SidebarGroup>
 					)}
-					<SidebarGroup collapsible open={runningOpen} onOpenChange={setRunningOpen}>
+					<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
 						<SidebarGroupLabel>
 							{running.length > 0 ? `${running.length} running` : pinned.hosts.length > 0 ? "No other sessions running" : "No sessions"}
 						</SidebarGroupLabel>
@@ -586,7 +571,7 @@ export function Roster({
 						</SidebarMenu>
 					</SidebarGroup>
 					{interrupted.length > 0 && (
-						<SidebarGroup collapsible>
+						<SidebarGroup collapsible open={!collapsed.has("interrupted")} onOpenChange={() => toggleGroup("interrupted")}>
 							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
 							{/* The group action's props carry no `disabled`, so it styles a native button that does. */}
 							<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
@@ -613,7 +598,7 @@ export function Roster({
 							</SidebarMenu>
 						</SidebarGroup>
 					)}
-					<SidebarGroup collapsible>
+					<SidebarGroup collapsible open={!collapsed.has("past")} onOpenChange={() => toggleGroup("past")}>
 						<SidebarGroupLabel>{ended.length === 0 ? "No past sessions" : `${ended.length} past`}</SidebarGroupLabel>
 						<SidebarMenu aria-label="Past omp sessions">{ended.map(session => pastRow(session, false))}</SidebarMenu>
 					</SidebarGroup>
@@ -634,6 +619,6 @@ export function Roster({
 					<TodoCategories list={userTodos} category={todoCategory} disabled={!connected} onChange={onTodoChange} />
 				</SidebarContent>
 			</TabPanel>
-		</Tabs>
+		</div>
 	);
 }

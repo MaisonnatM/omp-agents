@@ -1,6 +1,24 @@
 /** What the roster and past-session lists say about where sessions ran. */
 import type { PastSession, RosterHost, View } from "../src/shared";
 
+const HIDDEN_ROOTS = ["/tmp", "/private/tmp"];
+
+/** A working directory outside `/tmp` and `/private/tmp`, including their descendants. */
+export function discoverableCwd(cwd: string): boolean {
+	return !HIDDEN_ROOTS.some(root => cwd === root || cwd.startsWith(`${root}/`));
+}
+
+export function discoverableSessions(hosts: RosterHost[], past: PastSession[]): { hosts: RosterHost[]; past: PastSession[] } {
+	const listed = <T extends { cwd: string }>(rows: T[]): T[] => rows.filter(row => discoverableCwd(row.cwd));
+	return { hosts: listed(hosts), past: listed(past) };
+}
+
+/** The project a started or picked session switches to, so it stays listed. `null` keeps the current project; a temporary directory is not a switch. */
+export function projectSwitch(project: string | null, cwd: string): string | null {
+	if (project === null || cwd === project || !discoverableCwd(cwd)) return null;
+	return cwd;
+}
+
 /**
  * Where a new session starts unless the user picks another directory: the open session's,
  * else the newest live one's, else the newest past one's, each only from `project` when one is selected.

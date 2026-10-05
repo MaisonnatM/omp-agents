@@ -1,13 +1,15 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { View } from "../src/shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
+import { Tabs } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { InboxPage } from "./components/inbox/inbox-page";
+import { DashboardHeader, type SidebarTab } from "./components/navigation";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
 import { PlanPanel } from "./components/plan-panel";
 import { PlanUsageFooter } from "./components/plan-usage";
-import { Roster, type SidebarTab, useProject } from "./components/roster";
+import { Roster, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings/settings-page";
 import { SessionSwitcher } from "./components/session-switcher";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
@@ -30,7 +32,7 @@ import {
 	sameView,
 } from "./routing";
 import type { SectionTarget } from "./section";
-import { defaultCwd, listedViews, sidebarSessions, workspaces } from "./sessions";
+import { defaultCwd, discoverableSessions, listedViews, projectSwitch, sidebarSessions, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { useStoredKeys } from "./stored-state";
@@ -41,13 +43,13 @@ const PINNED_KEY = "omp-agents.pinned-sessions";
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
-		<section className="m-auto max-w-lg space-y-3 p-8 text-sm">
+		<section className="m-auto w-full min-w-0 max-w-lg space-y-3 p-8 text-sm">
 			<h2 className="text-base font-semibold">No omp sessions are published</h2>
 			<p>
 				Sessions publish themselves to the local Collab registry when <code>collab.autoStart</code> is <code>control</code>{" "}
 				(or <code>view</code> for read-only):
 			</p>
-			<pre className="rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs">
+			<pre className="overflow-x-auto rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs">
 				omp config set collab.autoStart control
 			</pre>
 			<p>
@@ -68,12 +70,15 @@ export function App() {
 	const quick = startOf(state.starts, "quick");
 	const resumeAll = startOf(state.starts, "resume-all");
 	const sidebars = useSidebarPanels();
-	const [project, pickProject] = useProject(workspaces(state.hosts, state.past));
+	const visible = discoverableSessions(state.hosts, state.past);
+	const projects = workspaces(visible.hosts, visible.past);
+	const [project, pickProject] = useProject(projects);
 	const [pinned, togglePin] = useStoredKeys(PINNED_KEY);
 	const { started } = state;
-	// A session started in another directory than the selected project would be missing from the sidebar.
 	useEffect(() => {
-		if (started && project !== null && started.cwd !== project) pickProject(started.cwd);
+		if (!started) return;
+		const next = projectSwitch(project, started.cwd);
+		if (next !== null) pickProject(next);
 	}, [started]);
 	const { layout } = state;
 	const view = focusedView(layout);
@@ -83,7 +88,7 @@ export function App() {
 	const [columns, setColumns] = useSplitRatio("columns");
 	const [rows, setRows] = useSplitRatio("rows");
 	const maximized = layout.maximized && !page;
-	const lists = sidebarSessions(state.hosts, state.past, project, pinned);
+	const lists = sidebarSessions(visible.hosts, visible.past, project, pinned);
 	// The running sessions the sidebar lists, in its order, which ending a session moves its panes along.
 	const listedHosts = [...lists.pinned.hosts, ...lists.running].map(host => host.instanceId);
 	const listed = listedViews(lists);
@@ -171,11 +176,11 @@ export function App() {
 	let main: ReactNode;
 	switch (page?.kind) {
 		case "new": {
-			const cwd = page.cwd ?? defaultCwd(view, state.hosts, state.past, project);
+			const cwd = page.cwd ?? defaultCwd(view, visible.hosts, visible.past, project);
 			main = (
 				<NewSession
 					cwd={cwd}
-					workspaces={workspaces(state.hosts, state.past)}
+					workspaces={projects}
 					launch={launch}
 					connected={state.connected}
 					completions={state.newSessionCompletions}
@@ -191,15 +196,15 @@ export function App() {
 			break;
 		}
 		case "settings":
-			main = <SettingsPage cwd={page.cwd} workspaces={workspaces(state.hosts, state.past)} />;
+			main = <SettingsPage cwd={page.cwd} workspaces={projects} />;
 			break;
 		case "inbox":
 			// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
 			main = state.listed ? (
 				<InboxPage
 					project={project}
-					hosts={state.hosts}
-					past={state.past}
+					hosts={visible.hosts}
+					past={visible.past}
 					target={page.target}
 					onOpen={open}
 					section={sectionTarget}
@@ -219,7 +224,7 @@ export function App() {
 					<TicketsPage
 						target={page.target}
 						section={sectionTarget}
-						cwd={defaultCwd(view, state.hosts, state.past, project)}
+						cwd={defaultCwd(view, visible.hosts, visible.past, project)}
 						quick={quick}
 						onQuickAction={start}
 						onDismissQuick={() => dismissStart("quick")}
@@ -235,7 +240,7 @@ export function App() {
 			if (layout.panes.length > 0) {
 				main = (
 					<div
-						className="relative grid h-svh min-h-0 gap-px bg-border"
+						className="relative grid h-full min-h-0 gap-px bg-border"
 						style={{
 							gridTemplateColumns: split ? `${splitAt(columns)} minmax(0, 1fr)` : "minmax(0, 1fr)",
 							gridTemplateRows: layout.panes.length > 2 ? `${splitAt(rows)} minmax(0, 1fr)` : "minmax(0, 1fr)",
@@ -292,63 +297,68 @@ export function App() {
 	}
 
 	return (
-		<SidebarProvider persist={false} shortcut={null} className="h-svh">
-			<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
-				<Roster
-					hosts={state.hosts}
-					past={state.past}
-					lists={lists}
-					onTogglePin={togglePin}
-					open={page ? [] : layout.panes}
-					connected={state.connected}
-					newSessionOpen={page?.kind === "new"}
-					settingsHref={settingsHref}
-					settingsOpen={page?.kind === "settings"}
-					ticketsShown={ticketsShown}
-					tab={tab}
-					onTab={showTab}
-					userTodos={state.userTodos}
-					todoCategory={todoCategory}
-					onTodoChange={changeTodo}
-					sectionTarget={sectionTarget}
-					onSectionTarget={setSectionTarget}
-					project={project}
-					onPickProject={pickProject}
-					onOpen={open}
-					onNewSession={openNewSession}
-					resume={resume}
-					onResume={sessionId => {
-						// The pane shows the resume's progress and failure, and the live session takes it over.
-						open({ kind: "past", sessionId }, "replace");
-						start({ kind: "resume", sessionId });
-					}}
-					resumeAll={resumeAll}
-					onResumeAll={sessionIds => start({ kind: "resume-all", sessionIds })}
-					onDismissResumeAll={() => dismissStart("resume-all")}
-					onDismissInterrupted={sessionId => send({ t: "dismiss-interrupted", sessionId })}
-					onEnd={endHost}
-					onShowShortcuts={() => setShortcutsOpen(true)}
-					toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
-				/>
-				<PlanUsageFooter usage={state.usage} />
-			</DashboardSidebar>
-			<SidebarInset>
-				<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
-			</SidebarInset>
-			{planView && (
-				<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-					<PlanPanel key={hashForView(planView)} view={planView} />
-				</DashboardSidebar>
-			)}
+		<SidebarProvider persist={false} shortcut={null} className="h-svh min-h-0 flex-col">
+			<Tabs value={tab} onValueChange={value => showTab(value as SidebarTab)} className="flex min-h-0 flex-1 flex-col">
+				<DashboardHeader ticketsShown={ticketsShown} sidebarOpen={sidebars.panels.left.open} />
+				<div className="flex min-h-0 flex-1">
+					<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
+						<Roster
+							hosts={visible.hosts}
+							past={visible.past}
+							lists={lists}
+							onTogglePin={togglePin}
+							open={page ? [] : layout.panes}
+							connected={state.connected}
+							newSessionOpen={page?.kind === "new"}
+							settingsHref={settingsHref}
+							settingsOpen={page?.kind === "settings"}
+							ticketsShown={ticketsShown}
+							tab={tab}
+							sidebarOpen={sidebars.panels.left.open}
+							userTodos={state.userTodos}
+							todoCategory={todoCategory}
+							onTodoChange={changeTodo}
+							sectionTarget={sectionTarget}
+							onSectionTarget={setSectionTarget}
+							project={project}
+							onPickProject={pickProject}
+							onOpen={open}
+							onNewSession={openNewSession}
+							resume={resume}
+							onResume={sessionId => {
+								// The pane shows the resume's progress and failure, and the live session takes it over.
+								open({ kind: "past", sessionId }, "replace");
+								start({ kind: "resume", sessionId });
+							}}
+							resumeAll={resumeAll}
+							onResumeAll={sessionIds => start({ kind: "resume-all", sessionIds })}
+							onDismissResumeAll={() => dismissStart("resume-all")}
+							onDismissInterrupted={sessionId => send({ t: "dismiss-interrupted", sessionId })}
+							onEnd={endHost}
+							onShowShortcuts={() => setShortcutsOpen(true)}
+							toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
+						/>
+						<PlanUsageFooter usage={state.usage} />
+					</DashboardSidebar>
+					<SidebarInset>
+						<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
+					</SidebarInset>
+					{planView && (
+						<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
+							<PlanPanel key={hashForView(planView)} view={planView} />
+						</DashboardSidebar>
+					)}
+				</div>
+			</Tabs>
 			<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 			<SessionSwitcher
 				open={switcherOpen}
 				onOpenChange={setSwitcherOpen}
-				hosts={state.hosts}
-				past={state.past}
+				hosts={visible.hosts}
+				past={visible.past}
 				onPick={(picked, cwd) => {
-					// As a started session does, a session from another project switches the sidebar to its project.
-					if (project !== null && cwd !== project) pickProject(cwd);
+					const next = projectSwitch(project, cwd);
+					if (next !== null) pickProject(next);
 					open(picked, "replace");
 				}}
 			/>

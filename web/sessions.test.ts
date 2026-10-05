@@ -1,6 +1,73 @@
 import { describe, expect, test } from "bun:test";
 import type { PastSession, RosterHost } from "../src/shared";
-import { defaultCwd, listedViews, sidebarSessions } from "./sessions";
+import { defaultCwd, discoverableSessions, listedViews, projectSwitch, sidebarSessions } from "./sessions";
+
+const host = (sessionId: string, cwd: string) => ({ instanceId: `i-${sessionId}`, sessionId, cwd }) as RosterHost;
+const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
+const ids = (rows: { sessionId: string }[]) => rows.map(row => row.sessionId);
+
+describe("discoverableSessions", () => {
+	test("hides temporary roots and descendants but keeps lookalikes and directories named tmp elsewhere", () => {
+		const paths = [
+			"/tmp",
+			"/tmp/",
+			"/tmp/build",
+			"/tmp/build/nested/",
+			"/private/tmp",
+			"/private/tmp/",
+			"/private/tmp/build",
+			"/private/tmp/build/nested/",
+			"/tmp-project",
+			"/private/tmp-project",
+			"/home/user/tmp",
+			"/home/user/tmp/project/",
+			"",
+		];
+		const hosts = paths.map((cwd, index) => host(`h${index}`, cwd));
+		const sessions = paths.map((cwd, index) => past(`p${index}`, cwd, index % 2 === 0));
+		const visible = discoverableSessions(hosts, sessions);
+		expect(visible.hosts.map(row => row.cwd)).toEqual(["/tmp-project", "/private/tmp-project", "/home/user/tmp", "/home/user/tmp/project/", ""]);
+		expect(visible.past.map(row => row.cwd)).toEqual(["/tmp-project", "/private/tmp-project", "/home/user/tmp", "/home/user/tmp/project/", ""]);
+	});
+
+	test("hidden sessions stay out of pinned and interrupted lists without losing saved rows", () => {
+		const hosts = [host("hidden-live", "/tmp/job"), host("pinned-live", "~/project"), host("running", "~/project")];
+		const sessions = [
+			past("hidden-interrupted", "/private/tmp/job", true),
+			past("hidden-ended", "/tmp/", false),
+			past("pinned-interrupted", "~/project", true),
+			past("pinned-ended", "~/project", false),
+			past("interrupted", "~/project", true),
+			past("ended", "~/project", false),
+		];
+		const visible = discoverableSessions(hosts, sessions);
+		const lists = sidebarSessions(
+			visible.hosts,
+			visible.past,
+			null,
+			new Set(["hidden-live", "hidden-interrupted", "hidden-ended", "pinned-live", "pinned-ended", "pinned-interrupted"]),
+		);
+		expect(ids(lists.pinned.hosts)).toEqual(["pinned-live"]);
+		expect(ids(lists.pinned.past)).toEqual(["pinned-interrupted", "pinned-ended"]);
+		expect(ids(lists.running)).toEqual(["running"]);
+		expect(ids(lists.interrupted)).toEqual(["interrupted"]);
+		expect(ids(lists.ended)).toEqual(["ended"]);
+		expect(ids(hosts)).toEqual(["hidden-live", "pinned-live", "running"]);
+		expect(ids(sessions)).toEqual(["hidden-interrupted", "hidden-ended", "pinned-interrupted", "pinned-ended", "interrupted", "ended"]);
+		expect(visible.hosts[0]).toBe(hosts[1]);
+		expect(visible.past[0]).toBe(sessions[2]);
+	});
+
+	test("a temp cwd is not a project switch", () => {
+		for (const cwd of ["/tmp", "/tmp/", "/tmp/job", "/private/tmp", "/private/tmp/", "/private/tmp/job"]) {
+			expect(projectSwitch("~/app", cwd)).toBeNull();
+		}
+		expect(projectSwitch("~/app", "/tmp-project")).toBe("/tmp-project");
+		expect(projectSwitch("~/app", "~/other")).toBe("~/other");
+		expect(projectSwitch(null, "~/other")).toBeNull();
+		expect(projectSwitch("~/app", "~/app")).toBeNull();
+	});
+});
 
 describe("defaultCwd", () => {
 	const host = (instanceId: string, cwdDisplay: string, startedAt: number) => ({ instanceId, cwd: cwdDisplay, cwdDisplay, startedAt }) as RosterHost;
@@ -23,11 +90,8 @@ describe("defaultCwd", () => {
 });
 
 describe("sidebarSessions", () => {
-	const host = (sessionId: string, cwd: string) => ({ instanceId: `i-${sessionId}`, sessionId, cwd }) as RosterHost;
-	const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
 	const hosts = [host("h1", "~/a"), host("h2", "~/a"), host("h3", "~/b")];
 	const sessions = [past("p1", "~/a", false), past("p2", "~/a", true), past("p3", "~/a", false), past("p4", "~/b", true)];
-	const ids = (rows: { sessionId: string }[]) => rows.map(row => row.sessionId);
 
 	test("a pinned session leaves its own list, and pinned past sessions list interrupted ones first", () => {
 		const lists = sidebarSessions(hosts, sessions, null, new Set(["h2", "p1", "p4"]));

@@ -175,7 +175,7 @@ export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspac
 	);
 
 	return (
-		<div className="flex h-svh min-h-0 flex-1 flex-col">
+		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header
 				title="Settings"
 				meta={cwd === null ? "omp's model routing and your files" : "omp's model routing and files, as a session in this workspace loads them"}
