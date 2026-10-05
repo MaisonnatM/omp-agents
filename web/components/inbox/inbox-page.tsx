@@ -9,11 +9,11 @@ import { Sheet } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { inboxSection, inboxSections } from "../../inbox-model";
+import { inboxStore } from "../../reads";
 import { hashForInbox, type OpenMode } from "../../routing";
 import type { SectionTarget } from "../../section";
 import type { QuickOp, StartOf } from "../../starts";
-import { useStoredKeys } from "../../stored-keys";
-import { refreshInbox, useInbox } from "../../use-inbox";
+import { useStoredKeys } from "../../stored-state";
 import { Header } from "../conversation";
 import { FoldButton, useRevealSection } from "../fold";
 import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
@@ -166,7 +166,7 @@ interface InboxPageProps {
 
 /** The pull requests of the sidebar's project, or of every project, in Graphite's inbox sections, read from GitHub. */
 export function InboxPage({ project, hosts, past, target, onOpen, section, quick, onQuickAction, onDismissQuick }: InboxPageProps) {
-	const { read, error, refreshing } = useInbox(project, true);
+	const { read, error, refreshing } = inboxStore.usePolling(project);
 	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
 	const place = read && target ? placeOf(read.data, target) : null;
 	const targetKey = target && rowId(target);
@@ -230,7 +230,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 				title="Inbox"
 				meta={read ? `Your pull requests and review requests on GitHub · updated ${readTime(read.at)}` : "Your pull requests and review requests on GitHub"}
 			>
-				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void refreshInbox(project, true)}>
+				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void inboxStore.refresh(project, { fresh: true })}>
 					{refreshing ? "Refreshing…" : "Refresh"}
 				</Button>
 			</Header>

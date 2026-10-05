@@ -1,12 +1,12 @@
 import { Box, Calendar } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import type { Ticket, TicketComment, TicketDetail } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { age } from "../../labels";
+import { useRead } from "../../reads";
 import { PRIORITY_LABEL } from "../../tickets-model";
-import { useDetail } from "../../use-detail";
 import { IconTip } from "../inbox/avatars";
 import { DetailSection, OutLink } from "../inbox/pr-details";
 import { MessageMarkdown } from "../message-markdown";
@@ -47,7 +47,11 @@ interface TicketSheetContentProps {
  * Linear answered it in full, with `actions` below, then its description, links, and comments.
  */
 export function TicketSheetContent({ id, listed, actions }: TicketSheetContentProps) {
-	const { detail, error, replace } = useDetail<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
+	const read = useRead<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
+	// The version a field change answered; the sheet mounts anew (by `key`) for another issue.
+	const [replaced, replace] = useState<TicketDetail | null>(null);
+	const detail = replaced ?? read.data;
+	const error = replaced ? null : read.error;
 	const ticket = detail ?? listed;
 	const [PriorityIcon, priorityColor] = PRIORITY_ICON[ticket?.priority ?? 0];
 	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking Linear for the issue…</p>;

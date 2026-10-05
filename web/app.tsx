@@ -12,10 +12,11 @@ import { SettingsPage } from "./components/settings/settings-page";
 import { SessionSwitcher } from "./components/session-switcher";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
-import { SplitResizeHandle, splitAt, storedSplitRatio } from "./components/split-resize-handle";
+import { SplitResizeHandle, splitAt, useSplitRatio } from "./components/split-resize-handle";
 import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-page";
 import { ToolsExpanded } from "./components/transcript";
 import { SPLIT_CLICK } from "./labels";
+import { linearStore } from "./reads";
 import {
 	adjacentSession,
 	closePane,
@@ -31,9 +32,8 @@ import type { SectionTarget } from "./section";
 import { defaultCwd, listedViews, sidebarSessions, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
-import { useStoredKeys } from "./stored-keys";
+import { useStoredKeys } from "./stored-state";
 import { useDashboard } from "./use-dashboard";
-import { useLinear } from "./use-linear";
 
 /** The session ids the sidebar lists under Pinned. */
 const PINNED_KEY = "omp-agents.pinned-sessions";
@@ -79,8 +79,8 @@ export function App() {
 	const viewHost = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
 	const viewPast = view?.kind === "past" ? state.past.find(s => s.sessionId === view.sessionId) : undefined;
 	const split = layout.panes.length > 1;
-	const [columns, setColumns] = useState(() => storedSplitRatio("columns"));
-	const [rows, setRows] = useState(() => storedSplitRatio("rows"));
+	const [columns, setColumns] = useSplitRatio("columns");
+	const [rows, setRows] = useSplitRatio("rows");
 	const maximized = layout.maximized && !page;
 	const lists = sidebarSessions(state.hosts, state.past, project, pinned);
 	// The running sessions the sidebar lists, in its order, which ending a session moves its panes along.
@@ -111,7 +111,7 @@ export function App() {
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [switcherOpen, setSwitcherOpen] = useState(false);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
-	const linear = useLinear(true);
+	const linear = linearStore.usePolling();
 	/** The Tickets tab and its shortcut show only once omp is signed in to Linear. */
 	const ticketsShown = linear.read?.data.connected === true;
 	const tab: SidebarTab = page?.kind === "inbox" ? "inbox" : page?.kind === "tickets" && ticketsShown ? "tickets" : "sessions";

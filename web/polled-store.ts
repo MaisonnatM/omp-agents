@@ -1,5 +1,5 @@
-import { useEffect, useSyncExternalStore } from "react";
-import { getJson } from "./api";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { errorText, getJson } from "./api";
 
 /** How often an open page asks again; the server answers from its cache in between. */
 const POLL_MS = 60_000;
@@ -20,15 +20,16 @@ export interface PolledEntry<T> {
 interface PolledStoreOptions<T> {
 	/** The localStorage key under which the last read of every key is kept, so a reopened page shows at once, even after a reload. */
 	cacheKey: string;
-	/** The API path that reads `key`; `fresh` makes the server skip its own cache too. */
-	url: (key: string, fresh: boolean) => string;
+	/** The API path that reads `scope`; `fresh` makes the server skip its own cache too. */
+	url: (scope: string | null, fresh: boolean) => string;
 	/** Whether a value read back from localStorage has the shape of `T`. */
 	isValid: (value: unknown) => value is T;
 }
 
 /**
- * A store of server reads by key that the sidebar and a page share, kept in localStorage and re-read while a page that
- * uses it is open. The key names what the read is about, such as a project; a read about everything uses `""`.
+ * A store of server reads by scope that the sidebar and a page share, kept in localStorage and re-read while a page that
+ * uses it is open. The scope names what the read is about, such as a project; it is `null` for a read about everything,
+ * or in a store with one entry. The entries and their cache hold `null` under `""`.
  */
 export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOptions<T>) {
 	const empty: PolledEntry<T> = { read: null, error: null, refreshing: false };
@@ -48,12 +49,12 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 	}
 
 	const entries = storedEntries();
-	const listeners = new Set<() => void>();
+	const listeners = new Map<string, Set<() => void>>();
 	let inflight: { key: string; controller: AbortController } | null = null;
 
 	function update(key: string, patch: Partial<PolledEntry<T>>): void {
 		entries.set(key, { ...(entries.get(key) ?? empty), ...patch });
-		for (const listener of listeners) listener();
+		for (const listener of listeners.get(key) ?? []) listener();
 	}
 
 	function persist(): void {
@@ -65,8 +66,9 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 		}
 	}
 
-	/** Reads `key` again, superseding any read in flight. */
-	async function refresh(key: string, fresh: boolean): Promise<void> {
+	/** Reads `scope` again, superseding any read in flight. */
+	async function refresh(scope: string | null = null, { fresh = false }: { fresh?: boolean } = {}): Promise<void> {
+		const key = scope ?? "";
 		if (inflight) {
 			inflight.controller.abort();
 			update(inflight.key, { refreshing: false });
@@ -75,31 +77,42 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 		inflight = current;
 		update(key, { refreshing: true });
 		try {
-			const data = await getJson<T>(url(key, fresh), current.controller.signal);
+			const data = await getJson<T>(url(scope, fresh), current.controller.signal);
 			update(key, { read: { data, at: Date.now() }, error: null, refreshing: false });
 			persist();
 		} catch (err) {
-			if (!current.controller.signal.aborted) update(key, { error: err instanceof Error ? err.message : String(err), refreshing: false });
+			if (!current.controller.signal.aborted) update(key, { error: errorText(err), refreshing: false });
 		} finally {
 			if (inflight === current) inflight = null;
 		}
 	}
 
-	const subscribe = (listener: () => void): (() => void) => {
-		listeners.add(listener);
-		return () => listeners.delete(listener);
+	const subscribe = (key: string, listener: () => void): (() => void) => {
+		const set = listeners.get(key) ?? new Set();
+		listeners.set(key, set.add(listener));
+		return () => {
+			set.delete(listener);
+			if (set.size === 0) listeners.delete(key);
+		};
 	};
 
-	/** `key`'s entry. With `poll`, reads it again now and every {@link POLL_MS} while mounted, showing the kept read meanwhile. */
-	function use(key: string, poll: boolean): PolledEntry<T> {
+	function useEntry(scope: string | null, poll: boolean): PolledEntry<T> {
+		const key = scope ?? "";
 		useEffect(() => {
 			if (!poll) return;
-			void refresh(key, false);
-			const timer = setInterval(() => void refresh(key, false), POLL_MS);
+			void refresh(scope);
+			const timer = setInterval(() => void refresh(scope), POLL_MS);
 			return () => clearInterval(timer);
-		}, [key, poll]);
-		return useSyncExternalStore(subscribe, () => entries.get(key) ?? empty);
+		}, [scope, poll]);
+		const watch = useCallback((listener: () => void) => subscribe(key, listener), [key]);
+		return useSyncExternalStore(watch, () => entries.get(key) ?? empty);
 	}
 
-	return { use, refresh };
+	return {
+		/** `scope`'s entry, as the store last read it. */
+		use: (scope: string | null = null): PolledEntry<T> => useEntry(scope, false),
+		/** `scope`'s entry, read again now and every {@link POLL_MS} while mounted, showing the kept read meanwhile. */
+		usePolling: (scope: string | null = null): PolledEntry<T> => useEntry(scope, true),
+		refresh,
+	};
 }

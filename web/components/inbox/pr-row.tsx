@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { putJson } from "../../api";
+import { errorText, putJson } from "../../api";
 import { hashForInbox, type OpenMode } from "../../routing";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../quick-actions";
@@ -92,7 +92,7 @@ function LinkSessionsButton({ pr, sessions }: { pr: PullRequest; sessions: Sessi
 		try {
 			setWriting({ phase: "done", changed: (await putJson<SessionLinksResult>("/api/pull-request/sessions", edit)).changed });
 		} catch (err) {
-			setWriting({ phase: "failed", error: err instanceof Error ? err.message : String(err) });
+			setWriting({ phase: "failed", error: errorText(err) });
 		}
 	};
 	const count = sessions.length === 1 ? "this session" : `these ${sessions.length} sessions`;

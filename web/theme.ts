@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useStoredState } from "./stored-state";
 
 /** The page's color scheme: follow the OS, or pin light or dark. */
 export type Theme = "system" | "light" | "dark";
@@ -9,10 +9,9 @@ const THEME_KEY = "omp-agents.theme";
 
 const OS_DARK = "(prefers-color-scheme: dark)";
 
-const storedTheme = (): Theme => {
-	const stored = localStorage.getItem(THEME_KEY);
-	return THEMES.find(theme => theme === stored) ?? "system";
-};
+const themeOf = (stored: string | null): Theme => THEMES.find(theme => theme === stored) ?? "system";
+
+const storedTheme = (): Theme => themeOf(localStorage.getItem(THEME_KEY));
 
 // The Fluid tokens switch on a `.dark` class.
 const applyTheme = (theme: Theme): void =>
@@ -26,11 +25,9 @@ export function startTheme(): void {
 
 /** The saved theme and its setter, which applies it at once and keeps it in localStorage. */
 export function useTheme(): [Theme, (theme: Theme) => void] {
-	const [theme, setTheme] = useState(storedTheme);
+	const [theme, store] = useStoredState(THEME_KEY, themeOf);
 	const pick = (next: Theme): void => {
-		setTheme(next);
-		if (next === "system") localStorage.removeItem(THEME_KEY);
-		else localStorage.setItem(THEME_KEY, next);
+		store(next);
 		applyTheme(next);
 	};
 	return [theme, pick];

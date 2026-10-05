@@ -2,16 +2,16 @@ import { Plug } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { LinearStatus } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
-import { putJson } from "../../api";
-import { refreshLinear, useLinear } from "../../use-linear";
-import { errorText, Section } from "./editor";
+import { errorText, putJson } from "../../api";
+import { linearStore } from "../../reads";
+import { Section } from "./editor";
 
 /** How often the page asks again while Linear's sign-in page is open, to notice the sign-in soon after it ends. */
 const WAITING_POLL_MS = 2_000;
 
 /** Linear's connection: whether omp is signed in to Linear's MCP server, and a button that signs in. */
 export function LinearConnection() {
-	const { read, error } = useLinear(true);
+	const { read, error } = linearStore.usePolling();
 	const [starting, setStarting] = useState(false);
 	const [startError, setStartError] = useState<string | null>(null);
 	const status = read?.data;
@@ -20,7 +20,7 @@ export function LinearConnection() {
 
 	useEffect(() => {
 		if (!waiting) return;
-		const timer = setInterval(() => void refreshLinear(), WAITING_POLL_MS);
+		const timer = setInterval(() => void linearStore.refresh(), WAITING_POLL_MS);
 		return () => clearInterval(timer);
 	}, [waiting]);
 
@@ -36,7 +36,7 @@ export function LinearConnection() {
 			if (next.signIn?.phase !== "waiting") tab?.close();
 			else if (tab) tab.location.replace(next.signIn.url);
 			else window.open(next.signIn.url, "_blank", "noopener");
-			await refreshLinear();
+			await linearStore.refresh();
 		} catch (err) {
 			tab?.close();
 			setStartError(errorText(err));

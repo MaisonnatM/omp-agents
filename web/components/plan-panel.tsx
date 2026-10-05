@@ -39,6 +39,7 @@ import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { age, readTime } from "../labels";
 import { usePane } from "../pane-store";
+import { useStoredState } from "../stored-state";
 import { MessageMarkdown } from "./message-markdown";
 
 const TASK_LOOK: Record<TodoStatus, { icon: LucideIcon; label: string; className: string }> = {
@@ -210,20 +211,10 @@ const TAB_KEY = "omp-agents.plan-tab";
 
 type PlanTab = "plan" | "files";
 
-function useStoredTab(): [PlanTab, (tab: PlanTab) => void] {
-	const [tab, setTab] = useState<PlanTab>(() => (localStorage.getItem(TAB_KEY) === "files" ? "files" : "plan"));
-	const pick = (next: PlanTab): void => {
-		setTab(next);
-		if (next === "plan") localStorage.removeItem(TAB_KEY);
-		else localStorage.setItem(TAB_KEY, next);
-	};
-	return [tab, pick];
-}
-
 /** The right sidebar's content: the focused view's latest todo list and plan file, and the files its agent changed, each tab apart. */
 export function PlanPanel({ view }: { view: View }) {
 	const { work } = usePane(view);
-	const [tab, setTab] = useStoredTab();
+	const [tab, setTab] = useStoredState<PlanTab>(TAB_KEY, raw => (raw === "files" ? "files" : "plan"));
 	const files = work?.files ?? [];
 	return (
 		<Tabs value={tab} onValueChange={value => setTab(value as PlanTab)} className="flex min-h-0 flex-1 flex-col">

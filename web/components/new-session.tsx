@@ -6,10 +6,10 @@ import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
-import { getJson } from "../api";
 import { projectName } from "../labels";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
+import { useRead } from "../reads";
 import { useShortcuts } from "../shortcuts";
 import type { NewOp, StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
@@ -130,8 +130,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				: draft.trimStart().startsWith("/")
 					? "bypassed"
 					: "on";
-	const [models, setModels] = useState<{ models: ModelOption[]; error: string | null } | null>(null);
 	const [modelsOpen, setModelsOpen] = useState(false);
+	// As in a live session, the list is read again on every open, so a login since the last one shows. Before the first
+	// open (`modelOpens` 0) nothing is read.
+	const [modelOpens, setModelOpens] = useState(0);
+	const modelsRead = useRead<{ models: ModelOption[] }>(modelOpens > 0 ? "/api/models/connected" : null, modelOpens);
+	const models = modelsRead.error !== null ? { models: [], error: modelsRead.error } : modelsRead.data && { models: modelsRead.data.models, error: null };
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
 	const checkout = useGitCheckout(cwd, launch?.phase === "failed" ? launch : null);
 	const pickedChoice = picked.cwd === cwd ? picked.choice : null;
@@ -142,14 +146,9 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			: pickedChoice;
 	const completion = useCompletion({ draft, setDraft, completions, onComplete });
 	const starting = launch?.phase === "starting";
-	// As in a live session, the list refreshes on every open, so a login since the last one shows.
 	const openModels = (open: boolean): void => {
 		setModelsOpen(open);
-		if (!open) return;
-		getJson<{ models: ModelOption[] }>("/api/models/connected").then(
-			({ models }) => setModels({ models, error: null }),
-			(err: unknown) => setModels({ models: [], error: err instanceof Error ? err.message : String(err) }),
-		);
+		if (open) setModelOpens(count => count + 1);
 	};
 	useShortcuts({
 		model: () => {

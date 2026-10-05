@@ -6,8 +6,8 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { getJson, putJson } from "../../api";
+import { ticketsStore } from "../../reads";
 import { PRIORITY_LABEL } from "../../tickets-model";
-import { refreshTickets } from "../../use-tickets";
 import { dueLabel, PRIORITY_ICON, STATUS_ICON } from "./ticket-row";
 
 type Change = Omit<TicketEdit, "id">;
@@ -178,7 +178,7 @@ export function TicketFields({ detail, replace }: { detail: TicketDetail; replac
 			putJson<TicketDetail>("/api/ticket", { id: detail.id, ...change }).then(
 				after => {
 					replace(after);
-					void refreshTickets(false);
+					void ticketsStore.refresh();
 				},
 				async (err: unknown) => {
 					setSaveError(messageOf(err));
