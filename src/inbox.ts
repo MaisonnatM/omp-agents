@@ -84,6 +84,9 @@ function parseUnresolved(threads: unknown): InboxPullRequest["unresolved"] {
 	return { count: nodes.filter(thread => isObject(thread) && thread.isResolved === false).length, exact: total <= nodes.length };
 }
 
+/** GitHub reports an open or draft pull request as `CONFLICTING` with its base branch; `UNKNOWN` means not computed yet. */
+const conflictsOf = (node: Record<string, unknown>): boolean => node.state !== "MERGED" && node.state !== "CLOSED" && node.mergeable === "CONFLICTING";
+
 /** A deleted account leaves no author; GitHub shows it as `ghost`. */
 const authorOf = (author: unknown): Person => parsePerson(author) ?? { login: "ghost", avatarUrl: null };
 
@@ -123,7 +126,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole)
 		...head,
 		role,
 		checks: STATUS[rollup ?? ""] ?? "none",
-		conflicts: node.state !== "MERGED" && node.mergeable === "CONFLICTING",
+		conflicts: conflictsOf(node),
 		stackedOn: defaultBranch !== undefined && base !== defaultBranch ? base : null,
 		unresolved: parseUnresolved(node.reviewThreads),
 		updatedAt,
@@ -160,7 +163,7 @@ const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
 
 const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	repository(owner: $owner, name: $repo) { pullRequest(number: $number) {
-		number title body isDraft state reviewDecision headRefName baseRefName createdAt additions deletions changedFiles
+		number title body isDraft state reviewDecision mergeable headRefName baseRefName createdAt additions deletions changedFiles
 		${REVIEW_FIELDS}
 		commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
 			... on CheckRun { name status conclusion detailsUrl }
@@ -239,6 +242,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		body: str(node.body) ?? "",
 		state: node.state === "CLOSED" ? "closed" : head.state,
 		additions: num(node.additions) ?? 0,
+		conflicts: conflictsOf(node),
 		deletions: num(node.deletions) ?? 0,
 		changedFiles: num(node.changedFiles) ?? 0,
 		files,

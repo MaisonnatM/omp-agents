@@ -1,7 +1,8 @@
 /** The parts shared by the inbox's pull request sheet and the tickets page's issue details. */
 import { ExternalLink } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { PullRequestComment } from "../../src/shared";
+import { Button } from "@/components/ui/button";
 import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { age } from "../labels";
@@ -70,6 +71,39 @@ export function Markdown({ text, className }: { text: string; className?: string
 	return (
 		<div className={cn("text-sm [&_img]:max-w-full", className)}>
 			<MessageMarkdown text={text} github />
+		</div>
+	);
+}
+
+/** How tall `Clamped` shows its content before it folds, in px, as `max-h-64`. Content only a little taller shows in full. */
+const CLAMP_PX = 256;
+const CLAMP_SLACK_PX = 48;
+
+/** `children` cut at {@link CLAMP_PX} with a Show more button, when they are taller. */
+export function Clamped({ children }: { children: ReactNode }) {
+	const ref = useRef<HTMLDivElement>(null);
+	const [tall, setTall] = useState(false);
+	const [open, setOpen] = useState(false);
+	useLayoutEffect(() => {
+		const element = ref.current;
+		if (!element || typeof ResizeObserver === "undefined") return;
+		const measure = (): void => setTall(element.scrollHeight > CLAMP_PX + CLAMP_SLACK_PX);
+		const observer = new ResizeObserver(measure);
+		observer.observe(element);
+		measure();
+		return () => observer.disconnect();
+	}, []);
+	const clamped = tall && !open;
+	return (
+		<div className="space-y-1">
+			<div ref={ref} className={cn(clamped && "max-h-64 overflow-hidden [mask-image:linear-gradient(to_bottom,black_65%,transparent)]")}>
+				{children}
+			</div>
+			{tall && (
+				<Button variant="ghost" size="compact" className="-ml-2 text-muted-foreground" aria-expanded={open} onClick={() => setOpen(!open)}>
+					{open ? "Show less" : "Show more"}
+				</Button>
+			)}
 		</div>
 	);
 }

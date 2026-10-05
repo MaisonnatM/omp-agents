@@ -269,6 +269,8 @@ export interface PullRequestDetail extends PullRequest {
 	review: ReviewDecision;
 	head: string;
 	base: string;
+	/** True when GitHub reports the PR as `CONFLICTING` with its base branch, as on {@link InboxPullRequest}. */
+	conflicts: boolean;
 	additions: number;
 	deletions: number;
 	/** All files the PR changes; `files` lists at most the first 100. */

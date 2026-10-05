@@ -21,7 +21,11 @@ export type ShortcutId =
 	| "tickets"
 	| "sessions"
 	| "todo"
-	| "project";
+	| "project"
+	| "nextPullRequest"
+	| "previousPullRequest"
+	| "pullRequestOnGitHub"
+	| "pullRequestActions";
 
 /**
  * Where a binding fires. `composer`: from the composer's textarea, before any page-wide binding sees the key.
@@ -87,6 +91,10 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "sessions", label: "Go to the sessions", keys: [{ goTo: "s" }] },
 	{ id: "todo", label: "Go to your todo list", keys: [{ goTo: "d" }] },
 	{ id: "project", label: "Choose the sidebar's project", keys: [{ goTo: "p" }] },
+	{ id: "nextPullRequest", label: "Inbox: move to the next pull request, or show it in the open sheet", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
+	{ id: "previousPullRequest", label: "Inbox: move to the previous pull request, or show it in the open sheet", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
+	{ id: "pullRequestOnGitHub", label: "Inbox: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
+	{ id: "pullRequestActions", label: "Inbox: open the pull request's quick actions", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
 ];
 
 const GO = "g";
