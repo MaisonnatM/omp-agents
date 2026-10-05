@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestUrl } from "../inbox-model";
 import { hostLabel, pastLabel, projectName } from "../labels";
 import { hashForInbox, hashForTickets } from "../routing";
-import { shortcutKeys, useShortcuts } from "../shortcuts";
+import { shortcutKeys, shortcutLabels, useShortcuts } from "../shortcuts";
 import { type ForkPoint, nextSuggestions } from "../transcript-view";
 import type { Completions } from "../pane-store";
 import type { StartOf } from "../starts";
@@ -562,6 +562,7 @@ function LiveConversation({
 					// While a turn runs, Enter and the send button steer it, and Stop interrupts a session's turn.
 					status={working ? "streaming" : "idle"}
 					onStop={view.agentId === null ? interrupt : undefined}
+					stopShortcut={shortcutLabels("interrupt")}
 					queue={queued.map(({ item }) => item)}
 					onEditQueued={item => take(queued.filter(entry => entry.item.id === item.id), true)}
 					onRemoveQueued={item => take(queued.filter(entry => entry.item.id === item.id), false)}

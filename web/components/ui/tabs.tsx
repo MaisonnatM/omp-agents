@@ -25,6 +25,7 @@ import { SizeProvider, useSize, type SizeVariant } from "@/lib/size-context";
 import { useSurface } from "@/lib/surface-context";
 import { surfaceClasses } from "@/lib/surface-classes";
 import { useFluidHover } from "@/hooks/use-fluid-hover";
+import { Tooltip } from "@/components/ui/tooltip";
 
 // ---------------------------------------------------------------------------
 // Tabs is a segmented control: a muted track (TabsList) holding one raised
@@ -474,12 +475,14 @@ interface TabItemProps
   icon?: IconComponent;
   /** Text label. */
   label: string;
+  /** Keys that select this tab; a tooltip names the label with them. */
+  shortcut?: readonly string[];
   /** @internal Auto-assigned by TabsList. */
   _index?: number;
 }
 
 const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
-  ({ value, icon: Icon, label, _index = 0, className, onClick, ...props }, ref) => {
+  ({ value, icon: Icon, label, shortcut, _index = 0, className, onClick, ...props }, ref) => {
     const internalRef = useRef<HTMLButtonElement>(null);
     const sizeClasses = useSize();
     const { registerTab, hoveredIndex, selectedValue, setOptimisticIdx } = useTabsList();
@@ -496,7 +499,7 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
     // changes weight, so hovering never thickens a label.
     const isActive = hoveredIndex === _index || isSelected;
 
-    return (
+    const trigger = (
       <TabsPrimitive.Trigger
         // Composed (not spread-overridable): a consumer onClick must not
         // replace the optimistic indicator jump.
@@ -527,6 +530,8 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
           className
         )}
         {...props}
+        // Keeps Radix's tab `data-state` contract under a shortcut Tooltip trigger, which stamps its own.
+        data-state={isSelected ? "active" : "inactive"}
       >
         {/* Stroke 1.5 → 2 and muted → foreground on hover or selection, over
             the label's 80ms, so icon and text change together. */}
@@ -569,6 +574,12 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
           </span>
         </span>
       </TabsPrimitive.Trigger>
+    );
+    if (!shortcut?.length) return trigger;
+    return (
+      <Tooltip content={label} shortcut={shortcut} side="bottom">
+        {trigger}
+      </Tooltip>
     );
   }
 );

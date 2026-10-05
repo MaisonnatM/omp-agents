@@ -31,7 +31,7 @@ import { useIcon } from "@/lib/icon-context";
 import { useSurface, SurfaceProvider } from "@/lib/surface-context";
 import { surfaceClasses } from "@/lib/surface-classes";
 import { Button, type ButtonProps } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip, TooltipKbd } from "@/components/ui/tooltip";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -850,15 +850,6 @@ SidebarShell.displayName = "SidebarShell";
 
 export type SidebarTriggerProps = ButtonProps;
 
-/** Keystroke chip rendered inside the (inverted) tooltip surface. */
-function ShortcutKbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="-my-1 flex h-4 min-w-4 items-center justify-center rounded border border-background/30 px-1 font-sans text-[10px] text-background/80">
-      {children}
-    </kbd>
-  );
-}
-
 /** The tooltips always show the toggle keystroke, falling back to the
  *  side's default key even when the provider's binding is disabled. */
 function useShortcutKey(): string {
@@ -900,17 +891,8 @@ const SidebarTrigger = forwardRef<HTMLButtonElement, SidebarTriggerProps>(
     return (
       <Tooltip
         side="bottom"
-        content={
-          <span className="flex items-center gap-1.5">
-            {/* A flex row escapes the surface's text-box trim, so the label
-                re-applies it — otherwise the shortcut row would sit taller
-                than a tooltip without a chip. */}
-            <span className="[text-box:trim-both_cap_alphabetic]">
-              {collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            </span>
-            <ShortcutKbd>{shortcutKey}</ShortcutKbd>
-          </span>
-        }
+        content={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        shortcut={[shortcutKey]}
       >
         <Button
           ref={ref}
@@ -1049,7 +1031,7 @@ const SidebarRail = forwardRef<HTMLButtonElement, SidebarRailProps>(
               <span className="[text-box:trim-both_cap_alphabetic]">
                 <span style={semibold}>Click</span> to collapse
               </span>
-              <ShortcutKbd>{shortcutKey}</ShortcutKbd>
+              <TooltipKbd>{shortcutKey}</TooltipKbd>
             </span>
           </span>
         }

@@ -153,8 +153,14 @@ export function bindingLabel(binding: Binding): string {
 
 const EITHER = new Intl.ListFormat("en", { type: "disjunction" });
 
-/** Every key that runs `id`, as a tooltip names them: `⌘/ or ?`. */
-export const shortcutKeys = (id: ShortcutId): string => EITHER.format(SHORTCUTS.find(shortcut => shortcut.id === id)?.keys.map(bindingLabel) ?? []);
+const LABELS = {} as Record<ShortcutId, readonly string[]>;
+for (const { id, keys } of SHORTCUTS) LABELS[id] = keys.map(bindingLabel);
+
+/** Every key that runs `id`, one label each, as a tooltip's chips draw them: `["⌘/", "?"]`. */
+export const shortcutLabels = (id: ShortcutId): readonly string[] => LABELS[id];
+
+/** Every key that runs `id`, as prose names them: `⌘/ or ?`. */
+export const shortcutKeys = (id: ShortcutId): string => EITHER.format(shortcutLabels(id));
 
 const typing = (target: EventTarget | null): boolean =>
 	target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
