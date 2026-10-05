@@ -619,7 +619,8 @@ Alt is Option on macOS.
 | Esc | Composer | Interrupt the running turn |
 | Cmd+Enter | Composer | Send once the running turn finishes, as a follow-up (Enter steers it) |
 | ↑ | Empty composer | Move the last queued message back into the composer |
-| Cmd+K | Anywhere | Jump to a session |
+| Cmd+K | Anywhere | Start a new todo |
+| Cmd+Shift+K | Anywhere | Jump to a session |
 | Cmd+Shift+O | Anywhere | Start a new session |
 | Cmd+Shift+X | Anywhere | End the focused session |
 | Alt+↑ | Anywhere | Open the previous session in the sidebar |
@@ -657,7 +658,9 @@ Alt is Option on macOS.
 - In the composer, Esc interrupts the running turn and Cmd+Enter sends a follow-up. ↑ moves the last queued message back only while the composer is empty, as ↑ edits your last message in Slack.
   With a draft, ↑ moves the caret as usual.
   In a maximized pane, Esc in the composer restores the split only when no turn runs there.
-- Cmd+K searches every running and past session, in every project, by title or directory, and opens the one you pick in the focused pane.
+- Cmd+K opens the **Todo** page on **All** and starts a new todo, so you can type its title and press Enter.
+  Cmd+Shift+K searches every running and past session, in every project, by title or directory, and opens the one you pick in the focused pane.
+  The search button in the sidebar header, immediately before the keyboard button, opens that search.
   A session from another project switches the sidebar to that project.
   Alt+↑ and Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane.
   From a subagent they step from its session's row.
@@ -701,6 +704,7 @@ Alt is Option on macOS.
   A session without a name reads as its project, and nothing open reads `omp agents`.
 - The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
 - Alt+Shift+Cmd+T, from any app, brings the window up on the **Todo** page with a new todo started, so you can type it and press Enter.
+  Cmd+K starts that new todo while the dashboard is focused.
   When another app holds the keys, the app logs so and the shortcut does nothing.
 - The Dock icon's badge counts the top-level todos left to do, as **All** does, and goes away at none.
 

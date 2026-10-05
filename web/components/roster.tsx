@@ -1,4 +1,4 @@
-import { AppWindow, Archive, CalendarClock, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
+import { AppWindow, Archive, CalendarClock, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Search, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
 import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type Routine, repoKey, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
@@ -442,6 +442,7 @@ interface RosterProps {
 	/** The selected project's `cwd`, or `null` for all projects. */
 	project: string | null;
 	onPickProject: (cwd: string | null) => void;
+	onShowSearch: () => void;
 	onShowShortcuts: () => void;
 	/** The button that hides the sidebar, first in the header. */
 	toggle: ReactNode;
@@ -466,6 +467,7 @@ export function Roster({
 	onSectionTarget,
 	project,
 	onPickProject,
+	onShowSearch,
 	onShowShortcuts,
 	toggle,
 }: RosterProps) {
@@ -574,8 +576,13 @@ export function Roster({
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
+				<Tooltip content="Search sessions" shortcut={shortcutLabels("switcher")} side="bottom">
+					<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Search sessions" onClick={onShowSearch}>
+						<Search />
+					</Button>
+				</Tooltip>
 				<Tooltip content="Keyboard shortcuts" shortcut={shortcutLabels("help")} side="bottom">
-					<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
+					<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
 						<Keyboard />
 					</Button>
 				</Tooltip>

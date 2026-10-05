@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { QUICK_TODO_EVENT, type UserTodoList, type View } from "../src/shared";
+import { QUICK_TODO_EVENT, type UserTodoList } from "../src/shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { DashboardContext } from "./components/dashboard-context";
 import { InboxPage } from "./components/inbox/inbox-page";
@@ -152,16 +152,16 @@ export function App() {
 		routedTodoList === null || (routedTodoList.kind === "category" && !state.userTodos?.categories.some(({ id }) => id === routedTodoList.id))
 			? { kind: "all" }
 			: routedTodoList;
-	/** The desktop shell's quick-capture shortcut asked for a new todo, which the Todo page has not started yet. */
+	/** The desktop shell's quick-capture shortcut, or Cmd+K, asked for a new todo, which the Todo page has not started yet. */
 	const [quickTodo, setQuickTodo] = useState(false);
-	useEffect(() => {
-		const onQuickTodo = (): void => {
-			navigate({ kind: "todo", list: { kind: "all" } });
-			setQuickTodo(true);
-		};
-		window.addEventListener(QUICK_TODO_EVENT, onQuickTodo);
-		return () => window.removeEventListener(QUICK_TODO_EVENT, onQuickTodo);
+	const startQuickTodo = useCallback((): void => {
+		navigate({ kind: "todo", list: { kind: "all" } });
+		setQuickTodo(true);
 	}, [navigate]);
+	useEffect(() => {
+		window.addEventListener(QUICK_TODO_EVENT, startQuickTodo);
+		return () => window.removeEventListener(QUICK_TODO_EVENT, startQuickTodo);
+	}, [startQuickTodo]);
 	/** The routine the Routines page shows; one another window deleted shows the list. */
 	const routinesTarget = page?.kind === "routines" && state.routines.some(({ id }) => id === page.target) ? page.target : null;
 	const showTab = (next: SidebarTab): void => {
@@ -176,6 +176,10 @@ export function App() {
 	};
 	useShortcuts({
 		help: () => setShortcutsOpen(open => !open),
+		quickTodo: () => {
+			setSwitcherOpen(false);
+			startQuickTodo();
+		},
 		switcher: () => setSwitcherOpen(open => !open),
 		newSession: openNewSession,
 		previousSession: () => step(-1),
@@ -372,6 +376,7 @@ export function App() {
 						onSectionTarget={setSectionTarget}
 						project={project}
 						onPickProject={switchProject}
+						onShowSearch={() => setSwitcherOpen(true)}
 						onShowShortcuts={() => setShortcutsOpen(true)}
 						toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
 					/>
