@@ -22,3 +22,6 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun test
       - run: bun run typecheck
+      # The desktop shell is its own package; Electron downloads its binary only on first launch, so this installs no app.
+      - run: bun install --cwd desktop --frozen-lockfile
+      - run: bun run --cwd desktop typecheck

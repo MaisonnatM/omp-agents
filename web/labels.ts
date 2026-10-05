@@ -57,9 +57,6 @@ export const providerLabel = (provider: string): string => labelWords(provider.s
 /** A skill name as its title: `poteto-mode` reads `Poteto Mode`. */
 export const skillLabel = (name: string): string => labelWords(name.split(/[-_\s]+/));
 
-/** A model role as its name: `smol` reads `Smol`. */
-export const roleLabel = (role: string): string => labelWords([role]);
-
 /**
  * A model selector as people name the model, leaving its provider and org to the logo: `anthropic/claude-opus-5-5`
  * reads `Opus 5.5`. A `:suffix`, such as a thinking level or a router's `batch` tier, follows in parentheses.

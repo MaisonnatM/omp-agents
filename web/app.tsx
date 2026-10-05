@@ -23,6 +23,7 @@ import {
 	focusedView,
 	hashForSettings,
 	hashForInbox,
+	hashForNewSession,
 	hashForTickets,
 	hashForView,
 	pageFromHash,
@@ -168,11 +169,17 @@ export function App() {
 			main = (
 				<NewSession
 					cwd={cwd}
+					workspaces={workspaces(state.hosts, state.past)}
 					launch={launch}
 					connected={state.connected}
 					completions={state.newSessionCompletions}
 					onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
-					onStart={(prompt, images, branch, model, thinking) => start({ kind: "new", cwd, prompt, images, branch, model, thinking })}
+					onPickCwd={next => {
+						// A failed start's error is about the directory left behind.
+						dismissStart("new");
+						location.hash = hashForNewSession(next);
+					}}
+					onStart={op => start({ kind: "new", cwd, ...op })}
 				/>
 			);
 			break;

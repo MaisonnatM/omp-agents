@@ -287,8 +287,8 @@ function SkillBadge({ name }: { name: string }) {
 	);
 }
 
-/** What a prompt's copy button copies: a skill prompt as the user typed it, not the skill's text. */
-const typedText = (item: Exclude<Item, ToolItem>): string =>
+/** What a message's copy button copies: a skill prompt as the user typed it, not the skill's text. `item.text` is the reply with its suggestions block already split off, so the body it renders is uniform. */
+const copyText = (item: Exclude<Item, ToolItem>): string =>
 	item.kind === "user" && item.skill ? [`/skill:${item.skill}`, item.text].filter(Boolean).join(" ") : item.text;
 
 /**
@@ -326,7 +326,8 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 								</MessageScrollerItem>
 							);
 						}
-						const copyable = item.kind === "assistant" ? replies.has(item.id) && !item.streaming : typedText(item).trim() !== "";
+						const copied = copyText(item);
+						const copyable = item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copied.trim() !== "";
 						const point = forks.get(item.id);
 						const failed = here?.phase === "failed" && here.op.itemId === item.id ? here.error : null;
 						return (
@@ -338,7 +339,7 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 									actions={
 										copyable || point ? (
 											<>
-												{copyable && <CopyButton text={typedText(item)} />}
+												{copyable && <CopyButton text={copied} />}
 												{point && (
 													<ForkButton
 														point={point}

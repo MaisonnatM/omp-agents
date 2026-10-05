@@ -6,6 +6,9 @@ import { isObject, str } from "./json";
 import { displayPath } from "./paths";
 import { type FileChange, parseDiffLine, type SessionWork, type TodoItem, type TodoPhase, type TodoStatus } from "./shared";
 
+/** omp's rule for a plan file (`listPlanFiles` in `pi-coding-agent/src/plan-mode/plan-files.ts`): a name ending in `plan.md`, such as `local://auth-plan.md`. */
+const PLAN_FILE = /plan\.md$/i;
+
 /** omp's custom entry for a todo list the user edited in its terminal (`USER_TODO_EDIT_CUSTOM_TYPE`). */
 const USER_TODO_EDIT = "user_todo_edit";
 
@@ -77,6 +80,8 @@ export class Work {
 	readonly #read = new Set<string>();
 	/** Lines of each `write` call's content, by tool call id, until its result arrives. */
 	readonly #writing = new Map<string, number>();
+	#planFile: string | null = null;
+	#planVersion = 0;
 
 	/** One session-file entry. Returns whether the plan or the changed files changed. */
 	applyEntry(entry: unknown): boolean {
@@ -116,8 +121,24 @@ export class Work {
 		}
 	}
 
-	snapshot(): SessionWork {
-		return { phases: this.#phases, files: [...this.#files].map(([path, changes]) => ({ path: this.#display(path), changes })) };
+	/** The plan file the agent wrote or edited last, as omp resolved it, or `null` when it wrote none or deleted that one. */
+	get planFile(): string | null {
+		return this.#planFile;
+	}
+
+	/** Counts every change to a plan file, so a reader knows when to read {@link planFile} again. */
+	get planVersion(): number {
+		return this.#planVersion;
+	}
+
+	/** `planText` is {@link planFile}'s text, `null` when it could not be read. */
+	snapshot(planText: string | null = null): SessionWork {
+		const planFile = this.#planFile;
+		return {
+			phases: this.#phases,
+			files: [...this.#files].map(([path, changes]) => ({ path: this.#display(path), changes })),
+			plan: planFile !== null && planText !== null ? { path: this.#display(planFile), text: planText } : null,
+		};
 	}
 
 	/** Keeps the line count of each `write` call in an assistant message, which its result does not repeat. */
@@ -156,6 +177,11 @@ export class Work {
 
 	#touch(touches: [string, FileChange][]): boolean {
 		for (const [path, change] of touches) {
+			if (PLAN_FILE.test(path)) {
+				if (change.kind !== "deleted") this.#planFile = path;
+				else if (path === this.#planFile) this.#planFile = null;
+				this.#planVersion++;
+			}
 			const changes = this.#files.get(path);
 			if (changes) changes.push(change);
 			else this.#files.set(path, [change]);

@@ -8,10 +8,22 @@ import type { ForkPoint } from "./transcript-view";
  * shows progress, the started session, and failure for.
  */
 export type StartOp =
-	| { kind: "new"; cwd: string; prompt: string; images: PromptImage[]; branch: BranchChoice | null; model: ModelOption | null; thinking: string | null }
+	| {
+			kind: "new";
+			cwd: string;
+			prompt: string;
+			images: PromptImage[];
+			branch: BranchChoice | null;
+			model: ModelOption | null;
+			/** The pinned skill, `null` when none is pinned or the draft skips it. */
+			skill: string | null;
+	  }
 	| { kind: "fork"; view: View; itemId: string; point: ForkPoint }
 	| { kind: "resume"; sessionId: string }
-	| { kind: "quick"; cwd: string; prompt: string; subject: QuickSubject };
+	/** `skill`: the skill pinned in the settings, `null` for none. */
+	| { kind: "quick"; cwd: string; prompt: string; subject: QuickSubject; skill: string | null };
+
+export type NewOp = Extract<StartOp, { kind: "new" }>;
 
 export type QuickOp = Extract<StartOp, { kind: "quick" }>;
 
@@ -31,9 +43,9 @@ export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 export const requestOf = (op: StartOp): StartRequest => {
 	switch (op.kind) {
 		case "new":
-			return { kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking };
+			return { kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: null, skill: op.skill };
 		case "quick":
-			return { kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null };
+			return { kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill };
 		case "fork":
 			return { kind: "fork", view: op.view, entryId: op.point.entryId };
 		case "resume":

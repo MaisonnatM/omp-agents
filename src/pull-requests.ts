@@ -8,11 +8,9 @@ import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { parseRemote } from "./github";
 import { isObject } from "./json";
+import { LineReader } from "./line-reader";
 import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo, type ShipProgress } from "./shared";
 import { textOf } from "./transcript";
-
-const NEWLINE = 0x0a;
-const decoder = new TextDecoder();
 
 /** `me/fe-trust-7: https://app.graphite.com/github/pr/acme/webapp/6596 (created)` */
 const GT_SUBMITTED = /^\S+: https:\/\/app\.graphite\.com\/github\/pr\/([\w.-]+)\/([\w.-]+)\/(\d+)\S* \((?:created|updated)\)[ \t\r]*$/gm;
@@ -217,31 +215,17 @@ export function resolveLinks(refs: Iterable<PullRequestRef>, repo: Repo | null, 
 /** One transcript, read up to its last complete line. */
 class TranscriptScan {
 	scan = new PullRequestScan();
-	#offset = 0;
+	readonly #lines: LineReader;
 
-	constructor(readonly path: string) {}
+	constructor(path: string) {
+		this.#lines = new LineReader(path, () => {
+			this.scan = new PullRequestScan();
+		});
+	}
 
 	/** Resolves `false` when the file could not be read; it reads again on the next call. */
-	async read(): Promise<boolean> {
-		const file = Bun.file(this.path);
-		const size = await file.stat().then(
-			stat => stat.size,
-			() => 0,
-		);
-		if (size < this.#offset) {
-			this.scan = new PullRequestScan();
-			this.#offset = 0;
-		}
-		if (size === this.#offset) return true;
-		const bytes = await file
-			.slice(this.#offset, size)
-			.bytes()
-			.catch(() => null);
-		if (!bytes) return false;
-		const end = bytes.lastIndexOf(NEWLINE) + 1;
-		this.#offset += end;
-		for (const line of decoder.decode(bytes.subarray(0, end)).split("\n")) this.scan.applyLine(line);
-		return true;
+	read(): Promise<boolean> {
+		return this.#lines.read(line => this.scan.applyLine(line));
 	}
 }
 

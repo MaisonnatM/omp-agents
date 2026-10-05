@@ -1,6 +1,7 @@
 /** What every HTTP route shares: refusals, answers, and the checks that keep other sites and programs' pages out. */
 import { errorText } from "../json";
 import type { SettingsError } from "../shared";
+import { dashboardHosts } from "./address";
 import { COOKIE, cookieValue, fetchSiteAllowed, tokenMatches } from "./auth";
 
 /** A request the server refuses, with the HTTP status it answers. `conflict`: the file changed on disk since it was read. */
@@ -52,7 +53,7 @@ export interface Guards {
  * and its requests carry no `Strict` cookie. A local program must hold the token, which only the user can read.
  */
 export function guardsFor(port: number, token: string): Guards {
-	const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+	const hosts = new Set(dashboardHosts(port));
 	const allowedHost = (req: Request): boolean => hosts.has(req.headers.get("host") ?? "");
 	const sameOrigin = (req: Request): boolean => allowedHost(req) && req.headers.get("origin") === `http://${req.headers.get("host")}`;
 	// The printed URL wins over a cookie, so its redirect always takes the token out of the address bar and history.

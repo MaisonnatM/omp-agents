@@ -13,6 +13,8 @@ bun test            # preloads src/test-env.ts, so tests never touch ~/.omp/agen
 bun run typecheck   # tsc --noEmit over src, web, and templates/omp
 ```
 
+After you change `desktop/`, also run `bun install --cwd desktop --frozen-lockfile` once and `bun run --cwd desktop typecheck`.
+
 ## Running it
 
 - `bun start` serves `http://127.0.0.1:4317`. The user's own dashboard usually runs on that port, so start a smoke server on another one: `PORT=4391 bun src/server.ts` (as a named service, ready on port 4391).
@@ -36,6 +38,14 @@ const tab = await browser.open({
 ```
 
 The page routes through the URL hash. Besides a session's own hash, the routes are `#inbox`, `#inbox/<owner>/<repo>/<number>`, `#tickets`, `#tickets/<identifier>`, `#new`, `#new/<encoded cwd>`, and `#settings`. `web/routing.ts` parses them.
+
+## Desktop smoke
+
+The desktop shell opens a real window on the user's screen. Start it on the smoke port from `desktop/`, after `bun run build`, as a named service: `PORT=4391 ./node_modules/.bin/electron . --remote-debugging-port=9339 --inspect=9449`, ready on the `Sign in at` line when it starts its own server. Drive it through the Chrome DevTools Protocol, not the keyboard:
+
+- The page: `http://127.0.0.1:9339/json` lists it; `Runtime.evaluate` runs JS in it, and `Page.captureScreenshot` shows it.
+- The main process: `http://127.0.0.1:9449/json` lists it; evaluate `process.mainModule.require("electron")` there to reach `app`, `BrowserWindow`, and `Menu`. `BrowserWindow.getAllWindows()[0].close()` is what Cmd+W does, `app.emit("activate")` a Dock click, and `app.quit()` Cmd+Q. Replace `shell.openExternal` with a function that records its address to check links without opening the user's browser.
+- Never send keys with `osascript`: they go to the user's frontmost app, not the window. The page's own `window.close()` destroys the window and quits the app, unlike Cmd+W.
 
 ## omp internals
 
