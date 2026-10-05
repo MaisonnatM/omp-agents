@@ -11,6 +11,7 @@ For installation, see the [README](../README.md).
 - [Questions](#questions)
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
 - [Pull requests and the inbox](#pull-requests-and-the-inbox)
+- [Todo list](#todo-list)
 - [Settings](#settings)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Desktop app](#desktop-app)
@@ -313,9 +314,9 @@ For installation, see the [README](../README.md).
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.
-- Three tabs under the sidebar header, **Inbox**, **Tickets**, and **Sessions**, switch what the sidebar lists.
+- Four tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, and **Todo**, switch what the sidebar lists.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
-  **Sessions** lists the running and past sessions.
+  **Sessions** lists the running and past sessions, and **Todo** your own todo list; see [Todo list](#todo-list).
   **Inbox** opens a pull request inbox like Graphite's, and the sidebar then lists the inbox's sections with their pull request counts, under each repository's name when there are several.
   Click a section in the sidebar to scroll the page to it and move focus there; a folded section unfolds.
   An `#inbox` address selects the Inbox tab.
@@ -405,6 +406,26 @@ For installation, see the [README](../README.md).
   Linear's page sends the browser back to `localhost:3000`, so that port must be free while you sign in.
   When Linear later refuses the sign-in, the tickets page says to run `/mcp reauth <name>` in omp; **Sign in again** in the settings does the same.
 
+## Todo list
+
+- The **Todo** tab lists todos of your own, not tied to a session or a project, in the sidebar beside the panes.
+  Choosing it from the inbox or the tickets returns to the panes; from **Settings** or the new-session draft, the page stays.
+  The browser's localStorage keeps whether **Sessions** or **Todo** was chosen last.
+- **Add a todo** at the bottom of the list starts a new todo; type it and press Enter.
+  Enter then starts the next todo below it, and Enter on an empty one, Esc, or a click elsewhere stops.
+- A todo can hold todos of its own, one level down and no deeper.
+  Tab while typing a todo moves it under the todo above it, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
+  Tab does nothing on a todo that holds todos of its own, since they would end up three deep.
+  The **+** that shows on hover adds a todo under that one.
+- Click the circle before a todo to check it; checking a todo checks the todos under it too.
+  A todo that holds others shows how many of them are checked, as in `2/3`.
+  The group label counts the top-level todos left to do, and its button removes every checked todo.
+- Click a todo's text to edit it.
+  An empty todo, or Backspace in one, removes it, and so does the **×** that shows on hover; removing a todo removes the todos under it.
+- The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
+  A `todos.json` that the server cannot read as a todo list is moved to `todos.json.invalid` rather than written over.
+  While the page has lost the server, the list cannot be changed.
+
 ## Settings
 
 - The gear button in the sidebar header opens **Settings**, split into six tabs that look like the sidebar's **Inbox** and **Sessions** tabs: **Model roles & provider order**, **Retry and fallback**, **Files**, **Integrations**, **New sessions**, and **Appearance**.
@@ -470,6 +491,7 @@ Alt is Option on macOS.
 | G then I | Outside text fields | Go to the pull request inbox |
 | G then T | Outside text fields | Go to your Linear tickets |
 | G then S | Outside text fields | Go to the sessions |
+| G then D | Outside text fields | Go to your todo list |
 | G then P | Outside text fields | Choose the sidebar's project |
 
 - Press `?` outside a text field, Cmd+/ anywhere, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
@@ -491,7 +513,8 @@ Alt is Option on macOS.
   Cmd+, opens Settings, where the model roles live, and closes it again.
   Ending a session has no shortcut: use **End session** in its header.
 - G then I opens the Inbox tab.
-  G then S goes back from the inbox, Settings, or the new-session draft to the panes.
+  G then S goes back from the inbox, Settings, or the new-session draft to the panes, and from the **Todo** tab to the sessions.
+  G then D opens the **Todo** tab.
   G then P opens the project picker with its search field focused.
 - Session shortcuts act on the focused pane.
   The dashboard does not read `~/.omp/agent/keybindings.yml`.

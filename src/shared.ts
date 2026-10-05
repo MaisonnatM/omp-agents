@@ -741,6 +741,34 @@ export interface OmpSettings {
 	files: OmpFile[];
 }
 
+/** A todo of your own, on the sidebar's Todo tab, under a top-level one. It holds none, so the list is two deep at most. */
+export interface UserTodoLeaf {
+	id: string;
+	text: string;
+	done: boolean;
+}
+
+/** A top-level todo of the Todo tab, with its own todos in order. */
+export interface UserTodo extends UserTodoLeaf {
+	children: UserTodoLeaf[];
+}
+
+/** One edit of the Todo tab's list. A change that names no todo, or would nest one three deep, changes nothing. */
+export type UserTodoChange =
+	/** After todo `afterId` among `parentId`'s todos (the top level for `null`), or last for `null`. The page picks `id`, so an add sent twice adds once. */
+	| { op: "add"; id: string; parentId: string | null; afterId: string | null; text: string }
+	| { op: "edit"; id: string; text: string }
+	/** Checking a top-level todo checks its todos too. */
+	| { op: "toggle"; id: string; done: boolean }
+	/** With its todos. */
+	| { op: "remove"; id: string }
+	/** A top-level todo without todos of its own goes last under the top-level todo above it. */
+	| { op: "indent"; id: string }
+	/** A todo under another goes to the top level right after it, and takes the todos below it along, so the list reads in the same order. */
+	| { op: "outdent"; id: string }
+	/** Removes every checked todo. */
+	| { op: "clear-done" };
+
 export type ServerMsg =
 	| { t: "roster"; hosts: RosterHost[]; error: string | null }
 	/** Newest first. */
@@ -760,7 +788,9 @@ export type ServerMsg =
 	/** Answers `list-models`. `error` is set when the session cannot list or switch models. */
 	| { t: "models"; instanceId: string; models: ModelOption[]; error: string | null }
 	/** Answers this socket's `dequeue` with the texts it took out of the queue, oldest first. Nothing answers when every message had gone. */
-	| { t: "dequeued"; view: LiveView; reqId: number; texts: string[] };
+	| { t: "dequeued"; view: LiveView; reqId: number; texts: string[] }
+	/** The Todo tab's list, whole, sent when a socket opens and after every change. */
+	| { t: "user-todos"; todos: UserTodo[] };
 
 export type ClientMsg =
 	/** The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming. */
@@ -792,4 +822,6 @@ export type ClientMsg =
 	/** Reply to one of a live session's pending `requests`. */
 	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer }
 	/** Cancel a running subagent of a live session without stopping the session's turn; it cannot be revived after. */
-	| { t: "cancel-agent"; view: LiveView & { agentId: string } };
+	| { t: "cancel-agent"; view: LiveView & { agentId: string } }
+	/** Change the Todo tab's list; every socket then gets the list as it is after. */
+	| { t: "user-todo"; change: UserTodoChange };

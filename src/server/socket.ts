@@ -2,7 +2,7 @@
 import { complete } from "../commands";
 import { errorText } from "../json";
 import { directoryOf } from "../paths";
-import type { ClientMsg, ServerMsg, StartRequest, StartResult } from "../shared";
+import type { ClientMsg, ServerMsg, StartRequest, StartResult, UserTodoChange } from "../shared";
 import type { LiveSessions } from "./live-sessions";
 import { type Socket, send, type Views, watching } from "./views";
 import type { MsgOf } from "./wire";
@@ -15,6 +15,8 @@ export interface SocketEnv {
 	dismissInterrupted(sessionId: string): void;
 	/** Whether interrupted session `sessionId` stopped while its turn ran. */
 	stoppedMidTurn(sessionId: string): boolean;
+	/** Apply `change` to the Todo tab's list and send every socket the list after it, or, when it changes nothing, send `ws` the list it missed. */
+	changeTodo(ws: Socket, change: UserTodoChange): void;
 }
 
 /**
@@ -114,6 +116,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	"set-model": ({ sessions }, _ws, { instanceId, model, thinking }) => sessions.started(instanceId)?.setModel(model, thinking),
 	"set-thinking": ({ sessions }, _ws, { instanceId, level }) => sessions.started(instanceId)?.setThinking(level),
 	answer: ({ sessions }, _ws, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
+	"user-todo": ({ changeTodo }, ws, { change }) => changeTodo(ws, change),
 };
 
 /** `t` keys the handler that takes `msg`; spelled apart so TypeScript pairs them. */

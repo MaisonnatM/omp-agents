@@ -32,11 +32,13 @@ import type { SectionTarget } from "./section";
 import { defaultCwd, listedViews, sidebarSessions, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
-import { useStoredKeys } from "./stored-state";
+import { useStoredKeys, useStoredState } from "./stored-state";
 import { useDashboard } from "./use-dashboard";
 
 /** The session ids the sidebar lists under Pinned. */
 const PINNED_KEY = "omp-agents.pinned-sessions";
+/** The sidebar's tab over the panes, sessions or todo; the inbox and the tickets go with their pages. */
+const PANES_TAB_KEY = "omp-agents.sidebar-tab";
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
@@ -60,7 +62,7 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 }
 
 export function App() {
-	const { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start } = useDashboard();
+	const { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo } = useDashboard();
 	const launch = startOf(state.starts, "new");
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
@@ -114,10 +116,16 @@ export function App() {
 	const linear = linearStore.usePolling();
 	/** The Tickets tab and its shortcut show only once omp is signed in to Linear. */
 	const ticketsShown = linear.read?.data.connected === true;
-	const tab: SidebarTab = page?.kind === "inbox" ? "inbox" : page?.kind === "tickets" && ticketsShown ? "tickets" : "sessions";
+	const [panesTab, setPanesTab] = useStoredState<"sessions" | "todo">(PANES_TAB_KEY, raw => (raw === "todo" ? "todo" : "sessions"));
+	const tab: SidebarTab = page?.kind === "inbox" ? "inbox" : page?.kind === "tickets" && ticketsShown ? "tickets" : panesTab;
 	const showTab = (next: SidebarTab): void => {
-		if (next === "sessions") show(layout);
-		else navigate({ kind: next, target: null });
+		if (next === "inbox" || next === "tickets") {
+			navigate({ kind: next, target: null });
+			return;
+		}
+		setPanesTab(next);
+		// The sessions tab goes back to the panes from any page; the todos leave only the pages that have their own tab.
+		if (next === "sessions" || tab === "inbox" || tab === "tickets") show(layout);
 	};
 	const step = (by: 1 | -1): boolean | void => {
 		const next = adjacentSession(listed, view, by);
@@ -149,8 +157,12 @@ export function App() {
 			showTab("tickets");
 		},
 		sessions: () => {
-			if (!page) return false;
-			show(layout);
+			if (!page && tab === "sessions") return false;
+			showTab("sessions");
+		},
+		todo: () => {
+			if (tab === "todo") return false;
+			showTab("todo");
 		},
 		restore: () => {
 			if (!maximized) return false;
@@ -296,6 +308,8 @@ export function App() {
 					ticketsShown={ticketsShown}
 					tab={tab}
 					onTab={showTab}
+					userTodos={state.userTodos}
+					onTodoChange={changeTodo}
 					sectionTarget={sectionTarget}
 					onSectionTarget={setSectionTarget}
 					project={project}
