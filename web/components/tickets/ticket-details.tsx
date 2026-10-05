@@ -1,8 +1,7 @@
 import { Box, Calendar } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { Ticket, TicketDetail } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
-import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { age } from "../../labels";
 import { useRead } from "../../reads";
@@ -14,25 +13,26 @@ import { dueLabel, PRIORITY_ICON, STATUS_ICON } from "./ticket-row";
 
 const ago = (at: string): string => `${age(Date.parse(at))} ago`;
 
-interface TicketSheetContentProps {
+interface TicketDetailContentProps {
 	id: string;
 	/** The issue as the page lists it, which names it while Linear answers; `null` when the page does not list it. */
 	listed: Ticket | null;
-	actions?: ReactNode;
+	actions?: (ticket: Ticket) => ReactNode;
 }
 
-/**
- * A Linear issue, as the tickets page's sheet shows it: a header that names it, whose fields change the issue once
- * Linear answered it in full, with `actions` below, then its description, links, and comments.
- */
-export function TicketSheetContent({ id, listed, actions }: TicketSheetContentProps) {
+/** A Linear issue's editable fields, actions, description, links, and comments in the tickets page's main content. */
+export function TicketDetailContent({ id, listed, actions }: TicketDetailContentProps) {
 	const read = useRead<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
-	// The version a field change answered; the sheet mounts anew (by `key`) for another issue.
+	// Field changes replace the read; the component mounts anew by key for another issue.
 	const [replaced, replace] = useState<TicketDetail | null>(null);
 	const detail = replaced ?? read.data;
 	const error = replaced ? null : read.error;
 	const ticket = detail ?? listed;
 	const [PriorityIcon, priorityColor] = PRIORITY_ICON[ticket?.priority ?? 0];
+	const headingRef = useRef<HTMLHeadingElement>(null);
+	useEffect(() => {
+		headingRef.current?.focus({ preventScroll: true });
+	}, []);
 	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking Linear for the issue…</p>;
 	if (detail) body = <TicketSections detail={detail} />;
 	else if (error) {
@@ -44,11 +44,11 @@ export function TicketSheetContent({ id, listed, actions }: TicketSheetContentPr
 	}
 	return (
 		<>
-			<header className="space-y-1.5 border-b border-border py-3 pr-12 pl-5">
-				<SheetTitle className="flex items-start gap-2.5 text-base leading-snug font-semibold">
+			<header className="space-y-3">
+				<h1 ref={headingRef} tabIndex={-1} className="flex items-start gap-2.5 text-base leading-snug font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
 					{ticket && <IconTip icon={[...STATUS_ICON[ticket.statusType], ticket.status]} className="mt-1" />}
 					<span className="min-w-0">{ticket?.title ?? id}</span>
-				</SheetTitle>
+				</h1>
 				<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
 					<span className="font-mono tabular-nums">{id}</span>
 					{ticket && !detail && (
@@ -93,9 +93,9 @@ export function TicketSheetContent({ id, listed, actions }: TicketSheetContentPr
 						))}
 					</p>
 				)}
-				{actions}
+				{ticket && actions?.(ticket)}
 			</header>
-			<div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">{body}</div>
+			<div className="space-y-5">{body}</div>
 		</>
 	);
 }

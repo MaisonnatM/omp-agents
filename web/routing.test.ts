@@ -107,7 +107,7 @@ describe("layout hash", () => {
 		for (const hash of ["#inbox", "#inbox/acme/web.app/6596", "#inbox/acme"]) expect(layoutFromHash(hash)).toBeNull();
 	});
 
-	test("the tickets hash opens the page alone or at one issue's row, and no tickets hash is read as a layout", () => {
+	test("the tickets hash opens the list or one issue's details, and no tickets hash is read as a layout", () => {
 		expect(hashForTickets(null)).toBe("#tickets");
 		expect(hashForTickets("ENG-2368")).toBe("#tickets/ENG-2368");
 		expect(pageFromHash("#tickets")).toEqual({ kind: "tickets", target: null });

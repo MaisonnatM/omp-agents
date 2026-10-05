@@ -1,3 +1,7 @@
+import { ArrowLeft } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { Ticket, View } from "../../../src/shared";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
@@ -7,11 +11,11 @@ import type { SectionTarget } from "../../section";
 import type { QuickOp, StartOf } from "../../starts";
 import { useStoredKeys } from "../../stored-state";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
-import { FoldButton, useRevealRow, useRevealSection } from "../fold";
-import { ListSheetPage, PageFrame, TargetSheet } from "../list-sheet-page";
-import { QuickStartNotice, SheetQuickActions } from "../quick-actions";
+import { FoldButton, useRevealSection } from "../fold";
+import { ListSheetPage, PageFrame } from "../list-sheet-page";
+import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
 import { LinearConnection } from "../settings/linear-connection";
-import { TicketSheetContent } from "./ticket-details";
+import { TicketDetailContent } from "./ticket-details";
 import { STATUS_ICON, TicketRow, ticketRowId } from "./ticket-row";
 
 /** Folded status groups, by status name. */
@@ -24,12 +28,11 @@ interface GroupProps {
 	group: TicketGroup;
 	open: boolean;
 	onToggle: () => void;
-	target: string | null;
 	quick: StartOf<"quick"> | null;
 	onQuickAction: (ticket: Ticket, action: TicketActionId) => void;
 }
 
-function GroupSection({ group, open, onToggle, target, quick, onQuickAction }: GroupProps) {
+function GroupSection({ group, open, onToggle, quick, onQuickAction }: GroupProps) {
 	const { id } = ticketSection(group.status);
 	const [Icon, color] = STATUS_ICON[group.statusType];
 	return (
@@ -48,7 +51,6 @@ function GroupSection({ group, open, onToggle, target, quick, onQuickAction }: G
 						<TicketRow
 							key={ticket.id}
 							ticket={ticket}
-							targeted={ticket.id === target}
 							pending={pendingOf(quick, { kind: "ticket", id: ticket.id })}
 							onQuickAction={action => onQuickAction(ticket, action)}
 						/>
@@ -60,7 +62,7 @@ function GroupSection({ group, open, onToggle, target, quick, onQuickAction }: G
 }
 
 interface TicketsPageProps {
-	/** The issue a tickets link named: its group unfolds, its row scrolls into view and stays highlighted while its details show in a sheet. */
+	/** The issue whose details replace the list; `null` shows the list. */
 	target: string | null;
 	/** The group a sidebar link last chose, to unfold, scroll to, and focus. */
 	section: SectionTarget | null;
@@ -82,10 +84,58 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 	const poll = ticketsStore.usePolling();
 	const tickets = poll.read?.data.tickets ?? [];
 	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
-	const targetGroup = target === null ? null : (tickets.find(ticket => ticket.id === target)?.status ?? null);
 	const start = (ticket: Ticket, action: TicketActionId) => onQuickAction(ticketStart(ticket, action, cwd, readPinnedSkill()));
-	useRevealRow(target !== null && targetGroup !== null ? { id: ticketRowId(target), folds: [targetGroup] } : null, collapsed, expand);
-	useRevealSection(section, collapsed, expand);
+	const listRef = useRef<HTMLDivElement>(null);
+	const listPageRef = useRef<HTMLDivElement>(null);
+	const previousTarget = useRef(target);
+	useEffect(() => {
+		if (target !== null) {
+			previousTarget.current = target;
+			return;
+		}
+		if (previousTarget.current === null) return;
+		const link = document.getElementById(ticketRowId(previousTarget.current))?.querySelector("a");
+		const destination = link ?? listRef.current;
+		if (destination) {
+			destination.focus();
+			previousTarget.current = null;
+			return;
+		}
+		// The lists mount only after a read. Until then, wait; a failed read never mounts them.
+		if (!poll.read && poll.error && listPageRef.current) {
+			listPageRef.current.focus();
+			previousTarget.current = null;
+		}
+	});
+	useRevealSection(target === null ? section : null, collapsed, expand);
+
+	if (target !== null) {
+		const listed = tickets.find(ticket => ticket.id === target) ?? null;
+		return (
+			<PageFrame title={TITLE} meta={META}>
+				<TooltipProvider>
+					<div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-6">
+						<Button variant="ghost" leadingIcon={ArrowLeft} render={<a href={hashForTickets(null)} />}>
+							Back to tickets
+						</Button>
+						{quick && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />}
+						<TicketDetailContent
+							key={target}
+							id={target}
+							listed={listed}
+							actions={ticket => (
+								<QuickActionButtons
+									actions={ticketActions(ticket)}
+									pending={pendingOf(quick, { kind: "ticket", id: target })}
+									onRun={action => start(ticket, action)}
+								/>
+							)}
+						/>
+					</div>
+				</TooltipProvider>
+			</PageFrame>
+		);
+	}
 
 	return (
 		<ListSheetPage
@@ -95,44 +145,15 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 			loading="Asking Linear for your issues…"
 			poll={poll}
 			onRefresh={() => void ticketsStore.refresh(null, { fresh: true })}
-			missing={
-				target && targetGroup === null
-					? `${target} is not on this page, which lists the issues assigned to you that are open or closed in the last seven days.`
-					: null
-			}
+			missing={null}
 			notice={quick && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />}
 			spacing="space-y-4"
-			sheet={
-				<TargetSheet target={target} onClose={() => (location.hash = hashForTickets(null))}>
-					{id => {
-						const listed = tickets.find(ticket => ticket.id === id) ?? null;
-						return (
-							<TicketSheetContent
-								key={id}
-								id={id}
-								listed={listed}
-								actions={
-									listed && (
-										<SheetQuickActions
-											item={{ kind: "ticket", id }}
-											actions={ticketActions(listed)}
-											onRun={action => start(listed, action)}
-											quick={quick}
-											onOpen={onOpen}
-											onDismiss={onDismissQuick}
-										/>
-									)
-								}
-							/>
-						);
-					}}
-				</TargetSheet>
-			}
+			contentRef={listPageRef}
 		>
 			{() => {
 				const groups = ticketGroups(tickets);
 				return (
-					<>
+					<div ref={listRef} tabIndex={-1} className="space-y-4 outline-none focus-visible:ring-2 focus-visible:ring-ring">
 						{groups.length === 0 && <p className="text-sm text-muted-foreground">No issues assigned to you.</p>}
 						{groups.map(group => (
 							<GroupSection
@@ -140,12 +161,11 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 								group={group}
 								open={!collapsed.has(group.status)}
 								onToggle={() => toggleCollapsed(group.status)}
-								target={target}
 								quick={quick}
 								onQuickAction={start}
 							/>
 						))}
-					</>
+					</div>
 				);
 			}}
 		</ListSheetPage>

@@ -1,4 +1,4 @@
-/** The parts that the inbox's pull request sheet and the tickets page's issue sheet share. */
+/** The parts shared by the inbox's pull request sheet and the tickets page's issue details. */
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import type { PullRequestComment } from "../../src/shared";
@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { age } from "../labels";
 import { MessageMarkdown } from "./message-markdown";
 
-/** A titled part of a sheet's details. */
+/** A titled part of a pull request's or issue's details. */
 export function DetailSection({ title, children }: { title: ReactNode; children: ReactNode }) {
 	return (
 		<section className="space-y-2">
