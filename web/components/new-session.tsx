@@ -1,7 +1,9 @@
-import { Sparkles } from "lucide-react";
+import { Check, ChevronsUpDown, Folder, Sparkles } from "lucide-react";
 import { useState } from "react";
-import type { BranchChoice, ModelOption, ModelRole } from "../../src/shared";
+import type { BranchChoice, ModelOption } from "../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { getJson } from "../api";
@@ -11,70 +13,111 @@ import { usePinnedSkill } from "../pinned-skill";
 import { useShortcuts } from "../shortcuts";
 import type { NewOp, StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
-import { roleOf, useModelRoles } from "../use-model-roles";
+import { useDefaultModel } from "../use-default-model";
 import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation, Header } from "./conversation";
 import { BranchPicker, chosenBranch, GitRef, targetOf } from "./git";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
 import { ModelPicker } from "./model-picker";
-import { RolePicker } from "./role-picker";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
 	cwd: string;
+	/** Directories sessions ran in, as {@link workspaces} lists them, which the directory picker offers. */
+	workspaces: { cwd: string; cwdDisplay: string }[];
 	launch: StartOf<"new"> | null;
 	connected: boolean;
 	/** The server's last answer to this draft's `complete`. */
 	completions: Completions | null;
 	/** Ask for `/` and `@` suggestions, resolved as a session started in `cwd` would resolve them. */
 	onComplete: (reqId: number, text: string, cursor: number) => void;
+	/** Move the draft to directory `cwd`, as typed or displayed. */
+	onPickCwd: (cwd: string) => void;
 	/** Start omp with the first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at `thinking` when it names a level; through `skill` when it names one. */
 	onStart: (op: Omit<NewOp, "kind" | "cwd">) => void;
 }
 
-/** What the draft starts on: omp's default, a role, or a model picked by itself at omp's thinking level. */
-type Selection = { kind: "default" } | { kind: "role"; role: ModelRole } | { kind: "model"; model: ModelOption };
+interface DirectoryPickerProps {
+	cwd: string;
+	workspaces: { cwd: string; cwdDisplay: string }[];
+	disabled: boolean;
+	onPick: (cwd: string) => void;
+}
 
-/** The model, thinking level, and role a start sends for `selection`; `null` leaves each to omp. */
-function startModel(selection: Selection): Pick<NewOp, "model" | "thinking" | "role"> {
-	switch (selection.kind) {
-		case "default":
-			return { model: null, thinking: null, role: null };
-		case "role":
-			return { model: selection.role.model, thinking: selection.role.thinking, role: selection.role.role };
-		case "model":
-			return { model: selection.model, thinking: null, role: null };
-		default: {
-			const unhandled: never = selection;
-			return unhandled;
-		}
-	}
+/** The directory the session starts in: one a session ran in, or any directory typed into the search field. */
+function DirectoryPicker({ cwd, workspaces, disabled, onPick }: DirectoryPickerProps) {
+	const [open, setOpen] = useState(false);
+	const [query, setQuery] = useState("");
+	const typed = query.trim();
+	const pick = (next: string): void => {
+		setOpen(false);
+		setQuery("");
+		if (next !== cwd) onPick(next);
+	};
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger asChild>
+				<Button
+					variant="ghost"
+					size="compact"
+					leadingIcon={Folder}
+					trailingIcon={ChevronsUpDown}
+					title={cwd}
+					aria-label={`Working directory: ${cwd}`}
+					active={open}
+					disabled={disabled}
+					className="min-w-0"
+				>
+					<span className="truncate">{projectName(cwd) ?? cwd}</span>
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent align="start" className="w-[min(24rem,calc(100vw-2rem))] p-0">
+				<Command>
+					<CommandInput aria-label="Search or type a directory" placeholder="Search or type a directory…" value={query} onValueChange={setQuery} />
+					<CommandList>
+						<CommandGroup heading="Directories sessions ran in">
+							{workspaces.map(workspace => (
+								<CommandItem key={workspace.cwd} value={workspace.cwd} keywords={[workspace.cwdDisplay]} onSelect={() => pick(workspace.cwdDisplay)}>
+									<span className="flex min-w-0 flex-col">
+										<span className="truncate">{projectName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
+										<span className="truncate text-xs text-muted-foreground">{workspace.cwdDisplay}</span>
+									</span>
+									<Check className={cn("ml-auto shrink-0", workspace.cwdDisplay === cwd || workspace.cwd === cwd ? "opacity-100" : "opacity-0")} />
+								</CommandItem>
+							))}
+						</CommandGroup>
+						{typed && !workspaces.some(w => w.cwd === typed || w.cwdDisplay === typed) && (
+							<CommandGroup forceMount>
+								<CommandItem forceMount value={`use ${typed}`} onSelect={() => pick(typed)}>
+									<span className="truncate">
+										Use <span className="font-mono">{typed}</span>
+									</span>
+								</CommandItem>
+							</CommandGroup>
+						)}
+					</CommandList>
+				</Command>
+			</PopoverContent>
+		</Popover>
+	);
 }
 
 /**
  * A session not started yet, with the same composer a live session has. omp starts in `cwd` only when the first message
  * is sent, so leaving the draft leaves nothing running. The message and its images stay in the composer until the session opens.
- * The composer picks the model role or the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
+ * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, launch, connected, completions, onComplete, onStart }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart }: NewSessionProps) {
 	const [draft, setDraft] = useState("");
 	const attachments = useImageAttachments();
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
-	const [selection, setSelection] = useState<Selection>({ kind: "default" });
-	const roles = useModelRoles(cwd);
-	// Until a pick, omp starts on its `default` role, so the pickers show that role and its model.
-	const defaultRole = roles.list?.roles.find(other => other.role === "default") ?? null;
-	const sent = startModel(selection);
-	const shownModel = sent.model ?? defaultRole?.model ?? null;
-	const role =
-		roles.list &&
-		(selection.kind === "role"
-			? selection.role
-			: selection.kind === "model"
-				? roleOf(roles.list.roles, `${selection.model.provider}/${selection.model.id}`, null, null)
-				: defaultRole);
+	/** The model picked, `null` for omp's default; either way at omp's thinking level. */
+	const [model, setModel] = useState<ModelOption | null>(null);
+	// Until a pick, omp starts on its `default` role's model, so the picker shows that one.
+	const defaultModel = useDefaultModel(cwd);
+	const shownModel = model ?? defaultModel;
 	const [pinnedSkill] = usePinnedSkill();
 	const [skipSkill, setSkipSkill] = useState(false);
 	const skills = useSkills(cwd);
@@ -150,29 +193,29 @@ export function NewSession({ cwd, launch, connected, completions, onComplete, on
 					onSend={text => {
 						if (directCommand) return;
 						completion.close();
-						attachments.read(images => onStart({ prompt: text, images, branch: choice, ...sent, skill: skipSkill ? null : pinnedSkill }));
+						attachments.read(images => onStart({ prompt: text, images, branch: choice, model, skill: skipSkill ? null : pinnedSkill }));
 					}}
 					placeholder="Message this session…"
 					files={attachments.files}
 					onFilesChange={attachments.onFilesChange}
 					accept={IMAGE_ACCEPT}
-					leftSlot={({ openFilePicker }) => (
+					leftSlot={
 						<>
-							<AttachButton onClick={() => openFilePicker()} disabled={starting} />
-							<RolePicker list={roles.list} current={role} onReload={roles.reload} onPick={next => setSelection({ kind: "role", role: next })} disabled={starting} />
 							<ModelPicker
 								current={shownModel && `${shownModel.provider}/${shownModel.id}`}
 								unset="Default model"
 								list={models}
 								open={modelsOpen}
 								onOpenChange={openModels}
-								onPick={next => setSelection({ kind: "model", model: next })}
+								onPick={setModel}
 								disabled={starting}
 							/>
+							<DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={starting} onPick={onPickCwd} />
 							{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 							{pinnedSkill !== null && <PinnedSkillToggle name={pinnedSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 						</>
-					)}
+					}
+					rightSlot={({ openFilePicker }) => <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
 					disabled={starting || !connected}
 					sendLabel="Start session"
 					textareaProps={{ ...completion.textareaProps, autoFocus: true }}

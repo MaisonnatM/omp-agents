@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { linearMarkdown, parseIssueDetail, parseIssues } from "./tickets";
+import { uploadAddress } from "./linear-uploads";
+import { linearMarkdown, parseIssueDetail, parseIssues, parseTicketOptions } from "./tickets";
+
+const signed = (path: string): string => `https://uploads.linear.app${path}?signature=x`;
+const proxied = (path: string): string => `/api/ticket/media?issue=ENG-1&path=${encodeURIComponent(path)}`;
+const media = (url: string): string => uploadAddress("ENG-1", url);
 
 const issue = (id: string, fields: Record<string, unknown> = {}) => ({
 	id,
@@ -24,7 +29,7 @@ describe("parseIssues", () => {
 		const { project: _, ...noProject } = issue("ENG-2", { statusType: "duplicate", status: "Duplicate", priority: { value: 0, name: "No priority" } });
 		const answer = listed({ issues: [issue("ENG-1", { dueDate: "2026-10-05" }), noProject], hasNextPage: false });
 		expect(parseIssues(answer)).toEqual({
-			issues: [
+			items: [
 				{
 					id: "ENG-1",
 					title: "Issue ENG-1",
@@ -60,7 +65,7 @@ describe("parseIssues", () => {
 
 	test("drops an issue without an id, a status, or a known state type, and keeps the rest", () => {
 		const answer = listed({ issues: [issue("ENG-1"), issue("", {}), issue("ENG-3", { status: undefined }), issue("ENG-4", { statusType: "archived" }), "ENG-5"] });
-		expect(parseIssues(answer).issues.map(({ id }) => id)).toEqual(["ENG-1"]);
+		expect(parseIssues(answer).items.map(({ id }) => id)).toEqual(["ENG-1"]);
 	});
 
 	test("names the next page's cursor only while Linear has one", () => {
@@ -78,10 +83,27 @@ describe("linearMarkdown", () => {
 	test("turns Linear's issue mentions into links and its images into image links, and drops an image without a source", () => {
 		const text = [
 			'Fixed in <issue id="2cfd" href="https://linear.app/acme/issue/ENG-2305/count">ENG-2305</issue>; see',
-			'<linear-image>{"type":"image","attrs":{"src":"https://uploads.linear.app/a/b?signature=x"}}</linear-image>',
+			`<linear-image>{"type":"image","attrs":{"src":"${signed("/a/b")}"}}</linear-image>`,
 			"<linear-image>{}</linear-image>",
 		].join("\n");
-		expect(linearMarkdown(text)).toBe("Fixed in [ENG-2305](<https://linear.app/acme/issue/ENG-2305/count>); see\n![image](<https://uploads.linear.app/a/b?signature=x>)\n");
+		expect(linearMarkdown(text, media)).toBe(`Fixed in [ENG-2305](<https://linear.app/acme/issue/ENG-2305/count>); see\n![image](<${proxied("/a/b")}>)\n`);
+	});
+
+	test("plays a video embed, links another embedded file, and loads every Linear upload through the server", () => {
+		const text = [
+			"Recording:",
+			`<linear-embed node-type="video">{"uploadState":"finished","uploadId":null,"src":"${signed("/org/v")}"}</linear-embed>`,
+			`<linear-embed node-type="file">{"src":"${signed("/org/f")}"}</linear-embed>`,
+			`[log](<${signed("/org/log")}>) and [docs](<https://example.com/a?b=c>)`,
+		].join("\n");
+		expect(linearMarkdown(text, media)).toBe(
+			[
+				"Recording:\n\n",
+				`<video controls preload="metadata" src="${proxied("/org/v")}"></video>\n\n`,
+				`[Attached file](<${proxied("/org/f")}>)`,
+				`[log](<${proxied("/org/log")}>) and [docs](<https://example.com/a?b=c>)`,
+			].join("\n"),
+		);
 	});
 });
 
@@ -93,6 +115,9 @@ describe("parseIssueDetail", () => {
 			issue("ENG-1", {
 				description: "Do it",
 				createdBy: "Grace",
+				assignee: "Ada Lovelace",
+				assigneeId: "u-1",
+				teamId: "t-1",
 				createdAt: "2026-09-01T00:00:00.000Z",
 				attachments: [{ id: "a", title: "feat: do it", url: "https://github.com/acme/web/pull/1" }, { id: "b", title: "", url: "https://example.com" }, { id: "c" }],
 			}),
@@ -106,9 +131,11 @@ describe("parseIssueDetail", () => {
 				comment("root", "2026-09-02T00:00:00.000Z", null),
 			],
 		});
-		const detail = parseIssueDetail(issueText, commentsText);
+		const detail = parseIssueDetail(issueText, commentsText, media);
 		expect(detail.description).toBe("Do it");
 		expect(detail.createdBy).toBe("Grace");
+		expect(detail.assignee).toEqual({ id: "u-1", name: "Ada Lovelace" });
+		expect(detail.teamId).toBe("t-1");
 		expect(detail.attachments).toEqual([
 			{ title: "feat: do it", url: "https://github.com/acme/web/pull/1" },
 			{ title: "https://example.com", url: "https://example.com" },
@@ -117,8 +144,51 @@ describe("parseIssueDetail", () => {
 		expect(detail.threads[0]![0]!.author).toBe("Ada");
 	});
 
+	test("reads an issue without an assignee as unassigned", () => {
+		const detail = parseIssueDetail(JSON.stringify(issue("ENG-1", { assignee: null, assigneeId: null })), JSON.stringify({ comments: [] }), media);
+		expect(detail.assignee).toBeNull();
+	});
+
 	test("throws when get_issue answers no issue", () => {
-		expect(() => parseIssueDetail("Issue not found", JSON.stringify({ comments: [] }))).toThrow("get_issue answered something other than JSON");
-		expect(() => parseIssueDetail(JSON.stringify({ title: "No id" }), JSON.stringify({ comments: [] }))).toThrow("without an issue");
+		expect(() => parseIssueDetail("Issue not found", JSON.stringify({ comments: [] }), media)).toThrow("get_issue answered something other than JSON");
+		expect(() => parseIssueDetail(JSON.stringify({ title: "No id" }), JSON.stringify({ comments: [] }), media)).toThrow("without an issue");
+	});
+});
+
+describe("parseTicketOptions", () => {
+	test("orders states as Linear's workflow does, keeps only active people and live labels, and sorts the rest by name", () => {
+		const statuses = JSON.stringify([
+			{ id: "s-done", type: "completed", name: "Done" },
+			{ id: "s-dup", type: "duplicate", name: "Duplicate" },
+			{ id: "s-todo", type: "unstarted", name: "Todo" },
+			{ id: "s-back", type: "backlog", name: "Backlog" },
+			{ id: "s-odd", type: "archived", name: "Odd" },
+		]);
+		const options = parseTicketOptions(
+			statuses,
+			[{ id: "u-2", name: "Zoe", isActive: true }, { id: "u-3", name: "Gone", isActive: false }, { id: "u-1", name: "Ada" }],
+			[{ id: "l-1", name: "Front", color: "#f00", archivedAt: null }, { id: "l-2", name: "Old", archivedAt: "2026-01-01" }, { id: "l-3", name: "Bug" }],
+			[{ id: "P-2", name: "Widget" }, { id: "P-1", name: "Analytics" }, { name: "No id" }],
+		);
+		expect(options).toEqual({
+			statuses: [
+				{ id: "s-back", name: "Backlog", type: "backlog" },
+				{ id: "s-todo", name: "Todo", type: "unstarted" },
+				{ id: "s-done", name: "Done", type: "completed" },
+				{ id: "s-dup", name: "Duplicate", type: "canceled" },
+			],
+			users: [
+				{ id: "u-1", name: "Ada" },
+				{ id: "u-2", name: "Zoe" },
+			],
+			labels: [
+				{ id: "l-3", name: "Bug", color: "" },
+				{ id: "l-1", name: "Front", color: "#f00" },
+			],
+			projects: [
+				{ id: "P-1", name: "Analytics" },
+				{ id: "P-2", name: "Widget" },
+			],
+		});
 	});
 });

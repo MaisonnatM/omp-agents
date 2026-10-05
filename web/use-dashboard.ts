@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { ClientMsg, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
 import { applyPaneMessage, type Completions, retainPanes } from "./pane-store";
-import { rememberPickedRole } from "./picked-roles";
 import {
 	EMPTY_LAYOUT,
 	hashForLayout,
@@ -291,7 +290,6 @@ export function useDashboard(): Dashboard {
 						return;
 					case "started": {
 						const start = pendingStart(startsRef.current, msg.reqId);
-						if (start?.op.kind === "new" && msg.result.ok) rememberPickedRole(msg.result.instanceId, start.op.role);
 						answer(msg, start && msg.result.ok ? layoutAfterStart(layoutRef.current, start.op, msg.result.instanceId) : null);
 						return;
 					}

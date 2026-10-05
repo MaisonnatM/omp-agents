@@ -1,9 +1,8 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { type LiveView, type PullRequest, type RosterHost, TICKET_ID, type View } from "../src/shared";
+import { type LiveView, type PullRequest, type RosterHost, SESSION_HASH_PREFIX, TICKET_ID, type View } from "../src/shared";
 import type { StartOp } from "./starts";
 
 const PAST_PREFIX = "past/";
-const SESSION = "session";
 
 /** The inbox page, and the pull request whose row it scrolls to and highlights; `null` for none. */
 export interface InboxRoute {
@@ -101,7 +100,7 @@ export function routeFromHash(hash: string): Route {
 	const head = slash < 0 ? raw : raw.slice(0, slash);
 	const rest = slash < 0 ? null : raw.slice(slash + 1);
 	if (isPageKind(head)) return { kind: "page", page: PAGES[head](rest) };
-	if (head === SESSION && rest) return { kind: "session", sessionId: decodeURIComponent(rest) };
+	if (`${head}/` === SESSION_HASH_PREFIX && rest) return { kind: "session", sessionId: decodeURIComponent(rest) };
 	return { kind: "panes", layout: layoutFromPanes(raw) };
 }
 

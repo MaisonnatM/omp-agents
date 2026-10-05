@@ -21,6 +21,7 @@ import {
 	closePane,
 	endSession,
 	focusedView,
+	hashForNewSession,
 	hashForPage,
 	hashForView,
 	type Page,
@@ -166,10 +167,16 @@ export function App() {
 			main = (
 				<NewSession
 					cwd={cwd}
+					workspaces={workspaces(state.hosts, state.past)}
 					launch={launch}
 					connected={state.connected}
 					completions={state.newSessionCompletions}
 					onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
+					onPickCwd={next => {
+						// A failed start's error is about the directory left behind.
+						dismissStart("new");
+						location.hash = hashForNewSession(next);
+					}}
 					onStart={op => start({ kind: "new", cwd, ...op })}
 				/>
 			);

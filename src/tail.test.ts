@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, jest, test } from "bun:test";
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Item, SessionWork } from "./shared";
@@ -87,9 +87,28 @@ describe("FileTail", () => {
 
 		expect(emits.at(-2)).toEqual({ reset: false, items: [{ id: "m2", kind: "user", text: "go on", skill: null, from: null, entryId: "e2" }] });
 		expect(works).toEqual([
-			{ phases: [], files: [] },
-			{ phases: [{ name: "Build", tasks: [{ content: "Write it", status: "pending" }] }], files: [] },
+			{ phases: [], files: [], plan: null },
+			{ phases: [{ name: "Build", tasks: [{ content: "Write it", status: "pending" }] }], files: [], plan: null },
 		]);
+	});
+
+	test("the plan's text is read from its file whenever the transcript changes it", async () => {
+		const { path, works, read } = setup();
+		const plan = join(path, "..", "local", "auth-plan.md");
+		mkdirSync(join(plan, ".."));
+		const changed = (id: string, toolName: string, details: unknown) =>
+			`${JSON.stringify({ type: "message", id, message: { role: "toolResult", toolCallId: id, toolName, details } })}\n`;
+		writeFileSync(plan, "# Auth\n");
+		writeFileSync(path, changed("w1", "write", { resolvedPath: plan }));
+		await read();
+		writeFileSync(plan, "# Auth\n\n1. Ship\n");
+		appendFileSync(path, changed("e1", "edit", { path: plan, diff: "+3|1. Ship" }));
+		await read();
+		rmSync(plan);
+		appendFileSync(path, changed("e2", "edit", { path: plan, op: "delete", diff: "" }));
+		await read();
+
+		expect(works.map(work => work.plan?.text ?? null)).toEqual(["# Auth\n", "# Auth\n\n1. Ship\n", null]);
 	});
 
 	describe("streamed updates", () => {

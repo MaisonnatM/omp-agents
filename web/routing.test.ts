@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { RosterHost, View } from "../src/shared";
+import { hashForSession, type RosterHost, type View } from "../src/shared";
 import type { StartOp } from "./starts";
 import {
 	adjacentSession,
@@ -244,5 +244,13 @@ describe("stepping through the sidebar's sessions", () => {
 		expect(adjacentSession(listed, elsewhere, 1)).toEqual(a);
 		expect(adjacentSession(listed, null, -1)).toEqual(old);
 		expect(adjacentSession([], null, 1)).toBe(null);
+	});
+});
+
+describe("session links", () => {
+	test("the link a pull request's description carries opens the session it names", () => {
+		const sessionId = "01a0f6a5-181e/#x y";
+		expect(sessionFromHash(hashForSession(sessionId))).toBe(sessionId);
+		expect(layoutFromHash(hashForSession(sessionId))).toBeNull();
 	});
 });

@@ -15,9 +15,6 @@ export type StartOp =
 			images: PromptImage[];
 			branch: BranchChoice | null;
 			model: ModelOption | null;
-			thinking: string | null;
-			/** The model role picked, for the live session's role picker; the server never sees it. */
-			role: string | null;
 			/** The pinned skill, `null` when none is pinned or the draft skips it. */
 			skill: string | null;
 	  }
@@ -48,7 +45,7 @@ export type StartOf<K extends StartKind> = Start<Extract<StartOp, { kind: K }>>;
 export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 	switch (op.kind) {
 		case "new":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: null, skill: op.skill };
 		case "quick":
 			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill };
 		case "fork":
