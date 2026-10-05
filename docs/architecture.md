@@ -139,8 +139,9 @@ It writes the `extension_ui_response` to the child's stdin as one line, the way 
 omp sends a `cancel` frame when a question ends without an answer, for example after Stop.
 A question with a timeout ends with no frame, so the server drops it at its deadline.
 omp's RPC mode does not title a session from its first prompt, as its terminal does.
-While a session has no title, each user message's `message_end` event makes the server send a bare `/rename` prompt, which omp runs as its own command: it titles the session from the conversation in the background and announces the title with a `session_info_update` frame.
+While a session has no title, the `message_end` event of each user message makes the server send a bare `/rename` prompt, which omp runs as its own command: it titles the session from the conversation in the background and announces the title with a `session_info_update` frame.
 `RpcClient` drops that frame too, so the same stdout copy reads it, and the server then reads omp's state again for the new `sessionName`.
+A `/skill:` prompt counts as a user message here, although omp records it as a `custom` message of type `skill-prompt` and reads it as the user's prompt when it titles the session.
 Stopping the dashboard stops every session that it started.
 The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one.
 
