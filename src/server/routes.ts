@@ -68,7 +68,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	const connected: Handler = async req => {
 		const refused = guards.admit(req);
 		if (refused) return refused;
-		return answer(async () => ({ models: await connectedModels() }));
+		return answer(connectedModels);
 	};
 
 	/** `GET /api/models/roles?cwd=<dir>`: omp's model roles a session in that directory could switch to. Like a new session, `cwd` may name any directory. */

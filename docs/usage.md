@@ -194,14 +194,17 @@ For installation, see the [README](../README.md).
   The host shows guests no queue, so a terminal session lists only the follow-ups that the dashboard holds, not the steers waiting in the host.
   A follow-up held when the room closes shows as a warning in the conversation instead.
   Esc in the host's terminal during a tool call looks to a guest like a turn that ended, so a follow-up that the dashboard holds still runs after it.
-- Sessions started from the dashboard have two pickers in the composer: the model and the thinking level.
-  The model picker is searchable by label or by selector.
-  It lists the models that the session's omp RPC process offers from the providers you are connected to, the ones that omp's `/login` marks as signed in or given a key, under each provider's logo and name (`OpenAI Codex`, `OpenRouter`, `OpenCode Zen`), and switches the active model.
+- Sessions started from the dashboard have a model picker with provider tabs and thinking choices in the same popover.
+  Opening it selects the active model's provider tab.
+  Provider tabs only filter the list, and the arrow keys move between tabs.
+  Search matches labels or selectors within the selected provider.
+  The list contains models that the session's omp RPC process offers from providers you are connected to, the ones omp's `/login` marks as signed in or given a key.
   Models that omp finds without a login, such as Apple's on-device model or a local Ollama, stay out of the list.
   A login made in a terminal shows the next time the picker opens.
   Each row shows the logo of the org that makes the model, its label (`Opus 5.5`), and its id, muted, to tell apart models that share a label.
-  The thinking picker lists the levels that the current model accepts, for example `off`, `low`, `medium`, `high`, `xhigh`, and `max`, and switches the level.
-  A model switch refreshes that list.
+  Choosing a model keeps the picker open so you can also choose its thinking level.
+  Thinking choices come from the current live model's supported levels.
+  While a model switch runs, thinking choices are unavailable until omp reports the new model and its levels.
   Terminal sessions show their model and thinking level in the same place, but Collab has no frame that changes them, so make those changes in the terminal.
   Subagents have no pickers.
 - The ring before the paperclip and the send button shows how full the session's context window is.
@@ -261,8 +264,12 @@ For installation, see the [README](../README.md).
 - The draft's composer has the model picker at its bottom left, as a running session's does.
   Until you pick one, it names the `default` role's model, such as **Opus 5.5**, which is the model omp starts on without `--model`.
   It reads **Default model** only when no `default` role names a model you are connected to.
-  Picking a model starts the session on it at omp's thinking level.
-  Cmd+. opens the model picker here too.
+  Provider tabs and search work as in a running session.
+  The thinking choices come from the selected model's omp catalog entry.
+  **Default** leaves omp's configured thinking level unchanged.
+  Choosing a level starts the session at that level, and choosing another model resets the thinking choice to **Default**.
+  Models without selectable thinking levels offer only **Default**.
+  Cmd+. opens the model picker here too, and Cmd+J cycles the supported thinking levels after the catalog loads.
 - A skill pinned in **Settings** shows as a toggle after the pickers, with the skill's name.
   While it is on, the first message goes through the skill, as if you had typed `/skill:<name>` before it, and the transcript shows the skill's pill.
   Click it to start this one session without the skill.
@@ -520,7 +527,7 @@ Alt is Option on macOS.
   From a subagent they step from its session's row.
 - Cmd+Shift+O opens the new-session draft, as the **+** next to the session list does.
   `/` puts the cursor in the focused pane's composer.
-- Cmd+. opens the model picker and Cmd+J moves to the next thinking level, in sessions that the dashboard started and, for the model, in the new-session draft.
+- Cmd+. opens the model picker and Cmd+J moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.
   Cmd+E expands or collapses every tool call.
   Cmd+, opens Settings, where the model roles live, and closes it again.
   Ending a session has no shortcut: use **End session** in its header.

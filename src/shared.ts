@@ -336,7 +336,7 @@ export type RosterHost = RosterHostBase &
 	(
 		| { source: "terminal"; participants: number; relayConnected: boolean }
 		/** Started by this dashboard, which can end it. */
-		| { source: "dashboard"; thinkingLevels: string[] }
+		| { source: "dashboard"; thinkingLevels: string[]; modelSwitch: { pending: boolean; revision: number } }
 	);
 
 /** Context-window occupancy as omp's status line counts it. */
@@ -622,6 +622,18 @@ export interface PlanUsage {
 export interface ModelOption {
 	provider: string;
 	id: string;
+}
+
+/** Supported draft thinking levels from omp's catalog, separate from the model's identity. */
+export interface ModelCapabilities {
+	model: ModelOption;
+	thinkingLevels: string[];
+}
+
+/** Models and their capabilities offered to a new-session draft. */
+export interface ConnectedModels {
+	models: ModelOption[];
+	capabilities: ModelCapabilities[];
 }
 
 /** A role in omp's `modelRoles`, such as `plan`, as the model and thinking level its selector names. */

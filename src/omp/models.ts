@@ -1,6 +1,6 @@
 import { isObject } from "../json";
 import { runJson } from "../proc";
-import { type CatalogModel, type ModelOption, type ModelRole, splitSelector } from "../shared";
+import { type CatalogModel, type ConnectedModels, type ModelRole, splitSelector } from "../shared";
 import { loadOmpConfig } from "./config";
 import { ompCommand } from "./install";
 import { auth, oauth } from "./modules";
@@ -40,9 +40,15 @@ export async function connectedProviders(): Promise<Set<string>> {
 }
 
 /** The models of {@link connectedProviders} that `omp models` lists, in omp's order: what a new session can start on. */
-export async function connectedModels(): Promise<ModelOption[]> {
-	const [models, connected] = await Promise.all([listModels(), connectedProviders()]);
-	return models.flatMap(({ selector, provider }) => (connected.has(provider) ? [{ provider, id: selector.slice(provider.length + 1) }] : []));
+export async function connectedModels(): Promise<ConnectedModels> {
+	const [catalog, connected] = await Promise.all([listModels(), connectedProviders()]);
+	const capabilities = catalog
+		.filter(model => connected.has(model.provider))
+		.map(({ selector, provider, thinking }) => ({
+			model: { provider, id: selector.slice(provider.length + 1) },
+			thinkingLevels: thinking,
+		}));
+	return { models: capabilities.map(({ model }) => model), capabilities };
 }
 
 /**

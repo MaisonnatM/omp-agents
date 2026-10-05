@@ -90,6 +90,7 @@ export class DashboardSession implements LiveSession {
 	thinkingLevel: string | null = null;
 	/** Levels the current model accepts, `off` first. */
 	thinkingLevels: string[] = [];
+	modelSwitch = { pending: false, revision: 0 };
 	context: ContextUsage | null = null;
 	/** omp's own queues, from `get_state` and then each `queue_update`. */
 	queue: MessageQueue;
@@ -145,7 +146,11 @@ export class DashboardSession implements LiveSession {
 	): Promise<DashboardSession> {
 		return DashboardSession.#spawn(instanceId, cwd, emit, async client => {
 			if (model) await client.setModel(model.provider, model.id);
-			if (thinking) await client.setThinkingLevel(thinking);
+			if (thinking) {
+				const levels = await client.getAvailableThinkingLevels();
+				if (!levels.includes(thinking)) throw new Error(`This model does not support thinking level ${thinking}.`);
+				await client.setThinkingLevel(thinking);
+			}
 		});
 	}
 
@@ -228,6 +233,7 @@ export class DashboardSession implements LiveSession {
 			model: this.model,
 			thinkingLevel: this.thinkingLevel,
 			thinkingLevels: this.thinkingLevels,
+			modelSwitch: this.modelSwitch,
 			context: this.context,
 			startedAt: this.startedAt,
 			status: this.status,
@@ -351,23 +357,47 @@ export class DashboardSession implements LiveSession {
 	}
 
 	/** Switch to `model`, then to `thinking` when it names a level. */
-	setModel({ provider, id }: ModelOption, thinking: string | null): void {
+	async setModel({ provider, id }: ModelOption, thinking: string | null): Promise<void> {
+		if (this.modelSwitch.pending) return;
+		this.modelSwitch = { ...this.modelSwitch, pending: true };
+		this.thinkingLevels = [];
+		this.#emit({ kind: "roster" });
 		const { client } = this.#child;
-		client
-			.setModel(provider, id)
-			.then(() => (thinking ? client.setThinkingLevel(thinking) : undefined))
-			.then(
-				() => this.#refresh(),
-				(err: unknown) => this.#fail("Model switch failed", err),
-			);
+		try {
+			await client.setModel(provider, id);
+			if (thinking) await client.setThinkingLevel(thinking);
+		} catch (err) {
+			this.#fail("Model switch failed", err);
+		} finally {
+			try {
+				const state = await client.getState();
+				const levels = await client.getAvailableThinkingLevels();
+				this.#applyState(state);
+				this.thinkingLevels = levels;
+			} catch (err) {
+				this.#fail("Model state refresh failed", err);
+			}
+			this.modelSwitch = { pending: false, revision: this.modelSwitch.revision + 1 };
+			this.#emit({ kind: "roster" });
+			if (this.#refreshAgain) this.#refresh();
+		}
 	}
 
-	setThinking(level: string): void {
-		if (!this.thinkingLevels.includes(level)) return;
-		this.#child.client.setThinkingLevel(level).then(
-			() => this.#refresh(),
-			(err: unknown) => this.#fail("Thinking level switch failed", err),
-		);
+	async setThinking(level: string): Promise<void> {
+		if (this.modelSwitch.pending || !this.thinkingLevels.includes(level)) return;
+		const { client } = this.#child;
+		try {
+			const levels = await client.getAvailableThinkingLevels();
+			if (this.modelSwitch.pending) return;
+			if (!levels.includes(level)) {
+				this.#refresh();
+				return;
+			}
+			await client.setThinkingLevel(level);
+			this.#refresh();
+		} catch (err) {
+			this.#fail("Thinking level switch failed", err);
+		}
 	}
 
 	end(): Promise<void> {
@@ -406,15 +436,22 @@ export class DashboardSession implements LiveSession {
 
 	/** Re-read omp's state; a request that arrives mid-read runs once more after it, so the last change always lands. */
 	#refresh(): void {
+		if (this.modelSwitch.pending) {
+			this.#refreshAgain = true;
+			return;
+		}
 		if (this.#refreshing) {
 			this.#refreshAgain = true;
 			return;
 		}
 		this.#refreshing = true;
+		this.#refreshAgain = false;
 		const { client } = this.#child;
+		const revision = this.modelSwitch.revision;
 		Promise.all([client.getState(), client.getAvailableThinkingLevels()])
 			.then(
 				([state, levels]) => {
+					if (this.modelSwitch.pending || this.modelSwitch.revision !== revision) return;
 					this.#applyState(state);
 					this.thinkingLevels = levels;
 					this.#emit({ kind: "roster" });
@@ -425,7 +462,6 @@ export class DashboardSession implements LiveSession {
 			.finally(() => {
 				this.#refreshing = false;
 				if (!this.#refreshAgain) return;
-				this.#refreshAgain = false;
 				this.#refresh();
 			});
 	}

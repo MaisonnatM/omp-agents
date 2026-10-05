@@ -1,6 +1,6 @@
 import { Folder, Sparkles } from "lucide-react";
 import { useState } from "react";
-import type { BranchChoice, ModelOption } from "../../src/shared";
+import type { BranchChoice, ConnectedModels, ModelOption } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
@@ -119,8 +119,9 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const [draft, setDraft] = useState("");
 	const attachments = useImageAttachments();
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
-	/** The model picked, `null` for omp's default; either way at omp's thinking level. */
+	/** `null` leaves omp's default model unchanged. */
 	const [model, setModel] = useState<ModelOption | null>(null);
+	const [pickedThinking, setPickedThinking] = useState<{ model: string; level: string } | null>(null);
 	// Until a pick, omp starts on its `default` role's model, so the picker shows that one.
 	const defaultModel = useDefaultModel(cwd);
 	const shownModel = model ?? defaultModel;
@@ -137,11 +138,16 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					? "bypassed"
 					: "on";
 	const [modelsOpen, setModelsOpen] = useState(false);
-	// As in a live session, the list is read again on every open, so a login since the last one shows. Before the first
-	// open (`modelOpens` 0) nothing is read.
+	// Reopening reads credentials and model capabilities again after a provider login.
 	const [modelOpens, setModelOpens] = useState(0);
-	const modelsRead = useRead<{ models: ModelOption[] }>(modelOpens > 0 ? "/api/models/connected" : null, modelOpens);
+	const modelsRead = useRead<ConnectedModels>("/api/models/connected", modelOpens);
 	const models = modelsRead.error !== null ? { models: [], error: modelsRead.error } : modelsRead.data && { models: modelsRead.data.models, error: null };
+	const shownSelector = shownModel ? `${shownModel.provider}/${shownModel.id}` : null;
+	const levels = modelsRead.data?.capabilities.find(({ model }) => `${model.provider}/${model.id}` === shownSelector)?.thinkingLevels ?? null;
+	const thinking = pickedThinking?.model === shownSelector && levels?.includes(pickedThinking.level) ? pickedThinking.level : null;
+	const pickThinking = (level: string | null): void => {
+		setPickedThinking(level !== null && shownSelector ? { model: shownSelector, level } : null);
+	};
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
 	const checkout = useGitCheckout(cwd, launch?.phase === "failed" ? launch : null);
 	const pickedChoice = picked.cwd === cwd ? picked.choice : null;
@@ -158,8 +164,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	};
 	useShortcuts({
 		model: () => {
-			if (starting) return false;
+			if (starting || !connected) return false;
 			openModels(true);
+		},
+		thinking: () => {
+			if (starting || !connected || modelsRead.error !== null || !levels?.length) return false;
+			pickThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
 		},
 	});
 	const directCommand = blockedShortcut(draft, "new");
@@ -198,7 +208,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					onSend={text => {
 						if (directCommand) return;
 						completion.close();
-						attachments.read(images => onStart({ prompt: text, images, branch: choice, model, skill: skipSkill ? null : pinnedSkill }));
+						attachments.read(images => onStart({ prompt: text, images, branch: choice, model, thinking, skill: skipSkill ? null : pinnedSkill }));
 					}}
 					placeholder="Message this session…"
 					files={attachments.files}
@@ -207,13 +217,17 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					leftSlot={
 						<>
 							<ModelPicker
-								current={shownModel && `${shownModel.provider}/${shownModel.id}`}
+								current={shownSelector}
 								unset="Default model"
 								list={models}
 								open={modelsOpen}
 								onOpenChange={openModels}
-								onPick={setModel}
-								disabled={starting}
+								onPick={next => {
+									setModel(next);
+									setPickedThinking(null);
+								}}
+								thinking={{ current: thinking, levels, onPick: pickThinking, allowDefault: true, disabled: modelsRead.error !== null }}
+								disabled={starting || !connected}
 							/>
 							<DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={starting} onPick={onPickCwd} />
 							{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
