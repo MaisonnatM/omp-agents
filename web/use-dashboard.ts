@@ -1,29 +1,34 @@
-import { useCallback, useEffect, useReducer, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useReducer, useRef } from "react";
 import type { ClientMsg, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
-import { applyPaneMessage, type Completions, isPaneMsg, type PaneMsg, retainPanes } from "./pane-store";
+import { applyPaneMessage, type Completions, retainPanes } from "./pane-store";
 import {
 	EMPTY_LAYOUT,
 	hashForLayout,
-	hashForNewSession,
+	hashForPage,
 	type Layout,
-	layoutFromHash,
-	pageFromHash,
+	layoutAfterResumeAll,
+	layoutAfterStart,
 	type OpenMode,
 	openView,
+	type Page,
+	type Route,
+	routeFromHash,
 	sameView,
-	sessionFromHash,
-	swapView,
 	viewForSession,
 } from "./routing";
-import { beginStart, dismissSettled, dropHidden, loseStarts, requestOf, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
-
-const subscribeHash = (onChange: () => void): (() => void) => {
-	window.addEventListener("hashchange", onChange);
-	return () => window.removeEventListener("hashchange", onChange);
-};
-
-/** The URL hash, rendering again whenever it changes. */
-export const useHash = (): string => useSyncExternalStore(subscribeHash, () => location.hash);
+import {
+	beginStart,
+	dismissSettled,
+	dropHidden,
+	loseStarts,
+	messageOf,
+	pendingStart,
+	settleResumeAll,
+	settleStart,
+	type StartKind,
+	type StartOp,
+	type Starts,
+} from "./starts";
 
 const NO_VIEWS: View[] = [];
 
@@ -31,9 +36,6 @@ export interface Models {
 	models: ModelOption[];
 	error: string | null;
 }
-
-/** The page's last **Resume all**: waiting for the server's answer, or failed for some of its sessions. One that resumed everything leaves no trace. */
-export type ResumeAll = { phase: "starting"; reqId: number } | { phase: "failed"; error: string };
 
 export interface DashboardState {
 	connected: boolean;
@@ -43,10 +45,13 @@ export interface DashboardState {
 	past: PastSession[];
 	/** Whether the server has sent its session lists, the roster and then the past sessions, since the page loaded. */
 	listed: boolean;
+	/** What the URL hash shows over the panes: a page, or a `#session/<id>` link until the session lists show where it runs; `null` for the panes. */
+	cover: Exclude<Route, { kind: "panes" }> | null;
+	/** The panes, kept as they were behind a page that covers them. */
 	layout: Layout;
 	/** Last roster row seen for each open live session, by instance id, kept after it leaves the roster. */
 	lastHosts: Map<string, RosterHost>;
-	/** Starts of new, forked, resumed, and quick-action sessions, by the `reqId` the server answers with. */
+	/** Starts of new, forked, resumed, and quick-action sessions, and of **Resume all**, by the `reqId` the server answers with. */
 	starts: Starts;
 	/** The server's last answer to the new-session draft's `complete`. */
 	newSessionCompletions: Completions | null;
@@ -58,19 +63,19 @@ export interface DashboardState {
 	usage: { plans: PlanUsage[]; error: string | null } | null;
 	/** Last model list the server sent for each open live session, by instance id. */
 	models: Map<string, Models>;
-	resumeAll: ResumeAll | null;
 }
+
+/** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
+type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" }>;
 
 type Action =
 	| { t: "connected"; connected: boolean }
-	/** Everything the server sends except what {@link isPaneMsg} says belongs to one view, which the pane store takes. */
-	| { t: "server"; msg: Exclude<ServerMsg, PaneMsg> }
-	| { t: "layout"; layout: Layout }
+	| { t: "route"; route: Route }
 	| { t: "start"; reqId: number; op: StartOp }
 	/** A failed start's error, or a quick action's started session, goes away; a start under way keeps waiting for its answer. */
 	| { t: "dismiss-start"; kind: StartKind }
-	| { t: "resume-all"; reqId: number }
-	| { t: "dismiss-resume-all" };
+	| { t: "new-session-completions"; completions: Completions }
+	| ServerAction;
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
 
@@ -100,114 +105,86 @@ function keepUnchanged<T extends { instanceId: string }>(prev: T[], next: T[]): 
 	});
 }
 
+/** `state` with `next` in its panes. */
+function withLayout(state: DashboardState, next: Layout): DashboardState {
+	if (hashForLayout(next) === hashForLayout(state.layout)) return state;
+	// A view that stays open stays the same object, so its pane can skip the update.
+	const layout = { ...next, panes: next.panes.map(view => state.layout.panes.find(pane => sameView(pane, view)) ?? view) };
+	const shown = (view: View): boolean => layout.panes.some(pane => sameView(pane, view));
+	return {
+		...state,
+		layout,
+		lastHosts: rememberHosts(state.lastHosts, state.hosts, layout),
+		models: pick(state.models, liveIds(layout)),
+		starts: dropHidden(state.starts, shown),
+		draft: state.draft && shown(state.draft.view) ? state.draft : null,
+	};
+}
+
 function reduce(state: DashboardState, action: Action): DashboardState {
 	switch (action.t) {
 		case "connected":
-			return {
-				...state,
-				connected: action.connected,
-				starts: action.connected ? state.starts : loseStarts(state.starts),
-				resumeAll:
-					!action.connected && state.resumeAll?.phase === "starting"
-						? { phase: "failed", error: "Lost the dashboard server while resuming. The sessions may still appear." }
-						: state.resumeAll,
-			};
-		case "layout": {
-			if (hashForLayout(action.layout) === hashForLayout(state.layout)) return state;
-			// A view that stays open stays the same object, so its pane can skip the update.
-			const layout = { ...action.layout, panes: action.layout.panes.map(view => state.layout.panes.find(pane => sameView(pane, view)) ?? view) };
-			const shown = (view: View): boolean => layout.panes.some(pane => sameView(pane, view));
-			return {
-				...state,
-				layout,
-				lastHosts: rememberHosts(state.lastHosts, state.hosts, layout),
-				models: pick(state.models, liveIds(layout)),
-				starts: dropHidden(state.starts, shown),
-				draft: state.draft && shown(state.draft.view) ? state.draft : null,
-			};
+			return { ...state, connected: action.connected, starts: action.connected ? state.starts : loseStarts(state.starts) };
+		case "route": {
+			const { route } = action;
+			if (route.kind !== "panes") return { ...state, cover: route };
+			const next = withLayout(state, route.layout);
+			return next.cover === null ? next : { ...next, cover: null };
 		}
 		case "start":
 			return { ...state, starts: beginStart(state.starts, action.reqId, action.op) };
 		case "dismiss-start":
 			return { ...state, starts: dismissSettled(state.starts, action.kind) };
-		case "resume-all":
-			return { ...state, resumeAll: { phase: "starting", reqId: action.reqId } };
-		case "dismiss-resume-all":
-			return state.resumeAll?.phase === "failed" ? { ...state, resumeAll: null } : state;
-		case "server": {
-			const msg = action.msg;
-			switch (msg.t) {
-				case "roster":
-					return {
-						...state,
-						hosts: keepUnchanged(state.hosts, msg.hosts),
-						rosterError: msg.error,
-						lastHosts: rememberHosts(state.lastHosts, msg.hosts, state.layout),
-					};
-				case "past":
-					return { ...state, past: msg.sessions, listed: true };
-				case "started": {
-					const start = state.starts.get(msg.reqId);
-					if (start?.phase !== "starting") return state;
-					const starts = settleStart(state.starts, msg.reqId, msg.result);
-					if (!msg.result.ok) return { ...state, starts };
-					const { instanceId, cwd, prompt } = msg.result;
-					// A fork's composer starts with the prompt it branched at, to edit; forking a reply starts it empty.
-					const draft: DashboardState["draft"] =
-						start.op.kind === "fork"
-							? { view: { kind: "live", instanceId, agentId: null }, text: start.op.point.prefill ? (prompt ?? "") : "" }
-							: state.draft;
-					return { ...state, starts, draft, started: { instanceId, cwd } };
-				}
-				case "resumed-all": {
-					if (state.resumeAll?.phase !== "starting" || state.resumeAll.reqId !== msg.reqId) return state;
-					const [first] = msg.errors;
-					if (first === undefined) return { ...state, resumeAll: null };
-					const count = msg.errors.length === 1 ? "1 session" : `${msg.errors.length} sessions`;
-					return { ...state, resumeAll: { phase: "failed", error: `Could not resume ${count}. ${first}` } };
-				}
-				case "completions":
-					return { ...state, newSessionCompletions: { reqId: msg.reqId, items: msg.items, error: msg.error } };
-				case "usage":
-					return { ...state, usage: { plans: msg.plans, error: msg.error } };
-				case "models":
-					if (!liveIds(state.layout).includes(msg.instanceId)) return state;
-					return { ...state, models: new Map(state.models).set(msg.instanceId, { models: msg.models, error: msg.error }) };
-			}
+		case "new-session-completions":
+			return { ...state, newSessionCompletions: action.completions };
+		case "roster":
+			return {
+				...state,
+				hosts: keepUnchanged(state.hosts, action.hosts),
+				rosterError: action.error,
+				lastHosts: rememberHosts(state.lastHosts, action.hosts, state.layout),
+			};
+		case "past":
+			return { ...state, past: action.sessions, listed: true };
+		case "started": {
+			const start = pendingStart(state.starts, action.reqId);
+			if (!start) return state;
+			const starts = settleStart(state.starts, action.reqId, action.result);
+			if (!action.result.ok) return { ...state, starts };
+			const { instanceId, cwd, prompt } = action.result;
+			// A fork's composer starts with the prompt it branched at, to edit; forking a reply starts it empty.
+			const draft: DashboardState["draft"] =
+				start.op.kind === "fork"
+					? { view: { kind: "live", instanceId, agentId: null }, text: start.op.point.prefill ? (prompt ?? "") : "" }
+					: state.draft;
+			return { ...state, starts, draft, started: { instanceId, cwd } };
+		}
+		case "resumed-all": {
+			const starts = settleResumeAll(state.starts, action.reqId, action.errors);
+			return starts === state.starts ? state : { ...state, starts };
+		}
+		case "usage":
+			return { ...state, usage: { plans: action.plans, error: action.error } };
+		case "models":
+			if (!liveIds(state.layout).includes(action.instanceId)) return state;
+			return { ...state, models: new Map(state.models).set(action.instanceId, { models: action.models, error: action.error }) };
+		default: {
+			const never: never = action;
+			return never;
 		}
 	}
 }
 
-/** Dashboard state plus the ways the page talks back. */
-export interface Dashboard {
-	state: DashboardState;
-	send: (msg: ClientMsg) => void;
-	/** Show `view` in the focused pane, or in a new pane for `split`. */
-	open: (view: View, mode: OpenMode) => void;
-	focus: (index: number) => void;
-	/** Show `layout`, as a new history entry. */
-	show: (layout: Layout) => void;
-	/** Open the new-session draft in the default directory, clearing a failed start's error. */
-	openNewSession: () => void;
-	/** Forget the error of a failed start of `kind`, or the session a quick action started. */
-	dismissStart: (kind: StartKind) => void;
-	/** Start a session; it opens in the focused pane once ready, and a resumed one in the pane of the past session it continues. A quick action's session runs in the background, and the page stays where it is. */
-	start: (op: StartOp) => void;
-	/** Resume these interrupted sessions; a pane that shows one of them shows it live once it runs. */
-	resumeAll: (sessionIds: string[]) => void;
-	/** Forget why the last **Resume all** failed. */
-	dismissResumeAll: () => void;
-}
-
-/** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
-export function useDashboard(): Dashboard {
-	const [state, dispatch] = useReducer(reduce, {
+function initialState(): DashboardState {
+	const route = routeFromHash(location.hash);
+	return {
 		connected: false,
 		hosts: [],
 		rosterError: null,
 		past: [],
 		listed: false,
-		layout: layoutFromHash(location.hash) ?? EMPTY_LAYOUT,
+		cover: route.kind === "panes" ? null : route,
+		layout: route.kind === "panes" ? route.layout : EMPTY_LAYOUT,
 		lastHosts: new Map(),
 		starts: new Map(),
 		newSessionCompletions: null,
@@ -215,17 +192,46 @@ export function useDashboard(): Dashboard {
 		started: null,
 		usage: null,
 		models: new Map(),
-		resumeAll: null,
-	});
+	};
+}
+
+/** Dashboard state plus the ways the page talks back. */
+export interface Dashboard {
+	state: DashboardState;
+	/** The page covering the panes; `null` while the panes show. */
+	page: Page | null;
+	send: (msg: ClientMsg) => void;
+	/** Show `view` in the focused pane, or in a new pane for `split`. */
+	open: (view: View, mode: OpenMode) => void;
+	focus: (index: number) => void;
+	/** Show `layout`, as a new history entry. */
+	show: (layout: Layout) => void;
+	/** Show `page` over the panes, as a new history entry. */
+	navigate: (page: Page) => void;
+	/** Open the new-session draft in the default directory, clearing a failed start's error. */
+	openNewSession: () => void;
+	/** Forget the error of a failed start of `kind`, or the session a quick action started. */
+	dismissStart: (kind: StartKind) => void;
+	/**
+	 * Start a session; it opens in the focused pane once ready, and a resumed one in the pane of the past session it
+	 * continues. A quick action's session runs in the background, and the page stays where it is. A **Resume all** shows
+	 * each session it resumes live in the pane that shows it.
+	 */
+	start: (op: StartOp) => void;
+}
+
+/** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
+export function useDashboard(): Dashboard {
+	const [state, dispatch] = useReducer(reduce, null, initialState);
 	const socketRef = useRef<WebSocket | null>(null);
 	const layoutRef = useRef(state.layout);
 	layoutRef.current = state.layout;
-	// What the page asked to start when the last answer was rendered; a `started` message finds its start here before the render that settles it.
+	// What the page asked to start when the last answer was rendered; a server answer finds its start here before the render that settles it.
 	const startsRef = useRef(state.starts);
 	startsRef.current = state.starts;
+	const page = state.cover?.kind === "page" ? state.cover.page : null;
 	// A page covering the panes shows none of them, so the server stops streaming them until the panes return.
-	const hash = useHash();
-	const watched = pageFromHash(hash) ? NO_VIEWS : state.layout.panes;
+	const watched = page ? NO_VIEWS : state.layout.panes;
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
 
@@ -234,21 +240,31 @@ export function useDashboard(): Dashboard {
 		if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 	}, []);
 
-	// The hash is the source of truth; its `hashchange` dispatches the layout.
+	// The hash is the source of truth; its `hashchange` dispatches the route.
 	const show = useCallback((layout: Layout) => {
 		location.hash = hashForLayout(layout);
 	}, []);
 
-	const open = useCallback((view: View, mode: OpenMode) => show(openView(layoutRef.current, view, mode)), [show]);
-
-	// Moving focus is not navigation, so it rewrites the current history entry.
-	const focus = useCallback((index: number) => {
-		const layout = { ...layoutRef.current, focus: index };
-		history.replaceState(null, "", hashForLayout(layout) || location.pathname + location.search);
-		dispatch({ t: "layout", layout });
+	const navigate = useCallback((next: Page) => {
+		location.hash = hashForPage(next);
 	}, []);
 
+	// Moving focus, or opening a session link, is not navigation, so it rewrites the current history entry.
+	const replace = useCallback((layout: Layout) => {
+		history.replaceState(null, "", hashForLayout(layout) || location.pathname + location.search);
+		dispatch({ t: "route", route: { kind: "panes", layout } });
+	}, []);
+
+	const open = useCallback((view: View, mode: OpenMode) => show(openView(layoutRef.current, view, mode)), [show]);
+
+	const focus = useCallback((index: number) => replace({ ...layoutRef.current, focus: index }), [replace]);
+
 	useEffect(() => {
+		// A start's answer settles it, then the panes follow the start as it was before.
+		const answer = (msg: ServerAction, layout: Layout | null): void => {
+			dispatch(msg);
+			if (layout) show(layout);
+		};
 		let retryMs = 500;
 		let timer: number | undefined;
 		let disposed = false;
@@ -262,21 +278,34 @@ export function useDashboard(): Dashboard {
 			};
 			ws.onmessage = event => {
 				const msg = JSON.parse(String(event.data)) as ServerMsg;
-				if (isPaneMsg(msg)) applyPaneMessage(msg);
-				else dispatch({ t: "server", msg });
-				if (msg.t === "started" && msg.result.ok) {
-					const op = startsRef.current.get(msg.reqId)?.op;
-					const live: LiveView = { kind: "live", instanceId: msg.result.instanceId, agentId: null };
-					if (op?.kind === "resume") show(swapView(layoutRef.current, { kind: "past", sessionId: op.sessionId }, live));
-					else if (op && op.kind !== "quick") open(live, "replace");
-				}
-				if (msg.t === "resumed-all") {
-					const layout = layoutRef.current;
-					const panes = layout.panes.map(view => {
-						const started = view.kind === "past" && msg.started.find(({ sessionId }) => sessionId === view.sessionId);
-						return started ? { kind: "live" as const, instanceId: started.instanceId, agentId: null } : view;
-					});
-					if (panes.some((view, index) => view !== layout.panes[index])) show({ ...layout, panes });
+				switch (msg.t) {
+					case "items":
+					case "work":
+					case "dequeued":
+						applyPaneMessage(msg);
+						return;
+					case "completions":
+						if (msg.scope.kind === "live") applyPaneMessage({ ...msg, scope: msg.scope });
+						else dispatch({ t: "new-session-completions", completions: { reqId: msg.reqId, items: msg.items, error: msg.error } });
+						return;
+					case "started": {
+						const start = pendingStart(startsRef.current, msg.reqId);
+						answer(msg, start && msg.result.ok ? layoutAfterStart(layoutRef.current, start.op, msg.result.instanceId) : null);
+						return;
+					}
+					case "resumed-all":
+						answer(msg, pendingStart(startsRef.current, msg.reqId) && layoutAfterResumeAll(layoutRef.current, msg.started));
+						return;
+					case "roster":
+					case "past":
+					case "usage":
+					case "models":
+						dispatch(msg);
+						return;
+					default: {
+						const never: never = msg;
+						return never;
+					}
 				}
 			};
 			ws.onclose = () => {
@@ -292,25 +321,20 @@ export function useDashboard(): Dashboard {
 			clearTimeout(timer);
 			socketRef.current?.close();
 		};
-	}, [open, show]);
+	}, [show]);
 
 	useEffect(() => {
-		const onHash = (): void => {
-			const layout = layoutFromHash(location.hash);
-			if (layout) dispatch({ t: "layout", layout });
-		};
+		const onHash = (): void => dispatch({ t: "route", route: routeFromHash(location.hash) });
 		window.addEventListener("hashchange", onHash);
 		return () => window.removeEventListener("hashchange", onHash);
 	}, []);
 
 	// A `#session/<id>` link opens where that session runs, once the server has listed the sessions.
+	const sessionLink = state.cover?.kind === "session" ? state.cover.sessionId : null;
 	useEffect(() => {
-		const sessionId = sessionFromHash(location.hash);
-		if (sessionId === null || !state.listed) return;
-		const layout = openView(layoutRef.current, viewForSession(sessionId, state.hosts), "replace");
-		history.replaceState(null, "", hashForLayout(layout));
-		dispatch({ t: "layout", layout });
-	}, [hash, state.listed, state.hosts]);
+		if (sessionLink === null || !state.listed) return;
+		replace(openView(layoutRef.current, viewForSession(sessionLink, state.hosts), "replace"));
+	}, [sessionLink, state.listed, state.hosts, replace]);
 
 	// Declared before the watch, so a view's data is kept when its transcript arrives.
 	useEffect(() => retainPanes(state.layout.panes), [state.layout.panes]);
@@ -323,28 +347,18 @@ export function useDashboard(): Dashboard {
 
 	const openNewSession = useCallback(() => {
 		dispatch({ t: "dismiss-start", kind: "new" });
-		location.hash = hashForNewSession(null);
-	}, []);
+		navigate({ kind: "new", cwd: null });
+	}, [navigate]);
 
 	const nextReqId = useRef(0);
 	const start = useCallback(
 		(op: StartOp) => {
 			const reqId = nextReqId.current++;
 			dispatch({ t: "start", reqId, op });
-			send({ t: "start", reqId, ...requestOf(op) });
+			send(messageOf(op, reqId));
 		},
 		[send],
 	);
 
-	const resumeAll = useCallback(
-		(sessionIds: string[]) => {
-			const reqId = nextReqId.current++;
-			dispatch({ t: "resume-all", reqId });
-			send({ t: "resume-all", reqId, sessionIds });
-		},
-		[send],
-	);
-	const dismissResumeAll = useCallback(() => dispatch({ t: "dismiss-resume-all" }), []);
-
-	return { state, send, open, focus, show, openNewSession, dismissStart, start, resumeAll, dismissResumeAll };
+	return { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start };
 }

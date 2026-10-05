@@ -37,7 +37,6 @@ import { type SidebarSessions, workspaces } from "../sessions";
 import { shortcutKeys, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
 import { ticketGroups, ticketSection } from "../tickets-model";
-import type { ResumeAll } from "../use-dashboard";
 import { useInbox } from "../use-inbox";
 import { useTickets } from "../use-tickets";
 import { CommandPicker } from "./command-picker";
@@ -364,7 +363,7 @@ interface RosterProps {
 	/** Continue past session `sessionId`, in the pane that shows it. */
 	onResume: (sessionId: string) => void;
 	/** The page's last **Resume all**, while it runs or after it failed. */
-	resumeAll: ResumeAll | null;
+	resumeAll: StartOf<"resume-all"> | null;
 	/** Resume every interrupted session the sidebar lists. */
 	onResumeAll: (sessionIds: string[]) => void;
 	onDismissResumeAll: () => void;

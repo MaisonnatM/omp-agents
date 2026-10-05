@@ -1,30 +1,13 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { type PullRequest, type RosterHost, SESSION_HASH_PREFIX, TICKET_ID, type View } from "../src/shared";
+import { type LiveView, type PullRequest, type RosterHost, SESSION_HASH_PREFIX, TICKET_ID, type View } from "../src/shared";
+import type { StartOp } from "./starts";
 
 const PAST_PREFIX = "past/";
-const SETTINGS = "settings";
-const INBOX = "inbox";
-const TICKETS = "tickets";
-const NEW = "new";
 
 /** The inbox page, and the pull request whose row it scrolls to and highlights; `null` for none. */
 export interface InboxRoute {
 	target: PullRequest | null;
 }
-
-/**
- * `#inbox` opens the inbox page, which lists the pull requests of the sidebar's project, and
- * `#inbox/<owner>/<repo>/<number>` opens it at that pull request's row. Any other `#inbox/…` opens the page alone.
- */
-export function inboxFromHash(hash: string): InboxRoute | null {
-	const raw = hash.replace(/^#/, "");
-	if (raw !== INBOX && !raw.startsWith(`${INBOX}/`)) return null;
-	const match = /^inbox\/([\w.-]+)\/([\w.-]+)\/(\d+)$/.exec(raw);
-	return { target: match ? { owner: match[1]!, repo: match[2]!, number: Number(match[3]) } : null };
-}
-
-export const hashForInbox = (target: PullRequest | null): string =>
-	target ? `#${INBOX}/${target.owner}/${target.repo}/${target.number}` : `#${INBOX}`;
 
 /** The tickets page, and the Linear issue whose row it scrolls to and highlights; `null` for none. */
 export interface TicketsRoute {
@@ -32,23 +15,124 @@ export interface TicketsRoute {
 	target: string | null;
 }
 
-/**
- * `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
- * opens it at that issue's row. Any other `#tickets/…` opens the page alone.
- */
-export function ticketsFromHash(hash: string): TicketsRoute | null {
-	const raw = hash.replace(/^#/, "");
-	if (raw !== TICKETS && !raw.startsWith(`${TICKETS}/`)) return null;
-	const id = raw.slice(TICKETS.length + 1);
-	return { target: TICKET_ID.test(id) ? id : null };
+/** Where the settings page reads project files and config from; `null` for user-level only. */
+export interface SettingsRoute {
+	cwd: string | null;
 }
 
-export const hashForTickets = (target: string | null): string => (target ? `#${TICKETS}/${target}` : `#${TICKETS}`);
+/** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. */
+export interface NewSessionRoute {
+	cwd: string | null;
+}
 
-/** `#session/<id>` names a session by its id, which outlives the host running it, for links from outside the page. */
-export function sessionFromHash(hash: string): string | null {
+/** A page that covers the panes. */
+export type Page =
+	| ({ kind: "settings" } & SettingsRoute)
+	| ({ kind: "inbox" } & InboxRoute)
+	| ({ kind: "tickets" } & TicketsRoute)
+	| ({ kind: "new" } & NewSessionRoute);
+
+/** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
+export type Route = { kind: "page"; page: Page } | { kind: "session"; sessionId: string } | { kind: "panes"; layout: Layout };
+
+type PageOf<K extends Page["kind"]> = Extract<Page, { kind: K }>;
+
+/** The settings page and the new-session draft both name an optional directory, encoded so it keeps its slashes and tilde. */
+const decodeCwd = (rest: string | null): string | null => (rest === null ? null : decodeURIComponent(rest));
+const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : encodeURIComponent(cwd));
+
+/**
+ * Each page by its kind, which is its hash's first segment, reading what follows the next `/` (`null` without one).
+ * - `#settings` opens the settings page, `#settings/<cwd>` with that workspace's project files and config.
+ * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen. No omp runs until its first message.
+ * - `#inbox` opens the inbox page, which lists the pull requests of the sidebar's project, and
+ *   `#inbox/<owner>/<repo>/<number>` opens it at that pull request's row. Any other `#inbox/…` opens the page alone.
+ * - `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
+ *   opens it at that issue's row. Any other `#tickets/…` opens the page alone.
+ */
+const PAGES: { [K in Page["kind"]]: (rest: string | null) => PageOf<K> } = {
+	settings: rest => ({ kind: "settings", cwd: decodeCwd(rest) }),
+	new: rest => ({ kind: "new", cwd: decodeCwd(rest) }),
+	inbox: rest => {
+		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)$/.exec(rest);
+		return { kind: "inbox", target: match ? { owner: match[1]!, repo: match[2]!, number: Number(match[3]) } : null };
+	},
+	tickets: rest => ({ kind: "tickets", target: rest !== null && TICKET_ID.test(rest) ? rest : null }),
+};
+
+const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, head);
+
+/** What follows `#<kind>/` in `page`'s hash; `null` for the page alone. */
+function restOfPage(page: Page): string | null {
+	switch (page.kind) {
+		case "settings":
+		case "new":
+			return encodeCwd(page.cwd);
+		case "inbox":
+			return page.target && `${page.target.owner}/${page.target.repo}/${page.target.number}`;
+		case "tickets":
+			return page.target || null;
+		default: {
+			const never: never = page;
+			return never;
+		}
+	}
+}
+
+export function hashForPage(page: Page): string {
+	const rest = restOfPage(page);
+	return rest === null ? `#${page.kind}` : `#${page.kind}/${rest}`;
+}
+
+export const hashForInbox = (target: PullRequest | null): string => hashForPage({ kind: "inbox", target });
+export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
+export const hashForSettings = (cwd: string | null): string => hashForPage({ kind: "settings", cwd });
+export const hashForNewSession = (cwd: string | null): string => hashForPage({ kind: "new", cwd });
+
+/**
+ * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives
+ * the host running it, for links from outside the page; it names no layout until the session lists show where that
+ * session runs. Any other hash names the panes.
+ */
+export function routeFromHash(hash: string): Route {
 	const raw = hash.replace(/^#/, "");
-	return raw.startsWith(SESSION_HASH_PREFIX) && raw.length > SESSION_HASH_PREFIX.length ? decodeURIComponent(raw.slice(SESSION_HASH_PREFIX.length)) : null;
+	const slash = raw.indexOf("/");
+	const head = slash < 0 ? raw : raw.slice(0, slash);
+	const rest = slash < 0 ? null : raw.slice(slash + 1);
+	if (isPageKind(head)) return { kind: "page", page: PAGES[head](rest) };
+	if (`${head}/` === SESSION_HASH_PREFIX && rest) return { kind: "session", sessionId: decodeURIComponent(rest) };
+	return { kind: "panes", layout: layoutFromPanes(raw) };
+}
+
+// The single-route readers below are the shapes routing.test.ts pins; the page itself reads `routeFromHash`.
+export function pageFromHash(hash: string): Page | null {
+	const route = routeFromHash(hash);
+	return route.kind === "page" ? route.page : null;
+}
+
+export function layoutFromHash(hash: string): Layout | null {
+	const route = routeFromHash(hash);
+	return route.kind === "panes" ? route.layout : null;
+}
+
+export function sessionFromHash(hash: string): string | null {
+	const route = routeFromHash(hash);
+	return route.kind === "session" ? route.sessionId : null;
+}
+
+export function settingsFromHash(hash: string): SettingsRoute | null {
+	const page = pageFromHash(hash);
+	return page?.kind === "settings" ? { cwd: page.cwd } : null;
+}
+
+export function newSessionFromHash(hash: string): NewSessionRoute | null {
+	const page = pageFromHash(hash);
+	return page?.kind === "new" ? { cwd: page.cwd } : null;
+}
+
+export function inboxFromHash(hash: string): InboxRoute | null {
+	const page = pageFromHash(hash);
+	return page?.kind === "inbox" ? { target: page.target } : null;
 }
 
 /** The view a session id opens: the live host that runs the session, else its saved transcript. */
@@ -56,35 +140,6 @@ export function viewForSession(sessionId: string, hosts: RosterHost[]): View {
 	const host = hosts.find(h => h.sessionId === sessionId);
 	return host ? { kind: "live", instanceId: host.instanceId, agentId: null } : { kind: "past", sessionId };
 }
-
-/** Where the settings page reads project files and config from; `null` for user-level only. */
-export interface SettingsRoute {
-	cwd: string | null;
-}
-
-/** `#settings` opens the settings page, `#settings/<cwd>` with that workspace's project files and config. */
-export function settingsFromHash(hash: string): SettingsRoute | null {
-	const raw = hash.replace(/^#/, "");
-	if (raw === SETTINGS) return { cwd: null };
-	return raw.startsWith(`${SETTINGS}/`) ? { cwd: decodeURIComponent(raw.slice(SETTINGS.length + 1)) } : null;
-}
-
-export const hashForSettings = (cwd: string | null): string =>
-	cwd === null ? `#${SETTINGS}` : `#${SETTINGS}/${encodeURIComponent(cwd)}`;
-
-/** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. */
-export interface NewSessionRoute {
-	cwd: string | null;
-}
-
-/** `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen. No omp runs until its first message. */
-export function newSessionFromHash(hash: string): NewSessionRoute | null {
-	const raw = hash.replace(/^#/, "");
-	if (raw === NEW) return { cwd: null };
-	return raw.startsWith(`${NEW}/`) ? { cwd: decodeURIComponent(raw.slice(NEW.length + 1)) } : null;
-}
-
-export const hashForNewSession = (cwd: string | null): string => (cwd === null ? `#${NEW}` : `#${NEW}/${encodeURIComponent(cwd)}`);
 
 /** Panes the page splits into at most, as a 2x2 grid. */
 export const MAX_PANES = 4;
@@ -139,14 +194,8 @@ export function hashForLayout({ panes, focus, maximized }: Layout): string {
 	return `#${panes.map(paneForView).join(",")}${focus > 0 ? `@${focus}` : ""}${maximized ? MAXIMIZED : ""}`;
 }
 
-/**
- * The layout a hash names, keeping the first {@link MAX_PANES} distinct views and focus on the view it named.
- * `null` for the settings, inbox, tickets, and new-session pages, which leave the panes behind them alone, and for a
- * `#session/<id>` link, which names no layout until the session lists show where that session runs.
- */
-export function layoutFromHash(hash: string): Layout | null {
-	if (pageFromHash(hash) || sessionFromHash(hash) !== null) return null;
-	const marked = hash.replace(/^#/, "");
+/** The layout a hash's panes name, keeping the first {@link MAX_PANES} distinct views and focus on the view it named. */
+function layoutFromPanes(marked: string): Layout {
 	const maximized = marked.endsWith(MAXIMIZED);
 	const raw = maximized ? marked.slice(0, -MAXIMIZED.length) : marked;
 	const at = raw.lastIndexOf("@");
@@ -198,6 +247,38 @@ export function swapView(layout: Layout, from: View, to: View): Layout {
 }
 
 /**
+ * The layout once start `op` answers with live session `instanceId`, `null` to leave it: a resumed session takes the
+ * pane of the past session it continues, a new session or a fork opens in the focused pane, and a quick action's
+ * session runs in the background.
+ */
+export function layoutAfterStart(layout: Layout, op: StartOp, instanceId: string): Layout | null {
+	const live: LiveView = { kind: "live", instanceId, agentId: null };
+	switch (op.kind) {
+		case "resume":
+			return swapView(layout, { kind: "past", sessionId: op.sessionId }, live);
+		case "new":
+		case "fork":
+			return openView(layout, live, "replace");
+		case "quick":
+		case "resume-all":
+			return null;
+		default: {
+			const never: never = op;
+			return never;
+		}
+	}
+}
+
+/** The layout once **Resume all** `started` these sessions: each pane showing one as past shows it live. `null` when no pane changes. */
+export function layoutAfterResumeAll(layout: Layout, started: { sessionId: string; instanceId: string }[]): Layout | null {
+	const panes = layout.panes.map((view): View => {
+		const resumed = view.kind === "past" && started.find(({ sessionId }) => sessionId === view.sessionId);
+		return resumed ? { kind: "live", instanceId: resumed.instanceId, agentId: null } : view;
+	});
+	return panes.some((view, index) => view !== layout.panes[index]) ? { ...layout, panes } : null;
+}
+
+/**
  * The layout once live session `instanceId` ends. Each pane showing it, or one of its subagents, shows the next
  * session in `listed` (the sidebar's running sessions, in order), else the previous, skipping sessions already open.
  * A pane left without one keeps the ended session.
@@ -221,23 +302,4 @@ export function adjacentSession(listed: View[], current: View | null, step: 1 | 
 	const at = listed.findIndex(view => sameView(view, row));
 	if (at < 0) return (step > 0 ? listed[0] : listed.at(-1)) ?? null;
 	return listed[at + step] ?? null;
-}
-
-/** A page that covers the panes. */
-export type Page =
-	| ({ kind: "settings" } & SettingsRoute)
-	| ({ kind: "inbox" } & InboxRoute)
-	| ({ kind: "tickets" } & TicketsRoute)
-	| ({ kind: "new" } & NewSessionRoute);
-
-/** The page a hash names: settings, inbox, tickets, or the new-session draft; `null` for the panes. */
-export function pageFromHash(hash: string): Page | null {
-	const settings = settingsFromHash(hash);
-	if (settings) return { kind: "settings", ...settings };
-	const inbox = inboxFromHash(hash);
-	if (inbox) return { kind: "inbox", ...inbox };
-	const tickets = ticketsFromHash(hash);
-	if (tickets) return { kind: "tickets", ...tickets };
-	const newSession = newSessionFromHash(hash);
-	return newSession && { kind: "new", ...newSession };
 }
