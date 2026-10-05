@@ -1,6 +1,5 @@
 /** The dashboard server: wires the registries, the HTTP API, and the socket together, then follows omp's files and registry. */
 import type { Server } from "bun";
-import { loadInbox } from "./inbox";
 import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
@@ -103,14 +102,6 @@ const startSession = (request: StartRequest): Promise<StartResult> => worktrees.
 const runner = new RoutineRunner({
 	file: routines,
 	start: startSession,
-	async inbox(cwd) {
-		const inbox = await loadInbox([cwd], true);
-		if (inbox.unmatched.length > 0) throw new Error(`${displayPath(cwd)} has no GitHub origin.`);
-		return inbox.repos.flatMap(repo => {
-			if ("error" in repo) throw new Error(repo.error);
-			return repo.pullRequests;
-		});
-	},
 	session(instanceId) {
 		const session = sessions.get(instanceId);
 		return session ? { status: session.row().status, sessionId: session.sessionId, end: () => session.end() } : null;

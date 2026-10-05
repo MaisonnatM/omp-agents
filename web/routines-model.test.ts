@@ -1,21 +1,22 @@
 import { describe, expect, test } from "bun:test";
-import type { Routine, RoutineRun, Weekday } from "../src/shared";
-import { draftOf, lastRunWords, newDraft, nextRunWords, runWords, scheduleWords, specOf, taskWords, whenWords } from "./routines-model";
+import type { Routine, RoutineRun, Schedule, Weekday } from "../src/shared";
+import { draftOf, lastRunWords, newDraft, nextRunWords, runWords, type RoutineDraft, schedulesWords, scheduleWords, specOf, taskWords, whenWords } from "./routines-model";
 
 // Local times, so the expected words hold in any time zone. Oct 5 2026 is a Monday.
 const at = (day: number, hour: number, minute = 0): number => new Date(2026, 9, day, hour, minute).getTime();
 
+const weekdays: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } };
+
 const routine = (fields: Partial<Routine>): Routine => ({
 	id: "r1",
-	name: "Morning reviews",
+	name: "Morning notes",
 	cwd: "~/code/webapp",
-	schedule: { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } },
-	task: { kind: "pull-requests", action: "review" },
+	schedules: [weekdays],
+	task: { kind: "prompt", prompt: "Summarize yesterday's commits." },
 	skill: null,
 	enabled: true,
 	createdAt: at(5, 10),
 	runs: [],
-	done: {},
 	...fields,
 });
 
@@ -42,10 +43,12 @@ describe("schedule words", () => {
 });
 
 describe("task words", () => {
-	test("a pull request task names its action, and a prompt task its first line with text", () => {
-		expect(taskWords({ kind: "pull-requests", action: "review" })).toBe("Review pull requests");
-		expect(taskWords({ kind: "pull-requests", action: "thermonuclear-review" })).toBe("Thermonuclear review");
+	test("a prompt task names its first line with text", () => {
 		expect(taskWords({ kind: "prompt", prompt: "\n  Summarize yesterday's commits.  \nThen list open questions." })).toBe("Summarize yesterday's commits.");
+	});
+
+	test("several schedules read in the order they were saved", () => {
+		expect(schedulesWords([weekdays, { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 18, minute: 0 } }])).toBe("Weekdays at 9:00, Weekdays at 18:00");
 	});
 });
 
@@ -53,19 +56,28 @@ describe("next run", () => {
 	test("a weekly routine runs at its next slot after its last run, named by day", () => {
 		const now = at(5, 10);
 		expect(nextRunWords(routine({ runs: [run({ at: at(5, 9) })] }), now)).toBe("Tomorrow at 9:00");
-		expect(nextRunWords(routine({ schedule: { kind: "weekly", days: [1, 5], time: { hour: 18, minute: 30 } } }), now)).toBe("Today at 18:30");
-		expect(nextRunWords(routine({ schedule: { kind: "weekly", days: [5], time: { hour: 9, minute: 0 } } }), now)).toBe("Fri at 9:00");
-		expect(nextRunWords(routine({ schedule: { kind: "weekly", days: [1], time: { hour: 9, minute: 0 } } }), now)).toBe("Oct 12 at 9:00");
+		expect(nextRunWords(routine({ schedules: [{ kind: "weekly", days: [1, 5], time: { hour: 18, minute: 30 } }] }), now)).toBe("Today at 18:30");
+		expect(nextRunWords(routine({ schedules: [{ kind: "weekly", days: [5], time: { hour: 9, minute: 0 } }] }), now)).toBe("Fri at 9:00");
+		expect(nextRunWords(routine({ schedules: [{ kind: "weekly", days: [1], time: { hour: 9, minute: 0 } }] }), now)).toBe("Oct 12 at 9:00");
 	});
 
 	test("an interval counts from the last run, else from when the routine was made", () => {
-		expect(nextRunWords(routine({ schedule: { kind: "every", minutes: 1440 } }), at(5, 11))).toBe("Tomorrow at 10:00");
-		expect(nextRunWords(routine({ schedule: { kind: "every", minutes: 360 }, runs: [run({ at: at(5, 11, 15) })] }), at(5, 12))).toBe("Today at 17:15");
+		expect(nextRunWords(routine({ schedules: [{ kind: "every", minutes: 1440 }] }), at(5, 11))).toBe("Tomorrow at 10:00");
+		expect(nextRunWords(routine({ schedules: [{ kind: "every", minutes: 360 }], runs: [run({ at: at(5, 11, 15) })] }), at(5, 12))).toBe("Today at 17:15");
+	});
+
+	test("two schedules name the sooner one", () => {
+		const both = routine({
+			schedules: [weekdays, { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 18, minute: 0 } }],
+			runs: [run({ at: at(5, 9) })],
+		});
+		expect(nextRunWords(both, at(5, 10))).toBe("Today at 18:00");
+		expect(nextRunWords(routine({ schedules: [{ kind: "every", minutes: 90 }, { kind: "every", minutes: 60 }] }), at(5, 10))).toBe("Today at 11:00");
 	});
 
 	test("a paused routine says so, and one whose slot passed is due now", () => {
 		expect(nextRunWords(routine({ enabled: false }), at(5, 10))).toBe("Paused");
-		expect(nextRunWords(routine({ schedule: { kind: "every", minutes: 60 } }), at(5, 11))).toBe("Due now");
+		expect(nextRunWords(routine({ schedules: [{ kind: "every", minutes: 60 }] }), at(5, 11))).toBe("Due now");
 	});
 
 	test("a date past the week names its month", () => {
@@ -77,24 +89,21 @@ describe("last run", () => {
 	const started = { label: "acme/webapp#7", instanceId: "7c51", sessionId: "01a0" };
 
 	test("names the sessions it started, its errors, and what it still has queued", () => {
-		const task = { kind: "pull-requests", action: "review" } as const;
-		expect(runWords(run({ started: [started], errors: ["GitHub timed out", "No such directory"], queue: ["a", "b", "c"] }), task)).toBe(
+		expect(runWords(run({ started: [started], errors: ["GitHub timed out", "No such directory"], queue: ["a", "b", "c"] }))).toBe(
 			"1 session started, 2 errors, Queued: 3",
 		);
-		expect(runWords(run({ started: [started, started] }), task)).toBe("2 sessions started");
-		expect(runWords(run({ errors: ["GitHub timed out"] }), task)).toBe("1 error");
+		expect(runWords(run({ started: [started, started] }))).toBe("2 sessions started");
+		expect(runWords(run({ errors: ["GitHub timed out"] }))).toBe("1 error");
 	});
 
-	test("a run that started nothing says why it may have, by task, and a routine never run says so", () => {
-		expect(runWords(run({}), { kind: "pull-requests", action: "review" })).toBe("No pull requests to review");
-		expect(runWords(run({}), { kind: "prompt", prompt: "Hi" })).toBe("Nothing started");
+	test("a run that started nothing says so, and a routine never run says so", () => {
+		expect(runWords(run({}))).toBe("Nothing started");
 		expect(lastRunWords(routine({}))).toBe("Not run yet");
 		expect(lastRunWords(routine({ runs: [run({ started: [started] }), run({ errors: ["old"] })] }))).toBe("1 session started");
 	});
 });
 
 describe("command runs", () => {
-	const task = { kind: "command", command: "git worktree prune" } as const;
 	const window = { startedAt: at(5, 9), endedAt: at(5, 9) + 3000 };
 
 	test("a command task reads as its first line after a prompt sign", () => {
@@ -102,38 +111,58 @@ describe("command runs", () => {
 	});
 
 	test("a run reads as how its command stands", () => {
-		expect(runWords(run({}), task)).toBe("Nothing started");
-		expect(runWords(run({ command: { phase: "running", startedAt: at(5, 9) } }), task)).toBe("Running…");
-		expect(runWords(run({ command: { phase: "exited", code: 0, output: "", ...window } }), task)).toBe("Succeeded");
-		expect(runWords(run({ command: { phase: "exited", code: 3, output: "", ...window }, errors: ["Exited with code 3."] }), task)).toBe("Failed (exit 3)");
-		expect(runWords(run({ command: { phase: "stopped", reason: "time-limit", output: "", ...window } }), task)).toBe("Stopped at the time limit");
-		expect(runWords(run({ command: { phase: "stopped", reason: "dashboard", output: "", ...window } }), task)).toBe("Stopped with the dashboard");
-		expect(runWords(run({ command: { phase: "failed", error: "/gone is not a directory.", ...window } }), task)).toBe("Could not start");
+		expect(runWords(run({}))).toBe("Nothing started");
+		expect(runWords(run({ command: { phase: "running", startedAt: at(5, 9) } }))).toBe("Running…");
+		expect(runWords(run({ command: { phase: "exited", code: 0, output: "", ...window } }))).toBe("Succeeded");
+		expect(runWords(run({ command: { phase: "exited", code: 3, output: "", ...window }, errors: ["Exited with code 3."] }))).toBe("Failed (exit 3)");
+		expect(runWords(run({ command: { phase: "stopped", reason: "time-limit", output: "", ...window } }))).toBe("Stopped at the time limit");
+		expect(runWords(run({ command: { phase: "stopped", reason: "dashboard", output: "", ...window } }))).toBe("Stopped with the dashboard");
+		expect(runWords(run({ command: { phase: "failed", error: "/gone is not a directory.", ...window } }))).toBe("Could not start");
 	});
 
 	test("a run that ran nothing because the last command still ran counts its error", () => {
-		expect(runWords(run({ errors: ["The last run's command is still running."] }), task)).toBe("1 error");
+		expect(runWords(run({ errors: ["The last run's command is still running."] }))).toBe("1 error");
 	});
 });
 
 describe("editor form", () => {
 	test("a saved routine's form saves the same routine back", () => {
-		const saved = routine({ schedule: { kind: "every", minutes: 360 }, task: { kind: "prompt", prompt: "Reply ok." }, skill: "poteto-mode", enabled: false });
-		expect(draftOf(saved)).toMatchObject({ amount: "6", unit: "hours", task: "prompt", prompt: "Reply ok." });
+		const saved = routine({ schedules: [{ kind: "every", minutes: 360 }], task: { kind: "prompt", prompt: "Reply ok." }, skill: "poteto-mode", enabled: false });
+		expect(draftOf(saved).schedules[0]).toMatchObject({ amount: "6", unit: "hours" });
+		expect(draftOf(saved)).toMatchObject({ task: "prompt", prompt: "Reply ok." });
 		expect(specOf(draftOf(saved))).toEqual({
-			ok: { id: "r1", name: "Morning reviews", cwd: "~/code/webapp", enabled: false, skill: "poteto-mode", task: { kind: "prompt", prompt: "Reply ok." }, schedule: { kind: "every", minutes: 360 } },
+			ok: {
+				id: "r1",
+				name: "Morning notes",
+				cwd: "~/code/webapp",
+				enabled: false,
+				skill: "poteto-mode",
+				task: { kind: "prompt", prompt: "Reply ok." },
+				schedules: [{ kind: "every", minutes: 360 }],
+			},
 		});
 	});
 
 	test("a form saves weekly days Monday first and its time as typed, and says what to fix first", () => {
-		const draft = { ...newDraft("r2", "/tmp", null), name: " Standup ", prompt: "Hi", days: [3, 1] as Weekday[], time: "18:30" };
+		const base = newDraft("r2", "/tmp", null);
+		const draft: RoutineDraft = { ...base, name: " Standup ", prompt: "Hi", schedules: [{ ...base.schedules[0]!, days: [3, 1], time: "18:30" }] };
 		expect(specOf(draft)).toEqual({
-			ok: { id: "r2", name: "Standup", cwd: "/tmp", enabled: true, skill: null, task: { kind: "prompt", prompt: "Hi" }, schedule: { kind: "weekly", days: [1, 3], time: { hour: 18, minute: 30 } } },
+			ok: {
+				id: "r2",
+				name: "Standup",
+				cwd: "/tmp",
+				enabled: true,
+				skill: null,
+				task: { kind: "prompt", prompt: "Hi" },
+				schedules: [{ kind: "weekly", days: [1, 3], time: { hour: 18, minute: 30 } }],
+			},
 		});
-		expect(specOf({ ...draft, days: [], name: "" })).toEqual({ fix: "Name the routine." });
-		expect(specOf({ ...draft, days: [] })).toEqual({ fix: "Pick at least one day." });
+		expect(specOf({ ...draft, name: "" })).toEqual({ fix: "Name the routine." });
+		expect(specOf({ ...draft, schedules: [{ ...draft.schedules[0]!, days: [] }] })).toEqual({ fix: "Pick at least one day." });
 		expect(specOf({ ...draft, prompt: "  " })).toEqual({ fix: "Write the prompt the session starts with." });
-		expect(specOf({ ...draft, days: [1], schedule: "every", amount: "0" })).toEqual({ fix: "Use a whole number of at least 1." });
+		expect(specOf({ ...draft, schedules: [{ ...draft.schedules[0]!, kind: "every", amount: "0" }] })).toEqual({ fix: "Use a whole number of at least 1." });
+		const evening = { ...draft.schedules[0]!, time: "18:00", days: [] as Weekday[] };
+		expect(specOf({ ...draft, schedules: [...draft.schedules, evening] })).toEqual({ fix: "Schedule 2: Pick at least one day." });
 	});
 
 	test("a command form saves its command, trimmed, without a skill, and keeps the skill for another task", () => {
@@ -146,7 +175,7 @@ describe("editor form", () => {
 				enabled: true,
 				skill: null,
 				task: { kind: "command", command: "git worktree prune" },
-				schedule: { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } },
+				schedules: [{ kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } }],
 			},
 		});
 		expect(specOf({ ...draft, command: " " })).toEqual({ fix: "Write the command to run." });

@@ -81,24 +81,29 @@ describe("parseClientMsg", () => {
 			id: "r1",
 			name: "Reviews",
 			cwd: "/work/webapp",
-			schedule: weekdays,
-			task: { kind: "pull-requests", action: "review" },
+			schedules: [weekdays],
+			task: { kind: "prompt", prompt: "Summarize" },
 			skill: null,
 			enabled: true,
 		};
 		const save = (fields: Record<string, unknown>) => change({ op: "save", routine: { ...routine, ...fields } });
 
 		test("save takes a whole routine and drops what the server keeps or does not know", () => {
-			expect(save({ runs: [], done: { "acme/webapp#1": "x" }, createdAt: 1, extra: 1, schedule: { ...weekdays, extra: 1 } })).toEqual({ t: "routine", change: { op: "save", routine } });
-			expect(save({ schedule: { kind: "every", minutes: 90 }, task: { kind: "prompt", prompt: "Summarize" }, skill: "ship" })).toEqual({
+			expect(save({ runs: [], createdAt: 1, extra: 1, schedules: [{ ...weekdays, extra: 1 }] })).toEqual({ t: "routine", change: { op: "save", routine } });
+			expect(save({ schedules: [{ kind: "every", minutes: 90 }, weekdays], skill: "ship" })).toEqual({
 				t: "routine",
-				change: { op: "save", routine: { ...routine, schedule: { kind: "every", minutes: 90 }, task: { kind: "prompt", prompt: "Summarize" }, skill: "ship" } },
+				change: { op: "save", routine: { ...routine, schedules: [{ kind: "every", minutes: 90 }, weekdays], skill: "ship" } },
 			});
 			expect(change({ op: "enable", id: "r1", enabled: false })).toEqual({ t: "routine", change: { op: "enable", id: "r1", enabled: false } });
 			expect(change({ op: "run-now", id: "r1", at: 5 })).toEqual({ t: "routine", change: { op: "run-now", id: "r1" } });
 		});
 
-		test("save refuses a schedule that names no slot or one out of range", () => {
+		test("an older save with one schedule reads as a list of that schedule", () => {
+			const { schedules: _schedules, ...older } = routine;
+			expect(change({ op: "save", routine: { ...older, schedule: weekdays } })).toEqual({ t: "routine", change: { op: "save", routine } });
+		});
+
+		test("save refuses a schedule that names no slot or one out of range, and an empty list", () => {
 			for (const schedule of [
 				{ kind: "every", minutes: 0 },
 				{ kind: "every", minutes: 1.5 },
@@ -109,12 +114,12 @@ describe("parseClientMsg", () => {
 				{ kind: "weekly", days: [1], time: { hour: 9, minute: 60 } },
 				{ kind: "cron", expression: "0 9 * * 1-5" },
 			])
-				expect(save({ schedule })).toBeNull();
+				expect(save({ schedules: [schedule] })).toBeNull();
+			expect(save({ schedules: [] })).toBeNull();
 		});
 
-		test("save refuses an action a routine may not run, and a blank name, workspace, or prompt", () => {
-			expect(save({ task: { kind: "pull-requests", action: "fix-ci" } })).toBeNull();
-			expect(save({ task: { kind: "pull-requests", action: "merge" } })).toBeNull();
+		test("save refuses a pull request task, and a blank name, workspace, or prompt", () => {
+			expect(save({ task: { kind: "pull-requests", action: "review" } })).toBeNull();
 			expect(save({ task: { kind: "prompt", prompt: " " } })).toBeNull();
 			expect(save({ name: "" })).toBeNull();
 			expect(save({ cwd: "  " })).toBeNull();

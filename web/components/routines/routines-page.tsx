@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { modeOf, readTime, SPLIT_CLICK } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { hashForRoutines } from "../../routing";
-import { draftOf, lastRunWords, newDraft, nextRunWords, type RoutineDraft, runWords, scheduleWords, taskWords } from "../../routines-model";
+import { draftOf, lastRunWords, newDraft, nextRunWords, type RoutineDraft, runWords, scheduleWords, schedulesWords, taskWords } from "../../routines-model";
 import { useDashboardContext } from "../dashboard-context";
 import { PageFrame } from "../list-sheet-page";
 import { SessionChip } from "../session-chip";
@@ -125,7 +125,7 @@ function RunItem({ run, routine, hosts }: { run: RoutineRun; routine: Routine; h
 		<li className="space-y-1.5 px-3 py-2.5">
 			<p className="flex items-baseline gap-2 text-sm">
 				<span className="font-medium tabular-nums">{readTime(run.at)}</span>
-				<span className="text-xs text-muted-foreground">{runWords(run, routine.task)}</span>
+				<span className="text-xs text-muted-foreground">{runWords(run)}</span>
 			</p>
 			{run.started.length > 0 && (
 				<div role="group" aria-label="Sessions it started" className="flex flex-wrap gap-1.5 text-xs">
@@ -167,25 +167,30 @@ interface DetailProps {
 	onEdit: () => void;
 }
 
-/** What a routine's task row shows: the prompt or command whole, or the review action and what it starts. */
+/** What a routine's task row shows: the prompt or the command, whole. */
 function TaskValue({ task }: { task: RoutineTask }) {
 	switch (task.kind) {
 		case "prompt":
 			return <span className="whitespace-pre-wrap break-words">{task.prompt}</span>;
 		case "command":
 			return <code className="font-mono text-xs whitespace-pre-wrap break-words">{task.command}</code>;
-		case "pull-requests":
-			return (
-				<>
-					{taskWords(task)}
-					<span className="block text-xs text-muted-foreground">One session for each pull request that asks for your review, once per new commit.</span>
-				</>
-			);
 		default: {
 			const unhandled: never = task;
 			return unhandled;
 		}
 	}
+}
+
+/** The schedules, one line each when there are several. */
+function ScheduleValue({ schedules }: { schedules: Routine["schedules"] }) {
+	if (schedules.length === 1) return schedulesWords(schedules);
+	return (
+		<ul>
+			{schedules.map((schedule, index) => (
+				<li key={index}>{scheduleWords(schedule)}</li>
+			))}
+		</ul>
+	);
 }
 
 /** One routine's settings, then its runs, newest first. */
@@ -194,7 +199,7 @@ function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: Det
 	const settings: [string, ReactNode][] = [
 		["Task", <TaskValue task={task} />],
 		["Workspace", <span className="font-mono text-xs">{routine.cwd}</span>],
-		["Schedule", scheduleWords(routine.schedule)],
+		["Schedule", <ScheduleValue schedules={routine.schedules} />],
 		["Next run", nextRunWords(routine, now)],
 	];
 	// A command runs without a session, so it takes no skill.
@@ -202,7 +207,7 @@ function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: Det
 	return (
 		<PageFrame
 			title={routine.name}
-			meta={`${scheduleWords(routine.schedule)} · ${taskWords(task)}`}
+			meta={`${schedulesWords(routine.schedules)} · ${taskWords(task)}`}
 			actions={
 				<>
 					<Button asChild variant="ghost" size="compact" leadingIcon={ArrowLeft}>
@@ -275,7 +280,7 @@ function RoutineRow({ routine, now, connected, onChange, onEdit }: RowProps) {
 					{routine.name}
 				</a>
 				<p className="truncate text-xs text-muted-foreground">
-					{scheduleWords(routine.schedule)} · {taskWords(routine.task)}
+					{schedulesWords(routine.schedules)} · {taskWords(routine.task)}
 				</p>
 			</div>
 			<div className="shrink-0 space-y-0.5 text-right text-xs">
@@ -352,7 +357,7 @@ export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, 
 				<div className="mx-auto max-w-md space-y-3 px-6 py-16 text-center">
 					<p className="text-sm font-medium">No routines yet</p>
 					<p className="text-sm text-muted-foreground">
-						A routine runs on a schedule. It starts a session with a prompt you write, reviews the pull requests that ask for your review, or runs a command.
+						A routine runs on one or more schedules. It starts a session with a prompt you write, or runs a command.
 					</p>
 					<Button size="compact" leadingIcon={Plus} disabled={!connected} onClick={startNew}>
 						New routine
