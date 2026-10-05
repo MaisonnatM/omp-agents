@@ -15,6 +15,7 @@ bun run omp-template             # install
 The installer:
 
 - copies every file under [`agent/`](agent) into your omp agent directory, `~/.omp/agent` (or `PI_CODING_AGENT_DIR` when set);
+- with `--maintainer`, also copies [`maintainer/`](maintainer), and a file there replaces the `agent/` file with the same path;
 - applies each setting in [`config.yml`](config.yml) with `omp config set`, so omp writes it and every other key in your `config.yml` stays as it is;
 - adds the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace and installs its `pstack` plugin, unless they are already there.
 
@@ -37,9 +38,9 @@ Settings, in `config.yml`:
 
 Files, in `agent/`:
 
-- `AGENTS.md`: worktree and Git safety invariants, plus conditional pointers for Graphite registration, model routing, reviews, and PR descriptions.
+- `AGENTS.md`: worktree and force-push safety, plus conditional pointers for model routing and reviews.
   Read the matching reference before taking that branch of the workflow.
-- `docs/`: `git-workflow.md` resolves Graphite configuration through the shared Git directory, `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear review and PR descriptions.
+- `docs/`: `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear review and PR descriptions.
   These references load on demand rather than in every session's context.
 - `APPEND_SYSTEM.md`: final replies in three parts (Résumé, Action, What next), and `isolated: true` for every subagent that touches a git repo.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that runs the thermo-nuclear code quality review on the `plan` role's model.
@@ -55,6 +56,13 @@ Files, in `agent/`:
   Edit `config.yml` before you install to drop a provider, or change the roles later in the dashboard's **Settings**.
 - For `/ship`: the [GitHub CLI](https://cli.github.com) signed in, and the Linear MCP server connected to omp.
   [Graphite](https://graphite.dev) is used when a repository is set up for it.
+
+## Maintainer git profile
+
+`bun run omp-template --maintainer` also copies [`maintainer/`](maintainer) on top of the same relative paths.
+That copy is `AGENTS.md`, which tells a session to push local `main` and to clean up worktrees, and `docs/git-workflow.md`, which registers Graphite branches.
+The default install does not copy those files.
+`--force` still overwrites a file you already have, including one the profile replaces.
 
 ## Customize
 

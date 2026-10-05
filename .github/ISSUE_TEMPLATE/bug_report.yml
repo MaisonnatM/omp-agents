@@ -1,0 +1,54 @@
+name: Bug report
+description: A session, the dashboard, or the desktop app did something wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report a security problem through GitHub's private advisory form, not in a public issue.
+        https://github.com/MaisonnatM/omp-agents/security/advisories/new
+  - type: input
+    id: bun
+    attributes:
+      label: Bun version
+      description: The output of `bun --version`.
+      placeholder: "1.4.2"
+    validations:
+      required: true
+  - type: input
+    id: omp
+    attributes:
+      label: omp version
+      description: The output of `omp --version`.
+      placeholder: "18.4.10"
+    validations:
+      required: true
+  - type: dropdown
+    id: started
+    attributes:
+      label: Where the session started
+      options:
+        - Dashboard
+        - Terminal
+        - Desktop app
+        - Not a session
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+    validations:
+      required: true

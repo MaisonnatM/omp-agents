@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { runShell } from "./proc";
 
 const limits = { timeoutMs: 10_000, maxOutput: 1024 };
@@ -10,7 +12,8 @@ describe("runShell", () => {
 	});
 
 	test("runs in its directory", async () => {
-		expect(await runShell("pwd -P", "/bin", limits)).toEqual({ exitCode: 0, output: "/bin\n" });
+		const dir = realpathSync(mkdtempSync(join(tmpdir(), "omp-agents-proc-")));
+		expect(await runShell("pwd -P", dir, limits)).toEqual({ exitCode: 0, output: `${dir}\n` });
 	});
 
 	test("keeps the end of output longer than the cap, after a mark", async () => {

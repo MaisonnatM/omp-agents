@@ -4,7 +4,7 @@ A local web dashboard for every [omp](https://omp.sh) session and subagent on yo
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Bun](https://img.shields.io/badge/bun-%E2%89%A51.4-black?logo=bun)](https://bun.sh)
-[![omp](https://img.shields.io/badge/omp-tested%2018.4.8-informational)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent)
+[![omp](https://img.shields.io/badge/omp-tested%2018.4.10-informational)](https://www.npmjs.com/package/@oh-my-pi/pi-coding-agent)
 
 omp-agents lists the sessions that run in your terminals and the ones it starts itself, streams each conversation as it happens, and lets you message, steer, interrupt, resume, or fork any of them from one browser tab.
 It reads omp's own session files and speaks omp's own protocols through omp's installed modules, so it stays in step with the omp version you run.
@@ -32,7 +32,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Live conversations.**
   Streaming Markdown transcripts, tool calls, and context-window usage, in up to four split panes.
 - **Full control.**
-  Prompt, with images attached, dropped, or pasted, steer, queue follow-ups, interrupt, answer `ask` questions and extension dialogs, message and cancel subagents, run `!` shell and built-in `/` commands in dashboard sessions, switch model and thinking level, end sessions.
+  Prompt, with images attached, dropped, or pasted, steer, queue follow-ups, interrupt, answer `ask` questions and extension dialogs, message and cancel subagents, run `!` shell and built-in `/` commands in a session the dashboard started, switch model and thinking level, end sessions.
 - **Next-prompt suggestions.**
   When omp ends a reply with a `Suggestions:` block, as the starter kit's system prompt asks it to, the composer lists them; press a number key to send one, or pick one with ↓ and ↑.
 - **Session lifecycle.**
@@ -74,7 +74,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 ```sh
 git clone https://github.com/MaisonnatM/omp-agents.git
 cd omp-agents
-bun install
+bun install --frozen-lockfile
 bun start
 ```
 
@@ -138,7 +138,12 @@ Install it with:
 ```sh
 bun run omp-template --dry-run   # list what would change
 bun run omp-template
+bun run omp-template --maintainer
 ```
+
+Pass `--maintainer` to also install the maintainer git profile.
+That profile tells a session to push local `main`, to register Graphite branches, and to clean up worktrees.
+The default install leaves it out.
 
 Files and settings that you already have keep your version unless you pass `--force`.
 See the [kit's README](templates/omp/README.md) for what it contains.
@@ -153,7 +158,10 @@ The **Inbox** tab shows your pull requests, the **Tickets** tab your Linear issu
 While a turn runs, Enter steers it and Cmd+Enter (Ctrl+Enter on Linux and Windows) queues a follow-up, as in omp's terminal.
 Esc interrupts the turn.
 
-The dashboard cannot run omp's built-in `/` commands, the `$` Python shortcut, or the `!` shell shortcut; run those in the omp terminal.
+In a session the dashboard started, built-in `/` commands and `!<command>` run as they do in omp's terminal.
+A terminal session cannot run them, because Collab accepts guest prompts and not host-side commands.
+No session runs the `$` Python shortcut from the dashboard, and only the omp terminal runs `!!`.
+The composer refuses a draft that starts with one of those and does not send it.
 
 See [docs/usage.md](docs/usage.md) for the full interface reference, including every keyboard shortcut and URL format.
 

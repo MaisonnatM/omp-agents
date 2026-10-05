@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { planSettings, settingsOf } from "./install";
+import { overlayFiles, planSettings, settingsOf } from "./install";
 
 const known = new Set(["modelRoles", "retry.fallbackChains", "task.isolation.merge"]);
 
@@ -15,6 +15,30 @@ describe("settingsOf", () => {
 
 	test("refuses a key omp does not know", () => {
 		expect(() => settingsOf({ task: { isolation: { merj: "patch" } } }, known)).toThrow("omp has no setting task.isolation.merj");
+	});
+});
+
+describe("overlayFiles", () => {
+	test("a later layer replaces AGENTS.md and adds the git workflow", () => {
+		const files = overlayFiles([
+			[
+				{ rel: "AGENTS.md", text: "public" },
+				{ rel: "docs/model-routing.md", text: "models" },
+			],
+			[
+				{ rel: "AGENTS.md", text: "maintainer" },
+				{ rel: "docs/git-workflow.md", text: "graphite" },
+			],
+		]);
+		expect(files).toEqual([
+			{ rel: "AGENTS.md", text: "maintainer" },
+			{ rel: "docs/git-workflow.md", text: "graphite" },
+			{ rel: "docs/model-routing.md", text: "models" },
+		]);
+	});
+
+	test("one layer keeps only the files it was given", () => {
+		expect(overlayFiles([[{ rel: "AGENTS.md", text: "public" }]])).toEqual([{ rel: "AGENTS.md", text: "public" }]);
 	});
 });
 

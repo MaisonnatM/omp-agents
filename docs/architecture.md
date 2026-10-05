@@ -522,11 +522,12 @@ The page lives in `web/`.
 - `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
-Its `agent/` files are copies of the maintainer's `~/.omp/agent` files, except for `AGENTS.md`, which is a generic version.
-After you edit one of those live files, copy it back.
+Its `agent/` files are the default kit.
+`maintainer/` is the maintainer git profile, `AGENTS.md` and `docs/git-workflow.md`, copied only when you pass `--maintainer`, and a file there replaces the `agent/` file with the same path.
+After you edit one of those live files, copy it back into the matching directory.
 `bun run omp-template --dry-run` shows a copy that has drifted as `keep yours`.
-The kit's `agent/AGENTS.md` keeps Git safety invariants inline and links to conditional procedures under `agent/docs/`.
-Graphite detection uses `git rev-parse --path-format=absolute --git-common-dir`, so the same procedure works from a checkout, a linked worktree, or a nested directory.
+The default `agent/AGENTS.md` keeps worktree and force-push safety inline and links to the model and review references under `agent/docs/`.
+The profile's `docs/git-workflow.md` detects Graphite with `git rev-parse --path-format=absolute --git-common-dir`, so the same procedure works from a checkout, a linked worktree, or a nested directory.
 `src/docs.test.ts` checks root Markdown and all Markdown below `docs/` and `templates/omp/`, including the kit's nested commands, skills, and references, for lines that tools would truncate.
 The repository's agent guide links to [agent smoke checks](agent-smoke.md) for server authentication and lifecycle, browser verification, and desktop verification.
 

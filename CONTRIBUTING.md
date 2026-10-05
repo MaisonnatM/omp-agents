@@ -15,7 +15,7 @@ Install the [requirements](README.md#requirements), then:
 ```sh
 git clone https://github.com/MaisonnatM/omp-agents.git
 cd omp-agents
-bun install
+bun install --frozen-lockfile
 bun start
 ```
 
