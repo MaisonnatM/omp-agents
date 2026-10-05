@@ -5,18 +5,26 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { app, BrowserWindow, Menu, type MenuItemConstructorOptions, type Rectangle, screen, shell } from "electron";
-import { isObject, num } from "../src/json";
+import { createInterface, type Interface } from "node:readline";
+import type { Readable } from "node:stream";
+import {
+	app,
+	BrowserWindow,
+	type ContextMenuParams,
+	Menu,
+	type MenuItemConstructorOptions,
+	type Rectangle,
+	screen,
+	shell,
+	type WebContents,
+} from "electron";
+import { errorText, isObject, num } from "../src/json";
 import { tokenFile } from "../src/paths";
+import { dashboardHosts, isListeningLine, originOf, portFromEnv } from "../src/server/address";
 import { loadToken } from "../src/server/auth";
 
-const PORT = Number(process.env.PORT ?? 4317);
-const ORIGIN = `http://127.0.0.1:${PORT}`;
-/** Whether `url` is the dashboard's own page, under either name `guardsFor` (src/server/http.ts) accepts. */
-const isDashboard = (url: string): boolean => {
-	const origin = URL.parse(url)?.origin;
-	return origin === ORIGIN || origin === `http://localhost:${PORT}`;
-};
+const PORT = portFromEnv();
+const ORIGIN = originOf(PORT);
 /** The checkout this shell runs: Electron runs the app in its `desktop/` directory. */
 const REPO_DIR = resolve(app.getAppPath(), "..");
 /** The server builds the page before it listens. */
@@ -28,17 +36,27 @@ const STOP_TIMEOUT_MS = 10_000;
 const LOG_LINES = 40;
 /** The error page's Retry link, which never loads: `will-navigate` catches it. */
 const RETRY_URL = "omp-agents:retry";
+/** A navigation that another one replaced, which is no failure. */
+const ERR_ABORTED = -3;
 const IS_MAC = process.platform === "darwin";
 /** `icon.svg` rendered at 1024 px; Electron reads no SVG. */
 const ICON = join(app.getAppPath(), "icon.png");
+const SEPARATOR: MenuItemConstructorOptions = { type: "separator" };
 
-// Each port is its own server, so each gets its own window state, cookie, and single-instance lock.
-if (process.env.PORT) app.setPath("userData", join(app.getPath("userData"), `port-${PORT}`));
+// Each port is its own server, so each gets its own cookie, localStorage, window bounds, and single-instance lock.
+app.setPath("userData", join(app.getPath("userData"), `port-${PORT}`));
+const BOUNDS_FILE = join(app.getPath("userData"), "window.json");
 
 /** The server this shell started, while it runs. `null` when the shell uses a server started elsewhere. */
 let server: ChildProcess | null = null;
 const serverLog: string[] = [];
 let quitting = false;
+
+/** Whether `url` is the dashboard's own page, under any name the server answers to. */
+function isDashboard(url: string): boolean {
+	const parsed = URL.parse(url);
+	return parsed?.protocol === "http:" && dashboardHosts(PORT).includes(parsed.host);
+}
 
 /**
  * Who answers on the port. `ours`: an omp-agents server that holds this token, since only it answers `?token=` with
@@ -55,26 +73,22 @@ async function probe(token: string): Promise<"ours" | "free" | "taken"> {
 	}
 }
 
-/** Copies a stream of the server's output through, and keeps its last lines; calls `onLine` with each complete line. */
-function follow(stream: NodeJS.ReadableStream, out: NodeJS.WriteStream, onLine: (line: string) => void): void {
-	let partial = "";
-	stream.on("data", (chunk: Buffer) => {
-		out.write(chunk);
-		const lines = (partial + chunk.toString()).split("\n");
-		partial = lines.pop() ?? "";
-		for (const line of lines.filter(Boolean)) {
-			serverLog.push(line);
-			onLine(line);
-		}
-		serverLog.splice(0, serverLog.length - LOG_LINES);
+/** Copies one of the server's output streams through, and keeps its last {@link LOG_LINES} lines for an error page. */
+function tail(stream: Readable, out: NodeJS.WriteStream): Interface {
+	stream.pipe(out);
+	const lines = createInterface({ input: stream });
+	lines.on("line", line => {
+		serverLog.push(line);
+		if (serverLog.length > LOG_LINES) serverLog.shift();
 	});
+	return lines;
 }
 
 /**
- * Starts the server and resolves once it listens, or with why it did not. It listens when it prints its address
- * (src/server.ts): an answer on the port alone could come from another server that took the port first.
+ * Starts the server and resolves once it listens, or rejects with why it did not. It listens when it prints
+ * {@link isListeningLine}: an answer on the port alone could come from another server that took the port first.
  */
-function launch(): Promise<string | null> {
+function launch(): Promise<ChildProcess> {
 	serverLog.length = 0;
 	const child = spawn("bun", [join(REPO_DIR, "src", "server.ts")], {
 		cwd: REPO_DIR,
@@ -82,28 +96,18 @@ function launch(): Promise<string | null> {
 		env: { ...process.env, PORT: String(PORT), OMP_AGENTS_PARENT: "stdin" },
 		stdio: ["pipe", "pipe", "pipe"],
 	});
-	server = child;
-	const { promise, resolve: settle } = Promise.withResolvers<string | null>();
-	let settled = false;
-	const done = (failure: string | null): void => {
-		if (settled) return;
-		settled = true;
-		clearTimeout(deadline);
-		settle(failure);
-	};
+	const { promise, resolve: listening, reject } = Promise.withResolvers<ChildProcess>();
 	const deadline = setTimeout(() => {
 		child.kill("SIGTERM");
-		done(`The server did not listen within ${READY_TIMEOUT_MS / 1000} s.`);
+		reject(new Error(`The server did not listen within ${READY_TIMEOUT_MS / 1000} s.`));
 	}, READY_TIMEOUT_MS);
-	follow(child.stdout, process.stdout, line => {
-		if (line.endsWith(` on ${ORIGIN}`)) done(null);
+	void promise.finally(() => clearTimeout(deadline)).catch(() => {});
+	tail(child.stdout, process.stdout).on("line", line => {
+		if (isListeningLine(line, PORT)) listening(child);
 	});
-	follow(child.stderr, process.stderr, () => {});
-	child.once("error", (err: NodeJS.ErrnoException) => done(err.code === "ENOENT" ? "`bun` is not on PATH." : err.message));
-	child.on("exit", (code, signal) => {
-		if (server === child) server = null;
-		done(`The server exited with ${signal ?? `code ${code}`}.`);
-	});
+	tail(child.stderr, process.stderr);
+	child.once("error", (err: NodeJS.ErrnoException) => reject(new Error(err.code === "ENOENT" ? "`bun` is not on PATH." : err.message)));
+	child.once("exit", (code, signal) => reject(new Error(`The server exited with ${signal ?? `code ${code}`}.`)));
 	return promise;
 }
 
@@ -125,25 +129,33 @@ function showError(win: BrowserWindow, title: string, detail: string): void {
 /** Uses the server on the port, or starts one, then signs the window in with the token. */
 async function connect(win: BrowserWindow): Promise<void> {
 	void win.loadURL(notice("Starting omp agents…"));
-	// The same call the server makes: whichever runs first creates the token, and both read the same one.
-	const token = loadToken(tokenFile);
-	const found = await probe(token);
-	if (found === "taken") {
-		showError(
-			win,
-			`Port ${PORT} is taken`,
-			`Something other than omp-agents answers on ${ORIGIN}, or an omp-agents server that started before ${tokenFile} changed. Stop it, or start the app with another PORT.`,
-		);
+	let token: string;
+	try {
+		// The same call the server makes: whichever runs first creates the token, and both read the same one.
+		token = loadToken(tokenFile);
+		const found = await probe(token);
+		if (found === "taken") {
+			showError(
+				win,
+				`Port ${PORT} is taken`,
+				`Something other than omp-agents answers on ${ORIGIN}, or an omp-agents server that started before ${tokenFile} changed. Stop it, or start the app with another PORT.`,
+			);
+			return;
+		}
+		if (found === "free") {
+			const child = await launch();
+			server = child;
+			child.once("exit", (code, signal) => {
+				if (server === child) server = null;
+				if (!quitting) showError(win, "The server stopped", `It exited with ${signal ?? `code ${code}`}.`);
+			});
+		}
+	} catch (err) {
+		showError(win, "The server did not start", errorText(err));
 		return;
 	}
-	if (found === "free") {
-		const failure = await launch();
-		if (failure) return showError(win, "The server did not start", failure);
-		server?.once("exit", (code, signal) => {
-			if (!quitting) showError(win, "The server stopped", `It exited with ${signal ?? `code ${code}`}.`);
-		});
-	}
-	await win.loadURL(`${ORIGIN}/?token=${token}`);
+	// A failed load reaches `did-fail-load`, which shows it.
+	win.loadURL(`${ORIGIN}/?token=${token}`).catch(() => {});
 }
 
 /** Opens a web address in the default browser; any other scheme goes nowhere. */
@@ -152,13 +164,11 @@ function openOutside(url: string): void {
 	if (protocol === "http:" || protocol === "https:") void shell.openExternal(url);
 }
 
-const boundsFile = (): string => join(app.getPath("userData"), "window.json");
-
 /** The bounds the window had when it last hid or closed; only the size when no display shows its top-left corner any more. */
 function savedBounds(): Partial<Rectangle> {
 	let saved: unknown;
 	try {
-		saved = JSON.parse(readFileSync(boundsFile(), "utf8"));
+		saved = JSON.parse(readFileSync(BOUNDS_FILE, "utf8"));
 	} catch {
 		return {};
 	}
@@ -168,6 +178,21 @@ function savedBounds(): Partial<Rectangle> {
 	const { workArea } = screen.getDisplayMatching({ x, y, width, height });
 	const visible = x >= workArea.x && y >= workArea.y && x < workArea.x + workArea.width && y < workArea.y + workArea.height;
 	return visible ? { x, y, width, height } : { width, height };
+}
+
+/** Copy for selected text; cut, copy, paste, and spelling suggestions in a text field; nothing elsewhere. */
+function contextMenuItems(params: ContextMenuParams, contents: WebContents): MenuItemConstructorOptions[] {
+	if (!params.isEditable) return params.selectionText ? [{ role: "copy" }] : [];
+	const spelling = params.dictionarySuggestions.map(word => ({ label: word, click: () => contents.replaceMisspelling(word) }));
+	return [...spelling, ...(spelling.length ? [SEPARATOR] : []), { role: "cut" }, { role: "copy" }, { role: "paste" }, SEPARATOR, { role: "selectAll" }];
+}
+
+/** Closing hides the window on macOS: quitting stops the server, and with it every session the dashboard started. */
+function hideInsteadOfClose(win: BrowserWindow, event: Electron.Event): void {
+	event.preventDefault();
+	if (!win.isFullScreen()) return win.hide();
+	win.once("leave-full-screen", () => win.hide());
+	win.setFullScreen(false);
 }
 
 function createWindow(): BrowserWindow {
@@ -184,7 +209,6 @@ function createWindow(): BrowserWindow {
 		webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
 	});
 	win.once("ready-to-show", () => win.show());
-	const saveBounds = (): void => writeFileSync(boundsFile(), JSON.stringify(win.getNormalBounds()));
 
 	const contents = win.webContents;
 	contents.setWindowOpenHandler(({ url }) => {
@@ -202,69 +226,37 @@ function createWindow(): BrowserWindow {
 		event.preventDefault();
 		openOutside(event.url);
 	});
+	// The dashboard's own page failed to load: the server it used stopped, or never answered.
+	contents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
+		if (isMainFrame && code !== ERR_ABORTED && isDashboard(url)) showError(win, "The dashboard did not load", `${ORIGIN} answered ${description}.`);
+	});
 	contents.on("context-menu", (_event, params) => {
-		const spelling: MenuItemConstructorOptions[] = params.dictionarySuggestions.map(word => ({ label: word, click: () => contents.replaceMisspelling(word) }));
-		const editing: MenuItemConstructorOptions[] = [{ role: "cut" }, { role: "copy" }, { role: "paste" }, { type: "separator" }, { role: "selectAll" }];
-		const items: MenuItemConstructorOptions[] = params.isEditable
-			? [...spelling, ...(spelling.length ? [{ type: "separator" } as const] : []), ...editing]
-			: params.selectionText
-				? [{ role: "copy" }]
-				: [];
+		const items = contextMenuItems(params, contents);
 		if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
 	});
 
 	win.on("close", event => {
-		saveBounds();
-		// Closing hides the window on macOS: quitting stops the server, and with it every session the dashboard started.
-		if (!IS_MAC || quitting) return;
-		event.preventDefault();
-		if (!win.isFullScreen()) return win.hide();
-		win.once("leave-full-screen", () => win.hide());
-		win.setFullScreen(false);
+		writeFileSync(BOUNDS_FILE, JSON.stringify(win.getNormalBounds()));
+		if (IS_MAC && !quitting) hideInsteadOfClose(win, event);
 	});
 	return win;
 }
 
 /** The menu holds no shortcut the dashboard binds (web/shortcuts.ts), so every one reaches the page. */
 function applicationMenu(): Menu {
-	const template: MenuItemConstructorOptions[] = [
-		...(IS_MAC
-			? [
-					{
-						label: app.name,
-						submenu: [
-							{ role: "about" },
-							{ type: "separator" },
-							{ role: "hide" },
-							{ role: "hideOthers" },
-							{ role: "unhide" },
-							{ type: "separator" },
-							{ role: "quit" },
-						],
-					} satisfies MenuItemConstructorOptions,
-				]
-			: []),
+	const appMenu: MenuItemConstructorOptions[] = IS_MAC
+		? [{ label: app.name, submenu: [{ role: "about" }, SEPARATOR, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, SEPARATOR, { role: "quit" }] }]
+		: [];
+	const front: MenuItemConstructorOptions[] = IS_MAC ? [SEPARATOR, { role: "front" }] : [];
+	return Menu.buildFromTemplate([
+		...appMenu,
 		{ role: "editMenu" },
 		{
 			label: "View",
-			submenu: [
-				{ role: "reload" },
-				{ role: "toggleDevTools" },
-				{ type: "separator" },
-				{ role: "resetZoom" },
-				{ role: "zoomIn" },
-				{ role: "zoomOut" },
-				{ type: "separator" },
-				{ role: "togglefullscreen" },
-			],
+			submenu: [{ role: "reload" }, { role: "toggleDevTools" }, SEPARATOR, { role: "resetZoom" }, { role: "zoomIn" }, { role: "zoomOut" }, SEPARATOR, { role: "togglefullscreen" }],
 		},
-		{
-			label: "Window",
-			role: "window",
-			submenu: [{ role: "minimize" }, { role: "zoom" }, { role: "close" }, ...(IS_MAC ? [{ type: "separator" } as const, { role: "front" } as const] : [])],
-		},
-	];
-	return Menu.buildFromTemplate(template);
+		{ label: "Window", role: "window", submenu: [{ role: "minimize" }, { role: "zoom" }, { role: "close" }, ...front] },
+	]);
 }
 
 if (!app.requestSingleInstanceLock()) {

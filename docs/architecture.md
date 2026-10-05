@@ -68,15 +68,16 @@ A `prompt` message, and a `start` of kind `new`, carry `images`, each `{ data, m
 
 ## Desktop shell
 
-`desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron. Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process, `bun src/server.ts`, and never imports it. It imports only `src/paths.ts`, `src/json.ts`, and `src/server/auth.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
+`desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron. Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process, `bun src/server.ts`, and never imports it. It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, and `src/server/address.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`. `src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
 
 - At launch it calls `loadToken`, as the server does, so whichever runs first creates the token file, and asks `GET /?token=<token>` on the port. A 302 that sets the cookie can come only from an omp-agents server that holds this token, and the window uses it. A refused connection starts a server. Any other answer means the port is taken, and the window says so.
-- The shell takes the server as started once it prints `omp-agents (omp v…) on http://127.0.0.1:<port>`, not once the port answers: another server that took the port while this one built its page would answer too, and the shell would then own a server that is about to fail.
+- The shell takes the server as started once it prints `listeningLine` (`omp-agents (omp v…) on http://127.0.0.1:<port>`), not once the port answers: another server that took the port while this one built its page would answer too, and the shell would then own a server that is about to fail.
 - It spawns the server with `OMP_AGENTS_PARENT=stdin` and an open stdin pipe that it never writes to. The server calls its `shutdown()` when that pipe ends, which it does however the shell exits, `SIGKILL` included, so no server outlives the app and holds the port. On a normal quit, the shell sends `SIGTERM` and waits up to 10 seconds for the server to end its sessions.
 - The window loads `http://127.0.0.1:<port>/?token=<token>`, a navigation that sends `Sec-Fetch-Site: none`, so `guardsFor` admits it as it admits the printed address in a browser, and the socket's `Origin` matches its `Host`. A custom scheme for the page would fail that check.
 - `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin. An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the Linear sign-in in `web/components/settings/linear-connection.tsx` then opens the address itself once the server names it.
 - The page runs with context isolation and the sandbox on, and no preload: it gets no Node or Electron API.
-- Setting `PORT` moves the app's data, its cookie, localStorage, window bounds, and single-instance lock, to `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
+- The app keeps its data, its cookie, localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
+- A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
 
 ## Plan quota
 
@@ -126,7 +127,7 @@ Questions use Fluid's `ask-user-questions`, installed from `https://www.fluidfun
 The server lives in `src/`:
 
 - `src/server.ts`: the entry point. Builds the page, loads the access token, starts the HTTP and WebSocket server, watches the sessions directory, and wires the modules below together. `PORT` sets the port, 4317 by default.
-- `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie) and the JSON answer helpers. `src/server/auth.ts` keeps the token file and parses the cookie, and `src/server/page.ts` bundles `web/index.html` in memory and serves it only to a signed-in browser.
+- `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie) and the JSON answer helpers. `src/server/auth.ts` keeps the token file and parses the cookie, `src/server/address.ts` names the port, host, and listening line that the desktop shell shares, and `src/server/page.ts` bundles `web/index.html` in memory and serves it only to a signed-in browser.
 - `src/server/routes.ts`: the `/api/` endpoints. `src/server/wire.ts` parses every socket message and request body into typed values.
 - `src/server/socket.ts`: handles each socket message. `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`. It builds the roster rows.

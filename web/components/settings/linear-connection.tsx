@@ -26,7 +26,7 @@ export function LinearConnection() {
 
 	const connect = async (): Promise<void> => {
 		// Opened during the click, so the browser lets it open; it goes to Linear once the server names the address.
-		// The desktop app opens no empty tab, so there the address itself opens, in the default browser.
+		// No tab (a blocked popup, or the desktop app, which denies empty windows): open the address itself instead.
 		const tab = window.open("", "_blank");
 		if (tab) tab.opener = null;
 		setStarting(true);

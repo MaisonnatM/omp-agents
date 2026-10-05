@@ -7,6 +7,7 @@ import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
 import { displayPath, interruptedFile, tokenFile } from "./paths";
+import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { fail, guardsFor } from "./server/http";
 import { InterruptedSessions } from "./server/interrupted";
@@ -21,8 +22,7 @@ import { parseClientMsg } from "./server/wire";
 import type { ServerMsg, View } from "./shared";
 import { fetchPlanUsage } from "./usage";
 
-const PORT = Number(process.env.PORT ?? 4317);
-const HOSTNAME = "127.0.0.1";
+const PORT = portFromEnv();
 /** The registry has no change feed; listing it is one local IPC round trip per host. */
 const POLL_MS = 1500;
 /** Coalesce bursts of subagent progress into one roster push. */
@@ -223,7 +223,7 @@ try {
 		routes: {
 			...createRoutes({
 				guards,
-				origin: `http://${HOSTNAME}:${PORT}`,
+				origin: originOf(PORT),
 				knownCwds,
 				pullRequestIndex: files.pullRequests,
 				pullRequestsOf: files.pullRequestsOf,
@@ -275,9 +275,8 @@ await listRegistry();
 setTimeout(pollRegistry, POLL_MS);
 setInterval(() => void rescanFiles(), RESCAN_MS);
 void pollUsage();
-// The desktop shell (desktop/main.ts) reads this line as the sign that this server, not another, listens on the port.
-console.log(`omp-agents (omp v${ompVersion}) on http://${HOSTNAME}:${PORT}`);
-console.log(`Sign in at http://${HOSTNAME}:${PORT}/?token=${token}`);
+console.log(listeningLine(PORT, ompVersion));
+console.log(`Sign in at ${originOf(PORT)}/?token=${token}`);
 console.log(`The access token is in ${displayPath(tokenFile)}; delete the file and restart to rotate it.`);
 
 /** SIGINT and SIGTERM may both arrive; the second finds the shutdown already under way. */
