@@ -21,7 +21,7 @@ interface PageFrameProps {
 /** A page's frame: its header, then its content, which scrolls under it. */
 export function PageFrame({ title, meta, actions, children }: PageFrameProps) {
 	return (
-		<div className="flex h-svh min-h-0 flex-1 flex-col">
+		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header title={title} meta={meta}>
 				{actions}
 			</Header>

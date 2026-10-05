@@ -304,7 +304,11 @@ A failure, or no return within five minutes, shows as `signIn: { phase: "failed"
 ## Front-end components
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
-The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, and **Todo** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
+The **Inbox**, **Tickets**, **Sessions**, and **Todo** navigation uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
+One controlled root in `web/app.tsx` connects the navigation to the roster's panels.
+`web/components/navigation.tsx` owns the tab registry and the header's bundled logo.
+Desktop navigation stays in the header.
+Narrow windows show navigation in the open sidebar, or in the header when the sidebar is hidden.
 User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
 `thinking-indicator` shows while the agent works.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
@@ -398,6 +402,9 @@ The page lives in `web/`.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
 - `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's project, and the pinned skill; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
+  `discoverableCwd` is the rule for `/tmp`, `/private/tmp`, and their descendants. `discoverableSessions` derives discovery rows from it, while the raw session state remains available to already-open panes and direct links. `projectSwitch` uses the same rule, so a start or pick in a hidden directory leaves the saved project alone. The empty roster is the raw registry, not the filtered list.
+  The app passes these rows to project and workspace pickers, session lists and counts, search, default workspace selection, and the inbox's session associations.
+  The roster keeps collapsed session-group IDs with `useStoredKeys`, so tab changes, project changes, and reloads preserve each group's choice.
 - `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
   `web/components/todo-categories.tsx` holds its Todo tab, the categories.
 - `web/components/user-todos.tsx`: the Todo page, its lists, and the open todo, whose notes `web/components/markdown-editor.tsx` edits and previews through `message-markdown.tsx`.

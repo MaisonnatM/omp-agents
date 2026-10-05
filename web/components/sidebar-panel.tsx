@@ -211,12 +211,12 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ side, panel, onResize, onToggle, children }: DashboardSidebarProps) {
 	return (
 		<>
-			<Sidebar id={SIDEBARS[side].id} side={side} collapsible="none" hidden={!panel.open} className="relative" style={{ width: panel.width }}>
+			<Sidebar id={SIDEBARS[side].id} side={side} collapsible="none" hidden={!panel.open} className="relative h-full" style={{ width: panel.width }}>
 				{children}
 				<SidebarResizeHandle side={side} width={panel.width} onWidth={onResize} />
 			</Sidebar>
 			{side === "left" && !panel.open && (
-				<div className="sticky top-0 flex h-svh shrink-0 flex-col border-r border-border px-2 pt-4">
+				<div className="sticky top-0 flex h-full shrink-0 flex-col border-r border-border px-2 pt-4">
 					<SidebarToggle side={side} open={false} onToggle={onToggle} />
 				</div>
 			)}
