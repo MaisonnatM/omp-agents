@@ -2,8 +2,6 @@
 import { type CheckState, type Inbox, type InboxPullRequest, type PullRequest, type PullRequestDetail, type ReviewDecision, repoKey } from "../src/shared";
 import { type SectionTarget, sectionId } from "./section";
 
-export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
-
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
 
 /** Whose move a section's pull requests wait on: someone asks you to review, or a reviewer sent it back to you. */

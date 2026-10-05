@@ -1,7 +1,7 @@
 import { ArrowUpRight } from "lucide-react";
 import { Fragment } from "react";
-import type { LinkedPullRequest } from "../../src/shared";
-import { graphiteUrl, pullRequestUrl } from "../inbox-model";
+import { type LinkedPullRequest, pullRequestUrl } from "../../src/shared";
+import { graphiteUrl } from "../inbox-model";
 import { projectName } from "../labels";
 import { hashForInbox, hashForTickets } from "../routing";
 import { OrgIcon } from "./org-icon";

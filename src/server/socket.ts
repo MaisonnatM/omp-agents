@@ -2,7 +2,7 @@
 import { complete } from "../commands";
 import { errorText } from "../json";
 import { directoryOf } from "../paths";
-import type { ClientMsg, ServerMsg, StartRequest, StartResult, UserTodoChange } from "../shared";
+import type { ClientMsg, RoutineChange, ServerMsg, StartRequest, StartResult, UserTodoChange } from "../shared";
 import type { LiveSessions } from "./live-sessions";
 import { type Socket, send, type Views, watching } from "./views";
 import type { MsgOf } from "./wire";
@@ -17,6 +17,10 @@ export interface SocketEnv {
 	stoppedMidTurn(sessionId: string): boolean;
 	/** Apply `change` to the Todo page's list and send every socket the list after it, or, when it changes nothing, send `ws` the list it missed. */
 	changeTodo(ws: Socket, change: UserTodoChange): void;
+	/** Apply `change` to the routines and send every socket the routines after it, or, when it changes nothing, send `ws` the routines it missed. */
+	changeRoutine(ws: Socket, change: Exclude<RoutineChange, { op: "run-now" }>): void;
+	/** Run routine `id` now, whatever its schedule. */
+	runRoutine(id: string): Promise<void>;
 }
 
 /**
@@ -116,6 +120,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	"set-thinking": ({ sessions }, _ws, { instanceId, level }) => sessions.started(instanceId)?.setThinking(level),
 	answer: ({ sessions }, _ws, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
 	"user-todo": ({ changeTodo }, ws, { change }) => changeTodo(ws, change),
+	routine: ({ changeRoutine, runRoutine }, ws, { change }) => (change.op === "run-now" ? runRoutine(change.id) : changeRoutine(ws, change)),
 };
 
 /** `t` keys the handler that takes `msg`; spelled apart so TypeScript pairs them. */

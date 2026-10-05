@@ -12,6 +12,7 @@ For installation, see the [README](../README.md).
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
 - [Pull requests and the inbox](#pull-requests-and-the-inbox)
 - [Todo list](#todo-list)
+- [Routines](#routines)
 - [Settings](#settings)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Desktop app](#desktop-app)
@@ -348,10 +349,12 @@ For installation, see the [README](../README.md).
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.
-- Four tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, and **Todo**, switch what the sidebar lists.
+- Five tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, **Todo**, and **Routines**, switch what the sidebar lists.
   Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
+  **Routines** opens the sessions that start on a schedule; see [Routines](#routines).
+  When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
   **Inbox** opens a pull request inbox like Graphite's, and the sidebar then lists the inbox's sections with their pull request counts, under each repository's name when there are several.
   The counts of the sections that wait on your move stand out: **Needs your review** in bold, and **Returned to you** in red.
   The **Inbox** tab counts the pull requests in those two sections, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
@@ -518,6 +521,39 @@ For installation, see the [README](../README.md).
 - The tool leaves each change as a file in `todo-inbox/` beside `todos.json`, and the server applies it and deletes the file, so a todo an agent adds while the dashboard is down shows once it starts.
   A file that is not a change an agent may make moves to `<name>.invalid`.
 
+## Routines
+
+- A routine starts sessions, or runs a shell command, on a schedule.
+  The **Routines** tab, or a `#routines` address, lists them in place of the panes, and the sidebar then lists **All** and each routine by name, a paused one muted.
+  `#routines/<id>` opens one routine.
+- **New routine** opens the editor: a name, the workspace it runs in, its task, its schedule, and its skill.
+  The task is a prompt you write, **Review** or **Thermonuclear review** of the pull requests that ask for your review, or a shell command.
+  The schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick; **Weekdays** and **Every day** pick those days at once.
+  The skill starts as the one pinned in **Settings › New sessions**, and **None** starts the sessions without one.
+- A pull request routine starts one session for each pull request in its workspace's inbox that asks for your review, and takes each pull request once per new commit.
+  Neither action posts anything on GitHub or changes a branch.
+- A command routine runs its command with `sh` in its workspace, without an omp session, so it takes no skill and the editor hides that field.
+  The command runs with your user's full permissions, and nothing asks before it acts: a file it deletes is gone.
+  It stops after 10 minutes, and its run keeps the last 64 KB of what it printed, stdout and stderr together.
+  A command routine whose last command still runs records an error instead of running a second one.
+  Its runs read **Running…**, **Succeeded**, **Failed (exit n)**, **Stopped at the time limit**, **Stopped with the dashboard**, or **Could not start**, and anything but a success also counts as an error.
+- Each row shows the routine's schedule and task, when it runs next or **Paused**, and what its last run did: how many sessions it started, how many errors it had, and **Queued: n** while it still has sessions to start.
+  Its **⋯** menu has **Run now**, which runs it at once whatever its schedule, **Pause** or **Resume**, **Edit**, and **Delete**, which asks first.
+- A routine's page shows its settings and its last 10 runs, newest first, each with the sessions it started, its command's output, and its errors.
+  Output longer than 20 lines folds behind **Show output**.
+  Click a session to open it, live while it runs, else its transcript (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
+  A run still opens a session in `/tmp`, which the sidebar does not list.
+- At most 3 routine sessions run at once, and a run starts the rest of its queue as they finish.
+  Commands do not count toward that limit.
+  A prompt routine whose last session still runs records an error instead of starting a second one.
+- A routine session runs unattended: its prompt tells it not to ask questions.
+  Once its turn finishes, the dashboard ends it, so it moves to the past sessions with its transcript, and **Resume** continues it.
+- Routines run only while the dashboard runs.
+  A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
+  Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
+- The server keeps the routines in `routines.json` beside its access token, so every browser tab and the desktop app show the same ones.
+  While the page has lost the server, the routines cannot be changed.
+
 ## Settings
 
 - The gear button in the sidebar header opens **Settings**, split into six tabs that look like the sidebar's **Inbox** and **Sessions** tabs: **Model roles & provider order**, **Retry and fallback**, **Files**, **Integrations**, **New sessions**, and **Appearance**.
@@ -585,6 +621,7 @@ Alt is Option on macOS.
 | G then T | Outside text fields | Go to your Linear tickets |
 | G then S | Outside text fields | Go to the sessions |
 | G then D | Outside text fields | Go to your todo list |
+| G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Choose the sidebar's project |
 | J | Inbox, outside text fields | Move to the next pull request, or show it in the open sheet |
 | K | Inbox, outside text fields | Move to the previous pull request, or show it in the open sheet |
@@ -615,8 +652,8 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool call.
   Cmd+, opens Settings, where the model roles live, and closes it again.
 - G then I opens the Inbox tab.
-  G then S goes back from the inbox, the todo list, Settings, or the new-session draft to the panes.
-  G then D opens the **Todo** page.
+  G then S goes back from the inbox, the todo list, the routines, Settings, or the new-session draft to the panes.
+  G then D opens the **Todo** page, and G then R the **Routines** page.
   G then P opens the project picker with its search field focused.
 - Session shortcuts act on the focused pane.
   The dashboard does not read `~/.omp/agent/keybindings.yml`.

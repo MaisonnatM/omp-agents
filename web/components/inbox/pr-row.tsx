@@ -6,6 +6,7 @@ import {
 	type InboxPullRequest,
 	type PastSession,
 	type PullRequest,
+	pullRequestUrl,
 	type PullRequestLink,
 	type RosterHost,
 	type SessionLinksEdit,
@@ -19,10 +20,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";
-import { type InboxRow, pullRequestUrl, type RowVerdict, rowVerdict, type StackPlace } from "../../inbox-model";
+import { type InboxRow, type RowVerdict, rowVerdict, type StackPlace } from "../../inbox-model";
 import { hashForInbox, type OpenMode } from "../../routing";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
-import { type PullRequestActionId, pullRequestActions, type QuickActionId } from "../../quick-actions";
+import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
+import type { QuickActionId } from "../../quick-actions";
 import { BranchName } from "../git";
 import { AddToTodo } from "../add-to-todo";
 import { QuickActionsMenu } from "../quick-actions";

@@ -55,7 +55,7 @@ const title = await tab.evaluate(() => document.title);
 ```
 
 The page routes through the URL hash.
-Besides a live session's own hash, the routes are `#past/<session id>`, `#session/<session id>`, `#inbox`, `#inbox/<owner>/<repo>/<number>`, `#tickets`, `#tickets/<identifier>`, `#todo`, `#todo/today`, `#todo/agents`, `#todo/done`, `#todo/<category id>`, `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#settings`, and `#settings/<encoded cwd>`.
+Besides a live session's own hash, the routes are `#past/<session id>`, `#session/<session id>`, `#inbox`, `#inbox/<owner>/<repo>/<number>`, `#tickets`, `#tickets/<identifier>`, `#todo`, `#todo/today`, `#todo/agents`, `#todo/done`, `#todo/<category id>`, `#routines`, `#routines/<id>`, `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#settings`, and `#settings/<encoded cwd>`.
 `web/routing.ts` parses them.
 
 ## Desktop smoke

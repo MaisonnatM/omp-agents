@@ -20,6 +20,8 @@ export const userTodosFile = join(configDir, "todos.json");
  * The server applies and deletes them, so it stays the only writer of {@link userTodosFile}.
  */
 export const userTodoInboxDir = join(configDir, "todo-inbox");
+/** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
+export const routinesFile = join(configDir, "routines.json");
 
 /** `path` with the home directory shortened to `~`. */
 export const displayPath = (path: string): string =>

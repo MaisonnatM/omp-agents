@@ -22,6 +22,7 @@ export type ShortcutId =
 	| "tickets"
 	| "sessions"
 	| "todo"
+	| "routines"
 	| "project"
 	| "nextPullRequest"
 	| "previousPullRequest"
@@ -98,6 +99,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "tickets", label: "Go to your Linear tickets", keys: [{ goTo: "t" }] },
 	{ id: "sessions", label: "Go to the sessions", keys: [{ goTo: "s" }] },
 	{ id: "todo", label: "Go to your todo list", keys: [{ goTo: "d" }] },
+	{ id: "routines", label: "Go to your routines", keys: [{ goTo: "r" }] },
 	{ id: "project", label: "Choose the sidebar's project", keys: [{ goTo: "p" }] },
 	{ id: "nextPullRequest", label: "Inbox: move to the next pull request, or show it in the open sheet", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", label: "Inbox: move to the previous pull request, or show it in the open sheet", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },

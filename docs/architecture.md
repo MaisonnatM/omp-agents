@@ -205,6 +205,50 @@ omp builds those reports from its auth storage, extensions, and credential broke
 omp can exit non-zero after it prints the reports it did get, so the server reads the output whatever the exit code.
 When the output is not a usage report, the footer shows the last line omp wrote to stderr.
 
+## Routines
+
+A routine starts dashboard sessions, or runs a shell command, on a schedule: every so many minutes, counted from its last run, or at a local time on chosen weekdays, so 9:00 stays 9:00 across DST.
+Its task is one prompt, one session per pull request that asks the viewer for a review, running the inbox's **Review** or **Thermonuclear review** action, which both post nothing to GitHub and change no branch, or one command.
+The prompt is the inbox action's own, from `src/pull-request-actions.ts`, plus `UNATTENDED`, which tells the session not to ask questions.
+
+`src/server/routines-file.ts` keeps the routines in `routines.json` beside the access token, and saves every change at once.
+Each routine holds its last 10 runs, newest first, and `done`, the head commit a session already took for each pull request still in the inbox.
+A run holds its slot time, its queue of pull request keys still to start, the sessions it started, its errors, and for a command task, its `command` result once the command ended.
+A prompt or command run's queue holds the one `SINGLE_TARGET` entry until the drain takes it.
+
+`src/server/routine-runner.ts` runs on a 60 s tick in `src/server/loops.ts`, whether or not a page is connected.
+Each tick does three things, in order:
+
+1. It claims each due slot: it saves a new run with its queue, read from the inbox with the cache skipped, before it starts anything.
+   Slots missed while the dashboard was closed or the Mac slept coalesce into one run at the next tick.
+   When the inbox cannot be read, the run still takes the slot and records the error; the next run takes the pull requests it missed, since none of them is in `done`.
+2. It drains the queues, oldest run first, while fewer than 3 routine sessions are busy; a command takes no session slot, so a command run drains even when they are all busy.
+   It reads each workspace's inbox once per drain and skips a pull request the action no longer applies to or whose head is already in `done`.
+   It starts each session through the same `start` the page uses, linked to its pull request.
+   A started session writes `done` and the run's `started`; a failed start goes to the run's errors and stays out of `done`, so the next run takes it again.
+   When the inbox cannot be read, the error goes to the run and the queue waits for the next tick.
+   A prompt routine whose last session still runs records an error instead of starting a second one.
+   A command starts through the runner's `exec`, `runShell` in `src/proc.ts`, and the drain does not wait for it, so a tick never blocks for minutes.
+   `runShell` runs `/bin/sh -c` in the workspace with stderr merged into stdout, keeps the last 64 KB of output, and stops the command after 10 minutes.
+   It spawns the shell in its own process group and stops the whole group with SIGTERM, since a command's own children would otherwise keep running and hold the output pipe open.
+   When the command ends, the runner writes its exit code, output, and times to the run; a non-zero exit, a stop, or a failed spawn also goes to the run's errors.
+   The runner keeps the routines whose command runs in memory, and a command routine whose last command still runs records an error instead of running a second one.
+3. It retires finished sessions: once a session that worked is idle, the runner ends it.
+   A session counts as working from the first time its row shows it working or waiting on a question, at its start, at a tick, or at any change of its row, which the server passes to `observe`.
+   `observe` also ends a session as soon as its row shows the turn over, so a finished session frees its slot at once rather than at the next tick.
+   Its transcript stays a past session, and **Resume** continues it.
+   A session that waits on a question holds its slot.
+
+Running a tick twice starts nothing new, since the slot is claimed and `done` holds the heads, and a tick that comes while one runs is skipped.
+A crash after a claim loses no queue, since it is on disk; a key taken off the queue whose session had not started yet is not in `done`, so the next run takes it.
+After a restart the runner tracks no session, which is right, because the dashboard's sessions die with the server.
+Stopping the server stops every running command, right before it exits, so the result of a command it stopped is never saved as a time-limit stop.
+A run saves its command as `running` before the command starts, then as `exited`, `stopped`, or `failed` when it ends.
+No command resumes after a restart: the next server turns each run still saved as `running` into `stopped` by the dashboard, with that error.
+
+A `routine` socket message carries one change: `save`, `remove`, `enable`, or `run-now`, which claims a slot now, whatever the schedule, and drains it.
+Every socket hears the routines after each change and each step of a run as a `routines` message on the roster topic, also sent when a socket opens.
+
 ## HTTP API
 
 **Settings** reads `GET /api/settings`, or `GET /api/settings?cwd=<directory>` for a workspace.
@@ -314,7 +358,7 @@ A failure, or no return within five minutes, shows as `signIn: { phase: "failed"
 ## Front-end components
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
-The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, and **Todo** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
+The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, **Todo**, and **Routines** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
 User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
 `thinking-indicator` shows while the agent works.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
@@ -353,10 +397,10 @@ The server lives in `src/`:
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and folds live events into it, and keeps each open view's media tree.
-- `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, the inbox, pull request, and ticket shapes).
-  `selectorOf` names a model as `provider/id`, which both session transports and the model picker use.
+- `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, the inbox, pull request, ticket, and routine shapes).
+  `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
-- `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json` and `todos.json`, and `src/paths.ts` names the home directory, the token file, the interrupted sessions' file, and the todo list's file.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, and `routines.json`, and `src/paths.ts` names the home directory, the token file, the interrupted sessions' file, the todo list's file, and the routines' file.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
@@ -387,6 +431,9 @@ The server lives in `src/`:
 - `src/server/todo-inbox.ts`: applies the changes that omp's `user_todo` tool (`templates/omp/agent/extensions/todos.ts`) leaves in `todo-inbox/` beside `todos.json`, one JSON file each, written under a `.tmp` name then renamed.
   It takes `add`, and `toggle` that checks, deletes each file it applies, and moves any other to `<name>.invalid` with a logged reason, so the server stays the only writer of `todos.json` and an agent cannot undo what you did.
 - `src/tickets.ts` also lists the workspace's Linear teams (`loadTeams`, `GET /api/linear/teams`) and opens an issue from a todo (`createTicket`, `PUT /api/ticket/new`), assigned to the viewer.
+- `src/routines.ts`: the rules of routines: `nextRunAt`, `isDue`, `pendingTargets`, which picks the pull requests a run takes, `applyRoutine`, which applies an edit, and a command's length, time, and output limits; see [Routines](#routines).
+  `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.
+- `src/pull-request-actions.ts`: the pull request actions, which pull requests each applies to and its prompt, which the inbox's quick actions and the routines share.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
   An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
@@ -396,17 +443,18 @@ The server lives in `src/`:
 The page lives in `web/`.
 `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
-- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, settings, and new-session pages, and focus handling.
+- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, todo, routines, settings, and new-session pages, and focus handling.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which runs in the background.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, images, and completions, outside the page state, so a token in one pane re-renders only that pane.
   It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
-- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
+- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the inbox and the tickets page show.
   `web/inbox-model.ts` holds the inbox's sections in one table, with whether each waits on you and whether it starts folded, sorts each stack's rows together by the chain of base branches, and says what a row's verdict and a sheet's Status show.
-- `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it.
+  `web/routines-model.ts` words a routine's schedule, task, next run, and last run, and turns the routine editor's form into the routine it saves.
+- `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
   `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's sheet or an issue's details, and the note that says why a start failed.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or a sheet, with the status dot of a running one.
 - `web/api.ts`: the page's HTTP client, and `errorText`, which says what any failure was.
@@ -422,6 +470,7 @@ The page lives in `web/`.
   `web/use-copy.ts` copies text to the clipboard and holds the copied state behind a button's check mark.
   `web/use-default-model.ts` reads the model that the `default` role names, which the draft's model picker shows until a pick.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
+  `web/components/skill-picker.tsx` is the skill picker that the settings' pinned skill and the routine editor share.
   The checkout, the default model, and the skills are each one `useRead`.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
   `web/components/session-switcher.tsx` is the Cmd+K search over every session.
@@ -432,10 +481,12 @@ The page lives in `web/`.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
 - `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
   `SessionRow` is the one row a past session and a live host both render.
-  `web/components/todo-categories.tsx` holds its Todo tab: **All**, **Today**, **From agents**, **Done**, then the categories.
+  `web/components/todo-categories.tsx` holds its Todo tab: **All**, **Today**, **From agents**, **Done**, then the categories, and `web/components/routines/routines-nav.tsx` its Routines tab, the routines by name.
 - `web/components/user-todos.tsx`: the Todo page and its lists; `todo-archive.tsx` is the **Done** page.
   `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows, `todo-search.tsx` is the search field, and `todo-undo.tsx` the **Undo** toast.
   `todo-detail.tsx` is the open todo, with its due day, links, **Start session**, and **Create Linear ticket**, whose notes `web/components/markdown-editor.tsx` edits and previews through `message-markdown.tsx`; `todo-links.tsx` draws a todo's link chips, and `add-to-todo.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
+- `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
+  `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.
 - `web/components/pane.tsx`: a pane.
   `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button and the checkout read, `past-conversation.tsx` a past session's view, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` the project, pull request, and ticket chips of a header.
@@ -445,7 +496,7 @@ The page lives in `web/`.
 - `web/components/dashboard-context.tsx`: the stable dashboard actions (`send`, `open`, `start`, `end`, …) and the last start of each kind, provided once by `App`, which the sidebar, the panes, and the pages read instead of taking them as props.
 - `web/components/plan-panel.tsx`: the right sidebar's tabs for the focused pane: its plan and its changed files, then `agents-tab.tsx`, the live session's agents as a tree, and `media-tab.tsx`, its images and their viewer.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
-  The inbox and tickets pages share `web/components/list-sheet-page.tsx` for their frame, header, and load and refresh states.
+  The inbox and tickets pages share `web/components/list-sheet-page.tsx` for their frame, header, and load and refresh states, and the Todo and Routines pages its `PageFrame`.
   The inbox also uses its sheet, which keeps its target through its exit slide. The tickets page replaces the list with the issue in the main content instead.
   Both use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
   `SheetFrame` is the pull request sheet's header and scrolling body, `LoadNote` is the loading or error line that sheet, the issue detail, and the list page share, and `Clamped` folds a long description behind **Show more**.

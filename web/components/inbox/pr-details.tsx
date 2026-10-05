@@ -1,10 +1,11 @@
 import { CircleCheck, CircleDashed, CircleSlash, CircleX, Eye, GitMerge, GitPullRequestDraft, type LucideIcon, MessageSquare } from "lucide-react";
 import type { ReactNode } from "react";
-import type { CheckRunState, PullRequest, PullRequestCheck, PullRequestDetail, PullRequestEvent, RosterHost, View } from "../../../src/shared";
+import { type CheckRunState, type PullRequest, type PullRequestCheck, type PullRequestDetail, type PullRequestEvent, pullRequestUrl, type RosterHost, type View } from "../../../src/shared";
 import { cn } from "@/lib/utils";
-import { graphiteUrl, pullRequestStatus, pullRequestUrl, type StatusItem } from "../../inbox-model";
+import { graphiteUrl, pullRequestStatus, type StatusItem } from "../../inbox-model";
 import { age } from "../../labels";
-import type { PullRequestActionId, QuickActionId } from "../../quick-actions";
+import type { PullRequestActionId } from "../../../src/pull-request-actions";
+import type { QuickActionId } from "../../quick-actions";
 import type { OpenMode } from "../../routing";
 import { useRead } from "../../reads";
 import { BranchName } from "../git";

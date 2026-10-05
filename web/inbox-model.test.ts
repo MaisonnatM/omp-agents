@@ -15,6 +15,7 @@ const pr = (number: number, fields: Partial<InboxPullRequest> = {}): InboxPullRe
 	checks: "passing",
 	conflicts: false,
 	head: `me/branch-${number}`,
+	headOid: `sha-${number}`,
 	stackedOn: null,
 	unresolved: { count: 0, exact: true },
 	updatedAt: number,

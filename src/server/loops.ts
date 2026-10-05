@@ -1,7 +1,8 @@
 /**
  * Every recurring job of the server, with its cadence: the registry poll, the watcher on omp's sessions
- * directory and the throttled re-read it asks for, the full rescan, and the `omp usage` poll.
+ * directory and the throttled re-read it asks for, the full rescan, the `omp usage` poll, and the routine tick.
  * The handlers do the work. The registry and usage polls schedule their next tick once the last one finished.
+ * The routine tick runs whether or not a page is connected, since routines start sessions on their own.
  */
 import { mkdirSync, watch } from "node:fs";
 import { join } from "node:path";
@@ -14,6 +15,8 @@ const LIST_THROTTLE_MS = 500;
 const RESCAN_MS = 60_000;
 /** `omp usage` caches provider reports itself; each run still costs a process and up to one network round trip per provider. */
 const USAGE_POLL_MS = 60_000;
+/** Routine schedules count in minutes, and a Mac that wakes from sleep catches up at the next tick. */
+const ROUTINE_TICK_MS = 60_000;
 
 export interface LoopHandlers {
 	/** Every {@link POLL_MS}. */
@@ -26,6 +29,8 @@ export interface LoopHandlers {
 	onRescanTick(): Promise<void>;
 	/** At once, then every {@link USAGE_POLL_MS}. */
 	onUsageTick(): Promise<void>;
+	/** Every {@link ROUTINE_TICK_MS}, listener or not. */
+	onRoutineTick(): Promise<void>;
 }
 
 /** Run `tick`, then again `ms` after each run finishes. */
@@ -52,11 +57,12 @@ export class Loops {
 		});
 	}
 
-	/** Start the registry poll, the rescans, and the usage poll. */
+	/** Start the registry poll, the rescans, the usage poll, and the routine tick. */
 	start(): void {
 		setTimeout(() => void repeat(this.#on.onRegistryTick, POLL_MS), POLL_MS);
 		setInterval(() => void this.#on.onRescanTick(), RESCAN_MS);
 		void repeat(this.#on.onUsageTick, USAGE_POLL_MS);
+		setInterval(() => void this.#on.onRoutineTick(), ROUTINE_TICK_MS);
 	}
 
 	/** A file changed, reported by the watcher or by the session that wrote it. */

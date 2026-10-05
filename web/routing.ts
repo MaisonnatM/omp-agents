@@ -28,6 +28,11 @@ export interface TodoRoute {
 	list: TodoListView;
 }
 
+/** The Routines page: the list, or routine `target`'s settings and runs when it is non-null. */
+export interface RoutinesRoute {
+	target: string | null;
+}
+
 /** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. `todoId` names the todo it works on. */
 export interface NewSessionRoute {
 	cwd: string | null;
@@ -40,6 +45,7 @@ export type Page =
 	| ({ kind: "inbox" } & InboxRoute)
 	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
+	| ({ kind: "routines" } & RoutinesRoute)
 	| ({ kind: "new" } & NewSessionRoute);
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
@@ -66,6 +72,7 @@ const TODO_LISTS = { today: { kind: "today" }, agents: { kind: "agents" }, done:
  *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/agents`, and `#todo/done` with the todos due by
  *   today, the ones agents added, or the archive, and `#todo/<category id>` with that category's todos alone.
+ * - `#routines` opens the Routines page with every routine, and `#routines/<id>` with that routine's settings and runs.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	settings: rest => ({ kind: "settings", cwd: decodeCwd(rest) }),
@@ -80,6 +87,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		const named = Object.hasOwn(TODO_LISTS, rest) ? TODO_LISTS[rest as keyof typeof TODO_LISTS] : null;
 		return { kind: "todo", list: named ?? { kind: "category", id: decodeURIComponent(rest) } };
 	},
+	routines: rest => ({ kind: "routines", target: rest ? decodeURIComponent(rest) : null }),
 };
 
 const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, head);
@@ -96,6 +104,8 @@ function restOfPage(page: Page): string | null {
 			return page.target || null;
 		case "todo":
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
+		case "routines":
+			return page.target === null ? null : encodeURIComponent(page.target);
 		default: {
 			const never: never = page;
 			return never;
@@ -112,6 +122,7 @@ export function hashForPage(page: Page): string {
 export const hashForInbox = (target: PullRequest | null): string => hashForPage({ kind: "inbox", target });
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
 export const hashForTodo = (list: TodoListView): string => hashForPage({ kind: "todo", list });
+export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
 export const hashForSettings = (cwd: string | null): string => hashForPage({ kind: "settings", cwd });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 
@@ -163,7 +174,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `todo`, `session`, or `new`. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `todo`, `routines`, `session`, or `new`. */
 function viewFromPane(pane: string): View {
 	if (pane.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(pane.slice(PAST_PREFIX.length)) };
 	const slash = pane.indexOf("/");

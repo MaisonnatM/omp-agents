@@ -16,6 +16,7 @@ const node = (number: number, fields: Record<string, unknown>) => ({
 	reviewDecision: "REVIEW_REQUIRED",
 	mergeable: "MERGEABLE",
 	headRefName: `me/branch-${number}`,
+	headRefOid: `sha-${number}`,
 	baseRefName: "main",
 	updatedAt: "2026-10-01T10:00:00Z",
 	mergedAt: null,
@@ -87,6 +88,7 @@ describe("parseInboxAnswer", () => {
 				checks: "failing",
 				conflicts: true,
 				head: "me/branch-1",
+				headOid: "sha-1",
 				stackedOn: "me/branch-0",
 				unresolved: { count: 0, exact: true },
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
@@ -103,6 +105,7 @@ describe("parseInboxAnswer", () => {
 				checks: "none",
 				conflicts: false,
 				head: "me/branch-2",
+				headOid: "sha-2",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
@@ -119,6 +122,7 @@ describe("parseInboxAnswer", () => {
 				checks: "passing",
 				conflicts: false,
 				head: "me/branch-3",
+				headOid: "sha-3",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
 				updatedAt: Date.parse("2026-10-01T10:00:00Z"),
@@ -135,6 +139,7 @@ describe("parseInboxAnswer", () => {
 				checks: "passing",
 				conflicts: false,
 				head: "me/branch-4",
+				headOid: "sha-4",
 				stackedOn: null,
 				unresolved: { count: 0, exact: true },
 				updatedAt: Date.parse("2026-09-30T08:00:00Z"),
@@ -204,6 +209,11 @@ describe("parseInboxAnswer", () => {
 
 	test("an answer without data reports GitHub's errors", () => {
 		expect(() => parseInboxAnswer({ errors: [{ message: "Could not resolve to a Repository" }] }, repo)).toThrow("Could not resolve to a Repository");
+	});
+
+	test("drops a PR whose head commit GitHub left out", () => {
+		const prs = parseInboxAnswer({ data: { authored: { nodes: [node(1, { headRefOid: null }), node(2, {})] } } }, repo);
+		expect(prs.map(pr => [pr.number, pr.headOid])).toEqual([[2, "sha-2"]]);
 	});
 });
 

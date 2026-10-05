@@ -1,6 +1,6 @@
-import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
+import { AppWindow, Archive, CalendarClock, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import { type PastSession, type PullRequest, type RosterHost, repoKey, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
+import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type Routine, repoKey, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +32,7 @@ import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { SizeProvider } from "@/lib/size-context";
-import { inboxSection, inboxSections, pullRequestUrl, type Waiting, waitingCount } from "../inbox-model";
+import { inboxSection, inboxSections, type Waiting, waitingCount } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView, type TodoListView } from "../routing";
@@ -44,6 +44,7 @@ import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { useDashboardContext } from "./dashboard-context";
 import { ShipStep } from "./ship-step";
+import { RoutinesNav } from "./routines/routines-nav";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TodoCategories } from "./todo-categories";
 
@@ -398,9 +399,10 @@ const SIDEBAR_TABS = [
 	{ value: "tickets", label: "Tickets", icon: SquareKanban },
 	{ value: "sessions", label: "Sessions", icon: MessagesSquare },
 	{ value: "todo", label: "Todo", icon: ListTodo },
+	{ value: "routines", label: "Routines", icon: CalendarClock },
 ] as const;
 
-/** The sidebar's tab; the inbox, tickets, and todo tabs go with their pages, sessions with the panes. */
+/** The sidebar's tab; the inbox, tickets, todo, and routines tabs go with their pages, sessions with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 interface RosterProps {
@@ -419,13 +421,16 @@ interface RosterProps {
 	settingsOpen: boolean;
 	/** omp is signed in to Linear, so the Tickets tab shows. */
 	ticketsShown: boolean;
-	/** The sidebar's tab: the inbox, the tickets, or the todos with their pages, or the sessions over the panes. */
+	/** The sidebar's tab: the inbox, the tickets, the todos, or the routines with their pages, or the sessions over the panes. */
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
 	/** The Todo page's list, `null` until the server sends it. */
 	userTodos: UserTodoList | null;
 	/** The list the Todo page shows. */
 	todoView: TodoListView;
+	routines: Routine[];
+	/** The routine the Routines page shows, `null` for the list. */
+	routinesTarget: string | null;
 	/** The inbox or tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
@@ -450,6 +455,8 @@ export function Roster({
 	onTab,
 	userTodos,
 	todoView,
+	routines,
+	routinesTarget,
 	sectionTarget,
 	onSectionTarget,
 	project,
@@ -558,7 +565,7 @@ export function Roster({
 		);
 	};
 	return (
-		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="flex min-h-0 flex-1 flex-col">
+		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
@@ -578,7 +585,7 @@ export function Roster({
 			</SidebarHeader>
 			<SizeProvider size="compact">
 				<TabsList aria-label="Sidebar" className="mx-2 self-start">
-					{/* Four tabs fit the sidebar's default width only with tighter padding than Fluid's. */}
+					{/* The tabs fit the sidebar's default width only with tighter padding than Fluid's, and five of them only without their icons. */}
 					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => {
 						const badge = value === "inbox" && waiting > 0 ? waiting : undefined;
 						return (
@@ -589,7 +596,7 @@ export function Roster({
 								icon={icon}
 								badge={badge}
 								aria-label={badge === undefined ? undefined : `${label}, ${badge} waiting on you`}
-								className="px-2"
+								className={ticketsShown ? "px-2 @max-[25rem]/sidebar:[&>svg]:hidden" : "px-2 @max-[20rem]/sidebar:[&>svg]:hidden"}
 								shortcut={shortcutLabels(value)}
 							/>
 						);
@@ -682,6 +689,11 @@ export function Roster({
 			<TabPanel value="todo" asChild>
 				<SidebarContent>
 					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} />
+				</SidebarContent>
+			</TabPanel>
+			<TabPanel value="routines" asChild>
+				<SidebarContent>
+					<RoutinesNav routines={routines} target={routinesTarget} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>
