@@ -1,14 +1,15 @@
 import { Box, Calendar } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import type { Ticket, TicketDetail } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { age } from "../../labels";
+import { useRead } from "../../reads";
 import { PRIORITY_LABEL } from "../../tickets-model";
-import { useDetail } from "../../use-detail";
 import { IconTip } from "../inbox/avatars";
 import { Comment, DetailSection, Markdown, OutLink } from "../sheet-details";
+import { TicketFields } from "./ticket-fields";
 import { dueLabel, PRIORITY_ICON, STATUS_ICON } from "./ticket-row";
 
 const ago = (at: string): string => `${age(Date.parse(at))} ago`;
@@ -20,9 +21,16 @@ interface TicketSheetContentProps {
 	actions?: ReactNode;
 }
 
-/** A Linear issue, as the tickets page's sheet shows it: a header that names it, with `actions` below, then its description, links, and comments. */
+/**
+ * A Linear issue, as the tickets page's sheet shows it: a header that names it, whose fields change the issue once
+ * Linear answered it in full, with `actions` below, then its description, links, and comments.
+ */
 export function TicketSheetContent({ id, listed, actions }: TicketSheetContentProps) {
-	const { detail, error } = useDetail<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
+	const read = useRead<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
+	// The version a field change answered; the sheet mounts anew (by `key`) for another issue.
+	const [replaced, replace] = useState<TicketDetail | null>(null);
+	const detail = replaced ?? read.data;
+	const error = replaced ? null : read.error;
 	const ticket = detail ?? listed;
 	const [PriorityIcon, priorityColor] = PRIORITY_ICON[ticket?.priority ?? 0];
 	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking Linear for the issue…</p>;
@@ -43,7 +51,7 @@ export function TicketSheetContent({ id, listed, actions }: TicketSheetContentPr
 				</SheetTitle>
 				<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
 					<span className="font-mono tabular-nums">{id}</span>
-					{ticket && (
+					{ticket && !detail && (
 						<>
 							<span>{ticket.status}</span>
 							<span className="flex items-center gap-1">
@@ -75,7 +83,8 @@ export function TicketSheetContent({ id, listed, actions }: TicketSheetContentPr
 						</span>
 					)}
 				</p>
-				{ticket && ticket.labels.length > 0 && (
+				{detail && <TicketFields detail={detail} replace={replace} />}
+				{!detail && ticket && ticket.labels.length > 0 && (
 					<p className="flex flex-wrap gap-1">
 						{ticket.labels.map(label => (
 							<Badge key={label} variant="dot" size="compact">

@@ -1,19 +1,32 @@
 # How omp-agents works
 
-The server's design, its protocols, and its HTTP API. For installation, see the [README](../README.md); for the interface, see [Using omp-agents](usage.md).
+The server's design, its protocols, and its HTTP API.
+For installation, see the [README](../README.md); for the interface, see [Using omp-agents](usage.md).
 
 ## omp modules
 
-The server imports omp's own modules from the installed package, so it does not reimplement a protocol, the encryption, or the session-file format, and it always speaks the same version as the sessions it shows. Only `src/omp/` imports them: `src/omp/modules.ts` loads every module once and checks at startup that each export this app uses exists, naming the omp version and the missing export when one does not. It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
+The server imports omp's own modules from the installed package, so it does not reimplement a protocol, the encryption, or the session-file format, and it always speaks the same version as the sessions it shows.
+Only `src/omp/` imports them: `src/omp/modules.ts` loads every module once and checks at startup that each export this app uses exists, naming the omp version and the missing export when one does not.
+It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 
-Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-tui/`, or `pi-utils/` are inside that install, in `@oh-my-pi/`. They are not in this repository. The main ones:
+Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-tui/`, or `pi-utils/` are inside that install, in `@oh-my-pi/`.
+They are not in this repository.
+The main ones:
 
 - Collab: `pi-coding-agent/src/collab/registry.ts`, `protocol.ts`, `crypto.ts`, and `relay-client.ts`.
 - Session files: `pi-coding-agent/src/session/session-listing.ts` and `session-loader.ts`.
-- RPC: `pi-coding-agent/src/modes/rpc/rpc-client.ts`, `rpc-frame.ts`, and the frame types in `rpc-types.ts`. `RpcClient` drops `extension_ui_request` and `session_info_update` frames, so `src/omp/rpc.ts` reads them from its own copy of the child's stdout (`UNROUTED_FRAMES`); see [Dashboard sessions](#dashboard-sessions).
+- Interrupted turns: `pi-coding-agent/src/session/exit-diagnostics.ts` (`createInterruptedTurnAbortMessage`), which `endsMidTurn` in `src/omp/sessions.ts` uses to refuse forking a session that ended mid-turn.
+- Images: `pi-coding-agent/src/session/blob-store.ts`, which moves a prompt's image out of the session file into `blob:sha256:<hash>`, and `getBlobsDir` in `pi-utils/src/dirs.ts`; `src/transcript.ts` and the `/api/image` route read them.
+- Plan files: `listPlanFiles` in `pi-coding-agent/src/plan-mode/plan-files.ts`, whose rule `src/work.ts` copies; see [Transcripts](#transcripts).
+- RPC: `pi-coding-agent/src/modes/rpc/rpc-client.ts`, `rpc-frame.ts`, and the frame types in `rpc-types.ts`.
+  `RpcClient` drops `extension_ui_request` and `session_info_update` frames, so `src/omp/rpc.ts` reads them from its own copy of the child's stdout (`UNROUTED_FRAMES`); see [Dashboard sessions](#dashboard-sessions).
 - Settings and discovery: `pi-coding-agent/src/config/settings.ts`, `pi-coding-agent/src/discovery/index.ts`, and `pi-coding-agent/src/task/discovery.ts`.
-- Credentials: `pi-coding-agent/src/session/auth-broker-config.ts` (`discoverAuthStorage`) and `pi-ai/src/registry/oauth/index.ts` (`getOAuthProviders`). `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`. It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.
-- MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `oauth-credentials.ts`, `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`), which `src/omp/mcp.ts` wraps for the tickets page and Linear's sign-in. Linear's sign-in reads and writes omp's credential store through the same `discoverAuthStorage`, opened and closed on each call.
+- Credentials: `pi-coding-agent/src/session/auth-broker-config.ts` (`discoverAuthStorage`) and `pi-ai/src/registry/oauth/index.ts` (`getOAuthProviders`).
+  `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`.
+  It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.
+- Model roles: `pi-coding-agent/src/config/model-resolver.ts` (`expandRoleAlias`, `resolveRoleChain`), whose `@role` aliases `resolveRoles` in `src/omp/models.ts` follows for `GET /api/models/roles`.
+- MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `oauth-credentials.ts`, `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`), which `src/omp/mcp.ts` wraps for the tickets page and Linear's sign-in.
+  Linear's sign-in reads and writes omp's credential store through the same `discoverAuthStorage`, opened and closed on each call.
 - Completions: `pi-tui/src/autocomplete.ts`, and the skills and slash commands in `pi-coding-agent/src/extensibility/`.
 - Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
 
@@ -21,145 +34,378 @@ Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-tui/`, 
 
 Every transcript comes from the session files on this machine, not from a network connection:
 
-- One recursive file watcher covers omp's sessions directory. When a file changes, every open transcript in that directory reads the bytes appended since its last read and folds the complete JSONL lines into display items. On macOS a burst of appends can surface only as events for omp's `.<file>.lock` sidecar, which is why a change anywhere in a directory re-reads every open transcript in it.
-- A session's transcript is its `<time>_<session id>.jsonl` file. A subagent's transcript is `<id>.jsonl` in its parent's artifacts directory, which is the parent's transcript path without `.jsonl`. A subagent that outlived a `/new` or `/resume` wrote beside the session it started in, so when the expected file is missing the server looks for the newest `<id>.jsonl` in the project's sessions that changed after the subagent registered.
+- One recursive file watcher covers omp's sessions directory.
+  When a file changes, every open transcript in that directory reads the bytes appended since its last read and folds the complete JSONL lines into display items.
+  On macOS a burst of appends can surface only as events for omp's `.<file>.lock` sidecar, which is why a change anywhere in a directory re-reads every open transcript in it.
+- A session's transcript is its `<time>_<session id>.jsonl` file.
+  A subagent's transcript is `<id>.jsonl` in its parent's artifacts directory, which is the parent's transcript path without `.jsonl`.
+  A subagent that outlived a `/new` or `/resume` wrote beside the session it started in, so when the expected file is missing the server looks for the newest `<id>.jsonl` in the project's sessions that changed after the subagent registered.
 - A past session reads the same way, so a session that runs without publishing itself keeps updating.
-- Live agent events only add what the file does not hold yet: the reply as it streams, and the running state of tool calls. omp keeps a message's `timestamp` when it writes the message, so the file's copy replaces the streamed copy in place, and a late event cannot undo it. omp writes a fresh session's file only with its first reply. Until then the prompt shows from its live event, except a prompt sent from the dashboard to a terminal session, whose file entry has no message timestamp to merge on. A queued steer or follow-up keeps the time it was sent, though the agent takes it later. So a message from the file never goes ahead of the file messages before it, and a live user message goes after everything already shown.
-- A reply that streams and a tool call that runs change with every token. Each open transcript sends those changes to the page at most every 50 ms; a message that finishes, a tool call that ends, a prompt, or a notice goes out at once, together with what was held back.
-- The same read folds each line into the view's plan and changes as well: the latest todo list, from a `todo` result's `details.phases` or a `user_todo_edit` entry, and the files changed, from each `edit` result's `details.path` and `diff` (one per entry of `perFileResults` for a multi-file edit) and each `write` result's `details.resolvedPath`, which omp sets only for a file. The view's socket topic carries them as a `work` message, whole, once with the transcript and again after each read that changes them. A subagent's view folds its own file, so it shows its own plan and changes.
-- A `task` result names the subagents it spawned in `details.progress` and `details.results`; the tool item lists their ids, which name each subagent's view. A running `task` reports them sooner through `tool_execution_update` events.
-- The server lists the session files through omp's session listing, the code behind omp's session picker, at startup and then once a minute, in case the watcher missed a change. Between listings it reads again only the session files the watcher reported, at most twice a second, so a session that streams costs one file read, not a listing of every session. The past list skips the empty sessions that omp's picker hides. The server looks up files by session id in this listing, so the page never sends a path. While no page is connected, it skips building the roster and the past list.
-- Whenever the list changes, the server also scans for pull requests in each session file whose modification time changed, plus the subagent files in its artifacts directory. Like an open transcript, each file reads only the bytes appended since its last scan. The first scan reads every session file. On 460 MB across 367 sessions it takes under a second, and the sidebar shows before it finishes. A session that names a PR by number alone costs one `git remote get-url origin` in its working directory. A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
-- Each inbox answer tells the server which branch heads which pull request in that repository. The server then links each session whose `git push` updated one of those branches to that PR, and sends the sidebar the new links.
+- Live agent events only add what the file does not hold yet: the reply as it streams, and the running state of tool calls.
+  omp keeps a message's `timestamp` when it writes the message, so the file's copy replaces the streamed copy in place, and a late event cannot undo it.
+  omp writes a fresh session's file only with its first reply.
+  Until then the prompt shows from its live event, except a prompt sent from the dashboard to a terminal session, whose file entry has no message timestamp to merge on.
+  A queued steer or follow-up keeps the time it was sent, though the agent takes it later.
+  So a message from the file never goes ahead of the file messages before it, and a live user message goes after everything already shown.
+- A reply that streams and a tool call that runs change with every token.
+  Each open transcript sends those changes to the page at most every 50 ms; a message that finishes, a tool call that ends, a prompt, or a notice goes out at once, together with what was held back.
+- The same read folds each line into the view's plan and changes as well: the latest todo list, from a `todo` result's `details.phases` or a `user_todo_edit` entry, and the files changed, from each `edit` result's `details.path` and `diff` (one per entry of `perFileResults` for a multi-file edit) and each `write` result's `details.resolvedPath`, which omp sets only for a file.
+  The view's socket topic carries them as a `work` message, whole, once with the transcript and again after each read that changes them.
+  A subagent's view folds its own file, so it shows its own plan and changes.
+- The `work` message also carries the plan file: the last path ending in `plan.md`, omp's own rule for a plan file (`listPlanFiles` in `pi-coding-agent/src/plan-mode/plan-files.ts`), that an `edit` or `write` result names, with its text.
+  The transcript cannot rebuild that text, since an edit records only a diff, so the server reads the file each time a read of the transcript finds a change to a plan file, before it sends that read on.
+  omp writes the file before it records the tool result, so the text matches the result.
+- A `task` result names the subagents it spawned in `details.progress` and `details.results`; the tool item lists their ids, which name each subagent's view.
+  A running `task` reports them sooner through `tool_execution_update` events.
+- The server lists the session files through omp's session listing, the code behind omp's session picker, at startup and then once a minute, in case the watcher missed a change.
+  Between listings it reads again only the session files the watcher reported, at most twice a second, so a session that streams costs one file read, not a listing of every session.
+  The past list skips the empty sessions that omp's picker hides.
+  The server looks up files by session id in this listing, so the page never sends a path.
+  While no page is connected, it skips building the roster and the past list.
+- Whenever the list changes, the server also scans for pull requests in each session file whose modification time changed, plus the subagent files in its artifacts directory.
+  Like an open transcript, each file reads only the bytes appended since its last scan.
+  The first scan reads every session file.
+  On 460 MB across 367 sessions it takes under a second, and the sidebar shows before it finishes.
+  A session that names a PR by number alone costs one `git remote get-url origin` in its working directory.
+  A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
+- Each inbox answer tells the server which branch heads which pull request in that repository.
+  The server then links each session whose `git push` updated one of those branches to that PR, and sends the sidebar the new links.
 
 ## Terminal sessions
 
 Sessions started in a terminal are reached through their Collab room:
 
-- Every 1.5 seconds the server lists the local hosts through the registry. That is the same call that backs `omp collab list`.
-- The server joins every listed session's room as a guest named `omp-agents`, as `omp join` would. The guest is how the dashboard prompts a session (`prompt` frames), stops a turn (`abort`), messages a subagent (`agent-cmd` `chat`; the host steers, prompts, or revives it), and cancels a running subagent (`agent-cmd` `kill`). It also carries the host's subagent registry (`agents` frames), subagent progress (`bus` frames), the host's model, thinking level, context numbers, and whether a turn runs (`state` frames), and the live agent events. The composer enables as soon as the host welcomes the guest. Nothing waits on the transcript snapshot that the host then sends.
-- The host steers every `prompt` and `chat` that arrives during a turn. The guest therefore holds follow-ups and sends the next one when a `state` frame stops reporting `isStreaming`, or when an `agents` frame shows the subagent no longer running. It sends none after a turn that its own `abort` or a reply cut off mid-stream ended.
-- The dashboard uses omp's discovery and autocomplete modules for file commands, skills, and file mentions. It expands file commands and skills before guest prompt delivery because Collab prompts bypass the host's slash-command pipeline. The host still resolves `@file` references in the selected session's working directory.
-- If a host starts a new room, for example after `/new` or `/resume`, the server sees the new generation and joins the new room. If the link request races the switch and fails with `stale_generation`, the server lists again and retries. A host that leaves the registry is marked as no longer running.
+- Every 1.5 seconds the server lists the local hosts through the registry.
+  That is the same call that backs `omp collab list`.
+- The server joins every listed session's room as a guest named `omp-agents`, as `omp join` would.
+  The guest is how the dashboard prompts a session (`prompt` frames), stops a turn (`abort`), messages a subagent (`agent-cmd` `chat`; the host steers, prompts, or revives it), and cancels a running subagent (`agent-cmd` `kill`).
+  It also carries the host's subagent registry (`agents` frames), subagent progress (`bus` frames), the host's model, thinking level, context numbers, and whether a turn runs (`state` frames), and the live agent events.
+  The composer enables as soon as the host welcomes the guest.
+  Nothing waits on the transcript snapshot that the host then sends.
+- The host steers every `prompt` and `chat` that arrives during a turn.
+  The guest therefore holds follow-ups and sends the next one when a `state` frame stops reporting `isStreaming`, or when an `agents` frame shows the subagent no longer running.
+  It sends none after a turn that its own `abort` or a reply cut off mid-stream ended.
+- The dashboard uses omp's discovery and autocomplete modules for file commands, skills, and file mentions.
+  It expands file commands and skills before guest prompt delivery because Collab prompts bypass the host's slash-command pipeline.
+  The host still resolves `@file` references in the selected session's working directory.
+- If a host starts a new room, for example after `/new` or `/resume`, the server sees the new generation and joins the new room.
+  If the link request races the switch and fails with `stale_generation`, the server lists again and retries.
+  A host that leaves the registry is marked as no longer running.
 
-Terminal sessions send their questions to writable guests as Collab `ui-request` frames, and the guest answers with `ui-response`. The host races every writable guest against its own terminal dialog, and the first answer wins. When the question ends anywhere else, the host sends `ui-request-end` and the card goes away. After a reconnect, the host sends the questions that still wait again. Read-only rooms receive no questions.
+Terminal sessions send their questions to writable guests as Collab `ui-request` frames, and the guest answers with `ui-response`.
+The host races every writable guest against its own terminal dialog, and the first answer wins.
+When the question ends anywhere else, the host sends `ui-request-end` and the card goes away.
+After a reconnect, the host sends the questions that still wait again.
+Read-only rooms receive no questions.
 
 ### Why the server joins every terminal session
 
-Subagent status lives in the host's memory. The session files on disk cannot tell an idle subagent from a parked one. The guest connection is the one source the protocol offers for live status, and the host already leaves advisor rows out of it. Joining every session keeps those rows current for sessions that you have not opened, and keeps each room ready for a prompt.
+Subagent status lives in the host's memory.
+The session files on disk cannot tell an idle subagent from a parked one.
+The guest connection is the one source the protocol offers for live status, and the host already leaves advisor rows out of it.
+Joining every session keeps those rows current for sessions that you have not opened, and keeps each room ready for a prompt.
 
 The cost is visible on each host and on its relay (`collab.relayUrl`, by default an internet relay):
 
-- Each listed session counts `omp-agents` as one more participant for as long as the dashboard runs. The terminal shows that the guest joined.
-- Each session sends its full transcript snapshot through the relay when the dashboard joins it, and every live event after that. The dashboard ignores the snapshot. Transcripts never travel through the relay.
-- The text that says what a subagent is doing comes from live progress events. After the dashboard restarts, a subagent's link shows only its status until that subagent reports progress again.
+- Each listed session counts `omp-agents` as one more participant for as long as the dashboard runs.
+  The terminal shows that the guest joined.
+- Each session sends its full transcript snapshot through the relay when the dashboard joins it, and every live event after that.
+  The dashboard ignores the snapshot.
+  Transcripts never travel through the relay.
+- The text that says what a subagent is doing comes from live progress events.
+  After the dashboard restarts, a subagent's link shows only its status until that subagent reports progress again.
 
 Stop the dashboard to leave every room.
 
 ## Dashboard sessions
 
-Sessions started from the dashboard are omp child processes in RPC mode with tool dialogs (`--mode rpc-ui`, NDJSON over stdio), spawned through omp's own `RpcClient` from this same package's CLI. The page starts one with a single `start` request whose `kind` is `new`, `fork`, or `resume`, and the server answers each with one `started` reply that carries the new session's instance id or the error. The server picks the instance id before omp spawns, so a question that omp raises while the session opens already belongs to it. A new session's first message rides on the `start` request: the server spawns omp, sends the message as its first prompt, and answers the page as soon as omp reports ready, with no terminal, registry, or relay involved. **Resume** spawns the same child in the directory that the session file's header records and opens the file with omp's `switch_session` command. Prompts, Stop, live events, subagent progress, and questions stay on the pipe. A prompt carries omp's `streamingBehavior`, `steer` or `followUp`, so omp queues it during a turn the way its terminal does. The composer's queue is omp's `queue_update` event, and taking a message back is `remove_queued_message`. Plain `--mode rpc` gives the session no `ask` tool. `rpc-ui` gives it one, and omp sends the `ask` steps and extension dialogs as `extension_ui_request` frames. omp's `RpcClient` reads those frames but only hands them to its own login flow, so the server reads a copy of the child's stdout through omp's JSONL reader and chunk decoder. It writes the `extension_ui_response` to the child's stdin as one line, the way `RpcClient` writes its own commands. omp sends a `cancel` frame when a question ends without an answer, for example after Stop. A question with a timeout ends with no frame, so the server drops it at its deadline. omp's RPC mode does not title a session from its first prompt, as its terminal does. While a session has no title, each user message's `message_end` event makes the server send a bare `/rename` prompt, which omp runs as its own command: it titles the session from the conversation in the background and announces the title with a `session_info_update` frame. `RpcClient` drops that frame too, so the same stdout copy reads it, and the server then reads omp's state again for the new `sessionName`. Stopping the dashboard stops every session that it started. The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one.
+Sessions started from the dashboard are omp child processes in RPC mode with tool dialogs (`--mode rpc-ui`, NDJSON over stdio), spawned through omp's own `RpcClient` from this same package's CLI.
+The page starts one with a single `start` request whose `kind` is `new`, `fork`, or `resume`, and the server answers each with one `started` reply that carries the new session's instance id or the error.
+The server picks the instance id before omp spawns, so a question that omp raises while the session opens already belongs to it.
+A new session's first message rides on the `start` request: the server spawns omp, sends the message as its first prompt, and answers the page as soon as omp reports ready, with no terminal, registry, or relay involved.
+**Resume** spawns the same child in the directory that the session file's header records and opens the file with omp's `switch_session` command.
+Prompts, Stop, live events, subagent progress, and questions stay on the pipe.
+A prompt carries omp's `streamingBehavior`, `steer` or `followUp`, so omp queues it during a turn the way its terminal does.
+The composer's queue is omp's `queue_update` event, and taking a message back is `remove_queued_message`.
+Plain `--mode rpc` gives the session no `ask` tool.
+`rpc-ui` gives it one, and omp sends the `ask` steps and extension dialogs as `extension_ui_request` frames.
+omp's `RpcClient` reads those frames but only hands them to its own login flow, so the server reads a copy of the child's stdout through omp's JSONL reader and chunk decoder.
+It writes the `extension_ui_response` to the child's stdin as one line, the way `RpcClient` writes its own commands.
+omp sends a `cancel` frame when a question ends without an answer, for example after Stop.
+A question with a timeout ends with no frame, so the server drops it at its deadline.
+omp's RPC mode does not title a session from its first prompt, as its terminal does.
+While a session has no title, each user message's `message_end` event makes the server send a bare `/rename` prompt, which omp runs as its own command: it titles the session from the conversation in the background and announces the title with a `session_info_update` frame.
+`RpcClient` drops that frame too, so the same stdout copy reads it, and the server then reads omp's state again for the new `sessionName`.
+Stopping the dashboard stops every session that it started.
+The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one.
 
-`src/server/interrupted.ts` keeps which of those sessions were interrupted, in `interrupted.json` beside the access token, and which of them were mid-turn (working or waiting on a question). Each time a dashboard session starts, exits, or starts or ends a turn, the server writes the session ids of the ones that run and of those whose turn runs. A session that exits without the page's `end` request joins the interrupted list, mid-turn if its turn ran. A server that crashes writes nothing more, so at its next start it reads the ones that ran as interrupted, with the turn state they last had. A session that runs again leaves the list, and `dismiss-interrupted` takes one out. Each past row carries `interrupted`. `resume-all` resumes several past sessions at once, each the way a `start` with `resume` does, then sends `continue` as a prompt to each one that stopped mid-turn. The server answers with one `resumed-all` that names the instance id of each session that started and the errors of those that did not. A terminal session keeps running when the dashboard stops, so the server tracks none of them.
+`src/server/interrupted.ts` keeps which of those sessions were interrupted, in `interrupted.json` beside the access token, and which of them were mid-turn (working or waiting on a question).
+Each time a dashboard session starts, exits, or starts or ends a turn, the server writes the session ids of the ones that run and of those whose turn runs.
+A session that exits without the page's `end` request joins the interrupted list, mid-turn if its turn ran.
+A server that crashes writes nothing more, so at its next start it reads the ones that ran as interrupted, with the turn state they last had.
+A session that runs again leaves the list, and `dismiss-interrupted` takes one out.
+Each past row carries `interrupted`.
+`resume-all` resumes several past sessions at once, each the way a `start` with `resume` does, then sends `continue` as a prompt to each one that stopped mid-turn.
+The server answers with one `resumed-all` that names the instance id of each session that started and the errors of those that did not.
+A terminal session keeps running when the dashboard stops, so the server tracks none of them.
 
-A subagent of a dashboard session takes a message through omp's `steer_subagent` command and stops with `cancel_subagent`; both reach only a subagent that runs, so the server offers them only for rows whose status is `running`. A prompt that starts with `!` goes to omp's `bash` command, which runs it in the session's directory and records a `bashExecution` message in the session file; the transcript shows that message as the user's command and output. omp appends that record without the lock churn that the watcher reports on macOS, so the server re-reads the file itself once `bash` answers. A built-in slash command runs from a plain `prompt`, and omp sends what it prints as `command_output` frames and a model switch as `config_update`. `RpcClient` drops both, so the same stdout copy reads them: the server shows the output as a notice when the user's last prompt was a `/` command, which leaves out what the titling `/rename` prints, and reads omp's state again after a model switch.
+A subagent of a dashboard session takes a message through omp's `steer_subagent` command and stops with `cancel_subagent`; both reach only a subagent that runs, so the server offers them only for rows whose status is `running`.
+A prompt that starts with `!` goes to omp's `bash` command, which runs it in the session's directory and records a `bashExecution` message in the session file; the transcript shows that message as the user's command and output.
+omp appends that record without the lock churn that the watcher reports on macOS, so the server re-reads the file itself once `bash` answers.
+A built-in slash command runs from a plain `prompt`, and omp sends what it prints as `command_output` frames and a model switch as `config_update`.
+`RpcClient` drops both, so the same stdout copy reads them: the server shows the output as a notice when the user's last prompt was a `/` command, which leaves out what the titling `/rename` prints, and reads omp's state again after a model switch.
 
-A `prompt` message, and a `start` of kind `new`, carry `images`, each `{ data, mimeType }` with the file's bytes in base64, as omp's `ImageContent` takes them. `src/server/wire.ts` accepts PNG, JPEG, GIF, and WebP, up to `MAX_PROMPT_IMAGE_BYTES` (32 MB) per prompt, and a prompt of images with no text. The socket's `maxPayloadLength` is 64 MB so such a message fits. A dashboard session passes the images to omp's RPC `prompt`; a terminal session's guest puts them on its Collab `prompt` frame, a held follow-up included. omp's `steer_subagent` and Collab's `agent-cmd` `chat` take text only, so a subagent's prompt with images is refused. omp writes a prompt's images inline into the session file and then moves each to its blob store, `~/.omp/agent/blobs/<sha256>`, leaving `blob:sha256:<hash>` in the file. A user item's `images` holds a `data:` URL for an inline image and `/api/image?hash=<sha256>&type=<image type>` for a moved one; that route serves the blob file as `type`, which must be one of the four prompt image types, since the store keeps none.
+A `prompt` message, and a `start` of kind `new`, carry `images`, each `{ data, mimeType }` with the file's bytes in base64, as omp's `ImageContent` takes them.
+`src/server/wire.ts` accepts PNG, JPEG, GIF, and WebP, up to `MAX_PROMPT_IMAGE_BYTES` (32 MB) per prompt, and a prompt of images with no text.
+The socket's `maxPayloadLength` is 64 MB so such a message fits.
+A dashboard session passes the images to omp's RPC `prompt`; a terminal session's guest puts them on its Collab `prompt` frame, a held follow-up included.
+omp's `steer_subagent` and Collab's `agent-cmd` `chat` take text only, so a subagent's prompt with images is refused.
+omp writes a prompt's images inline into the session file and then moves each to its blob store, `~/.omp/agent/blobs/<sha256>`, leaving `blob:sha256:<hash>` in the file.
+A user item's `images` holds a `data:` URL for an inline image and `/api/image?hash=<sha256>&type=<image type>` for a moved one; that route serves the blob file as `type`, which must be one of the four prompt image types, since the store keeps none.
+
+## Desktop shell
+
+`desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
+Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process, `bun src/server.ts`, and never imports it.
+It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, and `src/server/address.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
+`src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
+
+- At launch it calls `loadToken`, as the server does, so whichever runs first creates the token file, and asks `GET /?token=<token>` on the port.
+  A 302 that sets the cookie can come only from an omp-agents server that holds this token, and the window uses it.
+  A refused connection starts a server.
+  Any other answer means the port is taken, and the window says so.
+- The shell takes the server as started once it prints `listeningLine` (`omp-agents (omp v…) on http://127.0.0.1:<port>`), not once the port answers: another server that took the port while this one built its page would answer too, and the shell would then own a server that is about to fail.
+- It spawns the server with `OMP_AGENTS_PARENT=stdin` and an open stdin pipe that it never writes to.
+  The server calls its `shutdown()` when that pipe ends, which it does however the shell exits, `SIGKILL` included, so no server outlives the app and holds the port.
+  On a normal quit, the shell sends `SIGTERM` and waits up to 10 seconds for the server to end its sessions.
+- The window loads `http://127.0.0.1:<port>/?token=<token>`, a navigation that sends `Sec-Fetch-Site: none`, so `guardsFor` admits it as it admits the printed address in a browser, and the socket's `Origin` matches its `Host`.
+  A custom scheme for the page would fail that check.
+- `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin.
+  An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the Linear sign-in in `web/components/settings/linear-connection.tsx` then opens the address itself once the server names it.
+- The page runs with context isolation and the sandbox on, and no preload: it gets no Node or Electron API.
+- The app keeps its data, its cookie, localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
+- A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
 
 ## Plan quota
 
-Plan quota comes from `omp usage --json`, run through this same package's CLI. omp builds those reports from its auth storage, extensions, and credential broker, so the server reads the command's output instead of rebuilding that setup. omp can exit non-zero after it prints the reports it did get, so the server reads the output whatever the exit code. When the output is not a usage report, the footer shows the last line omp wrote to stderr.
+Plan quota comes from `omp usage --json`, run through this same package's CLI.
+omp builds those reports from its auth storage, extensions, and credential broker, so the server reads the command's output instead of rebuilding that setup.
+omp can exit non-zero after it prints the reports it did get, so the server reads the output whatever the exit code.
+When the output is not a usage report, the footer shows the last line omp wrote to stderr.
 
 ## HTTP API
 
-**Settings** reads `GET /api/settings`, or `GET /api/settings?cwd=<directory>` for a workspace. The server loads omp's settings with omp's own read-only loader (`Settings.loadReadOnly` in `pi-coding-agent/src/config/settings.ts`), the same way a session that starts in that directory would, and applies omp's rule for which roles use the `default` chain (`expandDefaultRetryFallbackChains`). It finds the files through omp's capability discovery (`pi-coding-agent/src/discovery`), agent discovery (`pi-coding-agent/src/task/discovery.ts`), and `findConfigFile` for `APPEND_SYSTEM.md`, and then reads each file from disk. Each file carries the SHA-256 of its text. `GET /api/models` runs `omp models --json` for the pickers.
+**Settings** reads `GET /api/settings`, or `GET /api/settings?cwd=<directory>` for a workspace.
+The server loads omp's settings with omp's own read-only loader (`Settings.loadReadOnly` in `pi-coding-agent/src/config/settings.ts`), the same way a session that starts in that directory would, and applies omp's rule for which roles use the `default` chain (`expandDefaultRetryFallbackChains`).
+It finds the files through omp's capability discovery (`pi-coding-agent/src/discovery`), agent discovery (`pi-coding-agent/src/task/discovery.ts`), and `findConfigFile` for `APPEND_SYSTEM.md`, and then reads each file from disk.
+Each file carries the SHA-256 of its text.
+`GET /api/models` runs `omp models --json` for the pickers.
 
 Edits go through two endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
 
-- `PUT /api/settings/routing` takes one change: a role's model or fallbacks, a model-keyed chain, some `retry.*` values, or the provider order. The server writes it through omp's own write path, the one `omp config set` uses: `Settings.loadIsolated`, the setting's `set` or `setEntry`, and `flush`. omp re-reads `config.yml` under its lock and writes back only the paths that changed. A model must be one that `omp models` lists, read by omp's `parseRetryFallbackSelector`, so `provider/id:level` works even when the id holds a colon. A selector that the config already names passes as it is, so keeping an entry never blocks a save. omp checks each retry value against the setting's type and allowed values. If omp cannot load `config.yml`, the write is refused, because omp would move the broken file aside before it writes.
-- `PUT /api/settings/file` takes `{ path, text, baseHash }`. The server runs discovery again for that `cwd` and writes only a path that it finds there, never one the page invents. `baseHash` must match the file's current hash, or `null` for a missing file. Otherwise the server answers 409 with `conflict: true`. The server resolves symlinks, writes a temporary file beside the real file with its mode, and renames it over the real file, so a symlinked file stays a link and a crash cannot leave a truncated file. Saves run one at a time, so two saves of the same file cannot both pass the hash check.
+- `PUT /api/settings/routing` takes one change: a role's model or fallbacks, a model-keyed chain, some `retry.*` values, or the provider order.
+  The server writes it through omp's own write path, the one `omp config set` uses: `Settings.loadIsolated`, the setting's `set` or `setEntry`, and `flush`.
+  omp re-reads `config.yml` under its lock and writes back only the paths that changed.
+  A model must be one that `omp models` lists, read by omp's `parseRetryFallbackSelector`, so `provider/id:level` works even when the id holds a colon.
+  A selector that the config already names passes as it is, so keeping an entry never blocks a save.
+  omp checks each retry value against the setting's type and allowed values.
+  If omp cannot load `config.yml`, the write is refused, because omp would move the broken file aside before it writes.
+- `PUT /api/settings/file` takes `{ path, text, baseHash }`.
+  The server runs discovery again for that `cwd` and writes only a path that it finds there, never one the page invents.
+  `baseHash` must match the file's current hash, or `null` for a missing file.
+  Otherwise the server answers 409 with `conflict: true`.
+  The server resolves symlinks, writes a temporary file beside the real file with its mode, and renames it over the real file, so a symlinked file stays a link and a crash cannot leave a truncated file.
+  Saves run one at a time, so two saves of the same file cannot both pass the hash check.
 
-Every response from these endpoints is JSON. An error is `{ error, conflict? }` with the HTTP status. Any other `/api/` path answers a JSON 404. The page reports a response that is not JSON with its status and text. Every endpoint needs the access token's cookie; see [SECURITY.md](../SECURITY.md).
+Every response from these endpoints is JSON.
+An error is `{ error, conflict? }` with the HTTP status.
+Any other `/api/` path answers a JSON 404.
+The page reports a response that is not JSON with its status and text.
+Every endpoint needs the access token's cookie; see [SECURITY.md](../SECURITY.md).
 
-`PUT /api/pull-request/sessions` takes `{ owner, repo, number, sessionIds }`, the link button's request. The server refuses a session that did not submit or work on that pull request by the rules in [Pull requests and the inbox](usage.md#pull-requests-and-the-inbox). It reads the description with `gh api repos/<owner>/<repo>/pulls/<number>`, puts the session block in it, and writes it back with `gh api --method PATCH` only when the text changed. The answer is `{ changed }`, or `{ error }` with the HTTP status.
+`PUT /api/pull-request/sessions` takes `{ owner, repo, number, sessionIds }`, the link button's request.
+The server refuses a session that did not submit or work on that pull request by the rules in [Pull requests and the inbox](usage.md#pull-requests-and-the-inbox).
+It reads the description with `gh api repos/<owner>/<repo>/pulls/<number>`, puts the session block in it, and writes it back with `gh api --method PATCH` only when the text changed.
+The answer is `{ changed }`, or `{ error }` with the HTTP status.
 
-`GET /api/git?cwd=<directory>` answers the git checkout that the directory is in, or `null` outside one: the GitHub repository that `origin` names, the checked-out branch, every local branch with the worktree that has it checked out, and the main worktree. It runs `git worktree list --porcelain`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the inbox's cached lookup. Like a new session's `start`, `cwd` may name any directory. The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
+`GET /api/git?cwd=<directory>` answers the git checkout that the directory is in, or `null` outside one: the GitHub repository that `origin` names, the checked-out branch, every local branch with the worktree that has it checked out, and the main worktree.
+It runs `git worktree list --porcelain`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the inbox's cached lookup.
+Like a new session's `start`, `cwd` may name any directory.
+The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
 
-`GET /api/models/connected` answers `{ models }`, each `{ provider, id }`: the models that `omp models` lists from the providers you are connected to, for the new-session draft's model picker. A live session's `list-models` answer applies the same filter to the models that its omp RPC process offers. A `start` of kind `new` carries a `model`, `null` for omp's default; the server sends omp `set_model` once it is ready and before the first prompt, and a model that omp refuses fails the start.
+`GET /api/models/connected` answers `{ models }`, each `{ provider, id }`: the models that `omp models` lists from the providers you are connected to, for the new-session draft's model picker.
+A live session's `list-models` answer applies the same filter to the models that its omp RPC process offers.
+A `start` of kind `new` carries a `model`, `null` for omp's default; the server sends omp `set_model` once it is ready and before the first prompt, and a model that omp refuses fails the start.
 
-`GET /api/models/roles?cwd=<directory>` answers `{ roles }`, each `{ role, model, thinking }`, for the role picker of the new-session draft and of a live dashboard session. Like `/api/git`, `cwd` may name any directory. `connectedRoles` in `src/omp/models.ts` loads `modelRoles` with omp's read-only loader for that directory, so a project's `.omp/config.yml` overrides count, and reads each role's selector against `omp models`: a `:level` suffix becomes `thinking`, and `@role` or `*` takes the named role's model and level unless it adds its own. Roles that name a model by a fuzzy pattern, or one on a provider you are not connected to, are left out. A `start` of kind `new` and a `set-model` each carry a `thinking`, `null` to keep omp's level; the server sends omp `set_thinking_level` after `set_model`.
+`GET /api/models/roles?cwd=<directory>` answers `{ roles }`, each `{ role, model, thinking }`; the new-session draft reads the `default` role's model from it to name the model omp starts on.
+Like `/api/git`, `cwd` may name any directory.
+`connectedRoles` in `src/omp/models.ts` loads `modelRoles` with omp's read-only loader for that directory, so a project's `.omp/config.yml` overrides count, and reads each role's selector against `omp models`: a `:level` suffix becomes `thinking`, and `@role` or `*` takes the named role's model and level unless it adds its own.
+Roles that name a model by a fuzzy pattern, or one on a provider you are not connected to, are left out.
+A `start` of kind `new` and a `set-model` each carry a `thinking`, `null` to keep omp's level; the server sends omp `set_thinking_level` after `set_model`.
 
-`GET /api/skills?cwd=<directory>` answers `{ skills }`, each `{ name, description }`: the skills that `/skill:<name>` invokes in a session started in that directory, from the same discovery as the composer's `/` completions (`listSkills` in `src/commands.ts`), and none when omp's `skills.enableSkillCommands` is off. The settings page lists them to pin one, and the new-session draft reads them to show whether the pinned skill exists there. The page keeps the pin in localStorage (`web/pinned-skill.ts`). A `start` of kind `new` carries a `skill`, `null` for none: the draft sends the pin unless you turned it off there, and a quick action always sends it. Once the server knows the directory omp runs in, worktree included, `withPinnedSkill` puts `/skill:<skill> ` before the first prompt, so omp's RPC prompt invokes the skill with the prompt as its arguments. A directory without that skill, or a prompt that starts with `/`, keeps the prompt as typed.
+`GET /api/skills?cwd=<directory>` answers `{ skills }`, each `{ name, description }`: the skills that `/skill:<name>` invokes in a session started in that directory, from the same discovery as the composer's `/` completions (`listSkills` in `src/commands.ts`), and none when omp's `skills.enableSkillCommands` is off.
+The settings page lists them to pin one, and the new-session draft reads them to show whether the pinned skill exists there.
+The page keeps the pin in localStorage (`web/pinned-skill.ts`).
+A `start` of kind `new` carries a `skill`, `null` for none: the draft sends the pin unless you turned it off there, and a quick action always sends it.
+Once the server knows the directory omp runs in, worktree included, `withPinnedSkill` puts `/skill:<skill> ` before the first prompt, so omp's RPC prompt invokes the skill with the prompt as its arguments.
+A directory without that skill, or a prompt that starts with `/`, keeps the prompt as typed.
 
-A `start` of kind `new` carries a `branch`, `null` for the directory as it is. For an existing branch, the server runs omp in the worktree that has it checked out, or in the starting directory when that worktree is the directory's own (`git rev-parse --show-toplevel`); with no such worktree it runs `git worktree add <dir> <branch>`. For a new branch, it runs `git check-ref-format --branch` and then `git worktree add -b <branch> <dir> <base>`. `<dir>` is `worktreeDir` in `src/shared.ts`, beside the main worktree. The server refuses a `<dir>` that already exists, because `git worktree add -b` creates the branch before it checks the path. A branch that git refuses answers the `start` with git's reason, and no omp spawns. A failed start makes the draft read the checkout again, so a branch that the start created shows as an existing one.
+A `start` of kind `new` carries a `branch`, `null` for the directory as it is.
+For an existing branch, the server runs omp in the worktree that has it checked out, or in the starting directory when that worktree is the directory's own (`git rev-parse --show-toplevel`); with no such worktree it runs `git worktree add <dir> <branch>`.
+For a new branch, it runs `git check-ref-format --branch` and then `git worktree add -b <branch> <dir> <base>`.
+`<dir>` is `worktreeDir` in `src/shared.ts`, beside the main worktree.
+The server refuses a `<dir>` that already exists, because `git worktree add -b` creates the branch before it checks the path.
+A branch that git refuses answers the `start` with git's reason, and no omp spawns.
+A failed start makes the draft read the checkout again, so a branch that the start created shows as an existing one.
 
-`GET /api/tickets`, or `GET /api/tickets?fresh` to skip the server's 30-second cache, answers the tickets page with `{ tickets }`. A failed read is the API's usual `{ error }` with status 500, and the page keeps showing the last tickets it has with the error above them. The server reads Linear through Linear's MCP server, with the OAuth sign-in that omp keeps for it, through `src/omp/mcp.ts`: it loads omp's own MCP config for the enabled server whose `url` has the `mcp.linear.app` host, and gets an access token for its `auth.credentialId`, or for the id omp files a sign-in for that URL under, from `omp token <credentialId>`, which refreshes the token through omp's credential owner. The token stays in memory for five minutes and is dropped when Linear answers 401, which the page reports as a `/mcp reauth <name>` hint; it is never logged. Linear's GraphQL API refuses that token, so the server calls the MCP endpoint's `list_issues` tool through omp's `callMCP`, a stateless JSON-RPC `tools/call` POST. It asks for each open state type in full, following the cursor, and for completed, canceled, and duplicate issues updated in the last seven days, in parallel, then drops repeats by identifier.
+`GET /api/tickets`, or `GET /api/tickets?fresh` to skip the server's 30-second cache, answers the tickets page with `{ tickets }`.
+A failed read is the API's usual `{ error }` with status 500, and the page keeps showing the last tickets it has with the error above them.
+The server reads Linear through Linear's MCP server, with the OAuth sign-in that omp keeps for it, through `src/omp/mcp.ts`: it loads omp's own MCP config for the enabled server whose `url` has the `mcp.linear.app` host, and gets an access token for its `auth.credentialId`, or for the id omp files a sign-in for that URL under, from `omp token <credentialId>`, which refreshes the token through omp's credential owner.
+The token stays in memory for five minutes and is dropped when Linear answers 401, which the page reports as a `/mcp reauth <name>` hint; it is never logged.
+Linear's GraphQL API refuses that token, so the server calls the MCP endpoint's `list_issues` tool through omp's `callMCP`, a stateless JSON-RPC `tools/call` POST.
+It asks for each open state type in full, following the cursor, and for completed, canceled, and duplicate issues updated in the last seven days, in parallel, then drops repeats by identifier.
 
-`GET /api/ticket?id=<identifier>`, such as `?id=ENG-2368`, answers the tickets page's sheet with that issue in full: the row's fields, the description, who opened it and when, the links Linear attaches to it, and its comment threads. The server calls `get_issue` and `list_comments` in parallel, through the same MCP sign-in, with no cache, so each opening reads the issue again. It rewrites Linear's `<issue>` mentions as markdown links and its `<linear-image>` tags as image links, and threads the comments by `parentId`, oldest first. An identifier that is not a team key, a dash, and a number answers 400.
+`GET /api/ticket?id=<identifier>`, such as `?id=ENG-2368`, answers the tickets page's sheet with that issue in full: the row's fields, the assignee, the team's id, the description, who opened it and when, the links Linear attaches to it, and its comment threads.
+The server calls `get_issue` and `list_comments` in parallel, through the same MCP sign-in, with no cache, so each opening reads the issue again.
+It rewrites Linear's `<issue>` mentions as markdown links, its `<linear-image>` tags as image links, its `<linear-embed node-type="video">` tags as `<video>` elements, and other `<linear-embed>` tags as links.
+It threads the comments by `parentId`, oldest first.
+An identifier that is not a team key, a dash, and a number answers 400.
 
-`GET /api/linear` answers `{ connected, signIn }`. `connected` is true when omp's user-level MCP config has an enabled server on `mcp.linear.app` and omp's credential store, read again on each call, holds an OAuth sign-in under that server's credential id. The page hides the **Tickets** tab until a read says `connected`, and keeps the last read in localStorage. `PUT /api/linear/sign-in` starts a sign-in the way omp's `/mcp reauth` does, in `src/linear.ts` and `src/omp/mcp.ts`: it reads Linear's OAuth endpoints from its metadata, registers a client, and starts omp's `MCPOAuthFlow`, whose callback server listens on `localhost:3000`. It answers once the flow has Linear's authorization address, as `signIn: { phase: "waiting", url }`, which the page opens in a new tab. When the browser comes back, the server stores the tokens, refresh material included, under the server's credential id, where `omp token` finds them, and adds `"linear": { "type": "http", "url": "https://mcp.linear.app/mcp" }` to omp's `mcp.json` when omp had no Linear server. A new sign-in abandons the one under way. A failure, or no return within five minutes, shows as `signIn: { phase: "failed", error }` until the next sign-in.
+Linear hands out its files as `uploads.linear.app` addresses whose `signature` JWT expires five minutes after the read.
+`src/linear-uploads.ts` rewrites each one in the description and comments to `GET /api/ticket/media?issue=<identifier>&path=<upload path>`, and keeps the latest signed address of each path in memory.
+That route fetches the kept address, passing the `Range` header on, and streams Linear's answer back with its type, length, range, and validators.
+When the kept address is within 30 seconds of expiring, missing after a restart, or refused by Linear, the route reads the issue again, which signs every file in it anew; requests for one issue within 10 seconds share that read.
+Only paths that a read of the issue named are fetched, so the route reaches nothing but Linear's own uploads.
+It serves each file with `Content-Security-Policy: sandbox` and `nosniff`, and anything other than an image, a video, or audio as an attachment, since a file that someone uploaded to Linear is served from the dashboard's origin.
+The page's CSP stays `'self'` for media.
+`message-markdown.tsx` lets Linear's text load images and play `<video>` only from that route.
+
+`GET /api/ticket/options?team=<team id>` answers `TicketOptions` for the sheet's pickers: the team's workflow states (`list_issue_statuses`) in Linear's workflow order, the workspace's active members (`list_users`), the team's and the workspace's live labels (`list_issue_labels`), and the team's projects (`list_projects`, 50 a page), each paged to its end.
+The server keeps each team's answer for five minutes.
+`PUT /api/ticket` takes a `TicketEdit`, `{ id, state?, assignee?, priority?, labels?, project?, dueDate? }`, checked by `parseTicketEdit` in `src/server/wire.ts`, where `null` clears a field and `labels` replaces the whole set by name.
+It calls `save_issue` with those fields, drops the cached tickets list, and answers the issue as `GET /api/ticket` reads it after the change.
+The sheet shows a change at once, sends its changes one at a time, and on a failure reads the issue again.
+
+`GET /api/linear` answers `{ connected, signIn }`.
+`connected` is true when omp's user-level MCP config has an enabled server on `mcp.linear.app` and omp's credential store, read again on each call, holds an OAuth sign-in under that server's credential id.
+The page hides the **Tickets** tab until a read says `connected`, and keeps the last read in localStorage.
+`PUT /api/linear/sign-in` starts a sign-in the way omp's `/mcp reauth` does, in `src/linear.ts` and `src/omp/mcp.ts`: it reads Linear's OAuth endpoints from its metadata, registers a client, and starts omp's `MCPOAuthFlow`, whose callback server listens on `localhost:3000`.
+It answers once the flow has Linear's authorization address, as `signIn: { phase: "waiting", url }`, which the page opens in a new tab.
+When the browser comes back, the server stores the tokens, refresh material included, under the server's credential id, where `omp token` finds them, and adds `"linear": { "type": "http", "url": "https://mcp.linear.app/mcp" }` to omp's `mcp.json` when omp had no Linear server.
+A new sign-in abandons the one under way.
+A failure, or no return within five minutes, shows as `signIn: { phase: "failed", error }` until the next sign-in.
 
 ## Front-end components
 
-The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`. The roster uses `sidebar`, and its **Inbox**, **Tickets**, and **Sessions** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`. User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`. `thinking-indicator` shows while the agent works. shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button. The model role, model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern. Fluid's built-in sidebar rail resizes by pointer only …
+The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
+The roster uses `sidebar`, and its **Inbox**, **Tickets**, and **Sessions** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
+User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
+`thinking-indicator` shows while the agent works.
+shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
+The model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern.
+Fluid's built-in sidebar rail resizes by pointer only and collapses on click.
+The dashboard turns it off and uses `web/components/sidebar-panel.tsx`, which gives each sidebar its own width and open state, because Fluid's provider holds only one of each.
 
 Fluid Functionalism has no sheet, so the sheet that the inbox shows a pull request in, and the tickets page an issue in, `web/components/ui/sheet.tsx`, follows the sidebar's mobile sheet: Radix `Dialog` for focus and dismissal, and a framer-motion slide on the `moderate` spring.
 
-The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items. Both share Base UI's menu items, so each row builds one item list and both menus render it. The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
+The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items.
+Both share Base UI's menu items, so each row builds one item list and both menus render it.
+The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
 
-Questions use Fluid's `ask-user-questions`, installed from `https://www.fluidfunctionalism.com/r/radix/ask-user-questions.json`, in `web/components/user-request.tsx`. Each question is one Fluid question with one row per omp option. A confirm is a question with **Yes** and **No** rows, and an input or an editor is a free-text question.
+Questions use Fluid's `ask-user-questions`, installed from `https://www.fluidfunctionalism.com/r/radix/ask-user-questions.json`, in `web/components/user-request.tsx`.
+Each question is one Fluid question with one row per omp option.
+A confirm is a question with **Yes** and **No** rows, and an input or an editor is a free-text question.
 
 ## Code layout
 
 The server lives in `src/`:
 
-- `src/server.ts`: the entry point. Builds the page, loads the access token, starts the HTTP and WebSocket server, watches the sessions directory, and wires the modules below together. `PORT` sets the port, 4317 by default.
-- `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie) and the JSON answer helpers. `src/server/auth.ts` keeps the token file and parses the cookie, and `src/server/page.ts` bundles `web/index.html` in memory and serves it only to a signed-in browser.
-- `src/server/routes.ts`: the `/api/` endpoints. `src/server/wire.ts` parses every socket message and request body into typed values.
-- `src/server/socket.ts`: handles each socket message. `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
-- `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`. It builds the roster rows.
-- `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list. `src/server/interrupted.ts` keeps which dashboard sessions were interrupted. `src/server/views.ts` points each open view at its file and folds live events into it.
+- `src/server.ts`: the entry point.
+  Builds the page, loads the access token, starts the HTTP and WebSocket server, watches the sessions directory, and wires the modules below together.
+  `PORT` sets the port, 4317 by default.
+- `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie) and the JSON answer helpers.
+  `src/server/auth.ts` keeps the token file and parses the cookie, `src/server/address.ts` names the port, host, and listening line that the desktop shell shares, and `src/server/page.ts` bundles `web/index.html` in memory and serves it only to a signed-in browser.
+- `src/server/routes.ts`: the `/api/` endpoints.
+  `src/server/wire.ts` parses every socket message and request body into typed values.
+- `src/server/socket.ts`: handles each socket message.
+  `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
+- `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`.
+  It builds the roster rows.
+- `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
+  `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
+  `src/server/views.ts` points each open view at its file and folds live events into it.
 - `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, the inbox, pull request, and ticket shapes).
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
-- `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON, and `src/paths.ts` names the home directory, the token file, and the interrupted sessions' file.
+- `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON, `src/fs.ts` replaces a file through a temporary one beside it, and `src/paths.ts` names the home directory, the token file, and the interrupted sessions' file.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
-- `src/guest.ts`: runs one Collab guest per terminal session. `src/subagents.ts` finds each subagent's transcript file.
+- `src/guest.ts`: runs one Collab guest per terminal session.
+  `src/subagents.ts` finds each subagent's transcript file.
 - `src/user-requests.ts`: parses the RPC and Collab question frames into one request shape, writes the answers back, and keeps each session's pending questions.
 - `src/commands.ts`: the composer's `/` and `@` completions, and the expansion of file commands and skills before a guest prompt.
-- `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below.
+- `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below, and reads the plan file that the second fold names.
 - `src/transcript.ts`: folds session-file lines and live events into display items.
-- `src/work.ts`: folds session-file lines into the plan and changes: the latest todo list and the files changed.
+- `src/work.ts`: folds session-file lines into the plan and changes: the latest todo list, the plan file changed last, and the files changed.
 - `src/pull-requests.ts`: finds the pull requests each session submitted or worked on.
 - `src/session-links.ts`: writes the session block into a pull request's description.
-- `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more. A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
+- `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
+  A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
 - `src/git.ts`: the git checkout of a directory, and the worktree a new session's branch runs in.
-- `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, and one issue in full for its sheet. `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
+- `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for its sheet, the options of its pickers, and the `save_issue` call they make.
+  `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
+  `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
-- `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory. `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`.
+  An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
+- `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory.
+  `bunfig.toml` preloads it for tests, so they never touch `~/.omp/agent`.
 
-The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
+The page lives in `web/`.
+`src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
 - `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, settings, and new-session pages, and focus handling.
-- `web/use-dashboard.ts`: the socket, the page state, and the URL hash. `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, or started by a quick action on a pull request or a Linear issue, which stays in the background and is kept as started so the inbox or the tickets page can offer it.
+- `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
+  One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
+  `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which stays in the background and is kept as started so the inbox or the tickets page can offer it.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
-- `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it. `web/components/quick-actions.tsx` holds their row menu, sheet buttons, and the note that names the session a start began in the background, or why it failed.
-- `web/api.ts`: every HTTP request the page makes. `web/settings-api.ts` holds the settings page's requests.
-- `web/polled-store.ts`: the store of server reads that a sidebar list and its page share, kept in localStorage and re-read every minute while the page is open. `web/use-inbox.ts` makes one for the inbox, with one entry per project, `web/use-tickets.ts` one for the tickets, with one entry, since Linear is not per project, and `web/use-linear.ts` one for whether omp is signed in to Linear.
-- `web/use-detail.ts`: reads the pull request or Linear issue in full that a sheet shows.
-- `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header. `web/components/git.tsx` holds the branch picker and the repository and branch in a header's meta line. `web/use-model-roles.ts` reads the model roles for the role picker in `web/components/role-picker.tsx`, and `roleOf` finds the role a session's model and thinking level match, the one picked last first; `web/picked-roles.ts` keeps that pick per session, from the draft's start on. `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions. Both reads go through `useCwdRead` in `web/use-cwd-read.ts`.
-- `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read. `web/components/session-switcher.tsx` is the Cmd+K search over every session.
+- `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it.
+  `web/components/quick-actions.tsx` holds their row menu, sheet buttons, and the note that names the session a start began in the background, or why it failed.
+- `web/api.ts`: the page's HTTP client, and `errorText`, which says what any failure was.
+  `web/settings-api.ts` holds the settings page's settings load and its writes.
+- `web/reads.ts`: the server reads that components hold.
+  `useRead` reads one URL, such as the pull request or Linear issue in full that a sheet shows, the settings page's model catalog, or the new-session draft's model list.
+  The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, and one for whether omp is signed in to Linear.
+  The issue sheet shows the version a field change answered in place of its read; `web/components/tickets/ticket-fields.tsx` holds its field pickers and sends their changes.
+- `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header.
+  `web/components/git.tsx` holds the branch picker and the repository and branch in a header's meta line.
+  `web/use-default-model.ts` reads the model that the `default` role names, which the draft's model picker shows until a pick.
+  `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
+  The checkout, the default model, and the skills are each one `useRead`.
+- `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
+  `web/components/session-switcher.tsx` is the Cmd+K search over every session.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
-- `web/stored-keys.ts`: a set of keys kept in localStorage, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections. `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
+- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's project, and the pinned skill; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
+  `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
 - `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
-- `web/components/pane.tsx`: a pane. `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript, whose `task` rows link to their subagents. `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
+- `web/components/pane.tsx`: a pane.
+  `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript, whose `task` rows link to their subagents.
+  `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
 - `web/components/plan-panel.tsx`: the right sidebar's plan and changes for the focused pane.
-- `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages. The inbox and tickets pages share `web/components/list-sheet-page.tsx`, their frame, header, load and refresh states, and the sheet that keeps its target through its exit slide, and `web/components/sheet-details.tsx`, the sections, links, and comments of a sheet's details. `web/components/fold.tsx` holds the fold button that both pages share, and the hooks that reveal the section a sidebar link chose and the row a page link named; `web/section.ts` names such a section target.
+- `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
+  The inbox and tickets pages share `web/components/list-sheet-page.tsx`, their frame, header, load and refresh states, and the sheet that keeps its target through its exit slide, and `web/components/sheet-details.tsx`, the sections, links, and comments of a sheet's details.
+  `web/components/fold.tsx` holds the fold button that both pages share, and the hooks that reveal the section a sidebar link chose and the row a page link named; `web/section.ts` names such a section target.
 - `web/components/ui`, `web/lib`, and `web/hooks`: mostly files from the Fluid registry; see below.
 
-`templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`). Its `agent/` files are copies of the maintainer's `~/.omp/agent` files, except for `AGENTS.md`, which is a generic version. After you edit one of those live files, copy it back. `bun run omp-template --dry-run` shows a copy that has drifted as `keep yours`.
+`templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
+Its `agent/` files are copies of the maintainer's `~/.omp/agent` files, except for `AGENTS.md`, which is a generic version.
+After you edit one of those live files, copy it back.
+`bun run omp-template --dry-run` shows a copy that has drifted as `keep yours`.
+
+`desktop/` holds the desktop shell; see [Desktop shell](#desktop-shell).
+`desktop/main.ts` is its whole main process, and `bun run desktop` at the root installs the package and starts it.
+`desktop/icon.svg` is the app icon, the logo mark on a macOS-style tile, and `desktop/icon.png` is that SVG rendered at 1024 px, because Electron reads no SVG; render it again after you change the SVG.
+The page's favicon, `web/favicon.svg`, is the bare mark.
 
 Changes the dashboard makes to Fluid's components:
 
@@ -167,6 +413,11 @@ Changes the dashboard makes to Fluid's components:
 - It adds an `images` prop to `ChatMessage`, the addresses of the images a sent prompt carried, since `files` takes only `File`s held in the browser.
 - It replaces `InputMessage`'s queue, which held every message sent during a response in the browser, with rows that the page passes in, each with a tag and edit and remove callbacks, because omp or the server holds the queue.
 - It adds a `header` prop to `AskUserQuestions`, which replaces the `Question 1 of 1` line with the question's status and **Dismiss**, and a `description` field for a question, which shows a confirm's message.
-- It makes `InputMessage`'s suggested prompts send instead of filling the composer: each row shows its number, its number key sends it (with Shift too, for layouts that type digits with it), Enter on the highlighted row and a click send it, and Tab fills it. `LiveConversation` passes the prompts that the last turn's reply ends on, which `splitSuggestions` in `src/transcript.ts` splits off the reply into the assistant item's `suggestions`.
+- It makes `InputMessage`'s suggested prompts send instead of filling the composer: each row shows its number, its number key sends it (with Shift too, for layouts that type digits with it), Enter on the highlighted row and a click send it, and Tab fills it.
+  `LiveConversation` passes the prompts that the last turn's reply ends on, which `splitSuggestions` in `src/transcript.ts` splits off the reply into the assistant item's `suggestions`.
 
-Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight` (`web/components/message-markdown.tsx`). In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL. Text from GitHub, which means pull request descriptions and comments, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, and keeps images only from GitHub's image hosts. `web/index.html` sets the page's `Content-Security-Policy`.
+Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight` (`web/components/message-markdown.tsx`).
+In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL.
+Text from GitHub, which means pull request descriptions and comments, and Linear issues' text, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, plus a `<video>` with only a `src`.
+It keeps images only from GitHub's image hosts and the route for a Linear issue's files, and plays a video only from that route.
+`web/index.html` sets the page's `Content-Security-Policy`.

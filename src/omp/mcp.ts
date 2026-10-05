@@ -29,8 +29,9 @@ export interface McpServer {
 	credentialId: string;
 }
 
-/** The id omp files the OAuth sign-in for the server at `url` under, when the server's config names none. */
-export const mcpCredentialId = (url: string): string | undefined => mcpCredentials.mcpOAuthCredentialIdsForServerUrl(url)[0];
+/** What `omp token` takes for the server at `url`: the id its config names, else the id omp files a sign-in for `url` under. */
+const credentialIdFor = (url: string, configured: string | undefined): string | undefined =>
+	configured ?? mcpCredentials.mcpOAuthCredentialIdsForServerUrl(url)[0];
 
 /** The enabled server in omp's user-level MCP config whose `url` is on `host`, or `null`. */
 export async function findMcpServer(host: string): Promise<McpServer | null> {
@@ -39,7 +40,7 @@ export async function findMcpServer(host: string): Promise<McpServer | null> {
 		if (!server.url) continue;
 		const url = discoveryHelpers.expandEnvVarsDeep(server.url);
 		if (!URL.canParse(url) || new URL(url).host !== host) continue;
-		const credentialId = server.auth?.credentialId ?? mcpCredentialId(server.url);
+		const credentialId = credentialIdFor(server.url, server.auth?.credentialId);
 		if (!credentialId) throw new Error(`omp has no sign-in for its "${name}" MCP server. Run /mcp reauth ${name} in omp.`);
 		return { name, url, credentialId };
 	}
@@ -75,9 +76,12 @@ export interface McpSignIn {
 /**
  * Signs in to `server` as omp's `/mcp reauth` does: reads its OAuth endpoints from its metadata, registers a client
  * when the authorization server offers that, then waits for the browser to come back to a local callback. The sign-in
- * is stored under `server.credentialId`, where `omp token` finds it, refresh material included.
+ * is stored under `server.credentialId`, else the id omp files a sign-in for its URL under, where `omp token` finds it,
+ * refresh material included.
  */
-export async function signInMcp(server: Pick<McpServer, "url" | "credentialId">, { onAuth, signal }: McpSignIn): Promise<void> {
+export async function signInMcp(server: Pick<McpServer, "url"> & Partial<Pick<McpServer, "credentialId">>, { onAuth, signal }: McpSignIn): Promise<void> {
+	const credentialId = credentialIdFor(server.url, server.credentialId);
+	if (!credentialId) throw new Error(`omp names no sign-in for ${server.url}`);
 	const oauth = await mcpOAuthDiscovery.discoverOAuthEndpoints(server.url);
 	if (!oauth) throw new Error(`${server.url} names no OAuth endpoints to sign in with`);
 	const flow = new mcpOAuthFlow.MCPOAuthFlow(
@@ -97,7 +101,7 @@ export async function signInMcp(server: Pick<McpServer, "url" | "credentialId">,
 	const granted = await flow.login();
 	const storage = await auth.discoverAuthStorage();
 	try {
-		await storage.credentials.set(server.credentialId, {
+		await storage.credentials.set(credentialId, {
 			...granted,
 			type: "oauth",
 			tokenUrl: oauth.tokenUrl,
@@ -109,7 +113,7 @@ export async function signInMcp(server: Pick<McpServer, "url" | "credentialId">,
 	} finally {
 		storage.close();
 	}
-	tokens.drop(server.credentialId);
+	tokens.drop(credentialId);
 }
 
 /** Adds an HTTP server to omp's user-level MCP config, which new omp sessions load. */
@@ -148,4 +152,13 @@ export async function callMcpTool(server: McpServer, tool: string, args: Record<
 	const text = content.map(part => (isObject(part) && part.type === "text" ? str(part.text) : undefined)).find(part => part !== undefined) ?? "";
 	if (result.isError === true) throw new Error(toolError(text));
 	return text;
+}
+
+/** `text`, what `service`'s `tool` answered, as JSON; the start of the text thrown when it is not JSON. */
+export function toolJson(service: string, tool: string, text: string): unknown {
+	try {
+		return JSON.parse(text);
+	} catch {
+		throw new Error(`${service}'s ${tool} answered something other than JSON: ${text.slice(0, 200)}`);
+	}
 }

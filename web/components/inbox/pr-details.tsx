@@ -5,7 +5,7 @@ import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestUrl } from "../../inbox-model";
 import { age } from "../../labels";
-import { useDetail } from "../../use-detail";
+import { useRead } from "../../reads";
 import { Comment, DetailSection, Markdown, OutLink } from "../sheet-details";
 import { Avatar, IconTip, STATE_ICON } from "./avatars";
 
@@ -75,7 +75,7 @@ function Checks({ checks }: { checks: PullRequestCheck[] }) {
 
 /** A pull request read from GitHub, as the inbox's sheet shows it: a header that names it, with `actions` below, then its details. */
 export function PullRequestSheetContent({ pr, actions }: { pr: PullRequest; actions?: ReactNode }) {
-	const { detail, error } = useDetail<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
+	const { data: detail, error } = useRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
 	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
 	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking GitHub for the pull request…</p>;
 	if (detail) body = <PullRequestSections detail={detail} />;

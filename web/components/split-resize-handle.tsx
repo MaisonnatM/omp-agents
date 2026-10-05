@@ -1,10 +1,11 @@
 import { type KeyboardEvent, type PointerEvent, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useStoredState } from "../stored-state";
 
 /**
  * The line between split panes, as a separator laid over the grid's 1px gap: pointer drag, arrow keys,
- * double-click to reset, and the ratio stored in localStorage, like the sidebar's handle. The ratio is the
- * first column's share of the width, or the first row's share of the height.
+ * double-click to reset, and the ratio stored in localStorage at every change, drag moves included, like the
+ * sidebar's handle. The ratio is the first column's share of the width, or the first row's share of the height.
  */
 export type SplitAxis = "columns" | "rows";
 
@@ -23,10 +24,12 @@ function clamp(ratio: number, axis: SplitAxis, size: number): number {
 	return Math.min(1 - min, Math.max(min, ratio));
 }
 
-export function storedSplitRatio(axis: SplitAxis): number {
-	const stored = Number(localStorage.getItem(STORAGE_KEYS[axis]));
-	return stored > 0 && stored < 1 ? stored : DEFAULT_RATIO;
-}
+/** The ratio of `axis` that localStorage keeps, and its setter. */
+export const useSplitRatio = (axis: SplitAxis): [number, (ratio: number) => void] =>
+	useStoredState(STORAGE_KEYS[axis], raw => {
+		const stored = Number(raw);
+		return stored > 0 && stored < 1 ? stored : DEFAULT_RATIO;
+	});
 
 /** Where a track boundary sits in a grid with a 1px gap, `ratio` of the way along it. */
 export const splitAt = (ratio: number): string => `calc((100% - 1px) * ${ratio})`;
@@ -56,10 +59,6 @@ export function SplitResizeHandle({ axis, ratio, onRatio, span = 1 }: SplitResiz
 	const pointer = (event: PointerEvent<HTMLDivElement>): number => (columns ? event.clientX : event.clientY);
 	const dragged = (event: PointerEvent<HTMLDivElement>, { start, startRatio, size }: Drag): number =>
 		clamp(startRatio + (pointer(event) - start) / (size - 1), axis, size);
-	const commit = (next: number): void => {
-		onRatio(next);
-		localStorage.setItem(STORAGE_KEYS[axis], String(next));
-	};
 
 	const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
 		drag.current = { start: pointer(event), startRatio: ratio, size: gridSize(event.currentTarget) };
@@ -70,7 +69,7 @@ export function SplitResizeHandle({ axis, ratio, onRatio, span = 1 }: SplitResiz
 	};
 	const onPointerUp = (event: PointerEvent<HTMLDivElement>): void => {
 		if (!drag.current) return;
-		commit(dragged(event, drag.current));
+		onRatio(dragged(event, drag.current));
 		drag.current = null;
 	};
 	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -81,11 +80,7 @@ export function SplitResizeHandle({ axis, ratio, onRatio, span = 1 }: SplitResiz
 		const target = next[event.key];
 		if (target === undefined) return;
 		event.preventDefault();
-		commit(clamp(target, axis, gridSize(event.currentTarget)));
-	};
-	const reset = (): void => {
-		onRatio(DEFAULT_RATIO);
-		localStorage.removeItem(STORAGE_KEYS[axis]);
+		onRatio(clamp(target, axis, gridSize(event.currentTarget)));
 	};
 
 	const along = `calc(${splitAt(ratio)} + 0.5px)`;
@@ -107,7 +102,7 @@ export function SplitResizeHandle({ axis, ratio, onRatio, span = 1 }: SplitResiz
 				drag.current = null;
 			}}
 			onKeyDown={onKeyDown}
-			onDoubleClick={reset}
+			onDoubleClick={() => onRatio(DEFAULT_RATIO)}
 			style={columns ? { left: along, height: across } : { top: along, width: across }}
 			className={cn(
 				"group absolute z-30 flex touch-none select-none justify-center outline-none",

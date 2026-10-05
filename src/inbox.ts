@@ -3,87 +3,30 @@
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
 import { createCache } from "./cache";
+import { CHANGE, CHECK_RUN, dataOf, ghGraphql, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
-import { run, runJson } from "./proc";
-import type {
-	CheckRunState,
-	CheckState,
-	Inbox,
-	InboxPullRequest,
-	InboxRole,
-	Person,
-	PullRequest,
-	PullRequestCheck,
-	PullRequestComment,
-	PullRequestDetail,
-	PullRequestEvent,
-	PullRequestFile,
-	PullRequestThread,
-	RepoInbox,
-	ReviewDecision,
-	Reviewer,
-	ReviewerState,
+import {
+	type CheckRunState,
+	type Inbox,
+	type InboxPullRequest,
+	type InboxRole,
+	type PullRequest,
+	type PullRequestCheck,
+	type PullRequestComment,
+	type PullRequestDetail,
+	type PullRequestEvent,
+	type PullRequestFile,
+	type PullRequestThread,
+	prKey,
+	type Repo,
+	type RepoInbox,
+	type Reviewer,
+	repoKey,
 } from "./shared";
 
-const GH_TIMEOUT_MS = 20_000;
+export { parseRemote, repoOf } from "./github";
+
 const MERGED_DAYS = 7;
-
-export interface Repo {
-	owner: string;
-	repo: string;
-}
-
-/** `git@github.com:o/r.git`, `ssh://git@github.com/o/r.git`, or `https://github.com/o/r`; `git push` prints `github.com:o/r.git`. */
-const GITHUB_REMOTE = /^(?:(?:[^@/:]+@)?github\.com:|(?:https|ssh|git):\/\/(?:[^@/]+@)?github\.com\/)([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
-
-export function parseRemote(url: string): Repo | null {
-	const match = GITHUB_REMOTE.exec(url.trim());
-	return match ? { owner: match[1]!, repo: match[2]! } : null;
-}
-
-/** Negative answers stay this long, so that a directory with no GitHub `origin` does not spawn `git` on every load. */
-const NO_REMOTE_TTL_MS = 10 * 60_000;
-/** Most `git` lookups running at once, however many workspaces the sessions have used. */
-const MAX_LOOKUPS = 8;
-
-/** Workspaces' repositories, and lookups in flight. `negativeUntil` marks a workspace with no GitHub `origin`, asked again after it. */
-const remotes = new Map<string, { repo: Promise<Repo | null>; negativeUntil?: number }>();
-let lookups = 0;
-const waiting: (() => void)[] = [];
-
-/** Runs `task` once fewer than {@link MAX_LOOKUPS} others run; a finished task hands its slot to the longest waiter. */
-async function withLookupSlot<T>(task: () => Promise<T>): Promise<T> {
-	if (lookups >= MAX_LOOKUPS) await new Promise<void>(resolve => waiting.push(resolve));
-	else lookups++;
-	try {
-		return await task();
-	} finally {
-		const next = waiting.shift();
-		if (next) next();
-		else lookups--;
-	}
-}
-
-/** The GitHub repository that `origin` names in `cwd`. */
-export function repoOf(cwd: string): Promise<Repo | null> {
-	const known = remotes.get(cwd);
-	if (known && !(known.negativeUntil !== undefined && known.negativeUntil <= Date.now())) return known.repo;
-	const entry: { repo: Promise<Repo | null>; negativeUntil?: number } = {
-		repo: withLookupSlot(async () => {
-			try {
-				const { stdout, code } = await run(["git", "-C", cwd, "remote", "get-url", "origin"]);
-				return code === 0 ? parseRemote(stdout) : null;
-			} catch {
-				return null;
-			}
-		}),
-	};
-	remotes.set(cwd, entry);
-	void entry.repo.then(found => {
-		if (!found) entry.negativeUntil = Date.now() + NO_REMOTE_TTL_MS;
-	});
-	return entry.repo;
-}
 
 const AVATAR = "avatarUrl(size: 48)";
 /** The most review threads one page lists; a PR with more counts its unresolved threads as a floor. */
@@ -114,35 +57,7 @@ const SEARCHES: [alias: string, role: InboxRole][] = [
 	["merged", "author"],
 ];
 
-const REVIEW: Record<string, ReviewDecision> = {
-	APPROVED: "approved",
-	CHANGES_REQUESTED: "changes-requested",
-	REVIEW_REQUIRED: "review-required",
-};
-
-const CHECKS: Record<string, CheckState> = {
-	SUCCESS: "passing",
-	FAILURE: "failing",
-	ERROR: "failing",
-	PENDING: "pending",
-	EXPECTED: "pending",
-};
-
-/** A latest review's state; a dismissed or pending review leaves its author out. */
-const REVIEWER: Record<string, ReviewerState> = {
-	APPROVED: "approved",
-	CHANGES_REQUESTED: "changes-requested",
-	COMMENTED: "commented",
-};
-
 const nodesOf = (connection: unknown): unknown[] => (isObject(connection) && Array.isArray(connection.nodes) ? connection.nodes : []);
-
-/** A user, bot, or mannequin by `login`, a team by `slug`. */
-function parsePerson(value: unknown): Person | null {
-	if (!isObject(value)) return null;
-	const login = str(value.login) ?? str(value.slug);
-	return login === undefined ? null : { login, avatarUrl: str(value.avatarUrl) ?? null };
-}
 
 /** Pending requests first, then latest reviews, each person once; the author's own comments are left out. */
 function parseReviewers(node: Record<string, unknown>, author: string): Reviewer[] {
@@ -189,21 +104,13 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole)
 		role,
 		state: node.state === "MERGED" ? "merged" : node.isDraft === true ? "draft" : "open",
 		review: REVIEW[str(node.reviewDecision) ?? ""] ?? "none",
-		checks: CHECKS[rollup ?? ""] ?? "none",
+		checks: STATUS[rollup ?? ""] ?? "none",
 		conflicts: node.state !== "MERGED" && node.mergeable === "CONFLICTING",
 		head,
 		stackedOn: defaultBranch !== undefined && base !== defaultBranch ? base : null,
 		unresolved: parseUnresolved(node.reviewThreads),
 		updatedAt,
 	};
-}
-
-/** The data of a `gh api graphql` answer, or GitHub's errors thrown. */
-function dataOf(answer: unknown): Record<string, unknown> {
-	if (isObject(answer) && isObject(answer.data)) return answer.data;
-	const errors = isObject(answer) && Array.isArray(answer.errors) ? answer.errors : [];
-	const message = errors.map(error => (isObject(error) ? str(error.message) : undefined)).filter(Boolean).join("; ");
-	throw new Error(message || "GitHub answered without data");
 }
 
 /** The pull requests in `gh api graphql`'s answer to `QUERY`, each once, in search order. */
@@ -222,22 +129,11 @@ export function parseInboxAnswer(answer: unknown, repo: Repo): InboxPullRequest[
 async function queryRepo(repo: Repo): Promise<InboxPullRequest[]> {
 	const scope = `repo:${repo.owner}/${repo.repo} is:pr`;
 	const since = new Date(Date.now() - MERGED_DAYS * 86_400_000).toISOString().slice(0, 10);
-	const answer = await runJson(
-		[
-			"gh",
-			"api",
-			"graphql",
-			"-f",
-			`query=${QUERY}`,
-			"-f",
-			`authored=${scope} is:open author:@me sort:updated-desc`,
-			"-f",
-			`reviewing=${scope} is:open review-requested:@me sort:updated-desc`,
-			"-f",
-			`merged=${scope} is:merged author:@me merged:>=${since} sort:updated-desc`,
-		],
-		{ timeoutMs: GH_TIMEOUT_MS },
-	);
+	const answer = await ghGraphql(QUERY, {
+		authored: `${scope} is:open author:@me sort:updated-desc`,
+		reviewing: `${scope} is:open review-requested:@me sort:updated-desc`,
+		merged: `${scope} is:merged author:@me merged:>=${since} sort:updated-desc`,
+	});
 	return parseInboxAnswer(answer, repo);
 }
 
@@ -264,40 +160,7 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	} }
 }`;
 
-/** A check run's conclusion once it completes; any other status is pending. */
-const CHECK_RUN: Record<string, CheckRunState> = {
-	SUCCESS: "passing",
-	FAILURE: "failing",
-	TIMED_OUT: "failing",
-	CANCELLED: "failing",
-	ACTION_REQUIRED: "failing",
-	STARTUP_FAILURE: "failing",
-	NEUTRAL: "skipped",
-	SKIPPED: "skipped",
-	STALE: "skipped",
-};
-
-/** A commit status's state. */
-const STATUS: Record<string, CheckRunState> = { SUCCESS: "passing", FAILURE: "failing", ERROR: "failing", PENDING: "pending", EXPECTED: "pending" };
-
 const CHECK_ORDER: CheckRunState[] = ["failing", "pending", "passing", "skipped"];
-
-/** A submitted review's state; a pending review is the viewer's unsent draft. */
-const REVIEW_EVENT: Record<string, NonNullable<PullRequestEvent["review"]>> = {
-	APPROVED: "approved",
-	CHANGES_REQUESTED: "changes-requested",
-	COMMENTED: "commented",
-	DISMISSED: "dismissed",
-};
-
-const CHANGE: Record<string, PullRequestFile["change"]> = {
-	ADDED: "added",
-	DELETED: "deleted",
-	MODIFIED: "modified",
-	RENAMED: "renamed",
-	COPIED: "copied",
-	CHANGED: "changed",
-};
 
 function parseCheck(node: unknown): PullRequestCheck | null {
 	if (!isObject(node)) return null;
@@ -385,15 +248,7 @@ const details = createCache<PullRequestDetail>();
 
 /** One pull request in full, live from `gh`. */
 export function loadPullRequestDetail(pr: PullRequest): Promise<PullRequestDetail> {
-	return details.get(`${pr.owner}/${pr.repo}#${pr.number}`.toLowerCase(), async () =>
-		parseDetailAnswer(
-			await runJson(
-				["gh", "api", "graphql", "-f", `query=${DETAIL_QUERY}`, "-f", `owner=${pr.owner}`, "-f", `repo=${pr.repo}`, "-F", `number=${pr.number}`],
-				{ timeoutMs: GH_TIMEOUT_MS },
-			),
-			pr,
-		),
-	);
+	return details.get(prKey(pr), async () => parseDetailAnswer(await ghGraphql(DETAIL_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }), pr));
 }
 
 /** The inbox for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache. */
@@ -406,7 +261,7 @@ export async function loadInbox(cwds: string[], fresh: boolean): Promise<Inbox> 
 			unmatched.push(cwd);
 			continue;
 		}
-		const key = `${repo.owner}/${repo.repo}`.toLowerCase();
+		const key = repoKey(repo);
 		const entry = byRepo.get(key);
 		if (entry) entry.cwds.push(cwd);
 		else byRepo.set(key, { ...repo, cwds: [cwd] });
@@ -414,7 +269,7 @@ export async function loadInbox(cwds: string[], fresh: boolean): Promise<Inbox> 
 	const repos = await Promise.all(
 		[...byRepo.values()].map(async (entry): Promise<RepoInbox> => {
 			try {
-				const pullRequests = await loaded.get(`${entry.owner}/${entry.repo}`.toLowerCase(), () => queryRepo(entry), fresh);
+				const pullRequests = await loaded.get(repoKey(entry), () => queryRepo(entry), fresh);
 				return { ...entry, pullRequests };
 			} catch (err) {
 				return { ...entry, error: errorText(err) };

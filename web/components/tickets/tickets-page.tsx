@@ -1,12 +1,12 @@
 import type { Ticket, View } from "../../../src/shared";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
+import { ticketsStore } from "../../reads";
 import { hashForTickets, type OpenMode } from "../../routing";
 import type { SectionTarget } from "../../section";
 import type { QuickOp, StartOf } from "../../starts";
-import { useStoredKeys } from "../../stored-keys";
+import { useStoredKeys } from "../../stored-state";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
-import { refreshTickets, useTickets } from "../../use-tickets";
 import { FoldButton, useRevealRow, useRevealSection } from "../fold";
 import { ListSheetPage, PageFrame, TargetSheet } from "../list-sheet-page";
 import { QuickStartNotice, SheetQuickActions } from "../quick-actions";
@@ -79,7 +79,7 @@ interface TicketsPageProps {
 
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
 export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDismissQuick, onOpen }: TicketsPageProps) {
-	const poll = useTickets(true);
+	const poll = ticketsStore.usePolling();
 	const tickets = poll.read?.data.tickets ?? [];
 	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
 	const targetGroup = target === null ? null : (tickets.find(ticket => ticket.id === target)?.status ?? null);
@@ -94,7 +94,7 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 			noun="the tickets"
 			loading="Asking Linear for your issues…"
 			poll={poll}
-			onRefresh={() => void refreshTickets(true)}
+			onRefresh={() => void ticketsStore.refresh(null, { fresh: true })}
 			missing={
 				target && targetGroup === null
 					? `${target} is not on this page, which lists the issues assigned to you that are open or closed in the last seven days.`

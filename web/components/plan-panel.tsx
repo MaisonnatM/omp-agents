@@ -12,7 +12,19 @@ import {
 	type LucideIcon,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals, parseDiffLine, type TodoPhase, type TodoStatus, type View } from "../../src/shared";
+import {
+	type ChangedFile,
+	type FileChange,
+	type FileChangeKind,
+	type FileStatus,
+	fileStatus,
+	lineTotals,
+	type PlanDocument,
+	parseDiffLine,
+	type TodoPhase,
+	type TodoStatus,
+	type View,
+} from "../../src/shared";
 import {
 	SidebarContent,
 	SidebarGroup,
@@ -27,6 +39,8 @@ import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { age, readTime } from "../labels";
 import { usePane } from "../pane-store";
+import { useStoredState } from "../stored-state";
+import { MessageMarkdown } from "./message-markdown";
 
 const TASK_LOOK: Record<TodoStatus, { icon: LucideIcon; label: string; className: string }> = {
 	pending: { icon: Circle, label: "Pending", className: "text-foreground" },
@@ -63,6 +77,21 @@ function Phase({ phase }: { phase: TodoPhase }) {
 					);
 				})}
 			</ol>
+		</SidebarGroup>
+	);
+}
+
+/** The plan file the agent wrote or edited last, as markdown under its file name. */
+function PlanFile({ plan }: { plan: PlanDocument }) {
+	const name = plan.path.slice(plan.path.lastIndexOf("/") + 1);
+	return (
+		<SidebarGroup>
+			<SidebarGroupLabel title={plan.path}>
+				<span className="min-w-0 flex-1 truncate">{name}</span>
+			</SidebarGroupLabel>
+			<article className="px-4 pb-2 text-sm leading-relaxed" aria-label={name}>
+				<MessageMarkdown text={plan.text} />
+			</article>
 		</SidebarGroup>
 	);
 }
@@ -182,20 +211,10 @@ const TAB_KEY = "omp-agents.plan-tab";
 
 type PlanTab = "plan" | "files";
 
-function useStoredTab(): [PlanTab, (tab: PlanTab) => void] {
-	const [tab, setTab] = useState<PlanTab>(() => (localStorage.getItem(TAB_KEY) === "files" ? "files" : "plan"));
-	const pick = (next: PlanTab): void => {
-		setTab(next);
-		if (next === "plan") localStorage.removeItem(TAB_KEY);
-		else localStorage.setItem(TAB_KEY, next);
-	};
-	return [tab, pick];
-}
-
-/** The right sidebar's content: the focused view's latest todo list and the files its agent changed, each in its own tab. */
+/** The right sidebar's content: the focused view's latest todo list and plan file, and the files its agent changed, each tab apart. */
 export function PlanPanel({ view }: { view: View }) {
 	const { work } = usePane(view);
-	const [tab, setTab] = useStoredTab();
+	const [tab, setTab] = useStoredState<PlanTab>(TAB_KEY, raw => (raw === "files" ? "files" : "plan"));
 	const files = work?.files ?? [];
 	return (
 		<Tabs value={tab} onValueChange={value => setTab(value as PlanTab)} className="flex min-h-0 flex-1 flex-col">
@@ -210,8 +229,9 @@ export function PlanPanel({ view }: { view: View }) {
 			</SidebarHeader>
 			<TabPanel value="plan" asChild>
 				<SidebarContent>
-					{work?.phases.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">No plan yet.</p>}
+					{work && work.phases.length === 0 && !work.plan && <p className="px-4 py-2 text-sm text-muted-foreground">No plan yet.</p>}
 					{work?.phases.map((phase, index) => <Phase key={`${index}:${phase.name}`} phase={phase} />)}
+					{work?.plan && <PlanFile plan={work.plan} />}
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="files" asChild>

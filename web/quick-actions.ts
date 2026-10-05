@@ -2,8 +2,8 @@
  * The quick actions of the inbox and the tickets page: which pull request or Linear issue each applies to, and the
  * prompt that starts its session.
  */
-import type { InboxPullRequest, PullRequest, Ticket } from "../src/shared";
-import { pullRequestUrl, samePullRequest } from "./inbox-model";
+import { type InboxPullRequest, type PullRequest, samePullRequest, type Ticket } from "../src/shared";
+import { pullRequestUrl } from "./inbox-model";
 import type { QuickOp, StartOf } from "./starts";
 
 export type PullRequestActionId = "fix-ci" | "resolve-conflicts" | "address-comments" | "review" | "thermonuclear-review";
