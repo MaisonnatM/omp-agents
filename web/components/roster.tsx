@@ -620,6 +620,12 @@ export function Roster({
 							</SidebarMenu>
 						</SidebarGroup>
 					)}
+					{idle.length > 0 && (
+						<SidebarGroup collapsible open={!collapsed.has("idle")} onOpenChange={() => toggleGroup("idle")}>
+							<SidebarGroupLabel>{`${idle.length} idle`}</SidebarGroupLabel>
+							<SidebarMenu aria-label="Idle omp sessions">{idle.map(host => hostRow(host, false))}</SidebarMenu>
+						</SidebarGroup>
+					)}
 					<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
 						<SidebarGroupLabel>
 							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length > 0 ? "No other sessions running" : "No sessions"}
@@ -636,12 +642,6 @@ export function Roster({
 							{running.map(host => hostRow(host, false))}
 						</SidebarMenu>
 					</SidebarGroup>
-					{idle.length > 0 && (
-						<SidebarGroup collapsible open={!collapsed.has("idle")} onOpenChange={() => toggleGroup("idle")}>
-							<SidebarGroupLabel>{`${idle.length} idle`}</SidebarGroupLabel>
-							<SidebarMenu aria-label="Idle omp sessions">{idle.map(host => hostRow(host, false))}</SidebarMenu>
-						</SidebarGroup>
-					)}
 					{interrupted.length > 0 && (
 						<SidebarGroup collapsible open={!collapsed.has("interrupted")} onOpenChange={() => toggleGroup("interrupted")}>
 							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>

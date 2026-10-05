@@ -44,16 +44,16 @@ Navigation, editing, scheduling toggles, Stop, and Delete keep their existing st
   A pinned session stays pinned when it ends, is resumed, or is interrupted, and an interrupted one says `interrupted` after its title.
   The selected project applies to the group too.
   The browser's localStorage keeps the pins, by session id.
-- A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group under it, and moves back when its next turn starts.
+- A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group above it, and moves back when its next turn starts.
   A session waiting on a question stays under **Running**, and a pinned session stays under **Pinned** whatever its state.
   The group shows only while it has a row.
-- Click the **Pinned**, **Running**, **Idle**, **Interrupted**, or **Past** group label to collapse or expand its rows.
+- Click the **Pinned**, **Idle**, **Running**, **Interrupted**, or **Past** group label to collapse or expand its rows.
   The browser's localStorage keeps each group's choice across tabs, projects, navigation, and reloads, even while the group has no rows.
 - The past sessions list every saved session that has no live host, newest first, with its title (else its first prompt) and how long ago it last changed; hover a row to see its working directory.
   Select one to read its transcript.
   The page cannot write to it until you resume it.
   A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.
-- The interrupted sessions, between the idle and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because the dashboard server stopped or crashed, which stops every session it started, or because omp exited on its own.
+- The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because the dashboard server stopped or crashed, which stops every session it started, or because omp exited on its own.
   The group shows only while it has a row.
   Its **Resume all** button resumes every session it lists, under the selected project, as **Resume** does for one; a pane that shows one of them then shows it live.
   A session that was working when it stopped, or waiting on a question, also gets the prompt `continue`, so it picks its turn back up; an idle one waits for your next message.
@@ -659,7 +659,7 @@ Alt is Option on macOS.
   In a maximized pane, Esc in the composer restores the split only when no turn runs there.
 - Cmd+K searches every running and past session, in every project, by title or directory, and opens the one you pick in the focused pane.
   A session from another project switches the sidebar to that project.
-  Alt+↑ and Alt+↓ walk the sidebar's list, pinned sessions, then running ones, then idle ones, then interrupted ones, then past ones, in the focused pane.
+  Alt+↑ and Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane.
   From a subagent they step from its session's row.
 - Cmd+Shift+O opens the new-session draft, as the **+** next to the session list does.
   Cmd+Shift+X ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.

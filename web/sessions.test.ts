@@ -134,14 +134,14 @@ describe("sidebarSessions", () => {
 		expect(ids(lists.idle)).toEqual(["h1"]);
 	});
 
-	test("the previous and next session keys walk pinned rows first, then running, idle, interrupted, and past", () => {
+	test("the previous and next session keys walk pinned rows first, then idle, running, interrupted, and past", () => {
 		const live = [{ ...host("h0", "~/a"), status: "idle" as const }, ...hosts];
 		const lists = sidebarSessions(live, sessions, "~/a", new Set(["h2", "p3"]));
 		expect(listedViews(lists)).toEqual([
 			{ kind: "live", instanceId: "i-h2", agentId: null },
 			{ kind: "past", sessionId: "p3" },
-			{ kind: "live", instanceId: "i-h1", agentId: null },
 			{ kind: "live", instanceId: "i-h0", agentId: null },
+			{ kind: "live", instanceId: "i-h1", agentId: null },
 			{ kind: "past", sessionId: "p2" },
 			{ kind: "past", sessionId: "p1" },
 		]);

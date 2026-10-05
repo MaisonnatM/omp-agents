@@ -93,5 +93,5 @@ export function sidebarSessions(hosts: RosterHost[], past: PastSession[], projec
 export function listedViews({ pinned, running, idle, interrupted, ended }: SidebarSessions): View[] {
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));
 	const saved = (sessions: PastSession[]): View[] => sessions.map(({ sessionId }) => ({ kind: "past", sessionId }));
-	return [...live(pinned.hosts), ...saved(pinned.past), ...live([...running, ...idle]), ...saved([...interrupted, ...ended])];
+	return [...live(pinned.hosts), ...saved(pinned.past), ...live([...idle, ...running]), ...saved([...interrupted, ...ended])];
 }
