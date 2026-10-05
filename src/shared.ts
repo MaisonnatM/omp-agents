@@ -859,8 +859,9 @@ export type UserTodoChange =
 	| { op: "toggle"; id: string; doneAt: string | null }
 	/** A todo of the list or of the archive, with its todos. */
 	| { op: "remove"; id: string }
-	/** Puts back a todo `remove` took, right after `afterId` among `parentId`'s todos (the top level for `null`), or first for `null`. */
-	| { op: "restore"; todo: UserTodo; parentId: string | null; afterId: string | null }
+	/** Puts back a todo `remove` took at `index` among the top-level todos, or among top-level todo `parentId`'s, which holds leaves only. */
+	| { op: "restore"; parentId: null; todo: UserTodo; index: number }
+	| { op: "restore"; parentId: string; todo: UserTodoLeaf; index: number }
 	/**
 	 * A top-level todo goes right after top-level todo `afterId`, or first among category `categoryId`'s for `null`, and
 	 * joins category `categoryId`. A todo under another goes after `afterId` among its parent's todos, or first for `null`.

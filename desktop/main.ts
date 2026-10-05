@@ -23,7 +23,7 @@ import { errorText, isObject, num } from "../src/json";
 import { tokenFile, userTodosFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv } from "../src/server/address";
 import { loadToken } from "../src/server/auth";
-import { parseUserTodoList } from "../src/server/user-todos-file";
+import { parseUserTodoList } from "../src/user-todos-parse";
 import { QUICK_TODO_EVENT } from "../src/shared";
 
 const PORT = portFromEnv();

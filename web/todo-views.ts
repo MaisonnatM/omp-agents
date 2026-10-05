@@ -1,6 +1,51 @@
-/** Which todos each of the Todo page's lists holds, shared by the page and the sidebar's counts. */
-import type { UserTodo, UserTodoList } from "../src/shared";
+/** Which todos each of the Todo page's lists holds and what it lets you do, shared by the page and the sidebar. */
+import { Archive, Bot, CalendarClock, ListTodo, type LucideIcon } from "lucide-react";
+import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/shared";
 import type { TodoListView } from "./routing";
+
+/** What a list is called and lets you do. A category's own name replaces its `title`. */
+interface ListKind {
+	/** What the sidebar calls it. */
+	name: string;
+	/** The page's title. */
+	title: string;
+	/** The sidebar's icon; a category has none. */
+	icon: LucideIcon | null;
+	canAdd: boolean;
+	/** Today sorts by due day and Done by when it was cleared, so neither moves todos. */
+	canMove: boolean;
+	/** A todo added here is due today. */
+	dueToday: boolean;
+	addLabel: string;
+	/** What the list says while it holds nothing to show and no search is typed. */
+	empty: string | null;
+}
+
+export const LIST_KINDS: Record<TodoListView["kind"], ListKind> = {
+	all: { name: "All", title: "Todo", icon: ListTodo, canAdd: true, canMove: true, dueToday: false, addLabel: "Add a todo", empty: null },
+	today: { name: "Today", title: "Today", icon: CalendarClock, canAdd: true, canMove: false, dueToday: true, addLabel: "Add a todo due today", empty: "Nothing is due today." },
+	agents: {
+		name: "From agents",
+		title: "From agents",
+		icon: Bot,
+		canAdd: false,
+		canMove: true,
+		dueToday: false,
+		addLabel: "",
+		empty: "No agent has added a todo. An omp session adds one with its `user_todo` tool.",
+	},
+	done: { name: "Done", title: "Done", icon: Archive, canAdd: false, canMove: false, dueToday: false, addLabel: "", empty: "Clear done puts checked todos here." },
+	category: { name: "", title: "Todo", icon: null, canAdd: true, canMove: true, dueToday: false, addLabel: "Add a todo", empty: null },
+};
+
+/** The lists the sidebar shows above the categories, in its order. */
+export const SIDEBAR_LISTS: Exclude<TodoListView, { kind: "category" }>[] = [{ kind: "all" }, { kind: "today" }, { kind: "agents" }, { kind: "done" }];
+
+export const titleOf = (list: UserTodoList, view: TodoListView): string =>
+	view.kind === "category" ? (list.categories.find(({ id }) => id === view.id)?.name ?? LIST_KINDS.category.title) : LIST_KINDS[view.kind].title;
+
+/** A day as the lists show it: `Oct 5`. */
+export const DAY_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 
 /** Today in the browser's time zone, as a todo's `due` names a day: `YYYY-MM-DD`. */
 export function today(now = new Date()): string {
@@ -53,4 +98,40 @@ export function matches(todo: UserTodo, query: string): boolean {
 	if (words.length === 0) return true;
 	const text = [todo, ...todo.children].map(leaf => `${leaf.text}\n${leaf.body}`).join("\n").toLowerCase();
 	return words.every(word => text.includes(word));
+}
+
+/** A todo as a list shows it: a top-level one, or one under top-level todo `parent`. */
+export type TodoEntry = { todo: UserTodo; parent: null } | { todo: UserTodoLeaf; parent: UserTodo };
+
+/**
+ * The `move` that puts `entry` at `position` among `siblings`, the todos a list shows beside it, counted once `entry`
+ * is out of them; a top-level todo joins `categoryId`. `null` when that is where it is.
+ */
+export function moveTo(entry: TodoEntry, siblings: readonly UserTodoLeaf[], position: number, categoryId: string | null): Extract<UserTodoChange, { op: "move" }> | null {
+	const { id } = entry.todo;
+	const rest = siblings.filter(todo => todo.id !== id);
+	if (position < 0 || position > rest.length || siblings[position]?.id === id) return null;
+	return { op: "move", id, afterId: rest[position - 1]?.id ?? null, categoryId: entry.parent === null ? categoryId : null };
+}
+
+/** Where todo `id` sits among the lists' `groups` of top-level todos: as an entry, with the todos shown beside it. */
+export function placeIn(groups: readonly (readonly UserTodo[])[], id: string): { entry: TodoEntry; siblings: readonly UserTodoLeaf[] } | null {
+	for (const todos of groups) {
+		for (const todo of todos) {
+			if (todo.id === id) return { entry: { todo, parent: null }, siblings: todos };
+			const child = todo.children.find(leaf => leaf.id === id);
+			if (child) return { entry: { todo: child, parent: todo }, siblings: todo.children };
+		}
+	}
+	return null;
+}
+
+/** The `restore` that puts todo `id` back where it is now, after a `remove`; `null` when the list does not hold it. */
+export function restoreOf(list: UserTodoList, id: string): Extract<UserTodoChange, { op: "restore" }> | null {
+	for (const [index, todo] of list.todos.entries()) {
+		if (todo.id === id) return { op: "restore", parentId: null, todo, index };
+		const child = todo.children.findIndex(leaf => leaf.id === id);
+		if (child >= 0) return { op: "restore", parentId: todo.id, todo: todo.children[child]!, index: child };
+	}
+	return null;
 }

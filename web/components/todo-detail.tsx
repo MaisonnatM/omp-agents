@@ -1,25 +1,14 @@
 import { Circle, CircleCheck, Play, Ticket, X } from "lucide-react";
 import { useState } from "react";
-import type { TicketChoice, TicketDraft, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../src/shared";
+import type { TicketChoice, TicketDraft, UserTodo, UserTodoChange, UserTodoList } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getJson, putJson } from "../api";
 import { errorText } from "../../src/json";
 import { hashForNewSession } from "../routing";
+import type { TodoEntry } from "../todo-views";
 import { MarkdownEditor } from "./markdown-editor";
 import { AddedByChip, type KnownSessions, TodoLinkChip } from "./todo-links";
-
-/** The todo whose notes show beside the list, and the top-level todo it is under, `null` when it is one. */
-export type Open = { todo: UserTodo; parent: null } | { todo: UserTodoLeaf; parent: UserTodo };
-
-export function openIn(todos: UserTodo[], id: string | null): Open | null {
-	for (const todo of todos) {
-		if (todo.id === id) return { todo, parent: null };
-		const child = todo.children.find(leaf => leaf.id === id);
-		if (child) return { todo: child, parent: todo };
-	}
-	return null;
-}
 
 const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60";
 
@@ -93,10 +82,9 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 
 interface TodoDetailProps {
 	list: UserTodoList;
-	open: Open;
-	/** An archived todo reads only. */
-	archived: boolean;
-	disabled: boolean;
+	open: TodoEntry;
+	/** Changes would not reach the server, or the todo is archived. */
+	readOnly: boolean;
 	onChange: (change: UserTodoChange) => void;
 	onClose: () => void;
 	sessions: KnownSessions;
@@ -106,9 +94,8 @@ interface TodoDetailProps {
 }
 
 /** The open todo: its title, category, due day, links, actions, and markdown notes. */
-export function TodoDetail({ list, open, archived, disabled, onChange, onClose, sessions, newSessionCwd, linearConnected }: TodoDetailProps) {
+export function TodoDetail({ list, open, readOnly, onChange, onClose, sessions, newSessionCwd, linearConnected }: TodoDetailProps) {
 	const { todo } = open;
-	const readOnly = disabled || archived;
 	const done = todo.doneAt !== null;
 	const top = open.parent === null ? open.todo : null;
 	return (

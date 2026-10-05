@@ -18,19 +18,13 @@ import type {
 	TicketDraft,
 	TicketEdit,
 	UserAnswer,
-	UserTodoChange,
-	UserTodoLink,
 	View,
 	WorkItem,
 } from "../shared";
-import { parseTodo, parseTodoLink } from "./user-todos-file";
+import { isDay, MAX_TODO_BODY, MAX_TODO_ID, MAX_TODO_TEXT, parseTodoChange } from "../user-todos-parse";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
-/** The longest todo title, category name, and id the server keeps, and the longest todo body. */
-const MAX_TODO_TEXT = 2000;
-const MAX_TODO_ID = 64;
-const MAX_TODO_BODY = 100_000;
 /** GitHub's owner and repository names. */
 const NAME = /^[\w.-]+$/;
 
@@ -124,63 +118,6 @@ function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
 	if (value.kind !== "pull-request" || !isObject(value.pr)) return null;
 	const pr = parsePullRequest(value.pr.owner, value.pr.repo, value.pr.number);
 	return pr && { ok: { kind: "pull-request", pr } };
-}
-
-export function parseTodoChange(value: unknown): Parsed<UserTodoChange> {
-	if (!isObject(value)) return null;
-	const isId = (id: unknown): id is string => isNonEmpty(id) && id.length <= MAX_TODO_ID;
-	const isOptionalId = (id: unknown): id is string | null => id === null || isId(id);
-	const isText = (text: unknown): text is string => typeof text === "string" && text.length <= MAX_TODO_TEXT;
-	const isBody = (body: unknown): body is string => typeof body === "string" && body.length <= MAX_TODO_BODY;
-	const isDue = (due: unknown): due is string | null => due === null || (typeof due === "string" && /^\d{4}-\d{2}-\d{2}$/.test(due));
-	const { op, id, text, name, categoryId, afterId } = value;
-	if (op === "clear-done") return isOptionalId(categoryId) ? { ok: { op, categoryId } } : null;
-	if (op === "empty-archive") return { ok: { op } };
-	if (op === "restore") {
-		const todo = parseTodo(value.todo);
-		const { parentId } = value;
-		return todo && isId(todo.id) && isOptionalId(parentId) && isOptionalId(afterId) ? { ok: { op, todo, parentId, afterId } } : null;
-	}
-	if (!isId(id)) return null;
-	switch (op) {
-		case "add": {
-			const { parentId, body = "", due = null, links = [], addedBy = null } = value;
-			const parsed = Array.isArray(links) ? links.map(parseTodoLink) : [null];
-			const kept = parsed.filter((link): link is UserTodoLink => link !== null);
-			if (!isText(text) || !isOptionalId(parentId) || !isOptionalId(afterId) || !isOptionalId(categoryId) || !isBody(body) || !isDue(due) || !isOptionalId(addedBy)) return null;
-			return kept.length === parsed.length ? { ok: { op, id, parentId, afterId, categoryId, text, body, due, links: kept, addedBy } } : null;
-		}
-		case "edit":
-			return isText(text) ? { ok: { op, id, text } } : null;
-		case "edit-body":
-			return isBody(value.body) ? { ok: { op, id, body: value.body } } : null;
-		case "toggle": {
-			const { doneAt } = value;
-			return doneAt === null || (typeof doneAt === "string" && !Number.isNaN(Date.parse(doneAt))) ? { ok: { op, id, doneAt } } : null;
-		}
-		case "move":
-			return isOptionalId(afterId) && isOptionalId(categoryId) ? { ok: { op, id, afterId, categoryId } } : null;
-		case "set-due":
-			return isDue(value.due) ? { ok: { op, id, due: value.due } } : null;
-		case "link":
-		case "unlink": {
-			const link = parseTodoLink(value.link);
-			return link && { ok: { op, id, link } };
-		}
-		case "categorize":
-			return isOptionalId(categoryId) ? { ok: { op, id, categoryId } } : null;
-		case "add-category":
-		case "rename-category":
-			return isNonEmpty(name) && isText(name) ? { ok: { op, id, name } } : null;
-		case "remove":
-		case "indent":
-		case "outdent":
-		case "unarchive":
-		case "remove-category":
-			return { ok: { op, id } };
-		default:
-			return null;
-	}
 }
 
 function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest> {
@@ -291,7 +228,7 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	},
 	"user-todo"(value) {
 		const change = parseTodoChange(value.change);
-		return change ? { ok: { t: "user-todo", change: change.ok } } : null;
+		return change && { ok: { t: "user-todo", change } };
 	},
 };
 
@@ -329,10 +266,9 @@ export function parseSessionLinks(body: unknown): SessionLinksEdit | null {
 	return sessionIds.every((id): id is string => typeof id === "string") ? { ...pr, sessionIds } : null;
 }
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const isTicketPriority = oneOf(TICKET_PRIORITIES);
 
-/** The body of `PUT /api/ticket/new`: a title, markdown, and a team by id. */
+/** The body of `PUT /api/ticket/new`: a todo's title and notes, so within a todo's limits, and a team by id. */
 export function parseTicketDraft(body: unknown): TicketDraft | null {
 	if (!isObject(body)) return null;
 	const { title, description, team } = body;
@@ -366,7 +302,7 @@ export function parseTicketEdit(body: unknown): TicketEdit | null {
 		edit.project = project;
 	}
 	if (dueDate !== undefined) {
-		if (dueDate !== null && (typeof dueDate !== "string" || !DATE.test(dueDate))) return null;
+		if (dueDate !== null && !isDay(dueDate)) return null;
 		edit.dueDate = dueDate;
 	}
 	return Object.keys(edit).length > 1 ? edit : null;

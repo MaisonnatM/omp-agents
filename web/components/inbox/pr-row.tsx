@@ -247,7 +247,7 @@ export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen,
 					>
 						<AddToTodo
 							text={pr.title}
-							body={`Pull request https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`}
+							body={`Pull request ${pullRequestUrl(pr)}`}
 							link={{ kind: "pull-request", owner: pr.owner, repo: pr.repo, number: pr.number }}
 							label={`Add ${pr.repo}#${pr.number} to your todo list`}
 						/>

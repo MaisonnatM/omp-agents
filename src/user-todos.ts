@@ -22,9 +22,8 @@ function placeOf(todos: readonly UserTodo[], id: string): Place | null {
 	return null;
 }
 
-/** `item` after the entry `afterId` names, or `atNull` (first or last) when `afterId` is `null`, and last when it names none: another window may have removed it. */
-function insertAfter<T extends { id: string }>(list: readonly T[], afterId: string | null, item: T, atNull: "first" | "last" = "last"): T[] {
-	if (afterId === null && atNull === "first") return [item, ...list];
+/** `item` after the entry `afterId` names, or last when `afterId` is `null` or names none: another window may have removed it. */
+function insertAfter<T extends { id: string }>(list: readonly T[], afterId: string | null, item: T): T[] {
 	const at = afterId === null ? -1 : list.findIndex(entry => entry.id === afterId);
 	return at < 0 ? [...list, item] : list.toSpliced(at + 1, 0, item);
 }
@@ -40,7 +39,10 @@ const leafOf = ({ id, text, body, doneAt, due }: UserTodoLeaf): UserTodoLeaf => 
 
 const topOf = (leaf: UserTodoLeaf, categoryId: string | null): UserTodo => ({ ...leafOf(leaf), categoryId, children: [], links: [], addedBy: null });
 
-export function sameLink(a: UserTodoLink, b: UserTodoLink): boolean {
+const validCategory = (categoryId: string | null, isCategory: (id: string) => boolean): string | null =>
+	categoryId !== null && isCategory(categoryId) ? categoryId : null;
+
+function sameLink(a: UserTodoLink, b: UserTodoLink): boolean {
 	switch (a.kind) {
 		case "session":
 			return b.kind === "session" && a.sessionId === b.sessionId;
@@ -59,33 +61,25 @@ export function sameLink(a: UserTodoLink, b: UserTodoLink): boolean {
 const uniqueLinks = (links: readonly UserTodoLink[]): UserTodoLink[] =>
 	links.filter((link, index) => links.findIndex(other => sameLink(link, other)) === index);
 
-/** `todo` placed after `afterId` among `parentId`'s todos, `atNull` for `null`, or `todos` itself when `parentId` names none. */
-function insertTodo(todos: UserTodo[], todo: UserTodo, parentId: string | null, afterId: string | null, atNull: "first" | "last", isCategory: (id: string) => boolean): UserTodo[] {
-	if (parentId === null) {
-		const categoryId = todo.categoryId !== null && isCategory(todo.categoryId) ? todo.categoryId : null;
-		return insertAfter(todos, afterId, { ...todo, categoryId }, atNull);
-	}
+/** `todo` placed after `afterId` among `parentId`'s todos, or `todos` itself when `parentId` names none. */
+function insertTodo(todos: UserTodo[], todo: UserTodo, parentId: string | null, afterId: string | null, isCategory: (id: string) => boolean): UserTodo[] {
+	if (parentId === null) return insertAfter(todos, afterId, { ...todo, categoryId: validCategory(todo.categoryId, isCategory) });
 	const parent = todos.findIndex(entry => entry.id === parentId);
 	if (parent < 0) return todos;
-	return todos.with(parent, { ...todos[parent]!, children: insertAfter(todos[parent]!.children, afterId, leafOf(todo), atNull) });
+	return todos.with(parent, { ...todos[parent]!, children: insertAfter(todos[parent]!.children, afterId, leafOf(todo)) });
 }
 
-/** `todos` with top-level todo `top` moved after top-level todo `afterId`, or first in `categoryId`, joining `categoryId`. */
-function moveTop(todos: UserTodo[], top: number, afterId: string | null, categoryId: string | null): UserTodo[] {
-	const moved = todos[top]!;
-	if (afterId === moved.id) return todos;
-	const rest = todos.toSpliced(top, 1);
-	let at: number;
-	if (afterId === null) {
-		const first = rest.findIndex(todo => todo.categoryId === categoryId);
-		at = first < 0 ? rest.length : first;
-	} else {
-		const after = rest.findIndex(todo => todo.id === afterId);
-		if (after < 0) return todos;
-		at = after + 1;
-	}
-	if (at === top && moved.categoryId === categoryId) return todos;
-	return rest.toSpliced(at, 0, { ...moved, categoryId });
+/**
+ * `list` with the entry at `from` taken out and `moved` put back right after `afterId`, or at `first(rest)` for `null`;
+ * `null` when that changes nothing or `afterId` names none.
+ */
+function reorder<T extends { id: string }>(list: readonly T[], from: number, afterId: string | null, first: (rest: T[]) => number, moved: T): T[] | null {
+	if (afterId === list[from]!.id) return null;
+	const rest = list.toSpliced(from, 1);
+	const after = afterId === null ? -1 : rest.findIndex(entry => entry.id === afterId);
+	if (afterId !== null && after < 0) return null;
+	const at = afterId === null ? first(rest) : after + 1;
+	return at === from && moved === list[from] ? null : rest.toSpliced(at, 0, moved);
 }
 
 /** `todos` after `change`, or `todos` itself when the change changes nothing; `isCategory` tells which categories exist. */
@@ -112,15 +106,16 @@ function applyToTodos(todos: UserTodo[], change: TodoChange, isCategory: (id: st
 		}
 		case "move": {
 			if (place.child === null) {
-				if (change.categoryId !== null && !isCategory(change.categoryId)) return todos;
-				return moveTop(todos, place.top, change.afterId, change.categoryId);
+				const { categoryId } = change;
+				if (categoryId !== null && !isCategory(categoryId)) return todos;
+				const firstInCategory = (rest: UserTodo[]): number => {
+					const first = rest.findIndex(todo => todo.categoryId === categoryId);
+					return first < 0 ? rest.length : first;
+				};
+				return reorder(todos, place.top, change.afterId, firstInCategory, parent.categoryId === categoryId ? parent : { ...parent, categoryId }) ?? todos;
 			}
-			if (change.afterId === change.id) return todos;
-			const rest = parent.children.toSpliced(place.child, 1);
-			const after = change.afterId === null ? -1 : rest.findIndex(child => child.id === change.afterId);
-			if (change.afterId !== null && after < 0) return todos;
-			if (after + 1 === place.child) return todos;
-			return todos.with(place.top, { ...parent, children: rest.toSpliced(after + 1, 0, target) });
+			const children = reorder(parent.children, place.child, change.afterId, () => 0, target);
+			return children ? todos.with(place.top, { ...parent, children }) : todos;
 		}
 		case "link":
 			if (place.child !== null || parent.links.some(link => sameLink(link, change.link))) return todos;
@@ -194,11 +189,18 @@ export function applyUserTodo(list: UserTodoList, change: UserTodoChange): UserT
 				links: uniqueLinks(change.links ?? []),
 				addedBy: change.addedBy ?? null,
 			};
-			return withTodos(insertTodo(todos, added, change.parentId, change.afterId, "last", isCategory));
+			return withTodos(insertTodo(todos, added, change.parentId, change.afterId, isCategory));
 		}
-		case "restore":
+		case "restore": {
 			if (known(change.todo.id)) return list;
-			return withTodos(insertTodo(todos, change.todo, change.parentId, change.afterId, "first", isCategory));
+			if (change.parentId === null) {
+				return withTodos(todos.toSpliced(change.index, 0, { ...change.todo, categoryId: validCategory(change.todo.categoryId, isCategory) }));
+			}
+			const { parentId } = change;
+			const at = todos.findIndex(todo => todo.id === parentId);
+			if (at < 0) return list;
+			return withTodos(todos.with(at, { ...todos[at]!, children: todos[at]!.children.toSpliced(change.index, 0, leafOf(change.todo)) }));
+		}
 		case "remove": {
 			const at = placeOf(todos, change.id);
 			if (at) {
@@ -214,8 +216,7 @@ export function applyUserTodo(list: UserTodoList, change: UserTodoChange): UserT
 			const at = archive.findIndex(todo => todo.id === change.id);
 			if (at < 0) return list;
 			const todo = archive[at]!;
-			const categoryId = todo.categoryId !== null && isCategory(todo.categoryId) ? todo.categoryId : null;
-			return { ...list, todos: [...todos, { ...todo, categoryId }], archive: archive.toSpliced(at, 1) };
+			return { ...list, todos: [...todos, { ...todo, categoryId: validCategory(todo.categoryId, isCategory) }], archive: archive.toSpliced(at, 1) };
 		}
 		case "empty-archive":
 			return archive.length === 0 ? list : { ...list, archive: [] };

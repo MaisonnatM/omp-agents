@@ -92,7 +92,8 @@ export default function todos(pi: ExtensionAPI) {
 				case "list":
 					return { content: [{ type: "text", text: listText(readList()) }] };
 				case "add": {
-					if (!text) return { content: [{ type: "text", text: "add needs text." }], isError: true };
+					const title = text?.replace(/\s+/g, " ").trim();
+					if (!title) return { content: [{ type: "text", text: "add needs text." }], isError: true };
 					const todoId = randomUUID();
 					leave({
 						op: "add",
@@ -100,7 +101,7 @@ export default function todos(pi: ExtensionAPI) {
 						parentId: null,
 						afterId: null,
 						categoryId: null,
-						text: text.replace(/\s+/g, " ").trim(),
+						text: title,
 						body: notes ?? "",
 						due: due ?? null,
 						addedBy: ctx.sessionManager.getSessionId(),

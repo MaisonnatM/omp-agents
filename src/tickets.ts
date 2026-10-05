@@ -283,11 +283,10 @@ export const loadTeams = (): Promise<TicketChoice[]> => teams.get("", queryTeams
 async function queryTeams(): Promise<TicketChoice[]> {
 	const server = await linearServer();
 	const raw = await allPages(server, "list_teams", { limit: PAGE }, text => parsePage("list_teams", "teams", text));
-	return raw.flatMap(team => {
-		const id = str(team.id);
-		const name = str(team.name);
-		return id && name ? [{ id, name }] : [];
-	});
+	return raw
+		.map(choiceOf)
+		.filter(team => team !== null)
+		.sort(byName);
 }
 
 /** Opens `draft` in Linear, assigned to the viewer, and answers its identifier; the tickets list is read anew on its next request. */

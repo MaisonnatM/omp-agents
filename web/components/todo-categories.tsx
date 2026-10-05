@@ -1,4 +1,4 @@
-import { Archive, Bot, CalendarClock, Ellipsis, ListTodo, type LucideIcon, Pencil, Plus, Trash2 } from "lucide-react";
+import { Ellipsis, type LucideIcon, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import type { UserTodoChange, UserTodoList } from "../../src/shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
@@ -13,15 +13,7 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { hashForTodo, type TodoListView } from "../routing";
-import { leftIn, sameTodoView, today } from "../todo-views";
-
-/** The lists that are not a category, in the sidebar's order. */
-const LISTS: { view: TodoListView; name: string; icon: LucideIcon }[] = [
-	{ view: { kind: "all" }, name: "All", icon: ListTodo },
-	{ view: { kind: "today" }, name: "Today", icon: CalendarClock },
-	{ view: { kind: "agents" }, name: "From agents", icon: Bot },
-	{ view: { kind: "done" }, name: "Done", icon: Archive },
-];
+import { LIST_KINDS, leftIn, SIDEBAR_LISTS, sameTodoView, today } from "../todo-views";
 
 interface NameInputProps {
 	initial: string;
@@ -74,7 +66,7 @@ export function TodoCategories({ list, view, disabled, onChange }: TodoCategorie
 	const [naming, setNaming] = useState<Naming>({ kind: "none" });
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your todos…</p></SidebarGroup>;
 	const day = today();
-	const link = (target: TodoListView, name: string, Icon?: LucideIcon) => {
+	const link = (target: TodoListView, name: string, Icon: LucideIcon | null = null) => {
 		const count = leftIn(list, target, day);
 		const active = sameTodoView(view, target);
 		return (
@@ -93,8 +85,8 @@ export function TodoCategories({ list, view, disabled, onChange }: TodoCategorie
 		<>
 			<SidebarGroup>
 				<SidebarMenu aria-label="Todo lists">
-					{LISTS.map(({ view: target, name, icon }) => (
-						<SidebarMenuItem key={target.kind}>{link(target, name, icon)}</SidebarMenuItem>
+					{SIDEBAR_LISTS.map(target => (
+						<SidebarMenuItem key={target.kind}>{link(target, LIST_KINDS[target.kind].name, LIST_KINDS[target.kind].icon)}</SidebarMenuItem>
 					))}
 				</SidebarMenu>
 			</SidebarGroup>

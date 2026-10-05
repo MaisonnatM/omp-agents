@@ -145,11 +145,12 @@ describe("applyUserTodo", () => {
 		const list = after(listOf([], todo("a", ["a1"]), todo("b")), { op: "link", id: "a", link: { kind: "session", sessionId: "s1" } });
 		const taken = list.todos[0]!;
 		const removed = after(list, { op: "remove", id: "a" });
-		expect(after(removed, { op: "restore", todo: taken, parentId: null, afterId: null }).todos).toEqual(list.todos);
-		expect(after(removed, { op: "restore", todo: taken, parentId: null, afterId: "b" }).todos).toEqual([list.todos[1]!, taken]);
-		const childBack = after(list, { op: "remove", id: "a1" }, { op: "restore", todo: { ...todo("a1"), body: "x" }, parentId: "a", afterId: null });
-		expect(childBack.todos[0]!.children).toEqual([{ id: "a1", text: "a1", body: "x", doneAt: null, due: null }]);
-		expect(after(list, { op: "restore", todo: taken, parentId: null, afterId: null })).toBe(list);
+		expect(after(removed, { op: "restore", todo: taken, parentId: null, index: 0 }).todos).toEqual(list.todos);
+		expect(after(removed, { op: "restore", todo: taken, parentId: null, index: 1 }).todos).toEqual([list.todos[1]!, taken]);
+		const leaf = { id: "a1", text: "a1", body: "x", doneAt: null, due: null };
+		const childBack = after(list, { op: "remove", id: "a1" }, { op: "restore", todo: leaf, parentId: "a", index: 0 });
+		expect(childBack.todos[0]!.children).toEqual([leaf]);
+		expect(after(list, { op: "restore", todo: taken, parentId: null, index: 0 })).toBe(list);
 	});
 
 	test("clear-done archives the checked todos of one category or of all, latest first, a checked child as its own todo", () => {

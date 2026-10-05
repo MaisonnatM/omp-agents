@@ -21,7 +21,7 @@ import { TodoInbox } from "./server/todo-inbox";
 import { UserTodosFile } from "./server/user-todos-file";
 import { type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
-import type { View } from "./shared";
+import type { UserTodoChange, View } from "./shared";
 
 const PORT = portFromEnv();
 
@@ -32,9 +32,13 @@ const files = new SessionFiles();
 const sessions = new LiveSessions(onLiveUpdate);
 const interrupted = new InterruptedSessions(interruptedFile);
 const todos = new UserTodosFile(userTodosFile);
-const inbox = new TodoInbox(userTodoInboxDir, change => {
-	if (todos.apply(change)) broadcasts.pushUserTodos();
-});
+/** Applies `change` to the list, and sends every socket the list when it changed; whether it did. */
+function applyTodo(change: UserTodoChange): boolean {
+	const changed = todos.apply(change);
+	if (changed) broadcasts.pushUserTodos();
+	return changed;
+}
+const inbox = new TodoInbox(userTodoInboxDir, applyTodo);
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
 const pathFor = (view: View): string | null =>
 	view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -68,9 +72,7 @@ const startSession = createStarter({
 	pathFor,
 	savedFile: files.pathOf,
 	onStarted: () => broadcasts.syncRoster(),
-	linkTodo(todoId, sessionId) {
-		if (todos.apply({ op: "link", id: todoId, link: { kind: "session", sessionId } })) broadcasts.pushUserTodos();
-	},
+	linkTodo: (todoId, sessionId) => applyTodo({ op: "link", id: todoId, link: { kind: "session", sessionId } }),
 });
 const handleClientMsg = createClientHandler({
 	sessions,
@@ -81,8 +83,7 @@ const handleClientMsg = createClientHandler({
 	},
 	stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
 	changeTodo(ws, change) {
-		if (todos.apply(change)) broadcasts.pushUserTodos();
-		else send(ws, { t: "user-todos", list: todos.list });
+		if (!applyTodo(change)) send(ws, { t: "user-todos", list: todos.list });
 	},
 });
 

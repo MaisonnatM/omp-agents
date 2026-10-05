@@ -15,6 +15,7 @@ import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/
 import { SplitResizeHandle, splitAt, useSplitRatio } from "./components/split-resize-handle";
 import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-page";
 import { ToolsExpanded } from "./components/transcript";
+import { ArchivePage } from "./components/todo-archive";
 import { TodoPage } from "./components/user-todos";
 import { documentTitle } from "./document-title";
 import { SPLIT_CLICK } from "./labels";
@@ -225,7 +226,7 @@ export function App() {
 						dismissStart("new");
 						location.hash = hashForNewSession(next, page.todoId);
 					}}
-					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed ? page.todoId : null })}
+					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId })}
 					todo={seed}
 				/>
 			);
@@ -251,23 +252,23 @@ export function App() {
 				);
 			} else main = <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
 			break;
-		case "todo":
-			main = (
-				<TodoPage
-					list={state.userTodos}
-					view={todoView}
-					disabled={!state.connected}
-					onChange={changeTodo}
-					// A linked session resolves wherever it ran, even in a directory the sidebar does not list.
-					hosts={state.hosts}
-					past={state.past}
-					newSessionCwd={defaultCwd(view, visible.hosts, visible.past, project)}
-					linearConnected={ticketsShown}
-					quickTodo={quickTodo}
-					onQuickTodo={() => setQuickTodo(false)}
-				/>
-			);
+		case "todo": {
+			const todoProps = {
+				disabled: !state.connected,
+				onChange: changeTodo,
+				newSessionCwd: defaultCwd(view, visible.hosts, visible.past, project),
+				linearConnected: ticketsShown,
+			};
+			// A linked session resolves wherever it ran, even in a directory the sidebar does not list.
+			const sessions = { hosts: state.hosts, past: state.past };
+			main =
+				todoView.kind === "done" && state.userTodos ? (
+					<ArchivePage list={state.userTodos} sessions={sessions} {...todoProps} />
+				) : (
+					<TodoPage list={state.userTodos} view={todoView} {...sessions} {...todoProps} quickTodo={quickTodo} onQuickTodo={() => setQuickTodo(false)} />
+				);
 			break;
+		}
 		case undefined:
 			if (layout.panes.length > 0) {
 				main = (

@@ -62,6 +62,18 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "move", id: "a" })).toBeNull();
 	});
 
+	test("restore puts back a todo of the level it names, held to the limits an add is", () => {
+		const change = (value: unknown) => msg({ t: "user-todo", change: value });
+		const leaf = { id: "a1", text: "Child", body: "", doneAt: null, due: null };
+		const top = { ...leaf, id: "a", categoryId: null, children: [leaf], links: [], addedBy: null };
+		expect(change({ op: "restore", parentId: null, todo: top, index: 0 })).toEqual({ t: "user-todo", change: { op: "restore", parentId: null, todo: top, index: 0 } });
+		expect(change({ op: "restore", parentId: "a", todo: { ...leaf, children: [leaf] }, index: 1 })).toEqual({ t: "user-todo", change: { op: "restore", parentId: "a", todo: leaf, index: 1 } });
+		expect(change({ op: "restore", parentId: null, todo: { ...top, text: "x".repeat(2001) }, index: 0 })).toBeNull();
+		expect(change({ op: "restore", parentId: null, todo: { ...top, children: [{ ...leaf, body: "x".repeat(100_001) }] }, index: 0 })).toBeNull();
+		expect(change({ op: "restore", parentId: null, todo: { ...top, children: [{ ...leaf, id: "c".repeat(65) }] }, index: 0 })).toBeNull();
+		expect(change({ op: "restore", parentId: null, todo: top, index: -1 })).toBeNull();
+	});
+
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {
 		const png = { data: "aGVsbG8=", mimeType: "image/png" };
 		const prompt = (images: unknown) => msg({ t: "prompt", view: live, text: "", images, delivery: "steer" });
