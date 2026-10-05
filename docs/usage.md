@@ -52,7 +52,7 @@ For installation, see the [README](../README.md).
   With the edge focused, the arrow keys move it in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes.
   Double-click the edge to reset the width.
   The button at the outer corner of the sessions sidebar's header hides it and leaves a narrow strip whose button shows it again.
-  The plan and changes sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden.
+  The plan and changes sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Shift+B the plan and changes sidebar.
   Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
 - The left sidebar's session rows leave out the full working directory and the model; the pane header shows both.
@@ -68,7 +68,7 @@ For installation, see the [README](../README.md).
 ## Plan and changes sidebar
 
 - The right sidebar shows what the focused pane's agent planned and changed: a live session, one of its subagents, or a past session, each from its own transcript file.
-  It hides for the inbox, the tickets, **Settings**, and the new-session page.
+  It hides for the inbox, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
 - Two tabs split it, **Plan** and **Files**.
   The sidebar remembers the tab you chose, for every view.
   The **Files** tab names how many files changed, as in `Files (3)`.
@@ -130,6 +130,7 @@ For installation, see the [README](../README.md).
 
 - Opening a live session or subagent puts the cursor in the focused pane's composer once it accepts messages, so you can type right away.
   A session that reconnects takes the cursor back the same way.
+- The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
 - Each tool call in a tool group shows an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
   The icon of a call that failed is red, and the group's heading counts the failures.
 - A `task` tool call lists the subagents it spawned, by id, under its row: each one as it starts while the call runs, and every one once the call finishes.

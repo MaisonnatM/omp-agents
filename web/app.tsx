@@ -96,8 +96,8 @@ export function App() {
 		const current = latest.current.layout;
 		show(kind === "max" ? { ...current, focus: index, maximized: !current.maximized } : closePane(current, index));
 	}, [show]);
-	/** The view whose plan and changes the right sidebar shows; a page has none. */
-	const planView = page ? null : view;
+	/** The view whose plan and changes the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
+	const planView = page || (split && !maximized) ? null : view;
 	const toggleSidebar = useCallback((side: SidebarSide): void => {
 		const { sidebars } = latest.current;
 		sidebars.setOpen(side, !sidebars.panels[side].open);
