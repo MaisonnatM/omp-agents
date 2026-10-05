@@ -1,7 +1,6 @@
 import { CircleCheck, CircleDashed, CircleSlash, CircleX, Eye, GitMerge, GitPullRequestDraft, type LucideIcon, MessageSquare } from "lucide-react";
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { CheckRunState, PullRequest, PullRequestCheck, PullRequestDetail, PullRequestEvent, RosterHost, View } from "../../../src/shared";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestStatus, pullRequestUrl, type StatusItem } from "../../inbox-model";
 import { age } from "../../labels";
@@ -9,9 +8,8 @@ import type { PullRequestActionId, QuickActionId } from "../../quick-actions";
 import type { OpenMode } from "../../routing";
 import { useRead } from "../../reads";
 import { BranchName } from "../git";
-import { QuickActionButton, QuickActionButtons } from "../quick-actions";
-import { LiveSessionChips } from "../session-chip";
-import { Comment, DetailSection, Markdown, OutLink, SheetFrame } from "../sheet-details";
+import { QuickActionButton, type QuickActionsProps, SheetQuickActions } from "../quick-actions";
+import { Clamped, Comment, DetailSection, Markdown, OutLink, SheetFrame } from "../sheet-details";
 import { Avatar, IconTip, STATE_ICON } from "./avatars";
 
 const CHECK_RUN_ICON: Record<CheckRunState, [LucideIcon, string]> = {
@@ -81,30 +79,23 @@ const STATUS_VIEW: StatusView = {
 
 const viewOf = <Item extends StatusItem>(item: Item): ItemView<Item> => STATUS_VIEW[item.kind] as ItemView<Item>;
 
-/** The quick actions a sheet offers on its pull request: those that apply, the one starting, and their start. */
-export interface SheetActions {
-	actions: PullRequestActionId[];
-	pending: QuickActionId | null;
-	onRun: (action: PullRequestActionId) => void;
-}
-
 interface PlacedItem {
 	item: StatusItem;
 	fix: PullRequestActionId | null;
 }
 
-/** Each status item with the quick action it offers: one that applies and that no item above it offers already. */
-function placeFixes(items: StatusItem[], quick: SheetActions | undefined): PlacedItem[] {
+/** Each status item with the quick action it offers: one of `actions` that no item above it offers already. */
+function placeFixes(items: StatusItem[], actions: QuickActionId[]): PlacedItem[] {
 	const offered = new Set<PullRequestActionId>();
 	return items.map(item => {
 		const { fix } = viewOf(item);
-		if (!fix || !quick?.actions.includes(fix) || offered.has(fix)) return { item, fix: null };
+		if (!fix || !actions.includes(fix) || offered.has(fix)) return { item, fix: null };
 		offered.add(fix);
 		return { item, fix };
 	});
 }
 
-function Status({ placed, quick }: { placed: PlacedItem[]; quick: SheetActions | undefined }) {
+function Status({ placed, quick }: { placed: PlacedItem[]; quick: QuickActionsProps }) {
 	return (
 		<ul className="space-y-1.5 text-sm">
 			{placed.map(({ item, fix }) => {
@@ -113,44 +104,11 @@ function Status({ placed, quick }: { placed: PlacedItem[]; quick: SheetActions |
 					<li key={item.kind} className="flex min-h-7 items-center gap-2">
 						<Icon aria-hidden className={cn("size-4 shrink-0", TONE_COLOR[tone])} />
 						<span className="min-w-0 flex-1">{text(item)}</span>
-						{fix && quick && <QuickActionButton action={fix} pending={quick.pending} onRun={quick.onRun} />}
+						{fix && <QuickActionButton action={fix} pending={quick.pending} onRun={quick.onRun} />}
 					</li>
 				);
 			})}
 		</ul>
-	);
-}
-
-/** How tall a description shows before it folds, in px, as `max-h-64`. One only a little taller shows in full. */
-const CLAMP_PX = 256;
-const CLAMP_SLACK_PX = 48;
-
-/** `children` cut at {@link CLAMP_PX} with a Show more button, when they are taller. */
-function Clamped({ children }: { children: ReactNode }) {
-	const ref = useRef<HTMLDivElement>(null);
-	const [tall, setTall] = useState(false);
-	const [open, setOpen] = useState(false);
-	useLayoutEffect(() => {
-		const element = ref.current;
-		if (!element) return;
-		const measure = (): void => setTall(element.scrollHeight > CLAMP_PX + CLAMP_SLACK_PX);
-		const observer = new ResizeObserver(measure);
-		observer.observe(element);
-		measure();
-		return () => observer.disconnect();
-	}, []);
-	const clamped = tall && !open;
-	return (
-		<div className="space-y-1">
-			<div ref={ref} className={cn(clamped && "max-h-64 overflow-hidden [mask-image:linear-gradient(to_bottom,black_65%,transparent)]")}>
-				{children}
-			</div>
-			{tall && (
-				<Button variant="ghost" size="compact" className="-ml-2 text-muted-foreground" aria-expanded={open} onClick={() => setOpen(!open)}>
-					{open ? "Show less" : "Show more"}
-				</Button>
-			)}
-		</div>
 	);
 }
 
@@ -204,8 +162,8 @@ function Checks({ checks }: { checks: PullRequestCheck[] }) {
 
 interface SheetContentProps {
 	pr: PullRequest;
-	/** The quick actions on it; none when the inbox does not list it, since a start needs the workspace the inbox names. */
-	quick?: SheetActions;
+	/** The quick actions on it; none apply when the inbox does not list it, since a start needs the workspace the inbox names. */
+	quick: QuickActionsProps;
 	/** The running sessions that work on it. */
 	sessions: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
@@ -215,14 +173,14 @@ interface SheetContentProps {
 
 /**
  * A pull request read from GitHub, as the inbox's sheet shows it: a header that names it, then its Status, where each
- * blocker offers the quick action that works on it, then its details. The header offers the other quick actions, and
- * every one when the read failed, so the buttons do not move once the details arrive, then the sessions that work on it.
+ * blocker offers the quick action that works on it, then its details. The header offers the other quick actions once
+ * the read settles, so the buttons do not move when the details arrive, and the sessions that work on it.
  */
 export function PullRequestSheetContent({ pr, quick, sessions, onOpen, notice }: SheetContentProps) {
 	const { data: detail, error } = useRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
 	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
-	const placed = detail ? placeFixes(pullRequestStatus(detail), quick) : [];
-	const headerActions = quick && (detail || error) ? quick.actions.filter(action => !placed.some(({ fix }) => fix === action)) : [];
+	const placed = detail ? placeFixes(pullRequestStatus(detail), quick.actions) : [];
+	const headerActions = detail || error ? quick.actions.filter(action => !placed.some(({ fix }) => fix === action)) : [];
 	return (
 		<SheetFrame
 			title={detail?.title ?? name}
@@ -231,12 +189,7 @@ export function PullRequestSheetContent({ pr, quick, sessions, onOpen, notice }:
 			error={error && `Cannot load the pull request: ${error}`}
 			actions={
 				<>
-					{(headerActions.length > 0 || sessions.length > 0) && (
-						<div className="flex flex-wrap items-center gap-2">
-							{quick && <QuickActionButtons actions={headerActions} pending={quick.pending} onRun={quick.onRun} />}
-							<LiveSessionChips hosts={sessions} onOpen={onOpen} />
-						</div>
-					)}
+					<SheetQuickActions actions={headerActions} pending={quick.pending} onRun={quick.onRun} sessions={sessions} onOpen={onOpen} />
 					{notice}
 				</>
 			}

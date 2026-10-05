@@ -175,7 +175,7 @@ function LinkSessionsButton({ pr, sessions }: { pr: PullRequest; sessions: Sessi
 				aria-label={label}
 				loading={writing.phase === "writing"}
 				// Keeps the row's hover-only buttons shown while the write runs and after, so its outcome stays readable.
-				data-active={writing.phase === "idle" ? undefined : ""}
+				data-busy={writing.phase === "idle" ? undefined : ""}
 				className={cn("text-muted-foreground", writing.phase === "failed" && "text-red-600 dark:text-red-400")}
 				onClick={() => void write()}
 			>
@@ -199,7 +199,7 @@ interface RowProps {
 export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen, pending, onQuickAction }: RowProps) {
 	const verdict = rowVerdict(pr);
 	return (
-		<li id={rowId(pr)} data-inbox-row data-url={pullRequestUrl(pr)} data-targeted={targeted || undefined} className={cn("group/row relative scroll-my-6", targeted && "ring-2 ring-inset ring-ring")}>
+		<li id={rowId(pr)} data-targeted={targeted || undefined} className={cn("group/row relative scroll-my-6", targeted && "ring-2 ring-inset ring-ring")}>
 			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-[19.5px] h-3 w-px bg-border" />}
 			{stack?.joinsBelow && <span aria-hidden className="absolute top-7 bottom-0 left-[19.5px] w-px bg-border" />}
 			<div className={cn("flex items-start gap-3 px-3 py-2.5", targeted ? "bg-accent/60" : "hover:bg-muted/50")}>
@@ -209,7 +209,6 @@ export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen,
 					<div className="flex min-w-0 items-baseline gap-2">
 						<a
 							href={hashForInbox(pr)}
-							data-row-link
 							aria-haspopup="dialog"
 							title={`Show the details of ${pr.owner}/${pr.repo}#${pr.number}`}
 							className="truncate rounded-sm text-sm font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
@@ -241,7 +240,7 @@ export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen,
 					{pr.conflicts && <IconTip icon={CONFLICTS_ICON} />}
 					<span
 						className={cn(
-							"flex items-center gap-1 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-active]]:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
+							"flex items-center gap-1 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-busy]]:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
 							pending === null && "opacity-0",
 						)}
 					>

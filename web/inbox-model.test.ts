@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { InboxPullRequest, PullRequestDetail, RepoInbox } from "../src/shared";
-import { foldedByDefault, inboxSections, pullRequestStatus, rowVerdict, waitingCount } from "./inbox-model";
+import { foldedByDefault, inboxSections, pullRequestStatus, rowVerdict, shownPullRequests, waitingCount } from "./inbox-model";
 
 const pr = (number: number, fields: Partial<InboxPullRequest> = {}): InboxPullRequest => ({
 	owner: "acme",
@@ -102,6 +102,20 @@ test("the waiting count adds reviews asked of you and PRs returned to you across
 		unmatched: [],
 	};
 	expect(waitingCount(inbox)).toBe(3);
+});
+
+test("the shown pull requests follow page order and leave out folded repositories, folded sections, and unreadable repositories", () => {
+	const repo = (name: string, pullRequests: InboxPullRequest[]): RepoInbox => ({ owner: "acme", repo: name, cwds: [], pullRequests });
+	const inbox = {
+		repos: [
+			repo("webapp", [pr(1), pr(2, { role: "reviewer", author: teammate }), pr(3, { state: "merged" }), pr(4, { state: "draft" })]),
+			repo("folded", [pr(5)]),
+			{ owner: "acme", repo: "down", cwds: [], error: "rate limited" },
+		],
+		unmatched: [],
+	};
+	const folded = new Set(["acme/folded", "acme/webapp:Recently merged"]);
+	expect(shownPullRequests(inbox, key => folded.has(key)).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
 });
 
 describe("row verdict", () => {

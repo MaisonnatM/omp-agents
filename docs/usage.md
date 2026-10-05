@@ -369,8 +369,8 @@ For installation, see the [README](../README.md).
   A blocker that a quick action works on carries that action's button, such as **Resolve conflicts** next to the conflicts, and the header keeps the other actions.
   Then it shows the branch and the one it merges into, the lines added and removed, the description, folded after about 16 lines behind **Show more**, the head commit's checks (failing and pending ones listed, passing and skipped ones folded behind their counts), the unresolved review comments by file and line, the conversation of comments and reviews, and the changed files, with links to the pull request on GitHub and on Graphite.
   Each opening reads the pull request again; the server keeps its answer for 30 seconds.
-  The page reads GitHub through `gh` when it opens, and the dashboard reads it again every minute on every page.
-  Reopening the inbox, even after a reload, shows the last inbox read for the chosen project at once while it asks again; the header says when that inbox was read, and the browser's localStorage keeps the last one of each project.
+  The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Inbox** tab's count stays current.
+  Reopening the inbox, even after a reload, shows the last inbox read for the chosen project at once; the header says when that inbox was read, and the browser's localStorage keeps the last one of each project.
   The server keeps each repository's answer for 30 seconds, and **Refresh** asks GitHub again at once.
 - The inbox works from the keyboard, outside text fields.
   J and K move to the next and previous row, and Enter opens the focused row's sheet.

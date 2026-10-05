@@ -271,7 +271,7 @@ interface SectionLinkProps {
 	label: string;
 	count: number;
 	/** Marks the count of an inbox section that waits on your move. */
-	waiting?: Waiting | null;
+	waiting?: Waiting;
 	/** Gets a new target each time, so choosing a section again scrolls back to it. */
 	onChoose: (target: SectionTarget) => void;
 }
@@ -344,7 +344,7 @@ function InboxNav({ project, target, onTarget }: InboxNavProps) {
 							title={title}
 							label={`${title}, ${length} pull request${length === 1 ? "" : "s"}`}
 							count={length}
-							waiting={waiting}
+							waiting={waiting ?? undefined}
 							onChoose={onTarget}
 						/>
 					))}
@@ -579,18 +579,21 @@ export function Roster({
 			<SizeProvider size="compact">
 				<TabsList aria-label="Sidebar" className="mx-2 self-start">
 					{/* Four tabs fit the sidebar's default width only with tighter padding than Fluid's. */}
-					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => (
-						<TabItem
-							key={value}
-							value={value}
-							label={label}
-							icon={icon}
-							badge={value === "inbox" && waiting > 0 ? waiting : undefined}
-							aria-label={value === "inbox" && waiting > 0 ? `${label}, ${waiting} waiting on you` : undefined}
-							className="px-2"
-							shortcut={shortcutLabels(value)}
-						/>
-					))}
+					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => {
+						const badge = value === "inbox" && waiting > 0 ? waiting : undefined;
+						return (
+							<TabItem
+								key={value}
+								value={value}
+								label={label}
+								icon={icon}
+								badge={badge}
+								aria-label={badge === undefined ? undefined : `${label}, ${badge} waiting on you`}
+								className="px-2"
+								shortcut={shortcutLabels(value)}
+							/>
+						);
+					})}
 				</TabsList>
 			</SizeProvider>
 			{!connected && (

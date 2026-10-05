@@ -1,5 +1,5 @@
 /** Pull request links, the inbox page's sections and stacks, and what stands between a pull request and its merge. */
-import type { CheckState, Inbox, InboxPullRequest, PullRequest, PullRequestDetail, ReviewDecision } from "../src/shared";
+import { type CheckState, type Inbox, type InboxPullRequest, type PullRequest, type PullRequestDetail, type ReviewDecision, repoKey } from "../src/shared";
 import { type SectionTarget, sectionId } from "./section";
 
 export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
@@ -53,7 +53,7 @@ export interface InboxSection {
 interface StackMember {
 	/** The head branch of the stack's bottom pull request, which names the stack. */
 	root: string;
-	depth: number;
+	position: number;
 	size: number;
 }
 
@@ -61,59 +61,47 @@ interface StackMember {
 function stackMembers(pullRequests: InboxPullRequest[]): Map<InboxPullRequest, StackMember> {
 	const live = pullRequests.filter(pr => pr.state !== "merged");
 	const byHead = new Map(live.map(pr => [pr.head, pr]));
-	const places = new Map<InboxPullRequest, { root: string; depth: number }>();
-	const placeOf = (pr: InboxPullRequest, seen: Set<InboxPullRequest>): { root: string; depth: number } => {
-		const known = places.get(pr);
-		if (known) return known;
-		seen.add(pr);
-		const below = pr.stackedOn === null ? undefined : byHead.get(pr.stackedOn);
+	const places = live.map(pr => {
 		// GitHub cannot report a cycle of bases, but one must not hang the page.
-		const under = below && !seen.has(below) ? placeOf(below, seen) : null;
-		const place = under ? { root: under.root, depth: under.depth + 1 } : { root: pr.head, depth: 1 };
-		places.set(pr, place);
-		return place;
-	};
-	for (const pr of live) placeOf(pr, new Set());
-	const stacks = new Map<string, { members: number; size: number }>();
-	for (const { root, depth } of places.values()) {
-		const stack = stacks.get(root) ?? { members: 0, size: 0 };
-		stacks.set(root, { members: stack.members + 1, size: Math.max(stack.size, depth) });
-	}
+		const seen = new Set([pr]);
+		let bottom = pr;
+		for (let below = byHead.get(pr.stackedOn ?? ""); below && !seen.has(below); below = byHead.get(below.stackedOn ?? "")) {
+			seen.add(below);
+			bottom = below;
+		}
+		return { pr, root: bottom.head, position: seen.size };
+	});
 	const members = new Map<InboxPullRequest, StackMember>();
-	for (const [pr, place] of places) {
-		const stack = stacks.get(place.root)!;
-		if (stack.members > 1) members.set(pr, { ...place, size: stack.size });
+	for (const stack of Map.groupBy(places, place => place.root).values()) {
+		if (stack.length < 2) continue;
+		const size = Math.max(...stack.map(place => place.position));
+		for (const { pr, root, position } of stack) members.set(pr, { root, position, size });
 	}
 	return members;
 }
 
+const sectionOf = (pr: InboxPullRequest): SectionRule | undefined => SECTION_RULES.find(({ takes }) => takes(pr));
+
 /** A repository's pull requests in Graphite's inbox sections, leaving out the empty ones, each row with its place in a stack. */
 export function inboxSections(pullRequests: InboxPullRequest[]): InboxSection[] {
 	const members = stackMembers(pullRequests);
-	const taken = SECTION_RULES.map((): InboxPullRequest[] => []);
-	for (const pr of pullRequests.toSorted((a, b) => b.updatedAt - a.updatedAt)) {
-		taken[SECTION_RULES.findIndex(({ takes }) => takes(pr))]?.push(pr);
-	}
-	return SECTION_RULES.flatMap(({ title, waiting }, index): InboxSection[] => {
-		const prs = taken[index]!;
-		if (prs.length === 0) return [];
-		const ordered: InboxPullRequest[] = [];
-		for (const pr of prs) {
-			if (ordered.includes(pr)) continue;
-			const root = members.get(pr)?.root;
-			if (root === undefined) ordered.push(pr);
-			else ordered.push(...prs.filter(other => members.get(other)?.root === root).toSorted((a, b) => members.get(b)!.depth - members.get(a)!.depth));
-		}
+	const taken = Map.groupBy(pullRequests.toSorted((a, b) => b.updatedAt - a.updatedAt), sectionOf);
+	return SECTION_RULES.flatMap((rule): InboxSection[] => {
+		const prs = taken.get(rule);
+		if (!prs) return [];
+		// A group keeps its first member's place, so a stack sits where its most recently updated member would.
+		const groups = Map.groupBy(prs, pr => members.get(pr)?.root ?? `#${pr.number}`);
+		const ordered = [...groups.values()].flatMap(group => group.toSorted((a, b) => (members.get(b)?.position ?? 0) - (members.get(a)?.position ?? 0)));
 		const rows = ordered.map((pr, at): InboxRow => {
 			const member = members.get(pr);
 			if (!member) return { pr, stack: null };
 			const joins = (row: InboxPullRequest | undefined, step: number): boolean => {
 				const other = row && members.get(row);
-				return !!other && other.root === member.root && other.depth === member.depth + step;
+				return !!other && other.root === member.root && other.position === member.position + step;
 			};
-			return { pr, stack: { position: member.depth, size: member.size, joinsAbove: joins(ordered[at - 1], 1), joinsBelow: joins(ordered[at + 1], -1) } };
+			return { pr, stack: { position: member.position, size: member.size, joinsAbove: joins(ordered[at - 1], 1), joinsBelow: joins(ordered[at + 1], -1) } };
 		});
-		return [{ title, waiting, rows }];
+		return [{ title: rule.title, waiting: rule.waiting, rows }];
 	});
 }
 
@@ -121,10 +109,7 @@ export function inboxSections(pullRequests: InboxPullRequest[]): InboxSection[] 
 export const sectionFoldKey = (repo: string, title: string): string => `${repo}:${title}`;
 
 /** Whether the inbox folds the repository or section that `key` names until you unfold it. */
-export function foldedByDefault(key: string): boolean {
-	const title = key.slice(key.indexOf(":") + 1);
-	return key.includes(":") && SECTION_RULES.some(rule => rule.folded && rule.title === title);
-}
+export const foldedByDefault = (key: string): boolean => SECTION_RULES.some(rule => rule.folded && key.endsWith(`:${rule.title}`));
 
 /** A section of the inbox page, by `repoKey` and title, which a sidebar link scrolls to. Its title is folded under the repository. */
 export const inboxSection = (repo: string, title: string): SectionTarget => ({
@@ -132,13 +117,18 @@ export const inboxSection = (repo: string, title: string): SectionTarget => ({
 	folds: [repo, sectionFoldKey(repo, title)],
 });
 
-/** How many pull requests in `inbox` wait on your move: reviews asked of you and pull requests returned to you. */
-export function waitingCount({ repos }: Inbox): number {
-	return repos.reduce(
-		(total, repo) => total + ("error" in repo ? 0 : inboxSections(repo.pullRequests).filter(section => section.waiting !== null).reduce((sum, { rows }) => sum + rows.length, 0)),
-		0,
-	);
+/** The pull requests the inbox page shows, in page order: those of readable repositories and sections that `isFolded` leaves open. */
+export function shownPullRequests({ repos }: Inbox, isFolded: (key: string) => boolean): InboxPullRequest[] {
+	return repos.flatMap(repo => {
+		const key = repoKey(repo);
+		if ("error" in repo || isFolded(key)) return [];
+		return inboxSections(repo.pullRequests).flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
+	});
 }
+
+/** How many pull requests in `inbox` wait on your move: reviews asked of you and pull requests returned to you. */
+export const waitingCount = ({ repos }: Inbox): number =>
+	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => sectionOf(pr)?.waiting).length;
 
 interface MergeFacts {
 	state: PullRequestDetail["state"];
@@ -163,7 +153,8 @@ export type RowVerdict = "ready" | "approved" | "changes-requested" | null;
 export function rowVerdict(pr: InboxPullRequest): RowVerdict {
 	if (pr.state === "merged") return null;
 	if (pr.role === "author" && pr.state === "open") {
-		return readyToMerge({ ...pr, threadsOpen: pr.unresolved.count > 0 || !pr.unresolved.exact }) ? "ready" : null;
+		const threadsOpen = pr.unresolved.count > 0 || !pr.unresolved.exact;
+		return readyToMerge({ state: pr.state, review: pr.review, conflicts: pr.conflicts, checks: pr.checks, threadsOpen }) ? "ready" : null;
 	}
 	return pr.review === "approved" || pr.review === "changes-requested" ? pr.review : null;
 }
@@ -190,7 +181,7 @@ export function pullRequestStatus(detail: PullRequestDetail): StatusItem[] {
 	const pending = count("pending");
 	const checks: CheckState = failing > 0 ? "failing" : pending > 0 ? "pending" : detail.checks.length > 0 ? "passing" : "none";
 	const items: StatusItem[] = [];
-	if (readyToMerge({ ...detail, checks, threadsOpen: detail.threads.length > 0 })) items.push({ kind: "ready" });
+	if (readyToMerge({ state: detail.state, review: detail.review, conflicts: detail.conflicts, checks, threadsOpen: detail.threads.length > 0 })) items.push({ kind: "ready" });
 	if (detail.state === "draft") items.push({ kind: "draft" });
 	if (detail.conflicts) items.push({ kind: "conflicts", base: detail.base });
 	if (failing > 0) items.push({ kind: "checks-failing", count: failing });

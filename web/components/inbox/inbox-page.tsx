@@ -1,9 +1,9 @@
-import { type ReactNode, useEffect } from "react";
+import type { ReactNode } from "react";
 import { type Inbox, type InboxPullRequest, type PastSession, type PullRequest, type RepoInbox, type RosterHost, repoKey, samePullRequest, type WorkItem } from "../../../src/shared";
 import { projectName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { actionOn, pendingOf, type PullRequestActionId, pullRequestActions, pullRequestStart } from "../../quick-actions";
-import { foldedByDefault, inboxSection, inboxSections, pullRequestUrl, sectionFoldKey } from "../../inbox-model";
+import { foldedByDefault, inboxSection, inboxSections, pullRequestUrl, sectionFoldKey, shownPullRequests } from "../../inbox-model";
 import { inboxStore } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { sessionsOn } from "../../sessions";
@@ -17,25 +17,7 @@ import { PullRequestSheetContent } from "./pr-details";
 import { PullRequestRow, rowId, sessionsFor } from "./pr-row";
 
 /** The repositories and sections flipped from their default fold: `owner/repo`, and `owner/repo:<section title>`. */
-const FOLDS_KEY = "omp-agents.inbox-folds";
-
-/** Before sections could start folded, this key held the folded ones. A key that now starts folded would read inverted, so it is dropped. */
-const LEGACY_FOLDS_KEY = "omp-agents.inbox-collapsed";
-
-function migrateFolds(): void {
-	const legacy = localStorage.getItem(LEGACY_FOLDS_KEY);
-	if (legacy === null) return;
-	localStorage.removeItem(LEGACY_FOLDS_KEY);
-	try {
-		const keys: unknown = JSON.parse(legacy);
-		const kept = Array.isArray(keys) ? keys.filter(key => typeof key === "string" && !foldedByDefault(key)) : [];
-		if (kept.length > 0 && localStorage.getItem(FOLDS_KEY) === null) localStorage.setItem(FOLDS_KEY, JSON.stringify(kept));
-	} catch {
-		// A stored value that is not JSON held no folds to keep.
-	}
-}
-
-migrateFolds();
+const FOLDS_KEY = "omp-agents.inbox-collapsed";
 
 interface RepoProps {
 	inbox: RepoInbox;
@@ -147,43 +129,41 @@ function whyMissing(target: PullRequest, inbox: Inbox, allProjects: boolean): st
 	return `${repo}#${target.number} is not in this inbox, which covers only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}.`;
 }
 
-/** The rows the page shows, in order: the folded sections' rows are not in the document. */
-const shownRows = (): HTMLElement[] => [...document.querySelectorAll<HTMLElement>("[data-inbox-row]")];
-
 /**
- * J and K move between the rows the page shows, or, while a sheet is open, show the next or previous pull request in it.
+ * J and K move between the rows `shown` lists, or, while a sheet is open, show the next or previous pull request in it.
  * O opens the pull request on GitHub, and `.` opens a row's quick actions. A key that has nothing to act on keeps its
  * usual meaning.
  */
-function useTriageKeys(target: PullRequest | null): void {
-	const current = (rows: HTMLElement[]): number => (target ? rows.findIndex(row => row.id === rowId(target)) : rows.findIndex(row => row.contains(document.activeElement)));
+function useTriageKeys(shown: InboxPullRequest[], target: PullRequest | null): void {
+	const rowOf = (pr: PullRequest): HTMLElement | null => document.getElementById(rowId(pr));
+	const current = (): number =>
+		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowOf(pr)?.contains(document.activeElement) ?? false);
 	const step = (by: 1 | -1): boolean => {
-		const rows = shownRows();
-		const at = current(rows);
+		const at = current();
 		if (target) {
 			if (at < 0) return false;
-			const href = rows[at + by]?.querySelector("[data-row-link]")?.getAttribute("href");
-			if (href) location.hash = href;
+			const next = shown[at + by];
+			if (next) location.hash = hashForInbox(next);
 			return true;
 		}
-		const next = at < 0 ? rows[by === 1 ? 0 : rows.length - 1] : rows[at + by];
-		if (!next) return at >= 0;
-		next.querySelector<HTMLAnchorElement>("[data-row-link]")?.focus({ preventScroll: true });
-		next.scrollIntoView({ block: "nearest" });
+		const next = at < 0 ? shown[by === 1 ? 0 : shown.length - 1] : shown[at + by];
+		const row = next && rowOf(next);
+		if (!row) return at >= 0;
+		row.querySelector("a")?.focus({ preventScroll: true });
+		row.scrollIntoView({ block: "nearest" });
 		return true;
 	};
 	useShortcuts({
 		nextPullRequest: () => step(1),
 		previousPullRequest: () => step(-1),
 		pullRequestOnGitHub: () => {
-			const row = shownRows()[current(shownRows())];
-			const url = target ? pullRequestUrl(target) : row?.dataset.url;
-			if (!url) return false;
-			window.open(url, "_blank", "noopener,noreferrer");
+			const pr = target ?? shown[current()];
+			if (!pr) return false;
+			window.open(pullRequestUrl(pr), "_blank", "noopener,noreferrer");
 		},
 		pullRequestActions: () => {
-			if (target) return false;
-			const trigger = shownRows()[current(shownRows())]?.querySelector<HTMLButtonElement>("[data-row-actions] button");
+			const pr = target ? undefined : shown[current()];
+			const trigger = pr && rowOf(pr)?.querySelector<HTMLButtonElement>("[data-row-actions] button");
 			if (!trigger) return false;
 			trigger.click();
 		},
@@ -204,16 +184,14 @@ interface InboxPageProps {
 /** The pull requests of the sidebar's project, or of every project, in Graphite's inbox sections, read from GitHub. */
 export function InboxPage({ project, hosts, past, target, section }: InboxPageProps) {
 	const { open, start, dismissStart, starts: { quick } } = useDashboardContext();
-	// The page shell polls the inbox for the Inbox tab's count; opening the page reads it again at once.
 	const poll = inboxStore.use(project);
-	useEffect(() => void inboxStore.refresh(project), [project]);
 	const { read } = poll;
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 	const place = read && target ? placeOf(read.data, target) : null;
 	const row = target && place ? { id: rowId(target), folds: [place.repo, place.section] } : null;
 	useReveal(row, folds, { token: row?.id, block: "center", focus: false });
 	useReveal(section, folds, { token: section, block: "start", focus: true });
-	useTriageKeys(target);
+	useTriageKeys(read ? shownPullRequests(read.data, folds.isFolded) : [], target);
 
 	return (
 		<ListSheetPage
@@ -235,15 +213,11 @@ export function InboxPage({ project, hosts, past, target, section }: InboxPagePr
 							<PullRequestSheetContent
 								key={rowId(pr)}
 								pr={pr}
-								quick={
-									listed
-										? {
-												actions: pullRequestActions(listed.pr),
-												pending: pendingOf(quick, item),
-												onRun: action => start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill())),
-											}
-										: undefined
-								}
+								quick={{
+									actions: listed ? pullRequestActions(listed.pr) : [],
+									pending: pendingOf(quick, item),
+									onRun: (action: PullRequestActionId) => listed && start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill())),
+								}}
 								sessions={sessionsOn(item, hosts)}
 								onOpen={open}
 								notice={quick && actionOn(quick.op.subject, item) !== null && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}

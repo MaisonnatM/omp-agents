@@ -19,7 +19,7 @@ const ICON: Record<QuickActionId, LucideIcon> = {
 	plan: ListChecks,
 };
 
-interface QuickActionsProps {
+export interface QuickActionsProps {
 	/** The actions that apply to the row's pull request or issue, in the order offered. */
 	actions: QuickActionId[];
 	/** The action whose session is starting for it, if any. */
