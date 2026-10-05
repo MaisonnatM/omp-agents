@@ -15,19 +15,16 @@ import type {
 	PullRequest,
 	SessionLinksEdit,
 	StartRequest,
+	TicketDraft,
 	TicketEdit,
 	UserAnswer,
-	UserTodoChange,
 	View,
 	WorkItem,
 } from "../shared";
+import { isDay, MAX_TODO_BODY, MAX_TODO_ID, MAX_TODO_TEXT, parseTodoChange } from "../user-todos-parse";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
-/** The longest todo title, category name, and id the server keeps, and the longest todo body. */
-const MAX_TODO_TEXT = 2000;
-const MAX_TODO_ID = 64;
-const MAX_TODO_BODY = 100_000;
 /** GitHub's owner and repository names. */
 const NAME = /^[\w.-]+$/;
 
@@ -123,47 +120,10 @@ function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
 	return pr && { ok: { kind: "pull-request", pr } };
 }
 
-function parseTodoChange(value: unknown): Parsed<UserTodoChange> {
-	if (!isObject(value)) return null;
-	const isId = (id: unknown): id is string => isNonEmpty(id) && id.length <= MAX_TODO_ID;
-	const isOptionalId = (id: unknown): id is string | null => id === null || isId(id);
-	const isText = (text: unknown): text is string => typeof text === "string" && text.length <= MAX_TODO_TEXT;
-	const { op, id, text, name, categoryId } = value;
-	if (op === "clear-done") return isOptionalId(categoryId) ? { ok: { op, categoryId } } : null;
-	if (!isId(id)) return null;
-	switch (op) {
-		case "add": {
-			const { parentId, afterId } = value;
-			if (!isText(text) || !isOptionalId(parentId) || !isOptionalId(afterId) || !isOptionalId(categoryId)) return null;
-			return { ok: { op, id, parentId, afterId, categoryId, text } };
-		}
-		case "edit":
-			return isText(text) ? { ok: { op, id, text } } : null;
-		case "edit-body": {
-			const { body } = value;
-			return typeof body === "string" && body.length <= MAX_TODO_BODY ? { ok: { op, id, body } } : null;
-		}
-		case "toggle":
-			return typeof value.done === "boolean" ? { ok: { op, id, done: value.done } } : null;
-		case "categorize":
-			return isOptionalId(categoryId) ? { ok: { op, id, categoryId } } : null;
-		case "add-category":
-		case "rename-category":
-			return isNonEmpty(name) && isText(name) ? { ok: { op, id, name } } : null;
-		case "remove":
-		case "indent":
-		case "outdent":
-		case "remove-category":
-			return { ok: { op, id } };
-		default:
-			return null;
-	}
-}
-
 function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest> {
 	switch (value.kind) {
 		case "new": {
-			const { cwd, prompt } = value;
+			const { cwd, prompt, todoId = null } = value;
 			const images = parseImages(value.images);
 			const branch = parseBranchChoice(value.branch);
 			// `null` starts on omp's default model.
@@ -172,8 +132,9 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 			const skill = parseSkill(value.skill);
 			const subject = parseWorkItem(value.subject);
 			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !subject) return null;
+			if (todoId !== null && !(isNonEmpty(todoId) && todoId.length <= MAX_TODO_ID)) return null;
 			return prompt.trim() || images.ok.length > 0
-				? { ok: { kind: "new", cwd, prompt, images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok } }
+				? { ok: { kind: "new", cwd, prompt, images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId } }
 				: null;
 		}
 		case "fork": {
@@ -267,7 +228,7 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	},
 	"user-todo"(value) {
 		const change = parseTodoChange(value.change);
-		return change ? { ok: { t: "user-todo", change: change.ok } } : null;
+		return change && { ok: { t: "user-todo", change } };
 	},
 };
 
@@ -305,8 +266,15 @@ export function parseSessionLinks(body: unknown): SessionLinksEdit | null {
 	return sessionIds.every((id): id is string => typeof id === "string") ? { ...pr, sessionIds } : null;
 }
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const isTicketPriority = oneOf(TICKET_PRIORITIES);
+
+/** The body of `PUT /api/ticket/new`: a todo's title and notes, so within a todo's limits, and a team by id. */
+export function parseTicketDraft(body: unknown): TicketDraft | null {
+	if (!isObject(body)) return null;
+	const { title, description, team } = body;
+	if (!isNonEmpty(title) || title.length > MAX_TODO_TEXT || typeof description !== "string" || description.length > MAX_TODO_BODY || !isNonEmpty(team)) return null;
+	return { title: title.trim(), description, team };
+}
 
 /** The body of `PUT /api/ticket`: an issue identifier and at least one field to change, each of its own type. */
 export function parseTicketEdit(body: unknown): TicketEdit | null {
@@ -334,7 +302,7 @@ export function parseTicketEdit(body: unknown): TicketEdit | null {
 		edit.project = project;
 	}
 	if (dueDate !== undefined) {
-		if (dueDate !== null && (typeof dueDate !== "string" || !DATE.test(dueDate))) return null;
+		if (dueDate !== null && !isDay(dueDate)) return null;
 		edit.dueDate = dueDate;
 	}
 	return Object.keys(edit).length > 1 ? edit : null;

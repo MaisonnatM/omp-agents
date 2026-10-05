@@ -60,15 +60,19 @@ test("one key can name several shortcuts, tried in table order, each in its own 
 		{ id: "restore", scope: "anywhere" },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([{ id: "help", scope: "anywhere" }]);
-	expect(shortcutsFor(keyEvent("/", "Slash"), null, false)).toEqual([{ id: "focusComposer", scope: "outside-fields" }]);
+	expect(shortcutsFor(keyEvent("/", "Slash"), null, false)).toEqual([
+		{ id: "focusComposer", scope: "outside-fields" },
+		{ id: "todoSearch", scope: "outside-fields" },
+	]);
 });
 
-test("↑ alone takes back a queued message, and Alt+↑ and Alt+↓ step through the sessions", () => {
+test("↑ alone takes back a queued message, Alt+↑ and Alt+↓ step through the sessions, and with Shift they move a todo", () => {
 	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue"]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true })).toEqual(["previousSession"]);
 	expect(press("ArrowDown", "ArrowDown", { alt: true })).toEqual(["nextSession"]);
 	expect(press("ArrowDown", "ArrowDown")).toEqual([]);
-	expect(press("ArrowUp", "ArrowUp", { alt: true, shift: true })).toEqual([]);
+	expect(press("ArrowUp", "ArrowUp", { alt: true, shift: true })).toEqual(["todoMoveUp"]);
+	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["todoMoveDown"]);
 });
 
 test("G then a key goes to a page only right after a plain G", () => {

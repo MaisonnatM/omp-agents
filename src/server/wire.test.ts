@@ -34,9 +34,20 @@ describe("parseClientMsg", () => {
 		const change = (value: unknown) => msg({ t: "user-todo", change: value });
 		expect(change({ op: "add", id: "a", parentId: null, afterId: "b", categoryId: "w", text: "Ship", extra: 1 })).toEqual({
 			t: "user-todo",
-			change: { op: "add", id: "a", parentId: null, afterId: "b", categoryId: "w", text: "Ship" },
+			change: { op: "add", id: "a", parentId: null, afterId: "b", categoryId: "w", text: "Ship", body: "", due: null, links: [], addedBy: null },
 		});
-		expect(change({ op: "toggle", id: "a", done: true })).toEqual({ t: "user-todo", change: { op: "toggle", id: "a", done: true } });
+		const pr = { kind: "pull-request", owner: "o", repo: "r", number: 3 };
+		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "Review", links: [pr], due: "2026-10-06", addedBy: "s1" })).toMatchObject({
+			change: { links: [pr], due: "2026-10-06", addedBy: "s1" },
+		});
+		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "x", links: [{ kind: "pull-request", owner: "o", repo: "r", number: 0 }] })).toBeNull();
+		expect(change({ op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "x", due: "Friday" })).toBeNull();
+		expect(change({ op: "toggle", id: "a", doneAt: "2026-10-05T09:00:00.000Z" })).toEqual({ t: "user-todo", change: { op: "toggle", id: "a", doneAt: "2026-10-05T09:00:00.000Z" } });
+		expect(change({ op: "toggle", id: "a", doneAt: "soon" })).toBeNull();
+		expect(change({ op: "move", id: "a", afterId: null, categoryId: "w" })).toEqual({ t: "user-todo", change: { op: "move", id: "a", afterId: null, categoryId: "w" } });
+		expect(change({ op: "link", id: "a", link: { kind: "ticket", identifier: "ENG-1" } })).toMatchObject({ change: { link: { kind: "ticket", identifier: "ENG-1" } } });
+		expect(change({ op: "link", id: "a", link: { kind: "ticket" } })).toBeNull();
+		expect(change({ op: "empty-archive" })).toEqual({ t: "user-todo", change: { op: "empty-archive" } });
 		expect(change({ op: "clear-done", categoryId: null })).toEqual({ t: "user-todo", change: { op: "clear-done", categoryId: null } });
 		expect(change({ op: "edit-body", id: "a", body: "# Notes\n" })).toEqual({ t: "user-todo", change: { op: "edit-body", id: "a", body: "# Notes\n" } });
 		expect(change({ op: "categorize", id: "a", categoryId: null })).toEqual({ t: "user-todo", change: { op: "categorize", id: "a", categoryId: null } });
@@ -49,6 +60,18 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "edit-body", id: "a", body: "x".repeat(100_001) })).toBeNull();
 		expect(change({ op: "rename-category", id: "w", name: "  " })).toBeNull();
 		expect(change({ op: "move", id: "a" })).toBeNull();
+	});
+
+	test("restore puts back a todo of the level it names, held to the limits an add is", () => {
+		const change = (value: unknown) => msg({ t: "user-todo", change: value });
+		const leaf = { id: "a1", text: "Child", body: "", doneAt: null, due: null };
+		const top = { ...leaf, id: "a", categoryId: null, children: [leaf], links: [], addedBy: null };
+		expect(change({ op: "restore", parentId: null, todo: top, index: 0 })).toEqual({ t: "user-todo", change: { op: "restore", parentId: null, todo: top, index: 0 } });
+		expect(change({ op: "restore", parentId: "a", todo: { ...leaf, children: [leaf] }, index: 1 })).toEqual({ t: "user-todo", change: { op: "restore", parentId: "a", todo: leaf, index: 1 } });
+		expect(change({ op: "restore", parentId: null, todo: { ...top, text: "x".repeat(2001) }, index: 0 })).toBeNull();
+		expect(change({ op: "restore", parentId: null, todo: { ...top, children: [{ ...leaf, body: "x".repeat(100_001) }] }, index: 0 })).toBeNull();
+		expect(change({ op: "restore", parentId: null, todo: { ...top, children: [{ ...leaf, id: "c".repeat(65) }] }, index: 0 })).toBeNull();
+		expect(change({ op: "restore", parentId: null, todo: top, index: -1 })).toBeNull();
 	});
 
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {
@@ -98,6 +121,7 @@ describe("parseClientMsg", () => {
 			thinking: null,
 			skill: null,
 			subject: null,
+			todoId: null,
 		});
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", thinking: "high" })).toMatchObject({ thinking: "high" });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", skill: "poteto-mode" })).toMatchObject({ skill: "poteto-mode" });

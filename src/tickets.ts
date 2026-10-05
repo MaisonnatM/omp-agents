@@ -9,12 +9,14 @@ import { linearServer } from "./linear";
 import { serveUpload, uploadAddress } from "./linear-uploads";
 import { callMcpTool, type McpServer, toolJson } from "./omp/mcp";
 import {
+	TICKET_ID,
 	TICKET_PRIORITIES,
 	TICKET_STATUS_TYPES,
 	type Ticket,
 	type TicketChoice,
 	type TicketComment,
 	type TicketDetail,
+	type TicketDraft,
 	type TicketEdit,
 	type TicketOptions,
 	type TicketsAnswer,
@@ -271,4 +273,28 @@ export async function saveTicket(edit: TicketEdit): Promise<TicketDetail> {
 	await callMcpTool(await linearServer(), "save_issue", { ...edit });
 	loaded.drop("");
 	return loadTicketDetail(edit.id);
+}
+
+const teams = createCache<TicketChoice[]>(60 * 60_000);
+
+/** The workspace's Linear teams, by name, for the team a new issue goes in. */
+export const loadTeams = (): Promise<TicketChoice[]> => teams.get("", queryTeams);
+
+async function queryTeams(): Promise<TicketChoice[]> {
+	const server = await linearServer();
+	const raw = await allPages(server, "list_teams", { limit: PAGE }, text => parsePage("list_teams", "teams", text));
+	return raw
+		.map(choiceOf)
+		.filter(team => team !== null)
+		.sort(byName);
+}
+
+/** Opens `draft` in Linear, assigned to the viewer, and answers its identifier; the tickets list is read anew on its next request. */
+export async function createTicket({ title, description, team }: TicketDraft): Promise<{ identifier: string }> {
+	const text = await callMcpTool(await linearServer(), "save_issue", { title, description, team, assignee: "me" });
+	loaded.drop("");
+	const issue = toolJson("Linear", "save_issue", text);
+	const identifier = isObject(issue) ? [issue.identifier, issue.id].find(value => typeof value === "string" && TICKET_ID.test(value)) : undefined;
+	if (typeof identifier !== "string") throw new Error("Linear's save_issue answered without the new issue's identifier");
+	return { identifier };
 }

@@ -35,7 +35,7 @@ import { SizeProvider } from "@/lib/size-context";
 import { inboxSection, inboxSections, pullRequestUrl, type Waiting, waitingCount } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
-import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";
+import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
@@ -424,8 +424,8 @@ interface RosterProps {
 	onTab: (tab: SidebarTab) => void;
 	/** The Todo page's list, `null` until the server sends it. */
 	userTodos: UserTodoList | null;
-	/** The category the Todo page shows, `null` for every todo. */
-	todoCategory: string | null;
+	/** The list the Todo page shows. */
+	todoView: TodoListView;
 	/** The inbox or tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
@@ -449,7 +449,7 @@ export function Roster({
 	tab,
 	onTab,
 	userTodos,
-	todoCategory,
+	todoView,
 	sectionTarget,
 	onSectionTarget,
 	project,
@@ -681,7 +681,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="todo" asChild>
 				<SidebarContent>
-					<TodoCategories list={userTodos} category={todoCategory} disabled={!connected} onChange={onTodoChange} />
+					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>

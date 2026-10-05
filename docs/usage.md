@@ -456,29 +456,56 @@ For installation, see the [README](../README.md).
 ## Todo list
 
 - The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session or a project, in place of the panes.
-  The sidebar then lists **All** and your categories, each with how many top-level todos are left to do in it.
-  Click one to show its todos alone; `#todo/<category id>` addresses it.
+  The sidebar then lists **All**, **Today**, **From agents**, and **Done**, then your categories, each with how many top-level todos are left to do in it.
+  Click one to show its todos alone; `#todo/today`, `#todo/agents`, `#todo/done`, and `#todo/<category id>` address them.
   **All** lists the todos of no category first, then each category's under its name.
+  **Today** lists the todos due today or before, or with a todo under them that is, earliest due first; **Add a todo due today** there adds one due today.
+  **From agents** lists the todos that an agent added; see [Todos from agents](#todos-from-agents).
 - The **+** beside **Categories** adds a category; type its name and press Enter, and the page opens it.
   A category's **⋯** menu renames it or deletes it; deleting a category keeps its todos, in no category.
 - **Add a todo** at the bottom of a list starts a new todo in that list's category; type its title and press Enter.
   Enter then starts the next todo below it, and Enter on an empty one, Esc, or a click elsewhere stops.
 - A todo can hold todos of its own, one level down and no deeper, and they share its category.
   Tab while typing a todo moves it under the todo above it in its category, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
-  Tab does nothing on a todo that holds todos of its own, since they would end up three deep.
+  Tab does nothing on a todo that holds todos of its own, since they would end up three deep, nor on one with links, which a todo under another cannot hold.
   The **+** that shows on hover adds a todo under that one.
+- Drag a todo by its row to move it among the todos beside it, top-level ones in **All** and a category, and a todo under another among its parent's.
+  Dropped beside a todo of another category, a top-level todo joins that category.
+  Alt+Shift+↑ and Alt+Shift+↓ move the focused todo one place the same way.
+  **Today** sorts by due day and **Done** by when it was cleared, so neither moves todos.
 - Click the circle before a todo to check it; checking a todo checks the todos under it too.
   A todo that holds others shows how many of them are checked, as in `2/3`.
-  The page's header counts the top-level todos left to do, and **Clear done** removes every checked todo it lists.
+  The page's header counts the top-level todos left to do, and **Clear done** moves every checked todo it lists to **Done**, a checked todo under an unchecked one as a todo of its own.
+- **Done** lists the cleared todos, latest first, with the day each was checked.
+  Hover one to put it back last in the list, in its category if that still exists, or to delete it for good; **Empty** deletes them all, after you confirm.
 - Click a todo's title to edit it and open it beside the list.
-  An empty title, or Backspace in an empty one, removes the todo, and so does the **×** that shows on hover; removing a todo removes the todos under it.
-- An open todo shows its category, which you can change for a top-level todo, and its notes in markdown.
+  An empty title, or Backspace in an empty one, deletes the todo, and so does the **×** that shows on hover; deleting a todo deletes the todos under it.
+  **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
+- The search field in the page's header, or `/` outside a text field, keeps the todos whose title or notes, or a todo under them, hold every word typed; Esc clears it.
+  Outside a text field, J and K focus the next and previous todo, X checks the focused one, and Enter opens it.
+- An open todo shows its category, which you can change for a top-level todo, its due day, and its notes in markdown.
+  A todo due today reads **Today** in the list, and one whose day has passed reads **Overdue** in red; **No due day** takes the day off.
   **Write** edits the notes and **Preview** renders them as the agent's messages are, with GitHub's task lists and tables.
   The notes save when the text field loses focus, on Cmd+S, and when you switch to **Preview**; a todo with notes shows a notebook icon in the list.
+- A top-level todo shows what it links to: a session, a pull request, or a Linear issue, each a chip that opens it here.
+  A running session's chip shows its status dot; an open todo's **×** on a chip unlinks it.
+- An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.
+  The session links to the todo once omp starts.
+- With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, then opens an issue from the title and notes, assigned to you, and links it to the todo.
+- The list icon on an inbox pull request, a ticket, and a live session's header adds a todo of no category, last in the list, that links to it.
 - The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
-  A `todos.json` from before categories and notes still loads, with every todo in no category and without notes.
+  A `todos.json` from before categories, notes, due days, links, or the archive still loads, with none of them; a todo checked then reads as checked when the server loads it.
   A `todos.json` that the server cannot read as a todo list is moved to `todos.json.invalid` rather than written over.
   While the page has lost the server, the list cannot be changed.
+
+### Todos from agents
+
+- The `user_todo` tool lets an omp session list your todos, add one, or check one off; it cannot edit or delete one.
+  It comes from `~/.omp/agent/extensions/todos.ts`, which `bun run omp-template` installs.
+- An agent adds a todo when it stops on a step only you can take, such as approving a migration or reviewing a pull request.
+  The todo lands last in no category, and its chip names the session that added it and opens it.
+- The tool leaves each change as a file in `todo-inbox/` beside `todos.json`, and the server applies it and deletes the file, so a todo an agent adds while the dashboard is down shows once it starts.
+  A file that is not a change an agent may make moves to `<name>.invalid`.
 
 ## Settings
 
@@ -552,6 +579,10 @@ Alt is Option on macOS.
 | K | Inbox, outside text fields | Move to the previous pull request, or show it in the open sheet |
 | O | Inbox, outside text fields | Open the pull request on GitHub |
 | . | Inbox, outside text fields | Open the pull request's quick actions |
+| / | Todo page, outside text fields | Search the todos |
+| J / K | Todo page, outside text fields | Focus the next or previous todo |
+| X | Todo page, outside text fields | Check or uncheck the focused todo |
+| Alt+Shift+↑ / Alt+Shift+↓ | Todo page | Move the focused todo up or down |
 
 - Press `?` outside a text field, Cmd+/ anywhere, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, **End session**, the composer's Stop button, and a maximized pane's restore button.
@@ -604,6 +635,9 @@ Alt is Option on macOS.
 - The window title follows what the page shows, and a browser tab's title does too: the focused session's name, a subagent's name ahead of its session's, `Inbox`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, or `New session`, then `omp agents`.
   A session without a name reads as its project, and nothing open reads `omp agents`.
 - The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
+- Alt+Shift+Cmd+T, from any app, brings the window up on the **Todo** page with a new todo started, so you can type it and press Enter.
+  When another app holds the keys, the app logs so and the shortcut does nothing.
+- The Dock icon's badge counts the top-level todos left to do, as **All** does, and goes away at none.
 
 ## Limitations
 

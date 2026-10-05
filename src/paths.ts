@@ -15,6 +15,12 @@ export const interruptedFile = join(configDir, "interrupted.json");
 /** The Todo page's list, beside {@link tokenFile}. */
 export const userTodosFile = join(configDir, "todos.json");
 
+/**
+ * Where omp's `user_todo` tool leaves its changes to the Todo page's list, one JSON file each, beside {@link tokenFile}.
+ * The server applies and deletes them, so it stays the only writer of {@link userTodosFile}.
+ */
+export const userTodoInboxDir = join(configDir, "todo-inbox");
+
 /** `path` with the home directory shortened to `~`. */
 export const displayPath = (path: string): string =>
 	path === HOME || path.startsWith(`${HOME}/`) ? `~${path.slice(HOME.length)}` : path;

@@ -35,7 +35,9 @@ interface NewSessionProps {
 	/** Move the draft to directory `cwd`, as typed or displayed. */
 	onPickCwd: (cwd: string) => void;
 	/** Start omp with the first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at `thinking` when it names a level; through `skill` when it names one. */
-	onStart: (op: Omit<NewOp, "kind" | "cwd">) => void;
+	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId">) => void;
+	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
+	todo: { text: string; prompt: string } | null;
 }
 
 interface DirectoryPickerProps {
@@ -116,8 +118,8 @@ function DirectoryPicker({ cwd, workspaces, disabled, onPick }: DirectoryPickerP
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart }: NewSessionProps) {
-	const [draft, setDraft] = useState("");
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, todo }: NewSessionProps) {
+	const [draft, setDraft] = useState(todo?.prompt ?? "");
 	const attachments = useImageAttachments();
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
 	/** `null` leaves omp's default model unchanged. */
@@ -199,6 +201,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				{target.creates
 					? "It starts when you send the first message, which adds the worktree, so leaving this draft leaves nothing running."
 					: "It starts when you send the first message, so leaving this draft leaves nothing running."}
+				{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 			</EmptyConversation>
 			<div className="relative mx-auto w-full max-w-3xl px-3 pb-5">
 				{completion.popup}

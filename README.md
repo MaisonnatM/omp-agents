@@ -42,6 +42,10 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Linear tickets.**
   The Linear issues assigned to you, grouped by workflow state like Linear's My issues, read through omp's Linear MCP sign-in.
   Click one to read it in full, and start a session that works on it or plans it.
+- **Your own todo list.**
+  Categories, due days with a Today list, drag-to-reorder, search, and an archive with undo.
+  A todo links to the sessions, pull requests, and Linear issues it is about, starts a session or opens a Linear issue from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool.
+  The desktop app captures a todo from any app and badges the Dock with what is left.
 - **Settings editor.**
   Edit omp's model roles, fallback chains, retry settings, and context files (`AGENTS.md`, `config.yml`, skills, rules) in place, and pin a skill that every new session starts through.
 - **Plan quota.**

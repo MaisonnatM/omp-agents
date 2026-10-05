@@ -22,6 +22,7 @@ import { type QuickActionId, type TicketActionId, ticketActions } from "../../qu
 import { hashForTickets, type OpenMode } from "../../routing";
 import { inReview, PRIORITY_LABEL } from "../../tickets-model";
 import { IconTip } from "../inbox/avatars";
+import { AddToTodo } from "../add-to-todo";
 import { QuickActionsMenu } from "../quick-actions";
 import { LiveSessionChips } from "../session-chip";
 
@@ -99,6 +100,7 @@ export function TicketRow({ ticket, sessions, onOpen, pending, onQuickAction }: 
 			</a>
 			<div className="flex shrink-0 items-center gap-3 px-3 text-xs">
 				<LiveSessionChips hosts={sessions.slice(0, 2)} onOpen={onOpen} />
+				<AddToTodo text={ticket.title} body={`Linear issue ${ticket.id}: ${ticket.url}`} link={{ kind: "ticket", identifier: ticket.id }} label={`Add ${ticket.id} to your todo list`} />
 				<QuickActionsMenu actions={ticketActions(ticket)} pending={pending} onRun={onQuickAction} label="Quick actions: start a session in the background that works on this issue" />
 				<span className="w-10 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={`Updated ${new Date(ticket.updatedAt).toLocaleString()}`}>
 					{age(Date.parse(ticket.updatedAt))}

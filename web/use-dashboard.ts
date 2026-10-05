@@ -173,7 +173,7 @@ export function useDashboard(): Dashboard {
 
 	const openNewSession = useCallback(() => {
 		dispatch({ t: "dismiss-start", kind: "new" });
-		navigate({ kind: "new", cwd: null });
+		navigate({ kind: "new", cwd: null, todoId: null });
 	}, [navigate]);
 
 	const nextReqId = useRef(0);

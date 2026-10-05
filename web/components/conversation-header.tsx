@@ -6,6 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useGitCheckout } from "../use-git-checkout";
+import { AddToTodo } from "./add-to-todo";
 import { GitRef } from "./git";
 import { Model } from "./model-picker";
 import { Header } from "./page-header";
@@ -57,6 +58,9 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 			);
 	return (
 		<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
+			{subject.kind === "session" && shown && (
+				<AddToTodo text={`Follow up on ${title}`} body="" link={{ kind: "session", sessionId: shown.sessionId }} label="Add a todo that links to this session" />
+			)}
 			{subject.kind === "session" && live && host && (
 				<Tooltip
 					content={

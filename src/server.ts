@@ -4,7 +4,7 @@ import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
-import { displayPath, interruptedFile, tokenFile, userTodosFile } from "./paths";
+import { displayPath, interruptedFile, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Broadcasts } from "./server/broadcasts";
@@ -17,10 +17,11 @@ import { createRoutes } from "./server/routes";
 import { SessionFiles } from "./server/session-files";
 import { createClientHandler } from "./server/socket";
 import { createStarter } from "./server/start";
+import { TodoInbox } from "./server/todo-inbox";
 import { UserTodosFile } from "./server/user-todos-file";
 import { type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
-import type { View } from "./shared";
+import type { UserTodoChange, View } from "./shared";
 
 const PORT = portFromEnv();
 
@@ -31,6 +32,13 @@ const files = new SessionFiles();
 const sessions = new LiveSessions(onLiveUpdate);
 const interrupted = new InterruptedSessions(interruptedFile);
 const todos = new UserTodosFile(userTodosFile);
+/** Applies `change` to the list, and sends every socket the list when it changed; whether it did. */
+function applyTodo(change: UserTodoChange): boolean {
+	const changed = todos.apply(change);
+	if (changed) broadcasts.pushUserTodos();
+	return changed;
+}
+const inbox = new TodoInbox(userTodoInboxDir, applyTodo);
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
 const pathFor = (view: View): string | null =>
 	view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -64,6 +72,7 @@ const startSession = createStarter({
 	pathFor,
 	savedFile: files.pathOf,
 	onStarted: () => broadcasts.syncRoster(),
+	linkTodo: (todoId, sessionId) => applyTodo({ op: "link", id: todoId, link: { kind: "session", sessionId } }),
 });
 const handleClientMsg = createClientHandler({
 	sessions,
@@ -74,8 +83,7 @@ const handleClientMsg = createClientHandler({
 	},
 	stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
 	changeTodo(ws, change) {
-		if (todos.apply(change)) broadcasts.pushUserTodos();
-		else send(ws, { t: "user-todos", list: todos.list });
+		if (!applyTodo(change)) send(ws, { t: "user-todos", list: todos.list });
 	},
 });
 
@@ -201,6 +209,7 @@ try {
 }
 
 loops.watch();
+inbox.watch();
 await rescanFiles();
 await listRegistry();
 loops.start();

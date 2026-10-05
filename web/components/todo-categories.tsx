@@ -1,4 +1,4 @@
-import { Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
+import { Ellipsis, type LucideIcon, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import type { UserTodoChange, UserTodoList } from "../../src/shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
@@ -12,7 +12,8 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { hashForTodo } from "../routing";
+import { hashForTodo, type TodoListView } from "../routing";
+import { LIST_KINDS, leftIn, SIDEBAR_LISTS, sameTodoView, today } from "../todo-views";
 
 interface NameInputProps {
 	initial: string;
@@ -53,99 +54,108 @@ type Naming = { kind: "none" } | { kind: "rename"; id: string } | { kind: "add" 
 interface TodoCategoriesProps {
 	/** `null` until the server sends the list. */
 	list: UserTodoList | null;
-	/** The category the Todo page shows, `null` for every todo. */
-	category: string | null;
+	/** The list the Todo page shows. */
+	view: TodoListView;
 	/** Changes would not reach the server. */
 	disabled: boolean;
 	onChange: (change: UserTodoChange) => void;
 }
 
-/** The Todo tab of the sidebar: every todo, then each category, with the top-level todos left to do in it. */
-export function TodoCategories({ list, category, disabled, onChange }: TodoCategoriesProps) {
+/** The Todo tab of the sidebar: every todo, today's, the ones agents added, the archive, then each category, with the top-level todos left to do in each. */
+export function TodoCategories({ list, view, disabled, onChange }: TodoCategoriesProps) {
 	const [naming, setNaming] = useState<Naming>({ kind: "none" });
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your todos…</p></SidebarGroup>;
-	const left = (categoryId: string | null): number => list.todos.filter(todo => !todo.done && (categoryId === null || todo.categoryId === categoryId)).length;
-	const link = (id: string | null, name: string) => {
-		const count = left(id);
+	const day = today();
+	const link = (target: TodoListView, name: string, Icon: LucideIcon | null = null) => {
+		const count = leftIn(list, target, day);
+		const active = sameTodoView(view, target);
 		return (
-			<SidebarMenuButton asChild isActive={category === id}>
-				<a href={hashForTodo(id)} aria-current={category === id ? "page" : undefined} aria-label={`${name}, ${count} to do`}>
-					<span className="truncate">{name}</span>
-				</a>
-			</SidebarMenuButton>
+			<>
+				<SidebarMenuButton asChild isActive={active}>
+					<a href={hashForTodo(target)} aria-current={active ? "page" : undefined} aria-label={`${name}, ${count} ${target.kind === "done" ? "done" : "to do"}`}>
+						{Icon && <Icon className="size-4" />}
+						<span className="truncate">{name}</span>
+					</a>
+				</SidebarMenuButton>
+				{(count > 0 || target.kind === "all" || target.kind === "category") && <SidebarMenuBadge aria-hidden>{count}</SidebarMenuBadge>}
+			</>
 		);
 	};
 	return (
-		<SidebarGroup>
-			<SidebarGroupLabel>Categories</SidebarGroupLabel>
-			{!disabled && (
-				<SidebarGroupAction title="New category" aria-label="New category" onClick={() => setNaming({ kind: "add" })}>
-					<Plus />
-				</SidebarGroupAction>
-			)}
-			<SidebarMenu aria-label="Todo categories">
-				<SidebarMenuItem>
-					{link(null, "All")}
-					<SidebarMenuBadge aria-hidden>{left(null)}</SidebarMenuBadge>
-				</SidebarMenuItem>
-				{list.categories.map(({ id, name }) =>
-					naming.kind === "rename" && naming.id === id ? (
-						<li key={id}>
+		<>
+			<SidebarGroup>
+				<SidebarMenu aria-label="Todo lists">
+					{SIDEBAR_LISTS.map(target => (
+						<SidebarMenuItem key={target.kind}>{link(target, LIST_KINDS[target.kind].name, LIST_KINDS[target.kind].icon)}</SidebarMenuItem>
+					))}
+				</SidebarMenu>
+			</SidebarGroup>
+			<SidebarGroup>
+				<SidebarGroupLabel>Categories</SidebarGroupLabel>
+				{!disabled && (
+					<SidebarGroupAction title="New category" aria-label="New category" onClick={() => setNaming({ kind: "add" })}>
+						<Plus />
+					</SidebarGroupAction>
+				)}
+				<SidebarMenu aria-label="Todo categories">
+					{list.categories.map(({ id, name }) =>
+						naming.kind === "rename" && naming.id === id ? (
+							<li key={id}>
+								<NameInput
+									initial={name}
+									label={`Rename ${name}`}
+									onDone={next => {
+										if (next && next !== name) onChange({ op: "rename-category", id, name: next });
+										setNaming({ kind: "none" });
+									}}
+								/>
+							</li>
+						) : (
+							<SidebarMenuItem key={id}>
+								{link({ kind: "category", id }, name)}
+								{!disabled && (
+									<DropdownMenu>
+										<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${name}`} title="More actions" />}>
+											<Ellipsis />
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align="end">
+											<MenuItem onClick={() => setNaming({ kind: "rename", id })}>
+												<Pencil />
+												Rename
+											</MenuItem>
+											<MenuItem
+												variant="destructive"
+												onClick={() => {
+													onChange({ op: "remove-category", id });
+													if (view.kind === "category" && view.id === id) location.hash = hashForTodo({ kind: "all" });
+												}}
+											>
+												<Trash2 />
+												Delete, keeping its todos
+											</MenuItem>
+										</DropdownMenuContent>
+									</DropdownMenu>
+								)}
+							</SidebarMenuItem>
+						),
+					)}
+					{naming.kind === "add" && (
+						<li>
 							<NameInput
-								initial={name}
-								label={`Rename ${name}`}
-								onDone={next => {
-									if (next && next !== name) onChange({ op: "rename-category", id, name: next });
+								initial=""
+								label="New category"
+								onDone={name => {
 									setNaming({ kind: "none" });
+									if (!name) return;
+									const id = crypto.randomUUID();
+									onChange({ op: "add-category", id, name });
+									location.hash = hashForTodo({ kind: "category", id });
 								}}
 							/>
 						</li>
-					) : (
-						<SidebarMenuItem key={id}>
-							{link(id, name)}
-							<SidebarMenuBadge aria-hidden>{left(id)}</SidebarMenuBadge>
-							{!disabled && (
-								<DropdownMenu>
-									<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${name}`} title="More actions" />}>
-										<Ellipsis />
-									</DropdownMenuTrigger>
-									<DropdownMenuContent align="end">
-										<MenuItem onClick={() => setNaming({ kind: "rename", id })}>
-											<Pencil />
-											Rename
-										</MenuItem>
-										<MenuItem
-											variant="destructive"
-											onClick={() => {
-												onChange({ op: "remove-category", id });
-												if (category === id) location.hash = hashForTodo(null);
-											}}
-										>
-											<Trash2 />
-											Delete, keeping its todos
-										</MenuItem>
-									</DropdownMenuContent>
-								</DropdownMenu>
-							)}
-						</SidebarMenuItem>
-					),
-				)}
-				{naming.kind === "add" && (
-					<li>
-						<NameInput
-							initial=""
-							label="New category"
-							onDone={name => {
-								setNaming({ kind: "none" });
-								if (!name) return;
-								const id = crypto.randomUUID();
-								onChange({ op: "add-category", id, name });
-								location.hash = hashForTodo(id);
-							}}
-						/>
-					</li>
-				)}
-			</SidebarMenu>
-		</SidebarGroup>
+					)}
+				</SidebarMenu>
+			</SidebarGroup>
+		</>
 	);
 }
