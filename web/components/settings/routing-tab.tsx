@@ -1,13 +1,12 @@
-import { ChevronsUpDown, Plus, X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { type CatalogModel, type ModelChain, type ModelRouting, type RetrySettings, type RoleRoute, splitSelector } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { modelLabel, providerOrg } from "../../labels";
+import { providerOrg } from "../../labels";
 import { saveRouting } from "../../settings-api";
-import { Model, ModelRow, modelDescription, ProviderHeading } from "../model-picker";
+import { CommandPicker } from "../command-picker";
+import { MODEL_LIST, Model, modelDescription, modelGroups } from "../model-picker";
 import { OrgIcon } from "../org-icon";
 import { type Catalog, EditBar, type Editing, OrderedList, SaveError, Section, useEditor } from "./editor";
 
@@ -48,58 +47,35 @@ function Chain({ fallbacks }: { fallbacks: string[] }) {
 
 /** A model `omp models` lists, then its thinking level. The value is omp's selector, `provider/id` with an optional `:level`. */
 function SelectorPicker({ value, catalog, label, onPick }: { value: string | null; catalog: Catalog; label: string; onPick: (selector: string) => void }) {
-	const [open, setOpen] = useState(false);
 	const models = catalog.phase === "loaded" ? catalog.bySelector : null;
 	const { model, level } = value && models ? splitSelector(value, models) : { model: value, level: null };
 	const levels = (model && models?.get(model)?.thinking) || [];
-	const pickModel = (next: CatalogModel): void => {
-		setOpen(false);
-		onPick(level && next.thinking.includes(level) ? `${next.selector}:${level}` : next.selector);
-	};
+	const pickModel = (next: CatalogModel): void => onPick(level && next.thinking.includes(level) ? `${next.selector}:${level}` : next.selector);
 	return (
 		<div className="flex min-w-0 items-center gap-1">
-			<Popover open={open} onOpenChange={setOpen}>
-				<PopoverTrigger asChild>
-					<Button variant="ghost" size="compact" trailingIcon={ChevronsUpDown} aria-label={`${label}: ${model ? modelDescription(model) : "none"}`} active={open} className="min-w-0">
-						<span className="max-w-56 truncate">{model ? <Model selector={model} /> : "Choose a model"}</span>
-					</Button>
-				</PopoverTrigger>
-				<PopoverContent align="start" className="w-[min(24rem,calc(100vw-2rem))] p-0">
-					<Command>
-						<CommandInput aria-label="Search models" placeholder="Search models…" />
-						<CommandList>
-							{catalog.phase === "loading" ? (
-								<p role="status" className="py-6 text-center text-sm text-muted-foreground">
-									Loading models…
-								</p>
-							) : catalog.phase === "failed" ? (
-								<p role="alert" className="px-3 py-6 text-center text-sm text-red-600 dark:text-red-400">
-									{catalog.error}
-								</p>
-							) : (
-								<>
-									<CommandEmpty>No model matches.</CommandEmpty>
-									{catalog.byProvider.map(([provider, group]) => (
-										<CommandGroup key={provider} heading={<ProviderHeading provider={provider} />}>
-											{group.map(option => (
-												<CommandItem
-													key={option.selector}
-													value={option.selector}
-													keywords={[modelLabel(option.selector), option.name]}
-													title={option.selector}
-													onSelect={() => pickModel(option)}
-												>
-													<ModelRow selector={option.selector} id={option.selector.slice(provider.length + 1)} selected={option.selector === model} />
-												</CommandItem>
-											))}
-										</CommandGroup>
-									))}
-								</>
-							)}
-						</CommandList>
-					</Command>
-				</PopoverContent>
-			</Popover>
+			<CommandPicker
+				trigger={<span className="max-w-56 truncate">{model ? <Model selector={model} /> : "Choose a model"}</span>}
+				ariaLabel={`${label}: ${model ? modelDescription(model) : "none"}`}
+				className="min-w-0"
+				search={MODEL_LIST.search}
+				width="lg"
+				list={
+					catalog.phase === "loading"
+						? { kind: "loading", message: MODEL_LIST.loading }
+						: catalog.phase === "failed"
+							? { kind: "failed", error: catalog.error }
+							: {
+									kind: "ready",
+									groups: modelGroups(
+										catalog.byProvider,
+										option => ({ selector: option.selector, id: option.selector.slice(option.provider.length + 1), keyword: option.name }),
+										model,
+										pickModel,
+									),
+								}
+				}
+				empty={MODEL_LIST.empty}
+			/>
 			{model && (levels.length > 0 || level) && (
 				<select
 					aria-label={`${label}: thinking level`}
@@ -305,38 +281,34 @@ export function RetrySection({ routing, editing }: { routing: ModelRouting; edit
 }
 
 function ProviderPicker({ providers, onPick }: { providers: string[]; onPick: (provider: string) => void }) {
-	const [open, setOpen] = useState(false);
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
-				<Button variant="ghost" size="compact" leadingIcon={Plus} active={open} disabled={providers.length === 0}>
-					Add provider
-				</Button>
-			</PopoverTrigger>
-			<PopoverContent align="start" className="w-64 p-0">
-				<Command>
-					<CommandInput aria-label="Search providers" placeholder="Search providers…" />
-					<CommandList>
-						<CommandEmpty>No provider matches.</CommandEmpty>
-						<CommandGroup>
-							{providers.map(provider => (
-								<CommandItem
-									key={provider}
-									value={provider}
-									onSelect={() => {
-										setOpen(false);
-										onPick(provider);
-									}}
-								>
+		<CommandPicker
+			trigger="Add provider"
+			icon={Plus}
+			chevron={false}
+			disabled={providers.length === 0}
+			search={{ label: "Search providers" }}
+			width="md"
+			list={{
+				kind: "ready",
+				groups: [
+					{
+						key: "providers",
+						items: providers.map(provider => ({
+							value: provider,
+							label: (
+								<>
 									<OrgIcon org={providerOrg(provider)} />
 									{provider}
-								</CommandItem>
-							))}
-						</CommandGroup>
-					</CommandList>
-				</Command>
-			</PopoverContent>
-		</Popover>
+								</>
+							),
+							onSelect: () => onPick(provider),
+						})),
+					},
+				],
+			}}
+			empty="No provider matches."
+		/>
 	);
 }
 

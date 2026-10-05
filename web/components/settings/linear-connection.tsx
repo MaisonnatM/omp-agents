@@ -26,14 +26,16 @@ export function LinearConnection() {
 
 	const connect = async (): Promise<void> => {
 		// Opened during the click, so the browser lets it open; it goes to Linear once the server names the address.
+		// No tab (a blocked popup, or the desktop app, which denies empty windows): open the address itself instead.
 		const tab = window.open("", "_blank");
 		if (tab) tab.opener = null;
 		setStarting(true);
 		setStartError(null);
 		try {
 			const next = await putJson<LinearStatus>("/api/linear/sign-in", {});
-			if (next.signIn?.phase === "waiting") tab?.location.replace(next.signIn.url);
-			else tab?.close();
+			if (next.signIn?.phase !== "waiting") tab?.close();
+			else if (tab) tab.location.replace(next.signIn.url);
+			else window.open(next.signIn.url, "_blank", "noopener");
 			await linearStore.refresh();
 		} catch (err) {
 			tab?.close();

@@ -20,6 +20,12 @@ export class LiveSessions {
 		return this.#sessions.get(instanceId);
 	}
 
+	/** Session `instanceId` when this dashboard started it: only those switch models and thinking levels. */
+	started(instanceId: string): DashboardSession | undefined {
+		const session = this.#sessions.get(instanceId);
+		return session instanceof DashboardSession ? session : undefined;
+	}
+
 	/** An instance id with the emitter its session reports through, decided before the session spawns so that nothing it reports precedes it. */
 	allocate(): { instanceId: string; emit: (update: SessionUpdate) => void } {
 		const instanceId = newInstanceId();

@@ -1,38 +1,27 @@
 /** The dashboard server: wires the registries, the HTTP API, and the socket together, then follows omp's files and registry. */
-import { mkdirSync, watch as watchFiles } from "node:fs";
-import { join } from "node:path";
 import type { Server } from "bun";
 import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
 import { displayPath, interruptedFile, tokenFile } from "./paths";
+import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
+import { Broadcasts } from "./server/broadcasts";
 import { fail, guardsFor } from "./server/http";
 import { InterruptedSessions } from "./server/interrupted";
 import { LiveSessions, type SessionUpdate } from "./server/live-sessions";
+import { Loops } from "./server/loops";
 import { buildPage, servePage } from "./server/page";
 import { createRoutes } from "./server/routes";
 import { SessionFiles } from "./server/session-files";
 import { createClientHandler } from "./server/socket";
 import { createStarter } from "./server/start";
-import { type SocketData, send, Views } from "./server/views";
+import { type SocketData, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
-import type { ServerMsg, View } from "./shared";
-import { fetchPlanUsage } from "./usage";
+import type { View } from "./shared";
 
-const PORT = Number(process.env.PORT ?? 4317);
-const HOSTNAME = "127.0.0.1";
-/** The registry has no change feed; listing it is one local IPC round trip per host. */
-const POLL_MS = 1500;
-/** Coalesce bursts of subagent progress into one roster push. */
-const ROSTER_PUSH_MS = 150;
-/** Re-read the session files the watcher reported at most this often while sessions write. */
-const LIST_THROTTLE_MS = 500;
-/** List every session file this often, in case the watcher missed a change. */
-const RESCAN_MS = 60_000;
-/** `omp usage` caches provider reports itself; each run still costs a process and up to one network round trip per provider. */
-const USAGE_POLL_MS = 60_000;
+const PORT = portFromEnv();
 
 const token = loadToken(tokenFile);
 const guards = guardsFor(PORT, token);
@@ -44,103 +33,61 @@ const interrupted = new InterruptedSessions(interruptedFile);
 const pathFor = (view: View): string | null =>
 	view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
 const views = new Views(pathFor, (topic, msg) => server.publish(topic, JSON.stringify(msg)));
+const broadcasts = new Broadcasts({
+	rosterMsg: () => ({ t: "roster", hosts: sessions.rows(files.factsOf), error: rosterError }),
+	pastMsg: () => ({ t: "past", sessions: files.past(sessions.sessionIds(), id => interrupted.has(id)) }),
+	publish: (topic, json) => void server.publish(topic, json),
+	subscriberCount: topic => server.subscriberCount(topic),
+	beforeRosterPush: () => views.sync(),
+	saveRunning: () => interrupted.setRunning(sessions.startedHere()),
+});
+const loops = new Loops(sessionsDir, {
+	async onRegistryTick() {
+		if (broadcasts.listening()) await listRegistry();
+		else registryFresh = false;
+	},
+	onFileChange(path) {
+		views.poke(path);
+		return files.touch(path);
+	},
+	async onListRefresh() {
+		if (await files.refresh()) onFilesChanged();
+	},
+	onRescanTick: rescanFiles,
+	onUsageTick: () => broadcasts.refreshUsage(),
+});
 const startSession = createStarter({
 	sessions,
 	pathFor,
 	savedFile: files.pathOf,
-	onStarted() {
-		interrupted.setRunning(sessions.startedHere());
-		pushRoster();
-		pushPast();
-	},
+	onStarted: () => broadcasts.syncRoster(),
 });
 const handleClientMsg = createClientHandler({
 	sessions,
 	views,
 	start: startSession,
 	dismissInterrupted(sessionId) {
-		if (interrupted.dismiss(sessionId)) pushPast();
+		if (interrupted.dismiss(sessionId)) broadcasts.pushPast();
 	},
 	stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
 });
 
+/** Why the last registry listing failed, shown with the roster. */
 let rosterError: string | null = null;
-let rosterJson = "";
-let rosterPush: NodeJS.Timeout | undefined;
-let pastJson = "";
-let listTimer: NodeJS.Timeout | undefined;
 /** Whether the registry was listed since the last poll tick found no listener. */
 let registryFresh = false;
-/** The last `usage` message, empty until the first `omp usage` run finishes. */
-let usageJson = "";
 
 /** Directories sessions ran in: live ones first, then saved ones newest first. */
 const knownCwds = (): string[] => [...new Set([...sessions.cwds(), ...files.cwds()].filter(Boolean))];
 
-const rosterMsg = (): ServerMsg => ({ t: "roster", hosts: sessions.rows(files.factsOf), error: rosterError });
-const pastMsg = (): ServerMsg => ({ t: "past", sessions: files.past(sessions.sessionIds(), id => interrupted.has(id)) });
-
-/** Whether any socket listens. Pushes, and the work to compare them with the last one, wait for the first. */
-const hasSubscribers = (): boolean => server.subscriberCount("roster") > 0;
-
-/** Debounced through {@link ROSTER_PUSH_MS}: a burst of roster updates costs one sync and one push. */
-function pushRoster(): void {
-	clearTimeout(rosterPush);
-	rosterPush = undefined;
-	if (!hasSubscribers()) {
-		rosterJson = "";
-		return;
-	}
-	// A subagent may have registered for a view that waits on its file.
-	views.sync();
-	const json = JSON.stringify(rosterMsg());
-	if (json === rosterJson) return;
-	rosterJson = json;
-	server.publish("roster", json);
-}
-
-function pushPast(): void {
-	if (!hasSubscribers()) {
-		pastJson = "";
-		return;
-	}
-	const json = JSON.stringify(pastMsg());
-	if (json === pastJson) return;
-	pastJson = json;
-	server.publish("roster", json);
-}
-
-async function pollUsage(): Promise<void> {
-	let msg: ServerMsg;
-	try {
-		msg = { t: "usage", plans: await fetchPlanUsage(), error: null };
-	} catch (err) {
-		msg = { t: "usage", plans: [], error: errorText(err) };
-	}
-	const json = JSON.stringify(msg);
-	if (json !== usageJson) {
-		usageJson = json;
-		server.publish("roster", json);
-	}
-	setTimeout(pollUsage, USAGE_POLL_MS);
-}
-
 /** The session list changed: views may now find their file, and the past list is out of date. */
 function onFilesChanged(): void {
 	views.sync();
-	pushPast();
+	broadcasts.pushPast();
 	// The first scan reads every transcript; the list shows before it finishes.
 	void files.linkPullRequests().then(changed => {
-		if (!changed) return;
-		pushPast();
-		pushRoster();
+		if (changed) broadcasts.pushAll();
 	});
-}
-
-/** Read again the session files the watcher reported. */
-async function refreshFiles(): Promise<void> {
-	listTimer = undefined;
-	if (await files.refresh()) onFilesChanged();
 }
 
 /** List every session file again, for the changes the watcher did not report. */
@@ -151,10 +98,7 @@ async function rescanFiles(): Promise<void> {
 function onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 	switch (update.kind) {
 		case "roster":
-			// A turn that starts or ends is saved at once, so a crash right after still knows it.
-			interrupted.setRunning(sessions.startedHere());
-			// The push also points views at subagent files that registered since.
-			rosterPush ??= setTimeout(pushRoster, ROSTER_PUSH_MS);
+			broadcasts.rosterChanged();
 			return;
 		case "event":
 			views.applyEvent(instanceId, update.event);
@@ -167,15 +111,17 @@ function onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 			const sessionId = sessions.get(instanceId)?.sessionId;
 			if (sessionId && !update.ended) interrupted.interrupt(sessionId);
 			sessions.remove(instanceId);
-			interrupted.setRunning(sessions.startedHere());
-			pushRoster();
-			pushPast();
-			void refreshFiles();
+			broadcasts.syncRoster();
+			void loops.listNow();
 			return;
 		}
 		case "written":
-			onFileChange(update.path);
+			loops.fileChanged(update.path);
 			return;
+		default: {
+			const unhandled: never = update;
+			return unhandled;
+		}
 	}
 }
 
@@ -191,20 +137,7 @@ async function listRegistry(): Promise<void> {
 	}
 	registryFresh = true;
 	sessions.follow(hosts);
-	pushRoster();
-	pushPast();
-}
-
-/** One tick of the registry poll, which only runs while a socket listens. */
-async function pollRegistry(): Promise<void> {
-	if (hasSubscribers()) await listRegistry();
-	else registryFresh = false;
-	setTimeout(pollRegistry, POLL_MS);
-}
-
-function onFileChange(path: string): void {
-	views.poke(path);
-	if (files.touch(path)) listTimer ??= setTimeout(refreshFiles, LIST_THROTTLE_MS);
+	broadcasts.pushAll();
 }
 
 function upgrade(req: Request, srv: Server<SocketData>): Response | undefined {
@@ -223,14 +156,11 @@ try {
 		routes: {
 			...createRoutes({
 				guards,
-				origin: `http://${HOSTNAME}:${PORT}`,
+				origin: originOf(PORT),
 				knownCwds,
 				pullRequestIndex: files.pullRequests,
 				pullRequestsOf: files.pullRequestsOf,
-				onLinked() {
-					pushPast();
-					pushRoster();
-				},
+				onLinked: () => broadcasts.pushAll(),
 			}),
 		},
 		fetch(req, srv) {
@@ -243,12 +173,9 @@ try {
 			// A prompt's images travel as base64 in one message: MAX_PROMPT_IMAGE_BYTES of them, a third more as base64.
 			maxPayloadLength: 64 * 1024 * 1024,
 			open(ws) {
-				ws.subscribe("roster");
+				broadcasts.open(ws);
 				// The registry was not polled while nobody listened; list it now rather than at the next tick.
 				if (!registryFresh) void listRegistry();
-				send(ws, rosterMsg());
-				send(ws, pastMsg());
-				if (usageJson) ws.send(usageJson);
 			},
 			message(ws, raw) {
 				const msg = parseClientMsg(raw);
@@ -265,18 +192,12 @@ try {
 	process.exit(1);
 }
 
-// One recursive watcher on omp's sessions directory drives every tail and the past-session list.
-mkdirSync(sessionsDir, { recursive: true });
-watchFiles(sessionsDir, { recursive: true }, (_event, name) => {
-	if (name) onFileChange(join(sessionsDir, String(name)));
-});
+loops.watch();
 await rescanFiles();
 await listRegistry();
-setTimeout(pollRegistry, POLL_MS);
-setInterval(() => void rescanFiles(), RESCAN_MS);
-void pollUsage();
-console.log(`omp-agents (omp v${ompVersion}) on http://${HOSTNAME}:${PORT}`);
-console.log(`Sign in at http://${HOSTNAME}:${PORT}/?token=${token}`);
+loops.start();
+console.log(listeningLine(PORT, ompVersion));
+console.log(`Sign in at ${originOf(PORT)}/?token=${token}`);
 console.log(`The access token is in ${displayPath(tokenFile)}; delete the file and restart to rotate it.`);
 
 /** SIGINT and SIGTERM may both arrive; the second finds the shutdown already under way. */
@@ -291,3 +212,8 @@ function shutdown(): Promise<void> {
 }
 process.on("SIGINT", () => void shutdown());
 process.on("SIGTERM", () => void shutdown());
+// The desktop shell holds the server's stdin open and never writes to it; when the shell dies, even by SIGKILL, the pipe ends.
+if (process.env.OMP_AGENTS_PARENT === "stdin") {
+	process.stdin.on("end", () => void shutdown());
+	process.stdin.resume();
+}

@@ -22,11 +22,10 @@ import {
 	closePane,
 	endSession,
 	focusedView,
-	hashForSettings,
-	hashForInbox,
-	hashForTickets,
+	hashForNewSession,
+	hashForPage,
 	hashForView,
-	pageFromHash,
+	type Page,
 	sameView,
 } from "./routing";
 import type { SectionTarget } from "./section";
@@ -34,7 +33,7 @@ import { defaultCwd, listedViews, sidebarSessions, workspaces } from "./sessions
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { useStoredKeys } from "./stored-state";
-import { useDashboard, useHash } from "./use-dashboard";
+import { useDashboard } from "./use-dashboard";
 
 /** The session ids the sidebar lists under Pinned. */
 const PINNED_KEY = "omp-agents.pinned-sessions";
@@ -61,14 +60,13 @@ function EmptyState({ rosterError }: { rosterError: string | null }) {
 }
 
 export function App() {
-	const { state, send, open, focus, show, openNewSession, dismissStart, start, resumeAll, dismissResumeAll } = useDashboard();
+	const { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start } = useDashboard();
 	const launch = startOf(state.starts, "new");
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
 	const quick = startOf(state.starts, "quick");
+	const resumeAll = startOf(state.starts, "resume-all");
 	const sidebars = useSidebarPanels();
-	const hash = useHash();
-	const page = pageFromHash(hash);
 	const [project, pickProject] = useProject(workspaces(state.hosts, state.past));
 	const [pinned, togglePin] = useStoredKeys(PINNED_KEY);
 	const { started } = state;
@@ -107,7 +105,8 @@ export function App() {
 	const toggleRight = useCallback(() => toggleSidebar("right"), [toggleSidebar]);
 	const topRightPane = maximized ? layout.focus : Math.min(1, layout.panes.length - 1);
 
-	const settingsHref = hashForSettings(page?.kind === "settings" ? page.cwd : (viewHost ?? viewPast)?.cwd || null);
+	const settingsPage: Page = { kind: "settings", cwd: page?.kind === "settings" ? page.cwd : (viewHost ?? viewPast)?.cwd || null };
+	const settingsHref = hashForPage(settingsPage);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -118,7 +117,7 @@ export function App() {
 	const tab: SidebarTab = page?.kind === "inbox" ? "inbox" : page?.kind === "tickets" && ticketsShown ? "tickets" : "sessions";
 	const showTab = (next: SidebarTab): void => {
 		if (next === "sessions") show(layout);
-		else location.hash = next === "inbox" ? hashForInbox(null) : hashForTickets(null);
+		else navigate({ kind: next, target: null });
 	};
 	const step = (by: 1 | -1): boolean | void => {
 		const next = adjacentSession(listed, view, by);
@@ -139,7 +138,7 @@ export function App() {
 		},
 		settings: () => {
 			if (page?.kind === "settings") show(layout);
-			else location.hash = settingsHref;
+			else navigate(settingsPage);
 		},
 		inbox: () => {
 			if (page?.kind === "inbox") return false;
@@ -168,10 +167,16 @@ export function App() {
 			main = (
 				<NewSession
 					cwd={cwd}
+					workspaces={workspaces(state.hosts, state.past)}
 					launch={launch}
 					connected={state.connected}
 					completions={state.newSessionCompletions}
 					onComplete={(reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "new", cwd }, text, cursor })}
+					onPickCwd={next => {
+						// A failed start's error is about the directory left behind.
+						dismissStart("new");
+						location.hash = hashForNewSession(next);
+					}}
 					onStart={op => start({ kind: "new", cwd, ...op })}
 				/>
 			);
@@ -215,7 +220,7 @@ export function App() {
 				);
 			} else main = <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
 			break;
-		default:
+		case undefined:
 			if (layout.panes.length > 0) {
 				main = (
 					<div
@@ -268,6 +273,11 @@ export function App() {
 					</p>
 				);
 			}
+			break;
+		default: {
+			const never: never = page;
+			return never;
+		}
 	}
 
 	return (
@@ -298,9 +308,9 @@ export function App() {
 						open({ kind: "past", sessionId }, "replace");
 						start({ kind: "resume", sessionId });
 					}}
-					resumeAll={state.resumeAll}
-					onResumeAll={resumeAll}
-					onDismissResumeAll={dismissResumeAll}
+					resumeAll={resumeAll}
+					onResumeAll={sessionIds => start({ kind: "resume-all", sessionIds })}
+					onDismissResumeAll={() => dismissStart("resume-all")}
 					onDismissInterrupted={sessionId => send({ t: "dismiss-interrupted", sessionId })}
 					onEnd={endHost}
 					onShowShortcuts={() => setShortcutsOpen(true)}

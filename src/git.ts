@@ -1,6 +1,6 @@
 /** The git checkout a directory is in, and the worktree a new session's branch runs in. */
 import { existsSync } from "node:fs";
-import { repoOf } from "./inbox";
+import { repoOf } from "./github";
 import { run, runChecked } from "./proc";
 import { type BranchChoice, type GitCheckout, worktreeDir } from "./shared";
 

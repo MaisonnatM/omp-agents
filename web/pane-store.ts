@@ -28,9 +28,6 @@ export type PaneMsg =
 	| Extract<ServerMsg, { t: "items" | "work" | "dequeued" }>
 	| (Extract<ServerMsg, { t: "completions" }> & { scope: { kind: "live" } });
 
-export const isPaneMsg = (msg: ServerMsg): msg is PaneMsg =>
-	msg.t === "items" || msg.t === "work" || msg.t === "dequeued" || (msg.t === "completions" && msg.scope.kind === "live");
-
 /**
  * Per open view, by {@link hashForView}. Outside React state on purpose: a streamed token changes one view's entry and
  * wakes only the pane reading it, instead of rendering the whole page and every other pane's transcript again.
@@ -64,6 +61,10 @@ export function applyPaneMessage(msg: PaneMsg): void {
 		case "dequeued":
 			panes.set(key, { ...pane, dequeued: { reqId: msg.reqId, texts: msg.texts } });
 			break;
+		default: {
+			const never: never = msg;
+			return never;
+		}
 	}
 	for (const listener of listeners.get(key) ?? []) listener();
 }
