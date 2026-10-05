@@ -98,8 +98,21 @@ const selectorOf = (model: ModelOption): string => `${model.provider}/${model.id
 export function ModelPicker({ current, unset, list, open, onOpenChange, onPick, disabled }: ModelPickerProps) {
 	return (
 		<CommandPicker
-			trigger={<span className="max-w-56 truncate">{current ? <Model selector={current} /> : (unset ?? "Choose model")}</span>}
+			trigger={
+				<span className="max-w-56 truncate">
+					{/* No `Model`: its native titles would show over the tooltip, which names the selector as the aria-label names the provider. */}
+					{current ? (
+						<>
+							<OrgIcon org={modelOrg(current)} className="mr-1 inline-block align-[-0.125em]" />
+							{modelLabel(current)}
+						</>
+					) : (
+						(unset ?? "Choose model")
+					)}
+				</span>
+			}
 			title={current ?? undefined}
+			shortcut="model"
 			ariaLabel={`Choose model: ${current ? modelDescription(current) : (unset ?? "none selected")}`}
 			disabled={disabled}
 			search={MODEL_LIST.search}

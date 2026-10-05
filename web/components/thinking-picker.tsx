@@ -16,6 +16,7 @@ export function ThinkingPicker({ current, levels, onPick }: ThinkingPickerProps)
 			trigger={current ?? "Thinking"}
 			icon={Brain}
 			ariaLabel={`Choose thinking level: ${current ?? "none selected"}`}
+			shortcut="thinking"
 			width="sm"
 			side="top"
 			list={{

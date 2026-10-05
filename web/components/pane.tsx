@@ -2,9 +2,11 @@ import { Maximize2, Minimize2, X } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
 import type { RosterHost, PastSession, View, LiveView, ModelOption, Delivery, MessageQueue, PromptImage, UserAnswer } from "../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { usePane } from "../pane-store";
 import type { StartOf } from "../starts";
+import { shortcutLabels } from "../shortcuts";
 import type { ForkPoint } from "../transcript-view";
 import type { Dashboard } from "../use-dashboard";
 import { Conversation, PastConversation } from "./conversation";
@@ -85,15 +87,11 @@ export const Pane = memo(function Pane({
 		<>
 			{count > 1 && (
 				<>
-					<Button
-						variant="ghost"
-						size="icon-compact"
-						title={maximized ? "Restore split" : "Maximize pane"}
-						aria-label={maximized ? "Restore split" : "Maximize pane"}
-						onClick={onMaximize}
-					>
-						{maximized ? <Minimize2 /> : <Maximize2 />}
-					</Button>
+					<Tooltip content={maximized ? "Restore split" : "Maximize pane"} shortcut={maximized ? shortcutLabels("restore") : undefined} side="bottom">
+						<Button variant="ghost" size="icon-compact" aria-label={maximized ? "Restore split" : "Maximize pane"} onClick={onMaximize}>
+							{maximized ? <Minimize2 /> : <Maximize2 />}
+						</Button>
+					</Tooltip>
 					<Button variant="ghost" size="icon-compact" title="Close pane" aria-label="Close pane" onClick={onClose}>
 						<X />
 					</Button>

@@ -3,8 +3,9 @@ import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef } from "r
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { type ShortcutId, shortcutKeys } from "../shortcuts";
+import { type ShortcutId, shortcutLabels } from "../shortcuts";
 import { useStoredState } from "../stored-state";
 
 /**
@@ -109,20 +110,20 @@ interface SidebarToggleProps {
 /** Shows or hides a sidebar: the left one's from its header or the strip left in its place, the right one's from the pane header. */
 export function SidebarToggle({ side, open, onToggle }: SidebarToggleProps) {
 	const { name, id, shortcut, hideIcon: Hide, showIcon: Show } = SIDEBARS[side];
-	const action = `${open ? "Hide" : "Show"} the ${name.toLowerCase()} sidebar`;
 	return (
-		<Button
-			variant="ghost"
-			size="icon-compact"
-			className="shrink-0 text-muted-foreground"
-			aria-label={`${name} sidebar`}
-			aria-expanded={open}
-			aria-controls={id}
-			title={`${action} (${shortcutKeys(shortcut)})`}
-			onClick={onToggle}
-		>
-			{open ? <Hide /> : <Show />}
-		</Button>
+		<Tooltip content={`${open ? "Hide" : "Show"} the ${name.toLowerCase()} sidebar`} shortcut={shortcutLabels(shortcut)} side="bottom">
+			<Button
+				variant="ghost"
+				size="icon-compact"
+				className="shrink-0 text-muted-foreground"
+				aria-label={`${name} sidebar`}
+				aria-expanded={open}
+				aria-controls={id}
+				onClick={onToggle}
+			>
+				{open ? <Hide /> : <Show />}
+			</Button>
+		</Tooltip>
 	);
 }
 

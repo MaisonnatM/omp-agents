@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestUrl } from "../inbox-model";
 import { hostLabel, pastLabel, projectName } from "../labels";
 import { hashForInbox } from "../routing";
-import { shortcutKeys, useShortcuts } from "../shortcuts";
+import { shortcutKeys, shortcutLabels, useShortcuts } from "../shortcuts";
 import { type ForkPoint, nextSuggestions } from "../transcript-view";
 import type { Completions } from "../pane-store";
 import type { StartOf } from "../starts";
@@ -51,6 +51,7 @@ const QUEUE_TAGS: [keyof MessageQueue, string][] = [
 ];
 
 const FOLLOW_UP_KEYS = shortcutKeys("followUp");
+const INTERRUPT_KEYS = shortcutLabels("interrupt");
 
 
 interface HeaderProps {
@@ -549,6 +550,7 @@ function LiveConversation({
 					// While a turn runs, Enter and the send button steer it, and Stop interrupts a session's turn.
 					status={working ? "streaming" : "idle"}
 					onStop={view.agentId === null ? interrupt : undefined}
+					stopShortcut={INTERRUPT_KEYS}
 					queue={queued.map(({ item }) => item)}
 					onEditQueued={item => take(queued.filter(entry => entry.item.id === item.id), true)}
 					onRemoveQueued={item => take(queued.filter(entry => entry.item.id === item.id), false)}

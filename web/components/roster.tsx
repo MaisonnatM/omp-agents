@@ -28,6 +28,7 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
+import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
@@ -35,7 +36,7 @@ import { inboxStore, ticketsStore } from "../reads";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";
 import type { SectionTarget } from "../section";
 import { type SidebarSessions, workspaces } from "../sessions";
-import { shortcutKeys, useShortcuts } from "../shortcuts";
+import { shortcutLabels, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
 import { useStoredState } from "../stored-state";
 import { ticketGroups, ticketSection } from "../tickets-model";
@@ -175,6 +176,7 @@ function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 			trigger={<span className="truncate">{label}</span>}
 			icon={Folder}
 			title={selected?.cwdDisplay}
+			shortcut="project"
 			ariaLabel={`Show sessions from: ${label}`}
 			className="min-w-0 font-semibold"
 			search={{ label: "Search projects" }}
@@ -512,28 +514,24 @@ export function Roster({
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
-				<Button
-					variant="ghost"
-					size="icon-compact"
-					className="ml-auto shrink-0 text-muted-foreground"
-					title={`Keyboard shortcuts (${shortcutKeys("help")})`}
-					aria-label="Keyboard shortcuts"
-					onClick={onShowShortcuts}
-				>
-					<Keyboard />
-				</Button>
-
-				<Button asChild variant="ghost" size="icon-compact" active={settingsOpen} className="shrink-0 text-muted-foreground">
-					<a href={settingsHref} title={`Settings (${shortcutKeys("settings")})`} aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
-						<Settings />
-					</a>
-				</Button>
+				<Tooltip content="Keyboard shortcuts" shortcut={shortcutLabels("help")} side="bottom">
+					<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
+						<Keyboard />
+					</Button>
+				</Tooltip>
+				<Tooltip content="Settings" shortcut={shortcutLabels("settings")} side="bottom">
+					<Button asChild variant="ghost" size="icon-compact" active={settingsOpen} className="shrink-0 text-muted-foreground">
+						<a href={settingsHref} aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
+							<Settings />
+						</a>
+					</Button>
+				</Tooltip>
 				{toggle}
 			</SidebarHeader>
 			<SizeProvider size="compact">
 				<TabsList aria-label="Sidebar" className="mx-2 self-start">
 					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => (
-						<TabItem key={value} value={value} label={label} icon={icon} />
+						<TabItem key={value} value={value} label={label} icon={icon} shortcut={shortcutLabels(value)} />
 					))}
 				</TabsList>
 			</SizeProvider>
@@ -558,14 +556,11 @@ export function Roster({
 						<SidebarGroupLabel>
 							{running.length > 0 ? `${running.length} running` : pinned.hosts.length > 0 ? "No other sessions running" : "No sessions"}
 						</SidebarGroupLabel>
-						<SidebarGroupAction
-							title={`${newSessionLabel} (${shortcutKeys("newSession")})`}
-							aria-label={newSessionLabel}
-							aria-current={newSessionOpen ? "page" : undefined}
-							onClick={onNewSession}
-						>
-							<Plus />
-						</SidebarGroupAction>
+						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")}>
+							<SidebarGroupAction aria-label={newSessionLabel} aria-current={newSessionOpen ? "page" : undefined} onClick={onNewSession}>
+								<Plus />
+							</SidebarGroupAction>
+						</Tooltip>
 						<SidebarMenu aria-label="Running omp sessions">
 							{running.map(host => hostRow(host, false))}
 						</SidebarMenu>

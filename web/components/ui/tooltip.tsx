@@ -85,6 +85,8 @@ type TooltipSide = "top" | "right" | "bottom" | "left";
 
 interface TooltipProps {
   content: ReactNode;
+  /** Keys that run the trigger's action, drawn as chips after `content`: `["⌘/", "?"]` reads `⌘/ or ?`. */
+  shortcut?: readonly string[];
   children: React.ReactElement;
   side?: TooltipSide;
   sideOffset?: number;
@@ -127,8 +129,18 @@ function getSlideOffset(side: TooltipSide) {
 // Tooltip
 // ---------------------------------------------------------------------------
 
+/** Keystroke chip rendered inside the (inverted) tooltip surface. */
+function TooltipKbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="-my-1 flex h-4 min-w-4 items-center justify-center rounded border border-background/30 px-1 font-sans text-[10px] text-background/80">
+      {children}
+    </kbd>
+  );
+}
+
 function Tooltip({
   content,
+  shortcut,
   children,
   side = "top",
   sideOffset = 8,
@@ -228,7 +240,22 @@ function Tooltip({
                 transition={open ? spring.fast : spring.fast.exit}
                 onAnimationComplete={handleExitComplete}
               >
-                {content}
+                {shortcut?.length ? (
+                  // A flex row escapes the surface's text-box trim, so the
+                  // label re-applies it; otherwise the row would sit taller
+                  // than a tooltip without chips.
+                  <span className="flex items-center gap-1.5">
+                    <span className="[text-box:trim-both_cap_alphabetic]">{content}</span>
+                    {shortcut.map((key, index) => (
+                      <span key={key} className="flex items-center gap-1.5">
+                        {index > 0 && <span className="text-background/60 [text-box:trim-both_cap_alphabetic]">or</span>}
+                        <TooltipKbd>{key}</TooltipKbd>
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  content
+                )}
               </motion.div>
             </motion.div>
           </TooltipPrimitive.Content>
@@ -250,5 +277,5 @@ function Tooltip({
   );
 }
 
-export { Tooltip, TooltipPortalContainer, TooltipProvider };
+export { Tooltip, TooltipKbd, TooltipPortalContainer, TooltipProvider };
 export type { TooltipProps, TooltipProviderProps, TooltipSide };

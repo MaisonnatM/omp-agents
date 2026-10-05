@@ -162,6 +162,8 @@ interface InputMessageProps
   status?: "idle" | "streaming";
   /** Fired when the Stop control is pressed (streaming, empty draft). */
   onStop?: () => void;
+  /** Keys that press Stop, shown in its tooltip; no tooltip when omitted. */
+  stopShortcut?: readonly string[];
   /** Messages waiting on the running turn, owned by the consumer and shown as
    *  rows above the textarea, the next to be delivered on top. */
   queue?: QueuedMessage[];
@@ -442,6 +444,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       textareaProps,
       status,
       onStop,
+      stopShortcut,
       queue,
       onEditQueued,
       onRemoveQueued,
@@ -1147,50 +1150,57 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
             <div className="flex items-center gap-1.5 min-w-0">{leftContent}</div>
             <div className="flex items-center gap-1.5 shrink-0">
               {rightContent}
-              <Button
-                type="button"
-                variant="primary"
-                size="icon-sm"
-                onClick={buttonMode === "stop" ? handleStop : handleSend}
-                disabled={buttonMode === "stop" ? disabled : !canSend}
-                aria-label={buttonLabel}
+              <Tooltip
+                content="Stop"
+                shortcut={stopShortcut}
+                // Send has no tooltip; one open over Stop closes as the button turns back into Send.
+                forceOpen={buttonMode === "stop" && stopShortcut ? undefined : false}
               >
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.span
-                    key={buttonMode === "stop" ? "stop" : "arrow"}
-                    initial={
-                      reduceMotion
-                        ? { opacity: 0 }
-                        : { opacity: 0, scale: 0.6 }
-                    }
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={
-                      reduceMotion
-                        ? { opacity: 0 }
-                        : { opacity: 0, scale: 0.6, transition: spring.fast.exit }
-                    }
-                    transition={spring.fast}
-                    className="flex items-center justify-center leading-none"
-                  >
-                    {buttonMode === "stop" ? (
-                      <span className="h-3 w-3 rounded-[3px] bg-current" />
-                    ) : (
-                      // Override icon-sm's small 14px svg — the send glyph reads
-                      // better a touch larger. `size` matches the attribute to
-                      // the CSS so the svg box stays centered.
-                      <ArrowUpIcon
-                        size={compactStep ? 15 : 19}
-                        className={cn(
-                          "block",
-                          compactStep
-                            ? "!h-[15px] !w-[15px]"
-                            : "!h-[19px] !w-[19px]"
-                        )}
-                      />
-                    )}
-                  </motion.span>
-                </AnimatePresence>
-              </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="icon-sm"
+                  onClick={buttonMode === "stop" ? handleStop : handleSend}
+                  disabled={buttonMode === "stop" ? disabled : !canSend}
+                  aria-label={buttonLabel}
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                      key={buttonMode === "stop" ? "stop" : "arrow"}
+                      initial={
+                        reduceMotion
+                          ? { opacity: 0 }
+                          : { opacity: 0, scale: 0.6 }
+                      }
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={
+                        reduceMotion
+                          ? { opacity: 0 }
+                          : { opacity: 0, scale: 0.6, transition: spring.fast.exit }
+                      }
+                      transition={spring.fast}
+                      className="flex items-center justify-center leading-none"
+                    >
+                      {buttonMode === "stop" ? (
+                        <span className="h-3 w-3 rounded-[3px] bg-current" />
+                      ) : (
+                        // Override icon-sm's small 14px svg — the send glyph reads
+                        // better a touch larger. `size` matches the attribute to
+                        // the CSS so the svg box stays centered.
+                        <ArrowUpIcon
+                          size={compactStep ? 15 : 19}
+                          className={cn(
+                            "block",
+                            compactStep
+                              ? "!h-[15px] !w-[15px]"
+                              : "!h-[19px] !w-[19px]"
+                          )}
+                        />
+                      )}
+                    </motion.span>
+                  </AnimatePresence>
+                </Button>
+              </Tooltip>
             </div>
           </div>
 
