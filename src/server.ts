@@ -275,6 +275,7 @@ await listRegistry();
 setTimeout(pollRegistry, POLL_MS);
 setInterval(() => void rescanFiles(), RESCAN_MS);
 void pollUsage();
+// The desktop shell (desktop/main.ts) reads this line as the sign that this server, not another, listens on the port.
 console.log(`omp-agents (omp v${ompVersion}) on http://${HOSTNAME}:${PORT}`);
 console.log(`Sign in at http://${HOSTNAME}:${PORT}/?token=${token}`);
 console.log(`The access token is in ${displayPath(tokenFile)}; delete the file and restart to rotate it.`);
@@ -291,3 +292,8 @@ function shutdown(): Promise<void> {
 }
 process.on("SIGINT", () => void shutdown());
 process.on("SIGTERM", () => void shutdown());
+// The desktop shell holds the server's stdin open and never writes to it; when the shell dies, even by SIGKILL, the pipe ends.
+if (process.env.OMP_AGENTS_PARENT === "stdin") {
+	process.stdin.on("end", () => void shutdown());
+	process.stdin.resume();
+}

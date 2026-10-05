@@ -66,6 +66,18 @@ A subagent of a dashboard session takes a message through omp's `steer_subagent`
 
 A `prompt` message, and a `start` of kind `new`, carry `images`, each `{ data, mimeType }` with the file's bytes in base64, as omp's `ImageContent` takes them. `src/server/wire.ts` accepts PNG, JPEG, GIF, and WebP, up to `MAX_PROMPT_IMAGE_BYTES` (32 MB) per prompt, and a prompt of images with no text. The socket's `maxPayloadLength` is 64 MB so such a message fits. A dashboard session passes the images to omp's RPC `prompt`; a terminal session's guest puts them on its Collab `prompt` frame, a held follow-up included. omp's `steer_subagent` and Collab's `agent-cmd` `chat` take text only, so a subagent's prompt with images is refused. omp writes a prompt's images inline into the session file and then moves each to its blob store, `~/.omp/agent/blobs/<sha256>`, leaving `blob:sha256:<hash>` in the file. A user item's `images` holds a `data:` URL for an inline image and `/api/image?hash=<sha256>&type=<image type>` for a moved one; that route serves the blob file as `type`, which must be one of the four prompt image types, since the store keeps none.
 
+## Desktop shell
+
+`desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron. Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process, `bun src/server.ts`, and never imports it. It imports only `src/paths.ts`, `src/json.ts`, and `src/server/auth.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
+
+- At launch it calls `loadToken`, as the server does, so whichever runs first creates the token file, and asks `GET /?token=<token>` on the port. A 302 that sets the cookie can come only from an omp-agents server that holds this token, and the window uses it. A refused connection starts a server. Any other answer means the port is taken, and the window says so.
+- The shell takes the server as started once it prints `omp-agents (omp v…) on http://127.0.0.1:<port>`, not once the port answers: another server that took the port while this one built its page would answer too, and the shell would then own a server that is about to fail.
+- It spawns the server with `OMP_AGENTS_PARENT=stdin` and an open stdin pipe that it never writes to. The server calls its `shutdown()` when that pipe ends, which it does however the shell exits, `SIGKILL` included, so no server outlives the app and holds the port. On a normal quit, the shell sends `SIGTERM` and waits up to 10 seconds for the server to end its sessions.
+- The window loads `http://127.0.0.1:<port>/?token=<token>`, a navigation that sends `Sec-Fetch-Site: none`, so `guardsFor` admits it as it admits the printed address in a browser, and the socket's `Origin` matches its `Host`. A custom scheme for the page would fail that check.
+- `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin. An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the Linear sign-in in `web/components/settings/linear-connection.tsx` then opens the address itself once the server names it.
+- The page runs with context isolation and the sandbox on, and no preload: it gets no Node or Electron API.
+- Setting `PORT` moves the app's data, its cookie, localStorage, window bounds, and single-instance lock, to `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
+
 ## Plan quota
 
 Plan quota comes from `omp usage --json`, run through this same package's CLI. omp builds those reports from its auth storage, extensions, and credential broker, so the server reads the command's output instead of rebuilding that setup. omp can exit non-zero after it prints the reports it did get, so the server reads the output whatever the exit code. When the output is not a usage report, the footer shows the last line omp wrote to stderr.
@@ -160,6 +172,8 @@ The page lives in `web/`. `src/server/page.ts` bundles `web/index.html` and `web
 - `web/components/ui`, `web/lib`, and `web/hooks`: mostly files from the Fluid registry; see below.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`). Its `agent/` files are copies of the maintainer's `~/.omp/agent` files, except for `AGENTS.md`, which is a generic version. After you edit one of those live files, copy it back. `bun run omp-template --dry-run` shows a copy that has drifted as `keep yours`.
+
+`desktop/` holds the desktop shell; see [Desktop shell](#desktop-shell). `desktop/main.ts` is its whole main process, and `bun run desktop` at the root installs the package and starts it.
 
 Changes the dashboard makes to Fluid's components:
 
