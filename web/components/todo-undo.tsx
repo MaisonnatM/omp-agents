@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import type { UserTodoChange } from "../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /** How long **Undo** stays after a todo is deleted. */
 const UNDO_MS = 8000;
@@ -16,16 +17,18 @@ export function useUndo(onChange: (change: UserTodoChange) => void): { offer: (t
 	const toast = undo && (
 		<div role="status" className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-border bg-popover px-4 py-2 text-sm shadow-lg">
 			<span className="max-w-72 truncate">Deleted “{undo.text}”</span>
-			<Button
-				variant="secondary"
-				size="compact"
-				onClick={() => {
-					onChange(undo.change);
-					setUndo(null);
-				}}
-			>
-				Undo
-			</Button>
+			<Tooltip content="Put the todo back">
+				<Button
+					variant="secondary"
+					size="compact"
+					onClick={() => {
+						onChange(undo.change);
+						setUndo(null);
+					}}
+				>
+					Undo
+				</Button>
+			</Tooltip>
 		</div>
 	);
 	return { offer: (text, change) => setUndo({ text, change }), toast };

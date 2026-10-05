@@ -34,16 +34,18 @@ export function ArchivePage({ list, disabled, onChange, sessions, newSessionCwd,
 				<>
 					<TodoSearch query={query} onQuery={setQuery} />
 					{list.archive.length > 0 && !disabled && (
-						<Button
-							variant="ghost"
-							size="compact"
-							leadingIcon={Trash2}
-							onClick={() => {
-								if (window.confirm(`Delete the ${list.archive.length} archived todos for good?`)) onChange({ op: "empty-archive" });
-							}}
-						>
-							Empty
-						</Button>
+						<Tooltip content="Delete every archived todo">
+							<Button
+								variant="ghost"
+								size="compact"
+								leadingIcon={Trash2}
+								onClick={() => {
+									if (window.confirm(`Delete the ${list.archive.length} archived todos for good?`)) onChange({ op: "empty-archive" });
+								}}
+							>
+								Empty
+							</Button>
+						</Tooltip>
 					)}
 				</>
 			}
@@ -54,10 +56,12 @@ export function ArchivePage({ list, disabled, onChange, sessions, newSessionCwd,
 						{shown.map(todo => (
 							<li key={todo.id} className={cn("group/todo flex items-start gap-2 rounded-md px-2 py-1 text-sm leading-snug hover:bg-accent/50", todo.id === openId && "bg-accent")}>
 								<Archive aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-								<button type="button" onClick={() => setOpenId(todo.id)} className="min-w-0 flex-1 break-words text-left text-muted-foreground">
-									{todo.text}
-									{todo.children.length > 0 && <span className="ml-2 text-xs tabular-nums">{todo.children.length} under it</span>}
-								</button>
+								<Tooltip content="Open">
+									<button type="button" onClick={() => setOpenId(todo.id)} className="min-w-0 flex-1 break-words text-left text-muted-foreground">
+										{todo.text}
+										{todo.children.length > 0 && <span className="ml-2 text-xs tabular-nums">{todo.children.length} under it</span>}
+									</button>
+								</Tooltip>
 								{todo.doneAt && <span className="shrink-0 text-xs text-muted-foreground">{DAY_FORMAT.format(new Date(todo.doneAt))}</span>}
 								{!disabled && (
 									<span className="flex shrink-0 gap-1 opacity-0 group-hover/todo:opacity-100 focus-within:opacity-100 [&_svg]:size-3.5">

@@ -506,8 +506,8 @@ Navigation, editing, scheduling toggles, Stop, and Delete keep their existing st
   Outside a text field, J and K focus the next and previous todo, X checks the focused one, and Enter opens it.
 - An open todo shows its category, which you can change for a top-level todo, its due day, and its notes in markdown.
   A todo due today reads **Today** in the list, and one whose day has passed reads **Overdue** in red; **No due day** takes the day off.
-  **Write** edits the notes and **Preview** renders them as the agent's messages are, with GitHub's task lists and tables.
-  The notes save when the text field loses focus, on Cmd+S, and when you switch to **Preview**; a todo with notes shows a notebook icon in the list.
+  The notes always render as the agent's messages do, with GitHub's task lists and tables, and that render stays on screen while you edit them in the same type.
+  They save when the text field loses focus and on Cmd+S; a todo with notes shows a notebook icon in the list.
 - A top-level todo shows what it links to: a session, a pull request, or a Linear issue, each a chip that opens it here.
   A running session's chip shows its status dot; an open todo's **×** on a chip unlinks it.
 - An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.

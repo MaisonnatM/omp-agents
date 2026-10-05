@@ -501,7 +501,7 @@ The page lives in `web/`.
   `web/components/todo-categories.tsx` holds its Todo tab: **All**, **Today**, **From agents**, **Done**, then the categories, and `web/components/routines/routines-nav.tsx` its Routines tab, the routines by name.
 - `web/components/user-todos.tsx`: the Todo page and its lists; `todo-archive.tsx` is the **Done** page.
   `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows, `todo-search.tsx` is the search field, and `todo-undo.tsx` the **Undo** toast.
-  `todo-detail.tsx` is the open todo, with its due day, links, **Start session**, and **Create Linear ticket**, whose notes `web/components/markdown-editor.tsx` edits and previews through `message-markdown.tsx`; `todo-links.tsx` draws a todo's link chips, and `add-to-todo.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
+  `todo-detail.tsx` is the open todo, with its due day, links, **Start session**, and **Create Linear ticket**, whose notes `web/components/markdown-editor.tsx` always renders through `message-markdown.tsx` while you edit them; `todo-links.tsx` draws a todo's link chips, and `add-to-todo.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
 - `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.
 - `web/components/pane.tsx`: a pane.

@@ -44,11 +44,17 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 		}
 	};
 	if (step.kind === "idle" || step.kind === "loading" || step.kind === "failed") {
+		const loading = step.kind === "loading";
+		const createButton = (
+			<Button variant="tertiary" size="compact" leadingIcon={Ticket} disabled={loading} onClick={() => void start()}>
+				{loading ? "Reading teams…" : "Create Linear ticket"}
+			</Button>
+		);
 		return (
 			<div className="flex flex-wrap items-center gap-2">
-				<Button variant="tertiary" size="compact" leadingIcon={Ticket} disabled={step.kind === "loading"} onClick={() => void start()}>
-					{step.kind === "loading" ? "Reading teams…" : "Create Linear ticket"}
-				</Button>
+				<Tooltip content="Create a Linear issue from this todo">
+					{loading ? <span className="inline-flex">{createButton}</span> : createButton}
+				</Tooltip>
 				{step.kind === "failed" && (
 					<p role="alert" className="text-xs text-red-600 dark:text-red-400">
 						{step.error}
@@ -59,6 +65,16 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 	}
 	const { teams, team } = step;
 	const creating = step.kind === "creating";
+	const createButton = (
+		<Button size="compact" disabled={creating} onClick={() => void create(teams, team)}>
+			{creating ? "Creating…" : "Create, assigned to you"}
+		</Button>
+	);
+	const cancelButton = (
+		<Button variant="ghost" size="compact" disabled={creating} onClick={() => setStep({ kind: "idle" })}>
+			Cancel
+		</Button>
+	);
 	return (
 		<div className="flex flex-wrap items-center gap-2">
 			<label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -71,12 +87,12 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 					))}
 				</select>
 			</label>
-			<Button size="compact" disabled={creating} onClick={() => void create(teams, team)}>
-				{creating ? "Creating…" : "Create, assigned to you"}
-			</Button>
-			<Button variant="ghost" size="compact" disabled={creating} onClick={() => setStep({ kind: "idle" })}>
-				Cancel
-			</Button>
+			<Tooltip content="Create the issue in this team, assigned to you">
+				{creating ? <span className="inline-flex">{createButton}</span> : createButton}
+			</Tooltip>
+			<Tooltip content="Don't create the issue">
+				{creating ? <span className="inline-flex">{cancelButton}</span> : cancelButton}
+			</Tooltip>
 		</div>
 	);
 }
@@ -161,9 +177,11 @@ export function TodoDetail({ list, open, readOnly, onChange, onClose, sessions, 
 					/>
 				</label>
 				{todo.due && !readOnly && (
-					<button type="button" onClick={() => onChange({ op: "set-due", id: todo.id, due: null })} className="hover:text-foreground">
-						No due day
-					</button>
+					<Tooltip content="Clear the due day">
+						<button type="button" onClick={() => onChange({ op: "set-due", id: todo.id, due: null })} className="hover:text-foreground">
+							No due day
+						</button>
+					</Tooltip>
 				)}
 			</div>
 			{top && (top.links.length > 0 || top.addedBy) && (
@@ -181,9 +199,11 @@ export function TodoDetail({ list, open, readOnly, onChange, onClose, sessions, 
 			)}
 			{top && !readOnly && (
 				<div className="flex flex-wrap items-center gap-2">
-					<Button variant="tertiary" size="compact" leadingIcon={Play} asChild>
-						<a href={hashForNewSession(newSessionCwd, top.id)}>Start session</a>
-					</Button>
+					<Tooltip content="Start a session from this todo">
+						<Button variant="tertiary" size="compact" leadingIcon={Play} asChild>
+							<a href={hashForNewSession(newSessionCwd, top.id)}>Start session</a>
+						</Button>
+					</Tooltip>
 					{linearConnected && !top.links.some(link => link.kind === "ticket") && <CreateTicket todo={top} onChange={onChange} />}
 				</div>
 			)}

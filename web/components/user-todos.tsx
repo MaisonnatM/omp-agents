@@ -417,14 +417,16 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 				</ul>
 				{empty && <p className="px-2 text-sm text-muted-foreground">{empty}</p>}
 				{!disabled && kind.canAdd && (
-					<button
-						type="button"
-						onClick={() => setEditing({ kind: "draft", parentId: null, afterId: section.todos.at(-1)?.id ?? null, categoryId: section.categoryId, text: "" })}
-						className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground [&>svg]:size-4"
-					>
-						<Plus />
-						{kind.addLabel}
-					</button>
+					<Tooltip content={kind.dueToday ? "Add a todo due today" : "Add a todo at the end of this list"}>
+						<button
+							type="button"
+							onClick={() => setEditing({ kind: "draft", parentId: null, afterId: section.todos.at(-1)?.id ?? null, categoryId: section.categoryId, text: "" })}
+							className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground [&>svg]:size-4"
+						>
+							<Plus />
+							{kind.addLabel}
+						</button>
+					</Tooltip>
 				)}
 			</section>
 		);
@@ -439,9 +441,11 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 				<>
 					<TodoSearch query={query} onQuery={setQuery} />
 					{anyDone && !disabled && (
-						<Button variant="ghost" size="compact" leadingIcon={ListX} onClick={() => onChange({ op: "clear-done", categoryId: view.kind === "category" ? view.id : null })}>
-							Clear done
-						</Button>
+						<Tooltip content="Move checked todos to Done">
+							<Button variant="ghost" size="compact" leadingIcon={ListX} onClick={() => onChange({ op: "clear-done", categoryId: view.kind === "category" ? view.id : null })}>
+								Clear done
+							</Button>
+						</Tooltip>
 					)}
 				</>
 			}
