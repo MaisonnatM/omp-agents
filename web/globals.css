@@ -284,22 +284,17 @@
     inherits: false;
     initial-value: 1;
 }
-  .scroll-fade, .scroll-fade-x {
-    --scroll-fade-size: 48px;
-}
+  /* --sf-start and --sf-end are the top and bottom edges' opacity: 1 at rest, so a scroller with nothing to scroll
+     shows no fade. Scroll timelines drive them below; web/scroll-fade.ts sets them where the browser has none. */
   .scroll-fade {
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), transparent 100%);
+    --scroll-fade-size: 48px;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, var(--sf-end)) 100%);
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, var(--sf-end)) 100%);
 }
-  .scroll-fade-x {
-    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), transparent 100%);
-    mask-image: linear-gradient(to right, transparent 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), transparent 100%);
-}
-  /* No fade at rest: the bottom edge fades only once the list has left the
-     top. Without scroll timelines there is no "scrolled" signal, so no mask. */
+  /* The bottom stays opaque until both "scrolled" and "more below". */
   .scroll-fade.scroll-fade-once-scrolled {
-    -webkit-mask-image: none;
-    mask-image: none;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
 }
 
 @supports (timeline-scope: --sf) {
@@ -340,25 +335,11 @@
 }
 
 @supports (animation-timeline: scroll()) {
+  /* --sf-start runs 1 to 0 over the first fade length, --sf-end 0 to 1 over the last. A scroller that does not
+     overflow has an inactive timeline, which leaves both at 1. */
   .scroll-fade {
-    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, var(--sf-end)) 100%);
-    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, var(--sf-end)) 100%);
     animation: sf-reveal-start both linear, sf-reveal-end both linear;
     animation-timeline: scroll(self), scroll(self);
-    animation-range-start: 0, calc(100% - var(--scroll-fade-size));
-    animation-range-end: var(--scroll-fade-size), 100%;
-  }
-  /* --sf-start runs 1 to 0 over the first fade length, --sf-end 0 to 1 over
-     the last: the bottom stays opaque until both "scrolled" and "more below". */
-  .scroll-fade.scroll-fade-once-scrolled {
-    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
-    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
-  }
-  .scroll-fade-x {
-    mask-image: linear-gradient(to right, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, var(--sf-end)) 100%);
-    -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, var(--sf-end)) 100%);
-    animation: sf-reveal-start both linear, sf-reveal-end both linear;
-    animation-timeline: scroll(self inline), scroll(self inline);
     animation-range-start: 0, calc(100% - var(--scroll-fade-size));
     animation-range-end: var(--scroll-fade-size), 100%;
   }
