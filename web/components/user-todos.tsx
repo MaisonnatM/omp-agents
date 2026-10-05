@@ -155,12 +155,13 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 	});
 
 	// Keyed on the list's arrival as well, so a request made before the server sent the list starts the todo once it lands.
+	// Another list waits until All is showing: the address changes after the render that asked for the capture.
 	useEffect(() => {
-		if (!quickTodo || list === null || disabled) return;
+		if (!quickTodo || list === null || disabled || view.kind !== "all") return;
 		onQuickTodo();
 		const section = sections[0];
 		if (section) setEditing({ kind: "draft", parentId: null, afterId: section.todos.at(-1)?.id ?? null, categoryId: section.categoryId, text: "" });
-	}, [quickTodo, list === null, disabled]);
+	}, [quickTodo, list === null, disabled, view.kind]);
 
 	if (list === null) {
 		return (
