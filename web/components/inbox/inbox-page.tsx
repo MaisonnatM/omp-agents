@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { type Inbox, type InboxPullRequest, type PastSession, type PullRequest, type RepoInbox, type RosterHost, repoKey, samePullRequest } from "../../../src/shared";
+import { type Inbox, type InboxPullRequest, type PastSession, type PullRequest, type RepoInbox, type RosterHost, repoKey, samePullRequest, type WorkItem } from "../../../src/shared";
 import { projectName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { actionOn, pendingOf, type PullRequestActionId, pullRequestActions, pullRequestStart } from "../../quick-actions";
@@ -167,6 +167,7 @@ export function InboxPage({ project, hosts, past, target, section }: InboxPagePr
 				<TargetSheet target={target} onClose={() => (location.hash = hashForInbox(null))}>
 					{pr => {
 						const listed = read && listedPullRequest(read.data, pr);
+						const item: WorkItem = { kind: "pull-request", pr };
 						return (
 							<PullRequestSheetContent
 								key={rowId(pr)}
@@ -175,16 +176,13 @@ export function InboxPage({ project, hosts, past, target, section }: InboxPagePr
 									listed && (
 										<>
 											<SheetQuickActions
-												item={{ kind: "pull-request", pr: listed.pr }}
 												actions={pullRequestActions(listed.pr)}
+												pending={pendingOf(quick, item)}
 												onRun={(action: PullRequestActionId) => start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()))}
-												sessions={sessionsOn({ kind: "pull-request", pr }, hosts)}
-												quick={quick}
+												sessions={sessionsOn(item, hosts)}
 												onOpen={open}
 											/>
-											{quick && actionOn(quick.op.subject, { kind: "pull-request", pr }) !== null && (
-												<QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />
-											)}
+											{quick && actionOn(quick.op.subject, item) !== null && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 										</>
 									)
 								}

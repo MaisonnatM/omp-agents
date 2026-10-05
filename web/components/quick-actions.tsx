@@ -1,9 +1,9 @@
 import { CircleX, Eye, GitMerge, Hammer, ListChecks, type LucideIcon, MessageSquare, Radiation, Zap } from "lucide-react";
-import type { RosterHost, View, WorkItem } from "../../src/shared";
+import type { RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
-import { pendingOf, QUICK_ACTIONS, type QuickActionId } from "../quick-actions";
+import { QUICK_ACTIONS, type QuickActionId } from "../quick-actions";
 import type { OpenMode } from "../routing";
 import type { StartOf } from "../starts";
 import { LiveSessionChips } from "./session-chip";
@@ -89,23 +89,18 @@ export function QuickStartNotice({ quick, onDismiss }: NoticeProps) {
 	);
 }
 
-interface SheetActionsProps {
-	/** What the sheet shows. */
-	item: WorkItem;
-	actions: QuickActionId[];
-	onRun(action: QuickActionId): void;
-	/** The running sessions that work on `item`. */
+interface SheetActionsProps extends QuickActionsProps {
+	/** The running sessions that work on the sheet's pull request or issue. */
 	sessions: RosterHost[];
-	quick: StartOf<"quick"> | null;
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
-/** A sheet's buttons for `actions` on `item`, then the sessions that work on it; nothing when there is neither. */
-export function SheetQuickActions({ item, actions, onRun, sessions, quick, onOpen }: SheetActionsProps) {
+/** A sheet's buttons for `actions`, then the sessions that work on its item; nothing when there is neither. */
+export function SheetQuickActions({ actions, pending, onRun, sessions, onOpen }: SheetActionsProps) {
 	if (actions.length === 0 && sessions.length === 0) return null;
 	return (
 		<div className="flex flex-wrap items-center gap-2">
-			<QuickActionButtons actions={actions} pending={pendingOf(quick, item)} onRun={onRun} />
+			<QuickActionButtons actions={actions} pending={pending} onRun={onRun} />
 			<LiveSessionChips hosts={sessions} onOpen={onOpen} />
 		</div>
 	);

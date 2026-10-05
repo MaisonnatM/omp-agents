@@ -256,8 +256,8 @@ Once the server knows the directory omp runs in, worktree included, `withPinnedS
 A directory without that skill, or a prompt that starts with `/`, keeps the prompt as typed.
 
 A `start` of kind `new` carries a `subject`, `null` for none: a quick action sends the pull request or Linear issue it works on.
-`LiveSessions` keeps it by session id, and `rows()` puts it first among the session's `pullRequests` or `tickets` until the session's tool calls name it, so the roster links the session to its subject from the start, before omp writes the session file.
-A `/new` in that session drops the link, and it goes when the session ends.
+`LiveSessions` keeps it by instance id, and `rows()` puts it first among the session's `pullRequests` or `tickets` until the session's tool calls name it, so the roster links the session to its subject from the start, before omp writes the session file.
+The link goes when the session ends.
 
 A `start` of kind `new` carries a `branch`, `null` for the directory as it is.
 For an existing branch, the server runs omp in the worktree that has it checked out, or in the starting directory when that worktree is the directory's own (`git rev-parse --show-toplevel`); with no such worktree it runs `git worktree add <dir> <branch>`.

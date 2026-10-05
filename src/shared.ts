@@ -570,6 +570,10 @@ export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; n
 /** What a session started from a quick action works on: a pull request, or a Linear issue by its identifier. */
 export type WorkItem = { kind: "pull-request"; pr: PullRequest } | { kind: "ticket"; id: string };
 
+/** Whether `links`, a session's pull requests and Linear issues, name `item`. */
+export const worksOn = (links: Pick<RosterHost, "pullRequests" | "tickets">, item: WorkItem): boolean =>
+	item.kind === "ticket" ? links.tickets.includes(item.id) : links.pullRequests.some(pr => samePullRequest(pr, item.pr));
+
 /**
  * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` and `images` as
  * its first message, on `branch` when it names one, else in `cwd` as it is, on `model` when it names one, else on omp's

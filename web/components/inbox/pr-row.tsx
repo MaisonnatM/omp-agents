@@ -80,7 +80,7 @@ export function sessionsFor(pr: InboxPullRequest, hosts: RosterHost[], past: Pas
 			return found ? [{ view, sessionId: session.sessionId, label: pastLabel(session), link: found.link, status: null }] : [];
 		}),
 	];
-	return linked.toSorted((a, b) => Number(a.status === null) - Number(b.status === null) || Number(a.link === "worked") - Number(b.link === "worked"));
+	return linked.toSorted((a, b) => Number(a.view.kind === "past") - Number(b.view.kind === "past") || Number(a.link === "worked") - Number(b.link === "worked"));
 }
 
 /** The DOM id of a pull request's row, which an inbox link to that PR scrolls to. */

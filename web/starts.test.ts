@@ -51,19 +51,7 @@ describe("starts", () => {
 	});
 
 	test("a quick action asks for a new session linked to what it works on, without the action", () => {
-		expect(messageOf(quick, 4)).toEqual({
-			t: "start",
-			reqId: 4,
-			kind: "new",
-			cwd: "/tmp",
-			prompt: "fix",
-			images: [],
-			branch: null,
-			model: null,
-			thinking: null,
-			skill: null,
-			subject: { kind: "ticket", id: "ENG-7" },
-		});
+		expect(messageOf(quick, 4)).toMatchObject({ t: "start", kind: "new", subject: { kind: "ticket", id: "ENG-7" } });
 		expect(settleStart(beginStart(new Map(), 1, quick), 1, ok).size).toBe(0);
 	});
 

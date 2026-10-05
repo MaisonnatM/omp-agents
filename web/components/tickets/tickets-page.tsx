@@ -128,13 +128,12 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 							listed={listed}
 							actions={ticket => (
 								<SheetQuickActions
-									item={{ kind: "ticket", id: target }}
 									actions={ticketActions(ticket)}
+									pending={pendingOf(quick, { kind: "ticket", id: target })}
 									onRun={action => {
 										if (action === "work" || action === "plan") start(ticket, action);
 									}}
 									sessions={sessionsOn({ kind: "ticket", id: target }, hosts)}
-									quick={quick}
 									onOpen={open}
 								/>
 							)}
