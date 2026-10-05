@@ -588,13 +588,7 @@ export function Roster({
 					)}
 					<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
 						<SidebarGroupLabel>
-							{running.length > 0
-								? `${running.length} running`
-								: pinned.hosts.length > 0
-									? "No other sessions running"
-									: idle.length > 0
-										? "No sessions running"
-										: "No sessions"}
+							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length > 0 ? "No other sessions running" : "No sessions"}
 						</SidebarGroupLabel>
 						{/* The group finds its header actions by type, and the tooltip would hide this one, so its chevron would sit under the button. */}
 						<SidebarGroupActions>

@@ -63,14 +63,15 @@ export function sidebarSessions(hosts: RosterHost[], past: PastSession[], projec
 	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
 	const isPinned = (row: { sessionId: string }): boolean => pinned.has(row.sessionId);
 	const shownHosts = hosts.filter(inProject);
+	const unpinnedHosts = shownHosts.filter(host => !isPinned(host));
 	const shownPast = past.filter(inProject);
 	return {
 		pinned: {
 			hosts: shownHosts.filter(isPinned),
 			past: shownPast.filter(isPinned).toSorted((a, b) => Number(b.interrupted) - Number(a.interrupted)),
 		},
-		running: shownHosts.filter(host => !isPinned(host) && host.status !== "idle"),
-		idle: shownHosts.filter(host => !isPinned(host) && host.status === "idle"),
+		running: unpinnedHosts.filter(host => host.status !== "idle"),
+		idle: unpinnedHosts.filter(host => host.status === "idle"),
 		interrupted: shownPast.filter(session => session.interrupted && !isPinned(session)),
 		ended: shownPast.filter(session => !session.interrupted && !isPinned(session)),
 	};

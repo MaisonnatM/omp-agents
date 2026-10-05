@@ -260,7 +260,7 @@ export function layoutAfterResumeAll(layout: Layout, started: { sessionId: strin
 
 /**
  * The layout once live session `instanceId` ends. Each pane showing it, or one of its subagents, shows the next
- * session in `listed` (the sidebar's running sessions, in order), else the previous, skipping sessions already open.
+ * session in `listed` (the sidebar's live sessions, in order), else the previous, skipping sessions already open.
  * A pane left without one keeps the ended session.
  */
 export function endSession(layout: Layout, instanceId: string, listed: string[]): Layout {
