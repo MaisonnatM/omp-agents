@@ -23,54 +23,11 @@ bun run typecheck   # tsc --noEmit over src, web, and templates/omp
 
 After you change `desktop/`, also run `bun install --cwd desktop --frozen-lockfile` once and `bun run --cwd desktop typecheck`.
 
-## Running it
+## Smoke checks
 
-- `bun start` serves `http://127.0.0.1:4317`, where the user's own dashboard usually runs.
-  Other agent sessions run smoke servers at the same time, so pick a smoke port of your own between 4400 and 4899 for the whole session.
-  Start the server as a named service, ready on its `Sign in at` log line, which only your own server prints: `PORT=<port> bun src/server.ts`.
-  Stop it with `proc://<name>/kill`; `kill $(lsof -ti tcp:<port>)` also kills every process connected to the port, such as another session's desktop window.
-- Every request needs the access token, which the server keeps in `~/.config/omp-agents/token` and prints at startup as `Sign in at http://127.0.0.1:<port>/?token=<token>`.
-  Open that address, not `/`, in the browser smoke; for curl, send `Cookie: omp-agents-token=<token>` and a matching `Host` header.
-- The server does not reload, and it serves the page bundle it built at startup.
-  Restart it after you edit `src/` or `web/`.
-- A session that you start from the smoke dashboard is a real omp session.
-  Open `#new/%2Ftmp` to start one in `/tmp`, keep its prompt to something like `Reply with just the word ok. Use no tools.`, and end it with **End session**.
-
-## Browser smoke
-
-Open the page in managed headless Chromium.
-Without `relay: false`, `browser.open` tries the omp browser relay, then fails with "extension never connected" or times out after 30 s:
-
-```js
-const tab = await browser.open({
-	name: "smoke",
-	url: `http://127.0.0.1:${port}/?token=${token}`,
-	app: { relay: false, tern: false },
-	headed: false,
-	wait_until: "domcontentloaded",
-	timeout: 60000,
-});
-// Page JS goes through tab.evaluate; tab.run runs in Bun, where `document` is undefined.
-const title = await tab.evaluate(() => document.title);
-```
-
-The page routes through the URL hash.
-Besides a live session's own hash, the routes are `#past/<session id>`, `#session/<session id>`, `#inbox`, `#inbox/<owner>/<repo>/<number>`, `#tickets`, `#tickets/<identifier>`, `#todo`, `#todo/today`, `#todo/agents`, `#todo/done`, `#todo/<category id>`, `#routines`, `#routines/<id>`, `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`, `#settings`, and `#settings/<encoded cwd>`.
-`web/routing.ts` parses them.
-
-## Desktop smoke
-
-The desktop shell opens a real window on the user's screen.
-Start it on your smoke port from `desktop/`, after `bun run build`, as a named service: `PORT=<port> bun launch.ts --remote-debugging-port=<page port> --inspect=<main port>`, ready on the `Sign in at` line when it starts its own server.
-Pick the two debugging ports the same way as the smoke port, between 9400 and 9899.
-Drive it through the Chrome DevTools Protocol, not the keyboard:
-
-- The page: `http://127.0.0.1:<page port>/json` lists it; `Runtime.evaluate` runs JS in it, and `Page.captureScreenshot` shows it.
-- The main process: `http://127.0.0.1:<main port>/json` lists it; evaluate `process.mainModule.require("electron")` there to reach `app`, `BrowserWindow`, and `Menu`.
-  `BrowserWindow.getAllWindows()[0].close()` is what Cmd+W does, `app.emit("activate")` a Dock click, and `app.quit()` Cmd+Q.
-  Replace `shell.openExternal` with a function that records its address to check links without opening the user's browser.
-- Never send keys with `osascript`: they go to the user's frontmost app, not the window.
-  The page's own `window.close()` destroys the window and quits the app, unlike Cmd+W.
+- Before starting or stopping a server, read [Server lifecycle and authentication](docs/agent-smoke.md#server-lifecycle-and-authentication).
+- Before browser verification, also read [Browser smoke](docs/agent-smoke.md#browser-smoke).
+- Before desktop verification, also read [Desktop smoke](docs/agent-smoke.md#desktop-smoke).
 
 ## omp internals
 
@@ -92,7 +49,7 @@ Read omp's docs before its source: `omp://rpc.md` (RPC frames and commands), `om
 - `docs/usage.md` when the interface changes, and `docs/architecture.md` when the server, a protocol, or the code layout changes.
   The README only covers features, installation, and configuration.
 - [omp modules](docs/architecture.md#omp-modules) after you read omp's source to learn a subsystem: add its files and the exports you used, so the next agent starts there.
-- Every doc keeps one sentence per line; `src/docs.test.ts` fails on a line long enough for the read tool to cut.
+- Every doc keeps one sentence per line; `src/docs.test.ts` checks root Markdown and all Markdown under `docs/` and `templates/omp/`, including nested agent instructions.
 - `templates/omp/agent/` copies the maintainer's `~/.omp/agent` files, except `AGENTS.md`, which is a generic version.
   After you edit one of those live files, copy it into the template.
   `bun run omp-template --dry-run` lists a copy that has drifted as `keep yours`.

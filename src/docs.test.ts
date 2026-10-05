@@ -8,7 +8,7 @@ import { join } from "node:path";
  */
 const MAX_LINE = 700;
 const root = join(import.meta.dir, "..");
-const docs = ["*.md", "docs/*.md", "templates/omp/*.md"].flatMap(pattern => [...new Bun.Glob(pattern).scanSync({ cwd: root })]).sort();
+const docs = ["*.md", "docs/**/*.md", "templates/omp/**/*.md"].flatMap(pattern => [...new Bun.Glob(pattern).scanSync({ cwd: root })]).sort();
 
 describe("docs stay readable by agents", () => {
 	test.each(docs)("%s", async file => {

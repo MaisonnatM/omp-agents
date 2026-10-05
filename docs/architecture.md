@@ -516,6 +516,10 @@ The page lives in `web/`.
 Its `agent/` files are copies of the maintainer's `~/.omp/agent` files, except for `AGENTS.md`, which is a generic version.
 After you edit one of those live files, copy it back.
 `bun run omp-template --dry-run` shows a copy that has drifted as `keep yours`.
+The kit's `agent/AGENTS.md` keeps Git safety invariants inline and links to conditional procedures under `agent/docs/`.
+Graphite detection uses `git rev-parse --path-format=absolute --git-common-dir`, so the same procedure works from a checkout, a linked worktree, or a nested directory.
+`src/docs.test.ts` checks root Markdown and all Markdown below `docs/` and `templates/omp/`, including the kit's nested commands, skills, and references, for lines that tools would truncate.
+The repository's agent guide links to [agent smoke checks](agent-smoke.md) for server authentication and lifecycle, browser verification, and desktop verification.
 
 `desktop/` holds the desktop shell; see [Desktop shell](#desktop-shell).
 `desktop/main.ts` is its whole main process, and `bun run desktop` at the root installs the package and starts it through `desktop/launch.ts`.

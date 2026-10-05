@@ -37,7 +37,10 @@ Settings, in `config.yml`:
 
 Files, in `agent/`:
 
-- `AGENTS.md`: rules for every session: work in a git worktree, push `main` after a local merge, register branches with Graphite, keep the provider order, run thermonuclear reviews on the `plan` role, and keep markdown tables out of PR bodies.
+- `AGENTS.md`: worktree and Git safety invariants, plus conditional pointers for Graphite registration, model routing, reviews, and PR descriptions.
+  Read the matching reference before taking that branch of the workflow.
+- `docs/`: `git-workflow.md` resolves Graphite configuration through the shared Git directory, `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear review and PR descriptions.
+  These references load on demand rather than in every session's context.
 - `APPEND_SYSTEM.md`: final replies in three parts (Résumé, Action, What next), and `isolated: true` for every subagent that touches a git repo.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that runs the thermo-nuclear code quality review on the `plan` role's model.
 - `commands/ship.md` and `extensions/ship.ts`: `/ship <Linear issue>` drives an issue from ticket to draft PR, thermonuclear review, and live review.
