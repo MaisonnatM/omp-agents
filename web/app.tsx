@@ -120,6 +120,13 @@ export function App() {
 	const toggleRight = useCallback(() => toggleSidebar("right"), [toggleSidebar]);
 	const topRightPane = maximized ? layout.focus : Math.min(1, layout.panes.length - 1);
 
+	const switchProject = (cwd: string | null): void => {
+		pickProject(cwd);
+		// Over the panes, the focused one follows the sidebar into the project, unless it already shows one of its sessions.
+		if (cwd === null || page || (viewHost ?? viewPast)?.cwd === cwd) return;
+		const newest = state.hosts.filter(row => row.cwd === cwd).toSorted((a, b) => b.startedAt - a.startedAt)[0];
+		if (newest) open({ kind: "live", instanceId: newest.instanceId, agentId: null }, "replace");
+	};
 	const settingsPage: Page = { kind: "settings", cwd: page?.kind === "settings" ? page.cwd : (viewHost ?? viewPast)?.cwd || null };
 	const settingsHref = hashForPage(settingsPage);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
@@ -300,7 +307,7 @@ export function App() {
 						sectionTarget={sectionTarget}
 						onSectionTarget={setSectionTarget}
 						project={project}
-						onPickProject={pickProject}
+						onPickProject={switchProject}
 						onShowShortcuts={() => setShortcutsOpen(true)}
 						toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
 					/>
