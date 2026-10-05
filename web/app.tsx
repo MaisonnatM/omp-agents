@@ -152,7 +152,7 @@ export function App() {
 		routedTodoList === null || (routedTodoList.kind === "category" && !state.userTodos?.categories.some(({ id }) => id === routedTodoList.id))
 			? { kind: "all" }
 			: routedTodoList;
-	/** The desktop shell's quick-capture shortcut, or Cmd+K, asked for a new todo, which the Todo page has not started yet. */
+	/** The desktop shell's quick-capture shortcut asked for a new todo, which the Todo page has not started yet. */
 	const [quickTodo, setQuickTodo] = useState(false);
 	const startQuickTodo = useCallback((): void => {
 		navigate({ kind: "todo", list: { kind: "all" } });
@@ -176,10 +176,6 @@ export function App() {
 	};
 	useShortcuts({
 		help: () => setShortcutsOpen(open => !open),
-		quickTodo: () => {
-			setSwitcherOpen(false);
-			startQuickTodo();
-		},
 		switcher: () => setSwitcherOpen(open => !open),
 		newSession: openNewSession,
 		previousSession: () => step(-1),
@@ -403,6 +399,11 @@ export function App() {
 						if (next !== null) pickProject(next);
 						open(picked, "replace");
 					}}
+					onCreateTodo={
+						state.connected && state.userTodos
+							? text => changeTodo({ op: "add", id: crypto.randomUUID(), parentId: null, afterId: null, categoryId: null, text })
+							: undefined
+					}
 				/>
 			</SidebarProvider>
 		</DashboardContext.Provider>
