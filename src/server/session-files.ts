@@ -1,6 +1,6 @@
 /** Every session file on disk, newest first, with the pull requests each session worked on. */
 import { basename, dirname, join } from "node:path";
-import { repoOf } from "../inbox";
+import { repoOf } from "../github";
 import { listSessionFiles, readSessionFile, type SavedSession, sessionsDir } from "../omp/sessions";
 import { displayPath } from "../paths";
 import { PullRequestIndex } from "../pull-requests";

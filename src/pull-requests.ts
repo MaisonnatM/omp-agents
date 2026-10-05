@@ -6,10 +6,10 @@
  */
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { parseRemote, type Repo } from "./inbox";
+import { parseRemote } from "./github";
 import { isObject } from "./json";
 import { LineReader } from "./line-reader";
-import type { LinkedPullRequest, PullRequest, PullRequestLink, ShipProgress } from "./shared";
+import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo, type ShipProgress } from "./shared";
 import { textOf } from "./transcript";
 
 /** `me/fe-trust-7: https://app.graphite.com/github/pr/acme/webapp/6596 (created)` */
@@ -49,9 +49,6 @@ interface Expected {
 	created: boolean;
 	pushed: boolean;
 }
-
-const prKey = (pr: PullRequest): string => `${pr.owner}/${pr.repo}#${pr.number}`.toLowerCase();
-const headKey = (repo: Repo, branch: string): string => `${repo.owner}/${repo.repo}`.toLowerCase() + `:${branch}`;
 
 function refKey(ref: PullRequestRef): string {
 	if (ref.kind === "pr") return prKey(ref);
