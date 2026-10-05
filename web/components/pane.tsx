@@ -92,9 +92,11 @@ export const Pane = memo(function Pane({
 							{maximized ? <Minimize2 /> : <Maximize2 />}
 						</Button>
 					</Tooltip>
-					<Button variant="ghost" size="icon-compact" title="Close pane" aria-label="Close pane" onClick={onClose}>
-						<X />
-					</Button>
+					<Tooltip content="Close pane" side="bottom">
+						<Button variant="ghost" size="icon-compact" aria-label="Close pane" onClick={onClose}>
+							<X />
+						</Button>
+					</Tooltip>
 				</>
 			)}
 			{topRight && <SidebarToggle side="right" open={rightOpen} onToggle={toggleRight} />}

@@ -530,7 +530,7 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
           className
         )}
         {...props}
-        // The shortcut tooltip's trigger would stamp its own open state over the tab's.
+        // Keeps Radix's tab `data-state` contract under a shortcut Tooltip trigger, which stamps its own.
         data-state={isSelected ? "active" : "inactive"}
       >
         {/* Stroke 1.5 → 2 and muted → foreground on hover or selection, over

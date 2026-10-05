@@ -175,7 +175,7 @@ function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 		<CommandPicker
 			trigger={<span className="truncate">{label}</span>}
 			icon={Folder}
-			title={selected?.cwdDisplay}
+			tooltip={selected?.cwdDisplay ?? "All projects"}
 			shortcut="project"
 			ariaLabel={`Show sessions from: ${label}`}
 			className="min-w-0 font-semibold"

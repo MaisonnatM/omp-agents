@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useState,
+  Fragment,
   type ReactNode,
 } from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
@@ -247,10 +248,10 @@ function Tooltip({
                   <span className="flex items-center gap-1.5">
                     <span className="[text-box:trim-both_cap_alphabetic]">{content}</span>
                     {shortcut.map((key, index) => (
-                      <span key={key} className="flex items-center gap-1.5">
+                      <Fragment key={key}>
                         {index > 0 && <span className="text-background/60 [text-box:trim-both_cap_alphabetic]">or</span>}
                         <TooltipKbd>{key}</TooltipKbd>
-                      </span>
+                      </Fragment>
                     ))}
                   </span>
                 ) : (

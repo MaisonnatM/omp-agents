@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip } from "@/components/ui/tooltip";
 import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import { type ShortcutId, shortcutLabels, shortcutOf } from "../shortcuts";
+import { type ShortcutId, shortcutLabels } from "../shortcuts";
 
 export interface PickerItem {
 	/** What cmdk filters and keys on; unique across the picker. */
@@ -52,8 +52,9 @@ interface CommandPickerProps {
 	/** The up-down chevron after the trigger's content; `false` for a button that adds rather than switches. */
 	chevron?: boolean;
 	ariaLabel?: string;
-	title?: string;
-	/** The shortcut that runs the trigger's action: its keys show in a tooltip after `title`, or after the shortcut's own label without one. */
+	/** What hovering the trigger says; no tooltip when omitted. */
+	tooltip?: string;
+	/** Adds this shortcut's keys to the tooltip. */
 	shortcut?: ShortcutId;
 	disabled?: boolean;
 	className?: string;
@@ -71,7 +72,7 @@ interface CommandPickerProps {
 }
 
 /** A button that opens a searchable, grouped list of choices; picking one closes it. The dashboard's every combobox. */
-export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, title, shortcut, disabled, className, search, width, side, open, onOpenChange, list, empty }: CommandPickerProps) {
+export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, tooltip, shortcut, disabled, className, search, width, side, open, onOpenChange, list, empty }: CommandPickerProps) {
 	const [inner, setInner] = useState(false);
 	const shown = open ?? inner;
 	const change = (next: boolean): void => {
@@ -79,30 +80,31 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, title,
 		onOpenChange?.(next);
 	};
 	const button = (
-		<Button
-			variant="ghost"
-			size="compact"
-			leadingIcon={icon}
-			trailingIcon={chevron ? ChevronsUpDown : undefined}
-			aria-label={ariaLabel}
-			title={shortcut ? undefined : title}
-			// A shortcut tooltip's trigger would stamp its own open state over the popover's.
-			data-state={shown ? "open" : "closed"}
-			disabled={disabled}
-			active={shown}
-			className={className}
-		>
-			{trigger}
-		</Button>
+		<PopoverTrigger asChild>
+			<Button
+				variant="ghost"
+				size="compact"
+				leadingIcon={icon}
+				trailingIcon={chevron ? ChevronsUpDown : undefined}
+				aria-label={ariaLabel}
+				// Keeps Radix's popover `data-state` contract under a Tooltip trigger, which stamps its own.
+				data-state={shown ? "open" : "closed"}
+				disabled={disabled}
+				active={shown}
+				className={className}
+			>
+				{trigger}
+			</Button>
+		</PopoverTrigger>
 	);
 	return (
 		<Popover open={shown} onOpenChange={change}>
-			{shortcut ? (
-				<Tooltip content={title ?? shortcutOf(shortcut).label} shortcut={shortcutLabels(shortcut)} side={side ?? "bottom"} forceOpen={shown ? false : undefined}>
-					<PopoverTrigger asChild>{button}</PopoverTrigger>
+			{tooltip ? (
+				<Tooltip content={tooltip} shortcut={shortcut && shortcutLabels(shortcut)} side={side ?? "bottom"} forceOpen={shown ? false : undefined}>
+					{button}
 				</Tooltip>
 			) : (
-				<PopoverTrigger asChild>{button}</PopoverTrigger>
+				button
 			)}
 			{/* A click in the list must not reach the composer around a picker, which would take the focus back to its text box. */}
 			<PopoverContent side={side} align="start" className={cn(WIDTH[width], "p-0")} onMouseDown={event => event.stopPropagation()}>

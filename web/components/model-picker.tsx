@@ -3,11 +3,14 @@ import { modelLabel, modelOrg, providerLabel, providerOrg } from "../labels";
 import { CommandPicker, fromList, type PickerGroup } from "./command-picker";
 import { OrgIcon } from "./org-icon";
 
-/** `anthropic/claude-opus-5-5` as the Anthropic logo and `Opus 5.5`, with the full selector on hover. */
-export function Model({ selector }: { selector: string }) {
+/**
+ * `anthropic/claude-opus-5-5` as the Anthropic logo and `Opus 5.5`, with the full selector on hover. `titled={false}`
+ * drops the hover and the logo's name, for a trigger whose tooltip and aria-label already say them.
+ */
+export function Model({ selector, titled = true }: { selector: string; titled?: boolean }) {
 	return (
-		<span title={selector}>
-			<OrgIcon org={modelOrg(selector)} label className="mr-1 inline-block align-[-0.125em]" />
+		<span title={titled ? selector : undefined}>
+			<OrgIcon org={modelOrg(selector)} label={titled} className="mr-1 inline-block align-[-0.125em]" />
 			{modelLabel(selector)}
 		</span>
 	);
@@ -98,20 +101,8 @@ const selectorOf = (model: ModelOption): string => `${model.provider}/${model.id
 export function ModelPicker({ current, unset, list, open, onOpenChange, onPick, disabled }: ModelPickerProps) {
 	return (
 		<CommandPicker
-			trigger={
-				<span className="max-w-56 truncate">
-					{/* No `Model`: its native titles would show over the tooltip, which names the selector as the aria-label names the provider. */}
-					{current ? (
-						<>
-							<OrgIcon org={modelOrg(current)} className="mr-1 inline-block align-[-0.125em]" />
-							{modelLabel(current)}
-						</>
-					) : (
-						(unset ?? "Choose model")
-					)}
-				</span>
-			}
-			title={current ?? undefined}
+			trigger={<span className="max-w-56 truncate">{current ? <Model selector={current} titled={false} /> : (unset ?? "Choose model")}</span>}
+			tooltip={current ?? unset ?? "Choose model"}
 			shortcut="model"
 			ariaLabel={`Choose model: ${current ? modelDescription(current) : (unset ?? "none selected")}`}
 			disabled={disabled}

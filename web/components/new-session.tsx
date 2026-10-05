@@ -56,7 +56,7 @@ function DirectoryPicker({ cwd, workspaces, disabled, onPick }: DirectoryPickerP
 			trigger={<span className="truncate">{projectName(cwd) ?? cwd}</span>}
 			icon={Folder}
 			ariaLabel={`Working directory: ${cwd}`}
-			title={cwd}
+			tooltip={cwd}
 			disabled={disabled}
 			className="min-w-0"
 			search={{ label: "Search or type a directory", query: { value: query, onChange: setQuery } }}

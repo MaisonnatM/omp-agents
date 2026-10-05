@@ -51,7 +51,6 @@ const QUEUE_TAGS: [keyof MessageQueue, string][] = [
 ];
 
 const FOLLOW_UP_KEYS = shortcutKeys("followUp");
-const INTERRUPT_KEYS = shortcutLabels("interrupt");
 
 
 interface HeaderProps {
@@ -550,7 +549,7 @@ function LiveConversation({
 					// While a turn runs, Enter and the send button steer it, and Stop interrupts a session's turn.
 					status={working ? "streaming" : "idle"}
 					onStop={view.agentId === null ? interrupt : undefined}
-					stopShortcut={INTERRUPT_KEYS}
+					stopShortcut={shortcutLabels("interrupt")}
 					queue={queued.map(({ item }) => item)}
 					onEditQueued={item => take(queued.filter(entry => entry.item.id === item.id), true)}
 					onRemoveQueued={item => take(queued.filter(entry => entry.item.id === item.id), false)}
