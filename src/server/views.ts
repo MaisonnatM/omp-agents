@@ -35,7 +35,7 @@ function snapshot(view: View, tail: FileTail | undefined): ServerMsg[] {
 	if (!tail.loaded) return [];
 	return [
 		{ t: "items", view, reset: true, items: tail.transcript.items() },
-		{ t: "work", view, work: tail.work.snapshot() },
+		{ t: "work", view, work: tail.work },
 	];
 }
 

@@ -1,11 +1,10 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { type PullRequest, type RosterHost, TICKET_ID, type View } from "../src/shared";
+import { type PullRequest, type RosterHost, SESSION_HASH_PREFIX, TICKET_ID, type View } from "../src/shared";
 
 const PAST_PREFIX = "past/";
 const SETTINGS = "settings";
 const INBOX = "inbox";
 const TICKETS = "tickets";
-const SESSION_PREFIX = "session/";
 const NEW = "new";
 
 /** The inbox page, and the pull request whose row it scrolls to and highlights; `null` for none. */
@@ -49,7 +48,7 @@ export const hashForTickets = (target: string | null): string => (target ? `#${T
 /** `#session/<id>` names a session by its id, which outlives the host running it, for links from outside the page. */
 export function sessionFromHash(hash: string): string | null {
 	const raw = hash.replace(/^#/, "");
-	return raw.startsWith(SESSION_PREFIX) && raw.length > SESSION_PREFIX.length ? decodeURIComponent(raw.slice(SESSION_PREFIX.length)) : null;
+	return raw.startsWith(SESSION_HASH_PREFIX) && raw.length > SESSION_HASH_PREFIX.length ? decodeURIComponent(raw.slice(SESSION_HASH_PREFIX.length)) : null;
 }
 
 /** The view a session id opens: the live host that runs the session, else its saved transcript. */

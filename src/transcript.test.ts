@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildSkillPromptMessage } from "./omp/prompts";
-import { Transcript } from "./transcript";
+import { splitSuggestions, Transcript } from "./transcript";
 
 const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({
 	role: "assistant",
@@ -22,7 +22,7 @@ describe("Transcript", () => {
 			type: "message_update",
 			assistantMessageEvent: { type: "text_delta", delta: "po", partial: assistant(200, [text("po")]) },
 		});
-		expect(streaming).toEqual([{ id: "m200:0", kind: "assistant", text: "po", streaming: true }]);
+		expect(streaming).toEqual([{ id: "m200:0", kind: "assistant", text: "po", streaming: true, suggestions: [] }]);
 
 		t.applyEntry({ type: "message", id: "e2", message: assistant(200, [text("pong")], { stopReason: "stop" }) });
 		// The relay delivers the last update after the local file already has the message.
@@ -31,7 +31,7 @@ describe("Transcript", () => {
 		expect(late).toEqual([]);
 		expect(t.items()).toEqual([
 			{ id: "m100", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1" },
-			{ id: "m200:0", kind: "assistant", text: "pong", streaming: false },
+			{ id: "m200:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] },
 		]);
 	});
 
@@ -43,7 +43,7 @@ describe("Transcript", () => {
 
 		expect(update("po", call).map(item => item.id)).toEqual(["m200:0", "tool:c1"]);
 		expect(update("po", call)).toEqual([]);
-		expect(update("pong", call)).toEqual([{ id: "m200:0", kind: "assistant", text: "pong", streaming: true }]);
+		expect(update("pong", call)).toEqual([{ id: "m200:0", kind: "assistant", text: "pong", streaming: true, suggestions: [] }]);
 		expect(t.applyEvent({ type: "tool_execution_end", toolCallId: "c1", toolName: "bash", isError: true })).toEqual([
 			{ id: "tool:c1", kind: "tool", name: "bash", summary: "ls", status: "error", agents: [] },
 		]);
@@ -81,7 +81,7 @@ describe("Transcript", () => {
 		t.applyEvent({ type: "notice", level: "info", message: "Saved." });
 
 		expect(t.items().map(item => item.id)).toEqual(["m600", "m610:0", "notice1"]);
-		expect(t.items()[1]).toEqual({ id: "m610:0", kind: "assistant", text: "pong", streaming: false });
+		expect(t.items()[1]).toEqual({ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] });
 	});
 
 	test("a prompt omp can branch at carries its entry id once the file holds it", () => {
@@ -203,7 +203,7 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([
 			{ id: "m1", kind: "user", text: "list files", skill: null, from: null, entryId: "e1" },
 			{ id: "tool:c9", kind: "tool", name: "read", summary: "Listing files", status: "ok", agents: [] },
-			{ id: "m4:0", kind: "assistant", text: "README.md", streaming: false },
+			{ id: "m4:0", kind: "assistant", text: "README.md", streaming: false, suggestions: [] },
 			{ id: "m4:stop", kind: "notice", level: "warning", text: "Interrupted." },
 		]);
 	});
@@ -249,5 +249,33 @@ describe("Transcript", () => {
 			"```sh\n$ ls\n```\n\nExit code 2.",
 			"```sh\n$ ls\n```\n\nCancelled.",
 		]);
+	});
+});
+
+describe("splitSuggestions", () => {
+	test("the block splits off a reply's end, blank lines allowed between items", () => {
+		expect(splitSuggestions("Done: tests pass.\n\nSuggestions:\n1. Open the PR\n\n2. Add a test for `x`  \n")).toEqual({
+			body: "Done: tests pass.",
+			suggestions: ["Open the PR", "Add a test for `x`"],
+		});
+	});
+
+	test("a numbered list without the heading, text after the block, a heading with no items, or a restyled heading stays in the body", () => {
+		for (const text of [
+			"Steps:\n1. Build\n2. Ship",
+			"Suggestions:\n1. Open the PR\nThat is all.",
+			"Suggestions:\n1. Open the PR\n- also this",
+			"Done.\nSuggestions:",
+			"See the Suggestions below\n1. Open the PR",
+			"Done.\n**Suggestions:**\n1. Open the PR",
+		]) {
+			expect(splitSuggestions(text)).toEqual({ body: text, suggestions: [] });
+		}
+	});
+
+	test("a reply's item carries its suggestions and shows only the body", () => {
+		const t = new Transcript();
+		t.applyEntry({ type: "message", id: "e1", message: assistant(300, [text("Done.\nSuggestions:\n1. Ship it")], { stopReason: "stop" }) });
+		expect(t.items()).toEqual([{ id: "m300:0", kind: "assistant", text: "Done.", streaming: false, suggestions: ["Ship it"] }]);
 	});
 });

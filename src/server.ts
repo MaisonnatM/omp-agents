@@ -5,6 +5,7 @@ import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
 import { displayPath, interruptedFile, tokenFile } from "./paths";
+import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Broadcasts } from "./server/broadcasts";
 import { fail, guardsFor } from "./server/http";
@@ -20,8 +21,7 @@ import { type SocketData, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
 import type { View } from "./shared";
 
-const PORT = Number(process.env.PORT ?? 4317);
-const HOSTNAME = "127.0.0.1";
+const PORT = portFromEnv();
 
 const token = loadToken(tokenFile);
 const guards = guardsFor(PORT, token);
@@ -156,7 +156,7 @@ try {
 		routes: {
 			...createRoutes({
 				guards,
-				origin: `http://${HOSTNAME}:${PORT}`,
+				origin: originOf(PORT),
 				knownCwds,
 				pullRequestIndex: files.pullRequests,
 				pullRequestsOf: files.pullRequestsOf,
@@ -196,8 +196,8 @@ loops.watch();
 await rescanFiles();
 await listRegistry();
 loops.start();
-console.log(`omp-agents (omp v${ompVersion}) on http://${HOSTNAME}:${PORT}`);
-console.log(`Sign in at http://${HOSTNAME}:${PORT}/?token=${token}`);
+console.log(listeningLine(PORT, ompVersion));
+console.log(`Sign in at ${originOf(PORT)}/?token=${token}`);
 console.log(`The access token is in ${displayPath(tokenFile)}; delete the file and restart to rotate it.`);
 
 /** SIGINT and SIGTERM may both arrive; the second finds the shutdown already under way. */
@@ -212,3 +212,8 @@ function shutdown(): Promise<void> {
 }
 process.on("SIGINT", () => void shutdown());
 process.on("SIGTERM", () => void shutdown());
+// The desktop shell holds the server's stdin open and never writes to it; when the shell dies, even by SIGKILL, the pipe ends.
+if (process.env.OMP_AGENTS_PARENT === "stdin") {
+	process.stdin.on("end", () => void shutdown());
+	process.stdin.resume();
+}

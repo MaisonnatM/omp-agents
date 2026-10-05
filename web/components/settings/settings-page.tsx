@@ -1,4 +1,4 @@
-import { Check, ChevronsUpDown, FileText, FolderOpen, Palette, Plug, RotateCcw, Route } from "lucide-react";
+import { Check, ChevronsUpDown, FileText, FolderOpen, Palette, Plug, RotateCcw, Route, Sparkles } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { AppearanceTab } from "./appearance-tab";
 import { type Catalog, type Editing, errorText } from "./editor";
 import { Files } from "./files-tab";
 import { LinearConnection } from "./linear-connection";
+import { NewSessionsTab } from "./new-sessions-tab";
 import { RetrySection, RolesTab } from "./routing-tab";
 
 type Load = { phase: "loading" } | { phase: "loaded"; settings: OmpSettings } | { phase: "failed"; error: string };
@@ -65,6 +66,7 @@ const SETTINGS_TABS = [
 	{ value: "retry", label: "Retry and fallback", icon: RotateCcw },
 	{ value: "files", label: "Files", icon: FileText },
 	{ value: "integrations", label: "Integrations", icon: Plug },
+	{ value: "new-sessions", label: "New sessions", icon: Sparkles },
 	{ value: "appearance", label: "Appearance", icon: Palette },
 ] as const;
 
@@ -73,7 +75,7 @@ type SettingsTab = (typeof SETTINGS_TABS)[number]["value"];
 const PANEL = "space-y-10 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background data-[state=inactive]:hidden";
 
 /** What the omp tabs show: their content once omp's settings are read, else why they are empty. */
-function ompPanels(load: Load, cwd: string | null, editing: Editing): Record<Exclude<SettingsTab, "appearance" | "integrations">, ReactNode> {
+function ompPanels(load: Load, cwd: string | null, editing: Editing): Record<"roles" | "retry" | "files", ReactNode> {
 	if (load.phase !== "loaded") {
 		const note =
 			load.phase === "loading" ? (
@@ -146,7 +148,12 @@ export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspac
 			loadSettings(cwd, new AbortController().signal).then(saved, (err: unknown) => setLoad({ phase: "failed", error: errorText(err) })),
 	};
 
-	const panels: Record<SettingsTab, ReactNode> = { ...ompPanels(load, cwd, editing), integrations: <LinearConnection />, appearance: <AppearanceTab /> };
+	const panels: Record<SettingsTab, ReactNode> = {
+		...ompPanels(load, cwd, editing),
+		integrations: <LinearConnection />,
+		"new-sessions": <NewSessionsTab cwd={cwd} />,
+		appearance: <AppearanceTab />,
+	};
 	// Panels stay mounted so an unsaved draft survives switching tabs; PANEL hides the inactive ones.
 	const body = (
 		<Tabs value={tab} onValueChange={value => setTab(SETTINGS_TABS.find(option => option.value === value)?.value ?? tab)} className="space-y-6">

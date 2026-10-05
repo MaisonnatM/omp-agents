@@ -2,11 +2,10 @@
  * Links from a pull request's description back to the dashboard sessions that submitted or worked on it. The
  * dashboard writes them only when the user asks, inside one marked block that a rerun replaces.
  */
+import { ghGet, ghPatch } from "./github";
 import { isObject } from "./json";
-import { runChecked } from "./proc";
-import type { PullRequest, PullRequestLink, SessionLinksResult } from "./shared";
+import { hashForSession, type PullRequest, type PullRequestLink, type SessionLinksResult } from "./shared";
 
-const GH_TIMEOUT_MS = 20_000;
 const START = "<!-- omp-sessions -->";
 const END = "<!-- /omp-sessions -->";
 /** Cursor's Bugbot keeps its summary at the end of the description, in a block that starts with this marker. */
@@ -23,7 +22,7 @@ export interface SessionEntry {
 export function sessionLinksBlock(origin: string, sessions: readonly SessionEntry[]): string {
 	const lines = sessions.map(
 		({ sessionId, link }) =>
-			`- [Session ${sessionId.slice(0, 8)}](${origin}/#session/${encodeURIComponent(sessionId)}) ${link === "submitted" ? "submitted" : "worked on"} this pull request.`,
+			`- [Session ${sessionId.slice(0, 8)}](${origin}/${hashForSession(sessionId)}) ${link === "submitted" ? "submitted" : "worked on"} this pull request.`,
 	);
 	return [START, `**omp sessions.** These links open only on the machine that runs the omp-agents dashboard at ${origin}.`, "", ...lines, END].join("\n");
 }
@@ -39,7 +38,7 @@ export function mergeSessionLinks(body: string, block: string): string {
 
 /** The pull request's description as GitHub holds it now; empty when it has none. */
 export async function readDescription(pr: PullRequest): Promise<string> {
-	const answer: unknown = JSON.parse(await runChecked(["gh", "api", `repos/${pr.owner}/${pr.repo}/pulls/${pr.number}`], { timeoutMs: GH_TIMEOUT_MS }));
+	const answer = await ghGet(`repos/${pr.owner}/${pr.repo}/pulls/${pr.number}`);
 	const body = isObject(answer) ? answer.body : null;
 	return typeof body === "string" ? body : "";
 }
@@ -49,9 +48,6 @@ export async function linkSessions(pr: PullRequest, sessions: readonly SessionEn
 	const body = await readDescription(pr);
 	const next = mergeSessionLinks(body, sessionLinksBlock(origin, sessions));
 	if (next === body) return { changed: false };
-	await runChecked(["gh", "api", "--method", "PATCH", `repos/${pr.owner}/${pr.repo}/pulls/${pr.number}`, "--input", "-"], {
-		input: JSON.stringify({ body: next }),
-		timeoutMs: GH_TIMEOUT_MS,
-	});
+	await ghPatch(`repos/${pr.owner}/${pr.repo}/pulls/${pr.number}`, { body: next });
 	return { changed: true };
 }
