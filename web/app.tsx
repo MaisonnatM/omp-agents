@@ -31,7 +31,7 @@ import {
 	sameView,
 } from "./routing";
 import type { SectionTarget } from "./section";
-import { defaultCwd, discoverableSessions, listedViews, projectSwitch, sidebarSessions, workspaces } from "./sessions";
+import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, sidebarSessions, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { useStoredKeys } from "./stored-state";
@@ -89,6 +89,7 @@ export function App() {
 	useEffect(() => {
 		document.title = title;
 	}, [title]);
+	const viewCwd = (viewHost ?? viewPast)?.cwd;
 	const split = layout.panes.length > 1;
 	const [columns, setColumns] = useSplitRatio("columns");
 	const [rows, setRows] = useSplitRatio("rows");
@@ -122,12 +123,11 @@ export function App() {
 
 	const switchProject = (cwd: string | null): void => {
 		pickProject(cwd);
-		// Over the panes, the focused one follows the sidebar into the project, unless it already shows one of its sessions.
-		if (cwd === null || page || (viewHost ?? viewPast)?.cwd === cwd) return;
-		const newest = state.hosts.filter(row => row.cwd === cwd).toSorted((a, b) => b.startedAt - a.startedAt)[0];
-		if (newest) open({ kind: "live", instanceId: newest.instanceId, agentId: null }, "replace");
+		// A page such as the inbox stays; only the panes follow the sidebar into the project.
+		const next = page ? null : projectSession(cwd, visible.hosts, viewCwd);
+		if (next) open(next, "replace");
 	};
-	const settingsPage: Page = { kind: "settings", cwd: page?.kind === "settings" ? page.cwd : (viewHost ?? viewPast)?.cwd || null };
+	const settingsPage: Page = { kind: "settings", cwd: page?.kind === "settings" ? page.cwd : viewCwd || null };
 	const settingsHref = hashForPage(settingsPage);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);

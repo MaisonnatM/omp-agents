@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PastSession, RosterHost } from "../src/shared";
-import { defaultCwd, discoverableSessions, listedViews, projectSwitch, sidebarSessions } from "./sessions";
+import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, sidebarSessions } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => ({ instanceId: `i-${sessionId}`, sessionId, cwd }) as RosterHost;
 const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
@@ -66,6 +66,22 @@ describe("discoverableSessions", () => {
 		expect(projectSwitch("~/app", "~/other")).toBe("~/other");
 		expect(projectSwitch(null, "~/other")).toBeNull();
 		expect(projectSwitch("~/app", "~/app")).toBeNull();
+	});
+});
+
+describe("projectSession", () => {
+	const running = (instanceId: string, cwd: string, startedAt: number) => ({ instanceId, cwd, startedAt }) as RosterHost;
+	const hosts = [running("old", "~/app", 1), running("new", "~/app", 3), running("other", "~/other", 5)];
+
+	test("opens the project's most recently started running session", () => {
+		expect(projectSession("~/app", hosts, "~/other")).toEqual({ kind: "live", instanceId: "new", agentId: null });
+		expect(projectSession("~/app", hosts, undefined)).toEqual({ kind: "live", instanceId: "new", agentId: null });
+	});
+
+	test("opens nothing for All projects, a pane already in the project, or a project with no running session", () => {
+		expect(projectSession(null, hosts, "~/other")).toBeNull();
+		expect(projectSession("~/app", hosts, "~/app")).toBeNull();
+		expect(projectSession("~/idle", hosts, "~/other")).toBeNull();
 	});
 });
 
