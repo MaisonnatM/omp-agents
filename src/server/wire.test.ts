@@ -32,16 +32,22 @@ describe("parseClientMsg", () => {
 
 	test("user-todo takes each change with the fields it needs, and drops any other field", () => {
 		const change = (value: unknown) => msg({ t: "user-todo", change: value });
-		expect(change({ op: "add", id: "a", parentId: null, afterId: "b", text: "Ship", extra: 1 })).toEqual({
+		expect(change({ op: "add", id: "a", parentId: null, afterId: "b", categoryId: "w", text: "Ship", extra: 1 })).toEqual({
 			t: "user-todo",
-			change: { op: "add", id: "a", parentId: null, afterId: "b", text: "Ship" },
+			change: { op: "add", id: "a", parentId: null, afterId: "b", categoryId: "w", text: "Ship" },
 		});
 		expect(change({ op: "toggle", id: "a", done: true })).toEqual({ t: "user-todo", change: { op: "toggle", id: "a", done: true } });
-		expect(change({ op: "clear-done" })).toEqual({ t: "user-todo", change: { op: "clear-done" } });
-		expect(change({ op: "add", id: "a", text: "Ship" })).toBeNull();
+		expect(change({ op: "clear-done", categoryId: null })).toEqual({ t: "user-todo", change: { op: "clear-done", categoryId: null } });
+		expect(change({ op: "edit-body", id: "a", body: "# Notes\n" })).toEqual({ t: "user-todo", change: { op: "edit-body", id: "a", body: "# Notes\n" } });
+		expect(change({ op: "categorize", id: "a", categoryId: null })).toEqual({ t: "user-todo", change: { op: "categorize", id: "a", categoryId: null } });
+		expect(change({ op: "add-category", id: "w", name: "Work" })).toEqual({ t: "user-todo", change: { op: "add-category", id: "w", name: "Work" } });
+		expect(change({ op: "add", id: "a", parentId: null, afterId: null, text: "Ship" })).toBeNull();
+		expect(change({ op: "clear-done" })).toBeNull();
 		expect(change({ op: "toggle", id: "a", done: "yes" })).toBeNull();
 		expect(change({ op: "indent", id: "" })).toBeNull();
 		expect(change({ op: "edit", id: "a", text: "x".repeat(2001) })).toBeNull();
+		expect(change({ op: "edit-body", id: "a", body: "x".repeat(100_001) })).toBeNull();
+		expect(change({ op: "rename-category", id: "w", name: "  " })).toBeNull();
 		expect(change({ op: "move", id: "a" })).toBeNull();
 	});
 

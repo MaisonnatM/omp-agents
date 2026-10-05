@@ -12,7 +12,7 @@ export const tokenFile = join(configDir, "token");
 /** The sessions this dashboard started that stopped without End session, beside {@link tokenFile}. */
 export const interruptedFile = join(configDir, "interrupted.json");
 
-/** The sidebar Todo tab's list, beside {@link tokenFile}. */
+/** The Todo page's list, beside {@link tokenFile}. */
 export const userTodosFile = join(configDir, "todos.json");
 
 /** `path` with the home directory shortened to `~`. */

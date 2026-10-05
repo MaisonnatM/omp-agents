@@ -1,5 +1,5 @@
 /**
- * What every socket hears on the `roster` topic: the roster, the past-session list, plan usage, and the Todo tab's list.
+ * What every socket hears on the `roster` topic: the roster, the past-session list, plan usage, and the Todo page's list.
  * Each push publishes only what changed since the last one. Roster and past pushes wait for a listener;
  * a socket that subscribes gets all four at once.
  */

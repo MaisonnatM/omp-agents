@@ -20,6 +20,11 @@ export interface SettingsRoute {
 	cwd: string | null;
 }
 
+/** The Todo page, showing the todos of category `category` alone, or every todo for `null`. */
+export interface TodoRoute {
+	category: string | null;
+}
+
 /** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. */
 export interface NewSessionRoute {
 	cwd: string | null;
@@ -30,6 +35,7 @@ export type Page =
 	| ({ kind: "settings" } & SettingsRoute)
 	| ({ kind: "inbox" } & InboxRoute)
 	| ({ kind: "tickets" } & TicketsRoute)
+	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "new" } & NewSessionRoute);
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
@@ -49,6 +55,7 @@ const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : 
  *   `#inbox/<owner>/<repo>/<number>` opens it at that pull request's row. Any other `#inbox/…` opens the page alone.
  * - `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
  *   opens it at that issue's row. Any other `#tickets/…` opens the page alone.
+ * - `#todo` opens the Todo page with every todo, and `#todo/<category id>` with that category's todos alone.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null) => PageOf<K> } = {
 	settings: rest => ({ kind: "settings", cwd: decodeCwd(rest) }),
@@ -58,6 +65,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null) => PageOf<K> } = {
 		return { kind: "inbox", target: match ? { owner: match[1]!, repo: match[2]!, number: Number(match[3]) } : null };
 	},
 	tickets: rest => ({ kind: "tickets", target: rest !== null && TICKET_ID.test(rest) ? rest : null }),
+	todo: rest => ({ kind: "todo", category: rest ? decodeURIComponent(rest) : null }),
 };
 
 const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, head);
@@ -72,6 +80,8 @@ function restOfPage(page: Page): string | null {
 			return page.target && `${page.target.owner}/${page.target.repo}/${page.target.number}`;
 		case "tickets":
 			return page.target || null;
+		case "todo":
+			return page.category === null ? null : encodeURIComponent(page.category);
 		default: {
 			const never: never = page;
 			return never;
@@ -86,6 +96,7 @@ export function hashForPage(page: Page): string {
 
 export const hashForInbox = (target: PullRequest | null): string => hashForPage({ kind: "inbox", target });
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
+export const hashForTodo = (category: string | null): string => hashForPage({ kind: "todo", category });
 export const hashForSettings = (cwd: string | null): string => hashForPage({ kind: "settings", cwd });
 export const hashForNewSession = (cwd: string | null): string => hashForPage({ kind: "new", cwd });
 
@@ -165,7 +176,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `session`, or `new`. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `todo`, `session`, or `new`. */
 function viewFromPane(pane: string): View {
 	if (pane.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(pane.slice(PAST_PREFIX.length)) };
 	const slash = pane.indexOf("/");

@@ -745,33 +745,63 @@ export interface OmpSettings {
 	files: OmpFile[];
 }
 
-/** A todo of your own, on the sidebar's Todo tab, under a top-level one. It holds none, so the list is two deep at most. */
+/** A todo of your own, on the Todo page, under a top-level one. It holds none, so the list is two deep at most. */
 export interface UserTodoLeaf {
 	id: string;
+	/** Its title, one line. */
 	text: string;
+	/** Its markdown content, `""` for none. */
+	body: string;
 	done: boolean;
 }
 
-/** A top-level todo of the Todo tab, with its own todos in order. */
+/** A top-level todo of the Todo page, in category `categoryId` (`null` for none), with its own todos in order, which share its category. */
 export interface UserTodo extends UserTodoLeaf {
+	categoryId: string | null;
 	children: UserTodoLeaf[];
 }
 
-/** One edit of the Todo tab's list. A change that names no todo, or would nest one three deep, changes nothing. */
+/** A category of the Todo page, which the sidebar lists to show its todos alone. */
+export interface UserTodoCategory {
+	id: string;
+	name: string;
+}
+
+/** The Todo page's categories and todos, each in order. */
+export interface UserTodoList {
+	categories: UserTodoCategory[];
+	todos: UserTodo[];
+}
+
+/**
+ * One edit of the Todo page's list. A change that names no todo or category, or would nest a todo three deep, changes
+ * nothing. The page picks every new `id`, so an add sent twice adds once.
+ */
 export type UserTodoChange =
-	/** After todo `afterId` among `parentId`'s todos (the top level for `null`), or last for `null`. The page picks `id`, so an add sent twice adds once. */
-	| { op: "add"; id: string; parentId: string | null; afterId: string | null; text: string }
+	/**
+	 * After todo `afterId` among `parentId`'s todos (the top level for `null`), or last for `null`. A top-level todo goes
+	 * in category `categoryId`, or in none when that category is gone; one under another goes in its parent's.
+	 */
+	| { op: "add"; id: string; parentId: string | null; afterId: string | null; categoryId: string | null; text: string }
 	| { op: "edit"; id: string; text: string }
+	| { op: "edit-body"; id: string; body: string }
 	/** Checking a top-level todo checks its todos too. */
 	| { op: "toggle"; id: string; done: boolean }
 	/** With its todos. */
 	| { op: "remove"; id: string }
-	/** A top-level todo without todos of its own goes last under the top-level todo above it. */
+	/** A top-level todo without todos of its own goes last under the top-level todo above it in its category. */
 	| { op: "indent"; id: string }
 	/** A todo under another goes to the top level right after it, and takes the todos below it along, so the list reads in the same order. */
 	| { op: "outdent"; id: string }
-	/** Removes every checked todo. */
-	| { op: "clear-done" };
+	/** A top-level todo, with its todos, moves to category `categoryId`, or to none for `null`. */
+	| { op: "categorize"; id: string; categoryId: string | null }
+	/** Removes every checked todo of category `categoryId`, or of the whole list for `null`. */
+	| { op: "clear-done"; categoryId: string | null }
+	/** Last among the categories. */
+	| { op: "add-category"; id: string; name: string }
+	| { op: "rename-category"; id: string; name: string }
+	/** Its todos stay, in no category. */
+	| { op: "remove-category"; id: string };
 
 export type ServerMsg =
 	| { t: "roster"; hosts: RosterHost[]; error: string | null }
@@ -793,8 +823,8 @@ export type ServerMsg =
 	| { t: "models"; instanceId: string; models: ModelOption[]; error: string | null }
 	/** Answers this socket's `dequeue` with the texts it took out of the queue, oldest first. Nothing answers when every message had gone. */
 	| { t: "dequeued"; view: LiveView; reqId: number; texts: string[] }
-	/** The Todo tab's list, whole, sent when a socket opens and after every change. */
-	| { t: "user-todos"; todos: UserTodo[] };
+	/** The Todo page's list, whole, sent when a socket opens and after every change. */
+	| { t: "user-todos"; list: UserTodoList };
 
 export type ClientMsg =
 	/** The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming. */
@@ -827,5 +857,5 @@ export type ClientMsg =
 	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer }
 	/** Cancel a running subagent of a live session without stopping the session's turn; it cannot be revived after. */
 	| { t: "cancel-agent"; view: LiveView & { agentId: string } }
-	/** Change the Todo tab's list; every socket then gets the list as it is after. */
+	/** Change the Todo page's list; every socket then gets the list as it is after. */
 	| { t: "user-todo"; change: UserTodoChange };
