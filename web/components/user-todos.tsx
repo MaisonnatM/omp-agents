@@ -3,6 +3,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import type { PastSession, RosterHost, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../src/shared";
 import { applyUserTodo } from "../../src/user-todos";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { hashForTodo, type TodoListView } from "../routing";
 import { DAY_FORMAT, LIST_KINDS, leftIn, matches, placeIn, restoreOf, type TodoEntry, titleOf, todosOf, today } from "../todo-views";
@@ -275,6 +276,19 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 		const childrenDone = children.filter(child => child.doneAt !== null).length;
 		const over = drag.overOf(todo.id);
 		const rowProps = drag.rowProps(entry, siblings);
+		const check = (
+			<button
+				type="button"
+				role="checkbox"
+				aria-checked={done}
+				aria-label={todo.text}
+				disabled={disabled}
+				onClick={() => toggle(todo)}
+				className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground disabled:pointer-events-none [&>svg]:size-4"
+			>
+				{done ? <CircleCheck /> : <Circle />}
+			</button>
+		);
 		return (
 			<li
 				key={todo.id}
@@ -293,17 +307,9 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 				{rowProps.draggable && !isEditing && (
 					<GripVertical aria-hidden className="absolute -left-3 top-1.5 size-3.5 cursor-grab text-muted-foreground/50 opacity-0 group-hover/todo:opacity-100" />
 				)}
-				<button
-					type="button"
-					role="checkbox"
-					aria-checked={done}
-					aria-label={todo.text}
-					disabled={disabled}
-					onClick={() => toggle(todo)}
-					className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground disabled:pointer-events-none [&>svg]:size-4"
-				>
-					{done ? <CircleCheck /> : <Circle />}
-				</button>
+				<Tooltip content={done ? "Mark not done" : "Mark done"}>
+					{disabled ? <span className="inline-flex">{check}</span> : check}
+				</Tooltip>
 				{isEditing ? (
 					<TodoInput
 						initial={todo.text}
@@ -315,35 +321,37 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 						}}
 					/>
 				) : (
-					<button
-						type="button"
-						data-todo-row
-						title="Open and edit"
-						onClick={() => {
-							setOpenId(todo.id);
-							if (!disabled) setEditing({ kind: "edit", id: todo.id });
-						}}
-						onKeyDown={event => {
-							if (event.key === "Escape") event.currentTarget.blur();
-						}}
-						className={cn("min-w-0 flex-1 break-words rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring", done ? "text-muted-foreground line-through" : "text-foreground")}
-					>
-						{todo.text}
-					</button>
+					<Tooltip content="Open and edit">
+						<button
+							type="button"
+							data-todo-row
+							onClick={() => {
+								setOpenId(todo.id);
+								if (!disabled) setEditing({ kind: "edit", id: todo.id });
+							}}
+							onKeyDown={event => {
+								if (event.key === "Escape") event.currentTarget.blur();
+							}}
+							className={cn("min-w-0 flex-1 break-words rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring", done ? "text-muted-foreground line-through" : "text-foreground")}
+						>
+							{todo.text}
+						</button>
+					</Tooltip>
 				)}
 				{top?.addedBy && <AddedByChip sessionId={top.addedBy} sessions={sessions} />}
 				{top?.links.map(link => <TodoLinkChip key={JSON.stringify(link)} link={link} sessions={sessions} />)}
 				{todo.due && !done && <DueChip due={todo.due} day={day} />}
 				{todo.body.trim() && (
-					<button
-						type="button"
-						title="Has notes"
-						aria-label={`Open the notes of ${todo.text}`}
-						onClick={() => setOpenId(todo.id)}
-						className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground [&>svg]:size-3.5"
-					>
-						<NotebookText />
-					</button>
+					<Tooltip content="Has notes">
+						<button
+							type="button"
+							aria-label={`Open the notes of ${todo.text}`}
+							onClick={() => setOpenId(todo.id)}
+							className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground [&>svg]:size-3.5"
+						>
+							<NotebookText />
+						</button>
+					</Tooltip>
 				)}
 				{children.length > 0 && (
 					<span className="shrink-0 text-xs tabular-nums text-muted-foreground" aria-label={`${childrenDone} of ${children.length} done`}>
@@ -353,25 +361,27 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 				{!disabled && !isEditing && (
 					<span className="flex shrink-0 gap-1 opacity-0 group-hover/todo:opacity-100 focus-within:opacity-100 [&_svg]:size-3.5">
 						{top && (
+							<Tooltip content="Add a todo under it">
+								<button
+									type="button"
+									aria-label={`Add a todo under ${todo.text}`}
+									onClick={() => setEditing({ kind: "draft", parentId: todo.id, afterId: null, categoryId: section.categoryId, text: "" })}
+									className="text-muted-foreground hover:text-foreground"
+								>
+									<Plus />
+								</button>
+							</Tooltip>
+						)}
+						<Tooltip content="Delete">
 							<button
 								type="button"
-								title="Add a todo under it"
-								aria-label={`Add a todo under ${todo.text}`}
-								onClick={() => setEditing({ kind: "draft", parentId: todo.id, afterId: null, categoryId: section.categoryId, text: "" })}
+								aria-label={`Delete ${todo.text}`}
+								onClick={() => remove(todo.id, todo.text)}
 								className="text-muted-foreground hover:text-foreground"
 							>
-								<Plus />
+								<X />
 							</button>
-						)}
-						<button
-							type="button"
-							title="Delete"
-							aria-label={`Delete ${todo.text}`}
-							onClick={() => remove(todo.id, todo.text)}
-							className="text-muted-foreground hover:text-foreground"
-						>
-							<X />
-						</button>
+						</Tooltip>
 					</span>
 				)}
 			</li>

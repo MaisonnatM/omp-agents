@@ -475,6 +475,7 @@ interface TabItemProps
   icon?: IconComponent;
   /** Text label. */
   label: string;
+  tooltip?: string;
   /** Keys that select this tab; a tooltip names the label with them. */
   shortcut?: readonly string[];
   /** A count after the label, such as the items waiting on you. Name it in `aria-label` too: the pill is hidden from screen readers. */
@@ -484,7 +485,7 @@ interface TabItemProps
 }
 
 const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
-  ({ value, icon: Icon, label, shortcut, badge, _index = 0, className, onClick, ...props }, ref) => {
+  ({ value, icon: Icon, label, tooltip, shortcut, badge, _index = 0, className, onClick, ...props }, ref) => {
     const internalRef = useRef<HTMLButtonElement>(null);
     const sizeClasses = useSize();
     const { registerTab, hoveredIndex, selectedValue, setOptimisticIdx } = useTabsList();
@@ -586,9 +587,9 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
         )}
       </TabsPrimitive.Trigger>
     );
-    if (!shortcut?.length) return trigger;
+    if (!tooltip && !shortcut?.length) return trigger;
     return (
-      <Tooltip content={label} shortcut={shortcut} side="bottom">
+      <Tooltip content={tooltip ?? label} shortcut={shortcut} side="bottom">
         {trigger}
       </Tooltip>
     );

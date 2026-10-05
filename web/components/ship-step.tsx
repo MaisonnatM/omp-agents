@@ -1,4 +1,5 @@
 import { SHIP_STAGES, type ShipProgress } from "../../src/shared";
+import { Tooltip } from "@/components/ui/tooltip";
 
 const SHIP_NAMES: Record<ShipProgress["stage"] | NonNullable<ShipProgress["work"]>, string> = {
 	ticket: "Ticket", implement: "Implement", draft_pr: "Draft PR", thermonuclear: "Thermonuclear",
@@ -10,5 +11,9 @@ const SHIP_NAMES: Record<ShipProgress["stage"] | NonNullable<ShipProgress["work"
 export function ShipStep({ ship }: { ship: ShipProgress | null }) {
 	if (!ship) return null;
 	const text = `${SHIP_STAGES.indexOf(ship.stage) + 1}/7 · ${SHIP_NAMES[ship.work ?? ship.stage]}`;
-	return <span className="inline-block max-w-36 shrink-0 truncate rounded bg-muted px-1.5 text-xs text-muted-foreground" title={`${ship.issue ?? "Ship"} · ${text}`}>{text}</span>;
+	return (
+		<Tooltip content={`${ship.issue ?? "Ship"} · ${text}`}>
+			<span className="inline-block max-w-36 shrink-0 truncate rounded bg-muted px-1.5 text-xs text-muted-foreground">{text}</span>
+		</Tooltip>
+	);
 }

@@ -20,6 +20,7 @@ export function SkillPicker({ label, skills, value, onPick }: SkillPickerProps) 
 			trigger={<span className="max-w-64 truncate">{value ?? "None"}</span>}
 			icon={Sparkles}
 			ariaLabel={`${label}: ${value ?? "none"}`}
+			tooltip={value ?? "Choose a skill"}
 			search={{ label: "Search skills" }}
 			width="lg"
 			list={fromList(skills, "Loading skills…", ({ skills }) => [

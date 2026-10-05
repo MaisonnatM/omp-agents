@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { AgentMedia, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { SidebarGroup } from "@/components/ui/sidebar";
+import { Tooltip } from "@/components/ui/tooltip";
 import { age } from "../labels";
 import { useDashboardContext } from "./dashboard-context";
 
@@ -35,9 +36,11 @@ function MediaViewer({ media, index, view, onShow }: { media: AgentMedia[]; inde
 				>
 					<div className="flex items-start justify-between gap-4">
 						<div className="min-w-0 space-y-0.5">
-							<DialogPrimitive.Title className="truncate text-sm font-semibold" title={caption}>
-								{caption}
-							</DialogPrimitive.Title>
+							<Tooltip content={caption} side="bottom">
+								<DialogPrimitive.Title className="truncate text-sm font-semibold">
+									{caption}
+								</DialogPrimitive.Title>
+							</Tooltip>
 							<DialogPrimitive.Description className="text-xs text-muted-foreground">
 								{index + 1} of {media.length} · {new Date(shown.at).toLocaleString()}
 							</DialogPrimitive.Description>
@@ -56,26 +59,50 @@ function MediaViewer({ media, index, view, onShow }: { media: AgentMedia[]; inde
 									Open agent
 								</Button>
 							)}
-							<Button variant="ghost" size="icon-compact" aria-label="Open the image in a new tab" title="Open the image in a new tab" asChild>
-								<a href={shown.src} target="_blank" rel="noopener noreferrer">
-									<ExternalLink />
-								</a>
-							</Button>
-							<DialogPrimitive.Close asChild>
-								<Button variant="ghost" size="icon-compact" aria-label="Close" title="Close">
-									<X />
+							<Tooltip content="Open the image in a new tab">
+								<Button variant="ghost" size="icon-compact" aria-label="Open the image in a new tab" asChild>
+									<a href={shown.src} target="_blank" rel="noopener noreferrer">
+										<ExternalLink />
+									</a>
 								</Button>
-							</DialogPrimitive.Close>
+							</Tooltip>
+							<Tooltip content="Close" shortcut={["Esc"]}>
+								<DialogPrimitive.Close asChild>
+									<Button variant="ghost" size="icon-compact" aria-label="Close">
+										<X />
+									</Button>
+								</DialogPrimitive.Close>
+							</Tooltip>
 						</div>
 					</div>
 					<div className="flex min-h-0 flex-1 items-center gap-2">
-						<Button variant="ghost" size="icon-compact" aria-label="Newer image" title="Newer image (←)" disabled={index === 0} onClick={() => step(-1)}>
-							<ChevronLeft />
-						</Button>
+						<Tooltip content="Newer image" shortcut={["←"]}>
+							{index === 0 ? (
+								<span className="inline-flex">
+									<Button variant="ghost" size="icon-compact" aria-label="Newer image" disabled onClick={() => step(-1)}>
+										<ChevronLeft />
+									</Button>
+								</span>
+							) : (
+								<Button variant="ghost" size="icon-compact" aria-label="Newer image" onClick={() => step(-1)}>
+									<ChevronLeft />
+								</Button>
+							)}
+						</Tooltip>
 						<img src={shown.src} alt={caption} className="min-h-0 min-w-0 flex-1 max-h-[calc(100vh-9rem)] object-contain" />
-						<Button variant="ghost" size="icon-compact" aria-label="Older image" title="Older image (→)" disabled={index === media.length - 1} onClick={() => step(1)}>
-							<ChevronRight />
-						</Button>
+						<Tooltip content="Older image" shortcut={["→"]}>
+							{index === media.length - 1 ? (
+								<span className="inline-flex">
+									<Button variant="ghost" size="icon-compact" aria-label="Older image" disabled onClick={() => step(1)}>
+										<ChevronRight />
+									</Button>
+								</span>
+							) : (
+								<Button variant="ghost" size="icon-compact" aria-label="Older image" onClick={() => step(1)}>
+									<ChevronRight />
+								</Button>
+							)}
+						</Tooltip>
 					</div>
 				</DialogPrimitive.Content>
 			</DialogPrimitive.Portal>
@@ -94,18 +121,19 @@ export function MediaTab({ media, view }: { media: AgentMedia[] | null; view: Vi
 			<ul className="grid grid-cols-2 gap-2 px-2 py-1" aria-label="Images, newest first">
 				{media.map(item => (
 					<li key={mediaKey(item)} className="min-w-0">
-						<button
-							type="button"
-							onClick={() => setSelected(mediaKey(item))}
-							title={captionOf(item)}
-							className="group flex w-full flex-col gap-1 rounded-md p-1 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-						>
-							<img src={item.src} alt={item.summary || `Image from ${agentName(item)}`} loading="lazy" className="aspect-video w-full rounded-sm border border-border bg-muted object-cover object-top" />
-							<span className="flex min-w-0 items-baseline gap-1 text-xs">
-								<span className="min-w-0 flex-1 truncate text-foreground">{agentName(item)}</span>
-								<span className="shrink-0 tabular-nums text-muted-foreground">{age(item.at)}</span>
-							</span>
-						</button>
+						<Tooltip content={captionOf(item)} side="left">
+							<button
+								type="button"
+								onClick={() => setSelected(mediaKey(item))}
+								className="group flex w-full flex-col gap-1 rounded-md p-1 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+							>
+								<img src={item.src} alt={item.summary || `Image from ${agentName(item)}`} loading="lazy" className="aspect-video w-full rounded-sm border border-border bg-muted object-cover object-top" />
+								<span className="flex min-w-0 items-baseline gap-1 text-xs">
+									<span className="min-w-0 flex-1 truncate text-foreground">{agentName(item)}</span>
+									<span className="shrink-0 tabular-nums text-muted-foreground">{age(item.at)}</span>
+								</span>
+							</button>
+						</Tooltip>
 					</li>
 				))}
 			</ul>

@@ -1,5 +1,6 @@
 import { Brain } from "lucide-react";
 import type { ModelOption } from "../../src/shared";
+import { Tooltip } from "@/components/ui/tooltip";
 import type { ModelList } from "../reads";
 import { Model, type ModelMenuOpen, ModelPicker } from "./model-picker";
 import type { Subject } from "./subject";
@@ -51,19 +52,21 @@ export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onS
 	}
 	if (!model && !thinking) return null;
 	return (
-		<span className="flex min-w-0 items-center gap-3 px-2 text-xs text-muted-foreground" title="Switch this session's model and thinking level from its omp terminal.">
-			{model && (
-				<span className="truncate">
-					<Model selector={model} />
-				</span>
-			)}
-			{thinking && (
-				<span className="flex shrink-0 items-center gap-1">
-					<Brain aria-hidden="true" className="size-3.5" />
-					<span className="sr-only">Thinking level:</span>
-					{thinking}
-				</span>
-			)}
-		</span>
+		<Tooltip content={`${[model, thinking].filter(Boolean).join(" · ")}. Switch this session's model and thinking level from its omp terminal.`}>
+			<span className="flex min-w-0 items-center gap-3 px-2 text-xs text-muted-foreground">
+				{model && (
+					<span className="truncate">
+						<Model selector={model} />
+					</span>
+				)}
+				{thinking && (
+					<span className="flex shrink-0 items-center gap-1">
+						<Brain aria-hidden="true" className="size-3.5" />
+						<span className="sr-only">Thinking level:</span>
+						{thinking}
+					</span>
+				)}
+			</span>
+		</Tooltip>
 	);
 }

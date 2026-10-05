@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FileEdit, OmpFile, OmpSettings } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
 import { FILE_KIND_LABELS, fileGroups } from "../../labels";
@@ -102,21 +103,22 @@ export function Files({ files, editing }: { files: OmpFile[]; editing: Editing }
 								const name = parts.at(-1) === "SKILL.md" ? parts.at(-2) : parts.at(-1);
 								return (
 									<li key={file.path}>
-										<button
-											type="button"
-											aria-current={file === open ? "true" : undefined}
-											title={file.pathDisplay}
-											onClick={() => setSelected(file.path)}
-											className={cn(
-												"flex w-full items-baseline gap-2 rounded-md px-2 py-1 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
-												file === open && "bg-muted font-medium",
-											)}
-										>
-											<span className={cn("truncate", file.body.state !== "read" && "text-muted-foreground")}>{name}</span>
-											<span className="ml-auto shrink-0 text-xs text-muted-foreground">
-												{file.body.state === "missing" ? "missing" : file.scope === "project" ? "project" : ""}
-											</span>
-										</button>
+										<Tooltip content={file.pathDisplay}>
+											<button
+												type="button"
+												aria-current={file === open ? "true" : undefined}
+												onClick={() => setSelected(file.path)}
+												className={cn(
+													"flex w-full items-baseline gap-2 rounded-md px-2 py-1 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+													file === open && "bg-muted font-medium",
+												)}
+											>
+												<span className={cn("truncate", file.body.state !== "read" && "text-muted-foreground")}>{name}</span>
+												<span className="ml-auto shrink-0 text-xs text-muted-foreground">
+													{file.body.state === "missing" ? "missing" : file.scope === "project" ? "project" : ""}
+												</span>
+											</button>
+										</Tooltip>
 									</li>
 								);
 							})}

@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, Pencil, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ApiError, errorText } from "../../api";
 import type { ReadState } from "../../reads";
 
@@ -105,6 +106,20 @@ export function Section({ title, meta, actions, children }: { title: string; met
 	);
 }
 
+function OrderButton({ label, direction, disabled, onClick }: { label: string; direction: "up" | "down"; disabled: boolean; onClick: () => void }) {
+	const name = direction === "up" ? "up" : "down";
+	const button = (
+		<Button variant="ghost" size="icon-compact" aria-label={`Move ${label} ${name}`} disabled={disabled} onClick={onClick}>
+			{direction === "up" ? <ArrowUp /> : <ArrowDown />}
+		</Button>
+	);
+	return (
+		<Tooltip content={disabled ? `${label} is already ${direction === "up" ? "first" : "last"}` : `Move ${label} ${name}`}>
+			{disabled ? <span className="inline-flex">{button}</span> : button}
+		</Tooltip>
+	);
+}
+
 /** Moves, removes, and appends entries of an ordered list; `render` draws one entry. */
 export function OrderedList({
 	items,
@@ -131,21 +146,13 @@ export function OrderedList({
 					<li key={`${index}:${item}`} className="flex items-center gap-1">
 						<span className="w-4 shrink-0 text-xs tabular-nums text-muted-foreground">{index + 1}</span>
 						<div className="min-w-0 flex-1">{render(item, index)}</div>
-						<Button variant="ghost" size="icon-compact" aria-label={`Move ${label(item)} up`} disabled={index === 0} onClick={() => move(index, index - 1)}>
-							<ArrowUp />
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon-compact"
-							aria-label={`Move ${label(item)} down`}
-							disabled={index === items.length - 1}
-							onClick={() => move(index, index + 1)}
-						>
-							<ArrowDown />
-						</Button>
-						<Button variant="ghost" size="icon-compact" aria-label={`Remove ${label(item)}`} onClick={() => onChange(items.filter((_, other) => other !== index))}>
-							<X />
-						</Button>
+						<OrderButton label={label(item)} direction="up" disabled={index === 0} onClick={() => move(index, index - 1)} />
+						<OrderButton label={label(item)} direction="down" disabled={index === items.length - 1} onClick={() => move(index, index + 1)} />
+						<Tooltip content={`Remove ${label(item)}`}>
+							<Button variant="ghost" size="icon-compact" aria-label={`Remove ${label(item)}`} onClick={() => onChange(items.filter((_, other) => other !== index))}>
+								<X />
+							</Button>
+						</Tooltip>
 					</li>
 				))}
 			</ol>

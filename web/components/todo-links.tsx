@@ -2,6 +2,7 @@ import { Bot, GitPullRequest, MessageSquare, Ticket, X } from "lucide-react";
 import { hashForSession, type PastSession, type RosterHost, type UserTodoLink } from "../../src/shared";
 import { hostLabel, pastLabel } from "../labels";
 import { hashForInbox, hashForTickets } from "../routing";
+import { Tooltip } from "@/components/ui/tooltip";
 import { StatusDot } from "./status-dot";
 
 /** The live and past sessions, which name a linked session and tell whether it still runs. */
@@ -49,14 +50,18 @@ export function TodoLinkChip({ link, sessions, onRemove }: TodoLinkChipProps) {
 	const Icon = ICONS[link.kind];
 	return (
 		<span className="inline-flex max-w-56 items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
-			<a href={href} title={title} className="inline-flex min-w-0 items-center gap-1 hover:text-foreground [&>svg]:size-3 [&>svg]:shrink-0">
-				{host ? <StatusDot status={host.status} /> : <Icon />}
-				<span className="truncate">{label}</span>
-			</a>
+			<Tooltip content={title}>
+				<a href={href} className="inline-flex min-w-0 items-center gap-1 hover:text-foreground [&>svg]:size-3 [&>svg]:shrink-0">
+					{host ? <StatusDot status={host.status} /> : <Icon />}
+					<span className="truncate">{label}</span>
+				</a>
+			</Tooltip>
 			{onRemove && (
-				<button type="button" aria-label={`Unlink ${label}`} title="Unlink" onClick={onRemove} className="hover:text-foreground [&>svg]:size-3">
-					<X />
-				</button>
+				<Tooltip content="Unlink">
+					<button type="button" aria-label={`Unlink ${label}`} onClick={onRemove} className="hover:text-foreground [&>svg]:size-3">
+						<X />
+					</button>
+				</Tooltip>
 			)}
 		</span>
 	);
@@ -66,13 +71,11 @@ export function TodoLinkChip({ link, sessions, onRemove }: TodoLinkChipProps) {
 export function AddedByChip({ sessionId, sessions }: { sessionId: string; sessions: KnownSessions }) {
 	const { name } = sessionLabel(sessionId, sessions);
 	return (
-		<a
-			href={hashForSession(sessionId)}
-			title={`Added by the agent of ${name}`}
-			className="inline-flex max-w-48 items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground [&>svg]:size-3 [&>svg]:shrink-0"
-		>
-			<Bot />
-			<span className="truncate">{name}</span>
-		</a>
+		<Tooltip content={`Added by the agent of ${name}`}>
+			<a href={hashForSession(sessionId)} className="inline-flex max-w-48 items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground hover:text-foreground [&>svg]:size-3 [&>svg]:shrink-0">
+				<Bot />
+				<span className="truncate">{name}</span>
+			</a>
+		</Tooltip>
 	);
 }
