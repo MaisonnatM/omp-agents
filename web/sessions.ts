@@ -22,6 +22,18 @@ export function projectSwitch(project: string | null, cwd: string): string | nul
 	return cwd;
 }
 
+const newestFirst = (a: RosterHost, b: RosterHost): number => b.startedAt - a.startedAt;
+
+/**
+ * The session the focused pane follows a picked project into: its most recently started running one, unless the pane
+ * already shows a session from `cwd`. `null` for All projects, or when no session runs there.
+ */
+export function projectSession(cwd: string | null, hosts: RosterHost[], shownCwd: string | undefined): View | null {
+	if (cwd === null || shownCwd === cwd) return null;
+	const newest = hosts.filter(host => host.cwd === cwd).toSorted(newestFirst)[0];
+	return newest ? { kind: "live", instanceId: newest.instanceId, agentId: null } : null;
+}
+
 /**
  * Where a new session starts unless the user picks another directory: the open session's,
  * else the newest live one's, else the newest past one's, each only from `project` when one is selected.
@@ -31,7 +43,7 @@ export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSes
 		view?.kind === "live"
 			? hosts.find(host => host.instanceId === view.instanceId)
 			: past.find(session => session.sessionId === view?.sessionId);
-	const rows = [open, ...hosts.toSorted((a, b) => b.startedAt - a.startedAt), ...past];
+	const rows = [open, ...hosts.toSorted(newestFirst), ...past];
 	// Sessions from old omp versions recorded no directory.
 	const chosen = rows.find(row => row?.cwdDisplay && (project === null || row.cwd === project));
 	return chosen?.cwdDisplay ?? "~";
@@ -40,7 +52,7 @@ export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSes
 /** Directories sessions ran in, live ones first, then past ones newest first. The settings page reads a workspace from one. */
 export function workspaces(hosts: RosterHost[], past: PastSession[]): { cwd: string; cwdDisplay: string }[] {
 	const byCwd = new Map<string, string>();
-	for (const row of [...hosts.toSorted((a, b) => b.startedAt - a.startedAt), ...past]) {
+	for (const row of [...hosts.toSorted(newestFirst), ...past]) {
 		// Sessions from old omp versions recorded no directory.
 		if (row.cwd && !byCwd.has(row.cwd)) byCwd.set(row.cwd, row.cwdDisplay);
 	}

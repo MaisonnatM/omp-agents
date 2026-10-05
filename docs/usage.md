@@ -27,6 +27,7 @@ For installation, see the [README](../README.md).
 - The project picker in the sidebar header shows only the running, idle, interrupted, and past sessions from one working directory.
   It lists the directories that a live or saved session ran in, live sessions' directories first, except temporary directories.
   The session counts then count that directory's sessions only, such as `2 running` and `9 past`.
+  Picking a project also opens its most recently started running session in the focused pane, unless that pane already shows a session from the project or a page such as the inbox, Settings, or the new-session draft is open.
   Choose **All projects** to list every session again.
   The choice is saved in the browser's localStorage.
   If no session from the saved directory is left, the sidebar lists every session.

@@ -31,7 +31,7 @@ import {
 	sameView,
 } from "./routing";
 import type { SectionTarget } from "./section";
-import { defaultCwd, discoverableSessions, listedViews, projectSwitch, sidebarSessions, workspaces } from "./sessions";
+import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, sidebarSessions, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { useStoredKeys } from "./stored-state";
@@ -89,6 +89,7 @@ export function App() {
 	useEffect(() => {
 		document.title = title;
 	}, [title]);
+	const viewCwd = (viewHost ?? viewPast)?.cwd;
 	const split = layout.panes.length > 1;
 	const [columns, setColumns] = useSplitRatio("columns");
 	const [rows, setRows] = useSplitRatio("rows");
@@ -120,7 +121,13 @@ export function App() {
 	const toggleRight = useCallback(() => toggleSidebar("right"), [toggleSidebar]);
 	const topRightPane = maximized ? layout.focus : Math.min(1, layout.panes.length - 1);
 
-	const settingsPage: Page = { kind: "settings", cwd: page?.kind === "settings" ? page.cwd : (viewHost ?? viewPast)?.cwd || null };
+	const switchProject = (cwd: string | null): void => {
+		pickProject(cwd);
+		// A page such as the inbox stays; only the panes follow the sidebar into the project.
+		const next = page ? null : projectSession(cwd, visible.hosts, viewCwd);
+		if (next) open(next, "replace");
+	};
+	const settingsPage: Page = { kind: "settings", cwd: page?.kind === "settings" ? page.cwd : viewCwd || null };
 	const settingsHref = hashForPage(settingsPage);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -300,7 +307,7 @@ export function App() {
 						sectionTarget={sectionTarget}
 						onSectionTarget={setSectionTarget}
 						project={project}
-						onPickProject={pickProject}
+						onPickProject={switchProject}
 						onShowShortcuts={() => setShortcutsOpen(true)}
 						toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
 					/>
