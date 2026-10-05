@@ -24,17 +24,14 @@ import { hashForInbox } from "../routing";
 import { shortcutKeys, useShortcuts } from "../shortcuts";
 import { type ForkPoint, nextSuggestions } from "../transcript-view";
 import type { Completions } from "../pane-store";
-import { pickedRoleOf, rememberPickedRole } from "../picked-roles";
 import type { StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
-import { roleOf, useModelRoles } from "../use-model-roles";
 import { useCompletion } from "./completion-popup";
 import { ContextRing } from "./context-ring";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
 import { GitRef } from "./git";
 import { Model, ModelPicker } from "./model-picker";
 import { OrgIcon } from "./org-icon";
-import { RolePicker } from "./role-picker";
 import { ShipStep } from "./ship-step";
 import { ThinkingPicker } from "./thinking-picker";
 import { NOTICE_TONE, Transcript } from "./transcript";
@@ -304,12 +301,6 @@ function LiveConversation({
 	const [dequeueId, setDequeueId] = useState<number | null>(null);
 	const nextId = useRef(0);
 	const [modelsOpen, setModelsOpen] = useState(false);
-	/** The role picked last for this session; several roles can name its model, and only the pick tells them apart. */
-	const [pickedRole, setPickedRole] = useState(() => pickedRoleOf(view.instanceId));
-	const pickRole = (role: string | null): void => {
-		setPickedRole(role);
-		rememberPickedRole(view.instanceId, role);
-	};
 
 	const shown = host ?? lastHost;
 	const agent: AgentRow | null = view.agentId ? (shown?.agents.find(a => a.id === view.agentId) ?? null) : null;
@@ -418,7 +409,6 @@ function LiveConversation({
 	const thinking = shown?.thinkingLevel ?? null;
 	// Collab rooms carry no model or thinking switch, so only sessions this dashboard started over RPC can change them.
 	const switchable = view.agentId === null && host?.source === "dashboard" && live ? host : null;
-	const roles = useModelRoles(switchable?.cwd ?? null);
 	// The list refreshes on every open, whether a click or the model shortcut opened it.
 	const openModels = (open: boolean): void => {
 		setModelsOpen(open);
@@ -427,25 +417,7 @@ function LiveConversation({
 	const modelSlot =
 		view.agentId !== null ? null : switchable ? (
 			<>
-				<RolePicker
-					list={roles.list}
-					current={roles.list && roleOf(roles.list.roles, shownModel, thinking, pickedRole)}
-					onReload={roles.reload}
-					onPick={role => {
-						pickRole(role.role);
-						onSetModel(role.model, role.thinking);
-					}}
-				/>
-				<ModelPicker
-					current={shownModel}
-					list={models}
-					open={modelsOpen}
-					onOpenChange={openModels}
-					onPick={model => {
-						pickRole(null);
-						onSetModel(model, null);
-					}}
-				/>
+				<ModelPicker current={shownModel} list={models} open={modelsOpen} onOpenChange={openModels} onPick={model => onSetModel(model, null)} />
 				{switchable.thinkingLevels.length > 0 && <ThinkingPicker current={thinking} levels={switchable.thinkingLevels} onPick={onSetThinking} />}
 			</>
 		) : shownModel || thinking ? (
@@ -562,16 +534,16 @@ function LiveConversation({
 					onSend={text => {
 						if (blockedShortcut(text, shell) === null) submit(text, "steer");
 					}}
-					leftSlot={({ openFilePicker }) => (
-						<>
-							{attachable && <AttachButton onClick={() => openFilePicker()} />}
-							{modelSlot}
-						</>
-					)}
+					leftSlot={modelSlot}
 					files={attachable ? attachments.files : undefined}
 					onFilesChange={attachable ? attachments.onFilesChange : undefined}
 					accept={IMAGE_ACCEPT}
-					rightSlot={contextSlot}
+					rightSlot={({ openFilePicker }) => (
+						<>
+							{contextSlot}
+							{attachable && <AttachButton onClick={() => openFilePicker()} />}
+						</>
+					)}
 					placeholder={placeholder}
 					disabled={!writable}
 					// While a turn runs, Enter and the send button steer it, and Stop interrupts a session's turn.
