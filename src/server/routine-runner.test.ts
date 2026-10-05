@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { HostStatus, InboxPullRequest, RoutineTask, StartRequest, StartResult } from "../shared";
+import type { HostStatus, RoutineTask, StartRequest, StartResult } from "../shared";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 
@@ -20,32 +20,26 @@ function routinesPath(): string {
 	return join(dir, "omp-agents", "routines.json");
 }
 
-const pr = (number: number, fields: Partial<InboxPullRequest> = {}): InboxPullRequest => ({
-	owner: "acme",
-	repo: "webapp",
-	number,
-	title: `PR ${number}`,
-	author: { login: "teammate", avatarUrl: null },
-	reviewers: [],
-	role: "reviewer",
-	state: "open",
-	review: "review-required",
-	checks: "passing",
-	conflicts: false,
-	head: `teammate/branch-${number}`,
-	headOid: `sha-${number}`,
-	stackedOn: null,
-	unresolved: { count: 0, exact: true },
-	updatedAt: 1,
-	...fields,
-});
+const everyHour = { kind: "every" as const, minutes: 60 };
 
 /** A file at `path` holding one hourly routine created at {@link T0}. */
-function fileWith(path: string, task: RoutineTask = { kind: "pull-requests", action: "review" }): RoutinesFile {
+function fileWith(path: string, task: RoutineTask = { kind: "prompt", prompt: "Summarize yesterday's commits." }): RoutinesFile {
 	const file = new RoutinesFile(path);
-	const routine = { id: "r1", name: "Reviews", cwd: "/work/webapp", schedule: { kind: "every", minutes: 60 }, task, skill: "ship", enabled: true } as const;
-	file.apply({ op: "save", routine }, T0);
+	file.apply({ op: "save", routine: { id: "r1", name: "Notes", cwd: "/work/webapp", schedules: [everyHour], task, skill: task.kind === "command" ? null : "ship", enabled: true } }, T0);
 	return file;
+}
+
+/** Adds hourly prompt routines `r2` onward, so several can be due together. */
+function addPrompts(file: RoutinesFile, count: number): void {
+	for (let index = 2; index <= count; index++) {
+		file.apply(
+			{
+				op: "save",
+				routine: { id: `r${index}`, name: `Notes ${index}`, cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: `Prompt ${index}` }, skill: null, enabled: true },
+			},
+			T0,
+		);
+	}
 }
 
 /** A command the runner ran, which the test ends by hand. */
@@ -56,12 +50,11 @@ interface FakeExec {
 	fail: (err: Error) => void;
 }
 
-/** A runner over `file` with a fake clock, inbox, starter, sessions, and commands. */
-function harness(file: RoutinesFile, prs: InboxPullRequest[] = []) {
+/** A runner over `file` with a fake clock, starter, sessions, and commands. */
+function harness(file: RoutinesFile) {
 	const sessions = new Map<string, { status: HostStatus; ended: boolean }>();
 	const fake = {
 		now: T0 + HOUR,
-		prs,
 		requests: [] as StartRequest[],
 		/** The error the next starts answer with, or `null` to start. */
 		failWith: null as string | null,
@@ -77,7 +70,6 @@ function harness(file: RoutinesFile, prs: InboxPullRequest[] = []) {
 			sessions.set(instanceId, { status: "unknown", ended: false });
 			return { ok: true, instanceId, cwd: "/work/webapp", prompt: null };
 		},
-		inbox: async () => fake.prs,
 		session(instanceId) {
 			const session = sessions.get(instanceId);
 			if (!session || session.ended) return null;
@@ -97,66 +89,71 @@ function harness(file: RoutinesFile, prs: InboxPullRequest[] = []) {
 		},
 		onChange: () => {},
 	});
-	/** The pull request numbers each start was for, in order. */
-	const started = (): (number | undefined)[] => fake.requests.map(request => (request.kind === "new" && request.subject?.kind === "pull-request" ? request.subject.pr.number : undefined));
-	return { runner, fake, started };
+	return { runner, fake };
 }
 
 describe("RoutineRunner", () => {
 	test("a claimed run's queue survives a restart, and the next server drains it without claiming again", async () => {
 		const path = routinesPath();
-		const first = harness(fileWith(path), [pr(1), pr(2), pr(3), pr(4), pr(5)]);
+		const firstFile = fileWith(path);
+		addPrompts(firstFile, 4);
+		const first = harness(firstFile);
 		await first.runner.tick();
-		expect(first.started()).toEqual([1, 2, 3]);
+		expect(first.fake.requests).toHaveLength(3);
+		expect(firstFile.routines[3]?.runs[0]?.queue).toEqual(["single"]);
 
 		const file = new RoutinesFile(path);
-		const second = harness(file, first.fake.prs);
+		const second = harness(file);
 		await second.runner.tick();
-		expect(second.started()).toEqual([4, 5]);
-		expect(file.routines[0]?.runs.map(run => run.queue)).toEqual([[]]);
-		expect(file.routines[0]?.done).toEqual({ "acme/webapp#1": "sha-1", "acme/webapp#2": "sha-2", "acme/webapp#3": "sha-3", "acme/webapp#4": "sha-4", "acme/webapp#5": "sha-5" });
+		expect(second.fake.requests).toHaveLength(1);
+		expect(file.routines.map(routine => routine.runs[0]?.queue)).toEqual([[], [], [], []]);
+		expect(file.routines.map(routine => routine.runs.length)).toEqual([1, 1, 1, 1]);
 	});
 
-	test("no more than three routine sessions run at once, and a freed slot takes the next pull request", async () => {
-		const { runner, fake, started } = harness(fileWith(routinesPath()), [pr(1), pr(2), pr(3), pr(4)]);
+	test("no more than three routine sessions run at once, and a freed slot takes the next routine", async () => {
+		const file = fileWith(routinesPath());
+		addPrompts(file, 4);
+		const { runner, fake } = harness(file);
 		await runner.tick();
 		for (const session of fake.sessions.values()) session.status = "working";
 		await runner.tick();
-		expect(started()).toEqual([1, 2, 3]);
+		expect(fake.requests).toHaveLength(3);
 		fake.sessions.get("i1")!.status = "idle";
 		await runner.tick();
 		await runner.tick();
 		expect(fake.sessions.get("i1")?.ended).toBe(true);
-		expect(started()).toEqual([1, 2, 3, 4]);
+		expect(fake.requests).toHaveLength(4);
 	});
 
-	test("each start takes the action's prompt with the unattended suffix, in the routine's workspace and skill", async () => {
-		const { runner, fake } = harness(fileWith(routinesPath()), [pr(7)]);
+	test("each start takes the prompt with the unattended suffix, in the routine's workspace and skill", async () => {
+		const { runner, fake } = harness(fileWith(routinesPath()));
 		await runner.tick();
-		expect(fake.requests).toMatchObject([{ kind: "new", cwd: "/work/webapp", skill: "ship", subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 7 } } }]);
+		expect(fake.requests).toMatchObject([{ kind: "new", cwd: "/work/webapp", skill: "ship", subject: null }]);
 		const [request] = fake.requests;
-		expect(request?.kind === "new" && request.prompt.startsWith("Pull request https://github.com/acme/webapp/pull/7 (\"PR 7\")")).toBe(true);
-		expect(request?.kind === "new" && request.prompt.endsWith(" This session runs unattended from a routine. Do not ask questions. If something blocks you, say what and stop.")).toBe(true);
+		expect(request?.kind === "new" && request.prompt).toBe(
+			"Summarize yesterday's commits. This session runs unattended from a routine. Do not ask questions. If something blocks you, say what and stop.",
+		);
 	});
 
-	test("a start that fails stays out of done, and the next run takes the pull request again", async () => {
+	test("a start that fails records the error, and the next run tries again", async () => {
 		const file = fileWith(routinesPath());
-		const { runner, fake, started } = harness(file, [pr(1)]);
+		const { runner, fake } = harness(file);
 		fake.failWith = "omp is not installed";
 		await runner.tick();
-		expect(file.routines[0]?.runs[0]?.errors).toEqual(["acme/webapp#1: omp is not installed"]);
-		expect(file.routines[0]?.done).toEqual({});
+		expect(file.routines[0]?.runs[0]?.errors).toEqual(["Notes: omp is not installed"]);
+		expect(file.routines[0]?.runs[0]?.started).toEqual([]);
 
 		fake.failWith = null;
 		fake.now += HOUR;
 		await runner.tick();
-		expect(started()).toEqual([1, 1]);
-		expect(file.routines[0]?.runs[0]?.started).toEqual([{ label: "acme/webapp#1", instanceId: "i2", sessionId: "s-i2" }]);
-		expect(file.routines[0]?.done).toEqual({ "acme/webapp#1": "sha-1" });
+		expect(fake.requests).toHaveLength(2);
+		expect(file.routines[0]?.runs[0]?.started).toEqual([{ label: "Notes", instanceId: "i2", sessionId: "s-i2" }]);
 	});
 
 	test("a session that worked and went idle ends, and one idle before it ever worked keeps running", async () => {
-		const { runner, fake } = harness(fileWith(routinesPath()), [pr(1), pr(2)]);
+		const file = fileWith(routinesPath());
+		addPrompts(file, 2);
+		const { runner, fake } = harness(file);
 		await runner.tick();
 		fake.sessions.get("i1")!.status = "working";
 		await runner.tick();
@@ -168,7 +165,7 @@ describe("RoutineRunner", () => {
 	});
 
 	test("a session ends as soon as its row reports the turn over, without waiting for a tick", async () => {
-		const { runner, fake } = harness(fileWith(routinesPath()), [pr(1)]);
+		const { runner, fake } = harness(fileWith(routinesPath()));
 		await runner.tick();
 		fake.sessions.get("i1")!.status = "working";
 		runner.observe("i1");
@@ -187,7 +184,7 @@ describe("RoutineRunner", () => {
 		expect(fake.requests.length).toBe(1);
 		expect(file.routines[0]?.runs.map(run => [run.started.map(session => session.label), run.errors])).toEqual([
 			[[], ["The last run's session is still running."]],
-			[["Reviews"], []],
+			[["Notes"], []],
 		]);
 	});
 
@@ -250,10 +247,11 @@ describe("RoutineRunner", () => {
 
 		test("runs while every session slot is busy", async () => {
 			const file = fileWith(routinesPath());
-			file.apply({ op: "save", routine: { id: "r2", name: "Prune", cwd: "/work/other", schedule: { kind: "every", minutes: 60 }, task: command, skill: null, enabled: true } }, T0);
-			const { runner, fake, started } = harness(file, [pr(1), pr(2), pr(3), pr(4)]);
+			addPrompts(file, 3);
+			file.apply({ op: "save", routine: { id: "r4", name: "Prune", cwd: "/work/other", schedules: [everyHour], task: command, skill: null, enabled: true } }, T0);
+			const { runner, fake } = harness(file);
 			await runner.tick();
-			expect(started()).toEqual([1, 2, 3]);
+			expect(fake.requests).toHaveLength(3);
 			expect(fake.execs.map(exec => exec.cwd)).toEqual(["/work/other"]);
 		});
 

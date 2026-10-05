@@ -931,15 +931,12 @@ export type Schedule =
 	/** At `time`, local wall-clock time, on each of `days` (0 is Sunday). Daily is all seven. */
 	| { kind: "weekly"; days: Weekday[]; time: { hour: number; minute: number } };
 
-/** The pull request actions a routine may run: both only report, so they post nothing to GitHub and change no branch. */
-export const ROUTINE_PR_ACTIONS = ["review", "thermonuclear-review"] as const;
-export type RoutinePullRequestAction = (typeof ROUTINE_PR_ACTIONS)[number];
+/** One or more. A routine is due at the earliest. */
+export type Schedules = [Schedule, ...Schedule[]];
 
 export type RoutineTask =
 	/** One session in `cwd` that takes `prompt`. */
 	| { kind: "prompt"; prompt: string }
-	/** One session per inbox pull request to review that `action` applies to, once per head commit. */
-	| { kind: "pull-requests"; action: RoutinePullRequestAction }
 	/** `command` through `sh -c` in the routine's cwd, with no omp session. */
 	| { kind: "command"; command: string };
 
@@ -955,34 +952,32 @@ export type CommandRun =
 /** A run claims its slot first, then drains its queue as session slots free up. */
 export interface RoutineRun {
 	at: number;
-	/** PR keys this run still has to start, in inbox order. Empty for a prompt or command task once it started. */
+	/** What this run still has to start. Empty once a prompt or command run has started. */
 	queue: string[];
 	started: { label: string; instanceId: string; sessionId: string }[];
 	errors: string[];
-	/** Null for prompt and pull request runs, and for a command run that has not launched. */
+	/** Null until a command run launches. A prompt run leaves it null. */
 	command: CommandRun | null;
 }
 
-/** A schedule that starts dashboard sessions, or runs a command, on its own. */
+/** Schedules that start dashboard sessions, or run a command, on their own. */
 export interface Routine {
 	id: string;
 	name: string;
 	cwd: string;
-	schedule: Schedule;
+	schedules: Schedules;
 	task: RoutineTask;
 	/** Saved with the routine, since the page's pin lives in localStorage, which the server cannot read. */
 	skill: string | null;
 	enabled: boolean;
 	createdAt: number;
-	/** Newest first, the last 10. `runs[0].at` is the slot the next run counts from. */
+	/** Newest first, the last 10. `runs[0].at` is the time every schedule counts from. */
 	runs: RoutineRun[];
-	/** `prKey` to the head commit a session already took, for the PRs still in the inbox. */
-	done: Record<string, string>;
 }
 
 /** One edit of the routines; the page picks a new routine's `id`, so a save sent twice saves once. */
 export type RoutineChange =
-	| { op: "save"; routine: Omit<Routine, "runs" | "done" | "createdAt"> }
+	| { op: "save"; routine: Omit<Routine, "runs" | "createdAt"> }
 	| { op: "remove"; id: string }
 	| { op: "enable"; id: string; enabled: boolean }
 	/** Claims a run now, whatever the schedule says. */

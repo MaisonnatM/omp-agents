@@ -1,10 +1,9 @@
 import { type ReactNode, useId, useState } from "react";
-import { PULL_REQUEST_ACTIONS } from "../../../src/pull-request-actions";
 import { COMMAND_TIME_LIMIT } from "../../../src/routines";
-import { ROUTINE_PR_ACTIONS, type RoutinePullRequestAction, type Weekday } from "../../../src/shared";
+import type { Weekday } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { dayName, type EveryUnit, type RoutineDraft, type RoutineSpec, specOf, WEEK, WEEKDAYS } from "../../routines-model";
+import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type RoutineSpec, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";
 import { useSkills } from "../../use-skills";
 import { PageFrame } from "../list-sheet-page";
 import { DirectoryPicker } from "../new-session";
@@ -43,6 +42,90 @@ function Choice({ name, checked, label, onCheck, children }: { name: string; che
 	);
 }
 
+/** One schedule: an interval, or days and a time. Remove stays hidden while it is the only one. */
+function ScheduleEditor({
+	id,
+	index,
+	schedule,
+	canRemove,
+	onChange,
+	onRemove,
+}: {
+	id: string;
+	index: number;
+	schedule: ScheduleDraft;
+	canRemove: boolean;
+	onChange: (schedule: ScheduleDraft) => void;
+	onRemove: () => void;
+}) {
+	const set = <K extends keyof ScheduleDraft>(key: K, value: ScheduleDraft[K]): void => onChange({ ...schedule, [key]: value });
+	const toggleDay = (day: Weekday): void => set("days", schedule.days.includes(day) ? schedule.days.filter(item => item !== day) : [...schedule.days, day]);
+	const which = canRemove ? ` ${index + 1}` : "";
+	return (
+		<div className="space-y-3 rounded-md border border-border p-3">
+			{canRemove && (
+				<div className="flex justify-end">
+					<Button type="button" variant="ghost" size="compact" onClick={onRemove}>
+						Remove
+					</Button>
+				</div>
+			)}
+			<Choice name={id} checked={schedule.kind === "every"} label="Repeat" onCheck={() => set("kind", "every")}>
+				<div className="flex items-center gap-2 text-sm">
+					Every
+					<input
+						type="number"
+						inputMode="numeric"
+						min={1}
+						aria-label={`How many${which}`}
+						value={schedule.amount}
+						onChange={event => set("amount", event.target.value)}
+						className={cn(FIELD, "w-20 tabular-nums")}
+					/>
+					<select aria-label={`Unit${which}`} value={schedule.unit} onChange={event => set("unit", event.target.value as EveryUnit)} className={FIELD}>
+						{UNITS.map(unit => (
+							<option key={unit} value={unit}>
+								{unit}
+							</option>
+						))}
+					</select>
+				</div>
+				<p className="text-xs text-muted-foreground">Counted from its last run. Every schedule shares that run.</p>
+			</Choice>
+			<Choice name={id} checked={schedule.kind === "weekly"} label="On chosen days" onCheck={() => set("kind", "weekly")}>
+				<div role="group" aria-label={`Days${which}`} className="flex flex-wrap gap-1">
+					{WEEK.map(day => (
+						<button
+							key={day}
+							type="button"
+							aria-pressed={schedule.days.includes(day)}
+							onClick={() => toggleDay(day)}
+							className={cn(
+								"h-7 w-11 rounded-md text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring",
+								schedule.days.includes(day) ? "bg-foreground text-background" : "ring-1 ring-inset ring-border hover:bg-accent",
+							)}
+						>
+							{dayName(day)}
+						</button>
+					))}
+				</div>
+				<div className="flex flex-wrap items-center gap-2 text-sm">
+					<Button type="button" variant="ghost" size="compact" onClick={() => set("days", [...WEEKDAYS])}>
+						Weekdays
+					</Button>
+					<Button type="button" variant="ghost" size="compact" onClick={() => set("days", [...WEEK])}>
+						Every day
+					</Button>
+					<label className="ml-auto flex items-center gap-2">
+						At
+						<input type="time" aria-label={`Time${which}`} value={schedule.time} onChange={event => set("time", event.target.value)} className={cn(FIELD, "tabular-nums")} />
+					</label>
+				</div>
+			</Choice>
+		</div>
+	);
+}
+
 interface RoutineEditorProps {
 	initial: RoutineDraft;
 	isNew: boolean;
@@ -53,17 +136,18 @@ interface RoutineEditorProps {
 	onCancel: () => void;
 }
 
-/** A routine's name, workspace, task, schedule, and skill, saved together. */
+/** A routine's name, workspace, task, schedules, and skill, saved together. */
 export function RoutineEditor({ initial, isNew, workspaces, connected, onSave, onCancel }: RoutineEditorProps) {
 	const [draft, setDraft] = useState(initial);
 	const [tried, setTried] = useState(false);
 	const skills = useSkills(draft.cwd || "~");
 	const id = useId();
 	const set = <K extends keyof RoutineDraft>(key: K, value: RoutineDraft[K]): void => setDraft(current => ({ ...current, [key]: value }));
-	const toggleDay = (day: Weekday): void =>
-		setDraft(current => ({ ...current, days: current.days.includes(day) ? current.days.filter(d => d !== day) : [...current.days, day] }));
+	const setSchedule = (index: number, schedule: ScheduleDraft): void =>
+		setDraft(current => ({ ...current, schedules: current.schedules.map((item, i) => (i === index ? schedule : item)) }));
+	const removeSchedule = (index: number): void =>
+		setDraft(current => ({ ...current, schedules: current.schedules.filter((_, i) => i !== index) }));
 	const result = specOf(draft);
-	const action = PULL_REQUEST_ACTIONS[draft.action];
 
 	return (
 		<PageFrame title={isNew ? "New routine" : `Edit ${initial.name}`} meta="Runs on a schedule while the dashboard runs">
@@ -80,7 +164,7 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, onSave, o
 						id={`${id}-name`}
 						autoFocus
 						value={draft.name}
-						placeholder="Morning reviews"
+						placeholder="Morning notes"
 						onChange={event => set("name", event.target.value)}
 						className={cn(FIELD, "w-full")}
 					/>
@@ -102,23 +186,6 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, onSave, o
 								className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							/>
 						</Choice>
-						<Choice name={`${id}-task`} checked={draft.task === "pull-requests"} label="Review pull requests" onCheck={() => set("task", "pull-requests")}>
-							<select
-								aria-label="Review action"
-								value={draft.action}
-								onChange={event => set("action", event.target.value as RoutinePullRequestAction)}
-								className={FIELD}
-							>
-								{ROUTINE_PR_ACTIONS.map(value => (
-									<option key={value} value={value}>
-										{PULL_REQUEST_ACTIONS[value].label}
-									</option>
-								))}
-							</select>
-							<p className="text-xs text-muted-foreground">
-								{action.description}. It starts one for each pull request that asks for your review, once per new commit, and posts nothing on GitHub.
-							</p>
-						</Choice>
 						<Choice name={`${id}-task`} checked={draft.task === "command"} label="Run a command" onCheck={() => set("task", "command")}>
 							<textarea
 								aria-label="Command"
@@ -136,60 +203,22 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, onSave, o
 					</div>
 				</Field>
 
-				<Field label="Schedule">
+				<Field label="Schedules" hint="Runs at the soonest of these. A missed time still starts one run.">
 					<div className="space-y-3">
-						<Choice name={`${id}-schedule`} checked={draft.schedule === "every"} label="Repeat" onCheck={() => set("schedule", "every")}>
-							<div className="flex items-center gap-2 text-sm">
-								Every
-								<input
-									type="number"
-									inputMode="numeric"
-									min={1}
-									aria-label="How many"
-									value={draft.amount}
-									onChange={event => set("amount", event.target.value)}
-									className={cn(FIELD, "w-20 tabular-nums")}
-								/>
-								<select aria-label="Unit" value={draft.unit} onChange={event => set("unit", event.target.value as EveryUnit)} className={FIELD}>
-									{UNITS.map(unit => (
-										<option key={unit} value={unit}>
-											{unit}
-										</option>
-									))}
-								</select>
-							</div>
-							<p className="text-xs text-muted-foreground">Counted from its last run.</p>
-						</Choice>
-						<Choice name={`${id}-schedule`} checked={draft.schedule === "weekly"} label="On chosen days" onCheck={() => set("schedule", "weekly")}>
-							<div role="group" aria-label="Days" className="flex flex-wrap gap-1">
-								{WEEK.map(day => (
-									<button
-										key={day}
-										type="button"
-										aria-pressed={draft.days.includes(day)}
-										onClick={() => toggleDay(day)}
-										className={cn(
-											"h-7 w-11 rounded-md text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring",
-											draft.days.includes(day) ? "bg-foreground text-background" : "ring-1 ring-inset ring-border hover:bg-accent",
-										)}
-									>
-										{dayName(day)}
-									</button>
-								))}
-							</div>
-							<div className="flex flex-wrap items-center gap-2 text-sm">
-								<Button type="button" variant="ghost" size="compact" onClick={() => set("days", [...WEEKDAYS])}>
-									Weekdays
-								</Button>
-								<Button type="button" variant="ghost" size="compact" onClick={() => set("days", [...WEEK])}>
-									Every day
-								</Button>
-								<label className="ml-auto flex items-center gap-2">
-									At
-									<input type="time" value={draft.time} onChange={event => set("time", event.target.value)} className={cn(FIELD, "tabular-nums")} />
-								</label>
-							</div>
-						</Choice>
+						{draft.schedules.map((schedule, index) => (
+							<ScheduleEditor
+								key={index}
+								id={`${id}-schedule-${index}`}
+								index={index}
+								schedule={schedule}
+								canRemove={draft.schedules.length > 1}
+								onChange={next => setSchedule(index, next)}
+								onRemove={() => removeSchedule(index)}
+							/>
+						))}
+						<Button type="button" variant="ghost" size="compact" onClick={() => set("schedules", [...draft.schedules, blankSchedule()])}>
+							Add schedule
+						</Button>
 					</div>
 				</Field>
 

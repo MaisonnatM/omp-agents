@@ -1,6 +1,6 @@
 /** What the Routines page says about a routine, and the editor's form and how it becomes a routine to save. */
-import { MAX_COMMAND_LENGTH, nextRunAt } from "../src/routines";
-import type { CommandRun, Routine, RoutineChange, RoutinePullRequestAction, RoutineRun, RoutineTask, Schedule, Weekday } from "../src/shared";
+import { MAX_COMMAND_LENGTH, nextDueAt } from "../src/routines";
+import type { CommandRun, Routine, RoutineChange, RoutineRun, RoutineTask, Schedule, Weekday } from "../src/shared";
 
 /** What the editor saves: a routine without what the server keeps. */
 export type RoutineSpec = Extract<RoutineChange, { op: "save" }>["routine"];
@@ -41,19 +41,15 @@ export function scheduleWords(schedule: Schedule): string {
 	}
 }
 
-export const ROUTINE_ACTION_WORDS: Record<RoutinePullRequestAction, string> = {
-	review: "Review pull requests",
-	"thermonuclear-review": "Thermonuclear review",
-};
+/** The schedules in the order they were saved, each in its own words. */
+export const schedulesWords = (schedules: readonly Schedule[]): string => schedules.map(scheduleWords).join(", ");
 
 /** The first line of `text` with anything but blanks, trimmed. */
 const firstLine = (text: string): string => text.split("\n").find(line => line.trim())?.trim() ?? "";
 
-/** `Review pull requests`, `Thermonuclear review`, the prompt's first line, or the command's after `$ `. */
+/** The prompt's first line, or the command's after `$ `. */
 export function taskWords(task: RoutineTask): string {
 	switch (task.kind) {
-		case "pull-requests":
-			return ROUTINE_ACTION_WORDS[task.action];
 		case "prompt":
 			return firstLine(task.prompt);
 		case "command":
@@ -82,7 +78,7 @@ export function whenWords(at: number, now: number): string {
 /** When `routine` runs next: `Paused` while it is off, `Due now` once its slot passed, which the next minute's check runs. */
 export function nextRunWords(routine: Routine, now: number): string {
 	if (!routine.enabled) return "Paused";
-	const next = nextRunAt(routine.schedule, routine.runs[0]?.at ?? routine.createdAt);
+	const next = nextDueAt(routine.schedules, routine.runs[0]?.at ?? routine.createdAt);
 	return next <= now ? "Due now" : whenWords(next, now);
 }
 
@@ -103,7 +99,7 @@ function commandWords(command: CommandRun | null): string | null {
 }
 
 /** A command run's result, else `1 session started, 2 errors, Queued: 3`, the parts that apply. */
-export function runWords(run: RoutineRun, task: RoutineTask): string {
+export function runWords(run: RoutineRun): string {
 	const command = commandWords(run.command);
 	if (command !== null) return command;
 	const parts = [
@@ -112,11 +108,11 @@ export function runWords(run: RoutineRun, task: RoutineTask): string {
 		run.queue.length > 0 && `Queued: ${run.queue.length}`,
 	].filter(part => part !== false);
 	if (parts.length > 0) return parts.join(", ");
-	return task.kind === "pull-requests" ? "No pull requests to review" : "Nothing started";
+	return "Nothing started";
 }
 
 /** The last run's result, or that there was none. */
-export const lastRunWords = (routine: Routine): string => (routine.runs[0] ? runWords(routine.runs[0], routine.task) : "Not run yet");
+export const lastRunWords = (routine: Routine): string => (routine.runs[0] ? runWords(routine.runs[0]) : "Not run yet");
 
 export type EveryUnit = "minutes" | "hours" | "days";
 
@@ -129,8 +125,24 @@ export function everyUnit(minutes: number): { amount: number; unit: EveryUnit } 
 }
 
 /**
- * The editor's form. It keeps every task's and both schedules' fields, so switching kind and back keeps what you typed.
+ * One schedule in the editor. It keeps both kinds' fields, so switching kind and back keeps what you typed.
  * `amount` and `time` hold the inputs' text as typed (`time` is `HH:MM`).
+ */
+export interface ScheduleDraft {
+	kind: Schedule["kind"];
+	amount: string;
+	unit: EveryUnit;
+	days: Weekday[];
+	time: string;
+}
+
+/** A schedule the editor adds: weekdays at 9:00. */
+export function blankSchedule(): ScheduleDraft {
+	return { kind: "weekly", amount: "1", unit: "days", days: [...WEEKDAYS], time: "09:00" };
+}
+
+/**
+ * The editor's form. It keeps every task's fields, so switching kind and back keeps what you typed.
  */
 export interface RoutineDraft {
 	id: string;
@@ -140,13 +152,8 @@ export interface RoutineDraft {
 	skill: string | null;
 	task: RoutineTask["kind"];
 	prompt: string;
-	action: RoutinePullRequestAction;
 	command: string;
-	schedule: Schedule["kind"];
-	amount: string;
-	unit: EveryUnit;
-	days: Weekday[];
-	time: string;
+	schedules: ScheduleDraft[];
 }
 
 /** A new routine's form: a prompt on weekdays at 9:00 in `cwd`, through `skill`. */
@@ -159,34 +166,34 @@ export function newDraft(id: string, cwd: string, skill: string | null): Routine
 		skill,
 		task: "prompt",
 		prompt: "",
-		action: "review",
 		command: "",
-		schedule: "weekly",
-		amount: "1",
-		unit: "days",
-		days: [...WEEKDAYS],
-		time: "09:00",
+		schedules: [blankSchedule()],
 	};
 }
 
-/** `routine`'s form, its other kinds' fields at their defaults. */
+/** One saved schedule as the editor shows it, with the other kind's fields at their defaults. */
+function scheduleDraft(schedule: Schedule): ScheduleDraft {
+	const blank = blankSchedule();
+	if (schedule.kind === "every") {
+		const every = everyUnit(schedule.minutes);
+		return { ...blank, kind: "every", amount: String(every.amount), unit: every.unit };
+	}
+	const { hour, minute } = schedule.time;
+	return { ...blank, kind: "weekly", days: [...schedule.days], time: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}` };
+}
+
+/** `routine`'s form, its other task's fields at their defaults. */
 export function draftOf(routine: Routine): RoutineDraft {
 	const draft = newDraft(routine.id, routine.cwd, routine.skill);
-	const { task, schedule } = routine;
-	const every = schedule.kind === "every" ? everyUnit(schedule.minutes) : null;
+	const { task } = routine;
 	return {
 		...draft,
 		name: routine.name,
 		enabled: routine.enabled,
 		task: task.kind,
 		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
-		action: task.kind === "pull-requests" ? task.action : draft.action,
 		command: task.kind === "command" ? task.command : draft.command,
-		schedule: schedule.kind,
-		amount: every ? String(every.amount) : draft.amount,
-		unit: every?.unit ?? draft.unit,
-		days: schedule.kind === "weekly" ? [...schedule.days] : draft.days,
-		time: schedule.kind === "weekly" ? `${String(schedule.time.hour).padStart(2, "0")}:${String(schedule.time.minute).padStart(2, "0")}` : draft.time,
+		schedules: routine.schedules.map(scheduleDraft),
 	};
 }
 
@@ -202,9 +209,6 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 			if (!draft.prompt.trim()) return { fix: "Write the prompt the session starts with." };
 			task = { kind: "prompt", prompt: draft.prompt.trim() };
 			break;
-		case "pull-requests":
-			task = { kind: "pull-requests", action: draft.action };
-			break;
 		case "command": {
 			const command = draft.command.trim();
 			if (!command) return { fix: "Write the command to run." };
@@ -217,18 +221,30 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 			return unhandled;
 		}
 	}
-	let schedule: Schedule;
-	if (draft.schedule === "every") {
-		const amount = Number(draft.amount);
-		if (!Number.isSafeInteger(amount) || amount < 1) return { fix: "Use a whole number of at least 1." };
-		schedule = { kind: "every", minutes: amount * UNIT_MINUTES[draft.unit] };
-	} else {
-		if (draft.days.length === 0) return { fix: "Pick at least one day." };
-		const match = /^(\d{2}):(\d{2})$/.exec(draft.time);
-		if (!match) return { fix: "Set the time it runs at." };
-		schedule = { kind: "weekly", days: WEEK.filter(day => draft.days.includes(day)), time: { hour: Number(match[1]), minute: Number(match[2]) } };
+	if (draft.schedules.length === 0) return { fix: "Add a schedule." };
+	const schedules: Schedule[] = [];
+	for (const [index, schedule] of draft.schedules.entries()) {
+		const parsed = scheduleOf(schedule, draft.schedules.length > 1 ? index : null);
+		if ("fix" in parsed) return parsed;
+		schedules.push(parsed.ok);
 	}
+	const [first, ...rest] = schedules;
+	if (!first) return { fix: "Add a schedule." };
 	// A command runs without a session, so it has no skill to start one with.
 	const skill = task.kind === "command" ? null : draft.skill;
-	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill, task, schedule } };
+	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill, task, schedules: [first, ...rest] } };
+}
+
+/** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */
+function scheduleOf(draft: ScheduleDraft, index: number | null): { ok: Schedule } | { fix: string } {
+	const which = index === null ? "" : `Schedule ${index + 1}: `;
+	if (draft.kind === "every") {
+		const amount = Number(draft.amount);
+		if (!Number.isSafeInteger(amount) || amount < 1) return { fix: `${which}Use a whole number of at least 1.` };
+		return { ok: { kind: "every", minutes: amount * UNIT_MINUTES[draft.unit] } };
+	}
+	if (draft.days.length === 0) return { fix: `${which}Pick at least one day.` };
+	const match = /^(\d{2}):(\d{2})$/.exec(draft.time);
+	if (!match) return { fix: `${which}Set the time it runs at.` };
+	return { ok: { kind: "weekly", days: WEEK.filter(day => draft.days.includes(day)), time: { hour: Number(match[1]), minute: Number(match[2]) } } };
 }

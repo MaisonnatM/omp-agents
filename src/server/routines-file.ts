@@ -1,6 +1,7 @@
 /**
- * The routines, kept in a file so that the next server knows which slots ran and which pull request heads a session took.
+ * The routines, kept in a file so that the next server knows which slots ran.
  * Every change saves at once: a run's queue is on disk before the runner starts anything from it.
+ * A routine whose task was pull requests is dropped on load. The rest of the file stays.
  */
 import { JsonFile } from "../fs";
 import { isObject } from "../json";
@@ -61,29 +62,31 @@ function parseRun(value: unknown): RoutineRun | null {
 		: null;
 }
 
-function parseDone(value: unknown): Record<string, string> | null {
-	if (!isObject(value)) return null;
-	const done: Record<string, string> = {};
-	for (const [key, head] of Object.entries(value)) {
-		if (typeof head !== "string") return null;
-		done[key] = head;
-	}
-	return done;
-}
+const isPullRequestRoutine = (value: unknown): boolean => isObject(value) && isObject(value.task) && value.task.kind === "pull-requests";
 
-function parseRoutine(value: unknown): Routine | null {
+function parseRoutine(value: unknown): Routine | "drop" | null {
+	if (isPullRequestRoutine(value)) return "drop";
 	const spec = parseRoutineSpec(value);
 	if (!spec || !isObject(value)) return null;
 	const { createdAt } = value;
 	const runs = parseAll(value.runs, parseRun);
-	const done = parseDone(value.done);
-	return typeof createdAt === "number" && runs && done ? { ...spec, createdAt, runs, done } : null;
+	return typeof createdAt === "number" && runs ? { ...spec, createdAt, runs } : null;
 }
 
 function parseStored(value: unknown): Stored | null {
-	if (!isObject(value)) return null;
-	const routines = parseAll(value.routines, parseRoutine);
-	return routines && { routines };
+	if (!isObject(value) || !Array.isArray(value.routines)) return null;
+	const routines: Routine[] = [];
+	for (const entry of value.routines) {
+		const routine = parseRoutine(entry);
+		if (routine === null) return null;
+		if (routine === "drop") {
+			const name = isObject(entry) && typeof entry.name === "string" && entry.name ? entry.name : "unnamed";
+			console.error(`omp-agents: dropped routine "${name}", which reviewed pull requests`);
+			continue;
+		}
+		routines.push(routine);
+	}
+	return { routines };
 }
 
 export class RoutinesFile {
@@ -109,19 +112,12 @@ export class RoutinesFile {
 		return true;
 	}
 
-	/**
-	 * Claims routine `id`'s slot at `at` with `queue` to start, keeping the newest {@link MAX_ROUTINE_RUNS} runs.
-	 * `present` names the pull requests in the inbox now, and `done` forgets the others; `null` keeps it as it is.
-	 */
-	claim(id: string, at: number, queue: string[], present: string[] | null): void {
-		this.#update(id, routine => {
-			const keep = present && new Set(present);
-			return {
-				...routine,
-				runs: [{ at, queue, started: [], errors: [], command: null }, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
-				done: keep ? Object.fromEntries(Object.entries(routine.done).filter(([key]) => keep.has(key))) : routine.done,
-			};
-		});
+	/** Claims routine `id`'s slot at `at` with `queue` to start, keeping the newest {@link MAX_ROUTINE_RUNS} runs. */
+	claim(id: string, at: number, queue: string[]): void {
+		this.#update(id, routine => ({
+			...routine,
+			runs: [{ at, queue, started: [], errors: [], command: null }, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
+		}));
 	}
 
 	/** Takes the next key off the queue of routine `id`'s run at `at`; `null` when that run is gone or its queue is empty. */
@@ -146,11 +142,6 @@ export class RoutinesFile {
 	failed(id: string, at: number, error: string): void {
 		if (this.#run(id, at)?.errors.at(-1) === error) return;
 		this.#updateRun(id, at, run => ({ ...run, errors: [...run.errors, error] }));
-	}
-
-	/** Records that a session took pull request `key` at head commit `headOid`. */
-	done(id: string, key: string, headOid: string): void {
-		this.#update(id, routine => ({ ...routine, done: { ...routine.done, [key]: headOid } }));
 	}
 
 	#run(id: string, at: number): RoutineRun | undefined {

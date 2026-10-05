@@ -5,7 +5,7 @@
  */
 import { isObject, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH } from "../routines";
-import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, ROUTINE_PR_ACTIONS, TICKET_ID, TICKET_PRIORITIES } from "../shared";
+import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, TICKET_ID, TICKET_PRIORITIES } from "../shared";
 import type {
 	BranchChoice,
 	ClientMsg,
@@ -17,6 +17,7 @@ import type {
 	RoutineChange,
 	RoutineTask,
 	Schedule,
+	Schedules,
 	SessionLinksEdit,
 	StartRequest,
 	TicketDraft,
@@ -128,7 +129,6 @@ function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
 
 const isIntIn = (value: unknown, min: number, max: number): value is number => Number.isSafeInteger(value) && (value as number) >= min && (value as number) <= max;
 const isWeekday = (value: unknown): value is Weekday => isIntIn(value, 0, 6);
-const isRoutineAction = oneOf(ROUTINE_PR_ACTIONS);
 
 function parseSchedule(value: unknown): Parsed<Schedule> {
 	if (!isObject(value)) return null;
@@ -146,13 +146,25 @@ function parseSchedule(value: unknown): Parsed<Schedule> {
 	}
 }
 
+/** One or more schedules. An empty list is not one. */
+function parseSchedules(value: unknown): Parsed<Schedules> {
+	if (!Array.isArray(value) || value.length === 0) return null;
+	const schedules: Schedule[] = [];
+	for (const entry of value) {
+		const schedule = parseSchedule(entry);
+		if (!schedule) return null;
+		schedules.push(schedule.ok);
+	}
+	const [first, ...rest] = schedules;
+	if (!first) return null;
+	return { ok: [first, ...rest] };
+}
+
 function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 	if (!isObject(value)) return null;
 	switch (value.kind) {
 		case "prompt":
 			return isNonEmpty(value.prompt) ? { ok: { kind: "prompt", prompt: value.prompt } } : null;
-		case "pull-requests":
-			return isRoutineAction(value.action) ? { ok: { kind: "pull-requests", action: value.action } } : null;
 		case "command":
 			return isNonEmpty(value.command) && value.command.length <= MAX_COMMAND_LENGTH ? { ok: { kind: "command", command: value.command } } : null;
 		default:
@@ -160,18 +172,19 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 	}
 }
 
-/** What the page edits of a routine: all but its runs, its taken heads, and its creation time, which the server keeps. */
+/** What the page edits of a routine: all but its runs and its creation time, which the server keeps. */
 export type RoutineSpec = Extract<RoutineChange, { op: "save" }>["routine"];
 
 /** A routine as the page saves it, or `null` when a field is missing, of the wrong type, or out of range; other fields drop. */
 export function parseRoutineSpec(value: unknown): RoutineSpec | null {
 	if (!isObject(value)) return null;
 	const { id, name, cwd, enabled } = value;
-	const schedule = parseSchedule(value.schedule);
+	// A file from before `schedules` holds one `schedule`. A present `schedules`, even an empty one, does not fall back.
+	const schedules = "schedules" in value ? parseSchedules(value.schedules) : parseSchedules([value.schedule]);
 	const task = parseRoutineTask(value.task);
 	const skill = parseSkill(value.skill);
-	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedule || !task || !skill) return null;
-	return { id, name, cwd, schedule: schedule.ok, task: task.ok, skill: skill.ok, enabled };
+	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !skill) return null;
+	return { id, name, cwd, schedules: schedules.ok, task: task.ok, skill: skill.ok, enabled };
 }
 
 function parseRoutineChange(value: unknown): Parsed<RoutineChange> {

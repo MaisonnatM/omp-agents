@@ -530,22 +530,20 @@ Navigation, editing, scheduling toggles, Stop, and Delete keep their existing st
 
 ## Routines
 
-- A routine starts sessions, or runs a shell command, on a schedule.
+- A routine starts sessions, or runs a shell command, on one or more schedules.
   The **Routines** tab, or a `#routines` address, lists them in place of the panes, and the sidebar then lists **All** and each routine by name, a paused one muted.
   `#routines/<id>` opens one routine.
-- **New routine** opens the editor: a name, the workspace it runs in, its task, its schedule, and its skill.
-  The task is a prompt you write, **Review** or **Thermonuclear review** of the pull requests that ask for your review, or a shell command.
-  The schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick; **Weekdays** and **Every day** pick those days at once.
+- **New routine** opens the editor: a name, the workspace it runs in, its task, its schedules, and its skill.
+  The task is a prompt you write, or a shell command.
+  Each schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick. **Weekdays** and **Every day** pick those days at once. **Add schedule** adds another. The routine runs at the earliest of them, and a missed time still starts one run.
   The skill starts as the one pinned in **Settings › New sessions**, and **None** starts the sessions without one.
-- A pull request routine starts one session for each pull request in its workspace's inbox that asks for your review, and takes each pull request once per new commit.
-  Neither action posts anything on GitHub or changes a branch.
 - A command routine runs its command with `sh` in its workspace, without an omp session, so it takes no skill and the editor hides that field.
   The command runs with your user's full permissions, and nothing asks before it acts: a file it deletes is gone.
   It stops after 10 minutes, and its run keeps the last 64 KB of what it printed, stdout and stderr together.
   A command routine whose last command still runs records an error instead of running a second one.
   Its runs read **Running…**, **Succeeded**, **Failed (exit n)**, **Stopped at the time limit**, **Stopped with the dashboard**, or **Could not start**, and anything but a success also counts as an error.
-- Each row shows the routine's schedule and task, when it runs next or **Paused**, and what its last run did: how many sessions it started, how many errors it had, and **Queued: n** while it still has sessions to start.
-  Its **⋯** menu has **Run now**, which runs it at once whatever its schedule, **Pause** or **Resume**, **Edit**, and **Delete**, which asks first.
+- Each row shows the routine's schedules and task, when it runs next or **Paused**, and what its last run did: how many sessions it started, how many errors it had, and **Queued: n** while it still has sessions to start.
+  Its **⋯** menu has **Run now**, which runs it at once whatever its schedules, **Pause** or **Resume**, **Edit**, and **Delete**, which asks first.
 - A routine's page shows its settings and its last 10 runs, newest first, each with the sessions it started, its command's output, and its errors.
   Output longer than 20 lines folds behind **Show output**.
   Click a session to open it, live while it runs, else its transcript (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
