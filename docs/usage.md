@@ -4,7 +4,7 @@ The full reference for the dashboard's interface.
 For installation, see the [README](../README.md).
 
 - [Sessions sidebar](#sessions-sidebar)
-- [Plan and changes sidebar](#plan-and-changes-sidebar)
+- [Session details sidebar](#session-details-sidebar)
 - [Panes, splits, and links](#panes-splits-and-links)
 - [Conversations](#conversations)
 - [Composer](#composer)
@@ -58,12 +58,12 @@ For installation, see the [README](../README.md).
   The server keeps the list in `interrupted.json` beside its access token, so it survives a restart.
   Sessions started in a terminal keep running when the dashboard stops, so they never show here.
 - The sidebar list fades at its edges only after you scroll it: the top fades once rows pass under the header, and the bottom fades while more rows sit below.
-- Drag a sidebar's inner edge to resize it: the right edge of the sessions sidebar, or the left edge of the plan and changes sidebar.
+- Drag a sidebar's inner edge to resize it: the right edge of the sessions sidebar, or the left edge of the session details sidebar.
   With the edge focused, the arrow keys move it in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes.
   Double-click the edge to reset the width.
   The button at the outer corner of the sessions sidebar's header hides it and leaves a narrow strip whose button shows it again.
-  The plan and changes sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
-  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Shift+B the plan and changes sidebar.
+  The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
+  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Shift+B the session details sidebar.
   Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
 - The left sidebar's session rows leave out the full working directory and the model; the pane header shows both.
 - The bottom of the sidebar shows how much quota is left on each plan that `omp usage` reports, one line per plan: its provider's logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
@@ -75,13 +75,13 @@ For installation, see the [README](../README.md).
   Hover or focus a window to see omp's full limit name and when it resets.
   The server runs `omp usage --json` at startup and every minute after that.
 
-## Plan and changes sidebar
+## Session details sidebar
 
-- The right sidebar shows what the focused pane's agent planned and changed: a live session, one of its subagents, or a past session, each from its own transcript file.
+- The right sidebar shows what the focused pane's agent planned, changed, spawned, and captured: a live session, one of its subagents, or a past session, each from its own transcript file.
   It hides for the inbox, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
-- Two tabs split it, **Plan** and **Files**.
-  The sidebar remembers the tab you chose, for every view.
-  The **Files** tab names how many files changed, as in `Files (3)`.
+- Tabs split it: **Plan**, **Files**, **Agents** for a live session or subagent, and **Media**.
+  Each tab shows its icon and how many items it holds, such as `3` changed files; hover a tab for its name.
+  The sidebar remembers the tab you chose, for every view; a past session, which has no **Agents** tab, shows **Plan** instead.
 - **Plan** shows the agent's latest todo list, by phase, with how many of each phase's tasks are done (`2/5`).
   The task in progress is highlighted, a completed task is struck through, an abandoned one is dimmed, and a blocked one has an amber mark.
   The latest list wins, whether the agent's `todo` call wrote it or you edited it in omp's terminal.
@@ -95,6 +95,16 @@ For installation, see the [README](../README.md).
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
+- **Agents** lists the live session's main agent and then its subagents, each indented under the agent that spawned it, with its status dot, its type, and what it is doing.
+  The agent the pane shows is highlighted.
+  Click a row to open that agent in the pane, or Cmd-click (Ctrl-click on Linux and Windows) to open it in a split.
+- **Media** shows the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
+  On a session that is every image of the session; on a subagent it is that subagent's and its own subagents'.
+  Images you attached to your own prompts are left out, since the transcript shows them.
+  Each thumbnail names the agent whose tool returned it and how long ago.
+  Click one to see it large, with the tool and what the call said it did; the arrows, or the Left and Right keys, step to newer and older images.
+  **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in a new tab.
+  New images show up while the agents run.
 - A tab with nothing to show says so.
 
 ## Panes, splits, and links
@@ -149,6 +159,7 @@ For installation, see the [README](../README.md).
   Click it to open the subagent, Cmd-click (Ctrl-click on Linux and Windows) to open it in a split, or middle-click to open it in a new tab.
   A subagent's own `task` calls link its subagents the same way.
   A past session's ids are not links, because the dashboard opens subagents only of a running session.
+- A subagent's header starts with a back arrow that opens the session's main agent in the pane, or focuses the pane that already shows it.
 - In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one.
   A follow-up (Ctrl+Enter, or Cmd+Enter on macOS) waits in the dashboard until the subagent stops running.
   In a subagent of a session that the dashboard started, a message steers a running subagent at its next step, through omp's RPC `steer_subagent`.
@@ -564,7 +575,7 @@ Alt is Option on macOS.
 | Cmd+J | Anywhere | Cycle the thinking level |
 | Cmd+E | Anywhere | Expand or collapse tool calls |
 | Cmd+B | Anywhere | Show or hide the sessions sidebar |
-| Cmd+Shift+B | Anywhere | Show or hide the plan and changes sidebar |
+| Cmd+Shift+B | Anywhere | Show or hide the session details sidebar |
 | Cmd+, | Anywhere | Open or close settings |
 | Cmd+/ | Anywhere | Show keyboard shortcuts |
 | Esc | Maximized pane | Restore the split |

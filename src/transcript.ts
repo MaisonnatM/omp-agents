@@ -8,8 +8,8 @@
  * file's copy replaces the streamed one in place and a late event cannot undo it.
  */
 import { isObject, str } from "./json";
-import { oneLine, textOf } from "./session-entries";
-import { type Item, PROMPT_IMAGE_TYPES } from "./shared";
+import { imagesOf, oneLine, textOf, toolSummary } from "./session-entries";
+import type { Item } from "./shared";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
@@ -24,39 +24,6 @@ export const SKILL_PROMPT = "skill-prompt";
  */
 const SKILL_INVOCATION =
 	/^\[IMPORTANT: User invoked the "([^"]+)" skill; follow its instructions\. Full skill below\.\]\n[\s\S]*\n\[Skill directory: [^\n]*\]\n[^\n]*(?:\nUser: ([\s\S]*))?$/;
-
-/** How omp's session files point at an image it moved to its blob store. */
-const BLOB_REF = /^blob:sha256:([0-9a-f]{64})$/;
-
-/**
- * The images of a message's content, as the page shows them: inline as a `data:` URL, or through `/api/image` once omp
- * moved them to its blob store. Types the page does not show are left out.
- */
-function imagesOf(content: unknown): { images?: string[] } {
-	if (!Array.isArray(content)) return {};
-	const images = content.flatMap(block => {
-		if (!isObject(block) || block.type !== "image" || typeof block.data !== "string") return [];
-		const type = str(block.mimeType);
-		if (!type || !PROMPT_IMAGE_TYPES.includes(type)) return [];
-		const hash = BLOB_REF.exec(block.data)?.[1];
-		return [hash ? `/api/image?${new URLSearchParams({ hash, type })}` : `data:${type};base64,${block.data}`];
-	});
-	return images.length > 0 ? { images } : {};
-}
-
-/** Best one-line description of a tool call: its stated intent, else its most telling argument. */
-function toolSummary(args: unknown, intent: unknown): string {
-	if (typeof intent === "string" && intent) return oneLine(intent);
-	if (!isObject(args)) return "";
-	if (typeof args.i === "string" && args.i) return oneLine(args.i);
-	// `data` is a subagent's `yield` payload: its final answer.
-	for (const key of ["command", "path", "pattern", "query", "url", "file_path", "description", "data", "message"]) {
-		const value = args[key];
-		if (typeof value === "string" && value) return oneLine(value);
-	}
-	const first = Object.values(args).find(value => typeof value === "string");
-	return typeof first === "string" ? oneLine(first) : "";
-}
 
 /** The key a message shares between its live events and its file entry. */
 const messageKey = (message: Json): string | undefined =>

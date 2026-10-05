@@ -1,4 +1,5 @@
 import {
+	Bot,
 	Circle,
 	CircleAlert,
 	CircleCheck,
@@ -8,6 +9,7 @@ import {
 	FileMinus,
 	FilePen,
 	FilePlus,
+	Images,
 	ListTodo,
 	type LucideIcon,
 } from "lucide-react";
@@ -21,6 +23,7 @@ import {
 	lineTotals,
 	type PlanDocument,
 	parseDiffLine,
+	type RosterHost,
 	type TodoPhase,
 	type TodoStatus,
 	type View,
@@ -40,6 +43,8 @@ import { cn } from "@/lib/utils";
 import { age, readTime } from "../labels";
 import { usePane } from "../pane-store";
 import { useStoredState } from "../stored-state";
+import { AgentsTab } from "./agents-tab";
+import { MediaTab } from "./media-tab";
 import { MessageMarkdown } from "./message-markdown";
 
 const TASK_LOOK: Record<TodoStatus, { icon: LucideIcon; label: string; className: string }> = {
@@ -209,21 +214,34 @@ function FileRow({ file }: { file: ChangedFile }) {
 /** The right sidebar's tab, which localStorage keeps across views. */
 const TAB_KEY = "omp-agents.plan-tab";
 
-type PlanTab = "plan" | "files";
+const PLAN_TABS = ["plan", "files", "agents", "media"] as const;
+type PlanTab = (typeof PLAN_TABS)[number];
 
-/** The right sidebar's content: the focused view's latest todo list and plan file, and the files its agent changed, each tab apart. */
-export function PlanPanel({ view }: { view: View }) {
-	const { work } = usePane(view);
-	const [tab, setTab] = useStoredState<PlanTab>(TAB_KEY, raw => (raw === "files" ? "files" : "plan"));
+/** Four labeled tabs overflow the sidebar's default width, so each shows its icon and its count, and names itself on hover and to screen readers. */
+function tabLabel(name: string, count: number): { label: string; "aria-label": string; title: string } {
+	return { label: count > 0 ? String(count) : "", "aria-label": count > 0 ? `${name} (${count})` : name, title: name };
+}
+
+/**
+ * The right sidebar's content for the focused view: its latest todo list and plan file, the files its agent changed,
+ * a live session's agents, and the images its agents' tools returned, each tab apart.
+ */
+export function PlanPanel({ view, host }: { view: View; host: RosterHost | null }) {
+	const { work, media } = usePane(view);
+	const [stored, setTab] = useStoredState<PlanTab>(TAB_KEY, raw => PLAN_TABS.find(tab => tab === raw) ?? "plan");
+	// A past session's subagents have no view to open, so it has no Agents tab.
+	const tab = stored === "agents" && view.kind !== "live" ? "plan" : stored;
 	const files = work?.files ?? [];
 	return (
 		<Tabs value={tab} onValueChange={value => setTab(value as PlanTab)} className="flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center gap-2 px-2 pt-4">
-				<h2 className="sr-only">Plan and changes</h2>
+				<h2 className="sr-only">Session details</h2>
 				<SizeProvider size="compact">
-					<TabsList aria-label="Plan and changes">
-						<TabItem value="plan" label="Plan" icon={ListTodo} />
-						<TabItem value="files" label={files.length > 0 ? `Files (${files.length})` : "Files"} icon={FileDiff} />
+					<TabsList aria-label="Session details">
+						<TabItem value="plan" icon={ListTodo} {...tabLabel("Plan", 0)} />
+						<TabItem value="files" icon={FileDiff} {...tabLabel("Files", files.length)} />
+						{view.kind === "live" && <TabItem value="agents" icon={Bot} {...tabLabel("Agents", host?.agents.length ?? 0)} />}
+						<TabItem value="media" icon={Images} {...tabLabel("Media", media?.length ?? 0)} />
 					</TabsList>
 				</SizeProvider>
 			</SidebarHeader>
@@ -252,6 +270,18 @@ export function PlanPanel({ view }: { view: View }) {
 							</SidebarMenu>
 						</SidebarGroup>
 					)}
+				</SidebarContent>
+			</TabPanel>
+			{view.kind === "live" && (
+				<TabPanel value="agents" asChild>
+					<SidebarContent>
+						<AgentsTab view={view} host={host} />
+					</SidebarContent>
+				</TabPanel>
+			)}
+			<TabPanel value="media" asChild>
+				<SidebarContent>
+					<MediaTab media={media} view={view} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>

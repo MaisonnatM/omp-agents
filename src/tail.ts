@@ -3,7 +3,7 @@
  * folds each appended line into a {@link Transcript} and a {@link Work}. The
  * server pokes it when its file changes.
  */
-import { LineReader } from "./line-reader";
+import { LineReader, ReadQueue } from "./line-reader";
 import type { Item, SessionWork } from "./shared";
 import { Transcript } from "./transcript";
 import { Work } from "./work";
@@ -24,9 +24,7 @@ export class FileTail {
 	readonly path: string;
 	readonly #lines: LineReader;
 	#loaded = false;
-	/** Reads and live updates run one after another, in the order they were asked for. */
-	#chain: Promise<void> = Promise.resolve();
-	#readQueued = false;
+	readonly #reads = new ReadQueue(() => this.#read());
 	/** Changes held back for the window, by item id; a later version of an item replaces the earlier one in place. */
 	#pending = new Map<string, Item>();
 	#pendingReset = false;
@@ -53,12 +51,7 @@ export class FileTail {
 
 	/** Read what was appended since the last read. Calls that arrive before a queued read starts share it. */
 	poke(): void {
-		if (this.#readQueued) return;
-		this.#readQueued = true;
-		this.#chain = this.#chain.then(() => {
-			this.#readQueued = false;
-			return this.#read().catch(() => {});
-		});
+		this.#reads.poke();
 	}
 
 	/**
@@ -67,7 +60,7 @@ export class FileTail {
 	 */
 	live(apply: (transcript: Transcript) => Item[]): void {
 		this.poke();
-		this.#chain = this.#chain.then(() => this.#publish(apply(this.transcript)));
+		this.#reads.after(() => this.#publish(apply(this.transcript)));
 	}
 
 	/**

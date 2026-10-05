@@ -1,6 +1,6 @@
 /** What a Collab host reports of its agents, and where their transcripts are on disk. */
 import { existsSync } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { isObject, nonEmptyStr, oneOf, str } from "./json";
 import { oneLine } from "./session-entries";
@@ -95,6 +95,19 @@ export function contextOf(value: unknown): ContextUsage | null {
 		: null;
 }
 
+/** The directory omp writes a transcript's subagent transcripts in: its path without `.jsonl`. */
+export const artifactsDir = (transcript: string): string => transcript.replace(/\.jsonl$/, "");
+
+/** Every subagent transcript of `transcript`, at any depth under its {@link artifactsDir}, sorted by path. */
+export async function subagentFiles(transcript: string): Promise<string[]> {
+	const dir = artifactsDir(transcript);
+	const names = await readdir(dir, { recursive: true }).catch(() => []);
+	return names
+		.filter(name => name.endsWith(".jsonl"))
+		.sort()
+		.map(name => join(dir, name));
+}
+
 /**
  * Where omp writes a subagent's transcript: `<id>.jsonl` in its parent's artifacts
  * directory, which is the parent's transcript path without `.jsonl`. A subagent that
@@ -145,7 +158,7 @@ export class SubagentFiles {
 		for (let parent = agent.parentId ? byId.get(agent.parentId) : undefined; parent; parent = parent.parentId ? byId.get(parent.parentId) : undefined) {
 			ancestors.unshift(parent.id);
 		}
-		const path = join(sessionFile.replace(/\.jsonl$/, ""), ...ancestors, `${agentId}.jsonl`);
+		const path = join(artifactsDir(sessionFile), ...ancestors, `${agentId}.jsonl`);
 		this.#expected.set(agentId, { sessionFile, path });
 		if (!existsSync(path) && !this.#searched.has(agentId)) {
 			this.#searched.add(agentId);

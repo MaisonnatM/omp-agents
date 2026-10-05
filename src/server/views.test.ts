@@ -20,7 +20,7 @@ const streamed = (timestamp: number, reply: string) => ({ type: "message_update"
 const main = (instanceId: string): LiveView => ({ kind: "live", instanceId, agentId: null });
 const sub = (instanceId: string, agentId: string): LiveView => ({ kind: "live", instanceId, agentId });
 
-/** A socket that records the transcripts the server sends it, and the topics it follows. `work` messages, which go along with each, are left out. */
+/** A socket that records the transcripts the server sends it, and the topics it follows. `work` and `media` messages, which go along with each, are left out. */
 function socket() {
 	const sent: ServerMsg[] = [];
 	const topics = new Set<string>();
@@ -28,7 +28,7 @@ function socket() {
 		data: { views: new Map() } as SocketData,
 		send: (raw: string) => {
 			const msg: ServerMsg = JSON.parse(raw);
-			if (msg.t !== "work") sent.push(msg);
+			if (msg.t !== "work" && msg.t !== "media") sent.push(msg);
 		},
 		subscribe: (topic: string) => void topics.add(topic),
 		unsubscribe: (topic: string) => void topics.delete(topic),
@@ -36,7 +36,7 @@ function socket() {
 	return { ws: ws as unknown as Socket, sent, topics };
 }
 
-/** Views over files that tests name per view, publishing their transcripts into a list that a test can wait on; `work` messages are left out. */
+/** Views over files that tests name per view, publishing their transcripts into a list that a test can wait on; `work` and `media` messages are left out. */
 function setup() {
 	const root = mkdtempSync(join(tmpdir(), "omp-agents-views-"));
 	roots.push(root);
@@ -46,7 +46,7 @@ function setup() {
 	const views = new Views(
 		view => (view.kind === "live" ? (paths.get(`${view.instanceId}:${view.agentId ?? ""}`) ?? null) : null),
 		(topic, msg) => {
-			if (msg.t === "work") return;
+			if (msg.t === "work" || msg.t === "media") return;
 			published.push({ topic, msg });
 			if (waiter && published.length >= waiter.count) waiter.resolve();
 		},
@@ -243,5 +243,60 @@ describe("Views", () => {
 
 		expect(published.slice(2).map(({ topic }) => topic).sort()).toEqual(["view:live:a:", "view:live:b:"]);
 		expect([itemsOf(2), itemsOf(3)].flatMap(({ items }) => items.map(item => item.id)).sort()).toEqual(["m300", "m400"]);
+	});
+
+	test("a session's view gets its subagents' images as they arrive, a socket that joins later gets them at once, and losing the file clears them", async () => {
+		const root = mkdtempSync(join(tmpdir(), "omp-agents-views-"));
+		roots.push(root);
+		const file = join(root, "session.jsonl");
+		const smoke = join(root, "session", "Smoke.jsonl");
+		mkdirSync(join(root, "session"));
+		writeFileSync(file, userEntry("e1", 100, "take a screenshot"));
+		writeFileSync(smoke, "");
+		const image = (id: string, hash: string): string =>
+			line({ type: "message", message: { role: "toolResult", toolCallId: id, toolName: "eval", timestamp: 1, content: [{ type: "image", data: `blob:sha256:${hash}`, mimeType: "image/webp" }] } });
+		const srcOf = (hash: string): string => `/api/image?hash=${hash}&type=image%2Fwebp`;
+
+		let path: string | null = file;
+		const lists: (string | null)[][] = [];
+		let waiter: (() => void) | null = null;
+		const views = new Views(
+			() => path,
+			(_topic, msg) => {
+				if (msg.t !== "media") return;
+				lists.push(msg.media.map(media => media.agentId));
+				waiter?.();
+			},
+		);
+		const nextList = (): Promise<void> => {
+			const { promise, resolve } = Promise.withResolvers<void>();
+			waiter = resolve;
+			return promise;
+		};
+
+		const loaded = nextList();
+		views.watch(socket().ws, [main("a")]);
+		await loaded;
+		expect(lists).toEqual([[]]);
+
+		appendFileSync(smoke, image("c1", "a".repeat(64)));
+		const added = nextList();
+		views.poke(smoke);
+		await added;
+		expect(lists.at(-1)).toEqual(["Smoke"]);
+
+		const late: ServerMsg[] = [];
+		const joiner = {
+			data: { views: new Map() } as SocketData,
+			send: (raw: string) => void late.push(JSON.parse(raw)),
+			subscribe: () => {},
+			unsubscribe: () => {},
+		} as unknown as Socket;
+		views.watch(joiner, [main("a")]);
+		expect(late.find(msg => msg.t === "media")).toEqual({ t: "media", view: main("a"), media: [{ src: srcOf("a".repeat(64)), agentId: "Smoke", tool: "eval", summary: "", at: 1 }] });
+
+		path = null;
+		views.sync();
+		expect(lists.at(-1)).toEqual([]);
 	});
 });

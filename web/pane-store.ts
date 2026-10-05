@@ -1,4 +1,4 @@
-import type { CompletionItem, Item, ServerMsg, SessionWork, View } from "../src/shared";
+import type { AgentMedia, CompletionItem, Item, ServerMsg, SessionWork, View } from "../src/shared";
 import { keyedStore } from "./keyed-store";
 import { hashForView } from "./routing";
 import { applyItems } from "./transcript-view";
@@ -19,13 +19,15 @@ export interface PaneData {
 	dequeued: { reqId: number; texts: string[] } | null;
 	/** What the view's agent planned and changed; `null` until the server sends it. */
 	work: SessionWork | null;
+	/** The images its agent's and its subagents' tools returned, newest first; `null` until the server sends them. */
+	media: AgentMedia[] | null;
 }
 
-export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, dequeued: null, work: null };
+export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, dequeued: null, work: null, media: null };
 
-/** The server messages that belong to one open view: its transcript, its plan and changes, its composer's suggestions, and its dequeued texts. */
+/** The server messages that belong to one open view: its transcript, its plan and changes, its images, its composer's suggestions, and its dequeued texts. */
 export type PaneMsg =
-	| Extract<ServerMsg, { t: "items" | "work" | "dequeued" }>
+	| Extract<ServerMsg, { t: "items" | "work" | "media" | "dequeued" }>
 	| (Extract<ServerMsg, { t: "completions" }> & { scope: { kind: "live" } });
 
 /**
@@ -54,6 +56,9 @@ export function applyPaneMessage(msg: PaneMsg): void {
 			break;
 		case "work":
 			panes.set(key, { ...pane, work: msg.work });
+			break;
+		case "media":
+			panes.set(key, { ...pane, media: msg.media });
 			break;
 		case "completions":
 			panes.set(key, { ...pane, completions: { reqId: msg.reqId, items: msg.items, error: msg.error } });

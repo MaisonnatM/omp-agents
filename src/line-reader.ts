@@ -39,3 +39,32 @@ export class LineReader {
 		return true;
 	}
 }
+
+/**
+ * Runs a file's reads one after another, in the order they were asked for, with the tasks queued behind them. Pokes
+ * that arrive before a queued read starts share it, so a burst of watcher events costs one read.
+ */
+export class ReadQueue {
+	readonly #read: () => Promise<void>;
+	#chain: Promise<void> = Promise.resolve();
+	#readQueued = false;
+
+	/** A read that fails is dropped; the next poke reads again. */
+	constructor(read: () => Promise<void>) {
+		this.#read = read;
+	}
+
+	poke(): void {
+		if (this.#readQueued) return;
+		this.#readQueued = true;
+		this.#chain = this.#chain.then(() => {
+			this.#readQueued = false;
+			return this.#read().catch(() => {});
+		});
+	}
+
+	/** Run `task` once every read asked for so far is done. */
+	after(task: () => void): void {
+		this.#chain = this.#chain.then(task);
+	}
+}

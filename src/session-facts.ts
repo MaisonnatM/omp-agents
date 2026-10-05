@@ -8,13 +8,12 @@
  * (`get_issue`, `list_comments`), changed or opened (`save_issue`), or commented on (`save_comment`), and the
  * issue a /ship run records. An issue a search only listed is not linked.
  */
-import { readdir } from "node:fs/promises";
-import { join } from "node:path";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
 import { LineReader } from "./line-reader";
 import type { SessionFacts } from "./live-session";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
+import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo, SHIP_STAGES, SHIP_WORK, type ShipProgress, TICKET_ID } from "./shared";
 
 /** `me/fe-trust-7: https://app.graphite.com/github/pr/acme/webapp/6596 (created)` */
@@ -302,16 +301,6 @@ interface SessionScan {
 	pullRequests: LinkedPullRequest[];
 	/** Every transcript's Linear issues, each once, the session's own first. */
 	tickets: string[];
-}
-
-/** Subagent transcripts sit, at any depth, in the directory named after the session file. */
-async function subagentFiles(sessionPath: string): Promise<string[]> {
-	const dir = sessionPath.replace(/\.jsonl$/, "");
-	const names = await readdir(dir, { recursive: true }).catch(() => []);
-	return names
-		.filter(name => name.endsWith(".jsonl"))
-		.sort()
-		.map(name => join(dir, name));
 }
 
 export interface ListedSession {
