@@ -106,6 +106,7 @@ export function useDashboard(): Dashboard {
 				switch (msg.t) {
 					case "items":
 					case "work":
+					case "media":
 					case "dequeued":
 						applyPaneMessage(msg);
 						return;

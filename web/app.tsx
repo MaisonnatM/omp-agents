@@ -122,7 +122,7 @@ export function App() {
 		const current = latest.current.layout;
 		show(kind === "max" ? { ...current, focus: index, maximized: !current.maximized } : closePane(current, index));
 	}, [show]);
-	/** The view whose plan and changes the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
+	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const planView = page || (split && !maximized) ? null : view;
 	const toggleSidebar = useCallback((side: SidebarSide): void => {
 		const { sidebars } = latest.current;
@@ -360,7 +360,7 @@ export function App() {
 				</SidebarInset>
 				{planView && (
 					<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-						<PlanPanel key={hashForView(planView)} view={planView} />
+						<PlanPanel key={hashForView(planView)} view={planView} host={viewHost ?? null} />
 					</DashboardSidebar>
 				)}
 				<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />

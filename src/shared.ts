@@ -516,6 +516,19 @@ export interface SessionWork {
 
 export const EMPTY_WORK: SessionWork = { phases: [], files: [], plan: null };
 
+/** One image an agent's tool returned, such as a browser screenshot or a `read` of an image file. */
+export interface AgentMedia {
+	/** `/api/image?hash=…&type=…`, or a `data:` URL for an image omp kept in the session file. */
+	src: string;
+	/** The agent whose transcript holds it, by subagent id; `null` for a session's main agent. */
+	agentId: string | null;
+	tool: string;
+	/** What the tool call said it did, as one line; empty when it said nothing. */
+	summary: string;
+	/** When the tool returned it, in ms since the epoch. */
+	at: number;
+}
+
 /** One row of a select request. */
 export interface RequestOption {
 	label: string;
@@ -899,6 +912,8 @@ export type ServerMsg =
 	| { t: "items"; view: View; reset: boolean; items: Item[] }
 	/** The view's plan and changed files, whole, sent with its transcript and again whenever either changes. */
 	| { t: "work"; view: View; work: SessionWork }
+	/** The images the view's agent and its subagents' tools returned, newest first, whole, sent once the view's files are read and again whenever one adds an image. */
+	| { t: "media"; view: View; media: AgentMedia[] }
 	/** Answers this socket's `start` with `reqId` once the session is ready, or once starting it failed. */
 	| { t: "started"; reqId: number; result: StartResult }
 	/** Answers this socket's `resume-all` with `reqId` once every session is ready or failed to start. */

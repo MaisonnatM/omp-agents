@@ -80,7 +80,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "sessionsSidebar", label: "Show or hide the sessions sidebar, on the left", keys: [{ chord: { key: "b", mod: true }, scope: "anywhere" }] },
 	{
 		id: "planSidebar",
-		label: "Show or hide the plan and changes sidebar, on the right",
+		label: "Show or hide the session details sidebar, on the right",
 		keys: [{ chord: { key: "b", mod: true, shift: true }, scope: "anywhere" }],
 	},
 	{ id: "settings", label: "Open or close settings", keys: [{ chord: { key: ",", mod: true }, scope: "anywhere" }] },

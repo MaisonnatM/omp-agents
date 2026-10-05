@@ -27,8 +27,8 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   Every running and past session, with a status dot (running, idle, or waiting on a question), filtered by project.
   Pin a session to keep it at the top.
   Sessions that stopped when the dashboard went down wait in an **interrupted** group, and **Resume all** brings them back.
-- **Plan and changes.**
-  The focused conversation's todo list and the files its agent changed, with each file's latest diff; subagents open from the `task` call that spawned them.
+- **Session details.**
+  The focused conversation's todo list, the files its agent changed with each file's latest diff, the live session's subagents as a tree, and every screenshot and image its agents' tools returned; subagents also open from the `task` call that spawned them, and a back arrow returns to the session.
 - **Live conversations.**
   Streaming Markdown transcripts, tool calls, and context-window usage, in up to four split panes.
 - **Full control.**

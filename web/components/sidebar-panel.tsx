@@ -43,7 +43,7 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 		showIcon: PanelLeftOpen,
 	},
 	right: {
-		name: "Plan and changes",
+		name: "Session details",
 		id: "plan-sidebar",
 		defaultWidth: 288,
 		widthKey: "omp-agents.plan-width",
