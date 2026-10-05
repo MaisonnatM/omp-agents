@@ -7,50 +7,16 @@
  */
 import { expandPrompt } from "./commands";
 import { errorText, isObject, nonEmptyStr } from "./json";
-import type { LiveSession, LiveUpdate } from "./live-session";
+import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp/collab";
-import { displayPath } from "./paths";
-import type { SessionFacts } from "./live-session";
-import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, PromptImage, RosterHost, UserAnswer, UserRequest } from "./shared";
-import { type HostAgent, parseAgents, SubagentFiles } from "./subagents";
-import { oneLine } from "./transcript";
+import { type AgentRow, type ContextUsage, type ControlPhase, type Delivery, type HostStatus, type MessageQueue, type PromptImage, selectorOf, type UserAnswer, type UserRequest } from "./shared";
+import { contextOf, type HostAgent, parseAgents, parseSubagentFrame, SubagentFiles } from "./subagents";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
 
 const DISPLAY_NAME = "omp-agents";
 const LINK_ATTEMPTS = 3;
 /** Wait this long before rejoining a host whose room dropped us while it stays listed. */
 const REJOIN_MS = 5000;
-
-export const SUBAGENT_LIFECYCLE = "task:subagent:lifecycle";
-export const SUBAGENT_PROGRESS = "task:subagent:progress";
-
-/** One line saying what a subagent is doing, from a `task:subagent:*` payload (a Collab `bus` frame or an RPC subagent frame). */
-export function activityOf(channel: unknown, payload: unknown): { id: string; activity: string } | null {
-	if (!isObject(payload)) return null;
-	if (channel === SUBAGENT_LIFECYCLE) {
-		const description = nonEmptyStr(payload.description);
-		return typeof payload.id === "string" && description ? { id: payload.id, activity: oneLine(description) } : null;
-	}
-	if (channel !== SUBAGENT_PROGRESS || !isObject(payload.progress)) return null;
-	const progress = payload.progress;
-	if (typeof progress.id !== "string") return null;
-	const text =
-		nonEmptyStr(progress.currentToolIntent) ??
-		nonEmptyStr(progress.lastIntent) ??
-		nonEmptyStr(progress.description) ??
-		nonEmptyStr(payload.assignment) ??
-		nonEmptyStr(progress.task);
-	return text ? { id: progress.id, activity: oneLine(text) } : null;
-}
-
-/** omp's `ContextUsage` (a Collab state frame or an RPC state), as the roster's context numbers. */
-export function contextOf(value: unknown): ContextUsage | null {
-	if (!isObject(value)) return null;
-	const { tokens, contextWindow } = value;
-	return typeof tokens === "number" && typeof contextWindow === "number" && contextWindow > 0
-		? { tokens, window: contextWindow }
-		: null;
-}
 
 /** Model, thinking level, context, and whether a turn runs, from the host's status-line snapshot. */
 interface HostState {
@@ -64,7 +30,7 @@ function parseState(value: unknown): HostState | null {
 	if (!isObject(value)) return null;
 	const { model, thinkingLevel } = value;
 	return {
-		model: isObject(model) && typeof model.provider === "string" && typeof model.id === "string" ? `${model.provider}/${model.id}` : null,
+		model: isObject(model) && typeof model.provider === "string" && typeof model.id === "string" ? selectorOf({ provider: model.provider, id: model.id }) : null,
 		thinkingLevel: nonEmptyStr(thinkingLevel) ?? null,
 		context: contextOf(value.contextUsage),
 		streaming: value.isStreaming === true,
@@ -158,7 +124,7 @@ export class SessionGuest implements LiveSession {
 		return this.control.phase === "live" && !this.#readOnly;
 	}
 
-	row(facts: SessionFacts): RosterHost {
+	row(): LiveRow {
 		const host = this.#host;
 		return {
 			source: "terminal",
@@ -167,9 +133,8 @@ export class SessionGuest implements LiveSession {
 			sessionId: host.sessionId,
 			sessionName: host.sessionName,
 			cwd: host.cwd,
-			cwdDisplay: displayPath(host.cwd),
 			// The room's status-line snapshot, else the registry row until the guest is welcomed.
-			model: this.state?.model ?? (host.model ? `${host.model.provider}/${host.model.id}` : null),
+			model: this.state?.model ?? (host.model ? selectorOf(host.model) : null),
 			thinkingLevel: this.state?.thinkingLevel ?? null,
 			context: this.state?.context ?? null,
 			startedAt: host.startedAt,
@@ -178,7 +143,6 @@ export class SessionGuest implements LiveSession {
 			status: statusOf(host),
 			control: this.control,
 			agents: this.agents(),
-			...facts,
 			requests: this.requests(),
 			queue: this.queue(null),
 		};
@@ -412,8 +376,8 @@ export class SessionGuest implements LiveSession {
 				this.#emit({ kind: "roster" });
 				return;
 			case "bus": {
-				const update = activityOf(frame.channel, frame.data);
-				if (update && this.#activity.get(update.id) !== update.activity) {
+				const update = parseSubagentFrame(frame.channel, frame.data);
+				if (update?.activity && this.#activity.get(update.id) !== update.activity) {
 					this.#activity.set(update.id, update.activity);
 					this.#emit({ kind: "roster" });
 				}

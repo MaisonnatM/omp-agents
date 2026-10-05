@@ -5,26 +5,15 @@
  */
 import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
-import { activityOf, contextOf, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./guest";
-import { errorText, isObject } from "./json";
-import type { LiveSession, LiveUpdate, SessionFacts } from "./live-session";
+import { errorText, isObject, isTexts } from "./json";
+import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
 import { connectedProviders } from "./omp/models";
 import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
-import { displayPath } from "./paths";
-import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type PromptImage, type RosterHost, type UserAnswer, type UserRequest } from "./shared";
+import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type PromptImage, selectorOf, type UserAnswer, type UserRequest } from "./shared";
+import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { SKILL_PROMPT } from "./transcript";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
-
-/** omp's subagent lifecycle and progress statuses, as the roster's agent statuses. */
-const RPC_AGENT_STATUSES: Record<string, AgentStatus> = {
-	started: "running",
-	pending: "running",
-	running: "running",
-	completed: "idle",
-	failed: "aborted",
-	aborted: "aborted",
-};
 
 interface RpcAgent {
 	id: string;
@@ -71,8 +60,6 @@ async function recordedCwd(sessionFile: string): Promise<string> {
 
 /** Session events after which the model, thinking level, or context size can have changed. */
 const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_changed", "auto_compaction_end"]);
-
-const isTexts = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === "string");
 
 /** A message the user's prompt became: omp records a plain one as `user`, and a `/skill:` one as a `custom` `skill-prompt`. */
 const isPrompt = (message: Record<string, unknown>): boolean =>
@@ -221,7 +208,7 @@ export class DashboardSession implements LiveSession {
 		}
 	}
 
-	row(facts: SessionFacts): RosterHost {
+	row(): LiveRow {
 		return {
 			source: "dashboard",
 			instanceId: this.instanceId,
@@ -229,7 +216,6 @@ export class DashboardSession implements LiveSession {
 			sessionId: this.sessionId,
 			sessionName: this.sessionName,
 			cwd: this.cwd,
-			cwdDisplay: displayPath(this.cwd),
 			model: this.model,
 			thinkingLevel: this.thinkingLevel,
 			thinkingLevels: this.thinkingLevels,
@@ -239,7 +225,6 @@ export class DashboardSession implements LiveSession {
 			status: this.status,
 			control: { phase: "live", readOnly: false },
 			agents: this.agents(),
-			...facts,
 			requests: this.requests(),
 			queue: this.queue,
 		};
@@ -429,7 +414,7 @@ export class DashboardSession implements LiveSession {
 
 	#applyState(state: RpcState): void {
 		this.sessionName = state.sessionName ?? this.sessionName;
-		this.model = state.model ? `${state.model.provider}/${state.model.id}` : this.model;
+		this.model = state.model ? selectorOf(state.model) : this.model;
 		this.thinkingLevel = state.thinkingLevel ?? null;
 		this.context = contextOf(state.contextUsage);
 	}
@@ -473,19 +458,15 @@ export class DashboardSession implements LiveSession {
 	}
 
 	#onSubagent(channel: string, payload: unknown): void {
-		if (!isObject(payload)) return;
-		const body = channel === SUBAGENT_PROGRESS && isObject(payload.progress) ? payload.progress : payload;
-		const id = body.id;
-		if (typeof id !== "string") return;
-		const prev = this.#agents.get(id);
-		const status = typeof body.status === "string" ? RPC_AGENT_STATUSES[body.status] : undefined;
-		const update = activityOf(channel, payload);
-		this.#agents.set(id, {
-			id,
-			kind: typeof payload.agent === "string" ? payload.agent : (prev?.kind ?? "agent"),
-			status: status ?? prev?.status ?? "running",
-			activity: update?.activity ?? prev?.activity ?? null,
-			sessionFile: typeof payload.sessionFile === "string" ? payload.sessionFile : (prev?.sessionFile ?? null),
+		const frame = parseSubagentFrame(channel, payload);
+		if (!frame) return;
+		const prev = this.#agents.get(frame.id);
+		this.#agents.set(frame.id, {
+			id: frame.id,
+			kind: frame.kind ?? prev?.kind ?? "agent",
+			status: frame.status ?? prev?.status ?? "running",
+			activity: frame.activity ?? prev?.activity ?? null,
+			sessionFile: frame.sessionFile ?? prev?.sessionFile ?? null,
 		});
 		this.#emit({ kind: "roster" });
 	}

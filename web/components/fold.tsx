@@ -2,42 +2,36 @@
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import type { SectionTarget } from "../section";
+
+interface RevealTarget {
+	id: string;
+	folds: string[];
+}
+
+interface RevealOptions {
+	/** Once per `token`: a new section choice, or a row id that stays put when its object is rebuilt. */
+	token: unknown;
+	block: ScrollLogicalPosition;
+	focus: boolean;
+}
 
 /**
- * Unfolds, scrolls to the top, and focuses the section a sidebar link last chose, once per choice. It waits for the
- * section to unfold, and for a read that has it to load. Choosing the section again makes a new `target`, which reveals
- * it again.
+ * Unfolds `target`, then scrolls to it, once per `token`. It waits until the element is in the document, so an unfold
+ * that renders it reveals it on the next pass. A section link passes the target itself, so choosing it again scrolls
+ * back; a row link passes its id, so folding it again stays folded.
  */
-export function useRevealSection(target: SectionTarget | null, collapsed: ReadonlySet<string>, expand: (keys: string[]) => void): void {
-	const revealed = useRef<SectionTarget | null>(null);
+export function useReveal(target: RevealTarget | null, collapsed: ReadonlySet<string>, expand: (keys: string[]) => void, { token, block, focus }: RevealOptions): void {
+	const shown = useRef<unknown>(undefined);
 	useEffect(() => {
-		if (!target || revealed.current === target) return;
+		if (!target || shown.current === token) return;
 		const folded = target.folds.filter(key => collapsed.has(key));
 		if (folded.length > 0) return expand(folded);
 		const element = document.getElementById(target.id);
 		if (!element) return;
-		revealed.current = target;
-		element.scrollIntoView({ block: "start" });
-		element.focus({ preventScroll: true });
+		shown.current = token;
+		element.scrollIntoView({ block, behavior: focus ? "auto" : "smooth" });
+		if (focus) element.focus({ preventScroll: true });
 	});
-}
-
-/**
- * Unfolds the sections that list the row a page link named, then scrolls it to the middle, without focus, once per
- * row id: folding it again afterwards stays folded. `row` is `null` while the page does not list it.
- */
-export function useRevealRow(row: { id: string; folds: string[] } | null, collapsed: ReadonlySet<string>, expand: (keys: string[]) => void): void {
-	/** The row the page already unfolded and scrolled to. */
-	const shown = useRef<string | null>(null);
-	useEffect(() => {
-		if (!row || shown.current === row.id) return;
-		// Unfolding renders the row; this effect runs again and then scrolls to it.
-		const folded = row.folds.filter(key => collapsed.has(key));
-		if (folded.length > 0) return expand(folded);
-		shown.current = row.id;
-		document.getElementById(row.id)?.scrollIntoView({ block: "center", behavior: "smooth" });
-	}, [row?.id, row?.folds.join("\n"), collapsed]);
 }
 
 interface FoldProps {

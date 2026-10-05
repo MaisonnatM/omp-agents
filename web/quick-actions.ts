@@ -13,35 +13,25 @@ export type QuickActionId = PullRequestActionId | TicketActionId;
 /** What a quick start works on, with the action it runs there. */
 export type QuickSubject = { kind: "pull-request"; pr: PullRequest; action: PullRequestActionId } | { kind: "ticket"; id: string; action: TicketActionId };
 
-type WithoutAction<Subject> = Subject extends unknown ? Omit<Subject, "action"> : never;
-
 /** What a quick start can work on: a pull request, or a Linear issue by its identifier. */
-export type QuickItem = WithoutAction<QuickSubject>;
-
-/** The actions of `Item`'s kind. */
-export type ItemAction<Item extends QuickItem> = { [Subject in QuickSubject as Subject["kind"]]: Subject["action"] }[Item["kind"]];
+export type QuickItem = { kind: "pull-request"; pr: PullRequest } | { kind: "ticket"; id: string };
 
 /** The action that `subject` runs on `item`; `null` when it works on something else. */
-export function actionOn<Item extends QuickItem>(subject: QuickSubject, item: Item): ItemAction<Item> | null {
-	let same: boolean;
+export function actionOn(subject: QuickSubject, item: QuickItem): QuickActionId | null {
 	switch (subject.kind) {
 		case "pull-request":
-			same = item.kind === "pull-request" && samePullRequest(subject.pr, item.pr);
-			break;
+			return item.kind === "pull-request" && samePullRequest(subject.pr, item.pr) ? subject.action : null;
 		case "ticket":
-			same = item.kind === "ticket" && subject.id === item.id;
-			break;
+			return item.kind === "ticket" && subject.id === item.id ? subject.action : null;
 		default: {
 			const unhandled: never = subject;
 			return unhandled;
 		}
 	}
-	// The kinds just matched, which TypeScript cannot relate to the generic `Item`.
-	return same ? (subject.action as ItemAction<Item>) : null;
 }
 
 /** The action of the quick start under way on `item`, if any. */
-export function pendingOf<Item extends QuickItem>(quick: StartOf<"quick"> | null, item: Item): ItemAction<Item> | null {
+export function pendingOf(quick: StartOf<"quick"> | null, item: QuickItem): QuickActionId | null {
 	return quick?.phase === "starting" ? actionOn(quick.op.subject, item) : null;
 }
 

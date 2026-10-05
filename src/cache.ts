@@ -19,5 +19,9 @@ export function createCache<T>(ttlMs = 30_000) {
 		drop(key: string): void {
 			entries.delete(key);
 		},
+		/** Forget every kept answer whose key `matches`. */
+		dropWhere(matches: (key: string) => boolean): void {
+			for (const key of entries.keys()) if (matches(key)) entries.delete(key);
+		},
 	};
 }

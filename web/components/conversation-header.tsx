@@ -1,0 +1,76 @@
+import { CircleStop } from "lucide-react";
+import type { ReactNode } from "react";
+import type { ControlPhase, LiveView } from "../../src/shared";
+import { Button } from "@/components/ui/button";
+import { hostLabel } from "../labels";
+import { useGitCheckout } from "../use-git-checkout";
+import { GitRef } from "./git";
+import { Model } from "./model-picker";
+import { Header } from "./page-header";
+import { Project, PullRequests, Tickets } from "./session-meta";
+import { ShipStep } from "./ship-step";
+import type { Subject } from "./subject";
+
+/** A live session shows no status: the header speaks up only while the connection is not live. */
+const CONTROL_LABEL: Record<Exclude<ControlPhase["phase"], "live">, string> = {
+	connecting: "Connecting…",
+	reconnecting: "Reconnecting…",
+	ended: "Disconnected",
+};
+
+interface ConversationHeaderProps {
+	view: LiveView;
+	subject: Subject;
+	/** End running session `instanceId`, as the roster's End session does. */
+	onEnd: (instanceId: string) => void;
+	/** Header controls the page adds, such as closing a split pane. */
+	actions?: ReactNode;
+}
+
+/** A live session's or subagent's title, what it runs on, its connection status, and End session. */
+export function ConversationHeader({ view, subject, onEnd, actions }: ConversationHeaderProps) {
+	const { host, shown, agent, phase, live, working } = subject;
+	// Read again when a turn starts or ends, since a turn can switch the branch.
+	const checkout = useGitCheckout(subject.kind === "session" ? (shown?.cwd ?? null) : null, working);
+	const status =
+		phase.phase === "live" ? undefined : phase.phase === "connecting" ? CONTROL_LABEL.connecting : `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
+	const title = agent ? agent.id : shown ? hostLabel(shown) : view.instanceId;
+	const meta = agent
+		? [`${agent.kind} subagent of ${shown ? hostLabel(shown) : "a session"}`, agent.activity].filter(Boolean).join(" · ")
+		: shown && (
+				<>
+					<ShipStep ship={shown.ship} />{" "}
+					<Project cwdDisplay={shown.cwdDisplay} />
+					{checkout && (checkout.github || checkout.branch) && (
+						<>
+							{" · "}
+							<GitRef github={checkout.github} branch={checkout.branch} />
+						</>
+					)}
+					{" · "}
+					{shown.model ? <Model selector={shown.model} /> : "no model"} · pid {shown.pid}
+					<PullRequests pullRequests={shown.pullRequests} />
+					<Tickets tickets={shown.tickets} />
+				</>
+			);
+	return (
+		<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
+			{subject.kind === "session" && live && host && (
+				<Button
+					variant="primary"
+					size="compact"
+					leadingIcon={CircleStop}
+					onClick={() => onEnd(view.instanceId)}
+					title={
+						host.source === "dashboard"
+							? "Stop the omp process this dashboard started. Its transcript moves to Past sessions, where Resume continues it."
+							: `Stop the omp process running in its terminal (pid ${host.pid}). Its transcript moves to Past sessions, where Resume continues it.`
+					}
+				>
+					End session
+				</Button>
+			)}
+			{actions}
+		</Header>
+	);
+}

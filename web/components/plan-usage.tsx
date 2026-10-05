@@ -3,7 +3,7 @@ import type { PlanUsage, PlanWindow } from "../../src/shared";
 import { SidebarFooter } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { DashboardState } from "../use-dashboard";
+import type { DashboardState } from "../dashboard-state";
 import { providerOrg } from "../labels";
 import { OrgIcon } from "./org-icon";
 

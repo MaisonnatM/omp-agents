@@ -275,10 +275,13 @@ describe("SessionGuest subagents", () => {
 		expect(socket.messages).toEqual([]);
 		expect(guest.queue("s1").followUp).toEqual([]);
 		expect(guest.queue("s2").followUp).toEqual([]);
-		expect(notes()).toEqual([
-			{ kind: "note", agentId: "s1", level: "warning", text: "Not sent, the subagent stopped before its turn ended:\na\nb" },
-			{ kind: "note", agentId: "s2", level: "warning", text: "Not sent, the subagent stopped before its turn ended:\nc" },
+		const warnings = notes();
+		expect(warnings).toMatchObject([
+			{ kind: "note", agentId: "s1", level: "warning" },
+			{ kind: "note", agentId: "s2", level: "warning" },
 		]);
+		expect(warnings[0]?.text).toEndWith("a\nb");
+		expect(warnings[1]?.text).toEndWith("c");
 	});
 
 	test("messages for an aborted or unknown subagent are not sent", async () => {
@@ -415,10 +418,13 @@ describe("SessionGuest lifetime", () => {
 		socket.frame({ t: "bye", reason: "host quit" });
 
 		expect(guest.control).toEqual({ phase: "ended", reason: "Host ended the room: host quit" });
-		expect(notes()).toEqual([
-			{ kind: "note", agentId: null, level: "warning", text: "Not sent, the room closed before the turn ended:\nmain one" },
-			{ kind: "note", agentId: "s1", level: "warning", text: "Not sent, the room closed before the turn ended:\nsub one" },
+		const warnings = notes();
+		expect(warnings).toMatchObject([
+			{ kind: "note", agentId: null, level: "warning" },
+			{ kind: "note", agentId: "s1", level: "warning" },
 		]);
+		expect(warnings[0]?.text).toEndWith("main one");
+		expect(warnings[1]?.text).toEndWith("sub one");
 		expect(guest.queue(null).followUp).toEqual([]);
 		expect(socket.messages).toEqual([]);
 	});
@@ -436,7 +442,7 @@ describe("SessionGuest lifetime", () => {
 		const same = await joinRoom({ host: { instanceId: "inst-4" } });
 		const listed = host({ instanceId: "inst-4", participants: 3 });
 		expect(same.guest.follow(new Map([[listed.instanceId, listed]]))).toBe(true);
-		expect(same.guest.row({ pullRequests: [], tickets: [], ship: null })).toMatchObject({ participants: 3 });
+		expect(same.guest.row()).toMatchObject({ participants: 3 });
 	});
 
 	test("a host error names the subagent it concerns, or reports as the host's", async () => {

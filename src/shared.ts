@@ -2,7 +2,8 @@
 
 export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
 
-export type AgentStatus = "running" | "idle" | "parked" | "aborted";
+export const AGENT_STATUSES = ["running", "idle", "parked", "aborted"] as const;
+export type AgentStatus = (typeof AGENT_STATUSES)[number];
 
 /**
  * How a message sent while a turn runs reaches the agent, as omp's terminal sends it. Enter steers, and omp delivers a
@@ -118,7 +119,8 @@ export const TICKET_STATUS_TYPES = ["triage", "started", "unstarted", "backlog",
 export type TicketStatusType = (typeof TICKET_STATUS_TYPES)[number];
 
 /** Linear's priority: 0 none, 1 urgent, 2 high, 3 medium, 4 low. */
-export type TicketPriority = 0 | 1 | 2 | 3 | 4;
+export const TICKET_PRIORITIES = [0, 1, 2, 3, 4] as const;
+export type TicketPriority = (typeof TICKET_PRIORITIES)[number];
 
 /** A Linear issue assigned to the viewer, on the tickets page. */
 export interface Ticket {
@@ -296,9 +298,12 @@ export interface AgentRow {
 	queue: MessageQueue;
 }
 
+export const SHIP_STAGES = ["ticket", "implement", "draft_pr", "thermonuclear", "ready_gate", "live", "merged"] as const;
+export const SHIP_WORK = ["rebase", "fix_comments", "fix_ci"] as const;
+
 export interface ShipProgress {
-	stage: "ticket" | "implement" | "draft_pr" | "thermonuclear" | "ready_gate" | "live" | "merged";
-	work?: "rebase" | "fix_comments" | "fix_ci";
+	stage: (typeof SHIP_STAGES)[number];
+	work?: (typeof SHIP_WORK)[number];
 	issue?: string;
 	pr?: number;
 }
@@ -402,7 +407,8 @@ export type Item =
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
 
 /** omp's todo statuses (`pi-tui/src/tools/todo.ts`). */
-export type TodoStatus = "pending" | "in_progress" | "completed" | "abandoned" | "blocked";
+export const TODO_STATUSES = ["pending", "in_progress", "completed", "abandoned", "blocked"] as const;
+export type TodoStatus = (typeof TODO_STATUSES)[number];
 
 export interface TodoItem {
 	content: string;
@@ -635,6 +641,9 @@ export interface ConnectedModels {
 	models: ModelOption[];
 	capabilities: ModelCapabilities[];
 }
+
+/** `model` as omp's selector names it. */
+export const selectorOf = ({ provider, id }: ModelOption): string => `${provider}/${id}`;
 
 /** A role in omp's `modelRoles`, such as `plan`, as the model and thinking level its selector names. */
 export interface ModelRole {

@@ -10,6 +10,7 @@ import {
 	type Inbox,
 	type InboxPullRequest,
 	type InboxRole,
+	type Person,
 	type PullRequest,
 	type PullRequestCheck,
 	type PullRequestComment,
@@ -32,13 +33,16 @@ const AVATAR = "avatarUrl(size: 48)";
 /** The most review threads one page lists; a PR with more counts its unresolved threads as a floor. */
 const THREADS = 100;
 
-const PR_FIELDS = `... on PullRequest {
-	number title isDraft state reviewDecision mergeable headRefName baseRefName updatedAt mergedAt
-	author { login ${AVATAR} }
+/** The pull request's author, its requested reviewers, and its latest reviews, which the inbox's entry and its sheet both show. */
+const REVIEW_FIELDS = `author { login ${AVATAR} }
 	reviewRequests(first: 10) { nodes { requestedReviewer {
 		... on User { login ${AVATAR} } ... on Bot { login ${AVATAR} } ... on Mannequin { login ${AVATAR} } ... on Team { slug ${AVATAR} }
 	} } }
-	latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }
+	latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }`;
+
+const PR_FIELDS = `... on PullRequest {
+	number title isDraft state reviewDecision mergeable headRefName baseRefName updatedAt mergedAt
+	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 	reviewThreads(first: ${THREADS}) { totalCount nodes { isResolved } }
@@ -80,33 +84,46 @@ function parseUnresolved(threads: unknown): InboxPullRequest["unresolved"] {
 	return { count: nodes.filter(thread => isObject(thread) && thread.isResolved === false).length, exact: total <= nodes.length };
 }
 
-function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole): InboxPullRequest | null {
-	if (!isObject(node) || typeof node.number !== "number") return null;
+/** A deleted account leaves no author; GitHub shows it as `ghost`. */
+const authorOf = (author: unknown): Person => parsePerson(author) ?? { login: "ghost", avatarUrl: null };
+
+/** What a pull request's inbox entry and its sheet share, or `null` when GitHub left out its title or branches. */
+function parsePullRequestHead(node: Record<string, unknown>) {
 	const title = str(node.title);
 	const head = str(node.headRefName);
 	const base = str(node.baseRefName);
+	if (title === undefined || head === undefined || base === undefined) return null;
+	const author = authorOf(node.author);
+	return {
+		title,
+		head,
+		base,
+		author,
+		reviewers: parseReviewers(node, author.login),
+		state: node.state === "MERGED" ? ("merged" as const) : node.isDraft === true ? ("draft" as const) : ("open" as const),
+		review: REVIEW[str(node.reviewDecision) ?? ""] ?? "none",
+	};
+}
+
+function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole): InboxPullRequest | null {
+	if (!isObject(node) || typeof node.number !== "number") return null;
+	const parsed = parsePullRequestHead(node);
 	const updatedAt = Date.parse(str(node.mergedAt) ?? str(node.updatedAt) ?? "");
-	if (title === undefined || head === undefined || base === undefined || Number.isNaN(updatedAt)) return null;
+	if (!parsed || Number.isNaN(updatedAt)) return null;
+	const { base, ...head } = parsed;
 	const repository = isObject(node.repository) ? node.repository : {};
 	const defaultBranch = isObject(repository.defaultBranchRef) ? str(repository.defaultBranchRef.name) : undefined;
 	const commits = nodesOf(node.commits);
 	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
 	const rollup = isObject(commit.statusCheckRollup) ? str(commit.statusCheckRollup.state) : undefined;
-	// A deleted account leaves no author; GitHub shows it as `ghost`.
-	const author = parsePerson(node.author) ?? { login: "ghost", avatarUrl: null };
 	return {
 		owner,
 		repo,
 		number: node.number,
-		title,
-		author,
-		reviewers: parseReviewers(node, author.login),
+		...head,
 		role,
-		state: node.state === "MERGED" ? "merged" : node.isDraft === true ? "draft" : "open",
-		review: REVIEW[str(node.reviewDecision) ?? ""] ?? "none",
 		checks: STATUS[rollup ?? ""] ?? "none",
 		conflicts: node.state !== "MERGED" && node.mergeable === "CONFLICTING",
-		head,
 		stackedOn: defaultBranch !== undefined && base !== defaultBranch ? base : null,
 		unresolved: parseUnresolved(node.reviewThreads),
 		updatedAt,
@@ -144,11 +161,7 @@ const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
 const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	repository(owner: $owner, name: $repo) { pullRequest(number: $number) {
 		number title body isDraft state reviewDecision headRefName baseRefName createdAt additions deletions changedFiles
-		author { login ${AVATAR} }
-		reviewRequests(first: 10) { nodes { requestedReviewer {
-			... on User { login ${AVATAR} } ... on Bot { login ${AVATAR} } ... on Mannequin { login ${AVATAR} } ... on Team { slug ${AVATAR} }
-		} } }
-		latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }
+		${REVIEW_FIELDS}
 		commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
 			... on CheckRun { name status conclusion detailsUrl }
 			... on StatusContext { context state targetUrl }
@@ -177,7 +190,7 @@ function parseComment(node: unknown, at: unknown): PullRequestComment | null {
 	if (!isObject(node)) return null;
 	const posted = Date.parse(str(at) ?? "");
 	if (Number.isNaN(posted)) return null;
-	return { author: parsePerson(node.author) ?? { login: "ghost", avatarUrl: null }, body: str(node.body) ?? "", at: posted, url: str(node.url) ?? null };
+	return { author: authorOf(node.author), body: str(node.body) ?? "", at: posted, url: str(node.url) ?? null };
 }
 
 /** The pull request in `gh api graphql`'s answer to `DETAIL_QUERY`; throws when GitHub has no such PR. */
@@ -187,12 +200,9 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 	const node = repository.pullRequest;
 	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
 	if (!isObject(node)) throw new Error(`GitHub has no pull request ${name}`);
-	const title = str(node.title);
-	const head = str(node.headRefName);
-	const base = str(node.baseRefName);
+	const head = parsePullRequestHead(node);
 	const createdAt = Date.parse(str(node.createdAt) ?? "");
-	if (title === undefined || head === undefined || base === undefined || Number.isNaN(createdAt)) throw new Error(`GitHub answered an incomplete ${name}`);
-	const author = parsePerson(node.author) ?? { login: "ghost", avatarUrl: null };
+	if (!head || Number.isNaN(createdAt)) throw new Error(`GitHub answered an incomplete ${name}`);
 	const commits = nodesOf(node.commits);
 	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
 	const rollup = isObject(commit.statusCheckRollup) ? commit.statusCheckRollup.contexts : null;
@@ -225,14 +235,9 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		owner: pr.owner,
 		repo: pr.repo,
 		number: pr.number,
-		title,
+		...head,
 		body: str(node.body) ?? "",
-		author,
-		reviewers: parseReviewers(node, author.login),
-		state: node.state === "MERGED" ? "merged" : node.state === "CLOSED" ? "closed" : node.isDraft === true ? "draft" : "open",
-		review: REVIEW[str(node.reviewDecision) ?? ""] ?? "none",
-		head,
-		base,
+		state: node.state === "CLOSED" ? "closed" : head.state,
 		additions: num(node.additions) ?? 0,
 		deletions: num(node.deletions) ?? 0,
 		changedFiles: num(node.changedFiles) ?? 0,

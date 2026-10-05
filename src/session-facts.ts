@@ -11,10 +11,11 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { parseRemote } from "./github";
-import { isObject } from "./json";
+import { isObject, oneOf } from "./json";
 import { LineReader } from "./line-reader";
-import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo, type ShipProgress, TICKET_ID } from "./shared";
-import { textOf } from "./transcript";
+import type { SessionFacts } from "./live-session";
+import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
+import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo, SHIP_STAGES, SHIP_WORK, type ShipProgress, TICKET_ID } from "./shared";
 
 /** `me/fe-trust-7: https://app.graphite.com/github/pr/acme/webapp/6596 (created)` */
 const GT_SUBMITTED = /^\S+: https:\/\/app\.graphite\.com\/github\/pr\/([\w.-]+)\/([\w.-]+)\/(\d+)\S* \((?:created|updated)\)[ \t\r]*$/gm;
@@ -39,10 +40,8 @@ const LINEAR_TOOL = /^(?:xd_)?mcp__linear_(\w+)$/;
 const LINEAR_DEVICE = /^xd:\/\/mcp__linear_(\w+)$/;
 /** The Linear tools that act on one issue, and the argument that names it. */
 const LINEAR_ISSUE_ARG = { get_issue: "id", save_issue: "id", list_comments: "issueId", save_comment: "issueId" } as const;
-const SHIP_STAGES: Record<ShipProgress["stage"], true> = {
-	ticket: true, implement: true, draft_pr: true, thermonuclear: true, ready_gate: true, live: true, merged: true,
-};
-const SHIP_WORK: Record<NonNullable<ShipProgress["work"]>, true> = { rebase: true, fix_comments: true, fix_ci: true };
+const isShipStage = oneOf(SHIP_STAGES);
+const isShipWork = oneOf(SHIP_WORK);
 
 /**
  * One pull request a transcript links to. `number` is a PR in the session's own repository, the one `origin`
@@ -109,6 +108,19 @@ function linearCall(name: string, args: Record<string, unknown>): { tool: string
 	}
 }
 
+/** A /ship run's progress as its `omp-ship.state` entry records it, or `null` when the entry names no known stage. */
+export function parseShipProgress(data: unknown): ShipProgress | null {
+	if (!isObject(data)) return null;
+	const { stage, work, issue, pr } = data;
+	if (!isShipStage(stage)) return null;
+	return {
+		stage,
+		...(isShipWork(work) ? { work } : {}),
+		...(typeof issue === "string" ? { issue } : {}),
+		...(typeof pr === "number" && Number.isInteger(pr) && pr > 0 ? { pr } : {}),
+	};
+}
+
 /** Folds one transcript's lines, in order, into the pull requests and Linear issues it links to, each once. */
 export class SessionFactsScan {
 	/** Bash calls, then their background jobs, whose output has not been read yet, and what it can prove. */
@@ -131,16 +143,12 @@ export class SessionFactsScan {
 			return;
 		}
 		if (!isObject(entry)) return;
-		if (entry.type === "custom" && entry.customType === "omp-ship.state" && isObject(entry.data)) {
-			const data = entry.data;
-			if (typeof data.stage !== "string" || !Object.hasOwn(SHIP_STAGES, data.stage)) return;
-			this.ship = {
-				stage: data.stage as ShipProgress["stage"],
-				...(typeof data.work === "string" && Object.hasOwn(SHIP_WORK, data.work) ? { work: data.work as ShipProgress["work"] } : {}),
-				...(typeof data.issue === "string" ? { issue: data.issue } : {}),
-				...(typeof data.pr === "number" && Number.isInteger(data.pr) && data.pr > 0 ? { pr: data.pr } : {}),
-			};
-			if (this.ship.issue) this.#ticket(this.ship.issue);
+		if (entry.type === "custom" && entry.customType === "omp-ship.state") {
+			const ship = parseShipProgress(entry.data);
+			if (ship) {
+				this.ship = ship;
+				if (ship.issue) this.#ticket(ship.issue);
+			}
 			return;
 		}
 		if (entry.type === "custom_message" && entry.customType === "async-result" && typeof entry.content === "string") {
@@ -152,27 +160,27 @@ export class SessionFactsScan {
 			return;
 		}
 		if (entry.type !== "message" || !isObject(entry.message)) return;
-		const message = entry.message;
-		if (message.role === "assistant" && Array.isArray(message.content)) {
-			for (const block of message.content) {
-				if (!isObject(block) || block.type !== "toolCall" || typeof block.id !== "string") continue;
-				const args = isObject(block.arguments) ? block.arguments : {};
-				if (block.name === "bash" && typeof args.command === "string") this.#command(block.id, args.command);
-				if (block.name === "read" && typeof args.path === "string") this.#read(args.path);
-				const linear = typeof block.name === "string" && linearCall(block.name, args);
-				if (linear) this.#linear(block.id, linear.tool, linear.args);
-			}
-			return;
+		for (const call of toolCallsOf(entry.message)) {
+			if (call.name === "bash" && typeof call.args.command === "string") this.#command(call.id, call.args.command);
+			if (call.name === "read" && typeof call.args.path === "string") this.#read(call.args.path);
+			const linear = linearCall(call.name, call.args);
+			if (linear) this.#linear(call.id, linear.tool, linear.args);
 		}
-		if (message.role !== "toolResult") return;
-		if (typeof message.toolCallId === "string" && this.#opening.delete(message.toolCallId) && message.isError !== true) this.#opened(textOf(message.content));
-		const details = isObject(message.details) ? message.details : {};
-		if (message.toolName === "bash") {
-			const expected = typeof message.toolCallId === "string" ? this.#take(message.toolCallId) : undefined;
+		this.#toolResult(entry.message);
+	}
+
+	/** A tool result: it closes a `save_issue` that opened an issue, and a bash call or `wait` hands over what the command printed. */
+	#toolResult(message: Record<string, unknown>): void {
+		const result = toolResultOf(message);
+		if (!result) return;
+		const { callId, details } = result;
+		if (callId !== undefined && this.#opening.delete(callId) && !result.isError) this.#opened(textOf(result.content));
+		if (result.toolName === "bash") {
+			const expected = callId === undefined ? undefined : this.#take(callId);
 			const job = isObject(details.async) ? details.async.jobId : undefined;
 			if (expected && typeof job === "string") this.#pending.set(job, expected);
-			this.#output(textOf(message.content), expected);
-		} else if (message.toolName === "wait" && Array.isArray(details.jobs)) {
+			this.#output(textOf(result.content), expected);
+		} else if (result.toolName === "wait" && Array.isArray(details.jobs)) {
 			for (const job of details.jobs) {
 				if (!isObject(job) || job.type !== "bash" || typeof job.resultText !== "string") continue;
 				this.#output(job.resultText, this.#take(String(job.id)));
@@ -324,19 +332,17 @@ export class SessionFactsIndex {
 		this.#repoOf = repoOf;
 	}
 
-	/** What the session in `sessionPath` and its subagents submitted or worked on, or none before its first scan. */
-	pullRequestsOf(sessionPath: string): LinkedPullRequest[] {
-		return this.#sessions.get(sessionPath)?.pullRequests ?? [];
-	}
-
-	/** The latest /ship stage from the session's own transcript, not its subagents'. */
-	shipOf(sessionPath: string): ShipProgress | null {
-		return this.#sessions.get(sessionPath)?.transcripts.get(sessionPath)?.scan.ship ?? null;
-	}
-
-	/** The Linear issues the session in `sessionPath` and its subagents worked on, by identifier. */
-	ticketsOf(sessionPath: string): string[] {
-		return this.#sessions.get(sessionPath)?.tickets ?? [];
+	/**
+	 * What the session in `sessionPath` and its subagents submitted, worked on, and linked, or none before its first scan.
+	 * The /ship stage is the session's own transcript's, not its subagents'.
+	 */
+	factsOf(sessionPath: string): SessionFacts {
+		const session = this.#sessions.get(sessionPath);
+		return {
+			pullRequests: session?.pullRequests ?? [],
+			tickets: session?.tickets ?? [],
+			ship: session?.transcripts.get(sessionPath)?.scan.ship ?? null,
+		};
 	}
 
 	/**

@@ -1,8 +1,9 @@
-import type { ModelOption } from "../../src/shared";
+import { type ModelOption, selectorOf } from "../../src/shared";
 import { Brain } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Tabs, TabsList, TabItem, TabPanel } from "@/components/ui/tabs";
 import { modelLabel, modelOrg, providerLabel, providerOrg } from "../labels";
+import type { ModelList } from "../reads";
 import { CommandPicker, fromList, type PickerGroup } from "./command-picker";
 import { OrgIcon } from "./org-icon";
 import { ThinkingChoices, type ThinkingChoicesProps } from "./thinking-picker";
@@ -53,12 +54,12 @@ export const MODEL_LIST = { search: { label: "Search models" }, empty: "No model
  * checked when its selector is `current`. `describe` names a model's selector, its id, and one more word to search by.
  */
 export function modelGroups<T>(
-	byProvider: [string, T[]][],
+	byProvider: ReadonlyMap<string, T[]>,
 	describe: (model: T) => { selector: string; id: string; keyword: string },
 	current: string | null,
 	onPick: (model: T) => void,
 ): PickerGroup[] {
-	return byProvider.map(([provider, models]) => ({
+	return Array.from(byProvider, ([provider, models]) => ({
 		key: provider,
 		heading: <ProviderHeading provider={provider} />,
 		items: models.map(model => {
@@ -81,8 +82,8 @@ interface ModelPickerProps {
 	current: string | null;
 	/** What the button reads while `current` is `null`, `Choose model` when not given. */
 	unset?: string;
-	/** The last list the server sent, or `null` while none has arrived. */
-	list: { models: ModelOption[]; error: string | null } | null;
+	/** The models the server last sent for this session; nothing while none has arrived. */
+	list: ModelList;
 	open: boolean;
 	/** The parent refreshes the list from omp whenever the picker opens. */
 	onOpenChange: (open: boolean) => void;
@@ -91,22 +92,10 @@ interface ModelPickerProps {
 	thinking: ThinkingChoicesProps;
 }
 
-function byProvider(models: ModelOption[]): [string, ModelOption[]][] {
-	const groups = new Map<string, ModelOption[]>();
-	for (const model of models) {
-		const group = groups.get(model.provider);
-		if (group) group.push(model);
-		else groups.set(model.provider, [model]);
-	}
-	return [...groups];
-}
-
-const selectorOf = (model: ModelOption): string => `${model.provider}/${model.id}`;
-
 /** Provider tabs filter the models without changing the session's active model. */
 export function ModelPicker({ current, unset, list, open, onOpenChange, onPick, disabled, thinking }: ModelPickerProps) {
 	const [provider, setProvider] = useState<string | null>(null);
-	const groups = byProvider(list?.models ?? []);
+	const groups = [...Map.groupBy(list.data?.models ?? [], model => model.provider)];
 	const currentProvider = current?.slice(0, current.indexOf("/")) ?? null;
 	const wasOpen = useRef(false);
 	useEffect(() => {
@@ -144,7 +133,7 @@ export function ModelPicker({ current, unset, list, open, onOpenChange, onPick, 
 			closeOnSelect={false}
 			list={fromList(list, MODEL_LIST.loading, () =>
 				modelGroups(
-					groups.filter(([name]) => name === active),
+					new Map(groups.filter(([name]) => name === active)),
 					model => ({ selector: selectorOf(model), id: model.id, keyword: providerLabel(model.provider) }),
 					current,
 					model => {
@@ -152,7 +141,7 @@ export function ModelPicker({ current, unset, list, open, onOpenChange, onPick, 
 					},
 				),
 			)}
-			empty={list?.models.length === 0 ? "No connected models. Sign in to a provider in omp, then reopen this picker." : MODEL_LIST.empty}
+			empty={list.data?.models.length === 0 ? "No connected models. Sign in to a provider in omp, then reopen this picker." : MODEL_LIST.empty}
 			content={command => (
 				<>
 					{groups.length > 0 && !list?.error ? (

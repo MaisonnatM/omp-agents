@@ -1,16 +1,17 @@
 import { useState } from "react";
-import type { OmpFile } from "../../../src/shared";
+import type { FileEdit, OmpFile, OmpSettings } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { putJson, settingsUrl } from "../../api";
 import { FILE_KIND_LABELS, fileGroups } from "../../labels";
-import { saveFile } from "../../settings-api";
 import { EditBar, type Editing, SaveError, useEditor } from "./editor";
 
 function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
 	const { body } = file;
 	const editor = useEditor(
 		body.state === "read" ? body.text : "",
-		text => saveFile(editing.cwd, { path: file.path, text, baseHash: body.state === "read" ? body.hash : null }),
+		text =>
+			putJson<OmpSettings>(settingsUrl("/file", editing.cwd), { path: file.path, text, baseHash: body.state === "read" ? body.hash : null } satisfies FileEdit),
 		editing.saved,
 	);
 	const viewing = editor.state.phase === "viewing";
@@ -54,7 +55,7 @@ function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
 								size="compact"
 								onClick={() => {
 									editor.cancel();
-									void editing.reload();
+									editing.reload();
 								}}
 							>
 								Discard my edits and load the file from disk

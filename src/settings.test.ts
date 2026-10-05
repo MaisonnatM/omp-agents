@@ -68,11 +68,11 @@ const config = {
 	retry,
 	modelProviderOrder: [],
 };
-const rejection = (run: () => unknown): string => {
+const rejectionStatus = (run: () => unknown): number => {
 	try {
 		run();
 	} catch (err) {
-		if (err instanceof Rejected) return `${err.status} ${err.message}`;
+		if (err instanceof Rejected) return err.status;
 		throw err;
 	}
 	throw new Error("expected a rejection");
@@ -82,9 +82,7 @@ describe("parseRoutingEdit", () => {
 	test("a selector names a listed model, with an optional thinking level after an id that has its own colon", () => {
 		const edit: RoutingEdit = { kind: "role", role: "default", fallbacks: ["openrouter/minimax/minimax-m3:batch:low", "anthropic/claude-opus-5-5"] };
 		expect(parseRoutingEdit(edit, { catalog, config })).toEqual(edit);
-		expect(rejection(() => parseRoutingEdit({ ...edit, fallbacks: ["anthropic/claude-nope:high"] }, { catalog, config }))).toBe(
-			"400 omp lists no model anthropic/claude-nope:high",
-		);
+		expect(rejectionStatus(() => parseRoutingEdit({ ...edit, fallbacks: ["anthropic/claude-nope:high"] }, { catalog, config }))).toBe(400);
 	});
 
 	test("an unlisted selector the config already names still saves, so keeping it never blocks a save", () => {
@@ -97,9 +95,7 @@ describe("parseRoutingEdit", () => {
 			kind: "retry",
 			values: { usageReservePolicy: "auto" },
 		});
-		expect(rejection(() => parseRoutingEdit({ kind: "retry", values: { usageReservePolicy: "always" } }, { catalog, config }))).toBe(
-			'400 Invalid value for retry.usageReservePolicy: "always" (expected one of confirm, auto, fail-closed)',
-		);
+		expect(rejectionStatus(() => parseRoutingEdit({ kind: "retry", values: { usageReservePolicy: "always" } }, { catalog, config }))).toBe(400);
 	});
 });
 

@@ -1,12 +1,11 @@
 import { CircleCheck, CircleDashed, CircleSlash, CircleX, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { CheckRunState, PullRequest, PullRequestCheck, PullRequestDetail, PullRequestEvent } from "../../../src/shared";
-import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestUrl } from "../../inbox-model";
 import { age } from "../../labels";
 import { useRead } from "../../reads";
-import { Comment, DetailSection, Markdown, OutLink } from "../sheet-details";
+import { Comment, DetailSection, Markdown, OutLink, SheetFrame } from "../sheet-details";
 import { Avatar, IconTip, STATE_ICON } from "./avatars";
 
 const CHECK_RUN_ICON: Record<CheckRunState, [LucideIcon, string]> = {
@@ -77,23 +76,15 @@ function Checks({ checks }: { checks: PullRequestCheck[] }) {
 export function PullRequestSheetContent({ pr, actions }: { pr: PullRequest; actions?: ReactNode }) {
 	const { data: detail, error } = useRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
 	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
-	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking GitHub for the pull request…</p>;
-	if (detail) body = <PullRequestSections detail={detail} />;
-	else if (error) {
-		body = (
-			<p role="alert" className="text-sm text-red-600 dark:text-red-400">
-				Cannot load the pull request: {error}
-			</p>
-		);
-	}
 	return (
-		<>
-			<header className="space-y-1.5 border-b border-border py-3 pr-12 pl-5">
-				<SheetTitle className="flex items-start gap-2.5 text-base leading-snug font-semibold">
-					{detail && <IconTip icon={STATE_ICON[detail.state]} className="mt-1" />}
-					<span className="min-w-0">{detail?.title ?? name}</span>
-				</SheetTitle>
-				<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+		<SheetFrame
+			title={detail?.title ?? name}
+			icon={detail && <IconTip icon={STATE_ICON[detail.state]} className="mt-1" />}
+			loading="Asking GitHub for the pull request…"
+			error={error && `Cannot load the pull request: ${error}`}
+			actions={actions}
+			meta={
+				<>
 					<span className="tabular-nums">{name}</span>
 					{detail && (
 						<>
@@ -114,11 +105,11 @@ export function PullRequestSheetContent({ pr, actions }: { pr: PullRequest; acti
 						<OutLink href={pullRequestUrl(pr)}>GitHub</OutLink>
 						<OutLink href={graphiteUrl(pr)}>Graphite</OutLink>
 					</span>
-				</p>
-				{actions}
-			</header>
-			<div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">{body}</div>
-		</>
+				</>
+			}
+		>
+			{detail ? <PullRequestSections detail={detail} /> : null}
+		</SheetFrame>
 	);
 }
 

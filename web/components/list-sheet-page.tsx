@@ -7,7 +7,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { readTime } from "../labels";
 import type { PolledEntry } from "../polled-store";
-import { Header } from "./conversation";
+import { Header } from "./page-header";
+import { LoadNote } from "./sheet-details";
 
 interface PageFrameProps {
 	title: string;
@@ -61,8 +62,7 @@ interface ListSheetPageProps<Data> {
 export function ListSheetPage<Data>({ title, meta, noun, loading, poll, onRefresh, missing, notice, spacing, children, sheet, contentRef }: ListSheetPageProps<Data>) {
 	const { read, error, refreshing } = poll;
 	let body: ReactNode;
-	if (!read && error) body = <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot load {noun}: {error}</p>;
-	else if (!read) body = <p className="text-sm text-muted-foreground">{loading}</p>;
+	if (!read) body = <LoadNote loading={loading} error={error && `Cannot load ${noun}: ${error}`} />;
 	else {
 		body = (
 			<>

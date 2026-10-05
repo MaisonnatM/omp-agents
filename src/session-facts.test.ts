@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
+import { parseShipProgress, resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
 
 const toolCall = (id: string, name: string, args: object) =>
 	JSON.stringify({
@@ -208,16 +208,16 @@ describe("SessionFactsIndex", () => {
 		const index = new SessionFactsIndex(async () => null);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 		expect(await index.refresh(listed(1))).toBe(true);
-		expect(index.pullRequestsOf(session).map(pr => pr.number)).toEqual([1, 2]);
+		expect(index.factsOf(session).pullRequests.map(pr => pr.number)).toEqual([1, 2]);
 
 		appendFileSync(session, `${line(3)}\n${line(4).slice(0, 20)}`);
 		expect(await index.refresh(listed(1))).toBe(false);
-		expect(index.pullRequestsOf(session).map(pr => pr.number)).toEqual([1, 2]);
+		expect(index.factsOf(session).pullRequests.map(pr => pr.number)).toEqual([1, 2]);
 		expect(await index.refresh(listed(2))).toBe(true);
-		expect(index.pullRequestsOf(session).map(pr => pr.number)).toEqual([1, 3, 2]);
+		expect(index.factsOf(session).pullRequests.map(pr => pr.number)).toEqual([1, 3, 2]);
 
 		expect(await index.refresh([])).toBe(false);
-		expect(index.pullRequestsOf(session)).toEqual([]);
+		expect(index.factsOf(session).pullRequests).toEqual([]);
 	});
 
 	test("shows the latest parent workflow stage and picks up live review work on append", async () => {
@@ -234,13 +234,13 @@ describe("SessionFactsIndex", () => {
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
-		expect(index.shipOf(session)).toEqual({ stage: "thermonuclear", issue: "ENG-123", pr: 42 });
+		expect(index.factsOf(session).ship).toEqual({ stage: "thermonuclear", issue: "ENG-123", pr: 42 });
 		appendFileSync(session, `${state("live", "rebase")}\n`);
 		expect(await index.refresh(listed(2))).toBe(true);
-		expect(index.shipOf(session)).toEqual({ stage: "live", work: "rebase", issue: "ENG-123", pr: 42 });
+		expect(index.factsOf(session).ship).toEqual({ stage: "live", work: "rebase", issue: "ENG-123", pr: 42 });
 		appendFileSync(session, `${state("unknown")}\n`);
 		expect(await index.refresh(listed(3))).toBe(false);
-		expect(index.shipOf(session)?.work).toBe("rebase");
+		expect(index.factsOf(session).ship?.work).toBe("rebase");
 	});
 
 	test("lists the session's Linear issues before its subagents', each once, and reports a new one on append", async () => {
@@ -255,12 +255,12 @@ describe("SessionFactsIndex", () => {
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
-		expect(index.ticketsOf(session)).toEqual(["ENG-1", "ENG-2"]);
+		expect(index.factsOf(session).tickets).toEqual(["ENG-1", "ENG-2"]);
 		appendFileSync(session, `${read("ENG-1")}\n`);
 		expect(await index.refresh(listed(2))).toBe(false);
 		appendFileSync(session, `${read("ENG-3")}\n`);
 		expect(await index.refresh(listed(3))).toBe(true);
-		expect(index.ticketsOf(session)).toEqual(["ENG-1", "ENG-3", "ENG-2"]);
+		expect(index.factsOf(session).tickets).toEqual(["ENG-1", "ENG-3", "ENG-2"]);
 	});
 
 	test("asks for the repository only of sessions that name a bare number, and links pushes once the inbox names their PR", async () => {
@@ -282,14 +282,34 @@ describe("SessionFactsIndex", () => {
 			]),
 		).toBe(true);
 		expect(asked).toEqual(["/code/webapp"]);
-		expect(index.pullRequestsOf(reader)).toEqual([{ owner: "acme", repo: "webapp", number: 6611, link: "worked" }]);
-		expect(index.pullRequestsOf(pusher)).toEqual([]);
+		expect(index.factsOf(reader).pullRequests).toEqual([{ owner: "acme", repo: "webapp", number: 6611, link: "worked" }]);
+		expect(index.factsOf(pusher).pullRequests).toEqual([]);
 
 		const inbox = [{ owner: "acme", repo: "webapp", number: 6612, head: "me/feature" }];
 		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, inbox)).toBe(true);
-		expect(index.pullRequestsOf(pusher)).toEqual([{ owner: "acme", repo: "webapp", number: 6612, link: "worked" }]);
+		expect(index.factsOf(pusher).pullRequests).toEqual([{ owner: "acme", repo: "webapp", number: 6612, link: "worked" }]);
 		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, inbox)).toBe(false);
 		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, [])).toBe(true);
-		expect(index.pullRequestsOf(pusher)).toEqual([]);
+		expect(index.factsOf(pusher).pullRequests).toEqual([]);
+	});
+});
+
+describe("parseShipProgress", () => {
+	test("keeps a known stage with the work, issue, and PR it names", () => {
+		expect(parseShipProgress({ stage: "live", work: "fix_ci", issue: "ENG-1", pr: 7 })).toEqual({ stage: "live", work: "fix_ci", issue: "ENG-1", pr: 7 });
+		expect(parseShipProgress({ stage: "ticket" })).toEqual({ stage: "ticket" });
+	});
+
+	test("drops a work, issue, or PR of the wrong kind but keeps the stage", () => {
+		expect(parseShipProgress({ stage: "implement", work: "bogus", issue: 4, pr: 0 })).toEqual({ stage: "implement" });
+		expect(parseShipProgress({ stage: "implement", pr: 1.5 })).toEqual({ stage: "implement" });
+		expect(parseShipProgress({ stage: "implement", pr: -3 })).toEqual({ stage: "implement" });
+	});
+
+	test("is null without a known stage", () => {
+		expect(parseShipProgress({ stage: "unknown" })).toBeNull();
+		expect(parseShipProgress({ work: "rebase" })).toBeNull();
+		expect(parseShipProgress("live")).toBeNull();
+		expect(parseShipProgress(null)).toBeNull();
 	});
 });

@@ -8,6 +8,7 @@
  * file's copy replaces the streamed one in place and a late event cannot undo it.
  */
 import { isObject, str } from "./json";
+import { oneLine, textOf } from "./session-entries";
 import { type Item, PROMPT_IMAGE_TYPES } from "./shared";
 
 type Json = Record<string, unknown>;
@@ -23,16 +24,6 @@ export const SKILL_PROMPT = "skill-prompt";
  */
 const SKILL_INVOCATION =
 	/^\[IMPORTANT: User invoked the "([^"]+)" skill; follow its instructions\. Full skill below\.\]\n[\s\S]*\n\[Skill directory: [^\n]*\]\n[^\n]*(?:\nUser: ([\s\S]*))?$/;
-const SUMMARY_MAX = 160;
-
-export function textOf(content: unknown): string {
-	if (typeof content === "string") return content;
-	if (!Array.isArray(content)) return "";
-	return content
-		.filter(block => isObject(block) && block.type === "text")
-		.map(block => String(block.text))
-		.join("\n");
-}
 
 /** How omp's session files point at an image it moved to its blob store. */
 const BLOB_REF = /^blob:sha256:([0-9a-f]{64})$/;
@@ -51,11 +42,6 @@ function imagesOf(content: unknown): { images?: string[] } {
 		return [hash ? `/api/image?${new URLSearchParams({ hash, type })}` : `data:${type};base64,${block.data}`];
 	});
 	return images.length > 0 ? { images } : {};
-}
-
-export function oneLine(text: string): string {
-	const flat = text.replace(/\s+/g, " ").trim();
-	return flat.length > SUMMARY_MAX ? `${flat.slice(0, SUMMARY_MAX - 1)}…` : flat;
 }
 
 /** Best one-line description of a tool call: its stated intent, else its most telling argument. */

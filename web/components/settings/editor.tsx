@@ -3,12 +3,10 @@ import { type ReactNode, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ApiError, errorText } from "../../api";
+import type { ReadState } from "../../reads";
 
 /** The models `omp models` lists, for the pickers; loaded once per page. */
-export type Catalog =
-	| { phase: "loading" }
-	| { phase: "loaded"; bySelector: ReadonlyMap<string, CatalogModel>; byProvider: [string, CatalogModel[]][] }
-	| { phase: "failed"; error: string };
+export type Catalog = ReadState<{ bySelector: ReadonlyMap<string, CatalogModel>; byProvider: ReadonlyMap<string, CatalogModel[]> }>;
 
 /** What every editor shares: where it saves, the models it offers, and how the page takes a save's answer. */
 export interface Editing {
@@ -16,7 +14,7 @@ export interface Editing {
 	catalog: Catalog;
 	saved: (settings: OmpSettings) => void;
 	/** Re-read everything from disk, keeping the page as it is until the answer arrives. */
-	reload: () => Promise<void>;
+	reload: () => void;
 }
 
 type EditorState<T> =

@@ -1,5 +1,5 @@
 import { type LucideIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef } from "react";
+import type { ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
@@ -7,6 +7,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { type ShortcutId, shortcutLabels } from "../shortcuts";
 import { useStoredState } from "../stored-state";
+import { Separator, useDragSeparator } from "./drag-separator";
 
 /**
  * The dashboard's two sidebars, each one resizable and closeable on its own. Fluid's provider holds a single width
@@ -136,62 +137,29 @@ interface SidebarResizeHandleProps {
 function SidebarResizeHandle({ side, width, onWidth }: SidebarResizeHandleProps) {
 	const { name, defaultWidth } = SIDEBARS[side];
 	// The handle sits on the sidebar's inner edge: moving it toward the page widens the left sidebar and narrows the right one.
-	const sign = side === "left" ? 1 : -1;
-	const drag = useRef<{ startX: number; startWidth: number } | null>(null);
-	const dragged = (event: PointerEvent<HTMLDivElement>, { startX, startWidth }: { startX: number; startWidth: number }): number =>
-		startWidth + sign * (event.clientX - startX);
-
-	const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
-		drag.current = { startX: event.clientX, startWidth: width };
-		event.currentTarget.setPointerCapture(event.pointerId);
-	};
-	const onPointerMove = (event: PointerEvent<HTMLDivElement>): void => {
-		if (drag.current) onWidth(dragged(event, drag.current));
-	};
-	const onPointerUp = (event: PointerEvent<HTMLDivElement>): void => {
-		if (!drag.current) return;
-		onWidth(dragged(event, drag.current));
-		drag.current = null;
-	};
-	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-		const step = event.shiftKey ? STEP * 4 : STEP;
-		const next: Record<string, number> = {
-			ArrowLeft: width - sign * step,
-			ArrowRight: width + sign * step,
-			Home: MIN_WIDTH,
-			End: MAX_WIDTH,
-		};
-		const target = next[event.key];
-		if (target === undefined) return;
-		event.preventDefault();
-		onWidth(target);
-	};
-
+	const direction = side === "left" ? 1 : -1;
+	const events = useDragSeparator({
+		value: width,
+		onValue: onWidth,
+		axis: "vertical",
+		direction,
+		keyStep: STEP,
+		shiftSteps: 4,
+		min: MIN_WIDTH,
+		max: MAX_WIDTH,
+		reset: defaultWidth,
+		read: (event, start) => start.value + direction * (event.clientX - start.coordinate),
+	});
 	return (
-		<div
-			role="separator"
-			aria-orientation="vertical"
-			aria-label={`Resize the ${name.toLowerCase()} sidebar`}
-			aria-valuemin={MIN_WIDTH}
-			aria-valuemax={MAX_WIDTH}
-			aria-valuenow={width}
-			title="Drag or use arrow keys to resize. Double-click to reset."
-			tabIndex={0}
-			onPointerDown={onPointerDown}
-			onPointerMove={onPointerMove}
-			onPointerUp={onPointerUp}
-			onPointerCancel={() => {
-				drag.current = null;
-			}}
-			onKeyDown={onKeyDown}
-			onDoubleClick={() => onWidth(defaultWidth)}
-			className={cn(
-				"group absolute inset-y-0 z-30 flex w-3 cursor-col-resize touch-none justify-center outline-none",
-				side === "left" ? "-right-1.5" : "-left-1.5",
-			)}
-		>
-			<span className="h-full w-px bg-transparent transition-colors group-hover:bg-foreground/25 group-focus-visible:bg-ring group-active:bg-foreground/40" />
-		</div>
+		<Separator
+			{...events}
+			axis="vertical"
+			label={`Resize the ${name.toLowerCase()} sidebar`}
+			min={MIN_WIDTH}
+			max={MAX_WIDTH}
+			now={width}
+			className={cn("inset-y-0 w-3 cursor-col-resize", side === "left" ? "-right-1.5" : "-left-1.5")}
+		/>
 	);
 }
 

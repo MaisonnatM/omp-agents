@@ -32,7 +32,7 @@ import { useSize, SizeProvider, type SizeVariant } from "@/lib/size-context";
 import { useFluidHover, type ItemRect } from "@/hooks/use-fluid-hover";
 import type { IconComponent } from "@/lib/icon-context";
 import { resolveSlotTemplate, slotElement } from "@/components/ui/sidebar-core";
-import { FluidHoverHighlight } from "@/components/fluid-hover-highlight";
+import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 
 // SSR-safe layout effect (client components still server-render in Next).
 const useIsoLayoutEffect =

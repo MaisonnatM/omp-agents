@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip } from "@/components/ui/tooltip";
 import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
+import type { ReadState } from "../reads";
 import { type ShortcutId, shortcutLabels } from "../shortcuts";
 
 export interface PickerItem {
@@ -33,11 +34,11 @@ export interface PickerGroup {
 /** What the list shows: a status line while it loads, the error when it failed, else its groups. */
 export type PickerList = { kind: "loading"; message: string } | { kind: "failed"; error: string } | { kind: "ready"; groups: PickerGroup[] };
 
-/** A list the server sends as `{ …, error }`, or `null` before it arrives, as a {@link PickerList}. */
-export function fromList<T extends { error: string | null }>(list: T | null, loading: string, groups: (list: T) => PickerGroup[]): PickerList {
-	if (list === null) return { kind: "loading", message: loading };
-	if (list.error) return { kind: "failed", error: list.error };
-	return { kind: "ready", groups: groups(list) };
+/** A server read as a {@link PickerList}: `loading` until it answers, its error if it failed, else the groups of its data. */
+export function fromList<T>(read: ReadState<T>, loading: string, groups: (data: T) => PickerGroup[]): PickerList {
+	if (read.error) return { kind: "failed", error: read.error };
+	if (read.data === null) return { kind: "loading", message: loading };
+	return { kind: "ready", groups: groups(read.data) };
 }
 
 const WIDTH = {

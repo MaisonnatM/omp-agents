@@ -12,16 +12,11 @@ import {
 	hashForTickets,
 	hashForTodo,
 	hashForView,
-	inboxFromHash,
 	type Layout,
 	layoutAfterResumeAll,
 	layoutAfterStart,
-	layoutFromHash,
-	newSessionFromHash,
 	openView,
-	pageFromHash,
-	sessionFromHash,
-	settingsFromHash,
+	routeFromHash,
 	swapView,
 	viewForSession,
 } from "./routing";
@@ -34,112 +29,107 @@ describe("layout hash", () => {
 		const view = live("7c51f77b2a1bf7ba", "Parent/Child #2");
 		expect(hashForLayout({ panes: [view], focus: 0, maximized: false })).toBe("#7c51f77b2a1bf7ba/Parent%2FChild%20%232");
 		expect(hashForLayout({ panes: [view], focus: 0, maximized: false })).toBe(hashForView(view));
-		expect(layoutFromHash("#7c51f77b2a1bf7ba/Parent%2FChild%20%232")).toEqual({ panes: [view], focus: 0, maximized: false });
-		expect(layoutFromHash("#7c51f77b2a1bf7ba")).toEqual({ panes: [live("7c51f77b2a1bf7ba")], focus: 0, maximized: false });
-		expect(layoutFromHash("")).toEqual({ panes: [], focus: 0, maximized: false });
+		expect(routeFromHash("#7c51f77b2a1bf7ba/Parent%2FChild%20%232")).toEqual({ kind: "panes", layout: { panes: [view], focus: 0, maximized: false } });
+		expect(routeFromHash("#7c51f77b2a1bf7ba")).toEqual({ kind: "panes", layout: { panes: [live("7c51f77b2a1bf7ba")], focus: 0, maximized: false } });
+		expect(routeFromHash("")).toEqual({ kind: "panes", layout: { panes: [], focus: 0, maximized: false } });
 		expect(hashForLayout({ panes: [], focus: 0, maximized: false })).toBe("");
 	});
 
 	test("a past session is not read as a subagent of an instance named `past`", () => {
 		expect(hashForView(past("01a0f6a5-181e"))).toBe("#past/01a0f6a5-181e");
-		expect(layoutFromHash("#past/01a0f6a5-181e")).toEqual({ panes: [past("01a0f6a5-181e")], focus: 0, maximized: false });
+		expect(routeFromHash("#past/01a0f6a5-181e")).toEqual({ kind: "panes", layout: { panes: [past("01a0f6a5-181e")], focus: 0, maximized: false } });
 	});
 
 	test("several panes round-trip in order with the focused one, ids with commas and @ included", () => {
 		const layout: Layout = { panes: [live("a1"), live("a1", "x,y@z"), past("s,1"), live("b2")], focus: 2, maximized: false };
 		const hash = hashForLayout(layout);
 		expect(hash).toBe("#a1,a1/x%2Cy%40z,past/s%2C1,b2@2");
-		expect(layoutFromHash(hash)).toEqual(layout);
+		expect(routeFromHash(hash)).toEqual({ kind: "panes", layout });
 		expect(hashForLayout({ panes: [live("a1"), live("b2")], focus: 0, maximized: false })).toBe("#a1,b2");
 	});
 
 	test("a maximized pane round-trips, ids with semicolons included", () => {
 		const layout: Layout = { panes: [live("a1", "x;max"), live("b2")], focus: 1, maximized: true };
 		expect(hashForLayout(layout)).toBe("#a1/x%3Bmax,b2@1;max");
-		expect(layoutFromHash("#a1/x%3Bmax,b2@1;max")).toEqual(layout);
-		expect(layoutFromHash("#a1/x%3Bmax,b2;max")).toEqual({ ...layout, focus: 0 });
+		expect(routeFromHash("#a1/x%3Bmax,b2@1;max")).toEqual({ kind: "panes", layout });
+		expect(routeFromHash("#a1/x%3Bmax,b2;max")).toEqual({ kind: "panes", layout: { ...layout, focus: 0 } });
 	});
 
 	test("a hash maximizing a lone pane opens it unmaximized", () => {
-		expect(layoutFromHash("#a;max")).toEqual({ panes: [live("a")], focus: 0, maximized: false });
-		expect(layoutFromHash("#a,a@1;max")).toEqual({ panes: [live("a")], focus: 0, maximized: false });
+		expect(routeFromHash("#a;max")).toEqual({ kind: "panes", layout: { panes: [live("a")], focus: 0, maximized: false } });
+		expect(routeFromHash("#a,a@1;max")).toEqual({ kind: "panes", layout: { panes: [live("a")], focus: 0, maximized: false } });
 	});
 
 	test("keeps the first four distinct views and focus on the view the hash named", () => {
 		const layout = (panes: View[], focus: number): Layout => ({ panes, focus, maximized: false });
-		expect(layoutFromHash("#a,b,c,d,e")).toEqual(layout([live("a"), live("b"), live("c"), live("d")], 0));
-		expect(layoutFromHash("#a,b,a,c@2")).toEqual(layout([live("a"), live("b"), live("c")], 0));
-		expect(layoutFromHash("#a,b,a,c@3")).toEqual(layout([live("a"), live("b"), live("c")], 2));
-		expect(layoutFromHash("#a,b,c,d,e@4")).toEqual(layout([live("a"), live("b"), live("c"), live("d")], 0));
-		expect(layoutFromHash("#a,b@9")).toEqual(layout([live("a"), live("b")], 0));
-		expect(layoutFromHash("#a,b@x")).toEqual(layout([live("a"), live("b")], 0));
+		expect(routeFromHash("#a,b,c,d,e")).toEqual({ kind: "panes", layout: layout([live("a"), live("b"), live("c"), live("d")], 0) });
+		expect(routeFromHash("#a,b,a,c@2")).toEqual({ kind: "panes", layout: layout([live("a"), live("b"), live("c")], 0) });
+		expect(routeFromHash("#a,b,a,c@3")).toEqual({ kind: "panes", layout: layout([live("a"), live("b"), live("c")], 2) });
+		expect(routeFromHash("#a,b,c,d,e@4")).toEqual({ kind: "panes", layout: layout([live("a"), live("b"), live("c"), live("d")], 0) });
+		expect(routeFromHash("#a,b@9")).toEqual({ kind: "panes", layout: layout([live("a"), live("b")], 0) });
+		expect(routeFromHash("#a,b@x")).toEqual({ kind: "panes", layout: layout([live("a"), live("b")], 0) });
 	});
 
 	test("the settings page is not read as a layout, and its workspace keeps its slashes", () => {
 		const hash = hashForSettings("/Users/me/code/my app");
 		expect(hash).toBe("#settings/%2FUsers%2Fme%2Fcode%2Fmy%20app");
-		expect(settingsFromHash(hash)).toEqual({ cwd: "/Users/me/code/my app" });
-		expect(layoutFromHash(hash)).toBeNull();
-		expect(settingsFromHash("#settings")).toEqual({ cwd: null });
-		expect(layoutFromHash("#settings")).toBeNull();
-		expect(settingsFromHash("#7c51f77b2a1bf7ba")).toBeNull();
+		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "settings", cwd: "/Users/me/code/my app" } });
+		expect(routeFromHash("#settings")).toEqual({ kind: "page", page: { kind: "settings", cwd: null } });
+		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
 	});
 
 	test("the new-session draft is not read as a layout, and its directory keeps its slashes and tilde", () => {
 		const hash = hashForNewSession("~/code/my app");
 		expect(hash).toBe("#new/~%2Fcode%2Fmy%20app");
-		expect(newSessionFromHash(hash)).toEqual({ cwd: "~/code/my app" });
-		expect(layoutFromHash(hash)).toBeNull();
-		expect(newSessionFromHash("#new")).toEqual({ cwd: null });
-		expect(layoutFromHash("#new")).toBeNull();
-		expect(newSessionFromHash("#newer")).toBeNull();
-		expect(newSessionFromHash("#7c51f77b2a1bf7ba")).toBeNull();
+		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "new", cwd: "~/code/my app" } });
+		expect(routeFromHash("#new")).toEqual({ kind: "page", page: { kind: "new", cwd: null } });
+		expect(routeFromHash("#newer").kind).toBe("panes");
+		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
 	});
 
 	test("the inbox hash opens the page alone or at one pull request's row, and no inbox hash is read as a layout", () => {
 		const target = { owner: "acme", repo: "web.app", number: 6596 };
 		expect(hashForInbox(null)).toBe("#inbox");
 		expect(hashForInbox(target)).toBe("#inbox/acme/web.app/6596");
-		expect(inboxFromHash("#inbox")).toEqual({ target: null });
-		expect(inboxFromHash("#inbox/acme/web.app/6596")).toEqual({ target });
-		expect(inboxFromHash("#inbox/acme/web.app")).toEqual({ target: null });
-		expect(inboxFromHash("#7c51f77b2a1bf7ba")).toBeNull();
-		for (const hash of ["#inbox", "#inbox/acme/web.app/6596", "#inbox/acme"]) expect(layoutFromHash(hash)).toBeNull();
+		expect(routeFromHash("#inbox")).toEqual({ kind: "page", page: { kind: "inbox", target: null } });
+		expect(routeFromHash("#inbox/acme/web.app/6596")).toEqual({ kind: "page", page: { kind: "inbox", target } });
+		expect(routeFromHash("#inbox/acme/web.app")).toEqual({ kind: "page", page: { kind: "inbox", target: null } });
+		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
+		for (const hash of ["#inbox", "#inbox/acme/web.app/6596", "#inbox/acme"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
 	test("the tickets hash opens the list or one issue's details, and no tickets hash is read as a layout", () => {
 		expect(hashForTickets(null)).toBe("#tickets");
 		expect(hashForTickets("ENG-2368")).toBe("#tickets/ENG-2368");
-		expect(pageFromHash("#tickets")).toEqual({ kind: "tickets", target: null });
-		expect(pageFromHash("#tickets/ENG-2368")).toEqual({ kind: "tickets", target: "ENG-2368" });
-		expect(pageFromHash("#tickets/not-an-issue")).toEqual({ kind: "tickets", target: null });
-		expect(pageFromHash("#ticketsx")).toBeNull();
-		expect(pageFromHash("#7c51f77b2a1bf7ba")).toBeNull();
-		for (const hash of ["#tickets", "#tickets/ENG-2368", "#tickets/x"]) expect(layoutFromHash(hash)).toBeNull();
+		expect(routeFromHash("#tickets")).toEqual({ kind: "page", page: { kind: "tickets", target: null } });
+		expect(routeFromHash("#tickets/ENG-2368")).toEqual({ kind: "page", page: { kind: "tickets", target: "ENG-2368" } });
+		expect(routeFromHash("#tickets/not-an-issue")).toEqual({ kind: "page", page: { kind: "tickets", target: null } });
+		expect(routeFromHash("#ticketsx").kind).toBe("panes");
+		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
+		for (const hash of ["#tickets", "#tickets/ENG-2368", "#tickets/x"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
 	test("the todo hash opens every todo or one category's, and no todo hash is read as a layout", () => {
 		expect(hashForTodo(null)).toBe("#todo");
 		expect(hashForTodo("a b/c")).toBe("#todo/a%20b%2Fc");
-		expect(pageFromHash("#todo")).toEqual({ kind: "todo", category: null });
-		expect(pageFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "todo", category: "a b/c" });
-		expect(pageFromHash("#todo/")).toEqual({ kind: "todo", category: null });
-		for (const hash of ["#todo", "#todo/0b9e"]) expect(layoutFromHash(hash)).toBeNull();
+		expect(routeFromHash("#todo")).toEqual({ kind: "page", page: { kind: "todo", category: null } });
+		expect(routeFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "page", page: { kind: "todo", category: "a b/c" } });
+		expect(routeFromHash("#todo/")).toEqual({ kind: "page", page: { kind: "todo", category: null } });
+		for (const hash of ["#todo", "#todo/0b9e"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
 	test("every page hash names its page and route, and a session or layout hash names none", () => {
-		expect(pageFromHash(hashForSettings("/work/app"))).toEqual({ kind: "settings", cwd: "/work/app" });
-		expect(pageFromHash(hashForInbox(null))).toEqual({ kind: "inbox", target: null });
-		expect(pageFromHash(hashForNewSession(null))).toEqual({ kind: "new", cwd: null });
-		expect(pageFromHash("#session/01a0f6a5-181e")).toBeNull();
-		expect(pageFromHash("#7c51f77b2a1bf7ba,past/9d2e0000")).toBeNull();
+		expect(routeFromHash(hashForSettings("/work/app"))).toEqual({ kind: "page", page: { kind: "settings", cwd: "/work/app" } });
+		expect(routeFromHash(hashForInbox(null))).toEqual({ kind: "page", page: { kind: "inbox", target: null } });
+		expect(routeFromHash(hashForNewSession(null))).toEqual({ kind: "page", page: { kind: "new", cwd: null } });
+		expect(routeFromHash("#session/01a0f6a5-181e")).toEqual({ kind: "session", sessionId: "01a0f6a5-181e" });
+		expect(routeFromHash("#7c51f77b2a1bf7ba,past/9d2e0000").kind).toBe("panes");
 	});
 
 	test("a session link names the session by id and opens the host that runs it, else its saved transcript", () => {
 		const hosts = [{ instanceId: "7c51f77b", sessionId: "01a0f6a5-181e" }] as RosterHost[];
-		expect(sessionFromHash("#session/01a0f6a5-181e")).toBe("01a0f6a5-181e");
-		expect(sessionFromHash("#past/01a0f6a5-181e")).toBeNull();
-		expect(layoutFromHash("#session/01a0f6a5-181e")).toBeNull();
+		expect(routeFromHash("#session/01a0f6a5-181e")).toEqual({ kind: "session", sessionId: "01a0f6a5-181e" });
+		expect(routeFromHash("#past/01a0f6a5-181e").kind).toBe("panes");
 		expect(viewForSession("01a0f6a5-181e", hosts)).toEqual(live("7c51f77b"));
 		expect(viewForSession("9d2e0000", hosts)).toEqual(past("9d2e0000"));
 	});
@@ -260,7 +250,6 @@ describe("stepping through the sidebar's sessions", () => {
 describe("session links", () => {
 	test("the link a pull request's description carries opens the session it names", () => {
 		const sessionId = "01a0f6a5-181e/#x y";
-		expect(sessionFromHash(hashForSession(sessionId))).toBe(sessionId);
-		expect(layoutFromHash(hashForSession(sessionId))).toBeNull();
+		expect(routeFromHash(hashForSession(sessionId))).toEqual({ kind: "session", sessionId });
 	});
 });

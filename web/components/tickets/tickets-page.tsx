@@ -2,16 +2,17 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { Ticket, View } from "../../../src/shared";
+import type { Ticket } from "../../../src/shared";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
 import { ticketsStore } from "../../reads";
-import { hashForTickets, type OpenMode } from "../../routing";
+import { hashForTickets } from "../../routing";
 import type { SectionTarget } from "../../section";
-import type { QuickOp, StartOf } from "../../starts";
+import type { StartOf } from "../../starts";
 import { useStoredKeys } from "../../stored-state";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
-import { FoldButton, useRevealSection } from "../fold";
+import { useDashboardContext } from "../dashboard-context";
+import { FoldButton, useReveal } from "../fold";
 import { ListSheetPage, PageFrame } from "../list-sheet-page";
 import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
 import { LinearConnection } from "../settings/linear-connection";
@@ -71,20 +72,15 @@ interface TicketsPageProps {
 	 * project's workspace, as a new session would start in.
 	 */
 	cwd: string;
-	/** The quick action's start under way, failed, or started, whichever the page last asked for. */
-	quick: StartOf<"quick"> | null;
-	onQuickAction: (op: QuickOp) => void;
-	onDismissQuick: () => void;
-	/** Opens the session a quick action started. */
-	onOpen: (view: View, mode: OpenMode) => void;
 }
 
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
-export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDismissQuick, onOpen }: TicketsPageProps) {
+export function TicketsPage({ target, section, cwd }: TicketsPageProps) {
+	const { open, start: startSession, dismissStart, starts: { quick } } = useDashboardContext();
 	const poll = ticketsStore.usePolling();
 	const tickets = poll.read?.data.tickets ?? [];
 	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
-	const start = (ticket: Ticket, action: TicketActionId) => onQuickAction(ticketStart(ticket, action, cwd, readPinnedSkill()));
+	const start = (ticket: Ticket, action: TicketActionId) => startSession(ticketStart(ticket, action, cwd, readPinnedSkill()));
 	const listRef = useRef<HTMLDivElement>(null);
 	const listPageRef = useRef<HTMLDivElement>(null);
 	const previousTarget = useRef(target);
@@ -107,7 +103,7 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 			previousTarget.current = null;
 		}
 	});
-	useRevealSection(target === null ? section : null, collapsed, expand);
+	useReveal(target === null ? section : null, collapsed, expand, { token: section, block: "start", focus: true });
 
 	if (target !== null) {
 		const listed = tickets.find(ticket => ticket.id === target) ?? null;
@@ -118,7 +114,7 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 						<Button variant="ghost" leadingIcon={ArrowLeft} render={<a href={hashForTickets(null)} />}>
 							Back to tickets
 						</Button>
-						{quick && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />}
+						{quick && <QuickStartNotice quick={quick} onOpen={open} onDismiss={() => dismissStart("quick")} />}
 						<TicketDetailContent
 							key={target}
 							id={target}
@@ -127,7 +123,9 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 								<QuickActionButtons
 									actions={ticketActions(ticket)}
 									pending={pendingOf(quick, { kind: "ticket", id: target })}
-									onRun={action => start(ticket, action)}
+									onRun={action => {
+										if (action === "work" || action === "plan") start(ticket, action);
+									}}
 								/>
 							)}
 						/>
@@ -146,7 +144,7 @@ export function TicketsPage({ target, section, cwd, quick, onQuickAction, onDism
 			poll={poll}
 			onRefresh={() => void ticketsStore.refresh(null, { fresh: true })}
 			missing={null}
-			notice={quick && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />}
+			notice={quick && <QuickStartNotice quick={quick} onOpen={open} onDismiss={() => dismissStart("quick")} />}
 			spacing="space-y-4"
 			contentRef={listPageRef}
 		>

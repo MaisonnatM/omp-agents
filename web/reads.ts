@@ -1,15 +1,18 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
 import { useEffect, useState } from "react";
-import type { Inbox, LinearStatus, TicketsAnswer } from "../src/shared";
+import type { Inbox, LinearStatus, ModelOption, TicketsAnswer } from "../src/shared";
 import { errorText, getJson } from "./api";
 import { createPolledStore } from "./polled-store";
 
-interface ReadState<T> {
+export interface ReadState<T> {
 	data: T | null;
 	error: string | null;
 }
 
-const UNREAD: ReadState<never> = { data: null, error: null };
+export const UNREAD: ReadState<never> = { data: null, error: null };
+
+/** The models that omp lists, as the server answers a read or sends them to a session. */
+export type ModelList = ReadState<{ models: ModelOption[] }>;
 
 /**
  * The server's answer at `url`, nothing while `url` is `null` or until it first answers for `url`, so an answer for a
@@ -30,6 +33,17 @@ export function useRead<T>(url: string | null, version?: unknown): ReadState<T> 
 		return () => controller.abort();
 	}, [url, version]);
 	return read?.url === url ? read : UNREAD;
+}
+
+/**
+ * {@link useRead} whose answer a write can replace: `replace(answer)` shows the version that a save answered until a read
+ * of the same `url` answers anew, and a failed read shows no error over it.
+ */
+export function useReplaceableRead<T>(url: string | null, version?: unknown): ReadState<T> & { replace: (answer: T) => void } {
+	const read = useRead<T>(url, version);
+	const [replaced, setReplaced] = useState<{ url: string | null; answered: T | null; answer: T } | null>(null);
+	const shown = replaced?.url === url && replaced.answered === read.data ? replaced.answer : null;
+	return { data: shown ?? read.data, error: shown ? null : read.error, replace: answer => setReplaced({ url, answered: read.data, answer }) };
 }
 
 /** The open pull requests by project `cwd`, which the sidebar and the inbox page share; `null` reads every project. */
