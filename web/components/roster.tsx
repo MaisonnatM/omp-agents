@@ -327,7 +327,10 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 						title={status}
 						label={`${status}, ${length} issue${length === 1 ? "" : "s"}`}
 						count={length}
-						onChoose={onTarget}
+						onChoose={section => {
+							location.hash = hashForTickets(null);
+							onTarget(section);
+						}}
 					/>
 				))}
 			</SidebarMenu>

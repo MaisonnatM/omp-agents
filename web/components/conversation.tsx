@@ -169,7 +169,7 @@ function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 	});
 }
 
-/** The Linear issues a session worked on, after a separator; each opens the issue's sheet on the tickets page. */
+/** The Linear issues a session worked on, after a separator; each opens its details on the tickets page. */
 function Tickets({ tickets }: { tickets: string[] }) {
 	return tickets.map(id => (
 		<Fragment key={id}>

@@ -317,7 +317,7 @@ For installation, see the [README](../README.md).
 - In a session's header, a pull request's number opens its details in the inbox, the arrow after the number opens it on GitHub, and the Graphite logo after the arrow opens it on Graphite.
   Hover the number to see whether the session submitted it or worked on it.
 - A session's header also lists the Linear issues it worked on by identifier, such as `ENG-2368`, after its pull requests, and its row's menu has **Open ENG-2368** for each.
-  Both open the issue's sheet on the tickets page (`#tickets/<identifier>`).
+  Both open the issue's details in the tickets page's main content (`#tickets/<identifier>`).
   An issue counts when the session or one of its subagents read it with omp's Linear tools (`get_issue`, `list_comments`), changed or opened it (`save_issue`), commented on it (`save_comment`), or names it in its `/ship` step.
   An issue that a `list_issues` search only listed does not count.
 - Sessions that use `/ship` show their current workflow step in the sidebar and session header, for example `6/7 · Rebase`.
@@ -382,23 +382,25 @@ For installation, see the [README](../README.md).
 - A row shows the priority, the identifier, the state, the title, the labels, the project, the due date when there is one, and how long ago the issue changed.
   Hover an icon to read what it means.
   Click a state's heading to fold it; the browser's localStorage keeps folded ones folded across reloads.
-- Click a row to show the issue in a sheet that slides in from the right, as the inbox shows a pull request; Esc, the close button, or a click outside the sheet closes it.
-  The sheet shows the title, the state, the priority, the assignee, the project, the due date, the labels, who opened the issue and when, the description, Linear's branch name for it, the links Linear keeps for it (such as its pull requests), and the comment threads, with a link to the issue on Linear.
+- Click a row to replace the tickets list with the issue's details in the main content.
+  **Back to tickets** returns to the list with its folded states preserved.
+  The detail view shows the title, the state, the priority, the assignee, the project, the due date, the labels, who opened the issue and when, the description, Linear's branch name for it, the links Linear keeps for it (such as its pull requests), and the comment threads, with a link to the issue on Linear.
   Each opening reads the issue again through Linear's `get_issue` and `list_comments` tools.
   Linear's issue mentions in the text become links.
   Its images show in place, its screen recordings play in a video player, and another embedded file becomes a link to download it.
   The dashboard's server fetches each of these files from Linear, so a video still plays and seeks after Linear's five-minute link to it expires.
-- Once Linear has answered, each field under the sheet's title is a button that changes the issue in Linear: the state, the priority, the assignee, the project, and the labels open a list to search and pick from, and the due date opens a date field with **Set** and **Clear**.
+- Once Linear has answered, each field under the issue's title is a button that changes the issue in Linear: the state, the priority, the assignee, the project, and the labels open a list to search and pick from, and the due date opens a date field with **Set** and **Clear**.
   Labels toggle, and their list stays open for several.
   A change shows at once and saves in turn after the ones before it.
   The tickets list reads Linear again after each save, so an issue you assign to someone else leaves it.
-  When Linear refuses a change, the sheet says why and shows the issue as Linear has it.
+  When Linear refuses a change, the detail view says why and shows the issue as Linear has it.
   The lists come from the issue's team in Linear, read when you first open one, and the server keeps them for five minutes.
-- `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens the page at one issue.
-  It unfolds the issue's state, scrolls the row into view, highlights it, and opens its sheet.
-  When the page does not list that issue, a note says so, and the sheet still opens.
-- A lightning button on the row, and buttons in the issue's sheet, start a new dashboard session in the background, with a prompt that names the issue.
-  The page stays on screen: once the session runs, a note at the top of the page, and in the sheet of that issue, names it, with **Open session** (Cmd-click, or Ctrl-click off macOS, opens it in a new pane) and **Dismiss**.
+- `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens that issue's details directly, even when the tickets list does not include it or cannot load.
+  **Back to tickets** opens the list from a direct link too.
+- A lightning button on the row, and buttons in the issue's details, start a new dashboard session in the background, with a prompt that names the issue.
+  The page stays on screen.
+  Once the session runs, a note above the issue's details or at the top of the list names it, with **Open session** (Cmd-click, or Ctrl-click off macOS, opens it in a new pane) and **Dismiss**.
+  The detail page shows that note even when the issue itself cannot load.
   The session also shows in the sessions sidebar.
   A Linear issue names no repository, so the session starts where a new session would: in the sidebar project's workspace, or under **All projects** in the open session's workspace, else the newest session's.
   **Work on it**, on any open issue, implements the issue in a git worktree on Linear's branch for it, continuing a branch or pull request that exists already, then commits and reports without pushing.

@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import type { Ticket, TicketPriority, TicketStatusType } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 import { age } from "../../labels";
 import { type TicketActionId, ticketActions } from "../../quick-actions";
 import { hashForTickets } from "../../routing";
@@ -45,28 +44,21 @@ export const PRIORITY_ICON: Record<TicketPriority, [LucideIcon, string]> = {
 /** `2026-10-05` as `Oct 5`, read as a local date so it does not shift a day west of UTC. */
 export const dueLabel = (dueDate: string): string => new Date(`${dueDate}T00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
-/** The element id of an issue's row, which a `#tickets/<identifier>` link scrolls to. */
+/** The element id of an issue's row, used to restore focus after its details close. */
 export const ticketRowId = (id: string): string => `ticket-${id}`;
 
 interface TicketRowProps {
 	ticket: Ticket;
-	/** The issue a tickets link named, highlighted while its sheet shows. */
-	targeted: boolean;
 	/** The quick action whose session is starting for this issue, if any. */
 	pending: TicketActionId | null;
 	onQuickAction: (action: TicketActionId) => void;
 }
 
-export function TicketRow({ ticket, targeted, pending, onQuickAction }: TicketRowProps) {
+export function TicketRow({ ticket, pending, onQuickAction }: TicketRowProps) {
 	return (
-		<li
-			id={ticketRowId(ticket.id)}
-			data-targeted={targeted || undefined}
-			className={cn("flex scroll-my-6 items-center", targeted ? "bg-accent/60 ring-2 ring-inset ring-ring" : "hover:bg-muted/50")}
-		>
+		<li id={ticketRowId(ticket.id)} className="flex scroll-my-6 items-center hover:bg-muted/50">
 			<a
 				href={hashForTickets(ticket.id)}
-				aria-haspopup="dialog"
 				title={`Show the details of ${ticket.id}`}
 				className="flex h-9 min-w-0 flex-1 items-center gap-3 pl-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
 			>

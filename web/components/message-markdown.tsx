@@ -17,7 +17,7 @@ const GITHUB_IMAGE_PREFIXES = [
 const INLINE_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp|avif);base64,/i;
 
 const inlineImage = (src: string): boolean => INLINE_IMAGE.test(src);
-/** A file of a Linear issue, which this server fetches from Linear: the sheet's markdown names it so. */
+/** A file of a Linear issue, which this server fetches from Linear: the issue's markdown names it so. */
 const ticketMedia = (src: string): boolean => src.startsWith(`${TICKET_MEDIA_PATH}?`);
 const githubImage = (src: string): boolean => inlineImage(src) || ticketMedia(src) || GITHUB_IMAGE_PREFIXES.some(prefix => src.startsWith(prefix));
 

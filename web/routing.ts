@@ -9,7 +9,7 @@ export interface InboxRoute {
 	target: PullRequest | null;
 }
 
-/** The tickets page, and the Linear issue whose row it scrolls to and highlights; `null` for none. */
+/** The tickets list, or the Linear issue whose details replace it when `target` is non-null. */
 export interface TicketsRoute {
 	/** The issue's identifier: `ENG-2368`. */
 	target: string | null;
@@ -54,7 +54,7 @@ const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : 
  * - `#inbox` opens the inbox page, which lists the pull requests of the sidebar's project, and
  *   `#inbox/<owner>/<repo>/<number>` opens it at that pull request's row. Any other `#inbox/…` opens the page alone.
  * - `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
- *   opens it at that issue's row. Any other `#tickets/…` opens the page alone.
+ *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, and `#todo/<category id>` with that category's todos alone.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null) => PageOf<K> } = {

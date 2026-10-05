@@ -1,6 +1,6 @@
-/** The page that the inbox and the tickets page share: polled lists under a header, and a sheet with a target's details. */
+/** Polled lists under a page header, with an optional target details sheet. */
 import { RefreshCw } from "lucide-react";
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, type Ref, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -49,14 +49,16 @@ interface ListSheetPageProps<Data> {
 	/** The page's lists, from its read. */
 	children: (data: Data) => ReactNode;
 	/** The sheet with a target's details, which renders after the lists, inside the page's `TooltipProvider`. */
-	sheet: ReactNode;
+	sheet?: ReactNode;
+	/** Focus returns here when the lists are not mounted. */
+	contentRef?: Ref<HTMLDivElement>;
 }
 
 /**
- * A page of lists read from GitHub or Linear: a header with a Refresh button, `notice`, the lists once the first read
- * loads, and `sheet`.
+ * A page of lists read from GitHub or Linear with a Refresh button, `notice`, the lists once the first read loads,
+ * and an optional details sheet.
  */
-export function ListSheetPage<Data>({ title, meta, noun, loading, poll, onRefresh, missing, notice, spacing, children, sheet }: ListSheetPageProps<Data>) {
+export function ListSheetPage<Data>({ title, meta, noun, loading, poll, onRefresh, missing, notice, spacing, children, sheet, contentRef }: ListSheetPageProps<Data>) {
 	const { read, error, refreshing } = poll;
 	let body: ReactNode;
 	if (!read && error) body = <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot load {noun}: {error}</p>;
@@ -86,7 +88,7 @@ export function ListSheetPage<Data>({ title, meta, noun, loading, poll, onRefres
 			}
 		>
 			<TooltipProvider>
-				<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", spacing)}>
+				<div ref={contentRef} tabIndex={contentRef ? -1 : undefined} className={cn("mx-auto w-full max-w-5xl px-6 py-6", contentRef && "outline-none focus-visible:ring-2 focus-visible:ring-ring", spacing)}>
 					{notice}
 					{body}
 				</div>

@@ -123,7 +123,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return write instanceof Response ? write : answer(startLinearSignIn);
 	};
 
-	/** `GET /api/ticket?id=<identifier>`: that Linear issue in full, for the tickets page's sheet. */
+	/** `GET /api/ticket?id=<identifier>`: that Linear issue in full, for the tickets page's main content. */
 	const ticket: Handler = async req => {
 		const refused = guards.admit(req);
 		if (refused) return refused;
@@ -139,7 +139,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return edit ? answer(() => saveTicket(edit)) : fail(400, "Expected { id } naming a Linear issue and at least one field to change");
 	};
 
-	/** `GET /api/ticket/options?team=<id>`: what the sheet's pickers offer for an issue of that Linear team. */
+	/** `GET /api/ticket/options?team=<id>`: what the field pickers offer for an issue of that Linear team. */
 	const ticketOptions: Handler = async req => {
 		const refused = guards.admit(req);
 		if (refused) return refused;

@@ -177,7 +177,7 @@ export interface TicketComment {
 	createdAt: string;
 }
 
-/** `GET /api/ticket?id=<identifier>`: a Linear issue in full, for the tickets page's sheet. */
+/** `GET /api/ticket?id=<identifier>`: a Linear issue in full, for the tickets page's main content. */
 export interface TicketDetail extends Ticket {
 	/** Markdown, with Linear's issue mentions as links, and its images and videos loading through `TICKET_MEDIA_PATH`. */
 	description: string;
@@ -193,7 +193,7 @@ export interface TicketDetail extends Ticket {
 	threads: TicketComment[][];
 }
 
-/** `GET /api/ticket/options?team=<id>`: what the sheet's pickers offer for an issue of that team. */
+/** `GET /api/ticket/options?team=<id>`: what the issue's field pickers offer for that team. */
 export interface TicketOptions {
 	/** In Linear's workflow order: triage, backlog, unstarted, started, completed, canceled. */
 	statuses: (TicketChoice & { type: TicketStatusType })[];

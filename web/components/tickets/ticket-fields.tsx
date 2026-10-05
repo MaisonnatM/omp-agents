@@ -14,7 +14,7 @@ type Change = Omit<TicketEdit, "id">;
 
 const PRIORITIES: TicketPriority[] = [0, 1, 2, 3, 4];
 
-/** Each team's options, read once per page load and shared by every sheet; a failed read is tried again on the next opening. */
+/** Each team's options, shared across issue details; a failed read is tried again on the next opening. */
 const optionReads = new Map<string, Promise<TicketOptions>>();
 
 function readOptions(team: string): Promise<TicketOptions> {
@@ -156,7 +156,7 @@ function DuePicker({ dueDate, onChange }: { dueDate: string | null; onChange: (d
 
 /**
  * The issue's status, priority, assignee, project, due date, and labels, each a picker that changes it in Linear. A
- * change shows at once and is sent in turn after the ones before it; when Linear refuses it, the sheet reads the issue
+ * change shows at once and is sent in turn after the ones before it; when Linear refuses it, the detail view reads the issue
  * again and names why.
  */
 export function TicketFields({ detail, replace }: { detail: TicketDetail; replace: (detail: TicketDetail) => void }) {

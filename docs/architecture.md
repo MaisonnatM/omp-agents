@@ -278,7 +278,7 @@ The token stays in memory for five minutes and is dropped when Linear answers 40
 Linear's GraphQL API refuses that token, so the server calls the MCP endpoint's `list_issues` tool through omp's `callMCP`, a stateless JSON-RPC `tools/call` POST.
 It asks for each open state type in full, following the cursor, and for completed, canceled, and duplicate issues updated in the last seven days, in parallel, then drops repeats by identifier.
 
-`GET /api/ticket?id=<identifier>`, such as `?id=ENG-2368`, answers the tickets page's sheet with that issue in full: the row's fields, the assignee, the team's id, the description, who opened it and when, the links Linear attaches to it, and its comment threads.
+`GET /api/ticket?id=<identifier>`, such as `?id=ENG-2368`, answers the tickets page's main content with that issue in full: the row's fields, the assignee, the team's id, the description, who opened it and when, the links Linear attaches to it, and its comment threads.
 The server calls `get_issue` and `list_comments` in parallel, through the same MCP sign-in, with no cache, so each opening reads the issue again.
 It rewrites Linear's `<issue>` mentions as markdown links, its `<linear-image>` tags as image links, its `<linear-embed node-type="video">` tags as `<video>` elements, and other `<linear-embed>` tags as links.
 It threads the comments by `parentId`, oldest first.
@@ -293,11 +293,11 @@ It serves each file with `Content-Security-Policy: sandbox` and `nosniff`, and a
 The page's CSP stays `'self'` for media.
 `message-markdown.tsx` lets Linear's text load images and play `<video>` only from that route.
 
-`GET /api/ticket/options?team=<team id>` answers `TicketOptions` for the sheet's pickers: the team's workflow states (`list_issue_statuses`) in Linear's workflow order, the workspace's active members (`list_users`), the team's and the workspace's live labels (`list_issue_labels`), and the team's projects (`list_projects`, 50 a page), each paged to its end.
+`GET /api/ticket/options?team=<team id>` answers `TicketOptions` for the issue detail's field pickers: the team's workflow states (`list_issue_statuses`) in Linear's workflow order, the workspace's active members (`list_users`), the team's and the workspace's live labels (`list_issue_labels`), and the team's projects (`list_projects`, 50 a page), each paged to its end.
 The server keeps each team's answer for five minutes.
 `PUT /api/ticket` takes a `TicketEdit`, `{ id, state?, assignee?, priority?, labels?, project?, dueDate? }`, checked by `parseTicketEdit` in `src/server/wire.ts`, where `null` clears a field and `labels` replaces the whole set by name.
 It calls `save_issue` with those fields, drops the cached tickets list, and answers the issue as `GET /api/ticket` reads it after the change.
-The sheet shows a change at once, sends its changes one at a time, and on a failure reads the issue again.
+The issue detail shows a change at once, sends its changes one at a time, and on a failure reads the issue again.
 
 `GET /api/linear` answers `{ connected, signIn }`.
 `connected` is true when omp's user-level MCP config has an enabled server on `mcp.linear.app` and omp's credential store, read again on each call, holds an OAuth sign-in under that server's credential id.
@@ -319,7 +319,7 @@ The model, thinking, and project pickers use shadcn's `popover` and `command` co
 Fluid's built-in sidebar rail resizes by pointer only and collapses on click.
 The dashboard turns it off and uses `web/components/sidebar-panel.tsx`, which gives each sidebar its own width and open state, because Fluid's provider holds only one of each.
 
-Fluid Functionalism has no sheet, so the sheet that the inbox shows a pull request in, and the tickets page an issue in, `web/components/ui/sheet.tsx`, follows the sidebar's mobile sheet: Radix `Dialog` for focus and dismissal, and a framer-motion slide on the `moderate` spring.
+Fluid Functionalism has no sheet, so the sheet that the inbox shows a pull request in, `web/components/ui/sheet.tsx`, follows the sidebar's mobile sheet: Radix `Dialog` for focus and dismissal, and a framer-motion slide on the `moderate` spring. The tickets page shows an issue in the main content instead.
 
 The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items.
 Both share Base UI's menu items, so each row builds one item list and both menus render it.
@@ -363,7 +363,7 @@ The server lives in `src/`:
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
 - `src/git.ts`: the git checkout of a directory, and the worktree a new session's branch runs in.
-- `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for its sheet, the options of its pickers, and the `save_issue` call they make.
+- `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query.
@@ -387,13 +387,13 @@ The page lives in `web/`.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it.
-  `web/components/quick-actions.tsx` holds their row menu, sheet buttons, and the note that names the session a start began in the background, or why it failed.
+  `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's sheet or an issue's details, and the note that names the session a start began in the background, or why it failed.
 - `web/api.ts`: the page's HTTP client, and `errorText`, which says what any failure was.
   `web/settings-api.ts` holds the settings page's settings load and its writes.
 - `web/reads.ts`: the server reads that components hold.
-  `useRead` reads one URL, such as the pull request or Linear issue in full that a sheet shows, the settings page's model catalog, or the new-session draft's model list.
+  `useRead` reads one URL, such as the pull request a sheet shows, the Linear issue the tickets page shows in its main content, the settings page's model catalog, or the new-session draft's model list.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, and one for whether omp is signed in to Linear.
-  The issue sheet shows the version a field change answered in place of its read; `web/components/tickets/ticket-fields.tsx` holds its field pickers and sends their changes.
+  The issue detail shows the version a field change answered in place of its read; `web/components/tickets/ticket-fields.tsx` holds its field pickers and sends their changes.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header.
   `web/components/git.tsx` holds the branch picker and the repository and branch in a header's meta line.
   `web/use-default-model.ts` reads the model that the `default` role names, which the draft's model picker shows until a pick.
@@ -413,8 +413,8 @@ The page lives in `web/`.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
 - `web/components/plan-panel.tsx`: the right sidebar's plan and changes for the focused pane.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
-  The inbox and tickets pages share `web/components/list-sheet-page.tsx`, their frame, header, load and refresh states, and the sheet that keeps its target through its exit slide, and `web/components/sheet-details.tsx`, the sections, links, and comments of a sheet's details.
-  `web/components/fold.tsx` holds the fold button that both pages share, and the hooks that reveal the section a sidebar link chose and the row a page link named; `web/section.ts` names such a section target.
+  The inbox and tickets pages share `web/components/list-sheet-page.tsx` for their frame, header, and load and refresh states. The inbox also uses its sheet, which keeps its target through its exit slide. The tickets page replaces the list with the issue in the main content instead. Both use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
+  `web/components/fold.tsx` holds the fold button that both pages share, and the hooks that reveal the section a sidebar link chose and, on the inbox, the row a page link named; `web/section.ts` names such a section target.
 - `web/components/ui`, `web/lib`, and `web/hooks`: mostly files from the Fluid registry; see below.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).

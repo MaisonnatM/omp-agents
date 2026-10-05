@@ -1,5 +1,5 @@
 /**
- * The tickets page's issues: the viewer's assigned Linear issues, one issue in full for its sheet, what its pickers
+ * The tickets page's issues: the viewer's assigned Linear issues, one issue in full for the main content, what its pickers
  * offer, and the changes they make, read and written through Linear's MCP server with the OAuth credential that omp
  * keeps for it. That token works on the MCP endpoint only, not on Linear's GraphQL API.
  */
@@ -259,7 +259,7 @@ async function queryOptions(team: string): Promise<TicketOptions> {
 
 const options = createCache<TicketOptions>(5 * 60_000);
 
-/** What the sheet's pickers offer for an issue of team `team`, Linear's id of it. */
+/** What the field pickers offer for an issue of team `team`, Linear's id of it. */
 export const loadTicketOptions = (team: string): Promise<TicketOptions> => options.get(team, () => queryOptions(team));
 
 /** Applies `edit` in Linear and answers the issue as it is after it; the tickets list is read anew on its next request. */
