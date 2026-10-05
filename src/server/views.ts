@@ -61,7 +61,7 @@ export class Views {
 			// A tail still loading publishes its first read to every subscriber, this socket included.
 			if (tail?.loaded) {
 				send(ws, { t: "items", view, reset: true, items: tail.transcript.items() });
-				send(ws, { t: "work", view, work: tail.work.snapshot() });
+				send(ws, { t: "work", view, work: tail.work });
 			} else if (!tail) {
 				send(ws, { t: "items", view, reset: true, items: [] });
 				send(ws, { t: "work", view, work: EMPTY_WORK });

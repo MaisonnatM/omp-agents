@@ -421,13 +421,20 @@ export function fileStatus(changes: ChangedFile["changes"]): FileStatus {
 	return changes[0].kind === "created" ? "created" : "edited";
 }
 
-/** What one transcript planned and changed: its latest todo list, and the files it touched in first-touch order. */
+/** The text of the plan file the agent wrote or edited last; `path` shows as a {@link ChangedFile}'s does. */
+export interface PlanDocument {
+	path: string;
+	text: string;
+}
+
+/** What one transcript planned and changed: its latest todo list, its latest plan file, and the files it touched in first-touch order. */
 export interface SessionWork {
 	phases: TodoPhase[];
 	files: ChangedFile[];
+	plan: PlanDocument | null;
 }
 
-export const EMPTY_WORK: SessionWork = { phases: [], files: [] };
+export const EMPTY_WORK: SessionWork = { phases: [], files: [], plan: null };
 
 /** One row of a select request. */
 export interface RequestOption {
