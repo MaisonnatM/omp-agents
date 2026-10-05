@@ -393,7 +393,8 @@ The page lives in `web/`.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
 - `web/components/plan-panel.tsx`: the right sidebar's plan and changes for the focused pane.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
-  `web/components/fold.tsx` holds the fold button that the inbox and tickets pages share, and the hook that reveals the section a sidebar link chose; `web/section.ts` names such a section target.
+  The inbox and tickets pages share `web/components/list-sheet-page.tsx`, their frame, header, load and refresh states, and the sheet that keeps its target through its exit slide, and `web/components/sheet-details.tsx`, the sections, links, and comments of a sheet's details.
+  `web/components/fold.tsx` holds the fold button that both pages share, and the hooks that reveal the section a sidebar link chose and the row a page link named; `web/section.ts` names such a section target.
 - `web/components/ui`, `web/lib`, and `web/hooks`: mostly files from the Fluid registry; see below.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).

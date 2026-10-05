@@ -2,9 +2,9 @@
  * The quick actions of the inbox and the tickets page: which pull request or Linear issue each applies to, and the
  * prompt that starts its session.
  */
-import type { InboxPullRequest, PullRequest, Ticket } from "../src/shared";
+import { type InboxPullRequest, type PullRequest, samePullRequest, type Ticket } from "../src/shared";
 import { pullRequestUrl } from "./inbox-model";
-import type { QuickOp } from "./starts";
+import type { QuickOp, StartOf } from "./starts";
 
 export type PullRequestActionId = "fix-ci" | "resolve-conflicts" | "address-comments" | "review" | "thermonuclear-review";
 export type TicketActionId = "work" | "plan";
@@ -12,6 +12,38 @@ export type QuickActionId = PullRequestActionId | TicketActionId;
 
 /** What a quick start works on, with the action it runs there. */
 export type QuickSubject = { kind: "pull-request"; pr: PullRequest; action: PullRequestActionId } | { kind: "ticket"; id: string; action: TicketActionId };
+
+type WithoutAction<Subject> = Subject extends unknown ? Omit<Subject, "action"> : never;
+
+/** What a quick start can work on: a pull request, or a Linear issue by its identifier. */
+export type QuickItem = WithoutAction<QuickSubject>;
+
+/** The actions of `Item`'s kind. */
+export type ItemAction<Item extends QuickItem> = { [Subject in QuickSubject as Subject["kind"]]: Subject["action"] }[Item["kind"]];
+
+/** The action that `subject` runs on `item`; `null` when it works on something else. */
+export function actionOn<Item extends QuickItem>(subject: QuickSubject, item: Item): ItemAction<Item> | null {
+	let same: boolean;
+	switch (subject.kind) {
+		case "pull-request":
+			same = item.kind === "pull-request" && samePullRequest(subject.pr, item.pr);
+			break;
+		case "ticket":
+			same = item.kind === "ticket" && subject.id === item.id;
+			break;
+		default: {
+			const unhandled: never = subject;
+			return unhandled;
+		}
+	}
+	// The kinds just matched, which TypeScript cannot relate to the generic `Item`.
+	return same ? (subject.action as ItemAction<Item>) : null;
+}
+
+/** The action of the quick start under way on `item`, if any. */
+export function pendingOf<Item extends QuickItem>(quick: StartOf<"quick"> | null, item: Item): ItemAction<Item> | null {
+	return quick?.phase === "starting" ? actionOn(quick.op.subject, item) : null;
+}
 
 interface QuickAction<Subject> {
 	label: string;

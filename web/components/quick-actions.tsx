@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { modeOf, SPLIT_CLICK } from "../labels";
-import { QUICK_ACTIONS, type QuickActionId } from "../quick-actions";
+import { actionOn, type ItemAction, pendingOf, QUICK_ACTIONS, type QuickActionId, type QuickItem } from "../quick-actions";
 import type { OpenMode } from "../routing";
 import type { StartOf } from "../starts";
 
@@ -102,5 +102,25 @@ export function QuickStartNotice({ quick, onOpen, onDismiss }: NoticeProps) {
 				Dismiss
 			</Button>
 		</p>
+	);
+}
+
+interface SheetActionsProps<Item extends QuickItem> {
+	/** What the sheet shows. */
+	item: Item;
+	actions: ItemAction<Item>[];
+	onRun: (action: ItemAction<Item>) => void;
+	quick: StartOf<"quick"> | null;
+	onOpen: (view: View, mode: OpenMode) => void;
+	onDismiss: () => void;
+}
+
+/** A sheet's buttons for `actions` on `item`, then what became of the last quick action on it. */
+export function SheetQuickActions<Item extends QuickItem>({ item, actions, onRun, quick, onOpen, onDismiss }: SheetActionsProps<Item>) {
+	return (
+		<>
+			<QuickActionButtons actions={actions} pending={pendingOf(quick, item)} onRun={onRun} />
+			{quick && actionOn(quick.op.subject, item) !== null && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismiss} />}
+		</>
 	);
 }
