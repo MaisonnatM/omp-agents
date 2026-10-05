@@ -20,7 +20,7 @@ describe("ticket groups", () => {
 	});
 	const shape = (tickets: Ticket[]) => ticketGroups(tickets).map(({ status, tickets }) => [status, tickets.map(({ id }) => id)]);
 
-	test("groups by state name, ordered by state type as Linear lists them, then by name", () => {
+	test("groups by state name, with In Review first, then Linear's state-type order, then by name", () => {
 		const groups = shape([
 			ticket("A", { status: "Done", statusType: "completed" }),
 			ticket("B", { status: "Backlog", statusType: "backlog" }),
@@ -32,9 +32,9 @@ describe("ticket groups", () => {
 			ticket("H", { status: "In Review", statusType: "started" }),
 		]);
 		expect(groups).toEqual([
+			["In Review", ["C", "H"]],
 			["Triage", ["F"]],
 			["In Progress", ["E"]],
-			["In Review", ["C", "H"]],
 			["Todo", ["G"]],
 			["Backlog", ["B"]],
 			["Done", ["A"]],

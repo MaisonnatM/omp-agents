@@ -6,6 +6,7 @@ import {
 	CircleArrowOutUpRight,
 	CircleCheck,
 	CircleDashed,
+	CircleDot,
 	CircleX,
 	Contrast,
 	Ellipsis,
@@ -19,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { age } from "../../labels";
 import { type QuickActionId, type TicketActionId, ticketActions } from "../../quick-actions";
 import { hashForTickets } from "../../routing";
-import { PRIORITY_LABEL } from "../../tickets-model";
+import { inReview, PRIORITY_LABEL } from "../../tickets-model";
 import { IconTip } from "../inbox/avatars";
 import { QuickActionsMenu } from "../quick-actions";
 
@@ -32,6 +33,10 @@ export const STATUS_ICON: Record<TicketStatusType, [LucideIcon, string]> = {
 	completed: [CircleCheck, "text-indigo-500 dark:text-indigo-400"],
 	canceled: [CircleX, "text-muted-foreground"],
 };
+
+/** In Review is a started state in Linear, and it gets its own green mark so it does not look like In Progress. */
+export const statusIcon = (status: string, type: TicketStatusType): [LucideIcon, string] =>
+	inReview(status) ? [CircleDot, "text-green-600 dark:text-green-400"] : STATUS_ICON[type];
 
 export const PRIORITY_ICON: Record<TicketPriority, [LucideIcon, string]> = {
 	0: [Ellipsis, "text-muted-foreground"],
@@ -64,7 +69,7 @@ export function TicketRow({ ticket, pending, onQuickAction }: TicketRowProps) {
 			>
 				<IconTip icon={[...PRIORITY_ICON[ticket.priority], PRIORITY_LABEL[ticket.priority]]} />
 				<span className="w-20 shrink-0 truncate font-mono text-xs tabular-nums text-muted-foreground">{ticket.id}</span>
-				<IconTip icon={[...STATUS_ICON[ticket.statusType], ticket.status]} />
+				<IconTip icon={[...statusIcon(ticket.status, ticket.statusType), ticket.status]} />
 				<span className="min-w-0 flex-1 truncate">{ticket.title}</span>
 				{ticket.labels.length > 0 && (
 					<span className="hidden max-w-64 shrink items-center gap-1 overflow-hidden md:flex">

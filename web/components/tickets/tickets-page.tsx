@@ -17,7 +17,7 @@ import { ListSheetPage, PageFrame } from "../list-sheet-page";
 import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
 import { LinearConnection } from "../settings/linear-connection";
 import { TicketDetailContent } from "./ticket-details";
-import { STATUS_ICON, TicketRow, ticketRowId } from "./ticket-row";
+import { statusIcon, TicketRow, ticketRowId } from "./ticket-row";
 
 /** Folded status groups, by status name. */
 const COLLAPSED_KEY = "omp-agents.tickets-collapsed";
@@ -35,7 +35,7 @@ interface GroupProps {
 
 function GroupSection({ group, open, onToggle, quick, onQuickAction }: GroupProps) {
 	const { id } = ticketSection(group.status);
-	const [Icon, color] = STATUS_ICON[group.statusType];
+	const [Icon, color] = statusIcon(group.status, group.statusType);
 	return (
 		// Focused when its sidebar link is chosen.
 		<section id={id} tabIndex={-1} aria-labelledby={`${id}-heading`} className="scroll-mt-6 overflow-hidden rounded-md border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring">
