@@ -33,7 +33,7 @@ export interface Dashboard {
 	navigate: (page: Page) => void;
 	/** Open the new-session draft in the default directory, clearing a failed start's error. */
 	openNewSession: () => void;
-	/** Forget the error of a failed start of `kind`, or the session a quick action started. */
+	/** Forget the error of a failed start of `kind`. */
 	dismissStart: (kind: StartKind) => void;
 	/**
 	 * Start a session; it opens in the focused pane once ready, and a resumed one in the pane of the past session it

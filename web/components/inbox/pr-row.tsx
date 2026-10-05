@@ -2,6 +2,7 @@ import { Check, CircleCheck, CircleDashed, CircleX, GitMerge, Link2, type Lucide
 import { useState } from "react";
 import {
 	type CheckState,
+	type HostStatus,
 	type InboxPullRequest,
 	type PastSession,
 	type PullRequest,
@@ -23,6 +24,8 @@ import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions, type QuickActionId } from "../../quick-actions";
 import { BranchName } from "../git";
 import { QuickActionsMenu } from "../quick-actions";
+import { SessionChip } from "../session-chip";
+import { statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers, STATE_ICON } from "./avatars";
 
 const CHECK_ICON: Record<Exclude<CheckState, "none">, [LucideIcon, string, string]> = {
@@ -60,23 +63,25 @@ interface SessionLink {
 	sessionId: string;
 	label: string;
 	link: PullRequestLink;
+	/** A running session's status; `null` for a past one. */
+	status: HostStatus | null;
 }
 
-/** The sessions that submitted `pr`, then those that worked on it, live ones first within each. */
+/** The sessions linked to `pr`: running ones first, so the row's first chips show the work under way, then those that submitted it before those that worked on it. */
 export function sessionsFor(pr: InboxPullRequest, hosts: RosterHost[], past: PastSession[]): SessionLink[] {
 	const linked = [
 		...hosts.flatMap(host => {
 			const found = host.pullRequests.find(other => samePullRequest(other, pr));
 			const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
-			return found ? [{ view, sessionId: host.sessionId, label: hostLabel(host), link: found.link }] : [];
+			return found ? [{ view, sessionId: host.sessionId, label: hostLabel(host), link: found.link, status: host.status }] : [];
 		}),
 		...past.flatMap(session => {
 			const found = session.pullRequests.find(other => samePullRequest(other, pr));
 			const view: View = { kind: "past", sessionId: session.sessionId };
-			return found ? [{ view, sessionId: session.sessionId, label: pastLabel(session), link: found.link }] : [];
+			return found ? [{ view, sessionId: session.sessionId, label: pastLabel(session), link: found.link, status: null }] : [];
 		}),
 	];
-	return linked.toSorted((a, b) => Number(a.link === "worked") - Number(b.link === "worked"));
+	return linked.toSorted((a, b) => Number(a.view.kind === "past") - Number(b.view.kind === "past") || Number(a.link === "worked") - Number(b.link === "worked"));
 }
 
 /** The DOM id of a pull request's row, which an inbox link to that PR scrolls to. */
@@ -160,18 +165,14 @@ export function PullRequestRow({ pr, sessions, targeted, onOpen, pending, onQuic
 						)}
 						{pr.role === "reviewer" && <span>· by {pr.author.login}</span>}
 						{sessions.slice(0, 3).map(session => (
-							<button
+							<SessionChip
 								key={session.sessionId}
-								type="button"
-								title={`Open the session that ${session.link === "submitted" ? "submitted" : "worked on"} it (${SPLIT_CLICK} to split)`}
+								label={session.label}
+								status={session.status}
+								title={`Open the session that ${session.link === "submitted" ? "submitted" : "worked on"} it${session.status ? `, ${statusLabel(session.status)}` : ""} (${SPLIT_CLICK} to split)`}
+								filled={session.link === "submitted"}
 								onClick={event => onOpen(session.view, modeOf(event))}
-								className={cn(
-									"max-w-48 truncate rounded px-1.5 py-px text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
-									session.link === "submitted" ? "bg-muted" : "ring-1 ring-inset ring-border",
-								)}
-							>
-								{session.label}
-							</button>
+							/>
 						))}
 					</p>
 				</div>

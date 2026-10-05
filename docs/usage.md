@@ -344,8 +344,9 @@ For installation, see the [README](../README.md).
   A workspace's repository is the one its `origin` remote names.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
   They sort into Graphite's sections: **Needs your review**, **Returned to you** (changes requested), **Approved**, **Waiting for review**, **Drafts**, and **Recently merged**.
-  A row shows the author's picture, the branch, the branch it is stacked on when that is not the default branch, the reviewers' pictures, the review decision, the number of unresolved review comments, the check rollup, and the sessions that submitted it, then the sessions that worked on it.
+  A row shows the author's picture, the branch, the branch it is stacked on when that is not the default branch, the reviewers' pictures, the review decision, the number of unresolved review comments, the check rollup, and chips for the sessions linked to it: running ones first, then those that submitted it, then those that worked on it.
   A submitter's chip is filled and a worker's chip is outlined, and a chip's tooltip says which it is.
+  A running session's chip starts with the sidebar's status dot: green while it works, amber while it waits on a question, blue once its turn ended.
   The comment count shows only when a conversation waits for a resolution.
   A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+`.
   The dot on a reviewer's picture shows where they stand: green approved, red requested changes, grey commented, and amber means a review from them is still requested.
@@ -370,14 +371,15 @@ For installation, see the [README](../README.md).
   The button's tooltip reports whether the description changed or why the write failed.
 - An inbox row has a conflicts icon (a red merge symbol) when GitHub reports merge conflicts with the pull request's base branch.
   A lightning button on the row, and buttons in the pull request's sheet, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
-  The inbox stays on screen: once the session runs, a note at the top of the inbox, and in the sheet of that pull request, names it, with **Open session** (Cmd-click, or Ctrl-click off macOS, opens it in a new pane) and **Dismiss**.
+  The inbox stays on screen, and the session shows at once as a chip with its status dot on the row and in the sheet of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
+  The chip stays while the session runs, after a reload too, so the row says whether an agent still works on the pull request.
   The session also shows in the sessions sidebar.
   Which actions show depends on the pull request: **Fix CI** on your own open pull request whose checks failed, **Resolve conflicts** on your own open pull request with merge conflicts, **Address comments** on your own open pull request with unresolved review threads or requested changes, **Review** on an open pull request that waits for your review, and **Thermonuclear review** on every open or draft pull request.
   **Thermonuclear review** runs the `thermonuclear-reviewer` agent on the pull request's diff.
   On your own pull request, the session then applies the valid findings on its branch, pushes them, and only after the push adds `- [x] Thermo-nuclear code quality review` to its description; on a pull request you review, it reports the findings in the session and changes nothing on GitHub.
   A merged pull request has none.
   The button waits while the session starts.
-  When the start fails, the reason shows in the same places, until you dismiss it.
+  When the start fails, a note at the top of the inbox, and in the sheet of that pull request, gives the reason until you dismiss it.
 
 ## Linear tickets
 
@@ -408,17 +410,17 @@ For installation, see the [README](../README.md).
 - `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens that issue's details directly, even when the tickets list does not include it or cannot load.
   **Back to tickets** opens the list from a direct link too.
 - A lightning button on the row, and buttons in the issue's details, start a new dashboard session in the background, with a prompt that names the issue.
-  The page stays on screen.
-  Once the session runs, a note above the issue's details or at the top of the list names it, with **Open session** (Cmd-click, or Ctrl-click off macOS, opens it in a new pane) and **Dismiss**.
-  The detail page shows that note even when the issue itself cannot load.
+  The page stays on screen, and the session shows at once as a chip with its status dot on the issue's row and after the buttons in its details; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
+  A row and the details show a chip for every running session that works on the issue, whether a quick action started it or it read or changed the issue with omp's Linear tools, so they say whether an agent still works on it, after a reload too.
+  A row shows two chips at most.
   The session also shows in the sessions sidebar.
   A Linear issue names no repository, so the session starts where a new session would: in the sidebar project's workspace, or under **All projects** in the open session's workspace, else the newest session's.
   **Work on it**, on any open issue, implements the issue in a git worktree on Linear's branch for it, continuing a branch or pull request that exists already, then commits and reports without pushing.
   **Plan it**, on an issue that has not started yet (triage, backlog, or unstarted), reads the issue and the code and reports a plan without changing anything.
   A completed or canceled issue has none.
   The button waits while the session starts.
-  When the start fails, the note gives the reason instead.
-  The inbox and the tickets page share that note: either page shows the last quick action, whether it ran on a pull request or an issue.
+  When the start fails, a note above the issue's details or at the top of the list gives the reason, even when the issue itself cannot load, until you dismiss it.
+  The inbox and the tickets page share that note: either page shows the last failed quick action, whether it ran on a pull request or an issue.
 - The list of tickets is not tied to the sidebar's project.
   The page reads Linear when it opens and every minute after, and shows the last read at once on a reopen, even after a reload.
   The server keeps Linear's answer for 30 seconds, and **Refresh** asks again at once.

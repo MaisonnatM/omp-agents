@@ -94,7 +94,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 		const outcome = await spawnFor(request);
 		if ("error" in outcome) return { ok: false, error: outcome.error };
 		const { session, prompt, first } = outcome.started;
-		sessions.add(session);
+		sessions.add(session, request.kind === "new" ? request.subject : null);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
 		if (first) void session.prompt(null, first.text, first.images, "steer");
 		env.onStarted();

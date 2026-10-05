@@ -255,6 +255,10 @@ A `start` of kind `new` carries a `skill`, `null` for none: the draft sends the 
 Once the server knows the directory omp runs in, worktree included, `withPinnedSkill` puts `/skill:<skill> ` before the first prompt, so omp's RPC prompt invokes the skill with the prompt as its arguments.
 A directory without that skill, or a prompt that starts with `/`, keeps the prompt as typed.
 
+A `start` of kind `new` carries a `subject`, `null` for none: a quick action sends the pull request or Linear issue it works on.
+`LiveSessions` keeps it by instance id, and `rows()` puts it first among the session's `pullRequests` or `tickets` until the session's tool calls name it, so the roster links the session to its subject from the start, before omp writes the session file.
+The link goes when the session ends.
+
 A `start` of kind `new` carries a `branch`, `null` for the directory as it is.
 For an existing branch, the server runs omp in the worktree that has it checked out, or in the starting directory when that worktree is the directory's own (`git rev-parse --show-toplevel`); with no such worktree it runs `git worktree add <dir> <branch>`.
 For a new branch, it runs `git check-ref-format --branch` and then `git worktree add -b <branch> <dir> <base>`.
@@ -338,7 +342,7 @@ The server lives in `src/`:
 - `src/server/socket.ts`: handles each socket message.
   `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`.
-  Each session's `row()` returns a `LiveRow`, what its transport knows; `rows()` adds `cwdDisplay` and the session's facts to make the roster rows.
+  Each session's `row()` returns a `LiveRow`, what its transport knows; `rows()` adds `cwdDisplay`, the session's facts, and the subject a quick action started it on, to make the roster rows.
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and folds live events into it.
@@ -380,13 +384,15 @@ The page lives in `web/`.
 - `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, settings, and new-session pages, and focus handling.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
-  `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which stays in the background and is kept as started so the inbox or the tickets page can offer it.
+  `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which runs in the background.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
   It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
+  `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the inbox and the tickets page show.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it.
-  `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's sheet or an issue's details, and the note that names the session a start began in the background, or why it failed.
+  `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's sheet or an issue's details, and the note that says why a start failed.
+  `web/components/session-chip.tsx` holds the chip that names a session on a row or a sheet, with the status dot of a running one.
 - `web/api.ts`: the page's HTTP client, and `errorText`, which says what any failure was.
   `settingsUrl` names a settings route for one workspace, or for the user's own files.
 - `web/reads.ts`: the server reads that components hold.

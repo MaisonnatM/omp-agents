@@ -97,6 +97,7 @@ describe("parseClientMsg", () => {
 			model: null,
 			thinking: null,
 			skill: null,
+			subject: null,
 		});
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", thinking: "high" })).toMatchObject({ thinking: "high" });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", skill: "poteto-mode" })).toMatchObject({ skill: "poteto-mode" });
@@ -108,6 +109,12 @@ describe("parseClientMsg", () => {
 		});
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", branch: { kind: "new", name: "feat", base: "main" } })).toMatchObject({
 			branch: { kind: "new", name: "feat", base: "main" },
+		});
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "ticket", id: "ENG-7", action: "work" } })).toMatchObject({
+			subject: { kind: "ticket", id: "ENG-7" },
+		});
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 12 } } })).toMatchObject({
+			subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 12 } },
 		});
 		expect(msg({ t: "start", reqId: 5, kind: "fork", view: { kind: "past", sessionId: "s1" }, entryId: "e1" })).toEqual({
 			t: "start",
@@ -132,6 +139,8 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", thinking: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", skill: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", skill: "two words" })).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "ticket", id: "eng 7" } })).toBeNull();
+		expect(msg({ t: "start", reqId: 1, kind: "new", cwd: "~/code", prompt: "hi", subject: { kind: "pull-request", pr: { owner: "acme", repo: "webapp", number: 0 } } })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "fork", view: live, entryId: "" })).toBeNull();
 		expect(msg({ t: "start", reqId: 1, kind: "resume", sessionId: "" })).toBeNull();
 	});

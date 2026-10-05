@@ -17,7 +17,7 @@ export interface DashboardContextValue {
 	/** End running session `instanceId`, then move its panes along. */
 	end: (instanceId: string) => void;
 	connected: boolean;
-	/** The last start of each kind, under way, failed, or for a quick action, started. */
+	/** The last start of each kind, under way or failed. */
 	starts: {
 		fork: StartOf<"fork"> | null;
 		resume: StartOf<"resume"> | null;
