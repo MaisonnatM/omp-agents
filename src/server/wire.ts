@@ -3,8 +3,21 @@
  * Each parser returns a typed value, or `null` for anything else, so no caller casts what it received.
  */
 import { isObject } from "../json";
-import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared";
-import type { BranchChoice, ClientMsg, CompletionScope, LiveView, ModelOption, PromptImage, PullRequest, SessionLinksEdit, StartRequest, UserAnswer, View } from "../shared";
+import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, TICKET_ID } from "../shared";
+import type {
+	BranchChoice,
+	ClientMsg,
+	CompletionScope,
+	LiveView,
+	ModelOption,
+	PromptImage,
+	PullRequest,
+	SessionLinksEdit,
+	StartRequest,
+	TicketEdit,
+	UserAnswer,
+	View,
+} from "../shared";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
@@ -222,4 +235,38 @@ export function parseSessionLinks(body: unknown): SessionLinksEdit | null {
 	const { sessionIds } = body;
 	if (!pr || !Array.isArray(sessionIds) || sessionIds.length === 0) return null;
 	return sessionIds.every((id): id is string => typeof id === "string") ? { ...pr, sessionIds } : null;
+}
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The body of `PUT /api/ticket`: an issue identifier and at least one field to change, each of its own type. */
+export function parseTicketEdit(body: unknown): TicketEdit | null {
+	if (!isObject(body) || typeof body.id !== "string" || !TICKET_ID.test(body.id)) return null;
+	const { state, assignee, priority, labels, project, dueDate } = body;
+	const edit: TicketEdit = { id: body.id };
+	if (state !== undefined) {
+		if (!isNonEmpty(state)) return null;
+		edit.state = state;
+	}
+	if (assignee !== undefined) {
+		if (assignee !== null && !isNonEmpty(assignee)) return null;
+		edit.assignee = assignee;
+	}
+	if (priority !== undefined) {
+		if (priority !== 0 && priority !== 1 && priority !== 2 && priority !== 3 && priority !== 4) return null;
+		edit.priority = priority;
+	}
+	if (labels !== undefined) {
+		if (!Array.isArray(labels) || !labels.every(isNonEmpty)) return null;
+		edit.labels = [...new Set(labels)];
+	}
+	if (project !== undefined) {
+		if (project !== null && !isNonEmpty(project)) return null;
+		edit.project = project;
+	}
+	if (dueDate !== undefined) {
+		if (dueDate !== null && (typeof dueDate !== "string" || !DATE.test(dueDate))) return null;
+		edit.dueDate = dueDate;
+	}
+	return Object.keys(edit).length > 1 ? edit : null;
 }

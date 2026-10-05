@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getJson } from "./api";
 
 export interface DetailRead<T> {
@@ -7,10 +7,11 @@ export interface DetailRead<T> {
 }
 
 /**
- * The server's answer at `url`, read once, for a sheet's pull request or Linear issue in full. A caller showing another
- * item, or the same one again, mounts anew (by `key`).
+ * The server's answer at `url`, read once, for a sheet's pull request or Linear issue in full, and `replace`, which
+ * shows another version of it, such as the one a change answered. A caller showing another item, or the same one
+ * again, mounts anew (by `key`).
  */
-export function useDetail<T>(url: string): DetailRead<T> {
+export function useDetail<T>(url: string): DetailRead<T> & { replace: (detail: T) => void } {
 	const [read, setRead] = useState<DetailRead<T>>({ detail: null, error: null });
 	useEffect(() => {
 		const controller = new AbortController();
@@ -22,5 +23,6 @@ export function useDetail<T>(url: string): DetailRead<T> {
 		);
 		return () => controller.abort();
 	}, [url]);
-	return read;
+	const replace = useCallback((detail: T) => setRead({ detail, error: null }), []);
+	return { ...read, replace };
 }

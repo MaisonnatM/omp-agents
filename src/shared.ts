@@ -140,6 +140,15 @@ export interface LinearStatus {
 /** A Linear issue's identifier as Linear shows it, `ENG-2368`: its team's key, a dash, and its number. */
 export const TICKET_ID = /^[A-Z][A-Z0-9_]*-\d+$/;
 
+/** Where the page loads a file that a Linear issue or its comments embed; the server fetches it from Linear. */
+export const TICKET_MEDIA_PATH = "/api/ticket/media";
+
+/** One of the things an issue's pickers offer: a person, a project, or a workflow state. */
+export interface TicketChoice {
+	id: string;
+	name: string;
+}
+
 export interface TicketComment {
 	author: string;
 	/** Markdown. */
@@ -150,15 +159,44 @@ export interface TicketComment {
 
 /** `GET /api/ticket?id=<identifier>`: a Linear issue in full, for the tickets page's sheet. */
 export interface TicketDetail extends Ticket {
-	/** Markdown, with Linear's issue mentions as links and its images as image links. */
+	/** Markdown, with Linear's issue mentions as links, and its images and videos loading through `TICKET_MEDIA_PATH`. */
 	description: string;
 	createdBy: string | null;
 	/** ISO time. */
 	createdAt: string;
+	assignee: TicketChoice | null;
+	/** Linear's id of the issue's team, whose states, labels, and projects the pickers offer. */
+	teamId: string;
 	/** What Linear links the issue to: pull requests, documents, and other pages. */
 	attachments: { title: string; url: string }[];
 	/** Comment threads, oldest first, each its first comment then the replies. */
 	threads: TicketComment[][];
+}
+
+/** `GET /api/ticket/options?team=<id>`: what the sheet's pickers offer for an issue of that team. */
+export interface TicketOptions {
+	/** In Linear's workflow order: triage, backlog, unstarted, started, completed, canceled. */
+	statuses: (TicketChoice & { type: TicketStatusType })[];
+	/** Active members, by name. */
+	users: TicketChoice[];
+	/** The team's labels and the workspace's, by name. */
+	labels: (TicketChoice & { color: string })[];
+	projects: TicketChoice[];
+}
+
+/**
+ * `PUT /api/ticket`: changes to an issue, each field left out unchanged and `null` clearing it, which answers the
+ * issue as Linear has it after the change. `state`, `assignee`, and `project` are ids; `labels` replaces every label,
+ * by name; `dueDate` is `YYYY-MM-DD`.
+ */
+export interface TicketEdit {
+	id: string;
+	state?: string;
+	assignee?: string | null;
+	priority?: TicketPriority;
+	labels?: string[];
+	project?: string | null;
+	dueDate?: string | null;
 }
 
 /** How one check on a pull request's head commit went; `skipped` covers neutral and skipped runs. */

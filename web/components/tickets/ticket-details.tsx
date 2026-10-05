@@ -10,6 +10,7 @@ import { useDetail } from "../../use-detail";
 import { IconTip } from "../inbox/avatars";
 import { DetailSection, OutLink } from "../inbox/pr-details";
 import { MessageMarkdown } from "../message-markdown";
+import { TicketFields } from "./ticket-fields";
 import { dueLabel, PRIORITY_ICON, STATUS_ICON } from "./ticket-row";
 
 const ago = (at: string): string => `${age(Date.parse(at))} ago`;
@@ -41,9 +42,12 @@ interface TicketSheetContentProps {
 	actions?: ReactNode;
 }
 
-/** A Linear issue, as the tickets page's sheet shows it: a header that names it, with `actions` below, then its description, links, and comments. */
+/**
+ * A Linear issue, as the tickets page's sheet shows it: a header that names it, whose fields change the issue once
+ * Linear answered it in full, with `actions` below, then its description, links, and comments.
+ */
 export function TicketSheetContent({ id, listed, actions }: TicketSheetContentProps) {
-	const { detail, error } = useDetail<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
+	const { detail, error, replace } = useDetail<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
 	const ticket = detail ?? listed;
 	const [PriorityIcon, priorityColor] = PRIORITY_ICON[ticket?.priority ?? 0];
 	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking Linear for the issue…</p>;
@@ -64,7 +68,7 @@ export function TicketSheetContent({ id, listed, actions }: TicketSheetContentPr
 				</SheetTitle>
 				<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
 					<span className="font-mono tabular-nums">{id}</span>
-					{ticket && (
+					{ticket && !detail && (
 						<>
 							<span>{ticket.status}</span>
 							<span className="flex items-center gap-1">
@@ -96,7 +100,8 @@ export function TicketSheetContent({ id, listed, actions }: TicketSheetContentPr
 						</span>
 					)}
 				</p>
-				{ticket && ticket.labels.length > 0 && (
+				{detail && <TicketFields detail={detail} replace={replace} />}
+				{!detail && ticket && ticket.labels.length > 0 && (
 					<p className="flex flex-wrap gap-1">
 						{ticket.labels.map(label => (
 							<Badge key={label} variant="dot" size="compact">
