@@ -2,10 +2,11 @@ import type { ReactNode } from "react";
 import { type Inbox, type InboxPullRequest, type PastSession, type PullRequest, type RepoInbox, type RosterHost, repoKey, samePullRequest } from "../../../src/shared";
 import { projectName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
-import { pendingOf, type PullRequestActionId, pullRequestActions, pullRequestStart } from "../../quick-actions";
+import { actionOn, pendingOf, type PullRequestActionId, pullRequestActions, pullRequestStart } from "../../quick-actions";
 import { inboxSection, inboxSections } from "../../inbox-model";
 import { inboxStore } from "../../reads";
 import { hashForInbox } from "../../routing";
+import { sessionsOn } from "../../sessions";
 import type { SectionTarget } from "../../section";
 import { useStoredKeys } from "../../stored-state";
 import { useDashboardContext } from "../dashboard-context";
@@ -160,7 +161,7 @@ export function InboxPage({ project, hosts, past, target, section }: InboxPagePr
 			poll={poll}
 			onRefresh={() => void inboxStore.refresh(project, { fresh: true })}
 			missing={read && target && !place ? whyMissing(target, read.data, project === null) : null}
-			notice={quick && <QuickStartNotice quick={quick} onOpen={open} onDismiss={() => dismissStart("quick")} />}
+			notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 			spacing="space-y-10"
 			sheet={
 				<TargetSheet target={target} onClose={() => (location.hash = hashForInbox(null))}>
@@ -172,14 +173,19 @@ export function InboxPage({ project, hosts, past, target, section }: InboxPagePr
 								pr={pr}
 								actions={
 									listed && (
-										<SheetQuickActions
-											item={{ kind: "pull-request", pr: listed.pr }}
-											actions={pullRequestActions(listed.pr)}
-											onRun={(action: PullRequestActionId) => start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()))}
-											quick={quick}
-											onOpen={open}
-											onDismiss={() => dismissStart("quick")}
-										/>
+										<>
+											<SheetQuickActions
+												item={{ kind: "pull-request", pr: listed.pr }}
+												actions={pullRequestActions(listed.pr)}
+												onRun={(action: PullRequestActionId) => start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()))}
+												sessions={sessionsOn({ kind: "pull-request", pr }, hosts)}
+												quick={quick}
+												onOpen={open}
+											/>
+											{quick && actionOn(quick.op.subject, { kind: "pull-request", pr }) !== null && (
+												<QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />
+											)}
+										</>
 									)
 								}
 							/>

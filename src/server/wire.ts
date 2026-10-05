@@ -19,6 +19,7 @@ import type {
 	UserAnswer,
 	UserTodoChange,
 	View,
+	WorkItem,
 } from "../shared";
 
 /** The longest composer text the server completes. */
@@ -112,6 +113,16 @@ function parseSkill(value: unknown): Parsed<string | null> {
 	return typeof value === "string" && /^\S+$/.test(value) ? { ok: value } : null;
 }
 
+/** `{ ok: null }` for a start that works on nothing in particular. */
+function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
+	if (value === null || value === undefined) return { ok: null };
+	if (!isObject(value)) return null;
+	if (value.kind === "ticket") return typeof value.id === "string" && TICKET_ID.test(value.id) ? { ok: { kind: "ticket", id: value.id } } : null;
+	if (value.kind !== "pull-request" || !isObject(value.pr)) return null;
+	const pr = parsePullRequest(value.pr.owner, value.pr.repo, value.pr.number);
+	return pr && { ok: { kind: "pull-request", pr } };
+}
+
 function parseTodoChange(value: unknown): Parsed<UserTodoChange> {
 	if (!isObject(value)) return null;
 	const isId = (id: unknown): id is string => isNonEmpty(id) && id.length <= MAX_TODO_ID;
@@ -159,9 +170,10 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 			const model = value.model === null || value.model === undefined ? { ok: null } : parseModel(value.model);
 			const thinking = parseThinking(value.thinking);
 			const skill = parseSkill(value.skill);
-			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill) return null;
+			const subject = parseWorkItem(value.subject);
+			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !subject) return null;
 			return prompt.trim() || images.ok.length > 0
-				? { ok: { kind: "new", cwd, prompt, images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok } }
+				? { ok: { kind: "new", cwd, prompt, images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok } }
 				: null;
 		}
 		case "fork": {

@@ -43,7 +43,7 @@ export type Action =
 	| { t: "connected"; connected: boolean }
 	| { t: "route"; route: Route }
 	| { t: "start"; reqId: number; op: StartOp }
-	/** A failed start's error, or a quick action's started session, goes away; a start under way keeps waiting for its answer. */
+	/** A failed start's error goes away; a start under way keeps waiting for its answer. */
 	| { t: "dismiss-start"; kind: StartKind }
 	| { t: "new-session-completions"; completions: Completions }
 	| { t: "user-todo"; change: UserTodoChange }

@@ -5,12 +5,23 @@ import { SessionGuest } from "../guest";
 import type { LiveSession, LiveUpdate, SessionFacts } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath } from "../paths";
-import type { RosterHost } from "../shared";
+import { type RosterHost, samePullRequest, type WorkItem } from "../shared";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
 
+/** `facts` with `subject` first among the session's links, unless its tool calls named it already. */
+export function withSubject(facts: SessionFacts, subject: WorkItem | undefined): SessionFacts {
+	if (subject?.kind === "pull-request" && !facts.pullRequests.some(pr => samePullRequest(pr, subject.pr))) {
+		return { ...facts, pullRequests: [{ ...subject.pr, link: "worked" }, ...facts.pullRequests] };
+	}
+	if (subject?.kind === "ticket" && !facts.tickets.includes(subject.id)) return { ...facts, tickets: [subject.id, ...facts.tickets] };
+	return facts;
+}
+
 export class LiveSessions {
 	readonly #sessions = new Map<string, LiveSession>();
+	/** What the sessions started from a quick action work on, by session id, so that a `/new` in one leaves the link behind. */
+	readonly #subjects = new Map<string, WorkItem>();
 	readonly #onUpdate: (instanceId: string, update: SessionUpdate) => void;
 
 	constructor(onUpdate: (instanceId: string, update: SessionUpdate) => void) {
@@ -33,12 +44,17 @@ export class LiveSessions {
 		return { instanceId, emit: update => this.#onUpdate(instanceId, update) };
 	}
 
-	add(session: LiveSession): void {
+	add(session: LiveSession, subject: WorkItem | null): void {
 		this.#sessions.set(session.instanceId, session);
+		if (subject) this.#subjects.set(session.sessionId, subject);
 	}
 
 	remove(instanceId: string): void {
-		if (this.#sessions.delete(instanceId)) forgetSession(instanceId);
+		const session = this.#sessions.get(instanceId);
+		if (!session) return;
+		this.#sessions.delete(instanceId);
+		this.#subjects.delete(session.sessionId);
+		forgetSession(instanceId);
 	}
 
 	/** Each session's roster row, with its `cwdDisplay` and what the session files' index knows of it. */
@@ -46,7 +62,7 @@ export class LiveSessions {
 		return [...this.#sessions.values()].map(session => ({
 			...session.row(),
 			cwdDisplay: displayPath(session.cwd),
-			...factsOf(session.sessionId),
+			...withSubject(factsOf(session.sessionId), this.#subjects.get(session.sessionId)),
 		}));
 	}
 

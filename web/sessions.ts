@@ -1,5 +1,5 @@
-/** What the roster and past-session lists say about where sessions ran. */
-import type { PastSession, RosterHost, View } from "../src/shared";
+/** What the roster and past-session lists say about where sessions ran, and what they work on. */
+import { type PastSession, type RosterHost, samePullRequest, type View, type WorkItem } from "../src/shared";
 
 const HIDDEN_ROOTS = ["/tmp", "/private/tmp"];
 
@@ -7,6 +7,10 @@ const HIDDEN_ROOTS = ["/tmp", "/private/tmp"];
 export function discoverableCwd(cwd: string): boolean {
 	return !HIDDEN_ROOTS.some(root => cwd === root || cwd.startsWith(`${root}/`));
 }
+
+/** The running sessions that work on `item`: their tool calls named it, or a quick action on it started them. */
+export const sessionsOn = (item: WorkItem, hosts: RosterHost[]): RosterHost[] =>
+	hosts.filter(host => (item.kind === "ticket" ? host.tickets.includes(item.id) : host.pullRequests.some(pr => samePullRequest(pr, item.pr))));
 
 export function discoverableSessions(hosts: RosterHost[], past: PastSession[]): { hosts: RosterHost[]; past: PastSession[] } {
 	const listed = <T extends { cwd: string }>(rows: T[]): T[] => rows.filter(row => discoverableCwd(row.cwd));

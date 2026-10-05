@@ -15,14 +15,15 @@ import {
 	SignalLow,
 	SignalMedium,
 } from "lucide-react";
-import type { Ticket, TicketPriority, TicketStatusType } from "../../../src/shared";
+import type { RosterHost, Ticket, TicketPriority, TicketStatusType, View } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { age } from "../../labels";
 import { type QuickActionId, type TicketActionId, ticketActions } from "../../quick-actions";
-import { hashForTickets } from "../../routing";
+import { hashForTickets, type OpenMode } from "../../routing";
 import { inReview, PRIORITY_LABEL } from "../../tickets-model";
 import { IconTip } from "../inbox/avatars";
 import { QuickActionsMenu } from "../quick-actions";
+import { LiveSessionChips } from "../session-chip";
 
 /** Linear's glyph for each state type. */
 export const STATUS_ICON: Record<TicketStatusType, [LucideIcon, string]> = {
@@ -54,12 +55,15 @@ export const ticketRowId = (id: string): string => `ticket-${id}`;
 
 interface TicketRowProps {
 	ticket: Ticket;
+	/** The running sessions that work on this issue. */
+	sessions: RosterHost[];
+	onOpen: (view: View, mode: OpenMode) => void;
 	/** The quick action whose session is starting for this issue, if any. */
 	pending: QuickActionId | null;
 	onQuickAction: (action: TicketActionId) => void;
 }
 
-export function TicketRow({ ticket, pending, onQuickAction }: TicketRowProps) {
+export function TicketRow({ ticket, sessions, onOpen, pending, onQuickAction }: TicketRowProps) {
 	return (
 		<li id={ticketRowId(ticket.id)} className="flex scroll-my-6 items-center hover:bg-muted/50">
 			<a
@@ -94,6 +98,7 @@ export function TicketRow({ ticket, pending, onQuickAction }: TicketRowProps) {
 				)}
 			</a>
 			<div className="flex shrink-0 items-center gap-3 px-3 text-xs">
+				<LiveSessionChips hosts={sessions.slice(0, 2)} onOpen={onOpen} />
 				<QuickActionsMenu actions={ticketActions(ticket)} pending={pending} onRun={onQuickAction} label="Quick actions: start a session in the background that works on this issue" />
 				<span className="w-10 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={`Updated ${new Date(ticket.updatedAt).toLocaleString()}`}>
 					{age(Date.parse(ticket.updatedAt))}

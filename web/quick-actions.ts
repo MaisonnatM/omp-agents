@@ -2,7 +2,7 @@
  * The quick actions of the inbox and the tickets page: which pull request or Linear issue each applies to, and the
  * prompt that starts its session.
  */
-import { type InboxPullRequest, type PullRequest, samePullRequest, type Ticket } from "../src/shared";
+import { type InboxPullRequest, type PullRequest, samePullRequest, type Ticket, type WorkItem } from "../src/shared";
 import { pullRequestUrl } from "./inbox-model";
 import type { QuickOp, StartOf } from "./starts";
 
@@ -13,11 +13,11 @@ export type QuickActionId = PullRequestActionId | TicketActionId;
 /** What a quick start works on, with the action it runs there. */
 export type QuickSubject = { kind: "pull-request"; pr: PullRequest; action: PullRequestActionId } | { kind: "ticket"; id: string; action: TicketActionId };
 
-/** What a quick start can work on: a pull request, or a Linear issue by its identifier. */
-export type QuickItem = { kind: "pull-request"; pr: PullRequest } | { kind: "ticket"; id: string };
+/** What `subject` works on, without the action it runs there. */
+export const workItemOf = (subject: QuickSubject): WorkItem => (subject.kind === "ticket" ? { kind: "ticket", id: subject.id } : { kind: "pull-request", pr: subject.pr });
 
 /** The action that `subject` runs on `item`; `null` when it works on something else. */
-export function actionOn(subject: QuickSubject, item: QuickItem): QuickActionId | null {
+export function actionOn(subject: QuickSubject, item: WorkItem): QuickActionId | null {
 	switch (subject.kind) {
 		case "pull-request":
 			return item.kind === "pull-request" && samePullRequest(subject.pr, item.pr) ? subject.action : null;
@@ -31,7 +31,7 @@ export function actionOn(subject: QuickSubject, item: QuickItem): QuickActionId 
 }
 
 /** The action of the quick start under way on `item`, if any. */
-export function pendingOf(quick: StartOf<"quick"> | null, item: QuickItem): QuickActionId | null {
+export function pendingOf(quick: StartOf<"quick"> | null, item: WorkItem): QuickActionId | null {
 	return quick?.phase === "starting" ? actionOn(quick.op.subject, item) : null;
 }
 

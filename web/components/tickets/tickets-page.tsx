@@ -2,11 +2,12 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { Ticket } from "../../../src/shared";
+import type { RosterHost, Ticket, View } from "../../../src/shared";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
 import { ticketsStore } from "../../reads";
-import { hashForTickets } from "../../routing";
+import { hashForTickets, type OpenMode } from "../../routing";
+import { sessionsOn } from "../../sessions";
 import type { SectionTarget } from "../../section";
 import type { StartOf } from "../../starts";
 import { useStoredKeys } from "../../stored-state";
@@ -14,7 +15,7 @@ import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-mod
 import { useDashboardContext } from "../dashboard-context";
 import { FoldButton, useReveal } from "../fold";
 import { ListSheetPage, PageFrame } from "../list-sheet-page";
-import { QuickActionButtons, QuickStartNotice } from "../quick-actions";
+import { QuickStartNotice, SheetQuickActions } from "../quick-actions";
 import { LinearConnection } from "../settings/linear-connection";
 import { TicketDetailContent } from "./ticket-details";
 import { statusIcon, TicketRow, ticketRowId } from "./ticket-row";
@@ -29,11 +30,13 @@ interface GroupProps {
 	group: TicketGroup;
 	open: boolean;
 	onToggle: () => void;
+	hosts: RosterHost[];
+	onOpen: (view: View, mode: OpenMode) => void;
 	quick: StartOf<"quick"> | null;
 	onQuickAction: (ticket: Ticket, action: TicketActionId) => void;
 }
 
-function GroupSection({ group, open, onToggle, quick, onQuickAction }: GroupProps) {
+function GroupSection({ group, open, onToggle, hosts, onOpen, quick, onQuickAction }: GroupProps) {
 	const { id } = ticketSection(group.status);
 	const [Icon, color] = statusIcon(group.status, group.statusType);
 	return (
@@ -52,6 +55,8 @@ function GroupSection({ group, open, onToggle, quick, onQuickAction }: GroupProp
 						<TicketRow
 							key={ticket.id}
 							ticket={ticket}
+							sessions={sessionsOn({ kind: "ticket", id: ticket.id }, hosts)}
+							onOpen={onOpen}
 							pending={pendingOf(quick, { kind: "ticket", id: ticket.id })}
 							onQuickAction={action => onQuickAction(ticket, action)}
 						/>
@@ -72,10 +77,12 @@ interface TicketsPageProps {
 	 * project's workspace, as a new session would start in.
 	 */
 	cwd: string;
+	/** Running sessions, which the issues they work on name. */
+	hosts: RosterHost[];
 }
 
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
-export function TicketsPage({ target, section, cwd }: TicketsPageProps) {
+export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	const { open, start: startSession, dismissStart, starts: { quick } } = useDashboardContext();
 	const poll = ticketsStore.usePolling();
 	const tickets = poll.read?.data.tickets ?? [];
@@ -114,18 +121,21 @@ export function TicketsPage({ target, section, cwd }: TicketsPageProps) {
 						<Button variant="ghost" leadingIcon={ArrowLeft} render={<a href={hashForTickets(null)} />}>
 							Back to tickets
 						</Button>
-						{quick && <QuickStartNotice quick={quick} onOpen={open} onDismiss={() => dismissStart("quick")} />}
+						{quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 						<TicketDetailContent
 							key={target}
 							id={target}
 							listed={listed}
 							actions={ticket => (
-								<QuickActionButtons
+								<SheetQuickActions
+									item={{ kind: "ticket", id: target }}
 									actions={ticketActions(ticket)}
-									pending={pendingOf(quick, { kind: "ticket", id: target })}
 									onRun={action => {
 										if (action === "work" || action === "plan") start(ticket, action);
 									}}
+									sessions={sessionsOn({ kind: "ticket", id: target }, hosts)}
+									quick={quick}
+									onOpen={open}
 								/>
 							)}
 						/>
@@ -144,7 +154,7 @@ export function TicketsPage({ target, section, cwd }: TicketsPageProps) {
 			poll={poll}
 			onRefresh={() => void ticketsStore.refresh(null, { fresh: true })}
 			missing={null}
-			notice={quick && <QuickStartNotice quick={quick} onOpen={open} onDismiss={() => dismissStart("quick")} />}
+			notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 			spacing="space-y-4"
 			contentRef={listPageRef}
 		>
@@ -159,6 +169,8 @@ export function TicketsPage({ target, section, cwd }: TicketsPageProps) {
 								group={group}
 								open={!collapsed.has(group.status)}
 								onToggle={() => toggleCollapsed(group.status)}
+								hosts={hosts}
+								onOpen={open}
 								quick={quick}
 								onQuickAction={start}
 							/>

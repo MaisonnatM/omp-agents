@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { beginStart, dismissSettled, dropHidden, loseStarts, settleResumeAll, settleStart, type StartOp, startOf, type Starts } from "./starts";
+import { beginStart, dismissSettled, dropHidden, loseStarts, messageOf, settleResumeAll, settleStart, type StartOp, startOf, type Starts } from "./starts";
 
 const point = { entryId: "e1", prefill: true };
 const fork = { kind: "fork", view: { kind: "past", sessionId: "s1" }, itemId: "u1", point } as const;
@@ -50,12 +50,21 @@ describe("starts", () => {
 		expect(dismissSettled(hidden, "fork")).toBe(hidden);
 	});
 
-	test("a quick action's session stays as started, outlives the connection and every view, and goes on dismiss", () => {
-		const started = settleStart(beginStart(new Map(), 1, quick), 1, ok);
-		expect(startOf(started, "quick")).toMatchObject({ phase: "started", view: { kind: "live", instanceId: "i1", agentId: null } });
-		expect(loseStarts(started)).toBe(started);
-		expect(dropHidden(started, () => false)).toBe(started);
-		expect(dismissSettled(started, "quick").size).toBe(0);
+	test("a quick action asks for a new session linked to what it works on, without the action", () => {
+		expect(messageOf(quick, 4)).toEqual({
+			t: "start",
+			reqId: 4,
+			kind: "new",
+			cwd: "/tmp",
+			prompt: "fix",
+			images: [],
+			branch: null,
+			model: null,
+			thinking: null,
+			skill: null,
+			subject: { kind: "ticket", id: "ENG-7" },
+		});
+		expect(settleStart(beginStart(new Map(), 1, quick), 1, ok).size).toBe(0);
 	});
 
 	test("a Resume all leaves when every session resumed, and its failure outlives the connection and every view until dismissed", () => {

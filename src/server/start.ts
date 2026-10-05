@@ -4,7 +4,7 @@ import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
 import { directoryOf } from "../paths";
-import type { PromptImage, StartRequest, StartResult, View } from "../shared";
+import type { PromptImage, StartRequest, StartResult, View, WorkItem } from "../shared";
 import type { LiveSessions } from "./live-sessions";
 
 interface Started {
@@ -13,6 +13,8 @@ interface Started {
 	prompt: string | null;
 	/** A new session's first message, sent once the session is in the registry. */
 	first?: { text: string; images: PromptImage[] };
+	/** What a new session works on, linked from its start. */
+	subject?: WorkItem | null;
 }
 
 type Spawn = (instanceId: string, emit: (update: DashboardUpdate) => void) => Promise<Started>;
@@ -49,7 +51,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 				if (!dir) return { error: `${request.cwd.trim()} is not a directory.` };
 				// omp writes a fresh session's file only with its first reply, so a first `!` command would show nowhere.
 				if (request.prompt.startsWith("!")) return { error: "Start the session with a prompt. A ! command runs once omp has replied." };
-				const { branch, model, thinking, skill, images } = request;
+				const { branch, model, thinking, skill, images, subject } = request;
 				let cwd = dir;
 				if (branch) {
 					try {
@@ -68,6 +70,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 					session: await DashboardSession.start(id, cwd, model, thinking, emit),
 					prompt: null,
 					first: { text, images },
+					subject,
 				}));
 			}
 			case "fork": {
@@ -93,8 +96,8 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 	return async request => {
 		const outcome = await spawnFor(request);
 		if ("error" in outcome) return { ok: false, error: outcome.error };
-		const { session, prompt, first } = outcome.started;
-		sessions.add(session);
+		const { session, prompt, first, subject } = outcome.started;
+		sessions.add(session, subject ?? null);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
 		if (first) void session.prompt(null, first.text, first.images, "steer");
 		env.onStarted();

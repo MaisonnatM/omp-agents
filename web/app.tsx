@@ -215,7 +215,7 @@ export function App() {
 			// Until the sessions are listed, the workspace a quick action starts in is not known yet.
 			else if (state.listed) {
 				main = (
-					<TicketsPage target={page.target} section={sectionTarget} cwd={defaultCwd(view, visible.hosts, visible.past, project)} />
+					<TicketsPage target={page.target} section={sectionTarget} cwd={defaultCwd(view, visible.hosts, visible.past, project)} hosts={visible.hosts} />
 				);
 			} else main = <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
 			break;

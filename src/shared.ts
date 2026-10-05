@@ -567,12 +567,16 @@ export const worktreeDir = (mainWorktree: string, branch: string): string => `${
  */
 export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; name: string; base: string };
 
+/** What a session started from a quick action works on: a pull request, or a Linear issue by its identifier. */
+export type WorkItem = { kind: "pull-request"; pr: PullRequest } | { kind: "ticket"; id: string };
+
 /**
  * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` and `images` as
  * its first message, on `branch` when it names one, else in `cwd` as it is, on `model` when it names one, else on omp's
- * default, at thinking level `thinking` when it names one, and through skill `skill`, the one pinned in the settings,
- * when it names one; a fork holding the view's history before the user prompt `entryId`, its file left untouched; or
- * past session `sessionId` continued in its own file, as `omp --resume` does.
+ * default, at thinking level `thinking` when it names one, through skill `skill`, the one pinned in the settings,
+ * when it names one, and linked to `subject` from its start, before its tool calls name it; a fork holding the view's
+ * history before the user prompt `entryId`, its file left untouched; or past session `sessionId` continued in its own
+ * file, as `omp --resume` does.
  */
 export type StartRequest =
 	| {
@@ -584,6 +588,7 @@ export type StartRequest =
 			model: ModelOption | null;
 			thinking: string | null;
 			skill: string | null;
+			subject: WorkItem | null;
 	  }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "resume"; sessionId: string };
