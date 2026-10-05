@@ -7,8 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { getJson, putJson } from "../../api";
 import { ticketsStore } from "../../reads";
-import { PRIORITY_LABEL } from "../../tickets-model";
-import { dueLabel, PRIORITY_ICON, STATUS_ICON } from "./ticket-row";
+import { inReview, PRIORITY_LABEL } from "../../tickets-model";
+import { dueLabel, PRIORITY_ICON, statusIcon } from "./ticket-row";
 
 type Change = Omit<TicketEdit, "id">;
 
@@ -188,7 +188,7 @@ export function TicketFields({ detail, replace }: { detail: TicketDetail; replac
 		);
 	};
 
-	const [StatusIcon, statusColor] = STATUS_ICON[detail.statusType];
+	const [StatusIcon, statusColor] = statusIcon(detail.status, detail.statusType);
 	const [PriorityIcon, priorityColor] = PRIORITY_ICON[detail.priority];
 	const statusId = options?.statuses.find(status => status.name === detail.status)?.id;
 	const projectId = options?.projects.find(project => project.name === detail.project)?.id;
@@ -206,8 +206,8 @@ export function TicketFields({ detail, replace }: { detail: TicketDetail; replac
 						</>
 					}
 					choices={
-						options?.statuses.map(status => {
-							const [Icon, color] = STATUS_ICON[status.type];
+						options?.statuses.toSorted((a, b) => Number(inReview(b.name)) - Number(inReview(a.name))).map(status => {
+							const [Icon, color] = statusIcon(status.name, status.type);
 							return { value: status.id, label: status.name, icon: <Icon aria-hidden className={color} /> };
 						}) ?? null
 					}

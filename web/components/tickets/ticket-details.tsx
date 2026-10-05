@@ -9,7 +9,7 @@ import { PRIORITY_LABEL } from "../../tickets-model";
 import { IconTip } from "../inbox/avatars";
 import { Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
 import { TicketFields } from "./ticket-fields";
-import { dueLabel, PRIORITY_ICON, STATUS_ICON } from "./ticket-row";
+import { dueLabel, PRIORITY_ICON, statusIcon } from "./ticket-row";
 
 const ago = (at: string): string => `${age(Date.parse(at))} ago`;
 
@@ -34,7 +34,7 @@ export function TicketDetailContent({ id, listed, actions }: TicketDetailContent
 		<>
 			<header className="space-y-3">
 				<h1 ref={headingRef} tabIndex={-1} className="flex items-start gap-2.5 text-base leading-snug font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
-					{ticket && <IconTip icon={[...STATUS_ICON[ticket.statusType], ticket.status]} className="mt-1" />}
+					{ticket && <IconTip icon={[...statusIcon(ticket.status, ticket.statusType), ticket.status]} className="mt-1" />}
 					<span className="min-w-0">{ticket?.title ?? id}</span>
 				</h1>
 				<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">

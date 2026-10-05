@@ -383,7 +383,9 @@ For installation, see the [README](../README.md).
 
 - The **Tickets** tab, or a `#tickets` address, opens the Linear issues assigned to you, as Linear's **My issues › Assigned** lists them.
   The sidebar then lists the workflow states with their issue counts; click one to scroll the page to it and move focus there, and a folded state unfolds.
-- The page groups the issues by workflow state, in Linear's order: triage, started (such as **In Progress** and **In Review**), unstarted (**Todo**), backlog, completed, and canceled.
+- The page groups the issues by workflow state.
+  **In Review** comes first, in the sidebar and on the page, with a green circle-dot icon.
+  The other states follow Linear's order: triage, started (such as **In Progress**), unstarted (**Todo**), backlog, completed, and canceled.
   Duplicates count as canceled.
   Completed and canceled issues show only when they changed in the last seven days, like the inbox's recent merges.
   Within a state, issues sort by priority, urgent first and no priority last, then by the latest update.
