@@ -200,13 +200,14 @@ When the output is not a usage report, the footer shows the last line omp wrote 
 
 ## Routines
 
-A routine starts dashboard sessions on a schedule: every so many minutes, counted from its last run, or at a local time on chosen weekdays, so 9:00 stays 9:00 across DST.
-Its task is one prompt, or one session per pull request that asks the viewer for a review, running the inbox's **Review** or **Thermonuclear review** action, which both post nothing to GitHub and change no branch.
+A routine starts dashboard sessions, or runs a shell command, on a schedule: every so many minutes, counted from its last run, or at a local time on chosen weekdays, so 9:00 stays 9:00 across DST.
+Its task is one prompt, one session per pull request that asks the viewer for a review, running the inbox's **Review** or **Thermonuclear review** action, which both post nothing to GitHub and change no branch, or one command.
 The prompt is the inbox action's own, from `src/pull-request-actions.ts`, plus `UNATTENDED`, which tells the session not to ask questions.
 
 `src/server/routines-file.ts` keeps the routines in `routines.json` beside the access token, and saves every change at once.
 Each routine holds its last 10 runs, newest first, and `done`, the head commit a session already took for each pull request still in the inbox.
-A run holds its slot time, its queue of pull request keys still to start, the sessions it started, and its errors.
+A run holds its slot time, its queue of pull request keys still to start, the sessions it started, its errors, and for a command task, its `command` result once the command ended.
+A prompt or command run's queue holds the one `SINGLE_TARGET` entry until the drain takes it.
 
 `src/server/routine-runner.ts` runs on a 60 s tick in `src/server/loops.ts`, whether or not a page is connected.
 Each tick does three things, in order:
@@ -214,12 +215,17 @@ Each tick does three things, in order:
 1. It claims each due slot: it saves a new run with its queue, read from the inbox with the cache skipped, before it starts anything.
    Slots missed while the dashboard was closed or the Mac slept coalesce into one run at the next tick.
    When the inbox cannot be read, the run still takes the slot and records the error; the next run takes the pull requests it missed, since none of them is in `done`.
-2. It drains the queues, oldest run first, while fewer than 3 routine sessions are busy.
+2. It drains the queues, oldest run first, while fewer than 3 routine sessions are busy; a command takes no session slot, so a command run drains even when they are all busy.
    It reads each workspace's inbox once per drain and skips a pull request the action no longer applies to or whose head is already in `done`.
    It starts each session through the same `start` the page uses, linked to its pull request.
    A started session writes `done` and the run's `started`; a failed start goes to the run's errors and stays out of `done`, so the next run takes it again.
    When the inbox cannot be read, the error goes to the run and the queue waits for the next tick.
    A prompt routine whose last session still runs records an error instead of starting a second one.
+   A command starts through the runner's `exec`, `runShell` in `src/proc.ts`, and the drain does not wait for it, so a tick never blocks for minutes.
+   `runShell` runs `/bin/sh -c` in the workspace with stderr merged into stdout, keeps the last 64 KB of output, and stops the command after 10 minutes.
+   It spawns the shell in its own process group and stops the whole group with SIGTERM, since a command's own children would otherwise keep running and hold the output pipe open.
+   When the command ends, the runner writes its exit code, output, and times to the run; a non-zero exit, a stop, or a failed spawn also goes to the run's errors.
+   The runner keeps the routines whose command runs in memory, and a command routine whose last command still runs records an error instead of running a second one.
 3. It retires finished sessions: once a session that worked is idle, the runner ends it.
    A session counts as working from the first time its row shows it working or waiting on a question, at its start, at a tick, or at any change of its row, which the server passes to `observe`.
    `observe` also ends a session as soon as its row shows the turn over, so a finished session frees its slot at once rather than at the next tick.
@@ -229,6 +235,9 @@ Each tick does three things, in order:
 Running a tick twice starts nothing new, since the slot is claimed and `done` holds the heads, and a tick that comes while one runs is skipped.
 A crash after a claim loses no queue, since it is on disk; a key taken off the queue whose session had not started yet is not in `done`, so the next run takes it.
 After a restart the runner tracks no session, which is right, because the dashboard's sessions die with the server.
+Stopping the server stops every running command, right before it exits, so the result of a command it stopped is never saved as a time-limit stop.
+A run saves its command as `running` before the command starts, then as `exited`, `stopped`, or `failed` when it ends.
+No command resumes after a restart: the next server turns each run still saved as `running` into `stopped` by the dashboard, with that error.
 
 A `routine` socket message carries one change: `save`, `remove`, `enable`, or `run-now`, which claims a slot now, whatever the schedule, and drains it.
 Every socket hears the routines after each change and each step of a run as a `routines` message on the roster topic, also sent when a socket opens.
@@ -384,7 +393,7 @@ The server lives in `src/`:
 - `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, the inbox, pull request, ticket, and routine shapes).
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
-- `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, and `routines.json`, and `src/paths.ts` names the home directory, the token file, the interrupted sessions' file, the todo list's file, and the routines' file.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, and `routines.json`, and `src/paths.ts` names the home directory, the token file, the interrupted sessions' file, the todo list's file, and the routines' file.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, and finds each subagent's transcript file.
@@ -407,8 +416,8 @@ The server lives in `src/`:
   The list is `UserTodoList` in `src/shared.ts`: categories, then top-level todos, each with a title, markdown notes, a category or none, and todos of its own, which share its category.
   `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token, and reads a file from before categories and notes with none of either.
   A `user-todo` socket message carries one change, and every socket hears the list after it as a `user-todos` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the list back to its own socket alone.
-- `src/routines.ts`: the rules of routines: `nextRunAt`, `isDue`, `pendingTargets`, which picks the pull requests a run takes, and `applyRoutine`, which applies an edit; see [Routines](#routines).
-  `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs and starts and ends their sessions.
+- `src/routines.ts`: the rules of routines: `nextRunAt`, `isDue`, `pendingTargets`, which picks the pull requests a run takes, `applyRoutine`, which applies an edit, and a command's length, time, and output limits; see [Routines](#routines).
+  `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.
 - `src/pull-request-actions.ts`: the pull request actions, which pull requests each applies to and its prompt, which the inbox's quick actions and the routines share.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.

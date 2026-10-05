@@ -1,6 +1,6 @@
 /** What the Routines page says about a routine, and the editor's form and how it becomes a routine to save. */
-import { nextRunAt } from "../src/routines";
-import type { Routine, RoutineChange, RoutinePullRequestAction, RoutineRun, RoutineTask, Schedule, Weekday } from "../src/shared";
+import { MAX_COMMAND_LENGTH, nextRunAt } from "../src/routines";
+import type { CommandRun, Routine, RoutineChange, RoutinePullRequestAction, RoutineRun, RoutineTask, Schedule, Weekday } from "../src/shared";
 
 /** What the editor saves: a routine without what the server keeps. */
 export type RoutineSpec = Extract<RoutineChange, { op: "save" }>["routine"];
@@ -46,13 +46,18 @@ export const ROUTINE_ACTION_WORDS: Record<RoutinePullRequestAction, string> = {
 	"thermonuclear-review": "Thermonuclear review",
 };
 
-/** `Review pull requests`, `Thermonuclear review`, or the prompt's first line. */
+/** The first line of `text` with anything but blanks, trimmed. */
+const firstLine = (text: string): string => text.split("\n").find(line => line.trim())?.trim() ?? "";
+
+/** `Review pull requests`, `Thermonuclear review`, the prompt's first line, or the command's after `$ `. */
 export function taskWords(task: RoutineTask): string {
 	switch (task.kind) {
 		case "pull-requests":
 			return ROUTINE_ACTION_WORDS[task.action];
 		case "prompt":
-			return task.prompt.split("\n").find(line => line.trim())?.trim() ?? "";
+			return firstLine(task.prompt);
+		case "command":
+			return `$ ${firstLine(task.command)}`;
 		default: {
 			const unhandled: never = task;
 			return unhandled;
@@ -81,8 +86,26 @@ export function nextRunWords(routine: Routine, now: number): string {
 	return next <= now ? "Due now" : whenWords(next, now);
 }
 
-/** `1 session started, 2 errors, Queued: 3`, the parts that apply. */
+/** How a run's command stands, `null` for a run without one. */
+function commandWords(command: CommandRun | null): string | null {
+	switch (command?.phase) {
+		case undefined:
+			return null;
+		case "running":
+			return "Running…";
+		case "exited":
+			return command.code === 0 ? "Succeeded" : `Failed (exit ${command.code})`;
+		case "stopped":
+			return command.reason === "time-limit" ? "Stopped at the time limit" : "Stopped with the dashboard";
+		case "failed":
+			return "Could not start";
+	}
+}
+
+/** A command run's result, else `1 session started, 2 errors, Queued: 3`, the parts that apply. */
 export function runWords(run: RoutineRun, task: RoutineTask): string {
+	const command = commandWords(run.command);
+	if (command !== null) return command;
 	const parts = [
 		run.started.length > 0 && `${run.started.length} ${run.started.length === 1 ? "session" : "sessions"} started`,
 		run.errors.length > 0 && `${run.errors.length} ${run.errors.length === 1 ? "error" : "errors"}`,
@@ -106,7 +129,7 @@ export function everyUnit(minutes: number): { amount: number; unit: EveryUnit } 
 }
 
 /**
- * The editor's form. It keeps both tasks' and both schedules' fields, so switching kind and back keeps what you typed.
+ * The editor's form. It keeps every task's and both schedules' fields, so switching kind and back keeps what you typed.
  * `amount` and `time` hold the inputs' text as typed (`time` is `HH:MM`).
  */
 export interface RoutineDraft {
@@ -118,6 +141,7 @@ export interface RoutineDraft {
 	task: RoutineTask["kind"];
 	prompt: string;
 	action: RoutinePullRequestAction;
+	command: string;
 	schedule: Schedule["kind"];
 	amount: string;
 	unit: EveryUnit;
@@ -127,7 +151,22 @@ export interface RoutineDraft {
 
 /** A new routine's form: a prompt on weekdays at 9:00 in `cwd`, through `skill`. */
 export function newDraft(id: string, cwd: string, skill: string | null): RoutineDraft {
-	return { id, name: "", cwd, enabled: true, skill, task: "prompt", prompt: "", action: "review", schedule: "weekly", amount: "1", unit: "days", days: [...WEEKDAYS], time: "09:00" };
+	return {
+		id,
+		name: "",
+		cwd,
+		enabled: true,
+		skill,
+		task: "prompt",
+		prompt: "",
+		action: "review",
+		command: "",
+		schedule: "weekly",
+		amount: "1",
+		unit: "days",
+		days: [...WEEKDAYS],
+		time: "09:00",
+	};
 }
 
 /** `routine`'s form, its other kinds' fields at their defaults. */
@@ -142,6 +181,7 @@ export function draftOf(routine: Routine): RoutineDraft {
 		task: task.kind,
 		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
 		action: task.kind === "pull-requests" ? task.action : draft.action,
+		command: task.kind === "command" ? task.command : draft.command,
 		schedule: schedule.kind,
 		amount: every ? String(every.amount) : draft.amount,
 		unit: every?.unit ?? draft.unit,
@@ -157,10 +197,26 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 	const cwd = draft.cwd.trim();
 	if (!cwd) return { fix: "Choose a workspace." };
 	let task: RoutineTask;
-	if (draft.task === "prompt") {
-		if (!draft.prompt.trim()) return { fix: "Write the prompt the session starts with." };
-		task = { kind: "prompt", prompt: draft.prompt.trim() };
-	} else task = { kind: "pull-requests", action: draft.action };
+	switch (draft.task) {
+		case "prompt":
+			if (!draft.prompt.trim()) return { fix: "Write the prompt the session starts with." };
+			task = { kind: "prompt", prompt: draft.prompt.trim() };
+			break;
+		case "pull-requests":
+			task = { kind: "pull-requests", action: draft.action };
+			break;
+		case "command": {
+			const command = draft.command.trim();
+			if (!command) return { fix: "Write the command to run." };
+			if (command.length > MAX_COMMAND_LENGTH) return { fix: `Shorten the command to ${MAX_COMMAND_LENGTH.toLocaleString("en-US")} characters or fewer.` };
+			task = { kind: "command", command };
+			break;
+		}
+		default: {
+			const unhandled: never = draft.task;
+			return unhandled;
+		}
+	}
 	let schedule: Schedule;
 	if (draft.schedule === "every") {
 		const amount = Number(draft.amount);
@@ -172,5 +228,7 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 		if (!match) return { fix: "Set the time it runs at." };
 		schedule = { kind: "weekly", days: WEEK.filter(day => draft.days.includes(day)), time: { hour: Number(match[1]), minute: Number(match[2]) } };
 	}
-	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill: draft.skill, task, schedule } };
+	// A command runs without a session, so it has no skill to start one with.
+	const skill = task.kind === "command" ? null : draft.skill;
+	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill, task, schedule } };
 }

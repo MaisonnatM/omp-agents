@@ -98,6 +98,16 @@ describe("parseClientMsg", () => {
 			expect(save({ enabled: "yes" })).toBeNull();
 			expect(change({ op: "enable", id: "r1" })).toBeNull();
 		});
+
+		test("save takes a command task, and refuses one blank or past the length limit", () => {
+			const command = { kind: "command", command: "git worktree prune" } as const;
+			expect(save({ task: command, skill: null })).toEqual({ t: "routine", change: { op: "save", routine: { ...routine, task: command, skill: null } } });
+			expect(save({ task: { kind: "command", command: " \n" } })).toBeNull();
+			expect(save({ task: { kind: "command" } })).toBeNull();
+			const longest = { kind: "command", command: "x".repeat(10_000) };
+			expect(save({ task: longest })).toMatchObject({ change: { routine: { task: longest } } });
+			expect(save({ task: { kind: "command", command: "x".repeat(10_001) } })).toBeNull();
+		});
 	});
 
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {

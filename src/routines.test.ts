@@ -74,7 +74,7 @@ describe("nextRunAt", () => {
 });
 
 describe("isDue", () => {
-	const fridayRun = { at: at("2026-10-09T09:00:00+02:00"), queue: [], started: [], errors: [] };
+	const fridayRun = { at: at("2026-10-09T09:00:00+02:00"), queue: [], started: [], errors: [], command: null };
 
 	test("slots missed over a weekend coalesce into one run, which is not due again once claimed", () => {
 		const monday = at("2026-10-12T11:00:00+02:00");
@@ -115,7 +115,7 @@ describe("applyRoutine", () => {
 	});
 
 	test("an edit keeps the routine's creation, runs, and taken heads", () => {
-		const run = { at: at("2026-10-05T09:00:00+02:00"), queue: ["acme/webapp#2"], started: [], errors: [] };
+		const run = { at: at("2026-10-05T09:00:00+02:00"), queue: ["acme/webapp#2"], started: [], errors: [], command: null };
 		const saved = routine({ runs: [run], done: { "acme/webapp#1": "sha-1" } });
 		expect(applyRoutine([saved], { op: "save", routine: { ...spec, name: "Morning reviews", schedule: daily } }, now)).toEqual([
 			{ ...saved, name: "Morning reviews", schedule: daily },

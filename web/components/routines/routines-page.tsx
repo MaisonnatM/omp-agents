@@ -1,6 +1,6 @@
 import { ArrowLeft, Ellipsis, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
-import type { Routine, RoutineChange, RoutineRun, RosterHost, View } from "../../../src/shared";
+import type { Routine, RoutineChange, RoutineRun, RoutineTask, RosterHost, View } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
@@ -90,6 +90,31 @@ function sessionView(started: RoutineRun["started"][number], hosts: RosterHost[]
 	return { view: host ? { kind: "live", instanceId: host.instanceId, agentId: null } : { kind: "past", sessionId: started.sessionId }, host };
 }
 
+/** Output longer than this many lines folds behind a disclosure. */
+const FOLDED_OUTPUT_LINES = 20;
+
+/** What a command printed, scrolling past a few lines, and folded when it is long. */
+function CommandOutput({ output }: { output: string }) {
+	const pre = (
+		<pre
+			aria-label="Output"
+			// Focusable, so the keyboard can scroll it.
+			tabIndex={0}
+			className="max-h-64 overflow-auto rounded-md bg-muted px-2 py-1.5 font-mono text-xs leading-relaxed whitespace-pre-wrap break-words outline-none focus-visible:ring-2 focus-visible:ring-ring"
+		>
+			{output}
+		</pre>
+	);
+	const lines = output.trimEnd().split("\n").length;
+	if (lines <= FOLDED_OUTPUT_LINES) return pre;
+	return (
+		<details className="space-y-1.5">
+			<summary className="cursor-pointer text-xs text-muted-foreground select-none">Show output ({lines} lines)</summary>
+			{pre}
+		</details>
+	);
+}
+
 function RunItem({ run, routine, hosts }: { run: RoutineRun; routine: Routine; hosts: RosterHost[] }) {
 	const { open } = useDashboardContext();
 	return (
@@ -115,6 +140,7 @@ function RunItem({ run, routine, hosts }: { run: RoutineRun; routine: Routine; h
 					})}
 				</div>
 			)}
+			{run.command && "output" in run.command && run.command.output.trim() !== "" && <CommandOutput output={run.command.output} />}
 			{run.errors.length > 0 && (
 				<ul aria-label="Errors" className="space-y-0.5 text-xs text-red-600 dark:text-red-400">
 					{run.errors.map((error, index) => (
@@ -137,26 +163,38 @@ interface DetailProps {
 	onEdit: () => void;
 }
 
-/** One routine's settings, then its runs, newest first. */
-function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: DetailProps) {
-	const { task } = routine;
-	const settings: [string, ReactNode][] = [
-		[
-			"Task",
-			task.kind === "prompt" ? (
-				<span className="whitespace-pre-wrap break-words">{task.prompt}</span>
-			) : (
+/** What a routine's task row shows: the prompt or command whole, or the review action and what it starts. */
+function TaskValue({ task }: { task: RoutineTask }) {
+	switch (task.kind) {
+		case "prompt":
+			return <span className="whitespace-pre-wrap break-words">{task.prompt}</span>;
+		case "command":
+			return <code className="font-mono text-xs whitespace-pre-wrap break-words">{task.command}</code>;
+		case "pull-requests":
+			return (
 				<>
 					{taskWords(task)}
 					<span className="block text-xs text-muted-foreground">One session for each pull request that asks for your review, once per new commit.</span>
 				</>
-			),
-		],
+			);
+		default: {
+			const unhandled: never = task;
+			return unhandled;
+		}
+	}
+}
+
+/** One routine's settings, then its runs, newest first. */
+function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: DetailProps) {
+	const { task } = routine;
+	const settings: [string, ReactNode][] = [
+		["Task", <TaskValue task={task} />],
 		["Workspace", <span className="font-mono text-xs">{routine.cwd}</span>],
 		["Schedule", scheduleWords(routine.schedule)],
 		["Next run", nextRunWords(routine, now)],
-		["Skill", routine.skill ?? "None"],
 	];
+	// A command runs without a session, so it takes no skill.
+	if (task.kind !== "command") settings.push(["Skill", routine.skill ?? "None"]);
 	return (
 		<PageFrame
 			title={routine.name}
@@ -292,7 +330,7 @@ export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, 
 	const paused = routines.filter(routine => !routine.enabled).length;
 	const meta =
 		routines.length === 0
-			? "Sessions that start on a schedule"
+			? "Sessions and commands that run on a schedule"
 			: `${routines.length} ${routines.length === 1 ? "routine" : "routines"}${paused > 0 ? `, ${paused} paused` : ""}`;
 	return (
 		<PageFrame
@@ -310,7 +348,7 @@ export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, 
 				<div className="mx-auto max-w-md space-y-3 px-6 py-16 text-center">
 					<p className="text-sm font-medium">No routines yet</p>
 					<p className="text-sm text-muted-foreground">
-						A routine starts sessions on a schedule, with a prompt you write or to review the pull requests that ask for your review.
+						A routine runs on a schedule. It starts a session with a prompt you write, reviews the pull requests that ask for your review, or runs a command.
 					</p>
 					<Button size="compact" leadingIcon={Plus} disabled={!connected} onClick={startNew}>
 						New routine

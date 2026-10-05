@@ -853,18 +853,31 @@ export type RoutineTask =
 	/** One session in `cwd` that takes `prompt`. */
 	| { kind: "prompt"; prompt: string }
 	/** One session per inbox pull request to review that `action` applies to, once per head commit. */
-	| { kind: "pull-requests"; action: RoutinePullRequestAction };
+	| { kind: "pull-requests"; action: RoutinePullRequestAction }
+	/** `command` through `sh -c` in the routine's cwd, with no omp session. */
+	| { kind: "command"; command: string };
+
+/** A run's command: `running` from its launch, saved before it can end, then how it ended. */
+export type CommandRun =
+	| { phase: "running"; startedAt: number }
+	| { phase: "exited"; code: number; output: string; startedAt: number; endedAt: number }
+	/** Killed at the time limit, or by a dashboard stop, which the next server records. */
+	| { phase: "stopped"; reason: "time-limit" | "dashboard"; output: string; startedAt: number; endedAt: number }
+	/** `sh` could not start, as when the workspace is gone. */
+	| { phase: "failed"; error: string; startedAt: number; endedAt: number };
 
 /** A run claims its slot first, then drains its queue as session slots free up. */
 export interface RoutineRun {
 	at: number;
-	/** PR keys this run still has to start, in inbox order. Empty for a prompt task once its session started. */
+	/** PR keys this run still has to start, in inbox order. Empty for a prompt or command task once it started. */
 	queue: string[];
 	started: { label: string; instanceId: string; sessionId: string }[];
 	errors: string[];
+	/** Null for prompt and pull request runs, and for a command run that has not launched. */
+	command: CommandRun | null;
 }
 
-/** A schedule that starts dashboard sessions on its own. */
+/** A schedule that starts dashboard sessions, or runs a command, on its own. */
 export interface Routine {
 	id: string;
 	name: string;

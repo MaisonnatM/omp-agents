@@ -1,5 +1,6 @@
 import { type ReactNode, useId, useState } from "react";
 import { PULL_REQUEST_ACTIONS } from "../../../src/pull-request-actions";
+import { COMMAND_TIME_LIMIT } from "../../../src/routines";
 import { ROUTINE_PR_ACTIONS, type RoutinePullRequestAction, type Weekday } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -65,7 +66,7 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, onSave, o
 	const action = PULL_REQUEST_ACTIONS[draft.action];
 
 	return (
-		<PageFrame title={isNew ? "New routine" : `Edit ${initial.name}`} meta="Starts sessions on a schedule while the dashboard runs">
+		<PageFrame title={isNew ? "New routine" : `Edit ${initial.name}`} meta="Runs on a schedule while the dashboard runs">
 			<form
 				className="mx-auto w-full max-w-2xl space-y-6 px-6 py-6"
 				onSubmit={event => {
@@ -85,7 +86,7 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, onSave, o
 					/>
 				</Field>
 
-				<Field label="Workspace" hint="Its sessions start in this directory.">
+				<Field label="Workspace" hint={draft.task === "command" ? "The command runs in this directory." : "Its sessions start in this directory."}>
 					<DirectoryPicker cwd={draft.cwd} workspaces={workspaces} disabled={false} side="bottom" onPick={cwd => set("cwd", cwd)} />
 				</Field>
 
@@ -117,6 +118,20 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, onSave, o
 							<p className="text-xs text-muted-foreground">
 								{action.description}. It starts one for each pull request that asks for your review, once per new commit, and posts nothing on GitHub.
 							</p>
+						</Choice>
+						<Choice name={`${id}-task`} checked={draft.task === "command"} label="Run a command" onCheck={() => set("task", "command")}>
+							<textarea
+								aria-label="Command"
+								value={draft.command}
+								rows={3}
+								spellCheck={false}
+								autoCapitalize="off"
+								autoCorrect="off"
+								placeholder="git worktree prune"
+								onChange={event => set("command", event.target.value)}
+								className="w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							/>
+							<p className="text-xs text-muted-foreground">Runs with sh in the workspace, without an omp session. Stopped after {COMMAND_TIME_LIMIT}.</p>
 						</Choice>
 					</div>
 				</Field>
@@ -178,9 +193,11 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, onSave, o
 					</div>
 				</Field>
 
-				<Field label="Skill" hint="Each session's first message goes through this skill.">
-					<SkillPicker label="Skill" skills={skills} value={draft.skill} onPick={skill => set("skill", skill)} />
-				</Field>
+				{draft.task !== "command" && (
+					<Field label="Skill" hint="Each session's first message goes through this skill.">
+						<SkillPicker label="Skill" skills={skills} value={draft.skill} onPick={skill => set("skill", skill)} />
+					</Field>
+				)}
 
 				<div className="flex items-center gap-3 border-t border-border pt-4">
 					<Button type="submit" disabled={!connected}>

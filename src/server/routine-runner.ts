@@ -1,12 +1,23 @@
 /**
- * Starts the sessions that routines ask for. Each tick claims the slots that came due, starts what their queues hold
- * while session slots are free, and ends the sessions that finished their turn.
+ * Starts the sessions and runs the commands that routines ask for. Each tick claims the slots that came due, starts what their
+ * queues hold while session slots are free, and ends the sessions that finished their turn.
  * Every step converges: a slot claimed and a head taken are on disk, so a second tick, or the next server, starts nothing twice.
  */
 import { errorText } from "../json";
 import { PULL_REQUEST_ACTIONS } from "../pull-request-actions";
-import { isDue, PROMPT_TARGET, pendingTargets, UNATTENDED } from "../routines";
-import { type HostStatus, type InboxPullRequest, prKey, type Routine, type RoutineRun, type StartRequest, type StartResult, type WorkItem } from "../shared";
+import { COMMAND_TIME_LIMIT, isDue, pendingTargets, SINGLE_TARGET, UNATTENDED } from "../routines";
+import {
+	type CommandRun,
+	type HostStatus,
+	type InboxPullRequest,
+	prKey,
+	type Routine,
+	type RoutineRun,
+	type RoutineTask,
+	type StartRequest,
+	type StartResult,
+	type WorkItem,
+} from "../shared";
 import type { RoutinesFile } from "./routines-file";
 
 /** Routine sessions that may run at once; a session waiting on a question holds its slot. */
@@ -20,6 +31,8 @@ export interface RoutineRunnerDeps {
 	/** Live session `instanceId`, or `null` once it is gone. */
 	session(instanceId: string): { status: HostStatus; sessionId: string; end(): Promise<void> } | null;
 	now(): number;
+	/** Runs `command` through `sh` in `cwd`, whatever its exit code; rejects only when it cannot start. */
+	exec(command: string, cwd: string): Promise<{ exitCode: number | null; output: string }>;
 	/** The routines changed; every socket should hear them. */
 	onChange(): void;
 }
@@ -33,6 +46,9 @@ interface Tracked {
 /** A session's turn runs, or waits on a question; either way it holds its slot. */
 const turnRuns = (status: HostStatus | undefined): boolean => status === "working" || status === "needs-input";
 
+/** A command runs without an omp session, so it holds no session slot. */
+const takesSession = (task: RoutineTask): boolean => task.kind !== "command";
+
 /** What one start runs: its prompt, the row it links to, and the label its run lists. */
 interface Target {
 	label: string;
@@ -44,10 +60,19 @@ export class RoutineRunner {
 	readonly #deps: RoutineRunnerDeps;
 	/** By instance id. Kept in memory only: the sessions die with the server, and the queues resume from the file. */
 	readonly #tracked = new Map<string, Tracked>();
+	/** Routine ids whose command runs. In memory only: a command dies with the server, and the next one does not resume it. */
+	readonly #commands = new Set<string>();
 	#inFlight: Promise<void> | null = null;
 
 	constructor(deps: RoutineRunnerDeps) {
 		this.#deps = deps;
+		// No command runs yet, so a run saved as running lost its command with the server that ran it.
+		for (const { id, runs } of deps.file.routines)
+			for (const { at, command } of runs)
+				if (command?.phase === "running") {
+					deps.file.command(id, at, { phase: "stopped", reason: "dashboard", output: "", startedAt: command.startedAt, endedAt: deps.now() });
+					deps.file.failed(id, at, "The dashboard stopped while the command ran.");
+				}
 	}
 
 	/** Claims due slots, drains the queues, then retires finished sessions. A tick while one runs is skipped. */
@@ -98,8 +123,8 @@ export class RoutineRunner {
 	 */
 	async #claim(routine: Routine, at: number): Promise<void> {
 		const { file } = this.#deps;
-		if (routine.task.kind === "prompt") {
-			file.claim(routine.id, at, [PROMPT_TARGET], null);
+		if (routine.task.kind !== "pull-requests") {
+			file.claim(routine.id, at, [SINGLE_TARGET], null);
 		} else {
 			try {
 				const prs = await this.#deps.inbox(routine.cwd);
@@ -112,26 +137,32 @@ export class RoutineRunner {
 		this.#deps.onChange();
 	}
 
-	/** Starts queued targets, oldest run first, while fewer than {@link MAX_ROUTINE_SESSIONS} routine sessions are busy. */
+	/**
+	 * Starts queued targets, oldest run first: sessions while fewer than {@link MAX_ROUTINE_SESSIONS} routine sessions are busy,
+	 * and commands whatever the sessions, since they take no slot.
+	 */
 	async #drain(): Promise<void> {
 		const { file } = this.#deps;
 		/** Routines whose inbox failed this tick: their queues wait for the next one. */
 		const blocked = new Set<string>();
 		/** One inbox read per workspace per drain, however many pull requests it starts. */
 		const inboxes = new Map<string, Promise<InboxPullRequest[]>>();
-		while (this.#tracked.size < MAX_ROUTINE_SESSIONS) {
-			const next = oldestQueued(file.routines, blocked);
+		for (;;) {
+			const next = oldestQueued(file.routines, blocked, this.#tracked.size >= MAX_ROUTINE_SESSIONS);
 			if (!next) return;
 			const { routine, run } = next;
-			if (routine.task.kind === "prompt") {
-				// A queue claimed before an edit turned the routine into a prompt task holds pull request keys, which start nothing.
-				if (file.pop(routine.id, run.at) !== PROMPT_TARGET) {
+			const { task } = routine;
+			if (task.kind !== "pull-requests") {
+				// A queue claimed before an edit changed the routine's task holds pull request keys, which start nothing.
+				if (file.pop(routine.id, run.at) !== SINGLE_TARGET) {
 					this.#deps.onChange();
+				} else if (task.kind === "command") {
+					this.#launch(routine, run.at, task.command);
 				} else if ([...this.#tracked.values()].some(tracked => tracked.routineId === routine.id)) {
 					file.failed(routine.id, run.at, "The last run's session is still running.");
 					this.#deps.onChange();
 				} else {
-					await this.#start(routine, run.at, { label: routine.name, prompt: routine.task.prompt, subject: null }, null);
+					await this.#start(routine, run.at, { label: routine.name, prompt: task.prompt, subject: null }, null);
 				}
 				continue;
 			}
@@ -185,6 +216,37 @@ export class RoutineRunner {
 		this.#deps.onChange();
 	}
 
+	/** Runs `routine`'s command for the run at `at` without waiting for it, since a command may run for minutes. */
+	#launch(routine: Routine, at: number, command: string): void {
+		const { file } = this.#deps;
+		if (this.#commands.has(routine.id)) {
+			file.failed(routine.id, at, "The last run's command is still running.");
+			this.#deps.onChange();
+			return;
+		}
+		this.#commands.add(routine.id);
+		const startedAt = this.#deps.now();
+		file.command(routine.id, at, { phase: "running", startedAt });
+		this.#deps.onChange();
+		const ended = (command: CommandRun, error: string | null): void => {
+			this.#commands.delete(routine.id);
+			file.command(routine.id, at, command);
+			if (error !== null) file.failed(routine.id, at, error);
+			this.#deps.onChange();
+		};
+		void this.#deps.exec(command, routine.cwd).then(
+			({ exitCode, output }) => {
+				const endedAt = this.#deps.now();
+				if (exitCode === null) ended({ phase: "stopped", reason: "time-limit", output, startedAt, endedAt }, `Stopped after ${COMMAND_TIME_LIMIT}.`);
+				else ended({ phase: "exited", code: exitCode, output, startedAt, endedAt }, exitCode === 0 ? null : `Exited with code ${exitCode}.`);
+			},
+			(err: unknown) => {
+				const error = errorText(err);
+				ended({ phase: "failed", error, startedAt, endedAt: this.#deps.now() }, error);
+			},
+		);
+	}
+
 	/** Ends each session that worked and went idle; the transcript stays, and Resume continues it. */
 	async #retire(): Promise<void> {
 		for (const [instanceId, tracked] of this.#tracked) await this.#settle(instanceId, tracked);
@@ -204,11 +266,11 @@ export class RoutineRunner {
 	}
 }
 
-/** The oldest run with something queued, among the routines not in `blocked`. */
-function oldestQueued(routines: Routine[], blocked: ReadonlySet<string>): { routine: Routine; run: RoutineRun } | null {
+/** The oldest run with something queued, among the routines not in `blocked`, and only commands once `sessionsFull`. */
+function oldestQueued(routines: Routine[], blocked: ReadonlySet<string>, sessionsFull: boolean): { routine: Routine; run: RoutineRun } | null {
 	let oldest: { routine: Routine; run: RoutineRun } | null = null;
 	for (const routine of routines) {
-		if (blocked.has(routine.id)) continue;
+		if (blocked.has(routine.id) || (sessionsFull && takesSession(routine.task))) continue;
 		for (const run of routine.runs) if (run.queue.length > 0 && (!oldest || run.at < oldest.run.at)) oldest = { routine, run };
 	}
 	return oldest;

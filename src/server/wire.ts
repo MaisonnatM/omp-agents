@@ -4,6 +4,7 @@
  * Socket parsers return `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller casts what it received.
  */
 import { isObject, oneOf } from "../json";
+import { MAX_COMMAND_LENGTH } from "../routines";
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, ROUTINE_PR_ACTIONS, TICKET_ID, TICKET_PRIORITIES } from "../shared";
 import type {
 	BranchChoice,
@@ -191,6 +192,8 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 			return isNonEmpty(value.prompt) ? { ok: { kind: "prompt", prompt: value.prompt } } : null;
 		case "pull-requests":
 			return isRoutineAction(value.action) ? { ok: { kind: "pull-requests", action: value.action } } : null;
+		case "command":
+			return isNonEmpty(value.command) && value.command.length <= MAX_COMMAND_LENGTH ? { ok: { kind: "command", command: value.command } } : null;
 		default:
 			return null;
 	}

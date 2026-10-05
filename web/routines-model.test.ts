@@ -19,7 +19,7 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	...fields,
 });
 
-const run = (fields: Partial<RoutineRun>): RoutineRun => ({ at: at(5, 9), queue: [], started: [], errors: [], ...fields });
+const run = (fields: Partial<RoutineRun>): RoutineRun => ({ at: at(5, 9), queue: [], started: [], errors: [], command: null, ...fields });
 
 describe("schedule words", () => {
 	test("an interval reads in its largest whole unit", () => {
@@ -93,6 +93,29 @@ describe("last run", () => {
 	});
 });
 
+describe("command runs", () => {
+	const task = { kind: "command", command: "git worktree prune" } as const;
+	const window = { startedAt: at(5, 9), endedAt: at(5, 9) + 3000 };
+
+	test("a command task reads as its first line after a prompt sign", () => {
+		expect(taskWords({ kind: "command", command: "\n  git fetch --prune  \ngit worktree prune" })).toBe("$ git fetch --prune");
+	});
+
+	test("a run reads as how its command stands", () => {
+		expect(runWords(run({}), task)).toBe("Nothing started");
+		expect(runWords(run({ command: { phase: "running", startedAt: at(5, 9) } }), task)).toBe("Running…");
+		expect(runWords(run({ command: { phase: "exited", code: 0, output: "", ...window } }), task)).toBe("Succeeded");
+		expect(runWords(run({ command: { phase: "exited", code: 3, output: "", ...window }, errors: ["Exited with code 3."] }), task)).toBe("Failed (exit 3)");
+		expect(runWords(run({ command: { phase: "stopped", reason: "time-limit", output: "", ...window } }), task)).toBe("Stopped at the time limit");
+		expect(runWords(run({ command: { phase: "stopped", reason: "dashboard", output: "", ...window } }), task)).toBe("Stopped with the dashboard");
+		expect(runWords(run({ command: { phase: "failed", error: "/gone is not a directory.", ...window } }), task)).toBe("Could not start");
+	});
+
+	test("a run that ran nothing because the last command still ran counts its error", () => {
+		expect(runWords(run({ errors: ["The last run's command is still running."] }), task)).toBe("1 error");
+	});
+});
+
 describe("editor form", () => {
 	test("a saved routine's form saves the same routine back", () => {
 		const saved = routine({ schedule: { kind: "every", minutes: 360 }, task: { kind: "prompt", prompt: "Reply ok." }, skill: "poteto-mode", enabled: false });
@@ -111,5 +134,24 @@ describe("editor form", () => {
 		expect(specOf({ ...draft, days: [] })).toEqual({ fix: "Pick at least one day." });
 		expect(specOf({ ...draft, prompt: "  " })).toEqual({ fix: "Write the prompt the session starts with." });
 		expect(specOf({ ...draft, days: [1], schedule: "every", amount: "0" })).toEqual({ fix: "Use a whole number of at least 1." });
+	});
+
+	test("a command form saves its command, trimmed, without a skill, and keeps the skill for another task", () => {
+		const draft = { ...newDraft("r3", "~/code", "poteto-mode"), name: "Prune", task: "command" as const, command: "  git worktree prune\n" };
+		expect(specOf(draft)).toEqual({
+			ok: {
+				id: "r3",
+				name: "Prune",
+				cwd: "~/code",
+				enabled: true,
+				skill: null,
+				task: { kind: "command", command: "git worktree prune" },
+				schedule: { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 9, minute: 0 } },
+			},
+		});
+		expect(specOf({ ...draft, command: " " })).toEqual({ fix: "Write the command to run." });
+		expect(specOf({ ...draft, task: "prompt", prompt: "Hi" })).toMatchObject({ ok: { skill: "poteto-mode" } });
+		const saved = routine({ task: { kind: "command", command: "git worktree prune" } });
+		expect(specOf(draftOf(saved))).toMatchObject({ ok: { task: { kind: "command", command: "git worktree prune" } } });
 	});
 });

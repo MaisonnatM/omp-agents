@@ -5,7 +5,7 @@
 import { JsonFile } from "../fs";
 import { isObject } from "../json";
 import { applyRoutine, MAX_ROUTINE_RUNS } from "../routines";
-import type { Routine, RoutineChange, RoutineRun } from "../shared";
+import type { CommandRun, Routine, RoutineChange, RoutineRun } from "../shared";
 import { parseRoutineSpec } from "./wire";
 
 interface Stored {
@@ -32,11 +32,33 @@ function parseStarted(value: unknown): RoutineRun["started"][number] | null {
 	return typeof label === "string" && typeof instanceId === "string" && typeof sessionId === "string" ? { label, instanceId, sessionId } : null;
 }
 
+const isTime = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+
+function parseCommandRun(value: unknown): CommandRun | null {
+	if (!isObject(value) || !isTime(value.startedAt)) return null;
+	const { phase, startedAt, endedAt, output } = value;
+	if (phase === "running") return { phase, startedAt };
+	if (!isTime(endedAt)) return null;
+	switch (phase) {
+		case "exited":
+			return typeof value.code === "number" && Number.isSafeInteger(value.code) && typeof output === "string" ? { phase, code: value.code, output, startedAt, endedAt } : null;
+		case "stopped":
+			return (value.reason === "time-limit" || value.reason === "dashboard") && typeof output === "string" ? { phase, reason: value.reason, output, startedAt, endedAt } : null;
+		case "failed":
+			return typeof value.error === "string" ? { phase, error: value.error, startedAt, endedAt } : null;
+		default:
+			return null;
+	}
+}
+
+/** A run; a command result that is missing, as in a file written before commands, or malformed reads as none, and the run stays. */
 function parseRun(value: unknown): RoutineRun | null {
 	if (!isObject(value)) return null;
 	const { at, queue, errors } = value;
 	const started = parseAll(value.started, parseStarted);
-	return typeof at === "number" && isStrings(queue) && isStrings(errors) && started ? { at, queue, started, errors } : null;
+	return typeof at === "number" && isStrings(queue) && isStrings(errors) && started
+		? { at, queue, started, errors, command: parseCommandRun(value.command) }
+		: null;
 }
 
 function parseDone(value: unknown): Record<string, string> | null {
@@ -96,7 +118,7 @@ export class RoutinesFile {
 			const keep = present && new Set(present);
 			return {
 				...routine,
-				runs: [{ at, queue, started: [], errors: [] }, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
+				runs: [{ at, queue, started: [], errors: [], command: null }, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
 				done: keep ? Object.fromEntries(Object.entries(routine.done).filter(([key]) => keep.has(key))) : routine.done,
 			};
 		});
@@ -113,6 +135,11 @@ export class RoutinesFile {
 	/** Records a session that the run at `at` started. */
 	started(id: string, at: number, session: RoutineRun["started"][number]): void {
 		this.#updateRun(id, at, run => ({ ...run, started: [...run.started, session] }));
+	}
+
+	/** Records the command of the run at `at` as it launches and again as it ends. */
+	command(id: string, at: number, command: CommandRun): void {
+		this.#updateRun(id, at, run => ({ ...run, command }));
 	}
 
 	/** Records why the run at `at` could not start something; the same error twice in a row records once, so a retry each tick does not pile up. */

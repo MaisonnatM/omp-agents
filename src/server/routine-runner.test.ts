@@ -48,7 +48,15 @@ function fileWith(path: string, task: RoutineTask = { kind: "pull-requests", act
 	return file;
 }
 
-/** A runner over `file` with a fake clock, inbox, starter, and sessions. */
+/** A command the runner ran, which the test ends by hand. */
+interface FakeExec {
+	command: string;
+	cwd: string;
+	end: (result: { exitCode: number | null; output: string }) => void;
+	fail: (err: Error) => void;
+}
+
+/** A runner over `file` with a fake clock, inbox, starter, sessions, and commands. */
 function harness(file: RoutinesFile, prs: InboxPullRequest[] = []) {
 	const sessions = new Map<string, { status: HostStatus; ended: boolean }>();
 	const fake = {
@@ -58,6 +66,7 @@ function harness(file: RoutinesFile, prs: InboxPullRequest[] = []) {
 		/** The error the next starts answer with, or `null` to start. */
 		failWith: null as string | null,
 		sessions,
+		execs: [] as FakeExec[],
 	};
 	const runner = new RoutineRunner({
 		file,
@@ -81,6 +90,11 @@ function harness(file: RoutinesFile, prs: InboxPullRequest[] = []) {
 			};
 		},
 		now: () => fake.now,
+		exec(command, cwd) {
+			const { promise, resolve, reject } = Promise.withResolvers<{ exitCode: number | null; output: string }>();
+			fake.execs.push({ command, cwd, end: resolve, fail: reject });
+			return promise;
+		},
 		onChange: () => {},
 	});
 	/** The pull request numbers each start was for, in order. */
@@ -175,5 +189,92 @@ describe("RoutineRunner", () => {
 			[[], ["The last run's session is still running."]],
 			[["Reviews"], []],
 		]);
+	});
+
+	describe("a command routine", () => {
+		const command = { kind: "command", command: "git worktree prune" } as const;
+		/** Lets the runner see a command that the test just ended. */
+		const settled = () => new Promise<void>(resolve => setImmediate(resolve));
+
+		test("runs its command once in its workspace, returns from the tick while it runs, and saves how it ended", async () => {
+			const file = fileWith(routinesPath(), command);
+			const { runner, fake } = harness(file);
+			await runner.tick();
+			expect(fake.execs.map(({ command, cwd }) => ({ command, cwd }))).toEqual([{ command: "git worktree prune", cwd: "/work/webapp" }]);
+			expect(file.routines[0]?.runs[0]).toEqual({ at: T0 + HOUR, queue: [], started: [], errors: [], command: { phase: "running", startedAt: T0 + HOUR } });
+
+			fake.now += 4000;
+			fake.execs[0]!.end({ exitCode: 0, output: "Removing worktrees/old\n" });
+			await settled();
+			expect(file.routines[0]?.runs[0]).toEqual({
+				at: T0 + HOUR,
+				queue: [],
+				started: [],
+				errors: [],
+				command: { phase: "exited", code: 0, output: "Removing worktrees/old\n", startedAt: T0 + HOUR, endedAt: T0 + HOUR + 4000 },
+			});
+			expect(fake.requests).toEqual([]);
+		});
+
+		test("runs no second command while its last one runs, and a failure or a stop goes to the run's errors", async () => {
+			const file = fileWith(routinesPath(), command);
+			const { runner, fake } = harness(file);
+			await runner.tick();
+			fake.now += HOUR;
+			await runner.tick();
+			expect(fake.execs.length).toBe(1);
+			expect(file.routines[0]?.runs.map(run => run.errors)).toEqual([["The last run's command is still running."], []]);
+
+			fake.execs[0]!.end({ exitCode: 3, output: "fatal: not a git repository\n" });
+			await settled();
+			expect(file.routines[0]?.runs[1]).toMatchObject({ errors: ["Exited with code 3."], command: { phase: "exited", code: 3, output: "fatal: not a git repository\n" } });
+
+			fake.now += HOUR;
+			await runner.tick();
+			fake.execs[1]!.end({ exitCode: null, output: "" });
+			await settled();
+			expect(file.routines[0]?.runs[0]).toMatchObject({ errors: ["Stopped after 10 minutes."], command: { phase: "stopped", reason: "time-limit" } });
+		});
+
+		test("a command that cannot start saves why as its failure and its error", async () => {
+			const file = fileWith(routinesPath(), command);
+			const { runner, fake } = harness(file);
+			await runner.tick();
+			fake.execs[0]!.fail(new Error("/work/webapp is not a directory."));
+			await settled();
+			expect(file.routines[0]?.runs[0]).toMatchObject({
+				errors: ["/work/webapp is not a directory."],
+				command: { phase: "failed", error: "/work/webapp is not a directory." },
+			});
+		});
+
+		test("runs while every session slot is busy", async () => {
+			const file = fileWith(routinesPath());
+			file.apply({ op: "save", routine: { id: "r2", name: "Prune", cwd: "/work/other", schedule: { kind: "every", minutes: 60 }, task: command, skill: null, enabled: true } }, T0);
+			const { runner, fake, started } = harness(file, [pr(1), pr(2), pr(3), pr(4)]);
+			await runner.tick();
+			expect(started()).toEqual([1, 2, 3]);
+			expect(fake.execs.map(exec => exec.cwd)).toEqual(["/work/other"]);
+		});
+
+		test("the next server runs no command that a stopped one left running, and that run says why", async () => {
+			const path = routinesPath();
+			const first = harness(fileWith(path, command));
+			await first.runner.tick();
+
+			const file = new RoutinesFile(path);
+			const second = harness(file);
+			await second.runner.tick();
+			expect(second.fake.execs).toEqual([]);
+			expect(file.routines[0]?.runs).toEqual([
+				{
+					at: T0 + HOUR,
+					queue: [],
+					started: [],
+					errors: ["The dashboard stopped while the command ran."],
+					command: { phase: "stopped", reason: "dashboard", output: "", startedAt: T0 + HOUR, endedAt: T0 + HOUR },
+				},
+			]);
+		});
 	});
 });

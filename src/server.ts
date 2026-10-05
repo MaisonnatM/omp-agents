@@ -5,7 +5,9 @@ import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
-import { displayPath, interruptedFile, routinesFile, tokenFile, userTodosFile } from "./paths";
+import { directoryOf, displayPath, interruptedFile, routinesFile, tokenFile, userTodosFile } from "./paths";
+import { runShell } from "./proc";
+import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "./routines";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Broadcasts } from "./server/broadcasts";
@@ -35,6 +37,8 @@ const sessions = new LiveSessions(onLiveUpdate);
 const interrupted = new InterruptedSessions(interruptedFile);
 const todos = new UserTodosFile(userTodosFile);
 const routines = new RoutinesFile(routinesFile);
+/** Aborts as the server stops, which stops every routine command still running. */
+const stopping = new AbortController();
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
 const pathFor = (view: View): string | null =>
 	view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -87,6 +91,11 @@ const runner = new RoutineRunner({
 		return session ? { status: session.row().status, sessionId: session.sessionId, end: () => session.end() } : null;
 	},
 	now: Date.now,
+	async exec(command, cwd) {
+		const dir = directoryOf(cwd);
+		if (!dir) throw new Error(`${cwd.trim()} is not a directory.`);
+		return runShell(command, dir, { timeoutMs: COMMAND_TIMEOUT_MS, maxOutput: MAX_COMMAND_OUTPUT, signal: stopping.signal });
+	},
 	onChange: () => broadcasts.pushRoutines(),
 });
 const handleClientMsg = createClientHandler({
@@ -243,6 +252,8 @@ let shuttingDown: Promise<void> | undefined;
 function shutdown(): Promise<void> {
 	shuttingDown ??= (async () => {
 		await sessions.dispose();
+		// Last, right before exit, so a stopped command's result is not saved as one stopped at its time limit.
+		stopping.abort();
 		server.stop(true);
 		process.exit(0);
 	})();
