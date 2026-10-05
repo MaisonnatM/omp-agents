@@ -148,7 +148,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const [modelOpens, setModelOpens] = useState(0);
 	const modelsRead = useRead<ConnectedModels>(`/api/models/connected?cwd=${encodeURIComponent(cwd)}`, modelOpens);
 	const shownSelector = shownModel ? selectorOf(shownModel) : null;
-	const levels = modelsRead.data?.capabilities.find(({ model }) => selectorOf(model) === shownSelector)?.thinkingLevels ?? null;
+	const levels = modelsRead.data?.models.find(model => selectorOf(model) === shownSelector)?.thinkingLevels ?? null;
 	const thinking = pickedThinking?.model === shownSelector && levels?.includes(pickedThinking.level) ? pickedThinking.level : null;
 	const pickThinking = (level: string | null): void => {
 		setPickedThinking(level !== null && shownSelector ? { model: shownSelector, level } : null);

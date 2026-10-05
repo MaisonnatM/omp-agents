@@ -65,7 +65,7 @@ function SelectorPicker({ value, catalog, label, onPick }: { value: string | nul
 				list={fromList(catalog, MODEL_LIST.loading, ({ byProvider }) =>
 					modelGroups(
 						byProvider,
-						option => ({ selector: option.selector, id: option.selector.slice(option.provider.length + 1), keyword: option.name }),
+						option => ({ selector: option.selector, id: option.selector.slice(option.provider.length + 1), keywords: [option.name] }),
 						model,
 						pickModel,
 					),

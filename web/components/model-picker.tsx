@@ -1,8 +1,7 @@
 import { type FastMode, type ModelEntry, type ModelOption, type PlanUsage, selectorOf } from "../../src/shared";
-import { Check, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useContext, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -17,10 +16,10 @@ import {
 } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { modelLabel, modelOrg, providerLabel, providerOrg } from "../labels";
-import { contextVariants, levelLabel, modelMatch, providerUsed } from "../model-menu";
+import { contextVariants, levelLabel, modelMatch, providerQuota } from "../model-menu";
 import type { ModelList } from "../reads";
 import { shortcutLabels } from "../shortcuts";
-import type { PickerGroup } from "./command-picker";
+import { CommandResults, type PickerGroup, type PickerList } from "./command-picker";
 import { OrgIcon } from "./org-icon";
 import { NO_PLANS, Plans } from "./plan-usage";
 
@@ -43,15 +42,14 @@ export const modelDescription = (selector: string): string =>
 
 /** A provider's group heading in a model list: its logo and its name, then how much of its plan is used, when `plans` has it. */
 function ProviderHeading({ provider, plans = NO_PLANS }: { provider: string; plans?: readonly PlanUsage[] }) {
-	const used = providerUsed(plans, provider);
-	const windows = plans.flatMap(plan => (plan.provider === provider ? plan.windows : []));
+	const quota = providerQuota(plans, provider);
 	return (
 		<span className="flex w-full items-center gap-1.5">
 			<OrgIcon org={providerOrg(provider)} />
 			{providerLabel(provider)}
-			{used !== null && (
-				<span className="ml-auto tabular-nums" title={windows.map(window => `${window.title}: ${Math.round((1 - window.remaining) * 100)}% used`).join("\n")}>
-					{Math.round(used * 100)}% used
+			{quota && (
+				<span className="ml-auto tabular-nums" title={quota.windows.map(window => `${quota.account}: ${window.title}: ${Math.round((1 - window.remaining) * 100)}% used`).join("\n")}>
+					{Math.round(quota.used * 100)}% used
 				</span>
 			)}
 		</span>
@@ -74,23 +72,25 @@ export const MODEL_LIST = { search: { label: "Search models" }, empty: "No model
 
 /**
  * Models grouped by provider as picker groups, each under its {@link ProviderHeading} and drawn as a {@link ModelRow},
- * checked when its selector is `current`. `describe` names a model's selector, its id, and one more word to search by.
+ * checked when its selector is `current`. `describe` names a model's selector, its id, and the extra words to search by.
+ * `plans` puts each provider's quota on its heading.
  */
 export function modelGroups<T>(
 	byProvider: ReadonlyMap<string, T[]>,
-	describe: (model: T) => { selector: string; id: string; keyword: string },
+	describe: (model: T) => { selector: string; id: string; keywords: string[] },
 	current: string | null,
 	onPick: (model: T) => void,
+	plans?: readonly PlanUsage[],
 ): PickerGroup[] {
 	return Array.from(byProvider, ([provider, models]) => ({
 		key: provider,
-		heading: <ProviderHeading provider={provider} />,
+		heading: <ProviderHeading provider={provider} plans={plans} />,
 		items: models.map(model => {
-			const { selector, id, keyword } = describe(model);
+			const { selector, id, keywords } = describe(model);
 			return {
 				value: selector,
 				label: <ModelRow selector={selector} id={id} />,
-				keywords: [modelLabel(selector), keyword],
+				keywords: [modelLabel(selector), ...keywords],
 				title: selector,
 				ariaLabel: `${modelDescription(selector)}, ${id}`,
 				selected: selector === current,
@@ -259,55 +259,33 @@ function ModelSearch({ list, current, disabled, onPick }: { list: ModelList; cur
 	}, []);
 	const models = list.data?.models ?? [];
 	const shown = query.trim() === "" ? models.filter(model => model.curated || selectorOf(model) === current) : models;
+	const results: PickerList = list.error
+		? { kind: "failed", error: list.error }
+		: list.data === null
+			? { kind: "loading", message: MODEL_LIST.loading }
+			: {
+					kind: "ready",
+					groups: modelGroups(
+						Map.groupBy(shown, model => model.provider),
+						model => ({ selector: selectorOf(model), id: model.id, keywords: [model.name, providerLabel(model.provider)] }),
+						current,
+						onPick,
+						plans,
+					),
+				};
 	return (
-		<Command
+		<CommandResults
+			search={{ label: MODEL_LIST.search.label, query: { value: query, onChange: setQuery }, ref: input }}
+			list={results}
+			empty={models.length === 0 ? "No connected models. Sign in to a provider in omp, then reopen this menu." : MODEL_LIST.empty}
+			selectionDisabled={disabled}
+			closeOnSelect={false}
 			filter={modelMatch}
+			listClassName="max-h-80"
 			// Base UI's menu would read typed letters as type-ahead and arrows as its own navigation; Escape still closes the submenu.
 			onKeyDown={event => {
 				if (event.key !== "Escape") event.stopPropagation();
 			}}
-		>
-			<CommandInput ref={input} aria-label={MODEL_LIST.search.label} placeholder={`${MODEL_LIST.search.label}…`} value={query} onValueChange={setQuery} />
-			<CommandList className="max-h-80">
-				{list.error ? (
-					<p role="alert" className="px-3 py-6 text-center text-sm text-red-600 dark:text-red-400">
-						{list.error}
-					</p>
-				) : list.data === null ? (
-					<p role="status" className="py-6 text-center text-sm text-muted-foreground">
-						{MODEL_LIST.loading}
-					</p>
-				) : (
-					<>
-						<CommandEmpty className="px-3 py-6 text-center text-sm">
-							{models.length === 0 ? "No connected models. Sign in to a provider in omp, then reopen this menu." : MODEL_LIST.empty}
-						</CommandEmpty>
-						{[...Map.groupBy(shown, model => model.provider)].map(([provider, entries]) => (
-							<CommandGroup key={provider} heading={<ProviderHeading provider={provider} plans={plans} />}>
-								{entries.map(model => {
-									const selector = selectorOf(model);
-									return (
-										<CommandItem
-											key={selector}
-											value={selector}
-											keywords={[modelLabel(selector), model.name, providerLabel(provider)]}
-											title={selector}
-											aria-label={`${modelDescription(selector)}, ${model.id}`}
-											disabled={disabled}
-											onSelect={() => onPick(model)}
-										>
-											<span className="flex min-w-0 flex-1 items-center gap-2">
-												<ModelRow selector={selector} id={model.id} />
-											</span>
-											<Check className={selector === current ? "opacity-100" : "opacity-0"} />
-										</CommandItem>
-									);
-								})}
-							</CommandGroup>
-						))}
-					</>
-				)}
-			</CommandList>
-		</Command>
+		/>
 	);
 }

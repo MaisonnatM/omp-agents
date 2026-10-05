@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { ModelEntry, PlanUsage } from "../src/shared";
-import { contextVariants, modelMatch, providerUsed } from "./model-menu";
+import { contextVariants, modelMatch, providerQuota } from "./model-menu";
 
 const entry = (provider: string, id: string, contextWindow: number | null): ModelEntry => ({ provider, id, name: id, contextWindow, curated: false });
 
@@ -28,21 +28,23 @@ describe("contextVariants", () => {
 	});
 });
 
-describe("providerUsed", () => {
-	const plan = (provider: string, remaining: number[]): PlanUsage => ({
+describe("providerQuota", () => {
+	const plan = (provider: string, remaining: number[], account: string | null = null): PlanUsage => ({
 		provider,
 		name: provider,
-		account: null,
-		windows: remaining.map((left, index) => ({ label: `w${index}`, title: `w${index}`, remaining: left, resetsAt: null })),
+		account,
+		windows: remaining.map((left, index) => ({ label: `w${index}`, title: `Window ${index}`, remaining: left, resetsAt: null })),
 	});
 
-	test("the tightest window of the account with the most left", () => {
-		expect(providerUsed([plan("anthropic", [0.8, 0.25]), plan("anthropic", [0.5, 0.6]), plan("cursor", [0])], "anthropic")).toBe(0.5);
+	test("the tightest window of the account with the most left, and that account's windows", () => {
+		const work = plan("anthropic", [0.8, 0.25], "work");
+		const personal = plan("anthropic", [0.5, 0.6], "personal");
+		expect(providerQuota([work, personal, plan("cursor", [0], "cursor")], "anthropic")).toEqual({ used: 0.5, account: "personal", windows: personal.windows });
 	});
 
 	test("null for a provider without a plan or windows", () => {
-		expect(providerUsed([plan("anthropic", [0.5]), plan("cursor", [])], "openrouter")).toBeNull();
-		expect(providerUsed([plan("cursor", [])], "cursor")).toBeNull();
+		expect(providerQuota([plan("anthropic", [0.5]), plan("cursor", [])], "openrouter")).toBeNull();
+		expect(providerQuota([plan("cursor", [])], "cursor")).toBeNull();
 	});
 });
 

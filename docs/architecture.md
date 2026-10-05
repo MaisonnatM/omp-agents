@@ -291,8 +291,8 @@ It runs `git worktree list --porcelain`, `git for-each-ref`, and `git symbolic-r
 Like a new session's `start`, `cwd` may name any directory.
 The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
 
-`GET /api/models/connected?cwd=<directory>` answers `{ models, capabilities }`: the models that `omp models` lists from the providers you are connected to, for the new-session draft's model menu, and each one's thinking levels.
-Each model is `{ provider, id, name, contextWindow, curated }`; `curated` marks the ones that the directory's `modelRoles` or `retry.fallbackChains` name, with any `:level` dropped (`modelEntries` in `src/omp/models.ts`).
+`GET /api/models/connected?cwd=<directory>` answers `{ models }`: the models that `omp models` lists from the providers you are connected to, for the new-session draft's model menu.
+Each model is `{ provider, id, name, contextWindow, curated, thinkingLevels }`; `curated` marks the ones that the directory's `modelRoles` or `retry.fallbackChains` name, with any `:level` dropped, and `thinkingLevels` are the ones omp's catalog lists (`modelEntries` in `src/omp/models.ts`).
 A live session's `list-models` answer builds the same entries from the models that its omp RPC process offers and the config of the session's directory.
 A `start` of kind `new` carries a `model`, `null` for omp's default; the server sends omp `set_model` once it is ready and before the first prompt, and a model that omp refuses fails the start.
 
@@ -460,7 +460,7 @@ The page lives in `web/`.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the inbox and the tickets page show.
   `web/inbox-model.ts` holds the inbox's sections in one table, with whether each waits on you and whether it starts folded, sorts each stack's rows together by the chain of base branches, and says what a row's verdict and a sheet's Status show.
   `web/routines-model.ts` words a routine's schedule, task, next run, and last run, and turns the routine editor's form into the routine it saves.
-- `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota used, and the search's word match.
+- `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
   `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's sheet or an issue's details, and the note that says why a start failed.

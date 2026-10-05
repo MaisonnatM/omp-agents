@@ -1,6 +1,6 @@
 import { isObject } from "../json";
 import { runJson } from "../proc";
-import { type CatalogModel, type ConnectedModels, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared";
+import { type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared";
 import { loadOmpConfig, type OmpConfig } from "./config";
 import { ompCommand } from "./install";
 import { auth, oauth, type ServiceTierModel, serviceTiers } from "./modules";
@@ -40,7 +40,7 @@ export async function connectedProviders(): Promise<Set<string>> {
 	}
 }
 
-/** A model as `omp models` or a session's RPC lists it. */
+/** A model as `omp models` or a session's RPC lists it. Extra fields ride through {@link modelEntries}. */
 interface ListedModel {
 	provider: string;
 	id: string;
@@ -51,24 +51,30 @@ interface ListedModel {
 /**
  * The models of `connected` providers as a picker offers them, in their order. `curated` marks the ones `config` names
  * as a role's model or in a fallback chain, with any `:level` dropped; a role alias such as `@slow` names no model of its own.
+ * Fields on `models` beyond {@link ListedModel}, such as a draft's thinking levels, stay on each entry.
  */
-export function modelEntries(models: readonly ListedModel[], config: Pick<OmpConfig, "modelRoles" | "fallbackChains">, connected: ReadonlySet<string>): ModelEntry[] {
+export function modelEntries<T extends ListedModel>(models: readonly T[], config: Pick<OmpConfig, "modelRoles" | "fallbackChains">, connected: ReadonlySet<string>): (ModelEntry & Omit<T, keyof ListedModel>)[] {
 	const known = new Set(models.map(selectorOf));
 	const named = [...Object.values(config.modelRoles), ...Object.entries(config.fallbackChains).flatMap(([key, chain]) => [key, ...chain])];
 	const curated = new Set(named.map(value => splitSelector(value.trim(), known).model));
-	return models.flatMap(({ provider, id, name, contextWindow }) =>
-		connected.has(provider) ? [{ provider, id, name, contextWindow, curated: curated.has(`${provider}/${id}`) }] : [],
-	);
+	return models.flatMap(model => {
+		if (!connected.has(model.provider)) return [];
+		const { provider, id, name, contextWindow, ...rest } = model;
+		return [{ ...rest, provider, id, name, contextWindow, curated: curated.has(`${provider}/${id}`) }];
+	});
 }
 
 /** What a new session in `cwd` can start on: the models of {@link connectedProviders} that `omp models` lists, in omp's order. */
 export async function connectedModels(cwd: string): Promise<ConnectedModels> {
 	const [catalog, connected, config] = await Promise.all([listModels(), connectedProviders(), loadOmpConfig(cwd)]);
-	const listed = catalog.map(({ selector, provider, name, contextWindow, thinking }) => ({ provider, id: selector.slice(provider.length + 1), name, contextWindow, thinking }));
-	return {
-		models: modelEntries(listed, config, connected),
-		capabilities: listed.filter(({ provider }) => connected.has(provider)).map(({ provider, id, thinking }) => ({ model: { provider, id }, thinkingLevels: thinking })),
-	};
+	const listed: (ListedModel & Pick<DraftModel, "thinkingLevels">)[] = catalog.map(({ selector, provider, name, contextWindow, thinking }) => ({
+		provider,
+		id: selector.slice(provider.length + 1),
+		name,
+		contextWindow,
+		thinkingLevels: thinking,
+	}));
+	return { models: modelEntries(listed, config, connected) };
 }
 
 /** Whether omp's `/fast` can turn on for `model`, as omp's own `setFastMode` decides. */

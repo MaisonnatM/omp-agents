@@ -1,5 +1,5 @@
 /** What the model menu derives from the model list and plan usage. */
-import type { ModelEntry, PlanUsage } from "../src/shared";
+import type { ModelEntry, PlanUsage, PlanWindow } from "../src/shared";
 
 /** A trailing context size in a model id, as Cursor's `claude-opus-5-5-1m` names its 1M-token variant. */
 const CONTEXT_SUFFIX = /-\d+[km]$/i;
@@ -18,13 +18,28 @@ export function contextVariants(models: readonly ModelEntry[], selector: string 
 	return new Set(variants.map(model => model.contextWindow)).size > 1 ? variants : [];
 }
 
+/** The account a provider heading counts, and how much of its tightest window is used. */
+export interface ProviderQuota {
+	/** 0 to 1, the tightest window of {@link account}. */
+	used: number;
+	/** The account omp moves to: the one with the most left. omp's account id, else its plan name. */
+	account: string;
+	/** That account's windows, the ones the heading's tooltip lists. */
+	windows: PlanWindow[];
+}
+
 /**
- * How much of `provider`'s quota is used, 0 to 1, by its tightest window. With several accounts, omp moves to the one
- * with the most left, so that one counts. `null` when `omp usage` reports no plan for the provider.
+ * How much of `provider`'s quota is used. With several accounts, omp moves to the one with the most left, so that
+ * account's tightest window counts, and its windows are the ones to show. `null` when `omp usage` reports no plan.
  */
-export function providerUsed(plans: readonly PlanUsage[], provider: string): number | null {
-	const used = plans.flatMap(plan => (plan.provider === provider && plan.windows.length > 0 ? [Math.max(...plan.windows.map(window => 1 - window.remaining))] : []));
-	return used.length > 0 ? Math.min(...used) : null;
+export function providerQuota(plans: readonly PlanUsage[], provider: string): ProviderQuota | null {
+	let best: { used: number; plan: PlanUsage } | null = null;
+	for (const plan of plans) {
+		if (plan.provider !== provider || plan.windows.length === 0) continue;
+		const used = Math.max(...plan.windows.map(window => 1 - window.remaining));
+		if (!best || used < best.used) best = { used, plan };
+	}
+	return best && { used: best.used, account: best.plan.account ?? best.plan.name, windows: best.plan.windows };
 }
 
 /** The model search's filter, as cmdk calls it: every word typed is in the model's selector or one of its names, in any order. */

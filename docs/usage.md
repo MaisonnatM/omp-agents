@@ -224,7 +224,7 @@ For installation, see the [README](../README.md).
   **Model** opens the model search beside the menu, with the cursor in its field.
   Before you type, it lists the models that your `modelRoles` and `retry.fallbackChains` name, plus the current one, grouped by provider.
   Typing searches every connected model, and every word typed must appear in the model's selector, label, or name, in any order.
-  Each provider's heading shows how much of its plan is used, by its tightest window as `omp usage` reports it; hover the number for every window.
+  Each provider's heading shows how much of its plan is used, by the tightest window of the account with the most left, since omp moves to that account; hover the number for that account's windows.
   The list contains models that the session's omp RPC process offers from providers you are connected to, the ones omp's `/login` marks as signed in or given a key.
   Models that omp finds without a login, such as Apple's on-device model or a local Ollama, stay out of the list.
   A login made in a terminal shows the next time the menu opens.

@@ -57,4 +57,9 @@ describe("modelEntries", () => {
 		const entries = modelEntries(models, { modelRoles: { default: "cursor/gpt-5.5" }, fallbackChains: {} }, new Set(["anthropic"]));
 		expect(entries.map(entry => entry.id)).toEqual(["claude-opus-5-5", "claude-haiku-4-5"]);
 	});
+
+	test("a field beyond the picker entry stays on it", () => {
+		const [entry] = modelEntries([{ provider: "anthropic", id: "claude-opus-5-5", name: "Opus", contextWindow: 1_000_000, thinkingLevels: ["low", "high"] }], { modelRoles: {}, fallbackChains: {} }, new Set(["anthropic"]));
+		expect(entry?.thinkingLevels).toEqual(["low", "high"]);
+	});
 });

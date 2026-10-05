@@ -686,16 +686,14 @@ export interface ModelEntry extends ModelOption {
 	curated: boolean;
 }
 
-/** Supported draft thinking levels from omp's catalog, separate from the model's identity. */
-export interface ModelCapabilities {
-	model: ModelOption;
+/** A model the new-session draft can start on. `thinkingLevels` are the ones omp's catalog lists for it. */
+export interface DraftModel extends ModelEntry {
 	thinkingLevels: string[];
 }
 
-/** Models and their capabilities offered to a new-session draft. */
+/** The models a new-session draft can start on. */
 export interface ConnectedModels {
-	models: ModelEntry[];
-	capabilities: ModelCapabilities[];
+	models: DraftModel[];
 }
 
 /** `model` as omp's selector names it. */
