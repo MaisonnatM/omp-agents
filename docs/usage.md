@@ -171,6 +171,8 @@ For installation, see the [README](../README.md).
   The settings page labels models the same way.
   When a running session's directory is in a git checkout, the header also names the GitHub repository that `origin` points to, as a link to it, and the branch that the directory has checked out.
   The page reads the branch again whenever a turn starts or ends, so a session that switches branches shows the new one.
+  Click the branch to copy its name; its icon turns into a check mark for a moment.
+  The same works on the branch of an inbox row, of a pull request's sheet, and of a Linear issue's detail view.
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.
 
@@ -331,9 +333,7 @@ For installation, see the [README](../README.md).
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.
-- On desktop-width windows, the top header shows the omp logo and the **Inbox**, **Tickets**, **Sessions**, and **Todo** tabs above the sidebars and content.
-  The selected tab stays highlighted, and the tabs remain available when the sessions sidebar is hidden.
-  On narrow windows, the tabs stay in the sidebar while it is open and move to the top header when it is hidden.
+- Four tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, and **Todo**, switch what the sidebar lists.
   Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
@@ -423,7 +423,7 @@ For installation, see the [README](../README.md).
   The page reads Linear when it opens and every minute after, and shows the last read at once on a reopen, even after a reload.
   The server keeps Linear's answer for 30 seconds, and **Refresh** asks again at once.
 - The dashboard reads Linear through omp's Linear MCP server and its sign-in, so there is no key to set.
-  Until omp is signed in to that server, navigation has no **Tickets** tab, G then T does nothing, and a `#tickets` address shows how to connect instead of the issues.
+  Until omp is signed in to that server, the sidebar has no **Tickets** tab, G then T does nothing, and a `#tickets` address shows how to connect instead of the issues.
 - To connect, open **Settings › Integrations** and choose **Connect Linear**.
   A new browser tab opens Linear's sign-in page; approve omp there, and the **Tickets** tab appears within a few seconds.
   The dashboard signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds Linear's MCP server, `https://mcp.linear.app/mcp`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use Linear's tools too.
@@ -459,7 +459,7 @@ For installation, see the [README](../README.md).
 
 ## Settings
 
-- The gear button in the sidebar header opens **Settings**, split into six tabs that look like the dashboard's **Inbox** and **Sessions** tabs: **Model roles & provider order**, **Retry and fallback**, **Files**, **Integrations**, **New sessions**, and **Appearance**.
+- The gear button in the sidebar header opens **Settings**, split into six tabs that look like the sidebar's **Inbox** and **Sessions** tabs: **Model roles & provider order**, **Retry and fallback**, **Files**, **Integrations**, **New sessions**, and **Appearance**.
   Switching tabs keeps an unsaved edit, and the selected tab stays when you change workspace.
   **Integrations** connects Linear; see [Linear tickets](#linear-tickets).
   The first tab shows which model omp uses for each role (`default`, `slow`, `plan`, `advisor`, `vision`, `smol`, `commit`, `tiny`, `task`) and the fallbacks that omp tries after that model, in order.
@@ -526,7 +526,7 @@ Alt is Option on macOS.
 | G then P | Outside text fields | Choose the sidebar's project |
 
 - Press `?` outside a text field, Cmd+/ anywhere, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the navigation tabs, sidebar header's buttons, project, model, and thinking pickers, **New session**, composer's Stop button, and maximized pane's restore button.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, the composer's Stop button, and a maximized pane's restore button.
 - No shortcut takes a key that the browser keeps for itself: Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or a digit does what the browser does.
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.

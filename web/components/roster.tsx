@@ -1,4 +1,4 @@
-import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Keyboard, ListRestart, Loader, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
+import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
 import { type PastSession, type PullRequest, type RosterHost, repoKey, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import {
 	SidebarContent,
 	SidebarGroup,
 	SidebarGroupAction,
+	SidebarGroupActions,
 	SidebarGroupLabel,
 	SidebarHeader,
 	SidebarMenu,
@@ -26,10 +27,10 @@ import {
 	SidebarMenuBadge,
 	SidebarMenuButton,
 	SidebarMenuItem,
-	useSidebar,
 } from "@/components/ui/sidebar";
-import { TabPanel } from "@/components/ui/tabs";
+import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
+import { SizeProvider } from "@/lib/size-context";
 import { inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
@@ -41,7 +42,6 @@ import { useStoredKeys, useStoredState } from "../stored-state";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { useDashboardContext } from "./dashboard-context";
-import { NavigationTabs, type SidebarTab } from "./navigation";
 import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TodoCategories } from "./todo-categories";
@@ -380,6 +380,16 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 	);
 }
 
+const SIDEBAR_TABS = [
+	{ value: "inbox", label: "Inbox", icon: Inbox },
+	{ value: "tickets", label: "Tickets", icon: SquareKanban },
+	{ value: "sessions", label: "Sessions", icon: MessagesSquare },
+	{ value: "todo", label: "Todo", icon: ListTodo },
+] as const;
+
+/** The sidebar's tab; the inbox, tickets, and todo tabs go with their pages, sessions with the panes. */
+export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
+
 interface RosterProps {
 	/** Directories sessions ran in, as {@link workspaces} lists them. */
 	projects: { cwd: string; cwdDisplay: string }[];
@@ -398,8 +408,7 @@ interface RosterProps {
 	ticketsShown: boolean;
 	/** The sidebar's tab: the inbox, the tickets, or the todos with their pages, or the sessions over the panes. */
 	tab: SidebarTab;
-	/** The sessions sidebar is open, which on a narrow window shows the tabs here instead of the header. */
-	sidebarOpen: boolean;
+	onTab: (tab: SidebarTab) => void;
 	/** The Todo page's list, `null` until the server sends it. */
 	userTodos: UserTodoList | null;
 	/** The category the Todo page shows, `null` for every todo. */
@@ -425,7 +434,7 @@ export function Roster({
 	settingsOpen,
 	ticketsShown,
 	tab,
-	sidebarOpen,
+	onTab,
 	userTodos,
 	todoCategory,
 	sectionTarget,
@@ -437,7 +446,6 @@ export function Roster({
 }: RosterProps) {
 	const { open: onOpen, send, start, dismissStart, end: onEnd, openNewSession: onNewSession, changeTodo: onTodoChange, connected, starts } = useDashboardContext();
 	const { resume, resumeAll } = starts;
-	const { isMobile } = useSidebar();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	/** Continue past session `sessionId`, in the pane that shows it. */
 	const onResume = (sessionId: string): void => {
@@ -535,7 +543,7 @@ export function Roster({
 		);
 	};
 	return (
-		<div className="flex min-h-0 flex-1 flex-col">
+		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
@@ -553,7 +561,14 @@ export function Roster({
 				</Tooltip>
 				{toggle}
 			</SidebarHeader>
-			{isMobile && sidebarOpen && <NavigationTabs ticketsShown={ticketsShown} compact className="mx-2 self-start" />}
+			<SizeProvider size="compact">
+				<TabsList aria-label="Sidebar" className="mx-2 self-start">
+					{/* Four tabs fit the sidebar's default width only with tighter padding than Fluid's. */}
+					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => (
+						<TabItem key={value} value={value} label={label} icon={icon} className="px-2" shortcut={shortcutLabels(value)} />
+					))}
+				</TabsList>
+			</SizeProvider>
 			{!connected && (
 				<p className="mx-3 mt-2 rounded-md bg-red-500/10 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
 					Lost the dashboard server. Retrying…
@@ -575,11 +590,14 @@ export function Roster({
 						<SidebarGroupLabel>
 							{running.length > 0 ? `${running.length} running` : pinned.hosts.length > 0 ? "No other sessions running" : "No sessions"}
 						</SidebarGroupLabel>
-						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")}>
-							<SidebarGroupAction aria-label={newSessionLabel} aria-current={newSessionOpen ? "page" : undefined} onClick={onNewSession}>
-								<Plus />
-							</SidebarGroupAction>
-						</Tooltip>
+						{/* The group finds its header actions by type, and the tooltip would hide this one, so its chevron would sit under the button. */}
+						<SidebarGroupActions>
+							<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")}>
+								<SidebarGroupAction aria-label={newSessionLabel} aria-current={newSessionOpen ? "page" : undefined} onClick={onNewSession}>
+									<Plus />
+								</SidebarGroupAction>
+							</Tooltip>
+						</SidebarGroupActions>
 						<SidebarMenu aria-label="Running omp sessions">
 							{running.map(host => hostRow(host, false))}
 						</SidebarMenu>
@@ -633,6 +651,6 @@ export function Roster({
 					<TodoCategories list={userTodos} category={todoCategory} disabled={!connected} onChange={onTodoChange} />
 				</SidebarContent>
 			</TabPanel>
-		</div>
+		</Tabs>
 	);
 }

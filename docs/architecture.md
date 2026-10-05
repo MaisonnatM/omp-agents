@@ -303,10 +303,7 @@ A failure, or no return within five minutes, shows as `signIn: { phase: "failed"
 ## Front-end components
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
-The roster uses `sidebar`.
-`web/components/navigation.tsx` owns the **Inbox**, **Tickets**, **Sessions**, and **Todo** switch, built from `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
-Desktop navigation stays in the header, with the logo.
-Narrow windows show it in the open sidebar, or in the header when the sidebar is hidden.
+The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, and **Todo** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
 User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
 `thinking-indicator` shows while the agent works.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
@@ -398,7 +395,8 @@ The page lives in `web/`.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, and one for whether omp is signed in to Linear.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header.
-  `web/components/git.tsx` holds the branch picker and the repository and branch in a header's meta line.
+  `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the inbox and tickets also show.
+  `web/use-copy.ts` copies text to the clipboard and holds the copied state behind a button's check mark.
   `web/use-default-model.ts` reads the model that the `default` role names, which the draft's model picker shows until a pick.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
   The checkout, the default model, and the skills are each one `useRead`.

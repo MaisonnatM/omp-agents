@@ -21,6 +21,7 @@ import { errorText, putJson } from "../../api";
 import { hashForInbox, type OpenMode } from "../../routing";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions, type QuickActionId } from "../../quick-actions";
+import { BranchName } from "../git";
 import { QuickActionsMenu } from "../quick-actions";
 import { Avatar, IconTip, Reviewers, STATE_ICON } from "./avatars";
 
@@ -151,9 +152,7 @@ export function PullRequestRow({ pr, sessions, targeted, onOpen, pending, onQuic
 						<span className="shrink-0 text-xs tabular-nums text-muted-foreground">#{pr.number}</span>
 					</div>
 					<p className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-						<span className="truncate font-mono" title={pr.head}>
-							{pr.head}
-						</span>
+						<BranchName name={pr.head} className="truncate font-mono" />
 						{pr.stackedOn && (
 							<span className="truncate" title={`Stacked on ${pr.stackedOn}`}>
 								on <span className="font-mono">{pr.stackedOn}</span>

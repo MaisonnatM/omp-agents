@@ -1,9 +1,29 @@
-import { GitBranch, GitBranchPlus } from "lucide-react";
+import { Check, GitBranch, GitBranchPlus } from "lucide-react";
 import { Fragment, useState } from "react";
 import { type BranchChoice, type GitCheckout, worktreeDir } from "../../src/shared";
+import { cn } from "@/lib/utils";
 import { projectName } from "../labels";
+import { useCopy } from "../use-copy";
 import { CommandPicker } from "./command-picker";
 import { OrgIcon } from "./org-icon";
+
+/** A branch name, with its icon, that copies the name when clicked; the icon turns into a check mark once it is copied. */
+export function BranchName({ name, className }: { name: string; className?: string }) {
+	const { copied, copy } = useCopy();
+	const Icon = copied ? Check : GitBranch;
+	return (
+		<button
+			type="button"
+			aria-label={`Copy branch ${name}`}
+			title={copied ? "Copied" : `Copy branch ${name}`}
+			onClick={() => copy(name)}
+			className={cn("rounded-sm text-left underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring", className)}
+		>
+			<Icon aria-hidden className="mr-0.5 inline size-3 align-[-0.125em]" />
+			{name}
+		</button>
+	);
+}
 
 /** The GitHub repository, linked, then the branch, for a header's meta line; nothing outside a git checkout. */
 export function GitRef({ github, branch }: { github: GitCheckout["github"]; branch: string | null }) {
@@ -21,12 +41,7 @@ export function GitRef({ github, branch }: { github: GitCheckout["github"]; bran
 				{github.owner}/{github.repo}
 			</a>
 		),
-		branch && (
-			<span key="branch" title={`Branch ${branch}`}>
-				<GitBranch aria-hidden className="mr-0.5 inline size-3 align-[-0.125em]" />
-				{branch}
-			</span>
-		),
+		branch && <BranchName key="branch" name={branch} />,
 	].filter(Boolean);
 	return parts.map((part, index) => (
 		<Fragment key={index}>

@@ -59,6 +59,7 @@ import { modeOf, skillLabel, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies } from "../transcript-view";
+import { useCopy } from "../use-copy";
 import { MessageMarkdown } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
 
@@ -215,14 +216,9 @@ function ToolGroup({ tools }: { tools: ToolItem[] }) {
 }
 
 function CopyButton({ text }: { text: string }) {
-	const [copied, setCopied] = useState(false);
+	const { copied, copy } = useCopy();
 	const CopyIcon = useIcon("copy");
 	const CheckIcon = useIcon("check");
-	useEffect(() => {
-		if (!copied) return;
-		const timer = setTimeout(() => setCopied(false), 1500);
-		return () => clearTimeout(timer);
-	}, [copied]);
 	const Icon = copied ? CheckIcon : CopyIcon;
 	return (
 		<Button
@@ -231,7 +227,7 @@ function CopyButton({ text }: { text: string }) {
 			aria-label={copied ? "Copied" : "Copy message"}
 			title={copied ? "Copied" : "Copy message"}
 			data-copied={copied || undefined}
-			onClick={() => navigator.clipboard.writeText(text).then(() => setCopied(true))}
+			onClick={() => copy(text)}
 		>
 			<Icon />
 		</Button>
