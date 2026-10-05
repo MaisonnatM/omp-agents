@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { createContext, type ReactNode } from "react";
 import type { PlanUsage, PlanWindow } from "../../src/shared";
 import { SidebarFooter } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -9,6 +9,10 @@ import { OrgIcon } from "./org-icon";
 
 /** Below this fraction left, a window reads as running low. */
 const LOW = 0.2;
+
+export const NO_PLANS: readonly PlanUsage[] = [];
+/** The plans of the last `omp usage` run, for the model menu's quota line per provider. */
+export const Plans = createContext<readonly PlanUsage[]>(NO_PLANS);
 
 function WindowLeft({ window }: { window: PlanWindow }) {
 	const percent = Math.round(window.remaining * 100);

@@ -294,6 +294,8 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	},
 	"set-thinking": ({ instanceId, level }) =>
 		typeof instanceId === "string" && typeof level === "string" ? { ok: { t: "set-thinking", instanceId, level } } : null,
+	"set-fast": ({ instanceId, enabled }) =>
+		typeof instanceId === "string" && typeof enabled === "boolean" ? { ok: { t: "set-fast", instanceId, enabled } } : null,
 	answer(value) {
 		const { instanceId, requestId } = value;
 		const answer = parseAnswer(value.answer);

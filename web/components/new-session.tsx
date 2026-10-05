@@ -18,7 +18,7 @@ import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, chosenBranch, GitRef, targetOf } from "./git";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
-import { ModelPicker } from "./model-picker";
+import { type ModelMenuOpen, ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
 
 interface NewSessionProps {
@@ -143,10 +143,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				: draft.trimStart().startsWith("/")
 					? "bypassed"
 					: "on";
-	const [modelsOpen, setModelsOpen] = useState(false);
+	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
 	// Reopening reads credentials and model capabilities again after a provider login.
 	const [modelOpens, setModelOpens] = useState(0);
-	const modelsRead = useRead<ConnectedModels>("/api/models/connected", modelOpens);
+	const modelsRead = useRead<ConnectedModels>(`/api/models/connected?cwd=${encodeURIComponent(cwd)}`, modelOpens);
 	const shownSelector = shownModel ? selectorOf(shownModel) : null;
 	const levels = modelsRead.data?.capabilities.find(({ model }) => selectorOf(model) === shownSelector)?.thinkingLevels ?? null;
 	const thinking = pickedThinking?.model === shownSelector && levels?.includes(pickedThinking.level) ? pickedThinking.level : null;
@@ -163,14 +163,14 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			: pickedChoice;
 	const completion = useCompletion({ draft, setDraft, completions, onComplete });
 	const starting = launch?.phase === "starting";
-	const openModels = (open: boolean): void => {
+	const openModels = (open: ModelMenuOpen | null): void => {
+		if (open !== null && modelsOpen === null) setModelOpens(count => count + 1);
 		setModelsOpen(open);
-		if (open) setModelOpens(count => count + 1);
 	};
 	useShortcuts({
 		model: () => {
 			if (starting || !connected) return false;
-			openModels(true);
+			openModels("models");
 		},
 		thinking: () => {
 			if (starting || !connected || modelsRead.error !== null || !levels?.length) return false;
@@ -232,7 +232,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 									setModel(next);
 									setPickedThinking(null);
 								}}
-								thinking={{ current: thinking, levels, onPick: pickThinking, allowDefault: true, disabled: modelsRead.error !== null }}
+								effort={{ current: thinking, levels: modelsRead.error === null ? levels : [], onPick: pickThinking, allowDefault: true }}
 								disabled={starting || !connected}
 							/>
 							<DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={starting} onPick={onPickCwd} />

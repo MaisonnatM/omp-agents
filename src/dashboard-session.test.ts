@@ -4,7 +4,7 @@ import type { Frame } from "./omp/collab";
 import * as rpc from "./omp/rpc";
 import type { RpcChild, RpcClient, RpcState } from "./omp/rpc";
 
-const STATE: RpcState = { sessionId: "session-1", queuedMessages: { steering: [], followUp: [] } };
+const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, queuedMessages: { steering: [], followUp: [] } };
 
 /** An omp RPC client whose methods answer at once, records what the session sends omp, and lets a test play omp's events. */
 class FakeClient implements RpcClient {
@@ -24,6 +24,10 @@ class FakeClient implements RpcClient {
 	setModel: RpcClient["setModel"] = async (provider, id) => ({ provider, id });
 	getAvailableThinkingLevels = async () => ["off", "low"];
 	setThinkingLevel = async (): Promise<void> => {};
+	setFastMode: RpcClient["setFastMode"] = async enabled => {
+		this.calls.push(`fast ${enabled}`);
+		return { enabled, active: enabled };
+	};
 	setSubagentSubscription = async () => "progress";
 	getSubagents = async () => [];
 	switchSession = async () => ({ cancelled: false });
@@ -138,6 +142,30 @@ describe("DashboardSession prompts", () => {
 		const { session, client } = await startSession();
 		await expect(session.prompt(null, "!!ls", [], "steer")).rejects.toBeInstanceOf(Error);
 		expect(client.calls).toEqual([]);
+	});
+});
+
+describe("DashboardSession fast mode", () => {
+	const on = (provider: string, api: string, org: string, serviceTiers?: string[]): RpcState => ({
+		...STATE,
+		model: { provider, id: "m", name: "M", contextWindow: 200_000, api, identity: { class: org }, serviceTiers },
+		fastModeEnabled: true,
+		fastModeActive: true,
+	});
+
+	test("the session offers /fast only while its model has a priority tier, with omp's state after each switch", async () => {
+		const { session, client } = await startSession();
+		const after = async (state: RpcState) => {
+			client.getState = async () => state;
+			await session.setFast(true);
+			await settle();
+			return session.fast;
+		};
+		expect(await after(on("anthropic", "anthropic-messages", "anthropic"))).toEqual({ enabled: true, active: true });
+		expect(await after(on("cursor", "cursor-agent", "anthropic"))).toBeNull();
+		expect(await after(on("openai-codex", "openai-codex-responses", "openai", ["flex"]))).toBeNull();
+		expect(await after(on("openai-codex", "openai-codex-responses", "openai", ["priority"]))).toEqual({ enabled: true, active: true });
+		expect(client.calls.filter(call => call.startsWith("fast"))).toEqual(["fast true", "fast true", "fast true", "fast true"]);
 	});
 });
 

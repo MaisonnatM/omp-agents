@@ -357,8 +357,14 @@ export type RosterHost = RosterHostBase &
 	(
 		| { source: "terminal"; participants: number; relayConnected: boolean }
 		/** Started by this dashboard, which can end it. */
-		| { source: "dashboard"; thinkingLevels: string[]; modelSwitch: { pending: boolean; revision: number } }
+		| { source: "dashboard"; thinkingLevels: string[]; modelSwitch: { pending: boolean; revision: number }; fast: FastMode | null }
 	);
+
+/** omp's `/fast` for the session's model: whether you turned it on, and whether requests go out on the priority tier. */
+export interface FastMode {
+	enabled: boolean;
+	active: boolean;
+}
 
 /** Context-window occupancy as omp's status line counts it. */
 export interface ContextUsage {
@@ -670,6 +676,16 @@ export interface ModelOption {
 	id: string;
 }
 
+/** A model a picker offers, with what omp says of it. */
+export interface ModelEntry extends ModelOption {
+	/** omp's name for it, such as `Claude Opus 5.5`. */
+	name: string;
+	/** In tokens, `null` when omp does not say. */
+	contextWindow: number | null;
+	/** Named by `modelRoles` or `retry.fallbackChains`, so a picker lists it before you search. */
+	curated: boolean;
+}
+
 /** Supported draft thinking levels from omp's catalog, separate from the model's identity. */
 export interface ModelCapabilities {
 	model: ModelOption;
@@ -678,7 +694,7 @@ export interface ModelCapabilities {
 
 /** Models and their capabilities offered to a new-session draft. */
 export interface ConnectedModels {
-	models: ModelOption[];
+	models: ModelEntry[];
 	capabilities: ModelCapabilities[];
 }
 
@@ -737,6 +753,7 @@ export interface CatalogModel {
 	selector: string;
 	provider: string;
 	name: string;
+	contextWindow: number | null;
 	thinking: string[];
 }
 
@@ -744,7 +761,7 @@ export interface CatalogModel {
  * A selector as the model `omp models` lists and its `:level` thinking suffix. Model ids can hold colons
  * (`minimax-m3:batch`), so the suffix splits off only when the rest is a listed model and the whole is not.
  */
-export function splitSelector(selector: string, models: ReadonlyMap<string, CatalogModel>): { model: string; level: string | null } {
+export function splitSelector(selector: string, models: { has(selector: string): boolean }): { model: string; level: string | null } {
 	const colon = selector.lastIndexOf(":");
 	if (colon < 0 || models.has(selector) || !models.has(selector.slice(0, colon))) return { model: selector, level: null };
 	return { model: selector.slice(0, colon), level: selector.slice(colon + 1) };
@@ -992,7 +1009,7 @@ export type ServerMsg =
 	/** Plans as of the last `omp usage` run. `error` is set, and `plans` empty, when that run failed. */
 	| { t: "usage"; plans: PlanUsage[]; error: string | null }
 	/** Answers `list-models`. `error` is set when the session cannot list or switch models. */
-	| { t: "models"; instanceId: string; models: ModelOption[]; error: string | null }
+	| { t: "models"; instanceId: string; models: ModelEntry[]; error: string | null }
 	/** Answers this socket's `dequeue` with the texts it took out of the queue, oldest first. Nothing answers when every message had gone. */
 	| { t: "dequeued"; view: LiveView; reqId: number; texts: string[] }
 	/** The Todo page's list, whole, sent when a socket opens and after every change. */
@@ -1027,6 +1044,8 @@ export type ClientMsg =
 	| { t: "set-model"; instanceId: string; model: ModelOption; thinking: string | null }
 	/** Switch a session this dashboard started to another thinking level, one of its `thinkingLevels`. */
 	| { t: "set-thinking"; instanceId: string; level: string }
+	/** Turn omp's `/fast` on or off for a session this dashboard started. */
+	| { t: "set-fast"; instanceId: string; enabled: boolean }
 	/** Reply to one of a live session's pending `requests`. */
 	| { t: "answer"; instanceId: string; requestId: string; answer: UserAnswer }
 	/** Cancel a running subagent of a live session without stopping the session's turn; it cannot be revived after. */

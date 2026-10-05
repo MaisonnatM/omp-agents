@@ -249,6 +249,11 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "set-model", instanceId: "i1", model: { provider: "anthropic", id: "opus" }, thinking: 3 })).toBeNull();
 		expect(msg({ t: "set-model", instanceId: "i1", model: { provider: "anthropic" } })).toBeNull();
 	});
+
+	test("set-fast needs a boolean", () => {
+		expect(msg({ t: "set-fast", instanceId: "i1", enabled: true })).toEqual({ t: "set-fast", instanceId: "i1", enabled: true });
+		expect(msg({ t: "set-fast", instanceId: "i1", enabled: "true" })).toBeNull();
+	});
 });
 
 describe("parsePullRequestQuery", () => {

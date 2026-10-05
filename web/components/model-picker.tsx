@@ -1,12 +1,28 @@
-import { type ModelOption, selectorOf } from "../../src/shared";
-import { Brain } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { Tabs, TabsList, TabItem, TabPanel } from "@/components/ui/tabs";
+import { type FastMode, type ModelEntry, type ModelOption, type PlanUsage, selectorOf } from "../../src/shared";
+import { Check, ChevronDown } from "lucide-react";
+import { useContext, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuTrigger,
+	MenuRadioGroup,
+	MenuRadioItem,
+	MenuSeparator,
+	MenuSubmenu,
+	MenuSubmenuContent,
+	MenuSubmenuTrigger,
+	MenuSwitchItem,
+} from "@/components/ui/menu";
+import { Tooltip } from "@/components/ui/tooltip";
 import { modelLabel, modelOrg, providerLabel, providerOrg } from "../labels";
+import { contextVariants, levelLabel, modelMatch, providerUsed } from "../model-menu";
 import type { ModelList } from "../reads";
-import { CommandPicker, fromList, type PickerGroup } from "./command-picker";
+import { shortcutLabels } from "../shortcuts";
+import type { PickerGroup } from "./command-picker";
 import { OrgIcon } from "./org-icon";
-import { ThinkingChoices, type ThinkingChoicesProps } from "./thinking-picker";
+import { NO_PLANS, Plans } from "./plan-usage";
 
 /**
  * `anthropic/claude-opus-5-5` as the Anthropic logo and `Opus 5.5`, with the full selector on hover. `titled={false}`
@@ -25,12 +41,19 @@ export function Model({ selector, titled = true }: { selector: string; titled?: 
 export const modelDescription = (selector: string): string =>
 	`${modelLabel(selector)} from ${providerLabel(selector.slice(0, selector.indexOf("/")))}`;
 
-/** A provider's group heading in a model list: its logo and its name. */
-function ProviderHeading({ provider }: { provider: string }) {
+/** A provider's group heading in a model list: its logo and its name, then how much of its plan is used, when `plans` has it. */
+function ProviderHeading({ provider, plans = NO_PLANS }: { provider: string; plans?: readonly PlanUsage[] }) {
+	const used = providerUsed(plans, provider);
+	const windows = plans.flatMap(plan => (plan.provider === provider ? plan.windows : []));
 	return (
-		<span className="flex items-center gap-1.5">
+		<span className="flex w-full items-center gap-1.5">
 			<OrgIcon org={providerOrg(provider)} />
 			{providerLabel(provider)}
+			{used !== null && (
+				<span className="ml-auto tabular-nums" title={windows.map(window => `${window.title}: ${Math.round((1 - window.remaining) * 100)}% used`).join("\n")}>
+					{Math.round(used * 100)}% used
+				</span>
+			)}
 		</span>
 	);
 }
@@ -77,6 +100,19 @@ export function modelGroups<T>(
 	}));
 }
 
+/** Which part of the model menu is open: the menu, or the menu with its model search beside it. */
+export type ModelMenuOpen = "menu" | "models";
+
+export interface EffortChoices {
+	/** The chosen level, `null` for omp's default. */
+	current: string | null;
+	/** The levels the model takes, `null` until its capabilities are known. */
+	levels: string[] | null;
+	onPick: (level: string | null) => void;
+	/** Offers `Default`, which leaves the level to omp. */
+	allowDefault?: boolean;
+}
+
 interface ModelPickerProps {
 	/** The session's `provider/id`, or `null` before it reports one or, in the new-session draft, before you pick one. */
 	current: string | null;
@@ -84,83 +120,194 @@ interface ModelPickerProps {
 	unset?: string;
 	/** The models the server last sent for this session; nothing while none has arrived. */
 	list: ModelList;
-	open: boolean;
-	/** The parent refreshes the list from omp whenever the picker opens. */
-	onOpenChange: (open: boolean) => void;
+	/** `null` while closed. */
+	open: ModelMenuOpen | null;
+	/** The parent refreshes the list from omp whenever the menu opens. */
+	onOpenChange: (open: ModelMenuOpen | null) => void;
 	onPick: (model: ModelOption) => void;
 	disabled?: boolean;
-	thinking: ThinkingChoicesProps;
+	/** A model switch is under way, so nothing else switches until it lands. */
+	pending?: boolean;
+	effort: EffortChoices;
+	/** omp's `/fast` for a live session, `state` `null` while its model has no fast tier; the draft has no row. */
+	fast?: { state: FastMode | null; onChange: (enabled: boolean) => void };
 }
 
-/** Provider tabs filter the models without changing the session's active model. */
-export function ModelPicker({ current, unset, list, open, onOpenChange, onPick, disabled, thinking }: ModelPickerProps) {
-	const [provider, setProvider] = useState<string | null>(null);
-	const groups = [...Map.groupBy(list.data?.models ?? [], model => model.provider)];
-	const currentProvider = current?.slice(0, current.indexOf("/")) ?? null;
-	const wasOpen = useRef(false);
-	useEffect(() => {
-		if (open && !wasOpen.current) setProvider(currentProvider);
-		wasOpen.current = open;
-	}, [open, currentProvider]);
-	const active = groups.find(([name]) => name === provider)?.[0] ?? groups.find(([name]) => name === currentProvider)?.[0] ?? groups[0]?.[0] ?? "";
-	const changeOpen = (next: boolean): void => {
-		if (next) setProvider(currentProvider);
-		onOpenChange(next);
+/** `Default` among the effort choices; omp's own levels are never empty. */
+const DEFAULT_LEVEL = "";
+
+/** A submenu closing for one of these keeps the menu open; for any other reason, the whole menu is closing. */
+const BACK_TO_MENU: Record<string, true> = { "trigger-hover": true, "sibling-open": true, "list-navigation": true, "escape-key": true, "trigger-press": true };
+
+/** `300K` and `1M`, as model ids name their context sizes, whatever the browser's locale. */
+const tokens = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+
+/** Cursor's model menu: Fast, Context, and Effort for the current model, then Model, which searches every connected model. */
+export function ModelPicker({ current, unset = "Choose model", list, open, onOpenChange, onPick, disabled, pending = false, effort, fast }: ModelPickerProps) {
+	const models = list.data?.models ?? [];
+	const variants = contextVariants(models, current);
+	const contextWindow = variants.find(model => selectorOf(model) === current)?.contextWindow ?? null;
+	const levels = effort.levels ?? [];
+	const effortValue = pending ? "Switching…" : effort.levels === null ? "Unavailable" : levels.length === 0 ? "None" : effort.current ? levelLabel(effort.current) : "Default";
+	const pick = ({ provider, id }: ModelOption): void => {
+		onOpenChange(null);
+		if (!disabled && !pending && `${provider}/${id}` !== current) onPick({ provider, id });
 	};
+	// Opened together, the menu would focus its Model row after the search field took the keys; the search waits for it.
+	const [menuShown, setMenuShown] = useState(false);
 	return (
-		<CommandPicker
-			trigger={
-				<span className="flex min-w-0 items-center gap-2">
-					<span className="max-w-56 truncate">{current ? <Model selector={current} titled={false} /> : (unset ?? "Choose model")}</span>
-					{thinking.current && (
-						<span className="flex shrink-0 items-center gap-1 text-muted-foreground">
-							<Brain aria-hidden="true" className="size-3.5" />
-							{thinking.current}
-						</span>
-					)}
-				</span>
-			}
-			tooltip={current ?? unset ?? "Choose model"}
-			shortcut="model"
-			ariaLabel={`Choose model and thinking level: ${current ? modelDescription(current) : (unset ?? "none selected")}, thinking ${thinking.current ?? "Default"}`}
-			disabled={disabled}
-			selectionDisabled={thinking.pending}
-			search={MODEL_LIST.search}
-			width="lg"
-			side="top"
-			open={open}
-			onOpenChange={changeOpen}
-			closeOnSelect={false}
-			list={fromList(list, MODEL_LIST.loading, () =>
-				modelGroups(
-					new Map(groups.filter(([name]) => name === active)),
-					model => ({ selector: selectorOf(model), id: model.id, keyword: providerLabel(model.provider) }),
-					current,
-					model => {
-						if (!disabled && !thinking.pending && selectorOf(model) !== current) onPick(model);
-					},
-				),
-			)}
-			empty={list.data?.models.length === 0 ? "No connected models. Sign in to a provider in omp, then reopen this picker." : MODEL_LIST.empty}
-			content={command => (
-				<>
-					{groups.length > 0 && !list?.error ? (
-						<Tabs value={active} onValueChange={setProvider} size="compact">
-							<div className="max-w-full overflow-x-auto p-2">
-								<TabsList aria-label="Model providers" className="w-max min-w-full">
-									{groups.map(([name]) => (
-										<TabItem key={name} value={name} label={providerLabel(name)} onFocus={event => event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" })} />
-									))}
-								</TabsList>
-							</div>
-							{groups.map(([name]) => (
-								<TabPanel key={name} value={name}>{name === active ? command : null}</TabPanel>
+		<DropdownMenu open={open !== null} onOpenChange={next => onOpenChange(next ? "menu" : null)} onOpenChangeComplete={setMenuShown}>
+			<Tooltip content={current ?? unset} shortcut={shortcutLabels("model")} side="top" forceOpen={open !== null ? false : undefined}>
+				<DropdownMenuTrigger
+					disabled={disabled}
+					render={
+						<Button
+							variant="ghost"
+							size="compact"
+							trailingIcon={ChevronDown}
+							aria-label={`Choose model and effort: ${current ? modelDescription(current) : unset}, effort ${effort.current ? levelLabel(effort.current) : "Default"}`}
+							active={open !== null}
+						/>
+					}
+				>
+					<span className="flex min-w-0 items-center gap-1.5">
+						<span className="max-w-56 truncate">{current ? <Model selector={current} titled={false} /> : unset}</span>
+						{effort.current && <span className="shrink-0 text-muted-foreground">{levelLabel(effort.current)}</span>}
+					</span>
+				</DropdownMenuTrigger>
+			</Tooltip>
+			<DropdownMenuContent side="top" className="w-64">
+				{fast && (
+					<MenuSwitchItem
+						checked={fast.state?.enabled ?? false}
+						onCheckedChange={fast.onChange}
+						disabled={pending || fast.state === null}
+						title={fast.state === null ? "This model has no fast tier." : "omp's /fast: priority service, at a higher price."}
+					>
+						Fast
+						{fast.state?.enabled && !fast.state.active && <span className="text-xs text-muted-foreground">not active</span>}
+					</MenuSwitchItem>
+				)}
+				{contextWindow !== null && (
+					<MenuSubmenu>
+						<MenuSubmenuTrigger disabled={pending} value={tokens.format(contextWindow)}>
+							Context
+						</MenuSubmenuTrigger>
+						<MenuSubmenuContent>
+							<MenuRadioGroup
+								value={current}
+								onValueChange={(selector: string) => {
+									const variant = variants.find(model => selectorOf(model) === selector);
+									if (variant) pick(variant);
+								}}
+							>
+								{variants.map(model => (
+									<MenuRadioItem key={model.id} value={selectorOf(model)} closeOnClick>
+										{tokens.format(model.contextWindow ?? 0)}
+									</MenuRadioItem>
+								))}
+							</MenuRadioGroup>
+						</MenuSubmenuContent>
+					</MenuSubmenu>
+				)}
+				<MenuSubmenu>
+					<MenuSubmenuTrigger disabled={pending || levels.length === 0} value={effortValue} title={`Thinking level (${shortcutLabels("thinking").join(" or ")} cycles it)`}>
+						Effort
+					</MenuSubmenuTrigger>
+					<MenuSubmenuContent>
+						<MenuRadioGroup value={effort.current ?? DEFAULT_LEVEL} onValueChange={(level: string) => effort.onPick(level === DEFAULT_LEVEL ? null : level)}>
+							{effort.allowDefault && (
+								<MenuRadioItem value={DEFAULT_LEVEL} closeOnClick>
+									Default
+								</MenuRadioItem>
+							)}
+							{levels.map(level => (
+								<MenuRadioItem key={level} value={level} closeOnClick>
+									{levelLabel(level)}
+								</MenuRadioItem>
 							))}
-						</Tabs>
-					) : command}
-					<ThinkingChoices {...thinking} disabled={disabled || thinking.disabled} />
-				</>
-			)}
-		/>
+						</MenuRadioGroup>
+					</MenuSubmenuContent>
+				</MenuSubmenu>
+				<MenuSeparator />
+				<MenuSubmenu
+					open={open === "models" && menuShown}
+					onOpenChange={(next, details) => {
+						if (next) onOpenChange("models");
+						else if (BACK_TO_MENU[details.reason]) onOpenChange("menu");
+					}}
+				>
+					<MenuSubmenuTrigger value={current ? modelLabel(current) : unset}>Model</MenuSubmenuTrigger>
+					<MenuSubmenuContent className="w-[min(24rem,calc(100vw-2rem))] overflow-hidden p-0">
+						<ModelSearch list={list} current={current} disabled={disabled || pending} onPick={pick} />
+					</MenuSubmenuContent>
+				</MenuSubmenu>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+/** Before you type, the models your roles and fallback chains name plus the current one; typing searches every connected model. */
+function ModelSearch({ list, current, disabled, onPick }: { list: ModelList; current: string | null; disabled?: boolean; onPick: (model: ModelEntry) => void }) {
+	const plans = useContext(Plans);
+	const [query, setQuery] = useState("");
+	const input = useRef<HTMLInputElement>(null);
+	// The menu focuses its popup as the submenu opens; the search field takes the keys after it, as Cursor's does.
+	useEffect(() => {
+		const frame = requestAnimationFrame(() => input.current?.focus());
+		return () => cancelAnimationFrame(frame);
+	}, []);
+	const models = list.data?.models ?? [];
+	const shown = query.trim() === "" ? models.filter(model => model.curated || selectorOf(model) === current) : models;
+	return (
+		<Command
+			filter={modelMatch}
+			// Base UI's menu would read typed letters as type-ahead and arrows as its own navigation; Escape still closes the submenu.
+			onKeyDown={event => {
+				if (event.key !== "Escape") event.stopPropagation();
+			}}
+		>
+			<CommandInput ref={input} aria-label={MODEL_LIST.search.label} placeholder={`${MODEL_LIST.search.label}…`} value={query} onValueChange={setQuery} />
+			<CommandList className="max-h-80">
+				{list.error ? (
+					<p role="alert" className="px-3 py-6 text-center text-sm text-red-600 dark:text-red-400">
+						{list.error}
+					</p>
+				) : list.data === null ? (
+					<p role="status" className="py-6 text-center text-sm text-muted-foreground">
+						{MODEL_LIST.loading}
+					</p>
+				) : (
+					<>
+						<CommandEmpty className="px-3 py-6 text-center text-sm">
+							{models.length === 0 ? "No connected models. Sign in to a provider in omp, then reopen this menu." : MODEL_LIST.empty}
+						</CommandEmpty>
+						{[...Map.groupBy(shown, model => model.provider)].map(([provider, entries]) => (
+							<CommandGroup key={provider} heading={<ProviderHeading provider={provider} plans={plans} />}>
+								{entries.map(model => {
+									const selector = selectorOf(model);
+									return (
+										<CommandItem
+											key={selector}
+											value={selector}
+											keywords={[modelLabel(selector), model.name, providerLabel(provider)]}
+											title={selector}
+											aria-label={`${modelDescription(selector)}, ${model.id}`}
+											disabled={disabled}
+											onSelect={() => onPick(model)}
+										>
+											<span className="flex min-w-0 flex-1 items-center gap-2">
+												<ModelRow selector={selector} id={model.id} />
+											</span>
+											<Check className={selector === current ? "opacity-100" : "opacity-0"} />
+										</CommandItem>
+									);
+								})}
+							</CommandGroup>
+						))}
+					</>
+				)}
+			</CommandList>
+		</Command>
 	);
 }

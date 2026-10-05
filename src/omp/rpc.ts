@@ -2,7 +2,14 @@
 import { errorText, isObject } from "../json";
 import type { Frame } from "./collab";
 import { ompCommand } from "./install";
-import { type RpcProcess, rpc, rpcFrames, utils } from "./modules";
+import { type RpcProcess, rpc, rpcFrames, type ServiceTierModel, utils } from "./modules";
+
+/** Subset of omp's `Model` (pi-ai src/types.ts) this app reads. */
+export interface RpcModel extends ServiceTierModel {
+	id: string;
+	name: string;
+	contextWindow: number;
+}
 
 /** Subset of omp's `RpcSessionState` (src/modes/rpc/rpc-types.ts) this app reads. */
 export interface RpcState {
@@ -10,11 +17,15 @@ export interface RpcState {
 	/** Where the session will write; the file appears with its first message. */
 	sessionFile?: string;
 	sessionName?: string;
-	model?: { provider: string; id: string };
+	model?: RpcModel;
 	/** omp's `ThinkingLevel`. */
 	thinkingLevel?: string;
 	/** omp's `ContextUsage`: estimated tokens in the context window. */
 	contextUsage?: { tokens: number; contextWindow: number };
+	/** Whether `/fast` is on for the model's service-tier family. */
+	fastModeEnabled: boolean;
+	/** Whether requests actually go out on the priority tier. */
+	fastModeActive: boolean;
 	/** omp's displayable steering and follow-up queues, as its `queue_update` event reports them. */
 	queuedMessages: { steering: string[]; followUp: string[] };
 }
@@ -36,12 +47,13 @@ export interface RpcClient {
 	/** Takes the first queued message with this text out of `queue`; `removed` is false once omp has delivered it. */
 	removeQueuedMessage(message: string, queue: "steering" | "followUp"): Promise<{ removed: boolean }>;
 	abort(): Promise<void>;
-	/** omp's `ModelInfo` carries more fields; this app reads the selector parts. */
-	getAvailableModels(): Promise<{ provider: string; id: string }[]>;
+	getAvailableModels(): Promise<RpcModel[]>;
 	setModel(provider: string, modelId: string): Promise<{ provider: string; id: string }>;
 	/** Levels the live model accepts, `off` first. */
 	getAvailableThinkingLevels(): Promise<string[]>;
 	setThinkingLevel(level: string): Promise<void>;
+	/** Turns `/fast` on or off; enabling rejects for a model without a priority tier. */
+	setFastMode(enabled: boolean): Promise<{ enabled: boolean; active: boolean }>;
 	setSubagentSubscription(level: "progress"): Promise<string>;
 	getSubagents(): Promise<RpcSubagent[]>;
 	switchSession(sessionPath: string): Promise<{ cancelled: boolean }>;

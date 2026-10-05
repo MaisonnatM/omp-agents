@@ -6,7 +6,7 @@ import { InboxPage } from "./components/inbox/inbox-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
 import { PlanPanel } from "./components/plan-panel";
-import { PlanUsageFooter } from "./components/plan-usage";
+import { NO_PLANS, PlanUsageFooter, Plans } from "./components/plan-usage";
 import { Roster, type SidebarTab, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings/settings-page";
 import { SessionSwitcher } from "./components/session-switcher";
@@ -381,7 +381,9 @@ export function App() {
 					<PlanUsageFooter usage={state.usage} />
 				</DashboardSidebar>
 				<SidebarInset>
-					<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
+					<Plans value={state.usage?.plans ?? NO_PLANS}>
+						<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
+					</Plans>
 				</SidebarInset>
 				{planView && (
 					<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>

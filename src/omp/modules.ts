@@ -175,6 +175,19 @@ export interface OAuthModule {
 	/** Every provider omp's `/login` offers. */
 	getOAuthProviders(): { id: string }[];
 }
+/** The fields of omp's `Model` (pi-ai src/types.ts) that decide its service tiers. */
+export interface ServiceTierModel {
+	provider: string;
+	api: string;
+	identity: { class: string };
+	serviceTiers?: string[];
+}
+export interface ServiceTierModule {
+	/** The family whose service-tier knob governs `model`, `undefined` when it has none. */
+	serviceTierFamily(model: ServiceTierModel): string | undefined;
+	/** Whether omp sends `tier` to `model`'s provider. */
+	shouldSendServiceTier(tier: string, model: ServiceTierModel): boolean;
+}
 export interface FallbackChainsModule {
 	/** Gives every chat role without a chain of its own the `default` chain. */
 	expandDefaultRetryFallbackChains(configured: Record<string, string[]>, roleNames: readonly string[]): Record<string, string[]>;
@@ -336,6 +349,7 @@ export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc
 	"RpcClient.prototype.steerSubagent": "function",
 	"RpcClient.prototype.cancelSubagent": "function",
 	"RpcClient.prototype.bash": "function",
+	"RpcClient.prototype.setFastMode": "function",
 });
 export const rpcFrames = await load<RpcFrameModule>(join(srcDir, "modes", "rpc", "rpc-frame.ts"), { RpcFrameDecoder: "function" });
 export const utils = await load<UtilsModule>(join(utilsSrc, "index.ts"), { "ptree.spawn": "function", readJsonl: "function" });
@@ -372,6 +386,10 @@ export const modelSettings = await load<ModelSettingsModule>(join(srcDir, "confi
 export const auth = await load<AuthModule>(join(srcDir, "session", "auth-broker-config.ts"), { discoverAuthStorage: "function" });
 export const oauth = await load<OAuthModule>(join(dirname(packageDir), "pi-ai", "src", "registry", "oauth", "index.ts"), {
 	getOAuthProviders: "function",
+});
+export const serviceTiers = await load<ServiceTierModule>(join(dirname(packageDir), "pi-ai", "src", "types.ts"), {
+	serviceTierFamily: "function",
+	shouldSendServiceTier: "function",
 });
 export const fallbackChains = await load<FallbackChainsModule>(join(srcDir, "session", "retry-fallback-chains.ts"), {
 	expandDefaultRetryFallbackChains: "function",
