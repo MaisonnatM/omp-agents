@@ -42,11 +42,13 @@ interface DirectoryPickerProps {
 	cwd: string;
 	workspaces: { cwd: string; cwdDisplay: string }[];
 	disabled: boolean;
+	/** Which side of the trigger the list opens on; the composer's opens upward. */
+	side?: "top" | "bottom";
 	onPick: (cwd: string) => void;
 }
 
 /** The directory the session starts in: one a session ran in, or any directory typed into the search field. */
-function DirectoryPicker({ cwd, workspaces, disabled, onPick }: DirectoryPickerProps) {
+export function DirectoryPicker({ cwd, workspaces, disabled, side = "top", onPick }: DirectoryPickerProps) {
 	const [query, setQuery] = useState("");
 	const typed = query.trim();
 	const pick = (next: string): void => {
@@ -62,7 +64,7 @@ function DirectoryPicker({ cwd, workspaces, disabled, onPick }: DirectoryPickerP
 			className="min-w-0"
 			search={{ label: "Search or type a directory", query: { value: query, onChange: setQuery } }}
 			width="lg"
-			side="top"
+			side={side}
 			onOpenChange={next => {
 				if (!next) setQuery("");
 			}}

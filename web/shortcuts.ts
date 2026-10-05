@@ -21,6 +21,7 @@ export type ShortcutId =
 	| "tickets"
 	| "sessions"
 	| "todo"
+	| "routines"
 	| "project";
 
 /**
@@ -86,6 +87,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "tickets", label: "Go to your Linear tickets", keys: [{ goTo: "t" }] },
 	{ id: "sessions", label: "Go to the sessions", keys: [{ goTo: "s" }] },
 	{ id: "todo", label: "Go to your todo list", keys: [{ goTo: "d" }] },
+	{ id: "routines", label: "Go to your routines", keys: [{ goTo: "r" }] },
 	{ id: "project", label: "Choose the sidebar's project", keys: [{ goTo: "p" }] },
 ];
 

@@ -342,7 +342,7 @@ A failure, or no return within five minutes, shows as `signIn: { phase: "failed"
 ## Front-end components
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
-The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, and **Todo** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
+The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, **Todo**, and **Routines** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
 User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
 `thinking-indicator` shows while the agent works.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
@@ -419,15 +419,16 @@ The server lives in `src/`:
 The page lives in `web/`.
 `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
-- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, settings, and new-session pages, and focus handling.
+- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, todo, routines, settings, and new-session pages, and focus handling.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which runs in the background.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
   It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
-- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
+- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the inbox and the tickets page show.
+  `web/routines-model.ts` words a routine's schedule, task, next run, and last run, and turns the routine editor's form into the routine it saves.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
   `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's sheet or an issue's details, and the note that says why a start failed.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or a sheet, with the status dot of a running one.
@@ -443,6 +444,7 @@ The page lives in `web/`.
   `web/use-copy.ts` copies text to the clipboard and holds the copied state behind a button's check mark.
   `web/use-default-model.ts` reads the model that the `default` role names, which the draft's model picker shows until a pick.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
+  `web/components/skill-picker.tsx` is the skill picker that the settings' pinned skill and the routine editor share.
   The checkout, the default model, and the skills are each one `useRead`.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
   `web/components/session-switcher.tsx` is the Cmd+K search over every session.
@@ -453,8 +455,10 @@ The page lives in `web/`.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
 - `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
   `SessionRow` is the one row a past session and a live host both render.
-  `web/components/todo-categories.tsx` holds its Todo tab, the categories.
+  `web/components/todo-categories.tsx` holds its Todo tab, the categories, and `web/components/routines/routines-nav.tsx` its Routines tab, the routines by name.
 - `web/components/user-todos.tsx`: the Todo page, its lists, and the open todo, whose notes `web/components/markdown-editor.tsx` edits and previews through `message-markdown.tsx`.
+- `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
+  `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.
 - `web/components/pane.tsx`: a pane.
   `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button and the checkout read, `past-conversation.tsx` a past session's view, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` the project, pull request, and ticket chips of a header.
@@ -464,7 +468,7 @@ The page lives in `web/`.
 - `web/components/dashboard-context.tsx`: the stable dashboard actions (`send`, `open`, `start`, `end`, …) and the last start of each kind, provided once by `App`, which the sidebar, the panes, and the pages read instead of taking them as props.
 - `web/components/plan-panel.tsx`: the right sidebar's plan and changes for the focused pane.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
-  The inbox and tickets pages share `web/components/list-sheet-page.tsx` for their frame, header, and load and refresh states.
+  The inbox and tickets pages share `web/components/list-sheet-page.tsx` for their frame, header, and load and refresh states, and the Todo and Routines pages its `PageFrame`.
   The inbox also uses its sheet, which keeps its target through its exit slide. The tickets page replaces the list with the issue in the main content instead.
   Both use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
   `SheetFrame` is the pull request sheet's header and scrolling body, and `LoadNote` is the loading or error line that sheet, the issue detail, and the list page share.

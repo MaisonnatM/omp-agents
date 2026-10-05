@@ -8,6 +8,7 @@ import {
 	hashForInbox,
 	hashForLayout,
 	hashForNewSession,
+	hashForRoutines,
 	hashForSettings,
 	hashForTickets,
 	hashForTodo,
@@ -116,6 +117,16 @@ describe("layout hash", () => {
 		expect(routeFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "page", page: { kind: "todo", category: "a b/c" } });
 		expect(routeFromHash("#todo/")).toEqual({ kind: "page", page: { kind: "todo", category: null } });
 		for (const hash of ["#todo", "#todo/0b9e"]) expect(routeFromHash(hash).kind).toBe("page");
+	});
+
+	test("the routines hash opens the list or one routine, and no routines hash is read as a layout", () => {
+		const id = "3f2a9c1e-7b4d-4e8a-9f61-0c2d5e8b7a14";
+		expect(hashForRoutines(null)).toBe("#routines");
+		expect(hashForRoutines(id)).toBe(`#routines/${id}`);
+		expect(routeFromHash("#routines")).toEqual({ kind: "page", page: { kind: "routines", target: null } });
+		expect(routeFromHash(`#routines/${id}`)).toEqual({ kind: "page", page: { kind: "routines", target: id } });
+		expect(routeFromHash("#routines/")).toEqual({ kind: "page", page: { kind: "routines", target: null } });
+		expect(routeFromHash("#routinesx").kind).toBe("panes");
 	});
 
 	test("every page hash names its page and route, and a session or layout hash names none", () => {

@@ -13,6 +13,7 @@ import { SessionSwitcher } from "./components/session-switcher";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
 import { SplitResizeHandle, splitAt, useSplitRatio } from "./components/split-resize-handle";
+import { RoutinesPage } from "./components/routines/routines-page";
 import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-page";
 import { ToolsExpanded } from "./components/transcript";
 import { TodoPage } from "./components/user-todos";
@@ -122,9 +123,12 @@ export function App() {
 	const linear = linearStore.usePolling();
 	/** The Tickets tab and its shortcut show only once omp is signed in to Linear. */
 	const ticketsShown = linear.read?.data.connected === true;
-	const tab: SidebarTab = page?.kind === "inbox" || page?.kind === "todo" ? page.kind : page?.kind === "tickets" && ticketsShown ? "tickets" : "sessions";
+	const tab: SidebarTab =
+		page?.kind === "inbox" || page?.kind === "todo" || page?.kind === "routines" ? page.kind : page?.kind === "tickets" && ticketsShown ? "tickets" : "sessions";
 	/** The category the Todo page shows; one another window removed shows every todo. */
 	const todoCategory = page?.kind === "todo" && state.userTodos?.categories.some(({ id }) => id === page.category) ? page.category : null;
+	/** The routine the Routines page shows; one another window deleted shows the list. */
+	const routinesTarget = page?.kind === "routines" && state.routines.some(({ id }) => id === page.target) ? page.target : null;
 	const showTab = (next: SidebarTab): void => {
 		if (next === "sessions") show(layout);
 		else if (next === "todo") navigate({ kind: "todo", category: null });
@@ -166,6 +170,10 @@ export function App() {
 		todo: () => {
 			if (page?.kind === "todo") return false;
 			showTab("todo");
+		},
+		routines: () => {
+			if (page?.kind === "routines") return false;
+			showTab("routines");
 		},
 		restore: () => {
 			if (!maximized) return false;
@@ -219,6 +227,21 @@ export function App() {
 			break;
 		case "todo":
 			main = <TodoPage list={state.userTodos} category={todoCategory} disabled={!state.connected} onChange={changeTodo} />;
+			break;
+		case "routines":
+			main = (
+				// Keyed by its target, so leaving for another routine or the list closes the editor.
+				<RoutinesPage
+					key={routinesTarget ?? ""}
+					routines={state.routines}
+					target={routinesTarget}
+					// Every host, since a routine may run in `/tmp`, which the sidebar hides, and its runs still name their sessions.
+					hosts={state.hosts}
+					workspaces={projects}
+					defaultCwd={defaultCwd(view, visible.hosts, visible.past, project)}
+					connected={state.connected}
+				/>
+			);
 			break;
 		case undefined:
 			if (layout.panes.length > 0) {
@@ -290,6 +313,8 @@ export function App() {
 						onTab={showTab}
 						userTodos={state.userTodos}
 						todoCategory={todoCategory}
+						routines={state.routines}
+						routinesTarget={routinesTarget}
 						sectionTarget={sectionTarget}
 						onSectionTarget={setSectionTarget}
 						project={project}
