@@ -249,6 +249,8 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
     const reactId = useId();
     const total = questions.length;
     const safeIndex = Math.max(0, Math.min(index, Math.max(0, total - 1)));
+    // The last step submits: Finish, the gradient, and completing the flow are this predicate.
+    const submits = safeIndex >= total - 1;
     const question = questions[safeIndex];
     const qId = question ? questionKey(question, safeIndex) : "";
     const currentAnswer = answers[qId];
@@ -419,14 +421,14 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
     // ── Answer actions ───────────────────────────────────────────
     const goNext = useCallback(
       (snapshot: Record<string, AskUserAnswer>) => {
-        if (safeIndex >= total - 1) {
+        if (submits) {
           onComplete?.(snapshot);
         } else {
           markFocusRestore();
           setIndex(safeIndex + 1);
         }
       },
-      [safeIndex, total, onComplete, setIndex, markFocusRestore]
+      [submits, safeIndex, onComplete, setIndex, markFocusRestore]
     );
 
     const handleSingleSelect = useCallback(
@@ -993,8 +995,7 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
               registerItem={registerItem}
               role={isMulti ? "checkbox" : "radio"}
               isSelected={isSelected}
-              agentAction={!isMulti && safeIndex >= total - 1}
-              active={isHover}
+              submitAffordance={!isMulti && submits ? "row" : null}
               // Roving tabindex — see firstSelectedRow above. Multi-select
               // no longer puts a tab stop on every row.
               tabIndex={
@@ -1134,7 +1135,7 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
             registerItem={registerItem}
             role={null}
             isSelected={otherText.length > 0}
-            agentArrow={!isMulti && safeIndex >= total - 1}
+            submitAffordance={!isMulti && submits ? "arrow" : null}
             tabIndex={-1}
             onClick={() => otherInputRef.current?.focus()}
             shape={shape}
@@ -1544,7 +1545,7 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
                         }}
                       >
                         <Button
-                          variant={safeIndex >= total - 1 ? "agent" : "primary"}
+                          variant={submits ? "agent" : "primary"}
                           size="sm"
                           onClick={
                             isFreeText ? handleOtherSubmit : handleMultiNext
@@ -1563,13 +1564,13 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
                         >
                           <span className="inline-flex items-center gap-1.5">
                             {question.nextLabel ??
-                              (safeIndex >= total - 1 ? "Finish" : "Continue")}
+                              (submits ? "Finish" : "Continue")}
                             {/* Shortcut hint — replaces the trailing arrow. Sits
                                 inside the button so it dims with the disabled
                                 state. ⌘↵ on macOS, ⌃↵ elsewhere. Desktop-only:
                                 mobile has no physical keyboard to trigger it. */}
                             <span className="hidden sm:contents">
-                              <ShortcutChip shape={shape} tone={safeIndex >= total - 1 ? "agent" : "inverted"}>
+                              <ShortcutChip shape={shape} tone="inverted">
                                 {isMac ? "⌘" : "⌃"}
                                 {"↵"}
                               </ShortcutChip>
@@ -1598,7 +1599,8 @@ AskUserQuestions.displayName = "AskUserQuestions";
 // ── Shortcut chip ─────────────────────────────────────────────
 // Small keycap showing the keyboard shortcut for an action, so Back (←),
 // Skip (→) and Continue (⌘↵ / ⌃↵) all read consistently. `tone="inverted"`
-// sits on the dark primary button; the default reads on quiet ghost buttons.
+// sits on a filled button: the keycap is that button's text color at 15%,
+// and the glyph inherits. The default reads on quiet ghost buttons.
 // suppressHydrationWarning: the ⌘/⌃ glyph is platform-detected in a lazy
 // initializer (see isMac), so the server always renders ⌃ while a Mac client
 // renders ⌘ — a benign one-character text mismatch on hydration.
@@ -1608,7 +1610,7 @@ function ShortcutChip({
   shape,
 }: {
   children: React.ReactNode;
-  tone?: "muted" | "inverted" | "agent";
+  tone?: "muted" | "inverted";
   shape: ReturnType<typeof useShape>;
 }) {
   return (
@@ -1617,11 +1619,7 @@ function ShortcutChip({
       suppressHydrationWarning
       className={cn(
         "inline-flex items-center justify-center gap-0.5 px-1 min-w-[18px] h-[18px] text-[11px] leading-none font-sans tracking-wide",
-        tone === "agent"
-          ? "bg-white/15 text-white"
-          : tone === "inverted"
-            ? "bg-background/15 text-background"
-            : "bg-foreground/10 text-muted-foreground",
+        tone === "inverted" ? "bg-current/15" : "bg-foreground/10 text-muted-foreground",
         shape.bg
       )}
     >
@@ -1637,9 +1635,8 @@ interface RowProps {
   registerItem: (index: number, element: HTMLElement | null) => void;
   role: "radio" | "checkbox" | null;
   isSelected: boolean;
-  agentAction?: boolean;
-  agentArrow?: boolean;
-  active?: boolean;
+  /** Last-step single-select paint. "row" fills the option; "arrow" fills only the Other row's arrow. */
+  submitAffordance?: "row" | "arrow" | null;
   tabIndex: number;
   onClick: () => void;
   onKeyDown?: (e: ReactKeyboardEvent<HTMLDivElement>) => void;
@@ -1678,9 +1675,7 @@ function Row({
   registerItem,
   role,
   isSelected,
-  agentAction = false,
-  agentArrow = false,
-  active = false,
+  submitAffordance = null,
   tabIndex,
   onClick,
   onKeyDown,
@@ -1724,7 +1719,7 @@ function Row({
           }
           className={cn(
             "absolute inset-0 inline-flex items-center justify-center",
-            agentAction ? "bg-white/15 text-white" : agentArrow ? "agent-action" : "bg-foreground text-background",
+            submitAffordance === "arrow" ? "agent-action" : submitAffordance === "row" ? "bg-current/15" : "bg-foreground text-background",
             shape.bg,
             onArrowClick && "cursor-pointer"
           )}
@@ -1777,11 +1772,9 @@ function Row({
             ? chipFilled
               ? "bg-foreground text-background"
               : "border border-border text-muted-foreground"
-            : agentAction
-              ? "text-white"
-              : chipFilled
-                ? "text-foreground"
-                : "text-muted-foreground",
+            : chipFilled
+              ? "text-foreground"
+              : "text-muted-foreground",
           // Only fade the chip when it shares a slot with the arrow — for
           // chip-on-left the arrow has its own slot on the right, so the
           // chip stays in place.
@@ -1821,7 +1814,7 @@ function Row({
       ref={rowRef}
       data-fluid-hover-index={index}
       data-state={isSelected ? "checked" : "unchecked"}
-      data-active={agentAction && active ? "" : undefined}
+      data-highlighted={submitAffordance === "row" && showArrow ? "" : undefined}
       role={role ?? undefined}
       aria-checked={role === "radio" || role === "checkbox" ? !!aria["aria-checked"] : undefined}
       aria-label={ariaLabel}
@@ -1880,8 +1873,12 @@ function Row({
             : "pl-1.5 pr-1.5"
           : "pl-3 pr-1.5",
         shape.item,
-        agentAction && "agent-action",
-        agentAction && shape.bg,
+        // Title and description already use text-foreground and text-muted-foreground.
+        // Point those tokens at the fill so they stay distinct, instead of a global color override.
+        submitAffordance === "row" && "agent-action",
+        submitAffordance === "row" && "[--foreground:var(--agent-action-foreground)]",
+        submitAffordance === "row" && "[--muted-foreground:color-mix(in_srgb,var(--agent-action-foreground)_70%,transparent)]",
+        submitAffordance === "row" && shape.bg,
       )}
     >
       {/* Selected background is drawn at the container level so contiguous

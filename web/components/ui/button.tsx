@@ -113,7 +113,7 @@ interface ButtonProps
 const bgVariants: Record<string, string> = {
   primary:
     "[--btn-bg:var(--foreground)] group-hover:[--btn-bg:color-mix(in_oklab,var(--foreground)_90%,var(--background))] group-active:[--btn-bg:color-mix(in_oklab,var(--foreground)_80%,var(--background))] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",
-  agent: "agent-action agent-button-surface",
+  agent: "agent-button-surface",
   secondary:
     "[--btn-bg:var(--tint)] group-hover:[--btn-bg:var(--tint-hover)] group-active:[--btn-bg:var(--tint)] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",
   // The border ring is an outer 1px shadow at rest that hands off to an
@@ -129,11 +129,11 @@ const bgVariants: Record<string, string> = {
 };
 
 /* Forced-active (`active` prop): pressed colors at full size; the
-   geometric press-collapse still reacts on top. */
-const activeBgVariants: Record<string, string> = {
+   geometric press-collapse still reacts on top. Agent has no entry.
+   Its root carries data-pressed, and that selects the pressed fill. */
+const activeBgVariants: Partial<Record<string, string>> = {
   primary:
     "[--btn-bg:color-mix(in_oklab,var(--foreground)_80%,var(--background))] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",
-  agent: "agent-action agent-button-surface",
   secondary:
     "[--btn-bg:var(--tint)] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",
   tertiary:
@@ -196,15 +196,13 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     // proportionate across sizes.
     const spinnerSizeClass = isCompact ? "h-7 w-7" : "h-9 w-9";
     const shape = useShape();
-    const bgClass = active
-      ? activeBgVariants[variant ?? "primary"]
-      : bgVariants[variant ?? "primary"];
+    const variantKey = variant ?? "primary";
+    const bgClass = (active && activeBgVariants[variantKey]) || bgVariants[variantKey];
 
     const internals = (
       <>
         <span
           aria-hidden
-          data-pressed={variant === "agent" && active ? "" : undefined}
           className={cn(
             "absolute inset-px rounded-[inherit] transition-[box-shadow,background-color] [transition-duration:180ms,80ms] [transition-timing-function:cubic-bezier(0.23,1,0.32,1),ease] group-active:[transition-duration:80ms,80ms]",
             bgClass
@@ -291,6 +289,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={asChildElement ? undefined : disabled || loading}
         style={style}
         {...props}
+        data-pressed={active ? "" : undefined}
       >
         {asChildElement
           ? cloneElement(asChildElement, undefined, internals)
