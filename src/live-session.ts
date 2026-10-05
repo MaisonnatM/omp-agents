@@ -2,8 +2,8 @@
 import type { HostSnapshot } from "./omp/collab";
 import type { Delivery, MessageQueue, PromptImage, RosterHost, UserAnswer } from "./shared";
 
-/** What the index of session files knows of a session: the pull requests it worked on and its /ship stage. */
-export type SessionFacts = Pick<RosterHost, "pullRequests" | "ship">;
+/** What the index of session files knows of a session: the pull requests and Linear issues it worked on, and its /ship stage. */
+export type SessionFacts = Pick<RosterHost, "pullRequests" | "tickets" | "ship">;
 
 /** What a live session reports as it runs. */
 export type LiveUpdate =

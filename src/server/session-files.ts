@@ -3,7 +3,7 @@ import { basename, dirname, join } from "node:path";
 import { repoOf } from "../github";
 import { listSessionFiles, readSessionFile, type SavedSession, sessionsDir } from "../omp/sessions";
 import { displayPath } from "../paths";
-import { PullRequestIndex } from "../pull-requests";
+import { SessionFactsIndex } from "../session-facts";
 import type { SessionFacts } from "../live-session";
 import type { LinkedPullRequest, PastSession } from "../shared";
 
@@ -33,7 +33,7 @@ export class SessionFiles {
 	#touched = new Set<string>();
 	/** Scans and refreshes run one after another, so a slow full scan never overwrites a newer single-file read. */
 	#chain: Promise<unknown> = Promise.resolve();
-	readonly pullRequests = new PullRequestIndex(repoOf);
+	readonly facts = new SessionFactsIndex(repoOf);
 	readonly #root: string;
 
 	/** `root`: omp's sessions directory, one directory per working directory. */
@@ -47,17 +47,17 @@ export class SessionFiles {
 	/** What the pull-request index knows of session `sessionId`'s transcript. */
 	readonly pullRequestsOf = (sessionId: string): LinkedPullRequest[] => {
 		const path = this.pathOf(sessionId);
-		return path ? this.pullRequests.of(path) : [];
+		return path ? this.facts.pullRequestsOf(path) : [];
 	};
 
-	/** What the index knows of session `sessionId`: its pull requests and /ship stage. */
+	/** What the index knows of session `sessionId`: its pull requests, Linear issues, and /ship stage. */
 	readonly factsOf = (sessionId: string): SessionFacts => {
 		const path = this.pathOf(sessionId);
-		return path ? this.#factsAt(path) : { pullRequests: [], ship: null };
+		return path ? this.#factsAt(path) : { pullRequests: [], tickets: [], ship: null };
 	};
 
 	#factsAt(path: string): SessionFacts {
-		return { pullRequests: this.pullRequests.of(path), ship: this.pullRequests.shipOf(path) };
+		return { pullRequests: this.facts.pullRequestsOf(path), tickets: this.facts.ticketsOf(path), ship: this.facts.shipOf(path) };
 	}
 
 	/** Directories sessions ran in, newest first. Sessions from old omp versions recorded none. */
@@ -125,7 +125,7 @@ export class SessionFiles {
 
 	/** Read the transcripts for the pull requests they touched; whether any link changed. The first read covers every transcript. */
 	linkPullRequests(): Promise<boolean> {
-		return this.pullRequests.refresh(this.#files);
+		return this.facts.refresh(this.#files);
 	}
 
 	/** The saved sessions that no live session continues, newest first. `interrupted` names those that stopped without End session. */

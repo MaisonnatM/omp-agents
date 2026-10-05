@@ -308,6 +308,10 @@ For installation, see the [README](../README.md).
   A PR that a session submitted counts as submitted, even when it also worked on it.
 - In a session's header, a pull request's number opens its details in the inbox, the arrow after the number opens it on GitHub, and the Graphite logo after the arrow opens it on Graphite.
   Hover the number to see whether the session submitted it or worked on it.
+- A session's header also lists the Linear issues it worked on by identifier, such as `ENG-2368`, after its pull requests, and its row's menu has **Open ENG-2368** for each.
+  Both open the issue's sheet on the tickets page (`#tickets/<identifier>`).
+  An issue counts when the session or one of its subagents read it with omp's Linear tools (`get_issue`, `list_comments`), changed or opened it (`save_issue`), commented on it (`save_comment`), or names it in its `/ship` step.
+  An issue that a `list_issues` search only listed does not count.
 - Sessions that use `/ship` show their current workflow step in the sidebar and session header, for example `6/7 · Rebase`.
   Hover the badge to see the Linear issue.
   The steps are ticket, implementation, draft PR, thermonuclear review, ready gate, live review, and merged.

@@ -117,12 +117,12 @@ export function RowMenu({ view, label, isOpen, onOpen, children, items, style }:
 }
 
 interface SessionItemsProps {
-	row: { cwd: string; sessionId: string; pullRequests: PullRequest[] };
+	row: { cwd: string; sessionId: string; pullRequests: PullRequest[]; tickets: string[] };
 	pinned: boolean;
 	onTogglePin: (sessionId: string) => void;
 }
 
-/** Items a running or past session's menu shares: pinning it, its pull requests, its workspace's settings, and copying its ids. */
+/** Items a running or past session's menu shares: pinning it, its pull requests and Linear issues, its workspace's settings, and copying its ids. */
 function SessionItems({ row, pinned, onTogglePin }: SessionItemsProps) {
 	return (
 		<>
@@ -135,6 +135,12 @@ function SessionItems({ row, pinned, onTogglePin }: SessionItemsProps) {
 				<MenuLinkItem key={pullRequestUrl(pr)} href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
 					<GitPullRequest />
 					Open {pr.repo}#{pr.number}
+				</MenuLinkItem>
+			))}
+			{row.tickets.map(id => (
+				<MenuLinkItem key={id} href={hashForTickets(id)}>
+					<SquareKanban />
+					Open {id}
 				</MenuLinkItem>
 			))}
 			<MenuLinkItem href={hashForSettings(row.cwd)}>
