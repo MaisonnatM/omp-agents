@@ -88,7 +88,7 @@ export function App() {
 	const maximized = layout.maximized && !page;
 	const lists = sidebarSessions(visible.hosts, visible.past, project, pinned);
 	// The running sessions the sidebar lists, in its order, which ending a session moves its panes along.
-	const listedHosts = [...lists.pinned.hosts, ...lists.running].map(host => host.instanceId);
+	const listedHosts = [...lists.pinned.hosts, ...lists.running, ...lists.idle].map(host => host.instanceId);
 	const listed = listedViews(lists);
 	const latest = useRef({ layout, listedHosts, sidebars });
 	latest.current = { layout, listedHosts, sidebars };
@@ -139,6 +139,11 @@ export function App() {
 		help: () => setShortcutsOpen(open => !open),
 		switcher: () => setSwitcherOpen(open => !open),
 		newSession: openNewSession,
+		// As the header's End session: a writable session's own view, not a subagent's.
+		endSession: () => {
+			if (page || view?.kind !== "live" || view.agentId !== null || viewHost?.control.phase !== "live" || viewHost.control.readOnly) return false;
+			endHost(viewHost.instanceId);
+		},
 		previousSession: () => step(-1),
 		nextSession: () => step(1),
 		tools: () => setToolsExpanded(expanded => !expanded),

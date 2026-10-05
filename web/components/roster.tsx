@@ -453,7 +453,7 @@ export function Roster({
 		onOpen({ kind: "past", sessionId }, "replace");
 		start({ kind: "resume", sessionId });
 	};
-	const { pinned, running, interrupted, ended } = lists;
+	const { pinned, running, idle, interrupted, ended } = lists;
 	const resumingAll = resumeAll?.phase === "starting";
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	const selectedProject = projects.find(({ cwd }) => cwd === project);
@@ -588,7 +588,13 @@ export function Roster({
 					)}
 					<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
 						<SidebarGroupLabel>
-							{running.length > 0 ? `${running.length} running` : pinned.hosts.length > 0 ? "No other sessions running" : "No sessions"}
+							{running.length > 0
+								? `${running.length} running`
+								: pinned.hosts.length > 0
+									? "No other sessions running"
+									: idle.length > 0
+										? "No sessions running"
+										: "No sessions"}
 						</SidebarGroupLabel>
 						{/* The group finds its header actions by type, and the tooltip would hide this one, so its chevron would sit under the button. */}
 						<SidebarGroupActions>
@@ -602,6 +608,12 @@ export function Roster({
 							{running.map(host => hostRow(host, false))}
 						</SidebarMenu>
 					</SidebarGroup>
+					{idle.length > 0 && (
+						<SidebarGroup collapsible open={!collapsed.has("idle")} onOpenChange={() => toggleGroup("idle")}>
+							<SidebarGroupLabel>{`${idle.length} idle`}</SidebarGroupLabel>
+							<SidebarMenu aria-label="Idle omp sessions">{idle.map(host => hostRow(host, false))}</SidebarMenu>
+						</SidebarGroup>
+					)}
 					{interrupted.length > 0 && (
 						<SidebarGroup collapsible open={!collapsed.has("interrupted")} onOpenChange={() => toggleGroup("interrupted")}>
 							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>

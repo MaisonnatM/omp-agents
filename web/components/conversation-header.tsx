@@ -2,7 +2,9 @@ import { CircleStop } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ControlPhase, LiveView } from "../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";
+import { shortcutLabels } from "../shortcuts";
 import { useGitCheckout } from "../use-git-checkout";
 import { GitRef } from "./git";
 import { Model } from "./model-picker";
@@ -56,19 +58,19 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 	return (
 		<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"}>
 			{subject.kind === "session" && live && host && (
-				<Button
-					variant="primary"
-					size="compact"
-					leadingIcon={CircleStop}
-					onClick={() => onEnd(view.instanceId)}
-					title={
+				<Tooltip
+					content={
 						host.source === "dashboard"
 							? "Stop the omp process this dashboard started. Its transcript moves to Past sessions, where Resume continues it."
 							: `Stop the omp process running in its terminal (pid ${host.pid}). Its transcript moves to Past sessions, where Resume continues it.`
 					}
+					shortcut={shortcutLabels("endSession")}
+					side="bottom"
 				>
-					End session
-				</Button>
+					<Button variant="primary" size="compact" leadingIcon={CircleStop} onClick={() => onEnd(view.instanceId)}>
+						End session
+					</Button>
+				</Tooltip>
 			)}
 			{actions}
 		</Header>

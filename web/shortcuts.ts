@@ -6,6 +6,7 @@ export type ShortcutId =
 	| "dequeue"
 	| "switcher"
 	| "newSession"
+	| "endSession"
 	| "previousSession"
 	| "nextSession"
 	| "model"
@@ -60,6 +61,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "dequeue", label: "Move the last queued message back into the empty composer", keys: [{ chord: { key: "ArrowUp" }, scope: "composer" }] },
 	{ id: "switcher", label: "Jump to a session", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
 	{ id: "newSession", label: "Start a new session", keys: [{ chord: { key: "o", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "endSession", label: "End the focused session", keys: [{ chord: { key: "x", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "previousSession", label: "Open the previous session in the sidebar", keys: [{ chord: { key: "ArrowUp", alt: true }, scope: "anywhere" }] },
 	{ id: "nextSession", label: "Open the next session in the sidebar", keys: [{ chord: { key: "ArrowDown", alt: true }, scope: "anywhere" }] },
 	{ id: "model", label: "Choose the session's model", keys: [{ chord: { key: ".", mod: true }, scope: "anywhere" }] },
