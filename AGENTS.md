@@ -61,7 +61,7 @@ Besides a live session's own hash, the routes are `#past/<session id>`, `#sessio
 ## Desktop smoke
 
 The desktop shell opens a real window on the user's screen.
-Start it on your smoke port from `desktop/`, after `bun run build`, as a named service: `PORT=<port> ./node_modules/.bin/electron . --remote-debugging-port=<page port> --inspect=<main port>`, ready on the `Sign in at` line when it starts its own server.
+Start it on your smoke port from `desktop/`, after `bun run build`, as a named service: `PORT=<port> bun launch.ts --remote-debugging-port=<page port> --inspect=<main port>`, ready on the `Sign in at` line when it starts its own server.
 Pick the two debugging ports the same way as the smoke port, between 9400 and 9899.
 Drive it through the Chrome DevTools Protocol, not the keyboard:
 

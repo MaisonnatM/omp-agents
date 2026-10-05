@@ -574,6 +574,9 @@ Alt is Option on macOS.
   The menu takes none of the dashboard's own shortcuts.
   Right-click in a text field for cut, copy, paste, and spelling suggestions.
 - The window remembers its size and position.
+- The window title follows what the page shows, and a browser tab's title does too: the focused session's name, a subagent's name ahead of its session's, `Inbox`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, or `New session`, then `omp agents`.
+  A session without a name reads as its project, and nothing open reads `omp agents`.
+- The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
 
 ## Limitations
 

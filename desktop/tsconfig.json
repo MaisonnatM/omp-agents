@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["main.ts"]
+  "include": ["main.ts", "launch.ts"]
 }
