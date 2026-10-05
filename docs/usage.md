@@ -11,6 +11,7 @@ For installation, see the [README](../README.md).
 - [Questions](#questions)
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
 - [Pull requests and the inbox](#pull-requests-and-the-inbox)
+- [Todo list](#todo-list)
 - [Settings](#settings)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Desktop app](#desktop-app)
@@ -52,7 +53,7 @@ For installation, see the [README](../README.md).
   With the edge focused, the arrow keys move it in steps (hold Shift for bigger steps), and Home and End jump to the narrowest and widest sizes.
   Double-click the edge to reset the width.
   The button at the outer corner of the sessions sidebar's header hides it and leaves a narrow strip whose button shows it again.
-  The plan and changes sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden.
+  The plan and changes sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Shift+B the plan and changes sidebar.
   Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
 - The left sidebar's session rows leave out the full working directory and the model; the pane header shows both.
@@ -68,7 +69,7 @@ For installation, see the [README](../README.md).
 ## Plan and changes sidebar
 
 - The right sidebar shows what the focused pane's agent planned and changed: a live session, one of its subagents, or a past session, each from its own transcript file.
-  It hides for the inbox, the tickets, **Settings**, and the new-session page.
+  It hides for the inbox, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
 - Two tabs split it, **Plan** and **Files**.
   The sidebar remembers the tab you chose, for every view.
   The **Files** tab names how many files changed, as in `Files (3)`.
@@ -130,6 +131,7 @@ For installation, see the [README](../README.md).
 
 - Opening a live session or subagent puts the cursor in the focused pane's composer once it accepts messages, so you can type right away.
   A session that reconnects takes the cursor back the same way.
+- The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
 - Each tool call in a tool group shows an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
   The icon of a call that failed is red, and the group's heading counts the failures.
 - A `task` tool call lists the subagents it spawned, by id, under its row: each one as it starts while the call runs, and every one once the call finishes.
@@ -307,15 +309,19 @@ For installation, see the [README](../README.md).
   A PR that a session submitted counts as submitted, even when it also worked on it.
 - In a session's header, a pull request's number opens its details in the inbox, the arrow after the number opens it on GitHub, and the Graphite logo after the arrow opens it on Graphite.
   Hover the number to see whether the session submitted it or worked on it.
+- A session's header also lists the Linear issues it worked on by identifier, such as `ENG-2368`, after its pull requests, and its row's menu has **Open ENG-2368** for each.
+  Both open the issue's sheet on the tickets page (`#tickets/<identifier>`).
+  An issue counts when the session or one of its subagents read it with omp's Linear tools (`get_issue`, `list_comments`), changed or opened it (`save_issue`), commented on it (`save_comment`), or names it in its `/ship` step.
+  An issue that a `list_issues` search only listed does not count.
 - Sessions that use `/ship` show their current workflow step in the sidebar and session header, for example `6/7 · Rebase`.
   Hover the badge to see the Linear issue.
   The steps are ticket, implementation, draft PR, thermonuclear review, ready gate, live review, and merged.
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.
-- Three tabs under the sidebar header, **Inbox**, **Tickets**, and **Sessions**, switch what the sidebar lists.
+- Four tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, and **Todo**, switch what the sidebar lists.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
-  **Sessions** lists the running and past sessions.
+  **Sessions** lists the running and past sessions, and **Todo** your own todo list; see [Todo list](#todo-list).
   **Inbox** opens a pull request inbox like Graphite's, and the sidebar then lists the inbox's sections with their pull request counts, under each repository's name when there are several.
   Click a section in the sidebar to scroll the page to it and move focus there; a folded section unfolds.
   An `#inbox` address selects the Inbox tab.
@@ -405,6 +411,26 @@ For installation, see the [README](../README.md).
   Linear's page sends the browser back to `localhost:3000`, so that port must be free while you sign in.
   When Linear later refuses the sign-in, the tickets page says to run `/mcp reauth <name>` in omp; **Sign in again** in the settings does the same.
 
+## Todo list
+
+- The **Todo** tab lists todos of your own, not tied to a session or a project, in the sidebar beside the panes.
+  Choosing it from the inbox or the tickets returns to the panes; from **Settings** or the new-session draft, the page stays.
+  The browser's localStorage keeps whether **Sessions** or **Todo** was chosen last.
+- **Add a todo** at the bottom of the list starts a new todo; type it and press Enter.
+  Enter then starts the next todo below it, and Enter on an empty one, Esc, or a click elsewhere stops.
+- A todo can hold todos of its own, one level down and no deeper.
+  Tab while typing a todo moves it under the todo above it, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
+  Tab does nothing on a todo that holds todos of its own, since they would end up three deep.
+  The **+** that shows on hover adds a todo under that one.
+- Click the circle before a todo to check it; checking a todo checks the todos under it too.
+  A todo that holds others shows how many of them are checked, as in `2/3`.
+  The group label counts the top-level todos left to do, and its button removes every checked todo.
+- Click a todo's text to edit it.
+  An empty todo, or Backspace in one, removes it, and so does the **×** that shows on hover; removing a todo removes the todos under it.
+- The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
+  A `todos.json` that the server cannot read as a todo list is moved to `todos.json.invalid` rather than written over.
+  While the page has lost the server, the list cannot be changed.
+
 ## Settings
 
 - The gear button in the sidebar header opens **Settings**, split into six tabs that look like the sidebar's **Inbox** and **Sessions** tabs: **Model roles & provider order**, **Retry and fallback**, **Files**, **Integrations**, **New sessions**, and **Appearance**.
@@ -470,6 +496,7 @@ Alt is Option on macOS.
 | G then I | Outside text fields | Go to the pull request inbox |
 | G then T | Outside text fields | Go to your Linear tickets |
 | G then S | Outside text fields | Go to the sessions |
+| G then D | Outside text fields | Go to your todo list |
 | G then P | Outside text fields | Choose the sidebar's project |
 
 - Press `?` outside a text field, Cmd+/ anywhere, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
@@ -491,7 +518,8 @@ Alt is Option on macOS.
   Cmd+, opens Settings, where the model roles live, and closes it again.
   Ending a session has no shortcut: use **End session** in its header.
 - G then I opens the Inbox tab.
-  G then S goes back from the inbox, Settings, or the new-session draft to the panes.
+  G then S goes back from the inbox, Settings, or the new-session draft to the panes, and from the **Todo** tab to the sessions.
+  G then D opens the **Todo** tab.
   G then P opens the project picker with its search field focused.
 - Session shortcuts act on the focused pane.
   The dashboard does not read `~/.omp/agent/keybindings.yml`.

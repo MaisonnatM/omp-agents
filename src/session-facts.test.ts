@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PullRequestIndex, PullRequestScan, resolveLinks } from "./pull-requests";
+import { resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
 
 const toolCall = (id: string, name: string, args: object) =>
 	JSON.stringify({
@@ -28,12 +28,12 @@ const submitted = (owner: string, repo: string, number: number) => ({ kind: "pr"
 const worked = (owner: string, repo: string, number: number) => ({ kind: "pr", link: "worked", owner, repo, number }) as const;
 
 const scanned = (lines: string[]) => {
-	const scan = new PullRequestScan();
+	const scan = new SessionFactsScan();
 	for (const line of lines) scan.applyLine(line);
 	return [...scan.found.values()];
 };
 
-describe("PullRequestScan", () => {
+describe("SessionFactsScan", () => {
 	test("every branch a gt submit created or updated, once each", () => {
 		const output = [
 			"🥞 Pushing to remote and creating/updating PRs for stack...",
@@ -132,6 +132,26 @@ describe("PullRequestScan", () => {
 			]),
 		).toEqual([submitted("o", "r", 1), worked("o", "r", 2)]);
 	});
+
+	test("the Linear issues a session read, changed, opened, or commented on, but not one a search listed", () => {
+		const device = (id: string, tool: string, args: object) => toolCall(id, "write", { path: `xd://mcp__linear_${tool}`, content: JSON.stringify(args) });
+		const answered = (toolCallId: string, text: string, isError = false) =>
+			JSON.stringify({ type: "message", message: { role: "toolResult", toolCallId, toolName: "write", isError, content: [{ type: "text", text }] } });
+		const scan = new SessionFactsScan();
+		for (const line of [
+			toolCall("a", "mcp__linear_list_issues", { query: "ENG-1" }),
+			toolCall("b", "mcp__linear_get_issue", { id: "eng-2" }),
+			toolCall("c", "mcp__linear_get_issue", { id: "c07eebf1-444b-449f-b31d-a43d2b62504a" }),
+			device("d", "save_comment", { issueId: "ENG-3", body: "Done" }),
+			device("e", "save_issue", { team: "ENG", title: "New" }),
+			answered("e", JSON.stringify({ id: "ENG-4", title: "New" })),
+			device("f", "save_issue", { team: "ENG", title: "Refused" }),
+			answered("f", JSON.stringify({ id: "ENG-5" }), true),
+			toolCall("g", "xd_mcp__linear_list_comments", { issueId: "ENG-2" }),
+			JSON.stringify({ type: "custom", customType: "omp-ship.state", data: { stage: "ticket", issue: "ENG-6" } }),
+		]) scan.applyLine(line);
+		expect([...scan.tickets]).toEqual(["ENG-2", "ENG-3", "ENG-4", "ENG-6"]);
+	});
 });
 
 describe("resolveLinks", () => {
@@ -176,7 +196,7 @@ const sessionDir = () => {
 	return dir;
 };
 
-describe("PullRequestIndex", () => {
+describe("SessionFactsIndex", () => {
 	test("folds in subagents' submissions and picks up appends once the session file changes", async () => {
 		const dir = sessionDir();
 		const session = join(dir, "2026-10-01T00-00-00-000Z_s1.jsonl");
@@ -185,19 +205,19 @@ describe("PullRequestIndex", () => {
 		mkdirSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child"), { recursive: true });
 		writeFileSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child", "Grandchild.jsonl"), `${line(2)}\n`);
 
-		const index = new PullRequestIndex(async () => null);
+		const index = new SessionFactsIndex(async () => null);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 		expect(await index.refresh(listed(1))).toBe(true);
-		expect(index.of(session).map(pr => pr.number)).toEqual([1, 2]);
+		expect(index.pullRequestsOf(session).map(pr => pr.number)).toEqual([1, 2]);
 
 		appendFileSync(session, `${line(3)}\n${line(4).slice(0, 20)}`);
 		expect(await index.refresh(listed(1))).toBe(false);
-		expect(index.of(session).map(pr => pr.number)).toEqual([1, 2]);
+		expect(index.pullRequestsOf(session).map(pr => pr.number)).toEqual([1, 2]);
 		expect(await index.refresh(listed(2))).toBe(true);
-		expect(index.of(session).map(pr => pr.number)).toEqual([1, 3, 2]);
+		expect(index.pullRequestsOf(session).map(pr => pr.number)).toEqual([1, 3, 2]);
 
 		expect(await index.refresh([])).toBe(false);
-		expect(index.of(session)).toEqual([]);
+		expect(index.pullRequestsOf(session)).toEqual([]);
 	});
 
 	test("shows the latest parent workflow stage and picks up live review work on append", async () => {
@@ -210,7 +230,7 @@ describe("PullRequestIndex", () => {
 		const child = join(dir, "2026-10-01T00-00-00-000Z_ship", "Child");
 		mkdirSync(child, { recursive: true });
 		writeFileSync(join(child, "sub.jsonl"), `${state("merged")}\n`);
-		const index = new PullRequestIndex(async () => null);
+		const index = new SessionFactsIndex(async () => null);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
@@ -223,6 +243,26 @@ describe("PullRequestIndex", () => {
 		expect(index.shipOf(session)?.work).toBe("rebase");
 	});
 
+	test("lists the session's Linear issues before its subagents', each once, and reports a new one on append", async () => {
+		const dir = sessionDir();
+		const session = join(dir, "2026-10-01T00-00-00-000Z_tickets.jsonl");
+		const read = (id: string) => toolCall(`get-${id}`, "mcp__linear_get_issue", { id });
+		writeFileSync(session, `${read("ENG-1")}\n`);
+		const child = join(dir, "2026-10-01T00-00-00-000Z_tickets");
+		mkdirSync(child, { recursive: true });
+		writeFileSync(join(child, "Sub.jsonl"), `${read("ENG-2")}\n${read("ENG-1")}\n`);
+		const index = new SessionFactsIndex(async () => null);
+		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
+
+		expect(await index.refresh(listed(1))).toBe(true);
+		expect(index.ticketsOf(session)).toEqual(["ENG-1", "ENG-2"]);
+		appendFileSync(session, `${read("ENG-1")}\n`);
+		expect(await index.refresh(listed(2))).toBe(false);
+		appendFileSync(session, `${read("ENG-3")}\n`);
+		expect(await index.refresh(listed(3))).toBe(true);
+		expect(index.ticketsOf(session)).toEqual(["ENG-1", "ENG-3", "ENG-2"]);
+	});
+
 	test("asks for the repository only of sessions that name a bare number, and links pushes once the inbox names their PR", async () => {
 		const dir = sessionDir();
 		const reader = join(dir, "2026-10-01T00-00-00-000Z_s1.jsonl");
@@ -230,7 +270,7 @@ describe("PullRequestIndex", () => {
 		writeFileSync(reader, `${toolCall("r", "read", { path: "pr://6611" })}\n`);
 		writeFileSync(pusher, `${bashCall("p", "git push")}\n${result("p", pushed("me/feature"))}\n`);
 		const asked: string[] = [];
-		const index = new PullRequestIndex(async cwd => {
+		const index = new SessionFactsIndex(async cwd => {
 			asked.push(cwd);
 			return { owner: "acme", repo: "webapp" };
 		});
@@ -242,14 +282,14 @@ describe("PullRequestIndex", () => {
 			]),
 		).toBe(true);
 		expect(asked).toEqual(["/code/webapp"]);
-		expect(index.of(reader)).toEqual([{ owner: "acme", repo: "webapp", number: 6611, link: "worked" }]);
-		expect(index.of(pusher)).toEqual([]);
+		expect(index.pullRequestsOf(reader)).toEqual([{ owner: "acme", repo: "webapp", number: 6611, link: "worked" }]);
+		expect(index.pullRequestsOf(pusher)).toEqual([]);
 
 		const inbox = [{ owner: "acme", repo: "webapp", number: 6612, head: "me/feature" }];
 		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, inbox)).toBe(true);
-		expect(index.of(pusher)).toEqual([{ owner: "acme", repo: "webapp", number: 6612, link: "worked" }]);
+		expect(index.pullRequestsOf(pusher)).toEqual([{ owner: "acme", repo: "webapp", number: 6612, link: "worked" }]);
 		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, inbox)).toBe(false);
 		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, [])).toBe(true);
-		expect(index.of(pusher)).toEqual([]);
+		expect(index.pullRequestsOf(pusher)).toEqual([]);
 	});
 });

@@ -1,6 +1,6 @@
-import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
+import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import { type PastSession, type PullRequest, type RosterHost, repoKey, type View } from "../../src/shared";
+import { type PastSession, type PullRequest, type RosterHost, repoKey, type UserTodo, type UserTodoChange, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +43,7 @@ import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
+import { TodoPanel } from "./user-todos";
 
 /** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
 const PROJECT_KEY = "omp-agents.sidebar-project";
@@ -58,9 +59,10 @@ const SIDEBAR_TABS = [
 	{ value: "inbox", label: "Inbox", icon: Inbox },
 	{ value: "tickets", label: "Tickets", icon: SquareKanban },
 	{ value: "sessions", label: "Sessions", icon: MessagesSquare },
+	{ value: "todo", label: "Todo", icon: ListTodo },
 ] as const;
 
-/** The sidebar's tab; the inbox and tickets tabs go with their pages, sessions with the panes. */
+/** The sidebar's tab; the inbox and tickets tabs go with their pages, sessions and todo with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 /** The project a titled row ran in, before its title, shown only under all projects. An untitled row's label is already the project's name. */
@@ -118,12 +120,12 @@ export function RowMenu({ view, label, isOpen, onOpen, children, items, style }:
 }
 
 interface SessionItemsProps {
-	row: { cwd: string; sessionId: string; pullRequests: PullRequest[] };
+	row: { cwd: string; sessionId: string; pullRequests: PullRequest[]; tickets: string[] };
 	pinned: boolean;
 	onTogglePin: (sessionId: string) => void;
 }
 
-/** Items a running or past session's menu shares: pinning it, its pull requests, its workspace's settings, and copying its ids. */
+/** Items a running or past session's menu shares: pinning it, its pull requests and Linear issues, its workspace's settings, and copying its ids. */
 function SessionItems({ row, pinned, onTogglePin }: SessionItemsProps) {
 	return (
 		<>
@@ -136,6 +138,12 @@ function SessionItems({ row, pinned, onTogglePin }: SessionItemsProps) {
 				<MenuLinkItem key={pullRequestUrl(pr)} href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
 					<GitPullRequest />
 					Open {pr.repo}#{pr.number}
+				</MenuLinkItem>
+			))}
+			{row.tickets.map(id => (
+				<MenuLinkItem key={id} href={hashForTickets(id)}>
+					<SquareKanban />
+					Open {id}
 				</MenuLinkItem>
 			))}
 			<MenuLinkItem href={hashForSettings(row.cwd)}>
@@ -344,9 +352,12 @@ interface RosterProps {
 	settingsOpen: boolean;
 	/** omp is signed in to Linear, so the Tickets tab shows. */
 	ticketsShown: boolean;
-	/** The sidebar's tab, which follows the page: the inbox, the tickets, or the sessions over the panes. */
+	/** The sidebar's tab: the inbox or the tickets with their pages, or the sessions or the todos over the panes. */
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
+	/** The Todo tab's list, `null` until the server sends it. */
+	userTodos: UserTodo[] | null;
+	onTodoChange: (change: UserTodoChange) => void;
 	/** The inbox or tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
@@ -386,6 +397,8 @@ export function Roster({
 	ticketsShown,
 	tab,
 	onTab,
+	userTodos,
+	onTodoChange,
 	sectionTarget,
 	onSectionTarget,
 	project,
@@ -530,8 +543,9 @@ export function Roster({
 			</SidebarHeader>
 			<SizeProvider size="compact">
 				<TabsList aria-label="Sidebar" className="mx-2 self-start">
+					{/* Four tabs fit the sidebar's default width only with tighter padding than Fluid's. */}
 					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => (
-						<TabItem key={value} value={value} label={label} icon={icon} shortcut={shortcutLabels(value)} />
+						<TabItem key={value} value={value} label={label} icon={icon} className="px-2" shortcut={shortcutLabels(value)} />
 					))}
 				</TabsList>
 			</SizeProvider>
@@ -607,6 +621,11 @@ export function Roster({
 			<TabPanel value="tickets" asChild>
 				<SidebarContent>
 					<TicketsNav target={sectionTarget} onTarget={onSectionTarget} />
+				</SidebarContent>
+			</TabPanel>
+			<TabPanel value="todo" asChild>
+				<SidebarContent>
+					<TodoPanel todos={userTodos} disabled={!connected} onChange={onTodoChange} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>

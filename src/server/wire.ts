@@ -17,11 +17,15 @@ import type {
 	StartRequest,
 	TicketEdit,
 	UserAnswer,
+	UserTodoChange,
 	View,
 } from "../shared";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
+/** The longest todo text and todo id the server keeps. */
+const MAX_TODO_TEXT = 2000;
+const MAX_TODO_ID = 64;
 /** GitHub's owner and repository names. */
 const NAME = /^[\w.-]+$/;
 
@@ -105,6 +109,32 @@ function parseThinking(value: unknown): Parsed<string | null> {
 function parseSkill(value: unknown): Parsed<string | null> {
 	if (value === null || value === undefined) return { ok: null };
 	return typeof value === "string" && /^\S+$/.test(value) ? { ok: value } : null;
+}
+
+function parseTodoChange(value: unknown): Parsed<UserTodoChange> {
+	if (!isObject(value)) return null;
+	const isId = (id: unknown): id is string => isNonEmpty(id) && id.length <= MAX_TODO_ID;
+	const isText = (text: unknown): text is string => typeof text === "string" && text.length <= MAX_TODO_TEXT;
+	const { op, id, text } = value;
+	if (op === "clear-done") return { ok: { op } };
+	if (!isId(id)) return null;
+	switch (op) {
+		case "add": {
+			const { parentId, afterId } = value;
+			if (!isText(text) || !(parentId === null || isId(parentId)) || !(afterId === null || isId(afterId))) return null;
+			return { ok: { op, id, parentId, afterId, text } };
+		}
+		case "edit":
+			return isText(text) ? { ok: { op, id, text } } : null;
+		case "toggle":
+			return typeof value.done === "boolean" ? { ok: { op, id, done: value.done } } : null;
+		case "remove":
+		case "indent":
+		case "outdent":
+			return { ok: { op, id } };
+		default:
+			return null;
+	}
 }
 
 function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest> {
@@ -210,6 +240,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const { instanceId, requestId } = value;
 		const answer = parseAnswer(value.answer);
 		return typeof instanceId === "string" && typeof requestId === "string" && answer ? { ok: { t: "answer", instanceId, requestId, answer: answer.ok } } : null;
+	},
+	"user-todo"(value) {
+		const change = parseTodoChange(value.change);
+		return change ? { ok: { t: "user-todo", change: change.ok } } : null;
 	},
 };
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import type { ClientMsg, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
+import type { ClientMsg, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, UserTodo, UserTodoChange, View } from "../src/shared";
+import { applyUserTodo } from "../src/user-todos";
 import { applyPaneMessage, type Completions, retainPanes } from "./pane-store";
 import {
 	EMPTY_LAYOUT,
@@ -63,10 +64,12 @@ export interface DashboardState {
 	usage: { plans: PlanUsage[]; error: string | null } | null;
 	/** Last model list the server sent for each open live session, by instance id. */
 	models: Map<string, Models>;
+	/** The Todo tab's list, `null` until the server first sends it; a change shows here before the server answers. */
+	userTodos: UserTodo[] | null;
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" }>;
+type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" }>;
 
 type Action =
 	| { t: "connected"; connected: boolean }
@@ -75,6 +78,7 @@ type Action =
 	/** A failed start's error, or a quick action's started session, goes away; a start under way keeps waiting for its answer. */
 	| { t: "dismiss-start"; kind: StartKind }
 	| { t: "new-session-completions"; completions: Completions }
+	| { t: "user-todo"; change: UserTodoChange }
 	| ServerAction;
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
@@ -168,6 +172,10 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 		case "models":
 			if (!liveIds(state.layout).includes(action.instanceId)) return state;
 			return { ...state, models: new Map(state.models).set(action.instanceId, { models: action.models, error: action.error }) };
+		case "user-todos":
+			return { ...state, userTodos: action.todos };
+		case "user-todo":
+			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
 		default: {
 			const never: never = action;
 			return never;
@@ -192,6 +200,7 @@ function initialState(): DashboardState {
 		started: null,
 		usage: null,
 		models: new Map(),
+		userTodos: null,
 	};
 }
 
@@ -218,6 +227,8 @@ export interface Dashboard {
 	 * each session it resumes live in the pane that shows it.
 	 */
 	start: (op: StartOp) => void;
+	/** Change the Todo tab's list, which shows at once and reaches the server and every other window. */
+	changeTodo: (change: UserTodoChange) => void;
 }
 
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
@@ -300,6 +311,7 @@ export function useDashboard(): Dashboard {
 					case "past":
 					case "usage":
 					case "models":
+					case "user-todos":
 						dispatch(msg);
 						return;
 					default: {
@@ -359,6 +371,13 @@ export function useDashboard(): Dashboard {
 		},
 		[send],
 	);
+	const changeTodo = useCallback(
+		(change: UserTodoChange) => {
+			dispatch({ t: "user-todo", change });
+			send({ t: "user-todo", change });
+		},
+		[send],
+	);
 
-	return { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start };
+	return { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo };
 }

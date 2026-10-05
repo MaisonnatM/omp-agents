@@ -436,7 +436,7 @@ describe("SessionGuest lifetime", () => {
 		const same = await joinRoom({ host: { instanceId: "inst-4" } });
 		const listed = host({ instanceId: "inst-4", participants: 3 });
 		expect(same.guest.follow(new Map([[listed.instanceId, listed]]))).toBe(true);
-		expect(same.guest.row({ pullRequests: [], ship: null })).toMatchObject({ participants: 3 });
+		expect(same.guest.row({ pullRequests: [], tickets: [], ship: null })).toMatchObject({ participants: 3 });
 	});
 
 	test("a host error names the subagent it concerns, or reports as the host's", async () => {
