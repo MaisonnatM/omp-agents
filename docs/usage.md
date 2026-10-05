@@ -321,7 +321,7 @@ For installation, see the [README](../README.md).
   Other sessions have no workflow badge.
 - Four tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, and **Todo**, switch what the sidebar lists.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
-  **Sessions** lists the running and past sessions, and **Todo** your own todo list; see [Todo list](#todo-list).
+  **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
   **Inbox** opens a pull request inbox like Graphite's, and the sidebar then lists the inbox's sections with their pull request counts, under each repository's name when there are several.
   Click a section in the sidebar to scroll the page to it and move focus there; a folded section unfolds.
   An `#inbox` address selects the Inbox tab.
@@ -413,21 +413,28 @@ For installation, see the [README](../README.md).
 
 ## Todo list
 
-- The **Todo** tab lists todos of your own, not tied to a session or a project, in the sidebar beside the panes.
-  Choosing it from the inbox or the tickets returns to the panes; from **Settings** or the new-session draft, the page stays.
-  The browser's localStorage keeps whether **Sessions** or **Todo** was chosen last.
-- **Add a todo** at the bottom of the list starts a new todo; type it and press Enter.
+- The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session or a project, in place of the panes.
+  The sidebar then lists **All** and your categories, each with how many top-level todos are left to do in it.
+  Click one to show its todos alone; `#todo/<category id>` addresses it.
+  **All** lists the todos of no category first, then each category's under its name.
+- The **+** beside **Categories** adds a category; type its name and press Enter, and the page opens it.
+  A category's **⋯** menu renames it or deletes it; deleting a category keeps its todos, in no category.
+- **Add a todo** at the bottom of a list starts a new todo in that list's category; type its title and press Enter.
   Enter then starts the next todo below it, and Enter on an empty one, Esc, or a click elsewhere stops.
-- A todo can hold todos of its own, one level down and no deeper.
-  Tab while typing a todo moves it under the todo above it, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
+- A todo can hold todos of its own, one level down and no deeper, and they share its category.
+  Tab while typing a todo moves it under the todo above it in its category, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
   Tab does nothing on a todo that holds todos of its own, since they would end up three deep.
   The **+** that shows on hover adds a todo under that one.
 - Click the circle before a todo to check it; checking a todo checks the todos under it too.
   A todo that holds others shows how many of them are checked, as in `2/3`.
-  The group label counts the top-level todos left to do, and its button removes every checked todo.
-- Click a todo's text to edit it.
-  An empty todo, or Backspace in one, removes it, and so does the **×** that shows on hover; removing a todo removes the todos under it.
+  The page's header counts the top-level todos left to do, and **Clear done** removes every checked todo it lists.
+- Click a todo's title to edit it and open it beside the list.
+  An empty title, or Backspace in an empty one, removes the todo, and so does the **×** that shows on hover; removing a todo removes the todos under it.
+- An open todo shows its category, which you can change for a top-level todo, and its notes in markdown.
+  **Write** edits the notes and **Preview** renders them as the agent's messages are, with GitHub's task lists and tables.
+  The notes save when the text field loses focus, on Cmd+S, and when you switch to **Preview**; a todo with notes shows a notebook icon in the list.
 - The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
+  A `todos.json` from before categories and notes still loads, with every todo in no category and without notes.
   A `todos.json` that the server cannot read as a todo list is moved to `todos.json.invalid` rather than written over.
   While the page has lost the server, the list cannot be changed.
 
@@ -518,8 +525,8 @@ Alt is Option on macOS.
   Cmd+, opens Settings, where the model roles live, and closes it again.
   Ending a session has no shortcut: use **End session** in its header.
 - G then I opens the Inbox tab.
-  G then S goes back from the inbox, Settings, or the new-session draft to the panes, and from the **Todo** tab to the sessions.
-  G then D opens the **Todo** tab.
+  G then S goes back from the inbox, the todo list, Settings, or the new-session draft to the panes.
+  G then D opens the **Todo** page.
   G then P opens the project picker with its search field focused.
 - Session shortcuts act on the focused pane.
   The dashboard does not read `~/.omp/agent/keybindings.yml`.

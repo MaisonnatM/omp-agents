@@ -1,6 +1,6 @@
 import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import { type PastSession, type PullRequest, type RosterHost, repoKey, type UserTodo, type UserTodoChange, type View } from "../../src/shared";
+import { type PastSession, type PullRequest, type RosterHost, repoKey, type UserTodoChange, type UserTodoList, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,7 +43,7 @@ import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
-import { TodoPanel } from "./user-todos";
+import { TodoCategories } from "./todo-categories";
 
 /** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
 const PROJECT_KEY = "omp-agents.sidebar-project";
@@ -62,7 +62,7 @@ const SIDEBAR_TABS = [
 	{ value: "todo", label: "Todo", icon: ListTodo },
 ] as const;
 
-/** The sidebar's tab; the inbox and tickets tabs go with their pages, sessions and todo with the panes. */
+/** The sidebar's tab; the inbox, tickets, and todo tabs go with their pages, sessions with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 /** The project a titled row ran in, before its title, shown only under all projects. An untitled row's label is already the project's name. */
@@ -352,11 +352,13 @@ interface RosterProps {
 	settingsOpen: boolean;
 	/** omp is signed in to Linear, so the Tickets tab shows. */
 	ticketsShown: boolean;
-	/** The sidebar's tab: the inbox or the tickets with their pages, or the sessions or the todos over the panes. */
+	/** The sidebar's tab: the inbox, the tickets, or the todos with their pages, or the sessions over the panes. */
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
-	/** The Todo tab's list, `null` until the server sends it. */
-	userTodos: UserTodo[] | null;
+	/** The Todo page's list, `null` until the server sends it. */
+	userTodos: UserTodoList | null;
+	/** The category the Todo page shows, `null` for every todo. */
+	todoCategory: string | null;
 	onTodoChange: (change: UserTodoChange) => void;
 	/** The inbox or tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
@@ -398,6 +400,7 @@ export function Roster({
 	tab,
 	onTab,
 	userTodos,
+	todoCategory,
 	onTodoChange,
 	sectionTarget,
 	onSectionTarget,
@@ -625,7 +628,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="todo" asChild>
 				<SidebarContent>
-					<TodoPanel todos={userTodos} disabled={!connected} onChange={onTodoChange} />
+					<TodoCategories list={userTodos} category={todoCategory} disabled={!connected} onChange={onTodoChange} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>

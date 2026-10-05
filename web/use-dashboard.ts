@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import type { ClientMsg, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, UserTodo, UserTodoChange, View } from "../src/shared";
+import type { ClientMsg, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, UserTodoChange, UserTodoList, View } from "../src/shared";
 import { applyUserTodo } from "../src/user-todos";
 import { applyPaneMessage, type Completions, retainPanes } from "./pane-store";
 import {
@@ -64,8 +64,8 @@ export interface DashboardState {
 	usage: { plans: PlanUsage[]; error: string | null } | null;
 	/** Last model list the server sent for each open live session, by instance id. */
 	models: Map<string, Models>;
-	/** The Todo tab's list, `null` until the server first sends it; a change shows here before the server answers. */
-	userTodos: UserTodo[] | null;
+	/** The Todo page's list, `null` until the server first sends it; a change shows here before the server answers. */
+	userTodos: UserTodoList | null;
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
@@ -173,7 +173,7 @@ function reduce(state: DashboardState, action: Action): DashboardState {
 			if (!liveIds(state.layout).includes(action.instanceId)) return state;
 			return { ...state, models: new Map(state.models).set(action.instanceId, { models: action.models, error: action.error }) };
 		case "user-todos":
-			return { ...state, userTodos: action.todos };
+			return { ...state, userTodos: action.list };
 		case "user-todo":
 			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
 		default: {
@@ -227,7 +227,7 @@ export interface Dashboard {
 	 * each session it resumes live in the pane that shows it.
 	 */
 	start: (op: StartOp) => void;
-	/** Change the Todo tab's list, which shows at once and reaches the server and every other window. */
+	/** Change the Todo page's list, which shows at once and reaches the server and every other window. */
 	changeTodo: (change: UserTodoChange) => void;
 }
 

@@ -23,9 +23,10 @@ import type {
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
-/** The longest todo text and todo id the server keeps. */
+/** The longest todo title, category name, and id the server keeps, and the longest todo body. */
 const MAX_TODO_TEXT = 2000;
 const MAX_TODO_ID = 64;
+const MAX_TODO_BODY = 100_000;
 /** GitHub's owner and repository names. */
 const NAME = /^[\w.-]+$/;
 
@@ -114,23 +115,34 @@ function parseSkill(value: unknown): Parsed<string | null> {
 function parseTodoChange(value: unknown): Parsed<UserTodoChange> {
 	if (!isObject(value)) return null;
 	const isId = (id: unknown): id is string => isNonEmpty(id) && id.length <= MAX_TODO_ID;
+	const isOptionalId = (id: unknown): id is string | null => id === null || isId(id);
 	const isText = (text: unknown): text is string => typeof text === "string" && text.length <= MAX_TODO_TEXT;
-	const { op, id, text } = value;
-	if (op === "clear-done") return { ok: { op } };
+	const { op, id, text, name, categoryId } = value;
+	if (op === "clear-done") return isOptionalId(categoryId) ? { ok: { op, categoryId } } : null;
 	if (!isId(id)) return null;
 	switch (op) {
 		case "add": {
 			const { parentId, afterId } = value;
-			if (!isText(text) || !(parentId === null || isId(parentId)) || !(afterId === null || isId(afterId))) return null;
-			return { ok: { op, id, parentId, afterId, text } };
+			if (!isText(text) || !isOptionalId(parentId) || !isOptionalId(afterId) || !isOptionalId(categoryId)) return null;
+			return { ok: { op, id, parentId, afterId, categoryId, text } };
 		}
 		case "edit":
 			return isText(text) ? { ok: { op, id, text } } : null;
+		case "edit-body": {
+			const { body } = value;
+			return typeof body === "string" && body.length <= MAX_TODO_BODY ? { ok: { op, id, body } } : null;
+		}
 		case "toggle":
 			return typeof value.done === "boolean" ? { ok: { op, id, done: value.done } } : null;
+		case "categorize":
+			return isOptionalId(categoryId) ? { ok: { op, id, categoryId } } : null;
+		case "add-category":
+		case "rename-category":
+			return isNonEmpty(name) && isText(name) ? { ok: { op, id, name } } : null;
 		case "remove":
 		case "indent":
 		case "outdent":
+		case "remove-category":
 			return { ok: { op, id } };
 		default:
 			return null;

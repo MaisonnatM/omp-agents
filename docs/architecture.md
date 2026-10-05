@@ -359,8 +359,9 @@ The server lives in `src/`:
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query.
-- `src/user-todos.ts`: the rules of the sidebar's Todo list, `applyUserTodo`, which the server applies to its file and the page to what it shows before the server answers.
-  `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token.
+- `src/user-todos.ts`: the rules of the Todo page's list, `applyUserTodo`, which the server applies to its file and the page to what it shows before the server answers.
+  The list is `UserTodoList` in `src/shared.ts`: categories, then top-level todos, each with a title, markdown notes, a category or none, and todos of its own, which share its category.
+  `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token, and reads a file from before categories and notes with none of either.
   A `user-todo` socket message carries one change, and every socket hears the list after it as a `user-todos` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the list back to its own socket alone.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
@@ -394,10 +395,11 @@ The page lives in `web/`.
   `web/components/session-switcher.tsx` is the Cmd+K search over every session.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
-- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's tab over the panes, the sidebar's project, and the pinned skill; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
+- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's project, and the pinned skill; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
 - `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
-  `web/components/user-todos.tsx` holds its Todo tab.
+  `web/components/todo-categories.tsx` holds its Todo tab, the categories.
+- `web/components/user-todos.tsx`: the Todo page, its lists, and the open todo, whose notes `web/components/markdown-editor.tsx` edits and previews through `message-markdown.tsx`.
 - `web/components/pane.tsx`: a pane.
   `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript, whose `task` rows link to their subagents.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.

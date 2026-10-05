@@ -10,6 +10,7 @@ import {
 	hashForNewSession,
 	hashForSettings,
 	hashForTickets,
+	hashForTodo,
 	hashForView,
 	inboxFromHash,
 	type Layout,
@@ -115,6 +116,15 @@ describe("layout hash", () => {
 		expect(pageFromHash("#ticketsx")).toBeNull();
 		expect(pageFromHash("#7c51f77b2a1bf7ba")).toBeNull();
 		for (const hash of ["#tickets", "#tickets/ENG-2368", "#tickets/x"]) expect(layoutFromHash(hash)).toBeNull();
+	});
+
+	test("the todo hash opens every todo or one category's, and no todo hash is read as a layout", () => {
+		expect(hashForTodo(null)).toBe("#todo");
+		expect(hashForTodo("a b/c")).toBe("#todo/a%20b%2Fc");
+		expect(pageFromHash("#todo")).toEqual({ kind: "todo", category: null });
+		expect(pageFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "todo", category: "a b/c" });
+		expect(pageFromHash("#todo/")).toEqual({ kind: "todo", category: null });
+		for (const hash of ["#todo", "#todo/0b9e"]) expect(layoutFromHash(hash)).toBeNull();
 	});
 
 	test("every page hash names its page and route, and a session or layout hash names none", () => {

@@ -38,7 +38,7 @@ const views = new Views(pathFor, (topic, msg) => server.publish(topic, JSON.stri
 const broadcasts = new Broadcasts({
 	rosterMsg: () => ({ t: "roster", hosts: sessions.rows(files.factsOf), error: rosterError }),
 	pastMsg: () => ({ t: "past", sessions: files.past(sessions.sessionIds(), id => interrupted.has(id)) }),
-	userTodosMsg: () => ({ t: "user-todos", todos: todos.todos }),
+	userTodosMsg: () => ({ t: "user-todos", list: todos.list }),
 	publish: (topic, json) => void server.publish(topic, json),
 	subscriberCount: topic => server.subscriberCount(topic),
 	beforeRosterPush: () => views.sync(),
@@ -75,7 +75,7 @@ const handleClientMsg = createClientHandler({
 	stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
 	changeTodo(ws, change) {
 		if (todos.apply(change)) broadcasts.pushUserTodos();
-		else send(ws, { t: "user-todos", todos: todos.todos });
+		else send(ws, { t: "user-todos", list: todos.list });
 	},
 });
 

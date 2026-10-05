@@ -15,7 +15,7 @@ export interface SocketEnv {
 	dismissInterrupted(sessionId: string): void;
 	/** Whether interrupted session `sessionId` stopped while its turn ran. */
 	stoppedMidTurn(sessionId: string): boolean;
-	/** Apply `change` to the Todo tab's list and send every socket the list after it, or, when it changes nothing, send `ws` the list it missed. */
+	/** Apply `change` to the Todo page's list and send every socket the list after it, or, when it changes nothing, send `ws` the list it missed. */
 	changeTodo(ws: Socket, change: UserTodoChange): void;
 }
 
