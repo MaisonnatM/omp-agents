@@ -4,27 +4,15 @@ import type { SettingsError } from "../shared";
 import { dashboardHosts } from "./address";
 import { COOKIE, cookieValue, fetchSiteAllowed, tokenMatches } from "./auth";
 
-/** A request the server refuses, with the HTTP status it answers. `conflict`: the file changed on disk since it was read. */
-export class Rejected extends Error {
-	constructor(
-		readonly status: 400 | 404 | 409,
-		message: string,
-		readonly conflict = false,
-	) {
-		super(message);
-	}
-}
-
 export const fail = (status: number, error: string, conflict = false): Response =>
 	Response.json({ error, ...(conflict && { conflict: true }) } satisfies SettingsError, { status });
 
-/** The JSON of `run`'s result, or the refusal it threw. */
-export async function answer(run: () => Promise<unknown>): Promise<Response> {
+/** The JSON of `run`'s result; when it throws, `refuse`'s response for the error, else a 500 with its text. */
+export async function answer(run: () => Promise<unknown>, refuse?: (err: unknown) => Response | null): Promise<Response> {
 	try {
 		return Response.json(await run());
 	} catch (err) {
-		if (err instanceof Rejected) return fail(err.status, err.message, err.conflict);
-		return fail(500, errorText(err));
+		return refuse?.(err) ?? fail(500, errorText(err));
 	}
 }
 

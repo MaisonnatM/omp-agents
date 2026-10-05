@@ -7,7 +7,7 @@ import { createCache } from "./cache";
 import { isObject, num, str } from "./json";
 import { linearServer } from "./linear";
 import { serveUpload, uploadAddress } from "./linear-uploads";
-import { callMcpTool, type McpServer } from "./omp/mcp";
+import { callMcpTool, type McpServer, toolJson } from "./omp/mcp";
 import {
 	TICKET_STATUS_TYPES,
 	type Ticket,
@@ -73,17 +73,9 @@ function parseIssue(raw: unknown): Ticket | null {
 	};
 }
 
-function parseJson(tool: string, toolText: string): unknown {
-	try {
-		return JSON.parse(toolText);
-	} catch {
-		throw new Error(`Linear's ${tool} answered something other than JSON: ${toolText.slice(0, 200)}`);
-	}
-}
-
 /** The objects under `key` in one page of `tool`'s answer, and the cursor of the next page, `null` on the last. */
 function parsePage(tool: string, key: string, toolText: string): { items: Record<string, unknown>[]; next: string | null } {
-	const data = parseJson(tool, toolText);
+	const data = toolJson("Linear", tool, toolText);
 	const items = isObject(data) ? data[key] : undefined;
 	if (!isObject(data) || !Array.isArray(items)) throw new Error(`Linear's ${tool} answered without ${key}`);
 	return { items: items.filter(isObject), next: data.hasNextPage === true ? (str(data.cursor) ?? null) : null };
@@ -130,7 +122,7 @@ export function linearMarkdown(text: string, media: (url: string) => string): st
 
 /** The comments of one `list_comments` answer as threads, oldest first; a reply whose first comment is missing starts its own. */
 function parseThreads(toolText: string, media: (url: string) => string): TicketComment[][] {
-	const data = parseJson("list_comments", toolText);
+	const data = toolJson("Linear", "list_comments", toolText);
 	const raw = isObject(data) && Array.isArray(data.comments) ? data.comments.filter(isObject) : [];
 	const comments = raw
 		.map(comment => ({
@@ -152,7 +144,7 @@ function parseThreads(toolText: string, media: (url: string) => string): TicketC
 
 /** One issue in full from the texts of its `get_issue` and `list_comments` answers; `media` as for `linearMarkdown`. */
 export function parseIssueDetail(issueText: string, commentsText: string, media: (url: string) => string): TicketDetail {
-	const raw = parseJson("get_issue", issueText);
+	const raw = toolJson("Linear", "get_issue", issueText);
 	const ticket = parseIssue(raw);
 	if (!ticket || !isObject(raw)) throw new Error("Linear's get_issue answered without an issue");
 	const attachments = Array.isArray(raw.attachments) ? raw.attachments.filter(isObject) : [];
@@ -223,7 +215,7 @@ const byName = (a: TicketChoice, b: TicketChoice): number => a.name.localeCompar
 
 /** The states, people, labels, and projects the pickers offer, from the answers of Linear's list tools. */
 export function parseTicketOptions(statusesText: string, users: Record<string, unknown>[], labels: Record<string, unknown>[], projects: Record<string, unknown>[]): TicketOptions {
-	const statuses = parseJson("list_issue_statuses", statusesText);
+	const statuses = toolJson("Linear", "list_issue_statuses", statusesText);
 	if (!Array.isArray(statuses)) throw new Error("Linear's list_issue_statuses answered without statuses");
 	return {
 		statuses: statuses

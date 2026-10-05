@@ -1,14 +1,28 @@
 /** The settings page: omp's model routing and the files omp reads, as a session in a workspace would load them, and the edits it saves. */
-import { randomBytes } from "node:crypto";
-import { mkdir, open, realpath, rename, rm, stat } from "node:fs/promises";
-import { basename, dirname, extname, join } from "node:path";
+import { mkdir, realpath, stat } from "node:fs/promises";
+import { dirname, extname, join } from "node:path";
+import { atomicWriteText } from "./fs";
 import { errorText, isObject } from "./json";
 import { agentDir, assertRetryValue, expandDefaultRetryFallbackChains, loadOmpConfig, type OmpConfig, parseRetryFallbackSelector, retryChoices, writeRouting } from "./omp/config";
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
 import { listModels } from "./omp/models";
 import { displayPath, HOME } from "./paths";
-import { Rejected } from "./server/http";
 import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared";
+
+/**
+ * An edit the settings refuse, with the HTTP status the API answers it with: 400 for an edit omp could not use, 404 for
+ * a file omp does not read, 409 for a file or config in a state that blocks the save. `conflict`: the file changed on
+ * disk since the page read it.
+ */
+export class Rejected extends Error {
+	constructor(
+		readonly status: 400 | 404 | 409,
+		message: string,
+		readonly conflict = false,
+	) {
+		super(message);
+	}
+}
 
 /**
  * Every role omp knows a model or a chain for, in config order, with the fallbacks omp walks for it.
@@ -246,21 +260,7 @@ export function saveOmpFile(cwd: string | null, raw: unknown): Promise<OmpSettin
 		// Write next to the target, not the symlink: replacing the symlink would strand omp's config elsewhere.
 		const target = body.state === "read" ? await realpath(file.path) : file.path;
 		await mkdir(dirname(target), { recursive: true });
-		const mode = body.state === "read" ? (await stat(target)).mode & 0o777 : undefined;
-		const temp = join(dirname(target), `.${basename(target)}.${randomBytes(8).toString("hex")}.tmp`);
-		const handle = await open(temp, "wx", mode);
-		let replaced = false;
-		try {
-			try {
-				await handle.writeFile(edit.text);
-			} finally {
-				await handle.close();
-			}
-			await rename(temp, target);
-			replaced = true;
-		} finally {
-			if (!replaced) await rm(temp, { force: true });
-		}
+		await atomicWriteText(target, edit.text, body.state === "read" ? (await stat(target)).mode & 0o777 : undefined);
 		return loadOmpSettings(cwd);
 	});
 }
