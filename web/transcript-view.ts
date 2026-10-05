@@ -52,6 +52,14 @@ export function turnReplies(items: Item[], working: boolean): Set<string> {
 	return replies;
 }
 
+/** What the last turn suggests sending next: the suggestions its reply ends on; none while it runs or once a prompt follows it. */
+export function nextSuggestions(items: Item[], working: boolean): string[] {
+	if (working) return [];
+	const replies = turnReplies(items, false);
+	const last = items.findLast(item => item.kind === "user" || replies.has(item.id));
+	return last?.kind === "assistant" ? last.suggestions : [];
+}
+
 /** Where a message forks. omp branches only at a user prompt, keeping the history before it. */
 export interface ForkPoint {
 	entryId: string;

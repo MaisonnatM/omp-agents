@@ -86,7 +86,7 @@ describe("Views", () => {
 		appendFileSync(file, replyEntry("e2", assistant(200, [text("pong")], { stopReason: "stop" })));
 		views.poke(file);
 		await untilPublished(2);
-		expect(itemsOf(1)).toEqual({ reset: false, items: [{ id: "m200:0", kind: "assistant", text: "pong", streaming: false }] });
+		expect(itemsOf(1)).toEqual({ reset: false, items: [{ id: "m200:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] }] });
 
 		// A straggling update from the relay arrives after the file settled the message.
 		views.applyEvent("a", streamed(200, "pon"));
@@ -118,7 +118,7 @@ describe("Views", () => {
 		expect(items).toEqual(
 			expect.arrayContaining([
 				{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: "e1" },
-				{ id: "m610:0", kind: "assistant", text: "pong", streaming: false },
+				{ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] },
 			]),
 		);
 		expect(items.filter(item => item.id === "m600")).toHaveLength(1);

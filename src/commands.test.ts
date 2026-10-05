@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expandPrompt } from "./commands";
+import { expandPrompt, withPinnedSkill } from "./commands";
 
 /** A project directory with the file command `/review` and the skill `greet`; nothing else is defined in it. */
 const cwd = mkdtempSync(join(tmpdir(), "omp-agents-commands-"));
@@ -45,5 +45,19 @@ describe("expandPrompt", () => {
 		await expect(expand("/compact now")).rejects.toThrow("/compact");
 		await expect(expand("/compact now", "subagent")).rejects.toThrow("/compact");
 		await expect(expand("/skill:missing do it")).rejects.toThrow("/skill:missing");
+	});
+});
+
+describe("withPinnedSkill", () => {
+	test("a first prompt goes through the pinned skill, with the prompt as its arguments", async () => {
+		expect(await withPinnedSkill(cwd, "greet", "to Ada")).toBe("/skill:greet to Ada");
+		expect(await withPinnedSkill(cwd, "greet", "")).toBe("/skill:greet");
+	});
+
+	test("no pin, a skill the directory lacks, or a prompt that opens with its own command leaves the prompt as typed", async () => {
+		expect(await withPinnedSkill(cwd, null, "to Ada")).toBe("to Ada");
+		expect(await withPinnedSkill(cwd, "missing", "to Ada")).toBe("to Ada");
+		expect(await withPinnedSkill(cwd, "greet", "/review src/a.ts")).toBe("/review src/a.ts");
+		expect(await withPinnedSkill(cwd, "greet", "  /skill:greet to Bo")).toBe("  /skill:greet to Bo");
 	});
 });

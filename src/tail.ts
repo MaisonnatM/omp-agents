@@ -17,7 +17,10 @@ const inFlux = (item: Item): boolean => (item.kind === "assistant" && item.strea
 /** Folds a transcript's appended entries into a {@link Transcript} and a {@link Work} and publishes their changes; {@link LineReader} reads the file. */
 export class FileTail {
 	transcript = new Transcript();
-	work = new Work();
+	#work = new Work();
+	/** The {@link Work.planVersion} that {@link #planText} was read at. */
+	#planVersion = 0;
+	#planText: string | null = null;
 	readonly path: string;
 	readonly #lines: LineReader;
 	#loaded = false;
@@ -41,6 +44,11 @@ export class FileTail {
 
 	get loaded(): boolean {
 		return this.#loaded;
+	}
+
+	/** The plan, its file's text included, and the changed files, as of the last read. */
+	get work(): SessionWork {
+		return this.#work.snapshot(this.#planText);
 	}
 
 	/** Read what was appended since the last read. Calls that arrive before a queued read starts share it. */
@@ -93,8 +101,19 @@ export class FileTail {
 	#restart(): void {
 		this.#discardPending();
 		this.transcript = new Transcript();
-		this.work = new Work();
+		this.#work = new Work();
+		this.#planVersion = 0;
+		this.#planText = null;
 		this.#loaded = false;
+	}
+
+	/** Reads the plan file again when the transcript changed one since the last read; omp writes the file before the tool result. */
+	async #readPlan(): Promise<void> {
+		const version = this.#work.planVersion;
+		if (version === this.#planVersion) return;
+		this.#planVersion = version;
+		const path = this.#work.planFile;
+		this.#planText = path === null ? null : await Bun.file(path).text().catch(() => null);
 	}
 
 	async #read(): Promise<void> {
@@ -110,16 +129,18 @@ export class FileTail {
 		if (!complete) return;
 		const changed = entries.flatMap(entry => this.transcript.applyEntry(entry));
 		// Every entry goes through both folds, so `some` would skip the rest.
-		const worked = entries.reduce<boolean>((any, entry) => this.work.applyEntry(entry) || any, false);
+		const worked = entries.reduce<boolean>((any, entry) => this.#work.applyEntry(entry) || any, false);
+		// Before either emit, so the plan's text goes out with the read that changed it.
+		await this.#readPlan();
 		if (!this.#loaded) {
 			this.#loaded = true;
 			this.#discardPending();
 			this.transcript.takeReordered();
 			this.#emit(true, this.transcript.items());
-			this.#emitWork(this.work.snapshot());
+			this.#emitWork(this.work);
 		} else {
 			this.#publish(changed);
-			if (worked) this.#emitWork(this.work.snapshot());
+			if (worked) this.#emitWork(this.work);
 		}
 	}
 }

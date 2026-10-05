@@ -1,0 +1,17 @@
+{
+  "name": "omp-agents-desktop",
+  "productName": "omp agents",
+  "license": "MIT",
+  "private": true,
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "bun build main.ts --target=node --format=cjs --external electron --outfile dist/main.cjs",
+    "start": "bun run build && electron .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.0",
+    "electron": "^44.5.1",
+    "typescript": "^7.0.2"
+  }
+}

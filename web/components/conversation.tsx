@@ -22,18 +22,16 @@ import { graphiteUrl, pullRequestUrl } from "../inbox-model";
 import { hostLabel, pastLabel, projectName } from "../labels";
 import { hashForInbox } from "../routing";
 import { shortcutKeys, useShortcuts } from "../shortcuts";
-import type { ForkPoint } from "../transcript-view";
+import { type ForkPoint, nextSuggestions } from "../transcript-view";
 import type { Completions } from "../pane-store";
 import type { StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
-import { roleOf, useModelRoles } from "../use-model-roles";
 import { useCompletion } from "./completion-popup";
 import { ContextRing } from "./context-ring";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
 import { GitRef } from "./git";
 import { Model, ModelPicker } from "./model-picker";
 import { OrgIcon } from "./org-icon";
-import { RolePicker } from "./role-picker";
 import { ShipStep } from "./ship-step";
 import { ThinkingPicker } from "./thinking-picker";
 import { NOTICE_TONE, Transcript } from "./transcript";
@@ -402,12 +400,15 @@ function LiveConversation({
 					: "Message this subagent…"
 				: "Message this session…";
 
-	const directCommand = blockedShortcut(draft, view.agentId === null && host?.source === "dashboard" ? "rpc" : "none");
+	const shell: ShellReach = view.agentId === null && host?.source === "dashboard" ? "rpc" : "none";
+	const directCommand = blockedShortcut(draft, shell);
+	// What the finished turn suggests sending next, offered once nothing else waits on the user. Filtered to none the composer would hold back.
+	const turnSuggestions = useMemo(() => nextSuggestions(items, working), [items, working]);
+	const suggestions = writable && requests.length === 0 ? turnSuggestions.filter(text => blockedShortcut(text, shell) === null) : undefined;
 	const shownModel = shown?.model ?? null;
 	const thinking = shown?.thinkingLevel ?? null;
 	// Collab rooms carry no model or thinking switch, so only sessions this dashboard started over RPC can change them.
 	const switchable = view.agentId === null && host?.source === "dashboard" && live ? host : null;
-	const roles = useModelRoles(switchable?.cwd ?? null);
 	// The list refreshes on every open, whether a click or the model shortcut opened it.
 	const openModels = (open: boolean): void => {
 		setModelsOpen(open);
@@ -416,12 +417,6 @@ function LiveConversation({
 	const modelSlot =
 		view.agentId !== null ? null : switchable ? (
 			<>
-				<RolePicker
-					list={roles.list}
-					current={roles.list && roleOf(roles.list.roles, shownModel, thinking)}
-					onReload={roles.reload}
-					onPick={role => onSetModel(role.model, role.thinking)}
-				/>
 				<ModelPicker current={shownModel} list={models} open={modelsOpen} onOpenChange={openModels} onPick={model => onSetModel(model, null)} />
 				{switchable.thinkingLevels.length > 0 && <ThinkingPicker current={thinking} levels={switchable.thinkingLevels} onPick={onSetThinking} />}
 			</>
@@ -537,18 +532,18 @@ function LiveConversation({
 					onValueChange={completion.onValueChange}
 					textareaProps={completion.textareaProps}
 					onSend={text => {
-						if (!directCommand) submit(text, "steer");
+						if (blockedShortcut(text, shell) === null) submit(text, "steer");
 					}}
-					leftSlot={({ openFilePicker }) => (
-						<>
-							{attachable && <AttachButton onClick={() => openFilePicker()} />}
-							{modelSlot}
-						</>
-					)}
+					leftSlot={modelSlot}
 					files={attachable ? attachments.files : undefined}
 					onFilesChange={attachable ? attachments.onFilesChange : undefined}
 					accept={IMAGE_ACCEPT}
-					rightSlot={contextSlot}
+					rightSlot={({ openFilePicker }) => (
+						<>
+							{contextSlot}
+							{attachable && <AttachButton onClick={() => openFilePicker()} />}
+						</>
+					)}
 					placeholder={placeholder}
 					disabled={!writable}
 					// While a turn runs, Enter and the send button steer it, and Stop interrupts a session's turn.
@@ -558,6 +553,7 @@ function LiveConversation({
 					onEditQueued={item => take(queued.filter(entry => entry.item.id === item.id), true)}
 					onRemoveQueued={item => take(queued.filter(entry => entry.item.id === item.id), false)}
 					sendLabel={`${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
+					suggestions={suggestions}
 				/>
 				{directCommand && <ComposerNote text={directCommand} />}
 				{attachable && attachments.note && <ComposerNote text={attachments.note} />}
