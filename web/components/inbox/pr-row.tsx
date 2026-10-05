@@ -1,12 +1,24 @@
 import { Check, CircleCheck, CircleDashed, CircleX, GitMerge, Link2, type LucideIcon, MessageSquare } from "lucide-react";
 import { useState } from "react";
-import type { CheckState, InboxPullRequest, PastSession, PullRequest, PullRequestLink, ReviewDecision, RosterHost, SessionLinksEdit, SessionLinksResult, View } from "../../../src/shared";
+import {
+	type CheckState,
+	type InboxPullRequest,
+	type PastSession,
+	type PullRequest,
+	type PullRequestLink,
+	type ReviewDecision,
+	type RosterHost,
+	type SessionLinksEdit,
+	type SessionLinksResult,
+	repoKey,
+	samePullRequest,
+	type View,
+} from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { putJson } from "../../api";
+import { errorText, putJson } from "../../api";
 import { hashForInbox, type OpenMode } from "../../routing";
-import { samePullRequest } from "../../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../quick-actions";
 import { QuickActionsMenu } from "../quick-actions";
@@ -67,7 +79,7 @@ export function sessionsFor(pr: InboxPullRequest, hosts: RosterHost[], past: Pas
 }
 
 /** The DOM id of a pull request's row, which an inbox link to that PR scrolls to. */
-export const rowId = (pr: PullRequest): string => `inbox-pr-${pr.owner}/${pr.repo}/${pr.number}`.toLowerCase();
+export const rowId = (pr: PullRequest): string => `inbox-pr-${repoKey(pr)}/${pr.number}`;
 
 type Writing = { phase: "idle" | "writing" } | { phase: "done"; changed: boolean } | { phase: "failed"; error: string };
 
@@ -80,7 +92,7 @@ function LinkSessionsButton({ pr, sessions }: { pr: PullRequest; sessions: Sessi
 		try {
 			setWriting({ phase: "done", changed: (await putJson<SessionLinksResult>("/api/pull-request/sessions", edit)).changed });
 		} catch (err) {
-			setWriting({ phase: "failed", error: err instanceof Error ? err.message : String(err) });
+			setWriting({ phase: "failed", error: errorText(err) });
 		}
 	};
 	const count = sessions.length === 1 ? "this session" : `these ${sessions.length} sessions`;

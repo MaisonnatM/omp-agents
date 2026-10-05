@@ -58,6 +58,21 @@ bun start
 
 On start, the server prints a sign-in address, `http://127.0.0.1:4317/?token=<token>`. Open it once: it signs the browser in with a cookie, and from then on <http://127.0.0.1:4317> works in that browser. Sessions that the dashboard starts appear right away. To also see the sessions you start in a terminal, enable [Collab auto-start](#show-terminal-sessions).
 
+### Desktop app
+
+To use the dashboard in its own window instead of a browser tab, run it from the clone:
+
+```sh
+bun run desktop
+```
+
+The first run downloads Electron into `desktop/node_modules`, about 100 MB. The app is not packaged or signed; it runs from this checkout, so a `git pull` updates it. It signs itself in, so it needs no token from you.
+
+- If an omp-agents server already listens on the port, for example a `bun start` in another terminal, the window uses that server and leaves it running when you quit. Otherwise the app starts the server and stops it, with every session that the dashboard started, when you quit.
+- On macOS, closing the window (Cmd+W) hides it and keeps the server and its sessions running; click the app in the Dock to show it again. Cmd+Q quits.
+- Links to GitHub, Graphite, Linear, and every other site open in your default browser.
+- `PORT` works as for `bun start`. A browser tab on the same address keeps working alongside the window.
+
 ## Configuration
 
 ### Show terminal sessions

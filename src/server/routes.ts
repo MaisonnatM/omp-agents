@@ -1,8 +1,9 @@
 /**
  * The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, Linear's connection,
- * Linear tickets, and prompt images through.
+ * Linear tickets and their files, and prompt images through.
  */
 import { join } from "node:path";
+import { errorText } from "../json";
 import { listSkills } from "../commands";
 import { gitCheckout } from "../git";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
@@ -13,12 +14,14 @@ import { directoryOf } from "../paths";
 import type { PullRequestIndex } from "../pull-requests";
 import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
-import { loadTicketDetail, loadTickets } from "../tickets";
-import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, TICKET_ID } from "../shared";
+import { loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
+import { isUploadPath } from "../linear-uploads";
+import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, samePullRequest, TICKET_ID } from "../shared";
 import { answer, fail, type Guards } from "./http";
-import { parsePullRequestQuery, parseSessionLinks } from "./wire";
+import { parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
 
 const SHA256 = /^[0-9a-f]{64}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export interface RouteEnv {
 	guards: Guards;
@@ -128,6 +131,37 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return TICKET_ID.test(id) ? answer(() => loadTicketDetail(id)) : fail(400, "Expected ?id= naming a Linear issue, such as ENG-123");
 	};
 
+	/** `PUT /api/ticket`: `TicketEdit`, applied in Linear; answers the issue in full as it is after it. */
+	const ticketWrite: Handler = async req => {
+		const write = await guards.writeBody(req);
+		if (write instanceof Response) return write;
+		const edit = parseTicketEdit(write.body);
+		return edit ? answer(() => saveTicket(edit)) : fail(400, "Expected { id } naming a Linear issue and at least one field to change");
+	};
+
+	/** `GET /api/ticket/options?team=<id>`: what the sheet's pickers offer for an issue of that Linear team. */
+	const ticketOptions: Handler = async req => {
+		const refused = guards.admit(req);
+		if (refused) return refused;
+		const team = new URL(req.url).searchParams.get("team") ?? "";
+		return UUID.test(team) ? answer(() => loadTicketOptions(team)) : fail(400, "Expected ?team= naming a Linear team by id");
+	};
+
+	/** `GET /api/ticket/media?issue=<identifier>&path=<upload path>`: a file that the issue or its comments embed, from Linear. */
+	const ticketMedia: Handler = async req => {
+		const refused = guards.admit(req);
+		if (refused) return refused;
+		const params = new URL(req.url).searchParams;
+		const issue = params.get("issue") ?? "";
+		const path = params.get("path") ?? "";
+		if (!TICKET_ID.test(issue) || !isUploadPath(path)) return fail(400, "Expected ?issue= naming a Linear issue and ?path= naming one of its files");
+		try {
+			return (await loadTicketMedia(issue, path, req.headers.get("range"), req.signal)) ?? fail(404, `${issue} embeds no file ${path}`);
+		} catch (err) {
+			return fail(502, errorText(err));
+		}
+	};
+
 	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for the inbox's sheet. */
 	const pullRequest: Handler = async req => {
 		const refused = guards.admit(req);
@@ -195,7 +229,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		const name = `${pr.owner}/${pr.repo}#${pr.number}`;
 		const sessions: SessionEntry[] = [];
 		for (const sessionId of new Set(sessionIds)) {
-			const linked = env.pullRequestsOf(sessionId).find(other => `${other.owner}/${other.repo}#${other.number}`.toLowerCase() === name.toLowerCase());
+			const linked = env.pullRequestsOf(sessionId).find(other => samePullRequest(other, pr));
 			if (!linked) return fail(404, `Session ${sessionId} did not submit or work on ${name}`);
 			sessions.push({ sessionId, link: linked.link });
 		}
@@ -215,7 +249,9 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/tickets": { GET: tickets },
 		"/api/linear": { GET: linear },
 		"/api/linear/sign-in": { PUT: linearSignIn },
-		"/api/ticket": { GET: ticket },
+		"/api/ticket": { GET: ticket, PUT: ticketWrite },
+		"/api/ticket/options": { GET: ticketOptions },
+		"/api/ticket/media": { GET: ticketMedia },
 		"/api/pull-request": { GET: pullRequest },
 		"/api/git": { GET: git },
 		"/api/image": { GET: image },

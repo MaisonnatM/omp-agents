@@ -1,10 +1,11 @@
 import { type LucideIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { type ShortcutId, shortcutKeys } from "../shortcuts";
+import { useStoredState } from "../stored-state";
 
 /**
  * The dashboard's two sidebars, each one resizable and closeable on its own. Fluid's provider holds a single width
@@ -59,16 +60,21 @@ export interface SidebarPanel {
 
 const clamp = (width: number): number => Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, width)));
 
-function storedPanel(side: SidebarSide): SidebarPanel {
-	const { widthKey, openKey, defaultWidth } = SIDEBARS[side];
-	const width = Number(localStorage.getItem(widthKey));
-	return { open: localStorage.getItem(openKey) !== "false", width: Number.isFinite(width) && width > 0 ? clamp(width) : defaultWidth };
+interface StoredPanel {
+	panel: SidebarPanel;
+	setWidth: (width: number) => void;
+	setOpen: (open: boolean) => void;
 }
 
-/** A default is removed rather than stored, so a reset sidebar follows the default if it changes. */
-function store(key: string, value: string, fallback: string): void {
-	if (value === fallback) localStorage.removeItem(key);
-	else localStorage.setItem(key, value);
+/** `side`'s panel as localStorage keeps it. A default is removed rather than stored, so a reset sidebar follows the default if it changes. */
+function useStoredPanel(side: SidebarSide): StoredPanel {
+	const { widthKey, openKey, defaultWidth } = SIDEBARS[side];
+	const [width, setWidth] = useStoredState(widthKey, raw => {
+		const stored = Number(raw);
+		return Number.isFinite(stored) && stored > 0 ? clamp(stored) : defaultWidth;
+	});
+	const [open, setOpen] = useStoredState(openKey, raw => raw !== "false");
+	return { panel: { open, width }, setWidth, setOpen };
 }
 
 export interface SidebarPanels {
@@ -79,22 +85,16 @@ export interface SidebarPanels {
 }
 
 export function useSidebarPanels(): SidebarPanels {
-	const [panels, setPanels] = useState(() => ({ left: storedPanel("left"), right: storedPanel("right") }));
-	const update = (side: SidebarSide, panel: SidebarPanel): void => {
-		const { widthKey, openKey, defaultWidth } = SIDEBARS[side];
-		store(widthKey, String(panel.width), String(defaultWidth));
-		store(openKey, String(panel.open), "true");
-		setPanels(current => ({ ...current, [side]: panel }));
-	};
+	const sides: Record<SidebarSide, StoredPanel> = { left: useStoredPanel("left"), right: useStoredPanel("right") };
 	return {
-		panels,
-		resize: (side, width) => update(side, { ...panels[side], width: clamp(width) }),
+		panels: { left: sides.left.panel, right: sides.right.panel },
+		resize: (side, width) => sides[side].setWidth(clamp(width)),
 		setOpen: (side, open) => {
-			if (open === panels[side].open) return;
+			if (open === sides[side].panel.open) return;
 			const { id } = SIDEBARS[side];
 			const hiding = document.querySelector(open ? `[aria-controls="${id}"][aria-expanded="false"]` : `#${id}`);
 			const refocus = hiding?.contains(document.activeElement) ?? false;
-			flushSync(() => update(side, { ...panels[side], open }));
+			flushSync(() => sides[side].setOpen(open));
 			if (refocus) document.querySelector<HTMLElement>(`[aria-controls="${id}"]:not([hidden] *)`)?.focus();
 		},
 	};

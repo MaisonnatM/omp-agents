@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { beginStart, dismissSettled, dropHidden, loseStarts, settleStart, startOf, type Starts } from "./starts";
+import { beginStart, dismissSettled, dropHidden, loseStarts, settleResumeAll, settleStart, type StartOp, startOf, type Starts } from "./starts";
 
 const point = { entryId: "e1", prefill: true };
 const fork = { kind: "fork", view: { kind: "past", sessionId: "s1" }, itemId: "u1", point } as const;
@@ -38,7 +38,7 @@ describe("starts", () => {
 	test("a failure's reason leaves with its view, a start under way stays, and a draft's failure outlives any view", () => {
 		let starts = settleStart(beginStart(new Map(), 1, resume), 1, { ok: false, error: "no file" });
 		starts = settleStart(
-			beginStart(starts, 2, { kind: "new", cwd: "~", prompt: "hi", images: [], branch: null, model: null, thinking: null, role: null, skill: null }),
+			beginStart(starts, 2, { kind: "new", cwd: "~", prompt: "hi", images: [], branch: null, model: null, skill: null }),
 			2,
 			{ ok: false, error: "not a directory" },
 		);
@@ -56,5 +56,18 @@ describe("starts", () => {
 		expect(loseStarts(started)).toBe(started);
 		expect(dropHidden(started, () => false)).toBe(started);
 		expect(dismissSettled(started, "quick").size).toBe(0);
+	});
+
+	test("a Resume all leaves when every session resumed, and its failure outlives the connection and every view until dismissed", () => {
+		const resumeAll: StartOp = { kind: "resume-all", sessionIds: ["s1", "s2"] };
+		const waiting = beginStart(new Map(), 1, resumeAll);
+		expect(settleResumeAll(waiting, 1, []).size).toBe(0);
+		const failed = settleResumeAll(waiting, 1, ["no file", "busy"]);
+		expect(startOf(failed, "resume-all")).toMatchObject({ phase: "failed", error: "Could not resume 2 sessions. no file" });
+		expect(settleResumeAll(failed, 1, [])).toBe(failed);
+		const lost = loseStarts(waiting);
+		expect(startOf(lost, "resume-all")).toMatchObject({ phase: "failed", error: expect.stringContaining("sessions may still appear") });
+		expect(dropHidden(lost, () => false)).toBe(lost);
+		expect(dismissSettled(lost, "resume-all").size).toBe(0);
 	});
 });

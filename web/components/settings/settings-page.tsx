@@ -1,5 +1,5 @@
 import { Check, ChevronsUpDown, FileText, FolderOpen, Palette, Plug, RotateCcw, Route, Sparkles } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -7,11 +7,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
+import { errorText } from "../../api";
+import { useRead } from "../../reads";
 import { hashForSettings } from "../../routing";
-import { loadModels, loadSettings } from "../../settings-api";
+import { loadSettings } from "../../settings-api";
 import { Header } from "../conversation";
 import { AppearanceTab } from "./appearance-tab";
-import { type Catalog, type Editing, errorText } from "./editor";
+import type { Catalog, Editing } from "./editor";
 import { Files } from "./files-tab";
 import { LinearConnection } from "./linear-connection";
 import { NewSessionsTab } from "./new-sessions-tab";
@@ -109,21 +111,21 @@ function ompPanels(load: Load, cwd: string | null, editing: Editing): Record<"ro
 export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspaces: Workspace[] }) {
 	const [load, setLoad] = useState<Load>({ phase: "loading" });
 	const [tab, setTab] = useState<SettingsTab>("roles");
-	const [catalog, setCatalog] = useState<Catalog>({ phase: "loading" });
+	const models = useRead<{ models: CatalogModel[] }>("/api/models");
+	const catalog = useMemo((): Catalog => {
+		if (models.error !== null) return { phase: "failed", error: `Cannot list omp's models: ${models.error}` };
+		if (models.data === null) return { phase: "loading" };
+		const byProvider = new Map<string, CatalogModel[]>();
+		for (const model of models.data.models) {
+			const listed = byProvider.get(model.provider);
+			if (listed) listed.push(model);
+			else byProvider.set(model.provider, [model]);
+		}
+		return { phase: "loaded", bySelector: new Map(models.data.models.map(model => [model.selector, model])), byProvider: [...byProvider] };
+	}, [models]);
 	// A save answered after the user switched workspace must not replace the new workspace's settings.
 	const currentCwd = useRef(cwd);
 	currentCwd.current = cwd;
-
-	useEffect(() => {
-		loadModels().then(
-			models => {
-				const byProvider = new Map<string, CatalogModel[]>();
-				for (const model of models) byProvider.set(model.provider, [...(byProvider.get(model.provider) ?? []), model]);
-				setCatalog({ phase: "loaded", bySelector: new Map(models.map(model => [model.selector, model])), byProvider: [...byProvider] });
-			},
-			(err: unknown) => setCatalog({ phase: "failed", error: `Cannot list omp's models: ${errorText(err)}` }),
-		);
-	}, []);
 
 	useEffect(() => {
 		const controller = new AbortController();

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { RosterHost, View } from "../src/shared";
+import { hashForSession, type RosterHost, type View } from "../src/shared";
+import type { StartOp } from "./starts";
 import {
 	adjacentSession,
 	closePane,
@@ -12,6 +13,8 @@ import {
 	hashForView,
 	inboxFromHash,
 	type Layout,
+	layoutAfterResumeAll,
+	layoutAfterStart,
 	layoutFromHash,
 	newSessionFromHash,
 	openView,
@@ -181,6 +184,23 @@ describe("opening and closing panes", () => {
 		expect(swapView(split([a, b], 1), past, c)).toEqual(split([a, c], 1));
 	});
 
+	test("a started session opens where its start asked: a resume in its transcript's pane, a quick action nowhere", () => {
+		const past: View = { kind: "past", sessionId: "s" };
+		const layout = split([a, past, b], 2);
+		const quick: StartOp = { kind: "quick", cwd: "/tmp", prompt: "fix", subject: { kind: "ticket", id: "ENG-7", action: "work" }, skill: null };
+		expect(layoutAfterStart(layout, { kind: "resume", sessionId: "s" }, "c")).toEqual(split([a, c, b], 1));
+		expect(layoutAfterStart(layout, { kind: "fork", view: a, itemId: "u1", point: { entryId: "e1", prefill: true } }, "c")).toEqual(split([a, past, c], 2));
+		expect(layoutAfterStart(layout, quick, "c")).toBeNull();
+		expect(layoutAfterStart(layout, { kind: "resume-all", sessionIds: ["s"] }, "c")).toBeNull();
+	});
+
+	test("a Resume all shows each resumed session live in the pane of its transcript, and leaves the panes otherwise", () => {
+		const [s1, s2]: View[] = [{ kind: "past", sessionId: "s1" }, { kind: "past", sessionId: "s2" }];
+		const started = [{ sessionId: "s2", instanceId: "c" }];
+		expect(layoutAfterResumeAll(split([s1, a, s2], 0), started)).toEqual(split([s1, a, c], 0));
+		expect(layoutAfterResumeAll(split([s1, a], 1), started)).toBeNull();
+	});
+
 	test("ending a session shows the next listed session in its pane, else the previous, skipping open ones", () => {
 		const listed = ["a", "b", "c", "d"];
 		expect(endSession(split([b], 0), "b", listed)).toEqual(split([c], 0));
@@ -224,5 +244,13 @@ describe("stepping through the sidebar's sessions", () => {
 		expect(adjacentSession(listed, elsewhere, 1)).toEqual(a);
 		expect(adjacentSession(listed, null, -1)).toEqual(old);
 		expect(adjacentSession([], null, 1)).toBe(null);
+	});
+});
+
+describe("session links", () => {
+	test("the link a pull request's description carries opens the session it names", () => {
+		const sessionId = "01a0f6a5-181e/#x y";
+		expect(sessionFromHash(hashForSession(sessionId))).toBe(sessionId);
+		expect(layoutFromHash(hashForSession(sessionId))).toBeNull();
 	});
 });

@@ -109,4 +109,24 @@ describe("Work", () => {
 			{ path: "y.ts", changes: [edited(null, 0, 0)] },
 		]);
 	});
+
+	test("the plan is the plan file changed last, until the agent deletes that one", () => {
+		const work = fold(
+			{ type: "session", cwd: "/repo" },
+			result("write", { resolvedPath: "/s/local/auth-plan.md" }),
+			result("write", { resolvedPath: "/repo/notes.md" }),
+			result("edit", { path: "/repo/docs/PLAN.md", diff: "+1|# Ship" }),
+		);
+		expect(work.planFile).toBe("/repo/docs/PLAN.md");
+		expect(work.snapshot("# Ship").plan).toEqual({ path: "docs/PLAN.md", text: "# Ship" });
+		expect(work.snapshot(null).plan).toBeNull();
+
+		const version = work.planVersion;
+		work.applyEntry(result("edit", { path: "/repo/src/a.ts", diff: "+1|a" }));
+		expect(work.planVersion).toBe(version);
+		work.applyEntry(result("edit", { path: "/s/local/auth-plan.md", op: "delete", diff: "" }));
+		expect([work.planFile, work.planVersion]).toEqual(["/repo/docs/PLAN.md", version + 1]);
+		work.applyEntry(result("edit", { path: "/repo/docs/PLAN.md", op: "delete", diff: "" }));
+		expect(work.planFile).toBeNull();
+	});
 });
