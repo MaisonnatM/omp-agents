@@ -29,9 +29,20 @@ import { NO_PLANS, Plans } from "./plan-usage";
  */
 export function Model({ selector, titled = true }: { selector: string; titled?: boolean }) {
 	return (
-		<span title={titled ? selector : undefined}>
-			<OrgIcon org={modelOrg(selector)} label={titled} className="mr-1 inline-block align-[-0.125em]" />
-			{modelLabel(selector)}
+		<span>
+			{titled ? (
+				<Tooltip content={selector}>
+					<span>
+						<OrgIcon org={modelOrg(selector)} label className="mr-1 inline-block align-[-0.125em]" />
+						{modelLabel(selector)}
+					</span>
+				</Tooltip>
+			) : (
+				<>
+					<OrgIcon org={modelOrg(selector)} className="mr-1 inline-block align-[-0.125em]" />
+					{modelLabel(selector)}
+				</>
+			)}
 		</span>
 	);
 }

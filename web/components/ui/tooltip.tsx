@@ -226,7 +226,7 @@ function Tooltip({
                   // Trim recenters the label; the padding bump only applies
                   // where text-box is supported, keeping the same overall
                   // height (~26px) as untrimmed browsers.
-                  "bg-foreground text-background text-[12px] px-2 py-1",
+                  "max-w-64 text-pretty bg-foreground text-background text-[12px] px-2 py-1",
                   "[text-box:trim-both_cap_alphabetic] supports-[text-box:trim-both]:py-2",
                   shape.bg,
                   className

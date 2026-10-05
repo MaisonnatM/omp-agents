@@ -2,6 +2,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { Fragment } from "react";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { bindingLabel, type Scope, scopeOf, SHORTCUTS } from "../shortcuts";
 
 const LIST = new Intl.ListFormat("en", { type: "conjunction" });
@@ -24,11 +25,13 @@ export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenC
 								anywhere, even while you type. Session shortcuts act on the focused pane.
 							</DialogPrimitive.Description>
 						</div>
-						<DialogPrimitive.Close asChild>
-							<Button variant="ghost" size="icon-compact" aria-label="Close" title="Close">
-								<X />
-							</Button>
-						</DialogPrimitive.Close>
+						<Tooltip content="Close" shortcut={["Esc"]} side="bottom">
+							<DialogPrimitive.Close asChild>
+								<Button variant="ghost" size="icon-compact" aria-label="Close">
+									<X />
+								</Button>
+							</DialogPrimitive.Close>
+						</Tooltip>
 					</div>
 					<table className="mt-4 w-full text-sm" data-shortcuts>
 						<thead className="text-left text-xs text-muted-foreground">

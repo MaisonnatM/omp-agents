@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import type { PullRequestComment } from "../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { age } from "../labels";
@@ -127,7 +128,9 @@ export function Comment({ comment: { body, at, url }, avatar, author, action }: 
 				{avatar}
 				<span className="font-medium text-foreground">{author}</span>
 				{action}
-				<span title={new Date(at).toLocaleString()}>{url ? <OutLink href={url}>{when}</OutLink> : when}</span>
+				<Tooltip content={new Date(at).toLocaleString()}>
+					<span>{url ? <OutLink href={url}>{when}</OutLink> : when}</span>
+				</Tooltip>
 			</p>
 			{body.trim() && <Markdown text={body} className={avatar ? "pl-7" : undefined} />}
 		</li>

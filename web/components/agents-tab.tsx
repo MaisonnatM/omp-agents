@@ -1,5 +1,6 @@
 import type { AgentRow, AgentStatus, HostStatus, LiveView, RosterHost } from "../../src/shared";
 import { SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel, modeOf, SPLIT_CLICK } from "../labels";
 import { useDashboardContext } from "./dashboard-context";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -29,19 +30,20 @@ function AgentButton({ view, current, status, label, detail, depth }: AgentButto
 	const { open } = useDashboardContext();
 	return (
 		<SidebarMenuItem>
-			<SidebarMenuButton
-				isActive={current}
-				onClick={event => open(view, modeOf(event))}
-				title={`${label}\n${detail} · ${statusLabel(status)}\n${SPLIT_CLICK} to open it in a split`}
-				className="h-auto min-h-8 items-start py-1.5"
-				style={{ paddingInlineStart: 8 + depth * INDENT }}
-			>
-				<StatusDot status={status} />
-				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span className="truncate text-foreground">{label}</span>
-					<span className="truncate text-xs text-muted-foreground">{detail}</span>
-				</span>
-			</SidebarMenuButton>
+			<Tooltip content={`${label} · ${detail} · ${statusLabel(status)}. ${SPLIT_CLICK} to open it in a split`} side="left">
+				<SidebarMenuButton
+					isActive={current}
+					onClick={event => open(view, modeOf(event))}
+					className="h-auto min-h-8 items-start py-1.5"
+					style={{ paddingInlineStart: 8 + depth * INDENT }}
+				>
+					<StatusDot status={status} />
+					<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+						<span className="truncate text-foreground">{label}</span>
+						<span className="truncate text-xs text-muted-foreground">{detail}</span>
+					</span>
+				</SidebarMenuButton>
+			</Tooltip>
 		</SidebarMenuItem>
 	);
 }

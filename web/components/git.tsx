@@ -1,6 +1,7 @@
 import { Check, GitBranch, GitBranchPlus } from "lucide-react";
 import { Fragment, useState } from "react";
 import { type BranchChoice, type GitCheckout, worktreeDir } from "../../src/shared";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { projectName } from "../labels";
 import { useCopy } from "../use-copy";
@@ -12,16 +13,17 @@ export function BranchName({ name, className }: { name: string; className?: stri
 	const { copied, copy } = useCopy();
 	const Icon = copied ? Check : GitBranch;
 	return (
-		<button
-			type="button"
-			aria-label={`Copy branch ${name}`}
-			title={copied ? "Copied" : `Copy branch ${name}`}
-			onClick={() => copy(name)}
-			className={cn("rounded-sm text-left underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring", className)}
-		>
-			<Icon aria-hidden className="mr-0.5 inline size-3 align-[-0.125em]" />
-			{name}
-		</button>
+		<Tooltip content={copied ? "Copied" : `Copy branch ${name}`}>
+			<button
+				type="button"
+				aria-label={`Copy branch ${name}`}
+				onClick={() => copy(name)}
+				className={cn("rounded-sm text-left underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring", className)}
+			>
+				<Icon aria-hidden className="mr-0.5 inline size-3 align-[-0.125em]" />
+				{name}
+			</button>
+		</Tooltip>
 	);
 }
 
@@ -29,17 +31,17 @@ export function BranchName({ name, className }: { name: string; className?: stri
 export function GitRef({ github, branch }: { github: GitCheckout["github"]; branch: string | null }) {
 	const parts = [
 		github && (
-			<a
-				key="repo"
-				href={`https://github.com/${github.owner}/${github.repo}`}
-				target="_blank"
-				rel="noreferrer"
-				title={`${github.owner}/${github.repo} on GitHub`}
-				className="underline-offset-2 hover:text-foreground hover:underline"
-			>
-				<OrgIcon org="github" className="mr-1 inline align-[-0.125em]" />
-				{github.owner}/{github.repo}
-			</a>
+			<Tooltip key="repo" content={`${github.owner}/${github.repo} on GitHub`}>
+				<a
+					href={`https://github.com/${github.owner}/${github.repo}`}
+					target="_blank"
+					rel="noreferrer"
+					className="underline-offset-2 hover:text-foreground hover:underline"
+				>
+					<OrgIcon org="github" className="mr-1 inline align-[-0.125em]" />
+					{github.owner}/{github.repo}
+				</a>
+			</Tooltip>
 		),
 		branch && <BranchName key="branch" name={branch} />,
 	].filter(Boolean);
@@ -89,6 +91,7 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 			}
 			icon={choice?.kind === "new" ? GitBranchPlus : GitBranch}
 			ariaLabel={`Branch: ${label}${choice?.kind === "new" ? `, new from ${choice.base}` : ""}`}
+			tooltip={`Branch: ${label}${choice?.kind === "new" ? `, new from ${choice.base}` : ""}. Choosing another branch uses its existing worktree or creates a new worktree.`}
 			disabled={disabled}
 			search={{ label: "Search or create a branch", query: { value: search, onChange: setSearch } }}
 			width="lg"

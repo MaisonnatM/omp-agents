@@ -11,6 +11,7 @@ Dashboard behavior that can live outside these files does: the composer's queued
 - `textareaProps.onPaste`: runs first in the paste handler, and a pasted file that `accept` takes attaches instead of pasting its name as text.
   A screenshot or a copied image file is the common paste.
 - `stopShortcut`: the keys that press Stop, shown in its tooltip.
+- Send and queue buttons show their current action and Enter in a tooltip; Stop keeps its caller-provided shortcut.
 - Send button mode: while `status` is `"streaming"`, the button is Stop only when the draft is empty, and a draft sends at once.
   The dashboard steers a running turn with it, and has no queue inside this component.
 - `beforeTextarea`: a slot above the textarea and below the attached files, where the dashboard renders its queued rows.
@@ -33,9 +34,12 @@ Dashboard behavior that can live outside these files does: the composer's queued
 
 ## Others
 
+- `ui/sheet.tsx`: the close button uses the shared tooltip with an Esc keycap instead of a native `title`.
+
 - `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`, and the exported `TooltipKbd` chip.
+  Long labels wrap at 16rem.
   `ui/sidebar-core.tsx` uses both for the sidebar toggle.
-- `ui/tabs.tsx`: `shortcut` on `TabItem`, which wraps the tab in a shortcut tooltip and sets `data-state` itself, since the tooltip's trigger stamps its own.
+- `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys and keeps the tab's `data-state`, since the tooltip trigger stamps its own.
   `badge` on `TabItem` draws a count after the label, which the Inbox tab uses for the pull requests waiting on you.
 - `ui/thinking-steps.tsx`: `icon` takes a component as well as a name, and `iconClassName` styles it.
 - `ui/sidebar.tsx`: `scroll-fade-once-scrolled` on the scroll areas, so the fade shows only once scrolled.
