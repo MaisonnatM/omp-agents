@@ -33,7 +33,6 @@ import { GitRef } from "./git";
 import { Model, ModelPicker } from "./model-picker";
 import { OrgIcon } from "./org-icon";
 import { ShipStep } from "./ship-step";
-import { ThinkingPicker } from "./thinking-picker";
 import { NOTICE_TONE, Transcript } from "./transcript";
 import { UserRequestCard } from "./user-request";
 
@@ -313,6 +312,7 @@ function LiveConversation({
 	const [dequeueId, setDequeueId] = useState<number | null>(null);
 	const nextId = useRef(0);
 	const [modelsOpen, setModelsOpen] = useState(false);
+	const [pendingModelRevision, setPendingModelRevision] = useState<number | null>(null);
 
 	const shown = host ?? lastHost;
 	const agent: AgentRow | null = view.agentId ? (shown?.agents.find(a => a.id === view.agentId) ?? null) : null;
@@ -323,6 +323,9 @@ function LiveConversation({
 			: host.control;
 
 	const live = phase.phase === "live" && !phase.readOnly;
+	useEffect(() => {
+		if (!live) setPendingModelRevision(null);
+	}, [live]);
 	const writable = live && (view.agentId === null || agent?.canMessage === true);
 	// omp sends a subagent text only.
 	const attachable = writable && view.agentId === null;
@@ -422,6 +425,12 @@ function LiveConversation({
 	const thinking = shown?.thinkingLevel ?? null;
 	// Collab rooms carry no model or thinking switch, so only sessions this dashboard started over RPC can change them.
 	const switchable = view.agentId === null && host?.source === "dashboard" && live ? host : null;
+	const switchingModel = !!switchable && (switchable.modelSwitch.pending || pendingModelRevision === switchable.modelSwitch.revision);
+	const pickModel = (model: ModelOption): void => {
+		if (!switchable || switchingModel) return;
+		setPendingModelRevision(switchable.modelSwitch.revision);
+		onSetModel(model, null);
+	};
 	// The list refreshes on every open, whether a click or the model shortcut opened it.
 	const openModels = (open: boolean): void => {
 		setModelsOpen(open);
@@ -429,10 +438,21 @@ function LiveConversation({
 	};
 	const modelSlot =
 		view.agentId !== null ? null : switchable ? (
-			<>
-				<ModelPicker current={shownModel} list={models} open={modelsOpen} onOpenChange={openModels} onPick={model => onSetModel(model, null)} />
-				{switchable.thinkingLevels.length > 0 && <ThinkingPicker current={thinking} levels={switchable.thinkingLevels} onPick={onSetThinking} />}
-			</>
+			<ModelPicker
+				current={shownModel}
+				list={models}
+				open={modelsOpen}
+				onOpenChange={openModels}
+				onPick={pickModel}
+				thinking={{
+					current: thinking,
+					levels: switchable.thinkingLevels,
+					pending: switchingModel,
+					onPick: level => {
+						if (level !== null && !switchingModel) onSetThinking(level);
+					},
+				}}
+			/>
 		) : shownModel || thinking ? (
 			<span className="flex min-w-0 items-center gap-3 px-2 text-xs text-muted-foreground" title="Switch this session's model and thinking level from its omp terminal.">
 				{shownModel && (
@@ -483,7 +503,7 @@ function LiveConversation({
 						openModels(true);
 					},
 					thinking: () => {
-						const levels = switchable?.thinkingLevels ?? [];
+						const levels = switchingModel ? [] : switchable?.thinkingLevels ?? [];
 						if (levels.length === 0) return false;
 						onSetThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
 					},

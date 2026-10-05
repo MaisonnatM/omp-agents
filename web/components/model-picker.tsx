@@ -1,7 +1,11 @@
 import type { ModelOption } from "../../src/shared";
+import { Brain } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Tabs, TabsList, TabItem, TabPanel } from "@/components/ui/tabs";
 import { modelLabel, modelOrg, providerLabel, providerOrg } from "../labels";
 import { CommandPicker, fromList, type PickerGroup } from "./command-picker";
 import { OrgIcon } from "./org-icon";
+import { ThinkingChoices, type ThinkingChoicesProps } from "./thinking-picker";
 
 /**
  * `anthropic/claude-opus-5-5` as the Anthropic logo and `Opus 5.5`, with the full selector on hover. `titled={false}`
@@ -64,6 +68,7 @@ export function modelGroups<T>(
 				label: <ModelRow selector={selector} id={id} />,
 				keywords: [modelLabel(selector), keyword],
 				title: selector,
+				ariaLabel: `${modelDescription(selector)}, ${id}`,
 				selected: selector === current,
 				onSelect: () => onPick(model),
 			};
@@ -83,6 +88,7 @@ interface ModelPickerProps {
 	onOpenChange: (open: boolean) => void;
 	onPick: (model: ModelOption) => void;
 	disabled?: boolean;
+	thinking: ThinkingChoicesProps;
 }
 
 function byProvider(models: ModelOption[]): [string, ModelOption[]][] {
@@ -97,31 +103,75 @@ function byProvider(models: ModelOption[]): [string, ModelOption[]][] {
 
 const selectorOf = (model: ModelOption): string => `${model.provider}/${model.id}`;
 
-/** The composer's model switch: a searchable list of the models of the providers you are connected to, grouped by provider. */
-export function ModelPicker({ current, unset, list, open, onOpenChange, onPick, disabled }: ModelPickerProps) {
+/** Provider tabs filter the models without changing the session's active model. */
+export function ModelPicker({ current, unset, list, open, onOpenChange, onPick, disabled, thinking }: ModelPickerProps) {
+	const [provider, setProvider] = useState<string | null>(null);
+	const groups = byProvider(list?.models ?? []);
+	const currentProvider = current?.slice(0, current.indexOf("/")) ?? null;
+	const wasOpen = useRef(false);
+	useEffect(() => {
+		if (open && !wasOpen.current) setProvider(currentProvider);
+		wasOpen.current = open;
+	}, [open, currentProvider]);
+	const active = groups.find(([name]) => name === provider)?.[0] ?? groups.find(([name]) => name === currentProvider)?.[0] ?? groups[0]?.[0] ?? "";
+	const changeOpen = (next: boolean): void => {
+		if (next) setProvider(currentProvider);
+		onOpenChange(next);
+	};
 	return (
 		<CommandPicker
-			trigger={<span className="max-w-56 truncate">{current ? <Model selector={current} titled={false} /> : (unset ?? "Choose model")}</span>}
+			trigger={
+				<span className="flex min-w-0 items-center gap-2">
+					<span className="max-w-56 truncate">{current ? <Model selector={current} titled={false} /> : (unset ?? "Choose model")}</span>
+					{thinking.current && (
+						<span className="flex shrink-0 items-center gap-1 text-muted-foreground">
+							<Brain aria-hidden="true" className="size-3.5" />
+							{thinking.current}
+						</span>
+					)}
+				</span>
+			}
 			tooltip={current ?? unset ?? "Choose model"}
 			shortcut="model"
-			ariaLabel={`Choose model: ${current ? modelDescription(current) : (unset ?? "none selected")}`}
+			ariaLabel={`Choose model and thinking level: ${current ? modelDescription(current) : (unset ?? "none selected")}, thinking ${thinking.current ?? "Default"}`}
 			disabled={disabled}
+			selectionDisabled={thinking.pending}
 			search={MODEL_LIST.search}
 			width="lg"
 			side="top"
 			open={open}
-			onOpenChange={onOpenChange}
-			list={fromList(list, MODEL_LIST.loading, ({ models }) =>
+			onOpenChange={changeOpen}
+			closeOnSelect={false}
+			list={fromList(list, MODEL_LIST.loading, () =>
 				modelGroups(
-					byProvider(models),
+					groups.filter(([name]) => name === active),
 					model => ({ selector: selectorOf(model), id: model.id, keyword: providerLabel(model.provider) }),
 					current,
 					model => {
-						if (selectorOf(model) !== current) onPick(model);
+						if (!disabled && !thinking.pending && selectorOf(model) !== current) onPick(model);
 					},
 				),
 			)}
-			empty={MODEL_LIST.empty}
+			empty={list?.models.length === 0 ? "No connected models. Sign in to a provider in omp, then reopen this picker." : MODEL_LIST.empty}
+			content={command => (
+				<>
+					{groups.length > 0 && !list?.error ? (
+						<Tabs value={active} onValueChange={setProvider} size="compact">
+							<div className="max-w-full overflow-x-auto p-2">
+								<TabsList aria-label="Model providers" className="w-max min-w-full">
+									{groups.map(([name]) => (
+										<TabItem key={name} value={name} label={providerLabel(name)} onFocus={event => event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" })} />
+									))}
+								</TabsList>
+							</div>
+							{groups.map(([name]) => (
+								<TabPanel key={name} value={name}>{name === active ? command : null}</TabPanel>
+							))}
+						</Tabs>
+					) : command}
+					<ThinkingChoices {...thinking} disabled={disabled || thinking.disabled} />
+				</>
+			)}
 		/>
 	);
 }

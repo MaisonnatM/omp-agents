@@ -1,42 +1,48 @@
 import { Brain } from "lucide-react";
-import { CommandPicker } from "./command-picker";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
+import { shortcutLabels } from "../shortcuts";
 
-interface ThinkingPickerProps {
-	/** omp's thinking level, or `null` before the session reports one. */
+export interface ThinkingChoicesProps {
 	current: string | null;
-	/** Levels the session's model accepts, `off` first. */
-	levels: string[];
-	onPick: (level: string) => void;
+	levels: string[] | null;
+	onPick: (level: string | null) => void;
+	allowDefault?: boolean;
+	pending?: boolean;
+	disabled?: boolean;
 }
 
-/** The composer's thinking-level switch: omp's levels for the current model, lowest first. */
-export function ThinkingPicker({ current, levels, onPick }: ThinkingPickerProps) {
+export function ThinkingChoices({ current, levels, onPick, allowDefault, pending, disabled }: ThinkingChoicesProps) {
 	return (
-		<CommandPicker
-			trigger={current ?? "Thinking"}
-			icon={Brain}
-			ariaLabel={`Choose thinking level: ${current ?? "none selected"}`}
-			tooltip="Thinking level"
-			shortcut="thinking"
-			width="sm"
-			side="top"
-			list={{
-				kind: "ready",
-				groups: [
-					{
-						key: "levels",
-						heading: "Thinking level",
-						items: levels.map(level => ({
-							value: level,
-							label: level,
-							selected: level === current,
-							onSelect: () => {
-								if (level !== current) onPick(level);
-							},
-						})),
-					},
-				],
-			}}
-		/>
+		<fieldset disabled={disabled || pending} className="min-w-0 border-t border-border p-3">
+			<legend className="sr-only">Thinking level</legend>
+			<Tooltip content="Thinking level" shortcut={shortcutLabels("thinking")}>
+				<span className="mb-2 flex w-fit items-center gap-1.5 text-xs text-muted-foreground">
+					<Brain aria-hidden="true" className="size-3.5" />
+					Thinking level
+				</span>
+			</Tooltip>
+			{pending ? (
+				<p role="status" className="text-xs text-muted-foreground">Switching model…</p>
+			) : levels === null ? (
+				<p role="status" className="text-xs text-muted-foreground">Thinking levels are unavailable until a model and its capabilities are loaded.</p>
+			) : (
+				<>
+					<div className="flex flex-wrap gap-1">
+						{allowDefault && (
+							<Button variant="ghost" size="compact" aria-label="Thinking level: Default" aria-pressed={current === null} active={current === null} onClick={() => onPick(null)}>
+								Default
+							</Button>
+						)}
+						{levels.map(level => (
+							<Button key={level} variant="ghost" size="compact" aria-label={`Thinking level: ${level}`} aria-pressed={current === level} active={current === level} onClick={() => onPick(level)}>
+								{level}
+							</Button>
+						))}
+					</div>
+					{levels.length === 0 && <p className="mt-2 text-xs text-muted-foreground">This model has no selectable thinking levels.</p>}
+				</>
+			)}
+		</fieldset>
 	);
 }

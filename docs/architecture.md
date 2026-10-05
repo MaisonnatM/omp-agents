@@ -239,7 +239,9 @@ It runs `git worktree list --porcelain`, `git for-each-ref`, and `git symbolic-r
 Like a new session's `start`, `cwd` may name any directory.
 The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
 
-`GET /api/models/connected` answers `{ models }`, each `{ provider, id }`: the models that `omp models` lists from the providers you are connected to, for the new-session draft's model picker.
+`GET /api/models/connected` answers `{ models, capabilities }` for the new-session draft's model picker.
+`models` contains `{ provider, id }` identities from connected providers in `omp models`.
+Each capability contains a `model` identity and `thinkingLevels` from that catalog entry's `thinking` efforts.
 A live session's `list-models` answer applies the same filter to the models that its omp RPC process offers.
 A `start` of kind `new` carries a `model`, `null` for omp's default; the server sends omp `set_model` once it is ready and before the first prompt, and a model that omp refuses fails the start.
 
@@ -248,6 +250,11 @@ Like `/api/git`, `cwd` may name any directory.
 `connectedRoles` in `src/omp/models.ts` loads `modelRoles` with omp's read-only loader for that directory, so a project's `.omp/config.yml` overrides count, and reads each role's selector against `omp models`: a `:level` suffix becomes `thinking`, and `@role` or `*` takes the named role's model and level unless it adds its own.
 Roles that name a model by a fuzzy pattern, or one on a provider you are not connected to, are left out.
 A `start` of kind `new` and a `set-model` each carry a `thinking`, `null` to keep omp's level; the server sends omp `set_thinking_level` after `set_model`.
+Before starting with an explicit thinking level, the server checks omp's live `get_available_thinking_levels`, so a changed default or catalog cannot silently clamp an unsupported draft choice.
+A dashboard roster row carries `modelSwitch`, whose `pending` flag disables model and thinking changes while a model switch runs.
+Its `revision` advances after the server refreshes the model and thinking capabilities, including after a failed switch.
+The picker uses that revision to disable thinking choices immediately after a local selection, before the first pending roster arrives.
+In-flight state reads from before a model switch cannot replace the refreshed capabilities.
 
 `GET /api/skills?cwd=<directory>` answers `{ skills }`, each `{ name, description }`: the skills that `/skill:<name>` invokes in a session started in that directory, from the same discovery as the composer's `/` completions (`listSkills` in `src/commands.ts`), and none when omp's `skills.enableSkillCommands` is off.
 The settings page lists them to pin one, and the new-session draft reads them to show whether the pinned skill exists there.

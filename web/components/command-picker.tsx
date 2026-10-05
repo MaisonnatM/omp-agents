@@ -14,9 +14,10 @@ export interface PickerItem {
 	label: ReactNode;
 	keywords?: string[];
 	title?: string;
+	ariaLabel?: string;
 	/** Draws the check mark, shown when `true`; omit it for an action, like creating a branch, that has nothing to check. */
 	selected?: boolean;
-	/** Runs after the picker closes. */
+	/** Runs after selection, and after closing unless `closeOnSelect` is false. */
 	onSelect: () => void;
 }
 
@@ -69,10 +70,14 @@ interface CommandPickerProps {
 	list: PickerList;
 	/** What the list reads when no item matches; nothing when omitted. */
 	empty?: ReactNode;
+	closeOnSelect?: boolean;
+	selectionDisabled?: boolean;
+	/** Wraps the command list with additional controls inside the same popover. */
+	content?: (command: ReactNode) => ReactNode;
 }
 
 /** A button that opens a searchable, grouped list of choices; picking one closes it. The dashboard's every combobox. */
-export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, tooltip, shortcut, disabled, className, search, width, side, open, onOpenChange, list, empty }: CommandPickerProps) {
+export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, tooltip, shortcut, disabled, className, search, width, side, open, onOpenChange, list, empty, closeOnSelect = true, selectionDisabled = false, content = command => command }: CommandPickerProps) {
 	const [inner, setInner] = useState(false);
 	const shown = open ?? inner;
 	const change = (next: boolean): void => {
@@ -107,7 +112,8 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 				button
 			)}
 			{/* A click in the list must not reach the composer around a picker, which would take the focus back to its text box. */}
-			<PopoverContent side={side} align="start" className={cn(WIDTH[width], "p-0")} onMouseDown={event => event.stopPropagation()}>
+			<PopoverContent side={side} align="start" className={cn(WIDTH[width], "min-w-0 max-h-[var(--radix-popover-content-available-height)] overflow-x-hidden overflow-y-auto overscroll-contain p-0")} onMouseDown={event => event.stopPropagation()}>
+				{content(
 				<Command>
 					{search && <CommandInput aria-label={search.label} placeholder={`${search.label}…`} value={search.query?.value} onValueChange={search.query?.onChange} />}
 					<CommandList>
@@ -132,9 +138,11 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 													value={item.value}
 													keywords={item.keywords}
 													title={item.title}
+													aria-label={item.ariaLabel}
 													forceMount={group.forceMount}
+													disabled={disabled || selectionDisabled}
 													onSelect={() => {
-														change(false);
+														if (closeOnSelect) change(false);
 														item.onSelect();
 													}}
 												>
@@ -147,7 +155,7 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 							</>
 						)}
 					</CommandList>
-				</Command>
+				</Command>)}
 			</PopoverContent>
 		</Popover>
 	);
