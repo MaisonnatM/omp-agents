@@ -160,7 +160,7 @@ const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
 
 const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	repository(owner: $owner, name: $repo) { pullRequest(number: $number) {
-		number title body isDraft state reviewDecision headRefName baseRefName createdAt additions deletions changedFiles
+		number title body isDraft state reviewDecision mergeable headRefName baseRefName createdAt additions deletions changedFiles
 		${REVIEW_FIELDS}
 		commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
 			... on CheckRun { name status conclusion detailsUrl }
@@ -239,6 +239,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		body: str(node.body) ?? "",
 		state: node.state === "CLOSED" ? "closed" : head.state,
 		additions: num(node.additions) ?? 0,
+		conflicts: node.state !== "MERGED" && node.state !== "CLOSED" && node.mergeable === "CONFLICTING",
 		deletions: num(node.deletions) ?? 0,
 		changedFiles: num(node.changedFiles) ?? 0,
 		files,

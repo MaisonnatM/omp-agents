@@ -2,6 +2,24 @@
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useStoredKeys } from "../stored-state";
+
+/** Which of a page's sections show folded, by fold key. */
+export interface Folds {
+	isFolded: (key: string) => boolean;
+	toggle: (key: string) => void;
+	unfold: (keys: string[]) => void;
+}
+
+/**
+ * The folds that localStorage keeps under `storageKey`. It stores the keys you flipped from their default, so a section
+ * `foldedByDefault` names stays folded until you unfold it.
+ */
+export function useFolds(storageKey: string, foldedByDefault: (key: string) => boolean = () => false): Folds {
+	const [flipped, flip] = useStoredKeys(storageKey);
+	const isFolded = (key: string): boolean => foldedByDefault(key) !== flipped.has(key);
+	return { isFolded, toggle: key => flip(key), unfold: keys => flip(...keys.filter(isFolded)) };
+}
 
 interface RevealTarget {
 	id: string;
@@ -20,12 +38,12 @@ interface RevealOptions {
  * that renders it reveals it on the next pass. A section link passes the target itself, so choosing it again scrolls
  * back; a row link passes its id, so folding it again stays folded.
  */
-export function useReveal(target: RevealTarget | null, collapsed: ReadonlySet<string>, expand: (keys: string[]) => void, { token, block, focus }: RevealOptions): void {
+export function useReveal(target: RevealTarget | null, folds: Folds, { token, block, focus }: RevealOptions): void {
 	const shown = useRef<unknown>(undefined);
 	useEffect(() => {
 		if (!target || shown.current === token) return;
-		const folded = target.folds.filter(key => collapsed.has(key));
-		if (folded.length > 0) return expand(folded);
+		const folded = target.folds.filter(folds.isFolded);
+		if (folded.length > 0) return folds.unfold(folded);
 		const element = document.getElementById(target.id);
 		if (!element) return;
 		shown.current = token;

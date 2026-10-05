@@ -105,8 +105,8 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 	return {
 		/** `scope`'s entry, as the store last read it. */
 		use: (scope: string | null = null): PolledEntry<T> => useEntry(scope, false),
-		/** `scope`'s entry, read again now and every {@link POLL_MS} while mounted, showing the kept read meanwhile. */
-		usePolling: (scope: string | null = null): PolledEntry<T> => useEntry(scope, true),
+		/** `scope`'s entry, read again now and every {@link POLL_MS} while mounted and `enabled`, showing the kept read meanwhile. */
+		usePolling: (scope: string | null = null, enabled = true): PolledEntry<T> => useEntry(scope, enabled),
 		refresh,
 	};
 }

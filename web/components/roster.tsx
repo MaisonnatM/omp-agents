@@ -30,8 +30,9 @@ import {
 } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
+import { fontWeights } from "@/lib/font-weight";
 import { SizeProvider } from "@/lib/size-context";
-import { inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
+import { inboxSection, inboxSections, pullRequestUrl, type Waiting, waitingCount } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";
@@ -269,12 +270,20 @@ interface SectionLinkProps {
 	title: string;
 	label: string;
 	count: number;
+	/** Marks the count of an inbox section that waits on your move. */
+	waiting?: Waiting | null;
 	/** Gets a new target each time, so choosing a section again scrolls back to it. */
 	onChoose: (target: SectionTarget) => void;
 }
 
+/** The count of an inbox section that waits on your move: a review asked of you, or a pull request a reviewer sent back. */
+const WAITING_COUNT: Record<Waiting, string> = {
+	"your-review": "text-foreground",
+	"your-fix": "text-red-600 dark:text-red-400",
+};
+
 /** A link to a section of a page, with its count. A plain click scrolls there; the page listens for `onChoose`. */
-function SectionLink({ href, section, chosen, title, label, count, onChoose }: SectionLinkProps) {
+function SectionLink({ href, section, chosen, title, label, count, waiting, onChoose }: SectionLinkProps) {
 	const isChosen = chosen?.id === section.id;
 	return (
 		<SidebarMenuItem>
@@ -294,7 +303,10 @@ function SectionLink({ href, section, chosen, title, label, count, onChoose }: S
 					{title}
 				</a>
 			</SidebarMenuButton>
-			<SidebarMenuBadge aria-hidden>{count}</SidebarMenuBadge>
+			{/* The badge sets its weight through `font-variation-settings`, which a weight class cannot override. */}
+			<SidebarMenuBadge aria-hidden className={waiting ? WAITING_COUNT[waiting] : undefined} style={waiting ? { fontVariationSettings: fontWeights.semibold } : undefined}>
+				{count}
+			</SidebarMenuBadge>
 		</SidebarMenuItem>
 	);
 }
@@ -323,7 +335,7 @@ function InboxNav({ project, target, onTarget }: InboxNavProps) {
 		else
 			body = (
 				<SidebarMenu aria-label={repos.length > 1 ? `Inbox sections of ${name}` : "Inbox sections"}>
-					{sections.map(({ title, pullRequests: { length } }) => (
+					{sections.map(({ title, waiting, rows: { length } }) => (
 						<SectionLink
 							key={title}
 							href={hashForInbox(null)}
@@ -332,6 +344,7 @@ function InboxNav({ project, target, onTarget }: InboxNavProps) {
 							title={title}
 							label={`${title}, ${length} pull request${length === 1 ? "" : "s"}`}
 							count={length}
+							waiting={waiting}
 							onChoose={onTarget}
 						/>
 					))}
@@ -447,6 +460,8 @@ export function Roster({
 	const { open: onOpen, send, start, dismissStart, end: onEnd, openNewSession: onNewSession, changeTodo: onTodoChange, connected, starts } = useDashboardContext();
 	const { resume, resumeAll } = starts;
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
+	const inbox = inboxStore.use(project).read;
+	const waiting = inbox ? waitingCount(inbox.data) : 0;
 	/** Continue past session `sessionId`, in the pane that shows it. */
 	const onResume = (sessionId: string): void => {
 		// The pane shows the resume's progress and failure, and the live session takes it over.
@@ -565,7 +580,16 @@ export function Roster({
 				<TabsList aria-label="Sidebar" className="mx-2 self-start">
 					{/* Four tabs fit the sidebar's default width only with tighter padding than Fluid's. */}
 					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => (
-						<TabItem key={value} value={value} label={label} icon={icon} className="px-2" shortcut={shortcutLabels(value)} />
+						<TabItem
+							key={value}
+							value={value}
+							label={label}
+							icon={icon}
+							badge={value === "inbox" && waiting > 0 ? waiting : undefined}
+							aria-label={value === "inbox" && waiting > 0 ? `${label}, ${waiting} waiting on you` : undefined}
+							className="px-2"
+							shortcut={shortcutLabels(value)}
+						/>
 					))}
 				</TabsList>
 			</SizeProvider>

@@ -1,4 +1,4 @@
-import { Check, CircleCheck, CircleDashed, CircleX, GitMerge, Link2, type LucideIcon, MessageSquare } from "lucide-react";
+import { Check, CircleCheck, CircleDashed, CircleX, GitMerge, Layers, Link2, type LucideIcon, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import {
 	type CheckState,
@@ -7,7 +7,6 @@ import {
 	type PastSession,
 	type PullRequest,
 	type PullRequestLink,
-	type ReviewDecision,
 	type RosterHost,
 	type SessionLinksEdit,
 	type SessionLinksResult,
@@ -16,16 +15,18 @@ import {
 	type View,
 } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";
+import { type InboxRow, pullRequestUrl, type RowVerdict, rowVerdict, type StackPlace } from "../../inbox-model";
 import { hashForInbox, type OpenMode } from "../../routing";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions, type QuickActionId } from "../../quick-actions";
 import { BranchName } from "../git";
 import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
-import { statusLabel } from "../status-dot";
+import { StatusDot, statusLabel } from "../status-dot";
 import { Avatar, IconTip, Reviewers, STATE_ICON } from "./avatars";
 
 const CHECK_ICON: Record<Exclude<CheckState, "none">, [LucideIcon, string, string]> = {
@@ -36,10 +37,10 @@ const CHECK_ICON: Record<Exclude<CheckState, "none">, [LucideIcon, string, strin
 
 const CONFLICTS_ICON: [LucideIcon, string, string] = [GitMerge, "text-red-600 dark:text-red-400", "Merge conflicts with its base branch"];
 
-const REVIEW_LABEL: Record<Exclude<ReviewDecision, "none">, [string, string]> = {
+const VERDICT_LABEL: Record<Exclude<RowVerdict, null>, [string, string]> = {
+	ready: ["Ready to merge", "text-emerald-600 dark:text-emerald-400"],
 	approved: ["Approved", "text-emerald-600 dark:text-emerald-400"],
 	"changes-requested": ["Changes requested", "text-red-600 dark:text-red-400"],
-	"review-required": ["Review required", "text-muted-foreground"],
 };
 
 /** How many review threads wait for a resolution, shown only while some might. */
@@ -84,6 +85,62 @@ export function sessionsFor(pr: InboxPullRequest, hosts: RosterHost[], past: Pas
 	return linked.toSorted((a, b) => Number(a.view.kind === "past") - Number(b.view.kind === "past") || Number(a.link === "worked") - Number(b.link === "worked"));
 }
 
+const LINK_VERB: Record<PullRequestLink, string> = { submitted: "submitted", worked: "worked on" };
+
+/** The first session on the pull request as a chip, then the others behind a `+N` menu that lists every one. */
+function SessionChips({ sessions, onOpen }: { sessions: SessionLink[]; onOpen: (view: View, mode: OpenMode) => void }) {
+	const [first] = sessions;
+	if (!first) return null;
+	return (
+		<>
+			<SessionChip
+				label={first.label}
+				status={first.status}
+				title={`Open the session that ${LINK_VERB[first.link]} it${first.status ? `, ${statusLabel(first.status)}` : ""} (${SPLIT_CLICK} to split)`}
+				filled={first.link === "submitted"}
+				onClick={event => onOpen(first.view, modeOf(event))}
+			/>
+			{sessions.length > 1 && (
+				<DropdownMenu>
+					<DropdownMenuTrigger
+						render={
+							<button
+								type="button"
+								aria-label={`All ${sessions.length} sessions on this pull request`}
+								className="rounded px-1 py-px tabular-nums outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+							/>
+						}
+					>
+						+{sessions.length - 1}
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="start" className="max-w-80">
+						{sessions.map(session => (
+							<MenuItem key={session.sessionId} title={`Open it (${SPLIT_CLICK} to split)`} onClick={event => onOpen(session.view, modeOf(event))}>
+								{session.status ? <StatusDot status={session.status} /> : <span className="w-1.5 shrink-0" />}
+								<span className="min-w-0 flex-1 truncate">{session.label}</span>
+								<span className="shrink-0 text-xs text-muted-foreground">{LINK_VERB[session.link]}</span>
+							</MenuItem>
+						))}
+					</DropdownMenuContent>
+				</DropdownMenu>
+			)}
+		</>
+	);
+}
+
+/** Where the row sits in its stack, with the branch it stacks on in its tooltip. */
+function StackChip({ stack, base }: { stack: StackPlace; base: string | null }) {
+	const label = `Pull request ${stack.position} of ${stack.size} in a stack, on ${base ?? "the default branch"}`;
+	return (
+		<Tooltip content={label}>
+			<span role="img" aria-label={label} className="flex shrink-0 items-center gap-1 tabular-nums">
+				<Layers aria-hidden className="size-3" />
+				{stack.position}/{stack.size}
+			</span>
+		</Tooltip>
+	);
+}
+
 /** The DOM id of a pull request's row, which an inbox link to that PR scrolls to. */
 export const rowId = (pr: PullRequest): string => `inbox-pr-${repoKey(pr)}/${pr.number}`;
 
@@ -117,6 +174,8 @@ function LinkSessionsButton({ pr, sessions }: { pr: PullRequest; sessions: Sessi
 				size="icon-compact"
 				aria-label={label}
 				loading={writing.phase === "writing"}
+				// Keeps the row's hover-only buttons shown while the write runs and after, so its outcome stays readable.
+				data-active={writing.phase === "idle" ? undefined : ""}
 				className={cn("text-muted-foreground", writing.phase === "failed" && "text-red-600 dark:text-red-400")}
 				onClick={() => void write()}
 			>
@@ -127,7 +186,7 @@ function LinkSessionsButton({ pr, sessions }: { pr: PullRequest; sessions: Sessi
 }
 
 interface RowProps {
-	pr: InboxPullRequest;
+	row: InboxRow;
 	sessions: SessionLink[];
 	/** The PR the inbox link named, highlighted while its sheet shows. */
 	targeted: boolean;
@@ -137,17 +196,20 @@ interface RowProps {
 	onQuickAction: (action: PullRequestActionId) => void;
 }
 
-export function PullRequestRow({ pr, sessions, targeted, onOpen, pending, onQuickAction }: RowProps) {
-	const review = pr.state === "merged" || pr.review === "none" ? null : REVIEW_LABEL[pr.review];
+export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen, pending, onQuickAction }: RowProps) {
+	const verdict = rowVerdict(pr);
 	return (
-		<li id={rowId(pr)} data-targeted={targeted || undefined} className={cn("scroll-my-6", targeted && "ring-2 ring-inset ring-ring")}>
+		<li id={rowId(pr)} data-inbox-row data-url={pullRequestUrl(pr)} data-targeted={targeted || undefined} className={cn("group/row relative scroll-my-6", targeted && "ring-2 ring-inset ring-ring")}>
+			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-[19.5px] h-3 w-px bg-border" />}
+			{stack?.joinsBelow && <span aria-hidden className="absolute top-7 bottom-0 left-[19.5px] w-px bg-border" />}
 			<div className={cn("flex items-start gap-3 px-3 py-2.5", targeted ? "bg-accent/60" : "hover:bg-muted/50")}>
 				<IconTip icon={STATE_ICON[pr.state]} className="mt-0.5" />
-				<Avatar person={pr.author} label={`Opened by ${pr.author.login}`} className="mt-px" />
+				{pr.role === "reviewer" && <Avatar person={pr.author} label={`Opened by ${pr.author.login}`} className="mt-px" />}
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<div className="flex min-w-0 items-baseline gap-2">
 						<a
 							href={hashForInbox(pr)}
+							data-row-link
 							aria-haspopup="dialog"
 							title={`Show the details of ${pr.owner}/${pr.repo}#${pr.number}`}
 							className="truncate rounded-sm text-sm font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
@@ -156,39 +218,43 @@ export function PullRequestRow({ pr, sessions, targeted, onOpen, pending, onQuic
 						</a>
 						<span className="shrink-0 text-xs tabular-nums text-muted-foreground">#{pr.number}</span>
 					</div>
-					<p className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-						<BranchName name={pr.head} className="truncate font-mono" />
-						{pr.stackedOn && (
-							<span className="truncate" title={`Stacked on ${pr.stackedOn}`}>
-								on <span className="font-mono">{pr.stackedOn}</span>
-							</span>
+					<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
+						<BranchName name={pr.head} className="min-w-0 truncate font-mono" />
+						{stack ? (
+							<StackChip stack={stack} base={pr.stackedOn} />
+						) : (
+							pr.stackedOn && (
+								<span className="min-w-0 truncate" title={`Stacked on ${pr.stackedOn}`}>
+									on <span className="font-mono">{pr.stackedOn}</span>
+								</span>
+							)
 						)}
-						{pr.role === "reviewer" && <span>· by {pr.author.login}</span>}
-						{sessions.slice(0, 3).map(session => (
-							<SessionChip
-								key={session.sessionId}
-								label={session.label}
-								status={session.status}
-								title={`Open the session that ${session.link === "submitted" ? "submitted" : "worked on"} it${session.status ? `, ${statusLabel(session.status)}` : ""} (${SPLIT_CLICK} to split)`}
-								filled={session.link === "submitted"}
-								onClick={event => onOpen(session.view, modeOf(event))}
-							/>
-						))}
+						{pr.role === "reviewer" && <span className="shrink-0">· by {pr.author.login}</span>}
+						<SessionChips sessions={sessions} onOpen={onOpen} />
 					</p>
 				</div>
 				<div className="flex shrink-0 items-center gap-3 text-xs">
 					<Reviewers reviewers={pr.reviewers} />
-					{review && <span className={review[1]}>{review[0]}</span>}
+					{verdict && <span className={VERDICT_LABEL[verdict][1]}>{VERDICT_LABEL[verdict][0]}</span>}
 					<Unresolved unresolved={pr.unresolved} />
 					{pr.checks !== "none" && <IconTip icon={CHECK_ICON[pr.checks]} />}
 					{pr.conflicts && <IconTip icon={CONFLICTS_ICON} />}
-					<QuickActionsMenu
-						actions={pullRequestActions(pr)}
-						pending={pending}
-						onRun={onQuickAction}
-						label="Quick actions: start a session in the background that works on this pull request"
-					/>
-					{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
+					<span
+						className={cn(
+							"flex items-center gap-1 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-active]]:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
+							pending === null && "opacity-0",
+						)}
+					>
+						<span data-row-actions className="flex">
+							<QuickActionsMenu
+								actions={pullRequestActions(pr)}
+								pending={pending}
+								onRun={onQuickAction}
+								label="Quick actions: start a session in the background that works on this pull request"
+							/>
+						</span>
+						{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
+					</span>
 					<span className="w-14 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={new Date(pr.updatedAt).toLocaleString()}>
 						{age(pr.updatedAt)}
 					</span>

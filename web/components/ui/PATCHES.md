@@ -36,6 +36,7 @@ Dashboard behavior that can live outside these files does: the composer's queued
 - `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`, and the exported `TooltipKbd` chip.
   `ui/sidebar-core.tsx` uses both for the sidebar toggle.
 - `ui/tabs.tsx`: `shortcut` on `TabItem`, which wraps the tab in a shortcut tooltip and sets `data-state` itself, since the tooltip's trigger stamps its own.
+  `badge` on `TabItem` draws a count after the label, which the Inbox tab uses for the pull requests waiting on you.
 - `ui/thinking-steps.tsx`: `icon` takes a component as well as a name, and `iconClassName` styles it.
 - `ui/sidebar.tsx`: `scroll-fade-once-scrolled` on the scroll areas, so the fade shows only once scrolled.
 - `ui/sidebar-menu.tsx`: `gap-0.5` between rows, and the `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.

@@ -25,17 +25,13 @@ function decodeKeys(raw: string | null): ReadonlySet<string> {
 	}
 }
 
-/** A set of keys that localStorage keeps under `storageKey`, such as folded sections or pinned sessions, with a toggle and a removal. */
-export function useStoredKeys(storageKey: string): [ReadonlySet<string>, (key: string) => void, (keys: string[]) => void] {
+/** A set of keys that localStorage keeps under `storageKey`, such as folded sections or pinned sessions, with a toggle that flips each key it names. */
+export function useStoredKeys(storageKey: string): [ReadonlySet<string>, (...keys: string[]) => void] {
 	const [keys, store] = useStoredState(storageKey, decodeKeys, stored => JSON.stringify([...stored]));
-	const toggle = (key: string): void => {
+	const toggle = (...flipped: string[]): void => {
 		const next = new Set(keys);
-		if (!next.delete(key)) next.add(key);
+		for (const key of flipped) if (!next.delete(key)) next.add(key);
 		store(next);
 	};
-	const remove = (removed: string[]): void => {
-		const next = new Set(keys);
-		if (removed.filter(key => next.delete(key)).length > 0) store(next);
-	};
-	return [keys, toggle, remove];
+	return [keys, toggle];
 }

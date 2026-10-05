@@ -300,6 +300,17 @@ describe("parseDetailAnswer", () => {
 		]);
 	});
 
+	test("reports conflicts only on an open or draft PR that GitHub finds CONFLICTING", () => {
+		const conflicts = (fields: Record<string, unknown>) => parseDetailAnswer(answer(fields), pr).conflicts;
+		expect([
+			conflicts({ mergeable: "CONFLICTING" }),
+			conflicts({ mergeable: "CONFLICTING", isDraft: true }),
+			conflicts({ mergeable: "UNKNOWN" }),
+			conflicts({ mergeable: "CONFLICTING", state: "CLOSED" }),
+			conflicts({ mergeable: "CONFLICTING", state: "MERGED" }),
+		]).toEqual([true, true, false, false, false]);
+	});
+
 	test("a repository without that pull request is an error, not an empty one", () => {
 		expect(() => parseDetailAnswer({ data: { repository: { pullRequest: null } } }, pr)).toThrow("GitHub has no pull request acme/webapp#7");
 	});

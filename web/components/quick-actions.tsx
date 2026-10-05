@@ -3,6 +3,7 @@ import type { RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
+
 import { QUICK_ACTIONS, type QuickActionId } from "../quick-actions";
 import type { OpenMode } from "../routing";
 import type { StartOf } from "../starts";
@@ -51,17 +52,24 @@ export function QuickActionsMenu({ actions, pending, onRun, label }: QuickAction
 	);
 }
 
+/** One quick action's button, which waits while any start on the same item is pending. */
+export function QuickActionButton({ action, pending, onRun }: { action: QuickActionId } & Omit<QuickActionsProps, "actions">) {
+	return (
+		<Tooltip content={QUICK_ACTIONS[action].description}>
+			<Button variant="secondary" size="compact" leadingIcon={ICON[action]} loading={pending === action} disabled={pending !== null} onClick={() => onRun(action)}>
+				{QUICK_ACTIONS[action].label}
+			</Button>
+		</Tooltip>
+	);
+}
+
 /** A sheet's buttons for `actions`; nothing when there is none. One start at a time: all wait while one is pending. */
 export function QuickActionButtons({ actions, pending, onRun }: QuickActionsProps) {
 	if (actions.length === 0) return null;
 	return (
 		<div className="flex flex-wrap gap-2">
 			{actions.map(id => (
-				<Tooltip key={id} content={QUICK_ACTIONS[id].description}>
-					<Button variant="secondary" size="compact" leadingIcon={ICON[id]} loading={pending === id} disabled={pending !== null} onClick={() => onRun(id)}>
-						{QUICK_ACTIONS[id].label}
-					</Button>
-				</Tooltip>
+				<QuickActionButton key={id} action={id} pending={pending} onRun={onRun} />
 			))}
 		</div>
 	);

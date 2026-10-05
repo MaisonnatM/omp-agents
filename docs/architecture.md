@@ -390,6 +390,7 @@ The page lives in `web/`.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the inbox and the tickets page show.
+  `web/inbox-model.ts` holds the inbox's sections in one table, with whether each waits on you and whether it starts folded, sorts each stack's rows together by the chain of base branches, and says what a row's verdict and a sheet's Status show.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it.
   `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's sheet or an issue's details, and the note that says why a start failed.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or a sheet, with the status dot of a running one.
@@ -399,6 +400,7 @@ The page lives in `web/`.
   `useRead` reads one URL, such as the pull request a sheet shows, the Linear issue the tickets page shows in its main content, the settings page's model catalog, or the new-session draft's model list.
   `useReplaceableRead` shows the version a save answered until that URL is read again.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, and one for whether omp is signed in to Linear.
+  `web/app.tsx` polls the inbox on every page instead, for the Inbox tab's count, and the inbox page reads it again when it opens.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header.
   `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the inbox and tickets also show.
@@ -430,7 +432,8 @@ The page lives in `web/`.
   The inbox also uses its sheet, which keeps its target through its exit slide. The tickets page replaces the list with the issue in the main content instead.
   Both use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
   `SheetFrame` is the pull request sheet's header and scrolling body, and `LoadNote` is the loading or error line that sheet, the issue detail, and the list page share.
-  `web/components/fold.tsx` holds the fold button that both pages share and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
+  `web/components/fold.tsx` holds the fold button that both pages share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
+  The inbox page binds J, K, O, and `.` through `useShortcuts`, and finds the rows it moves between in the document, so a folded section's rows drop out.
 - `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).

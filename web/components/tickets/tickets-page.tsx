@@ -10,10 +10,9 @@ import { hashForTickets, type OpenMode } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import type { SectionTarget } from "../../section";
 import type { StartOf } from "../../starts";
-import { useStoredKeys } from "../../stored-state";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { useDashboardContext } from "../dashboard-context";
-import { FoldButton, useReveal } from "../fold";
+import { FoldButton, useFolds, useReveal } from "../fold";
 import { ListSheetPage, PageFrame } from "../list-sheet-page";
 import { QuickStartNotice, SheetQuickActions } from "../quick-actions";
 import { LinearConnection } from "../settings/linear-connection";
@@ -86,7 +85,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	const { open, start: startSession, dismissStart, starts: { quick } } = useDashboardContext();
 	const poll = ticketsStore.usePolling();
 	const tickets = poll.read?.data.tickets ?? [];
-	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
+	const folds = useFolds(COLLAPSED_KEY);
 	const start = (ticket: Ticket, action: TicketActionId) => startSession(ticketStart(ticket, action, cwd, readPinnedSkill()));
 	const listRef = useRef<HTMLDivElement>(null);
 	const listPageRef = useRef<HTMLDivElement>(null);
@@ -110,7 +109,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 			previousTarget.current = null;
 		}
 	});
-	useReveal(target === null ? section : null, collapsed, expand, { token: section, block: "start", focus: true });
+	useReveal(target === null ? section : null, folds, { token: section, block: "start", focus: true });
 
 	if (target !== null) {
 		const listed = tickets.find(ticket => ticket.id === target) ?? null;
@@ -166,8 +165,8 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 							<GroupSection
 								key={group.status}
 								group={group}
-								open={!collapsed.has(group.status)}
-								onToggle={() => toggleCollapsed(group.status)}
+								open={!folds.isFolded(group.status)}
+								onToggle={() => folds.toggle(group.status)}
 								hosts={hosts}
 								onOpen={open}
 								quick={quick}

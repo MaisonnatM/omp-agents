@@ -338,27 +338,44 @@ For installation, see the [README](../README.md).
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
   **Inbox** opens a pull request inbox like Graphite's, and the sidebar then lists the inbox's sections with their pull request counts, under each repository's name when there are several.
+  The counts of the sections that wait on your move stand out: **Needs your review** in bold, and **Returned to you** in red.
+  The **Inbox** tab counts the pull requests in those two sections, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
   Click a section in the sidebar to scroll the page to it and move focus there; a folded section unfolds.
   An `#inbox` address selects the Inbox tab.
   The inbox covers the GitHub repository of the project that the sidebar's picker shows, or under **All projects** every repository that a session ran in, one section per repository.
   A workspace's repository is the one its `origin` remote names.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
   They sort into Graphite's sections: **Needs your review**, **Returned to you** (changes requested), **Approved**, **Waiting for review**, **Drafts**, and **Recently merged**.
-  A row shows the author's picture, the branch, the branch it is stacked on when that is not the default branch, the reviewers' pictures, the review decision, the number of unresolved review comments, the check rollup, and chips for the sessions linked to it: running ones first, then those that submitted it, then those that worked on it.
+  A row shows the branch, its place in a stack, the reviewers' pictures, the review decision when its section does not already say it, the number of unresolved review comments, the check rollup, and the sessions on it.
+  A review asked of you also shows its author's picture and name; your own pull requests leave out your picture.
+  The review decision shows on drafts and on reviews asked of you, since the other sections name it.
+  Your own open pull request says **Ready to merge** instead when it is approved or needs no review, its checks passed or it has none, it has no conflicts, and no review thread waits for a resolution.
+  When the inbox lists another pull request of its stack, the row shows its place from the bottom, such as `2/4`, and its tooltip names the branch it is stacked on; otherwise a row stacked on another branch names it, as in `on fix/base`.
+  Within a section, a stack's pull requests sit together, top first, where its most recently updated one would, and a line joins each to the one below it.
+  A row shows one session chip: a running session first, since one may be working on the pull request now, then one that submitted it, then one that worked on it.
   A submitter's chip is filled and a worker's chip is outlined, and a chip's tooltip says which it is.
   A running session's chip starts with the sidebar's status dot: green while it works, amber while it waits on a question, blue once its turn ended.
+  `+N` after the chip lists every session on the pull request, each with whether it submitted or worked on it; choose one to open it.
   The comment count shows only when a conversation waits for a resolution.
   A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+`.
   The dot on a reviewer's picture shows where they stand: green approved, red requested changes, grey commented, and amber means a review from them is still requested.
   Hover an icon or a picture to read what it means.
-  Click a repository or a section heading to fold it; the browser's localStorage keeps folded ones folded across reloads.
+  The lightning and link buttons show while you hover or focus the row, while a start on it runs, and after a link write on it, so its outcome stays readable.
+  Click a repository or a section heading to fold it; the browser's localStorage keeps your choice across reloads.
+  **Recently merged** starts folded, since it lists history rather than work, and stays unfolded once you unfold it.
   Click the title to show the pull request's details in a sheet that slides in from the right, without leaving the page; Esc, the close button, or a click outside the sheet closes it.
   Click a session to open it.
-  The sheet shows the branch and the one it merges into, the lines added and removed, the description, the head commit's checks (failing and pending ones listed, passing and skipped ones folded behind their counts), the unresolved review comments by file and line, the conversation of comments and reviews, and the changed files, with links to the pull request on GitHub and on Graphite.
+  The sheet opens on **Status**, what stands between the pull request and its merge: **Ready to merge**, a draft, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first.
+  A blocker that a quick action works on carries that action's button, such as **Resolve conflicts** next to the conflicts, and the header keeps the other actions.
+  Then it shows the branch and the one it merges into, the lines added and removed, the description, folded after about 16 lines behind **Show more**, the head commit's checks (failing and pending ones listed, passing and skipped ones folded behind their counts), the unresolved review comments by file and line, the conversation of comments and reviews, and the changed files, with links to the pull request on GitHub and on Graphite.
   Each opening reads the pull request again; the server keeps its answer for 30 seconds.
-  The page reads GitHub through `gh` when it opens and every minute after.
+  The page reads GitHub through `gh` when it opens, and the dashboard reads it again every minute on every page.
   Reopening the inbox, even after a reload, shows the last inbox read for the chosen project at once while it asks again; the header says when that inbox was read, and the browser's localStorage keeps the last one of each project.
   The server keeps each repository's answer for 30 seconds, and **Refresh** asks GitHub again at once.
+- The inbox works from the keyboard, outside text fields.
+  J and K move to the next and previous row, and Enter opens the focused row's sheet.
+  While a sheet is open, J and K show the next and previous pull request in it.
+  O opens the focused row's pull request, or the sheet's, on GitHub, and `.` opens the focused row's quick actions.
 - `#inbox/<owner>/<repo>/<number>` opens the inbox at one pull request.
   It unfolds the row's repository and section, scrolls the row into view, highlights it, and opens the pull request's sheet.
   When the inbox does not list that pull request, a note says why, and the sheet still opens.
@@ -526,6 +543,10 @@ Alt is Option on macOS.
 | G then S | Outside text fields | Go to the sessions |
 | G then D | Outside text fields | Go to your todo list |
 | G then P | Outside text fields | Choose the sidebar's project |
+| J | Inbox, outside text fields | Move to the next pull request, or show it in the open sheet |
+| K | Inbox, outside text fields | Move to the previous pull request, or show it in the open sheet |
+| O | Inbox, outside text fields | Open the pull request on GitHub |
+| . | Inbox, outside text fields | Open the pull request's quick actions |
 
 - Press `?` outside a text field, Cmd+/ anywhere, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, the composer's Stop button, and a maximized pane's restore button.

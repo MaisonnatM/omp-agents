@@ -477,12 +477,14 @@ interface TabItemProps
   label: string;
   /** Keys that select this tab; a tooltip names the label with them. */
   shortcut?: readonly string[];
+  /** A count after the label, such as the items waiting on you. Name it in `aria-label` too: the pill is hidden from screen readers. */
+  badge?: number;
   /** @internal Auto-assigned by TabsList. */
   _index?: number;
 }
 
 const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
-  ({ value, icon: Icon, label, shortcut, _index = 0, className, onClick, ...props }, ref) => {
+  ({ value, icon: Icon, label, shortcut, badge, _index = 0, className, onClick, ...props }, ref) => {
     const internalRef = useRef<HTMLButtonElement>(null);
     const sizeClasses = useSize();
     const { registerTab, hoveredIndex, selectedValue, setOptimisticIdx } = useTabsList();
@@ -573,6 +575,15 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
             {label}
           </span>
         </span>
+        {badge !== undefined && (
+          <span
+            aria-hidden
+            className="min-w-4 rounded-full bg-foreground/10 px-1 text-center text-[10px] leading-4 tabular-nums text-foreground"
+            style={{ fontVariationSettings: fontWeights.medium }}
+          >
+            {badge}
+          </span>
+        )}
       </TabsPrimitive.Trigger>
     );
     if (!shortcut?.length) return trigger;

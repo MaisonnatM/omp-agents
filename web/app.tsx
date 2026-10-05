@@ -17,7 +17,7 @@ import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-p
 import { ToolsExpanded } from "./components/transcript";
 import { TodoPage } from "./components/user-todos";
 import { SPLIT_CLICK } from "./labels";
-import { linearStore, UNREAD } from "./reads";
+import { inboxStore, linearStore, UNREAD } from "./reads";
 import {
 	adjacentSession,
 	closePane,
@@ -71,6 +71,8 @@ export function App() {
 	const visible = discoverableSessions(state.hosts, state.past);
 	const projects = workspaces(visible.hosts, visible.past);
 	const [project, pickProject] = useProject(projects);
+	// Keeps the Inbox tab's count current on every page. Until the sessions are listed, the saved project reads as all projects.
+	inboxStore.usePolling(project, state.listed);
 	const [pinned, togglePin] = useStoredKeys(PINNED_KEY);
 	const { started } = state;
 	useEffect(() => {
