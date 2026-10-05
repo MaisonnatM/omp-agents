@@ -4,11 +4,12 @@
  * keeps for it. That token works on the MCP endpoint only, not on Linear's GraphQL API.
  */
 import { createCache } from "./cache";
-import { isObject, num, str } from "./json";
+import { isObject, num, oneOf, str } from "./json";
 import { linearServer } from "./linear";
 import { serveUpload, uploadAddress } from "./linear-uploads";
 import { callMcpTool, type McpServer, toolJson } from "./omp/mcp";
 import {
+	TICKET_PRIORITIES,
 	TICKET_STATUS_TYPES,
 	type Ticket,
 	type TicketChoice,
@@ -16,7 +17,6 @@ import {
 	type TicketDetail,
 	type TicketEdit,
 	type TicketOptions,
-	type TicketPriority,
 	type TicketsAnswer,
 	type TicketStatusType,
 } from "./shared";
@@ -42,10 +42,14 @@ const QUERIES: Record<string, unknown>[] = QUERY_STATES.map(state => (CLOSED_STA
 /** Linear's workflow order, which its status menu follows. */
 const WORKFLOW_ORDER: TicketStatusType[] = ["triage", "backlog", "unstarted", "started", "completed", "canceled"];
 
-const isPriority = (value: number | undefined): value is TicketPriority => value === 0 || value === 1 || value === 2 || value === 3 || value === 4;
+const isPriority = oneOf(TICKET_PRIORITIES);
+const isStatusType = oneOf(TICKET_STATUS_TYPES);
 
 /** A state type as the page reads it: Linear's `duplicate` is a kind of canceled. */
-const statusTypeOf = (type: string | undefined): TicketStatusType | undefined => (type === "duplicate" ? "canceled" : TICKET_STATUS_TYPES.find(known => known === type));
+const statusTypeOf = (type: string | undefined): TicketStatusType | undefined => {
+	if (type === "duplicate") return "canceled";
+	return isStatusType(type) ? type : undefined;
+};
 
 function parseIssue(raw: unknown): Ticket | null {
 	if (!isObject(raw)) return null;

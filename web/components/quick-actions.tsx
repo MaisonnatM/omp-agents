@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { modeOf, SPLIT_CLICK } from "../labels";
-import { actionOn, type ItemAction, pendingOf, QUICK_ACTIONS, type QuickActionId, type QuickItem } from "../quick-actions";
+import { actionOn, pendingOf, QUICK_ACTIONS, type QuickActionId, type QuickItem } from "../quick-actions";
 import type { OpenMode } from "../routing";
 import type { StartOf } from "../starts";
 
@@ -19,16 +19,16 @@ const ICON: Record<QuickActionId, LucideIcon> = {
 	plan: ListChecks,
 };
 
-interface QuickActionsProps<Id extends QuickActionId> {
+interface QuickActionsProps {
 	/** The actions that apply to the row's pull request or issue, in the order offered. */
-	actions: Id[];
+	actions: QuickActionId[];
 	/** The action whose session is starting for it, if any. */
-	pending: Id | null;
-	onRun: (action: Id) => void;
+	pending: QuickActionId | null;
+	onRun(action: QuickActionId): void;
 }
 
 /** A row's menu of `actions`, named by `label`; nothing when there is none. */
-export function QuickActionsMenu<Id extends QuickActionId>({ actions, pending, onRun, label }: QuickActionsProps<Id> & { label: string }) {
+export function QuickActionsMenu({ actions, pending, onRun, label }: QuickActionsProps & { label: string }) {
 	if (actions.length === 0) return null;
 	return (
 		<DropdownMenu>
@@ -53,7 +53,7 @@ export function QuickActionsMenu<Id extends QuickActionId>({ actions, pending, o
 }
 
 /** A sheet's buttons for `actions`; nothing when there is none. One start at a time: all wait while one is pending. */
-export function QuickActionButtons<Id extends QuickActionId>({ actions, pending, onRun }: QuickActionsProps<Id>) {
+export function QuickActionButtons({ actions, pending, onRun }: QuickActionsProps) {
 	if (actions.length === 0) return null;
 	return (
 		<div className="flex flex-wrap gap-2">
@@ -105,18 +105,18 @@ export function QuickStartNotice({ quick, onOpen, onDismiss }: NoticeProps) {
 	);
 }
 
-interface SheetActionsProps<Item extends QuickItem> {
+interface SheetActionsProps {
 	/** What the sheet shows. */
-	item: Item;
-	actions: ItemAction<Item>[];
-	onRun: (action: ItemAction<Item>) => void;
+	item: QuickItem;
+	actions: QuickActionId[];
+	onRun(action: QuickActionId): void;
 	quick: StartOf<"quick"> | null;
 	onOpen: (view: View, mode: OpenMode) => void;
 	onDismiss: () => void;
 }
 
 /** A sheet's buttons for `actions` on `item`, then what became of the last quick action on it. */
-export function SheetQuickActions<Item extends QuickItem>({ item, actions, onRun, quick, onOpen, onDismiss }: SheetActionsProps<Item>) {
+export function SheetQuickActions({ item, actions, onRun, quick, onOpen, onDismiss }: SheetActionsProps) {
 	return (
 		<>
 			<QuickActionButtons actions={actions} pending={pendingOf(quick, item)} onRun={onRun} />

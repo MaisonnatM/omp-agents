@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useEffect } from "react";
 import { errorText, getJson } from "./api";
+import { keyedStore } from "./keyed-store";
 
 /** How often an open page asks again; the server answers from its cache in between. */
 const POLL_MS = 60_000;
@@ -34,13 +35,13 @@ interface PolledStoreOptions<T> {
 export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOptions<T>) {
 	const empty: PolledEntry<T> = { read: null, error: null, refreshing: false };
 
-	function storedEntries(): Map<string, PolledEntry<T>> {
+	function storedEntries(): Map<string, PolledRead<T>> {
 		try {
 			const stored: unknown = JSON.parse(localStorage.getItem(cacheKey) ?? "{}");
 			if (typeof stored !== "object" || stored === null) return new Map();
 			return new Map(
 				Object.entries(stored).flatMap(([key, read]: [string, Partial<PolledRead<T>> | null]) =>
-					typeof read?.at === "number" && isValid(read.data) ? [[key, { ...empty, read: read as PolledRead<T> }]] : [],
+					typeof read?.at === "number" && isValid(read.data) ? [[key, read as PolledRead<T>]] : [],
 				),
 			);
 		} catch {
@@ -48,17 +49,17 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 		}
 	}
 
-	const entries = storedEntries();
-	const listeners = new Map<string, Set<() => void>>();
+	const cached = storedEntries();
+	const entries = keyedStore(empty);
+	for (const [key, read] of cached) entries.set(key, { ...empty, read });
 	let inflight: { key: string; controller: AbortController } | null = null;
 
 	function update(key: string, patch: Partial<PolledEntry<T>>): void {
-		entries.set(key, { ...(entries.get(key) ?? empty), ...patch });
-		for (const listener of listeners.get(key) ?? []) listener();
+		entries.set(key, { ...entries.get(key), ...patch });
 	}
 
 	function persist(): void {
-		const reads = Object.fromEntries([...entries].flatMap(([key, { read }]) => (read ? [[key, read]] : [])));
+		const reads = Object.fromEntries(cached);
 		try {
 			localStorage.setItem(cacheKey, JSON.stringify(reads));
 		} catch {
@@ -78,7 +79,10 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 		update(key, { refreshing: true });
 		try {
 			const data = await getJson<T>(url(scope, fresh), current.controller.signal);
-			update(key, { read: { data, at: Date.now() }, error: null, refreshing: false });
+			if (current.controller.signal.aborted) return;
+			const read = { data, at: Date.now() };
+			update(key, { read, error: null, refreshing: false });
+			cached.set(key, read);
 			persist();
 		} catch (err) {
 			if (!current.controller.signal.aborted) update(key, { error: errorText(err), refreshing: false });
@@ -86,15 +90,6 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 			if (inflight === current) inflight = null;
 		}
 	}
-
-	const subscribe = (key: string, listener: () => void): (() => void) => {
-		const set = listeners.get(key) ?? new Set();
-		listeners.set(key, set.add(listener));
-		return () => {
-			set.delete(listener);
-			if (set.size === 0) listeners.delete(key);
-		};
-	};
 
 	function useEntry(scope: string | null, poll: boolean): PolledEntry<T> {
 		const key = scope ?? "";
@@ -104,8 +99,7 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 			const timer = setInterval(() => void refresh(scope), POLL_MS);
 			return () => clearInterval(timer);
 		}, [scope, poll]);
-		const watch = useCallback((listener: () => void) => subscribe(key, listener), [key]);
-		return useSyncExternalStore(watch, () => entries.get(key) ?? empty);
+		return entries.use(key);
 	}
 
 	return {

@@ -1,5 +1,5 @@
-import { useCallback, useSyncExternalStore } from "react";
 import type { CompletionItem, Item, ServerMsg, SessionWork, View } from "../src/shared";
+import { keyedStore } from "./keyed-store";
 import { hashForView } from "./routing";
 import { applyItems } from "./transcript-view";
 
@@ -32,14 +32,14 @@ export type PaneMsg =
  * Per open view, by {@link hashForView}. Outside React state on purpose: a streamed token changes one view's entry and
  * wakes only the pane reading it, instead of rendering the whole page and every other pane's transcript again.
  */
-const panes = new Map<string, PaneData>();
-const listeners = new Map<string, Set<() => void>>();
+const panes = keyedStore(EMPTY_PANE);
 let open = new Set<string>();
 
 /** Keeps the data of `views` and drops the rest; messages for other views are ignored until they open. */
 export function retainPanes(views: View[]): void {
-	open = new Set(views.map(hashForView));
-	for (const key of panes.keys()) if (!open.has(key)) panes.delete(key);
+	const next = new Set(views.map(hashForView));
+	for (const key of open) if (!next.has(key)) panes.set(key, EMPTY_PANE);
+	open = next;
 }
 
 /** Applies a message to its view's entry. Views the page does not show ignore it. */
@@ -66,21 +66,9 @@ export function applyPaneMessage(msg: PaneMsg): void {
 			return never;
 		}
 	}
-	for (const listener of listeners.get(key) ?? []) listener();
 }
-
-const subscribe = (key: string, listener: () => void): (() => void) => {
-	const set = listeners.get(key) ?? new Set();
-	listeners.set(key, set.add(listener));
-	return () => {
-		set.delete(listener);
-		if (set.size === 0) listeners.delete(key);
-	};
-};
 
 /** `view`'s data from the server, rendering again only when that view's entry changes. */
 export function usePane(view: View): PaneData {
-	const key = hashForView(view);
-	const watch = useCallback((listener: () => void) => subscribe(key, listener), [key]);
-	return useSyncExternalStore(watch, () => panes.get(key) ?? EMPTY_PANE);
+	return panes.use(hashForView(view));
 }

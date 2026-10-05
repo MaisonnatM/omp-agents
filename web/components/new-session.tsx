@@ -1,6 +1,6 @@
 import { Folder, Sparkles } from "lucide-react";
 import { useState } from "react";
-import type { BranchChoice, ConnectedModels, ModelOption } from "../../src/shared";
+import { type BranchChoice, type ConnectedModels, type ModelOption, selectorOf } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
@@ -15,10 +15,11 @@ import { useDefaultModel } from "../use-default-model";
 import { useSkills } from "../use-skills";
 import { CommandPicker } from "./command-picker";
 import { useCompletion } from "./completion-popup";
-import { blockedShortcut, ComposerNote, EmptyConversation, Header } from "./conversation";
+import { blockedShortcut, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, chosenBranch, GitRef, targetOf } from "./git";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
 import { ModelPicker } from "./model-picker";
+import { Header } from "./page-header";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
@@ -129,8 +130,9 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const [skipSkill, setSkipSkill] = useState(false);
 	const skills = useSkills(cwd);
 	// The server decides whether the skill applies; the toggle only shows what it will decide.
+	const listedSkills = skills.error === null ? skills.data?.skills : [];
 	const skillState: SkillState =
-		skills !== null && !skills.skills.some(skill => skill.name === pinnedSkill)
+		listedSkills && !listedSkills.some(skill => skill.name === pinnedSkill)
 			? "missing"
 			: skipSkill
 				? "off"
@@ -141,9 +143,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	// Reopening reads credentials and model capabilities again after a provider login.
 	const [modelOpens, setModelOpens] = useState(0);
 	const modelsRead = useRead<ConnectedModels>("/api/models/connected", modelOpens);
-	const models = modelsRead.error !== null ? { models: [], error: modelsRead.error } : modelsRead.data && { models: modelsRead.data.models, error: null };
-	const shownSelector = shownModel ? `${shownModel.provider}/${shownModel.id}` : null;
-	const levels = modelsRead.data?.capabilities.find(({ model }) => `${model.provider}/${model.id}` === shownSelector)?.thinkingLevels ?? null;
+	const shownSelector = shownModel ? selectorOf(shownModel) : null;
+	const levels = modelsRead.data?.capabilities.find(({ model }) => selectorOf(model) === shownSelector)?.thinkingLevels ?? null;
 	const thinking = pickedThinking?.model === shownSelector && levels?.includes(pickedThinking.level) ? pickedThinking.level : null;
 	const pickThinking = (level: string | null): void => {
 		setPickedThinking(level !== null && shownSelector ? { model: shownSelector, level } : null);
@@ -219,7 +220,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							<ModelPicker
 								current={shownSelector}
 								unset="Default model"
-								list={models}
+								list={modelsRead}
 								open={modelsOpen}
 								onOpenChange={openModels}
 								onPick={next => {

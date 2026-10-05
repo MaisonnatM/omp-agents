@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { deepEquals, Glob } from "bun";
-import { isObject } from "../../src/json";
+import { errorText, isObject } from "../../src/json";
 
 type Json = Record<string, unknown>;
 
@@ -136,7 +136,7 @@ async function main(argv: string[]): Promise<void> {
 
 if (import.meta.main) {
 	main(Bun.argv.slice(2)).catch((err: unknown) => {
-		console.error(`omp-template: ${err instanceof Error ? err.message : String(err)}`);
+		console.error(`omp-template: ${errorText(err)}`);
 		process.exit(1);
 	});
 }

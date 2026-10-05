@@ -27,7 +27,7 @@ import { useIcon } from "@/lib/icon-context";
 import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hover";
 import { useMergeSplitBlocks, SelectionBackgrounds } from "@/hooks/use-merge-split";
 import { Button } from "@/components/ui/button";
-import { FluidHoverHighlight } from "@/components/fluid-hover-highlight";
+import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 
 export interface AskUserOption {
   id?: string;

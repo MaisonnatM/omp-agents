@@ -5,6 +5,11 @@ import type { Delivery, MessageQueue, PromptImage, RosterHost, UserAnswer } from
 /** What the index of session files knows of a session: the pull requests and Linear issues it worked on, and its /ship stage. */
 export type SessionFacts = Pick<RosterHost, "pullRequests" | "tickets" | "ship">;
 
+type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/** A roster row before the server adds the session's `cwdDisplay` and its {@link SessionFacts}. */
+export type LiveRow = WithoutKeys<RosterHost, "cwdDisplay" | keyof SessionFacts>;
+
 /** What a live session reports as it runs. */
 export type LiveUpdate =
 	/** Its roster row changed: control phase, subagents, or what a subagent is doing. */
@@ -19,8 +24,8 @@ export interface LiveSession {
 	readonly instanceId: string;
 	readonly cwd: string;
 	readonly sessionId: string;
-	/** The session's roster row, with what the session files' index knows of it. */
-	row(facts: SessionFacts): RosterHost;
+	/** The roster row of the session as its transport knows it; {@link LiveSessions.rows} adds the rest. */
+	row(): LiveRow;
 	/**
 	 * The file the main agent (`agentId` null) or a subagent writes, or `null` while it is not known.
 	 * `savedFile` resolves a session id to its file among the files on disk.

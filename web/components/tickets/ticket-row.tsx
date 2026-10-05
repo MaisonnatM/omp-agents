@@ -17,7 +17,7 @@ import {
 import type { Ticket, TicketPriority, TicketStatusType } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { age } from "../../labels";
-import { type TicketActionId, ticketActions } from "../../quick-actions";
+import { type QuickActionId, type TicketActionId, ticketActions } from "../../quick-actions";
 import { hashForTickets } from "../../routing";
 import { PRIORITY_LABEL } from "../../tickets-model";
 import { IconTip } from "../inbox/avatars";
@@ -50,7 +50,7 @@ export const ticketRowId = (id: string): string => `ticket-${id}`;
 interface TicketRowProps {
 	ticket: Ticket;
 	/** The quick action whose session is starting for this issue, if any. */
-	pending: TicketActionId | null;
+	pending: QuickActionId | null;
 	onQuickAction: (action: TicketActionId) => void;
 }
 

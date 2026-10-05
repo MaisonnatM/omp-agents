@@ -2,9 +2,10 @@
  * Folds a transcript file's entries into what its agent planned and changed: the latest todo list, and the files its
  * `edit` and `write` calls changed. Only the file feeds it; omp writes each tool result as soon as it exists.
  */
-import { isObject, str } from "./json";
+import { isObject, oneOf, str } from "./json";
 import { displayPath } from "./paths";
-import { type FileChange, parseDiffLine, type SessionWork, type TodoItem, type TodoPhase, type TodoStatus } from "./shared";
+import { entryTime, toolCallsOf, toolResultOf } from "./session-entries";
+import { type FileChange, parseDiffLine, type SessionWork, TODO_STATUSES, type TodoItem, type TodoPhase } from "./shared";
 
 /** omp's rule for a plan file (`listPlanFiles` in `pi-coding-agent/src/plan-mode/plan-files.ts`): a name ending in `plan.md`, such as `local://auth-plan.md`. */
 const PLAN_FILE = /plan\.md$/i;
@@ -12,9 +13,7 @@ const PLAN_FILE = /plan\.md$/i;
 /** omp's custom entry for a todo list the user edited in its terminal (`USER_TODO_EDIT_CUSTOM_TYPE`). */
 const USER_TODO_EDIT = "user_todo_edit";
 
-const TODO_STATUSES: Record<TodoStatus, true> = { pending: true, in_progress: true, completed: true, abandoned: true, blocked: true };
-
-const isTodoStatus = (value: unknown): value is TodoStatus => typeof value === "string" && Object.hasOwn(TODO_STATUSES, value);
+const isTodoStatus = oneOf(TODO_STATUSES);
 
 /** A todo list as omp persists it, or `null` when any part is malformed, as omp's own `isTodoPhase` rejects it. */
 function parsePhases(value: unknown): TodoPhase[] | null {
@@ -64,12 +63,6 @@ function editedFiles(details: Record<string, unknown>, at: number | null): [stri
 	});
 }
 
-/** An entry's ISO `timestamp` in ms since the epoch, or `null` when it has none. */
-function entryTime(entry: Record<string, unknown>): number | null {
-	const at = Date.parse(str(entry.timestamp) ?? "");
-	return Number.isFinite(at) ? at : null;
-}
-
 export class Work {
 	/** The transcript's working directory, from its `session` header. */
 	#cwd: string | null = null;
@@ -92,16 +85,13 @@ export class Work {
 		}
 		if (entry.type === "custom" && entry.customType === USER_TODO_EDIT) return this.#plan(isObject(entry.data) ? entry.data.phases : undefined);
 		if (entry.type !== "message" || !isObject(entry.message)) return false;
-		const message = entry.message;
-		if (message.role === "assistant") {
-			this.#noteWrites(message.content);
-			return false;
-		}
-		if (message.role !== "toolResult") return false;
-		const written = this.#takeWrite(message.toolCallId);
-		if (message.isError === true) return false;
-		const details = isObject(message.details) ? message.details : {};
-		switch (message.toolName) {
+		this.#noteWrites(entry.message);
+		const result = toolResultOf(entry.message);
+		if (!result) return false;
+		const written = this.#takeWrite(result.callId);
+		if (result.isError) return false;
+		const { details } = result;
+		switch (result.toolName) {
 			case "todo":
 				return details.op !== "view" && this.#plan(details.phases);
 			case "read": {
@@ -142,13 +132,10 @@ export class Work {
 	}
 
 	/** Keeps the line count of each `write` call in an assistant message, which its result does not repeat. */
-	#noteWrites(content: unknown): void {
-		if (!Array.isArray(content)) return;
-		for (const part of content) {
-			if (!isObject(part) || part.type !== "toolCall" || part.name !== "write" || !isObject(part.arguments)) continue;
-			const id = str(part.id);
-			const text = str(part.arguments.content);
-			if (id !== undefined && text !== undefined) this.#writing.set(id, lineCount(text));
+	#noteWrites(message: Record<string, unknown>): void {
+		for (const { id, name, args } of toolCallsOf(message)) {
+			const text = str(args.content);
+			if (name === "write" && text !== undefined) this.#writing.set(id, lineCount(text));
 		}
 	}
 

@@ -1,6 +1,5 @@
-import type { ShipProgress } from "../../src/shared";
+import { SHIP_STAGES, type ShipProgress } from "../../src/shared";
 
-const SHIP_STAGES: ShipProgress["stage"][] = ["ticket", "implement", "draft_pr", "thermonuclear", "ready_gate", "live", "merged"];
 const SHIP_NAMES: Record<ShipProgress["stage"] | NonNullable<ShipProgress["work"]>, string> = {
 	ticket: "Ticket", implement: "Implement", draft_pr: "Draft PR", thermonuclear: "Thermonuclear",
 	ready_gate: "Ready gate", live: "Live for review", merged: "Merged",

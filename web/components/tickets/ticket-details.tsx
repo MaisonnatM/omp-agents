@@ -1,13 +1,13 @@
 import { Box, Calendar } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import type { Ticket, TicketDetail } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { age } from "../../labels";
-import { useRead } from "../../reads";
+import { useReplaceableRead } from "../../reads";
 import { PRIORITY_LABEL } from "../../tickets-model";
 import { IconTip } from "../inbox/avatars";
-import { Comment, DetailSection, Markdown, OutLink } from "../sheet-details";
+import { Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
 import { TicketFields } from "./ticket-fields";
 import { dueLabel, PRIORITY_ICON, STATUS_ICON } from "./ticket-row";
 
@@ -22,26 +22,14 @@ interface TicketDetailContentProps {
 
 /** A Linear issue's editable fields, actions, description, links, and comments in the tickets page's main content. */
 export function TicketDetailContent({ id, listed, actions }: TicketDetailContentProps) {
-	const read = useRead<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
-	// Field changes replace the read; the component mounts anew by key for another issue.
-	const [replaced, replace] = useState<TicketDetail | null>(null);
-	const detail = replaced ?? read.data;
-	const error = replaced ? null : read.error;
+	const { data: detail, error, replace } = useReplaceableRead<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
 	const ticket = detail ?? listed;
 	const [PriorityIcon, priorityColor] = PRIORITY_ICON[ticket?.priority ?? 0];
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	useEffect(() => {
 		headingRef.current?.focus({ preventScroll: true });
 	}, []);
-	let body: ReactNode = <p className="text-sm text-muted-foreground">Asking Linear for the issue…</p>;
-	if (detail) body = <TicketSections detail={detail} />;
-	else if (error) {
-		body = (
-			<p role="alert" className="text-sm text-red-600 dark:text-red-400">
-				Cannot load the issue: {error}
-			</p>
-		);
-	}
+	const body = detail ? <TicketSections detail={detail} /> : <LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />;
 	return (
 		<>
 			<header className="space-y-3">

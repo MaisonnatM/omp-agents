@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { AgentStatus } from "./shared";
-import { type HostAgent, parseAgents, SubagentFiles } from "./subagents";
+import { type HostAgent, parseAgents, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS, SubagentFiles } from "./subagents";
 
 /**
  * A search for a subagent runs on after its test body ends, and one that finds nothing never signals, so the
@@ -66,6 +66,34 @@ describe("parseAgents", () => {
 			{ id: "s2", type: "agent", isMain: false, parentId: null, status: "idle", createdAt: 0 },
 		]);
 		expect(parseAgents(undefined)).toEqual([]);
+	});
+});
+
+describe("parseSubagentFrame", () => {
+	test("a lifecycle frame names the subagent, its type, status, description, and file", () => {
+		expect(
+			parseSubagentFrame(SUBAGENT_LIFECYCLE, { id: "s1", agent: "explore", status: "started", description: "  find\nthe   bug ", sessionFile: "/tmp/s1.jsonl" }),
+		).toEqual({ id: "s1", kind: "explore", status: "running", activity: "find the bug", sessionFile: "/tmp/s1.jsonl" });
+		expect(parseSubagentFrame(SUBAGENT_LIFECYCLE, { id: "s1", status: "failed" })).toEqual({ id: "s1", status: "aborted" });
+	});
+
+	test("a progress frame reads its status and activity from the progress record, the most specific intent first", () => {
+		const progress = { id: "s1", status: "completed", currentToolIntent: "reading", lastIntent: "planning", task: "the task" };
+		expect(parseSubagentFrame(SUBAGENT_PROGRESS, { agent: "task", assignment: "assigned", progress })).toEqual({
+			id: "s1",
+			kind: "task",
+			status: "idle",
+			activity: "reading",
+		});
+		expect(parseSubagentFrame(SUBAGENT_PROGRESS, { assignment: "assigned", progress: { id: "s1", task: "the task" } })?.activity).toBe("assigned");
+		expect(parseSubagentFrame(SUBAGENT_PROGRESS, { progress: { id: "s1" } })).toEqual({ id: "s1" });
+	});
+
+	test("a payload that names no subagent, or arrives on another channel, is ignored", () => {
+		expect(parseSubagentFrame(SUBAGENT_LIFECYCLE, { status: "started" })).toBeNull();
+		expect(parseSubagentFrame(SUBAGENT_PROGRESS, { progress: { status: "running" } })).toBeNull();
+		expect(parseSubagentFrame(SUBAGENT_LIFECYCLE, "junk")).toBeNull();
+		expect(parseSubagentFrame("task:other", { id: "s1", description: "x" })).toBeNull();
 	});
 });
 

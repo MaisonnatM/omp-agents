@@ -115,37 +115,6 @@ export function routeFromHash(hash: string): Route {
 	return { kind: "panes", layout: layoutFromPanes(raw) };
 }
 
-// The single-route readers below are the shapes routing.test.ts pins; the page itself reads `routeFromHash`.
-export function pageFromHash(hash: string): Page | null {
-	const route = routeFromHash(hash);
-	return route.kind === "page" ? route.page : null;
-}
-
-export function layoutFromHash(hash: string): Layout | null {
-	const route = routeFromHash(hash);
-	return route.kind === "panes" ? route.layout : null;
-}
-
-export function sessionFromHash(hash: string): string | null {
-	const route = routeFromHash(hash);
-	return route.kind === "session" ? route.sessionId : null;
-}
-
-export function settingsFromHash(hash: string): SettingsRoute | null {
-	const page = pageFromHash(hash);
-	return page?.kind === "settings" ? { cwd: page.cwd } : null;
-}
-
-export function newSessionFromHash(hash: string): NewSessionRoute | null {
-	const page = pageFromHash(hash);
-	return page?.kind === "new" ? { cwd: page.cwd } : null;
-}
-
-export function inboxFromHash(hash: string): InboxRoute | null {
-	const page = pageFromHash(hash);
-	return page?.kind === "inbox" ? { target: page.target } : null;
-}
-
 /** The view a session id opens: the live host that runs the session, else its saved transcript. */
 export function viewForSession(sessionId: string, hosts: RosterHost[]): View {
 	const host = hosts.find(h => h.sessionId === sessionId);

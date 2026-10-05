@@ -4,6 +4,7 @@ import { DashboardSession, type DashboardUpdate, newInstanceId } from "../dashbo
 import { SessionGuest } from "../guest";
 import type { LiveSession, LiveUpdate, SessionFacts } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
+import { displayPath } from "../paths";
 import type { RosterHost } from "../shared";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
@@ -40,8 +41,13 @@ export class LiveSessions {
 		if (this.#sessions.delete(instanceId)) forgetSession(instanceId);
 	}
 
+	/** Each session's roster row, with its `cwdDisplay` and what the session files' index knows of it. */
 	rows(factsOf: (sessionId: string) => SessionFacts): RosterHost[] {
-		return [...this.#sessions.values()].map(session => session.row(factsOf(session.sessionId)));
+		return [...this.#sessions.values()].map(session => ({
+			...session.row(),
+			cwdDisplay: displayPath(session.cwd),
+			...factsOf(session.sessionId),
+		}));
 	}
 
 	/** The ids of the sessions that run now, which are not past sessions. */

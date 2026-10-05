@@ -17,7 +17,7 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, Reorder, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { fontWeights } from "@/lib/font-weight";
 import { spring } from "@/lib/springs";
@@ -30,7 +30,7 @@ import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hove
 import { FileThumbnail } from "@/components/ui/file-thumbnail";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { FluidHoverHighlight } from "@/components/fluid-hover-highlight";
+import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 
 const useIsoLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -53,7 +53,7 @@ const useIsoLayoutEffect =
  * Observing the child rather than the parent keeps the ResizeObserver out of a
  * feedback loop with that animation.
  */
-function useRegionHeight() {
+export function useRegionHeight() {
   const roRef = useRef<ResizeObserver | null>(null);
   const [height, setHeight] = useState<number | null>(null);
   const ref = useCallback((el: HTMLElement | null) => {
@@ -75,7 +75,7 @@ function useRegionHeight() {
 // Touch devices have no hover, so hover-revealed affordances (like a queued
 // row's × button) would never appear. `(hover: none)` flags those so they can
 // be shown persistently instead. SSR-safe: starts false, resolves on mount.
-function useIsTouch() {
+export function useIsTouch() {
   const [isTouch, setIsTouch] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(hover: none)");
@@ -102,12 +102,13 @@ type InputMessageSlot =
   | ReactNode
   | ((ctx: InputMessageSlotContext) => ReactNode);
 
-/** A message that waits on the running turn, owned by the consumer. `tag`
- *  names how it will be delivered (e.g. "Follow-up"); `id` is a stable key. */
+/** A message held in the queue while the assistant is responding. Carries the
+ *  trimmed text plus a snapshot of the files attached when it was queued, so
+ *  double-click-to-edit can restore both. `id` is a stable key minted on enqueue. */
 interface QueuedMessage {
   id: string;
   text: string;
-  tag?: string;
+  files: File[];
 }
 
 interface InputMessageProps
@@ -119,9 +120,16 @@ interface InputMessageProps
   value: string;
   /** Called with the new value on every textarea change. */
   onValueChange: (value: string) => void;
-  /** Fired when the user submits (Enter or the send button), with the
-   *  trimmed value and the attached files. */
-  onSend?: (value: string, files: File[]) => void;
+  /** Fired when the user submits (Enter or the send button) and when a queued
+   *  message auto-dispatches. Receives the trimmed value, the attached files,
+   *  and — for auto-dispatched queue items — `meta.queuedId` (the originating
+   *  QueuedMessage id), so a consumer can e.g. morph the queued item into the
+   *  sent message via a shared-layout (`layoutId`) transition. */
+  onSend?: (
+    value: string,
+    files: File[],
+    meta?: { queuedId?: string }
+  ) => void;
   /** Placeholder text shown when the value is empty. */
   placeholder?: string;
   /** Content rendered in the bottom-left action area. Can be a function that
@@ -157,20 +165,24 @@ interface InputMessageProps
     "value" | "onChange" | "disabled" | "placeholder"
   >;
   /** Assistant response state. When `"streaming"`, the send button becomes a
-   *  Stop control while the draft is empty; a draft still sends at once.
-   *  Leave undefined to keep the plain send button. */
+   *  Stop control (empty draft) or a Queue action (non-empty draft); on the
+   *  `streaming → idle` edge the next queued message auto-dispatches via `onSend`.
+   *  Leave undefined to keep the legacy send-immediately behavior. */
   status?: "idle" | "streaming";
-  /** Fired when the Stop control is pressed (streaming, empty draft). */
+  /** Fired when the Stop control is pressed (streaming, empty draft). The
+   *  consumer should halt the current response and flip `status` to `"idle"`,
+   *  which immediately dispatches the next queued message. */
   onStop?: () => void;
   /** Keys that press Stop, shown in its tooltip; no tooltip when omitted. */
   stopShortcut?: readonly string[];
-  /** Messages waiting on the running turn, owned by the consumer and shown as
-   *  rows above the textarea, the next to be delivered on top. */
+  /** Controlled queue of pending messages. Requires `status` to be controlled. */
   queue?: QueuedMessage[];
-  /** Double-click, Enter, or F2 on a queued row: take it back for editing. */
-  onEditQueued?: (item: QueuedMessage) => void;
-  /** The row's × or Delete: drop it from the queue. */
-  onRemoveQueued?: (item: QueuedMessage) => void;
+  /** Called when the queue changes (enqueue, edit, delete, reorder, dispatch). */
+  onQueueChange?: (queue: QueuedMessage[]) => void;
+  /** Render the built-in reorderable queue rows above the textarea. Set to
+   *  `false` to suppress them and render the queue yourself (e.g. as full-width
+   *  rows above the composer) — enqueue + auto-dispatch still run. */
+  showQueue?: boolean;
   /** Previously-sent messages, oldest first. When the textarea is focused,
    *  ArrowUp (caret on the first line) recalls the previous one and walks
    *  backward through history; ArrowDown (caret on the last line) walks forward
@@ -180,13 +192,15 @@ interface InputMessageProps
    *  the draft is empty. Pressing Tab fills it into the composer — it doesn't
    *  send. Takes precedence over `placeholder`. */
   placeholderSuggestion?: string;
-  /** Suggested prompts listed under the action bar while the draft is empty,
-   *  numbered from 1. A row's number key sends it, as do Enter on the
-   *  highlighted row and a click; Tab fills the highlighted row into the
-   *  composer to edit first. ArrowDown moves a highlight into the list (focus
-   *  stays in the textarea), ArrowUp walks back up and out. Typing collapses
-   *  the list. */
+  /** Suggested prompts listed under the action bar while the draft is empty.
+   *  ArrowDown moves a highlight into the list (focus stays in the textarea),
+   *  ArrowUp walks back up and out, Enter or click fills the highlighted
+   *  prompt into the composer. Typing collapses the list. */
   suggestions?: string[];
+  /** Rendered above the textarea, below the attached files. */
+  beforeTextarea?: ReactNode;
+  /** Rendered under the action bar, inside the composer's frame. */
+  afterActions?: ReactNode;
 }
 
 // ─── File preview tile ────────────────────────────────────────────────────
@@ -243,18 +257,19 @@ function FilePreviewTile({ file, onRemove, size }: FilePreviewTileProps) {
 }
 
 // ─── Queued message row ───────────────────────────────────────────────────
-// A message waiting on the running turn: a recessed row that reads as
-// "staged, not live", led by its tag. Double-click (or Enter/F2) edits it
-// back into the composer; the hover-revealed × (or Delete) removes it. Top
-// of the list is delivered first.
+// A pending message in the queue: a recessed, draggable row that reads as
+// "staged, not live". Double-click (or Enter/F2) edits it back into the
+// composer; the hover-revealed × (or Delete) removes it; drag — or Alt+↑/↓ —
+// reorders. Top of the list is next to dispatch.
 interface QueuedRowProps {
   item: QueuedMessage;
   index: number;
   total: number;
   reduceMotion: boolean;
   isTouch: boolean;
-  onEdit?: (item: QueuedMessage) => void;
-  onRemove?: (item: QueuedMessage) => void;
+  onEdit: (item: QueuedMessage) => void;
+  onRemove: (item: QueuedMessage) => void;
+  onMove: (item: QueuedMessage, dir: -1 | 1) => void;
 }
 
 function QueuedRow({
@@ -265,13 +280,18 @@ function QueuedRow({
   isTouch,
   onEdit,
   onRemove,
+  onMove,
 }: QueuedRowProps) {
   const XIcon = useIcon("x");
+  const ImageIcon = useIcon("image");
   const compactStep = useSize().variant === "compact";
-  const kind = item.tag ? `${item.tag.toLowerCase()} ` : "";
+  const fileCount = item.files.length;
+  const label =
+    item.text || `${fileCount} attachment${fileCount === 1 ? "" : "s"}`;
 
   return (
-    <motion.li
+    <Reorder.Item
+      value={item}
       layout
       // Enter: spring-fast chip category. Exit slightly faster (0.06s linear),
       // per motion-guidelines.md. Reduced-motion drops the scale.
@@ -283,16 +303,19 @@ function QueuedRow({
           : { opacity: 0, scale: 0.97, transition: spring.fast.exit }
       }
       transition={spring.fast}
-      aria-label={`Queued ${kind}message ${index + 1} of ${total}: ${item.text}`}
+      aria-label={`Queued message ${index + 1} of ${total}: ${label}`}
       tabIndex={0}
-      onDoubleClick={() => onEdit?.(item)}
+      onDoubleClick={() => onEdit(item)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === "F2") {
           e.preventDefault();
-          onEdit?.(item);
+          onEdit(item);
         } else if (e.key === "Delete" || e.key === "Backspace") {
           e.preventDefault();
-          onRemove?.(item);
+          onRemove(item);
+        } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+          e.preventDefault();
+          onMove(item, e.key === "ArrowUp" ? -1 : 1);
         }
       }}
       className={cn(
@@ -303,48 +326,47 @@ function QueuedRow({
           ? "h-7 px-2 text-[12px]"
           : "h-8 px-2.5 text-[13px]",
         "text-foreground/85 select-none outline-none",
+        "cursor-grab active:cursor-grabbing",
         "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
       )}
       style={{ fontVariationSettings: fontWeights.normal }}
     >
-      {item.tag && (
-        <span
-          className="shrink-0 text-muted-foreground [text-box:trim-both_cap_alphabetic]"
-          style={{ fontVariationSettings: fontWeights.medium }}
-        >
-          {item.tag}
+      {fileCount > 0 && (
+        <span className="flex shrink-0 items-center gap-0.5 text-muted-foreground">
+          <ImageIcon size={13} />
+          {item.text && <span className="tabular-nums">{fileCount}</span>}
         </span>
       )}
       {/* py-1/-my-1 keeps truncate's overflow:hidden from clipping
           ascenders/descenders outside the trimmed box. */}
-      <span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{item.text}</span>
-      {onRemove && (
-        <Tooltip content="Remove" side="top">
-          <button
-            type="button"
-            // Keep the click from bubbling to the row's double-click/edit handler.
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove(item);
-            }}
-            aria-label={`Remove queued message: ${item.text}`}
-            className={cn(
-              "shrink-0 flex h-5 w-5 items-center justify-center rounded-full",
-              "text-muted-foreground hover:text-foreground hover:bg-hover",
-              // Hover devices reveal × on row-hover; touch has no hover, so keep
-              // it persistently visible there.
-              isTouch
-                ? "opacity-100"
-                : "opacity-0 group-hover/qrow:opacity-100 focus-visible:opacity-100",
-              "transition-opacity duration-80 cursor-pointer outline-none",
-              "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
-            )}
-          >
-            <XIcon size={13} strokeWidth={2.5} />
-          </button>
-        </Tooltip>
-      )}
-    </motion.li>
+      <span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{label}</span>
+      <Tooltip content="Remove" side="top">
+        <button
+          type="button"
+          // Stop the pointer-down from starting a Reorder drag, and the click
+          // from bubbling to the row's double-click/edit handler.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(item);
+          }}
+          aria-label={`Remove queued message: ${label}`}
+          className={cn(
+            "shrink-0 flex h-5 w-5 items-center justify-center rounded-full",
+            "text-muted-foreground hover:text-foreground hover:bg-hover",
+            // Hover devices reveal × on row-hover; touch has no hover, so keep
+            // it persistently visible there.
+            isTouch
+              ? "opacity-100"
+              : "opacity-0 group-hover/qrow:opacity-100 focus-visible:opacity-100",
+            "transition-opacity duration-80 cursor-pointer outline-none",
+            "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]"
+          )}
+        >
+          <XIcon size={13} strokeWidth={2.5} />
+        </button>
+      </Tooltip>
+    </Reorder.Item>
   );
 }
 
@@ -358,6 +380,9 @@ interface SuggestionRowProps {
   text: string;
   index: number;
   active: boolean;
+  /** Show a ↓ keycap hint in the icon slot — the first row displays it while
+   *  no row is highlighted, signposting that ArrowDown enters the list. */
+  keyHint: boolean;
   optionId: string;
   registerItem: (index: number, element: HTMLElement | null) => void;
   onSelect: () => void;
@@ -367,11 +392,13 @@ function SuggestionRow({
   text,
   index,
   active,
+  keyHint,
   optionId,
   registerItem,
   onSelect,
 }: SuggestionRowProps) {
   const EnterIcon = useIcon("corner-down-left");
+  const ArrowDownIcon = useIcon("arrow-down");
   const compactStep = useSize().variant === "compact";
   const ref = useRef<HTMLDivElement>(null);
 
@@ -395,26 +422,28 @@ function SuggestionRow({
       )}
       style={{ fontVariationSettings: fontWeights.normal }}
     >
-      {/* The number key that sends this row. */}
-      <kbd
-        aria-hidden="true"
-        className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-[5px] border border-border bg-background px-1 font-sans text-muted-foreground tabular-nums",
-          compactStep ? "h-4 min-w-4 text-[10px]" : "h-[18px] min-w-[18px] text-[11px]"
-        )}
-      >
-        {index + 1}
-      </kbd>
       {/* py-1/-my-1 keeps truncate's overflow:hidden from clipping
           ascenders/descenders outside the trimmed box. */}
       <span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">
         {text}
       </span>
-      {/* ↵ on the highlighted row: Enter sends it. */}
-      <EnterIcon
-        size={13}
-        className={cn("shrink-0 transition-opacity duration-80", active ? "opacity-100" : "opacity-0")}
-      />
+      {/* One icon slot: ↵ on the highlighted row; on the first row a muted ↓
+          takes the same slot while nothing is highlighted, signposting the
+          keyboard path into the list. */}
+      {!active && keyHint ? (
+        <ArrowDownIcon
+          size={13}
+          className="shrink-0 text-muted-foreground/70 transition-opacity duration-80"
+        />
+      ) : (
+        <EnterIcon
+          size={13}
+          className={cn(
+            "shrink-0 transition-opacity duration-80",
+            active ? "opacity-100" : "opacity-0"
+          )}
+        />
+      )}
     </div>
   );
 }
@@ -446,11 +475,13 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       onStop,
       stopShortcut,
       queue,
-      onEditQueued,
-      onRemoveQueued,
+      onQueueChange,
+      showQueue = true,
       history = [],
       placeholderSuggestion,
       suggestions,
+      beforeTextarea,
+      afterActions,
       className,
       style,
       ...props
@@ -483,8 +514,17 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     const filesArr = useMemo(() => files ?? [], [files]);
     const supportsFiles = onFilesChange !== undefined;
 
+    // Queue is active only when both the status is controlled and a change
+    // handler is wired — same opt-in shape as `supportsFiles`.
     const queueArr = useMemo(() => queue ?? [], [queue]);
+    // Always-current view of the queue, so enqueue/edit/remove/move read the
+    // latest value even if a handler closure is stale (e.g. two submits land
+    // before the controlled `queue` prop round-trips back).
+    const queueRef = useRef(queueArr);
+    queueRef.current = queueArr;
+    const supportsQueue = status !== undefined && onQueueChange !== undefined;
     const streaming = status === "streaming";
+    const [liveMsg, setLiveMsg] = useState("");
 
     // Sent-message history navigation (readline-style). `historyIndex` is null
     // when not browsing; `draftBeforeHistory` stashes the in-progress text so
@@ -528,8 +568,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
       if (!suggestionsOpen) setActiveSuggestion(null);
     }, [suggestionsOpen, setActiveSuggestion]);
 
-    // Fill a suggested prompt into the composer (Tab on a highlighted row) so
-    // the user can edit it before sending.
+    // Fill a suggested prompt into the composer (Tab / Enter / click). Fills
+    // only — the user still reviews and sends.
     const acceptSuggestion = useCallback(
       (text: string) => {
         setActiveSuggestion(null);
@@ -609,30 +649,125 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
           ? `0 0 0 1px var(--border), ${EDGE_DROP}`
           : undefined;
 
-    // The one send path: the draft, or a suggested prompt as it is (its
-    // number key, Enter on the highlighted row, or a click), with any
-    // attached files.
-    const send = useCallback(
-      (text: string) => {
-        if (disabled) return;
-        setActiveSuggestion(null);
-        setHistoryIndex(null);
-        onSend?.(text, filesArr);
-      },
-      [disabled, onSend, filesArr, setActiveSuggestion]
-    );
-
     const handleSend = useCallback(() => {
-      if (canSend) send(trimmed);
-    }, [canSend, send, trimmed]);
+      if (!canSend) return;
+      setHistoryIndex(null);
+      // While the assistant is streaming, a submit enqueues instead of sending:
+      // snapshot the draft (text + currently-attached files) into a queue item,
+      // then clear the composer and keep focus.
+      if (streaming && supportsQueue) {
+        const item: QueuedMessage = {
+          id: crypto.randomUUID(),
+          text: trimmed,
+          files: filesArr,
+        };
+        onQueueChange?.([...queueRef.current, item]);
+        onValueChange("");
+        if (supportsFiles) onFilesChange?.([]);
+        requestAnimationFrame(() => textareaRef.current?.focus());
+        return;
+      }
+      onSend?.(trimmed, filesArr);
+    }, [
+      canSend,
+      streaming,
+      supportsQueue,
+      onSend,
+      trimmed,
+      filesArr,
+      onQueueChange,
+      onValueChange,
+      supportsFiles,
+      onFilesChange,
+    ]);
 
     const handleStop = useCallback(() => onStop?.(), [onStop]);
 
-    // Send button morph: Stop (streaming + empty draft) → Send. Only the
+    // Auto-dispatch: on the streaming → idle edge (whether the response
+    // finished on its own or the user pressed Stop), fire the head of the
+    // queue and drop it. The consumer is expected to set status back to
+    // "streaming" inside onSend, which re-arms this for the next item.
+    const prevStatusRef = useRef(status);
+    useEffect(() => {
+      const prev = prevStatusRef.current;
+      prevStatusRef.current = status;
+      if (!supportsQueue) return;
+      if (prev === "streaming" && status === "idle" && queueArr.length > 0) {
+        const [next, ...rest] = queueArr;
+        onQueueChange?.(rest);
+        onSend?.(next.text, next.files, { queuedId: next.id });
+        setLiveMsg(
+          `Message sent.${rest.length ? ` ${rest.length} still queued.` : ""}`
+        );
+      }
+    }, [status, supportsQueue, queueArr, onQueueChange, onSend]);
+
+    // ── Queue item actions ────────────────────────────────────────────
+    const editQueued = useCallback(
+      (item: QueuedMessage) => {
+        if (!supportsQueue) return;
+        // Silent replace: pull the item out of the queue into the composer,
+        // overwriting any current draft. Re-sending re-queues it to the end.
+        setHistoryIndex(null);
+        onValueChange(item.text);
+        if (supportsFiles) {
+          onFilesChange?.(
+            maxFiles != null ? item.files.slice(0, maxFiles) : item.files
+          );
+        }
+        onQueueChange?.(queueRef.current.filter((q) => q.id !== item.id));
+        requestAnimationFrame(() => {
+          const el = textareaRef.current;
+          if (!el) return;
+          el.focus();
+          el.setSelectionRange(el.value.length, el.value.length);
+        });
+      },
+      [
+        supportsQueue,
+        supportsFiles,
+        onValueChange,
+        onFilesChange,
+        maxFiles,
+        onQueueChange,
+      ]
+    );
+
+    const removeQueued = useCallback(
+      (item: QueuedMessage) =>
+        onQueueChange?.(queueRef.current.filter((q) => q.id !== item.id)),
+      [onQueueChange]
+    );
+
+    const moveQueued = useCallback(
+      (item: QueuedMessage, dir: -1 | 1) => {
+        const cur = queueRef.current;
+        const i = cur.findIndex((q) => q.id === item.id);
+        const j = i + dir;
+        if (i < 0 || j < 0 || j >= cur.length) return;
+        const next = [...cur];
+        [next[i], next[j]] = [next[j], next[i]];
+        onQueueChange?.(next);
+      },
+      [onQueueChange]
+    );
+
+    // Send button morph: Stop (streaming + empty draft) → Queue (streaming +
+    // draft) → Send (idle). Send and Queue share the arrow-up glyph; only the
     // Stop⇄arrow swap animates.
-    const buttonMode: "send" | "stop" =
-      streaming && !canSend && onStop ? "stop" : "send";
-    const buttonLabel = buttonMode === "stop" ? "Stop" : sendLabel;
+    const buttonMode: "send" | "queue" | "stop" = !streaming
+      ? "send"
+      : canSend && supportsQueue
+        ? "queue"
+        : !canSend && onStop
+          ? "stop"
+          : "send";
+    const buttonLabel =
+      buttonMode === "stop"
+        ? "Stop"
+        : buttonMode === "queue"
+          ? "Queue message"
+          : sendLabel;
 
     const setCaretEnd = useCallback(() => {
       requestAnimationFrame(() => {
@@ -647,49 +782,42 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
         if (e.defaultPrevented) return;
         if (e.nativeEvent.isComposing) return;
 
-        // Suggested prompts. A row's number key sends it, Shift allowed since
-        // some layouts type digits with it. A digit sends even with no row
-        // highlighted, so a message of your own that starts with one needs
-        // another character first: the user chose speed over that. Plain
-        // ArrowDown moves the highlight into / down the list, ArrowUp walks it
-        // back up and out, Enter sends the highlighted prompt, Tab fills it to
-        // edit first, Escape drops the highlight. With no highlight, ArrowUp
-        // falls through to history recall below.
-        if (suggestionsOpen && !e.altKey && !e.metaKey && !e.ctrlKey) {
-          const numbered = /^[1-9]$/.test(e.key) ? suggestionsArr[Number(e.key) - 1] : undefined;
-          if (numbered !== undefined) {
+        // Suggested prompts: plain ArrowDown moves the highlight into / down
+        // the list, ArrowUp walks it back up (then out, returning to plain
+        // textarea behavior), Enter fills the highlighted prompt, Escape
+        // drops the highlight. With no highlight, ArrowUp still falls through
+        // to history recall below.
+        if (
+          suggestionsOpen &&
+          !e.shiftKey &&
+          !e.altKey &&
+          !e.metaKey &&
+          !e.ctrlKey
+        ) {
+          if (e.key === "ArrowDown") {
             e.preventDefault();
-            send(numbered);
+            setActiveSuggestion((prev) =>
+              prev == null ? 0 : Math.min(prev + 1, suggestionsArr.length - 1)
+            );
             return;
           }
-          if (!e.shiftKey) {
-            if (e.key === "ArrowDown") {
+          if (activeSuggestion != null) {
+            if (e.key === "ArrowUp") {
               e.preventDefault();
-              setActiveSuggestion((prev) => (prev == null ? 0 : Math.min(prev + 1, suggestionsArr.length - 1)));
+              setActiveSuggestion(
+                activeSuggestion === 0 ? null : activeSuggestion - 1
+              );
               return;
             }
-            if (activeSuggestion != null) {
-              const active = suggestionsArr[activeSuggestion];
-              if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setActiveSuggestion(activeSuggestion === 0 ? null : activeSuggestion - 1);
-                return;
-              }
-              if (e.key === "Enter") {
-                e.preventDefault();
-                send(active);
-                return;
-              }
-              if (e.key === "Tab") {
-                e.preventDefault();
-                acceptSuggestion(active);
-                return;
-              }
-              if (e.key === "Escape") {
-                e.preventDefault();
-                setActiveSuggestion(null);
-                return;
-              }
+            if (e.key === "Enter") {
+              e.preventDefault();
+              acceptSuggestion(suggestionsArr[activeSuggestion]);
+              return;
+            }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setActiveSuggestion(null);
+              return;
             }
           }
         }
@@ -771,7 +899,6 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
         textareaProps,
         setActiveSuggestion,
         acceptSuggestion,
-        send,
         placeholderSuggestion,
       ]
     );
@@ -1000,43 +1127,51 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
             )}
           </AnimatePresence>
 
-          {/* Queued messages — rows above the textarea. The outer motion.div
-              collapses the region height when the queue empties, and
-              AnimatePresence handles per-row enter/exit. */}
-          <AnimatePresence initial={false}>
-            {queueArr.length > 0 && (
-              <motion.div
-                key="queue-row"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: queueRegionHeight ?? 0, opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ ...spring.moderate, bounce: 0 }}
-                className="overflow-hidden"
-              >
-                <ul
-                  ref={queueRegionRef}
-                  aria-label="Queued messages"
-                  data-im-queue
-                  className="flex flex-col gap-1 pb-1"
+          {/* Queued messages — reorderable rows above the textarea. The outer
+              motion.div collapses the region height when the queue empties;
+              the Reorder.Group handles drag-reorder (top = next to dispatch)
+              and AnimatePresence handles per-row enter/exit. */}
+          {supportsQueue && showQueue && (
+            <AnimatePresence initial={false}>
+              {queueArr.length > 0 && (
+                <motion.div
+                  key="queue-row"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: queueRegionHeight ?? 0, opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ ...spring.moderate, bounce: 0 }}
+                  className="overflow-hidden"
                 >
-                  <AnimatePresence initial={false}>
-                    {queueArr.map((item, i) => (
-                      <QueuedRow
-                        key={item.id}
-                        item={item}
-                        index={i}
-                        total={queueArr.length}
-                        reduceMotion={reduceMotion}
-                        isTouch={isTouch}
-                        onEdit={onEditQueued}
-                        onRemove={onRemoveQueued}
-                      />
-                    ))}
-                  </AnimatePresence>
-                </ul>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  <Reorder.Group
+                    ref={queueRegionRef}
+                    axis="y"
+                    values={queueArr}
+                    onReorder={(next) => onQueueChange?.(next)}
+                    data-im-queue
+                    className="flex flex-col gap-1 pb-1"
+                  >
+                    <AnimatePresence initial={false}>
+                      {queueArr.map((item, i) => (
+                        <QueuedRow
+                          key={item.id}
+                          item={item}
+                          index={i}
+                          total={queueArr.length}
+                          reduceMotion={reduceMotion}
+                          isTouch={isTouch}
+                          onEdit={editQueued}
+                          onRemove={removeQueued}
+                          onMove={moveQueued}
+                        />
+                      ))}
+                    </AnimatePresence>
+                  </Reorder.Group>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )}
+
+          {beforeTextarea}
 
           <div className="relative">
             <textarea
@@ -1206,8 +1341,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
 
           {/* Suggested prompts — a listbox under the action bar, shown while
               the draft is empty. ↓/↑ move the highlight without moving focus
-              (the textarea's aria-activedescendant tracks it); a number key,
-              Enter, or a click sends a row. The outer motion.div collapses the region's
+              (the textarea's aria-activedescendant tracks it); Enter or click
+              fills the composer. The outer motion.div collapses the region's
               height once typing hides the list; -mx-2 cancels the container
               padding so the divider runs the composer's full width. Pointer
               and keyboard share one bg-hover overlay that springs between
@@ -1257,9 +1392,10 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
                         text={s}
                         index={i}
                         active={i === activeSuggestion}
+                        keyHint={i === 0 && activeSuggestion == null}
                         optionId={`${suggestionListId}-${i}`}
                         registerItem={registerSuggestion}
-                        onSelect={() => send(s)}
+                        onSelect={() => acceptSuggestion(s)}
                       />
                     ))}
                   </div>
@@ -1267,6 +1403,11 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
               )}
             </AnimatePresence>
           )}
+          {afterActions}
+          {/* Politely announces auto-dispatch of queued messages. */}
+          <span className="sr-only" role="status" aria-live="polite">
+            {liveMsg}
+          </span>
         </SurfaceProvider>
       </div>
     );

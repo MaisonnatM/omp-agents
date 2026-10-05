@@ -52,26 +52,25 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	},
 	async complete({ sessions }, ws, { scope, reqId, text, cursor }) {
 		// A live view completes as its session; a draft as a session not started yet in its cwd.
+		let target: { instanceId: string | null; cwd: string };
 		if (scope.kind === "new") {
 			const cwd = directoryOf(scope.cwd);
 			if (!cwd) {
 				send(ws, { t: "completions", scope, reqId, items: [], error: `${scope.cwd.trim()} is not a directory.` });
 				return;
 			}
-			try {
-				send(ws, { t: "completions", scope, reqId, items: await complete(null, cwd, text, cursor), error: null });
-			} catch (error) {
-				send(ws, { t: "completions", scope, reqId, items: [], error: errorText(error) });
-			}
-			return;
+			target = { instanceId: null, cwd };
+		} else {
+			const session = sessions.get(scope.view.instanceId);
+			if (!session) return;
+			target = session;
 		}
-		const session = sessions.get(scope.view.instanceId);
-		if (!session) return;
+		const { instanceId, cwd } = target;
+		const deliver = (msg: ServerMsg): void => (instanceId === null ? send(ws, msg) : reply(ws, instanceId, msg));
 		try {
-			const items = await complete(session.instanceId, session.cwd, text, cursor);
-			reply(ws, session.instanceId, { t: "completions", scope, reqId, items, error: null });
+			deliver({ t: "completions", scope, reqId, items: await complete(instanceId, cwd, text, cursor), error: null });
 		} catch (error) {
-			reply(ws, session.instanceId, { t: "completions", scope, reqId, items: [], error: errorText(error) });
+			deliver({ t: "completions", scope, reqId, items: [], error: errorText(error) });
 		}
 	},
 	abort: ({ sessions }, _ws, { instanceId }) => sessions.get(instanceId)?.abort(),

@@ -73,11 +73,3 @@ describe("ticketActions", () => {
 	});
 });
 
-describe("ticketStart", () => {
-	test("work happens on Linear's branch for the issue, or on a new one when Linear names none", () => {
-		expect(ticketStart(ticket({}), "work", "~", null).prompt).toContain("on the branch `eng-7-show-feedback`");
-		const unnamed = ticketStart(ticket({ branch: "" }), "work", "~", null).prompt;
-		expect(unnamed).toContain("on a new branch named after ENG-7");
-		expect(unnamed).not.toContain("``");
-	});
-});

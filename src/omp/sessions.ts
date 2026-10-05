@@ -1,6 +1,6 @@
 /** omp's session files: listing them and reading whether a process left one mid-turn. */
 import { dirname } from "node:path";
-import { oneLine } from "../transcript";
+import { oneLine } from "../session-entries";
 import { dirs, exitDiagnostics, type FileEntry, listing, loader, type SessionInfo, storage } from "./modules";
 
 /** omp's sessions root: one directory per working directory, each holding `<time>_<id>.jsonl` files. */

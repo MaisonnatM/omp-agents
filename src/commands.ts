@@ -9,6 +9,7 @@
  * two itself, with the functions the TUI uses, before sending.
  */
 import { isAbsolute, relative, resolve } from "node:path";
+import { createCache } from "./cache";
 import {
 	type AutocompleteItem,
 	type AutocompleteProvider,
@@ -34,7 +35,7 @@ interface Catalog {
 	fileCommands: FileSlashCommand[];
 }
 
-const catalogs = new Map<string, { loading: Promise<Catalog>; at: number }>();
+const catalogs = createCache<Catalog>(CATALOG_TTL_MS);
 
 async function buildCatalog(cwd: string): Promise<Catalog> {
 	const [{ enableSkillCommands, skills }, fileCommands] = await Promise.all([loadSessionSkills(cwd), loadSlashCommands({ cwd })]);
@@ -49,24 +50,13 @@ async function buildCatalog(cwd: string): Promise<Catalog> {
 /**
  * Keyed by session and cwd: two sessions in one directory get separate entries, and a `/move` gets a fresh one.
  * `instanceId` is `null` for a session not started yet, so every new-session draft in a directory shares one entry.
+ * Entries nobody asks for again (every cwd a new-session draft once named) expire with the cache's TTL.
  */
-function catalogFor(instanceId: string | null, cwd: string): Promise<Catalog> {
-	const key = `${instanceId ?? ""}\u0000${cwd}`;
-	const now = Date.now();
-	// Entries nobody asks for again (every cwd a new-session draft once named) would otherwise stay for good.
-	for (const [other, entry] of catalogs) if (now - entry.at >= CATALOG_TTL_MS) catalogs.delete(other);
-	const cached = catalogs.get(key);
-	if (cached) return cached.loading;
-	const loading = buildCatalog(cwd);
-	catalogs.set(key, { loading, at: now });
-	loading.catch(() => {
-		if (catalogs.get(key)?.loading === loading) catalogs.delete(key);
-	});
-	return loading;
-}
+const catalogFor = (instanceId: string | null, cwd: string): Promise<Catalog> =>
+	catalogs.get(`${instanceId ?? ""}\u0000${cwd}`, () => buildCatalog(cwd));
 
 export function forgetSession(instanceId: string): void {
-	for (const key of catalogs.keys()) if (key.startsWith(`${instanceId}\u0000`)) catalogs.delete(key);
+	catalogs.dropWhere(key => key.startsWith(`${instanceId}\u0000`));
 }
 
 /** The pi-tui editor addresses text as lines plus a caret line and column. */

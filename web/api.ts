@@ -44,3 +44,6 @@ export async function putJson<T>(url: string, body: unknown): Promise<T> {
 		}),
 	);
 }
+
+/** The settings route `part` for `cwd`, or for the user's own files when `cwd` is `null`. */
+export const settingsUrl = (part: "" | "/routing" | "/file", cwd: string | null): string => `/api/settings${part}${cwd === null ? "" : `?cwd=${encodeURIComponent(cwd)}`}`;

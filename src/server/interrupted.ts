@@ -1,7 +1,6 @@
 /** Sessions this dashboard started that stopped without **End session**: with the server, or on their own. A file keeps them across restarts. */
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { errorText, isObject } from "../json";
+import { JsonFile } from "../fs";
+import { isObject, isTexts } from "../json";
 
 interface SessionState {
 	/** Stopped without **End session**; otherwise it runs now. */
@@ -13,8 +12,6 @@ interface SessionState {
 interface Saved {
 	sessions: Array<{ id: string } & SessionState>;
 }
-
-const isTexts = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === "string");
 
 const isSaved = (value: unknown): value is Saved =>
 	isObject(value) &&
@@ -34,25 +31,8 @@ function fromLists(value: unknown): Saved | null {
 	return { sessions: [...value.interrupted.map(entry(true)), ...value.running.map(entry(false))] };
 }
 
-function load(path: string): Saved {
-	let text: string;
-	try {
-		text = readFileSync(path, "utf8");
-	} catch (err) {
-		if (!(isObject(err) && err.code === "ENOENT")) console.error(`omp-agents: cannot read ${path}: ${errorText(err)}`);
-		return { sessions: [] };
-	}
-	try {
-		const value: unknown = JSON.parse(text);
-		const saved = isSaved(value) ? value : fromLists(value);
-		if (saved) return saved;
-	} catch {}
-	console.error(`omp-agents: ignoring ${path}, which is not a list of interrupted sessions`);
-	return { sessions: [] };
-}
-
 export class InterruptedSessions {
-	readonly #path: string;
+	readonly #file: JsonFile<Saved>;
 	/**
 	 * The dashboard sessions that run now, and those that stopped without **End session**. The file keeps
 	 * them, so the next start finds the ones the server went down with.
@@ -60,8 +40,12 @@ export class InterruptedSessions {
 	readonly #sessions: Map<string, SessionState>;
 
 	constructor(path: string) {
-		this.#path = path;
-		const saved = load(path).sessions;
+		this.#file = new JsonFile(path, {
+			parse: value => (isSaved(value) ? value : fromLists(value)),
+			holds: "a list of interrupted sessions",
+			onInvalid: "ignore",
+		});
+		const saved = this.#file.load()?.sessions ?? [];
 		// The sessions that ran when the last server stopped stopped with it.
 		this.#sessions = new Map(saved.map(({ id, working }) => [id, { interrupted: true, working }]));
 		if (saved.some(session => !session.interrupted)) this.#save();
@@ -110,16 +94,7 @@ export class InterruptedSessions {
 		return true;
 	}
 
-	/** Written beside and renamed over the file, so a crash mid-write leaves the last complete list. */
 	#save(): void {
-		const saved: Saved = { sessions: [...this.#sessions].map(([id, state]) => ({ id, ...state })) };
-		const temp = `${this.#path}.tmp`;
-		try {
-			mkdirSync(dirname(this.#path), { recursive: true });
-			writeFileSync(temp, `${JSON.stringify(saved)}\n`);
-			renameSync(temp, this.#path);
-		} catch (err) {
-			console.error(`omp-agents: cannot write ${this.#path}: ${errorText(err)}`);
-		}
+		this.#file.save({ sessions: [...this.#sessions].map(([id, state]) => ({ id, ...state })) });
 	}
 }

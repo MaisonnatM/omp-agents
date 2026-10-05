@@ -1,8 +1,8 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../src/shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { Tabs } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { DashboardContext } from "./components/dashboard-context";
 import { InboxPage } from "./components/inbox/inbox-page";
 import { DashboardHeader, type SidebarTab } from "./components/navigation";
 import { NewSession } from "./components/new-session";
@@ -19,7 +19,7 @@ import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-p
 import { ToolsExpanded } from "./components/transcript";
 import { TodoPage } from "./components/user-todos";
 import { SPLIT_CLICK } from "./labels";
-import { linearStore } from "./reads";
+import { linearStore, UNREAD } from "./reads";
 import {
 	adjacentSession,
 	closePane,
@@ -98,6 +98,10 @@ export function App() {
 		send({ t: "end", instanceId });
 		show(endSession(latest.current.layout, instanceId, latest.current.listedHosts));
 	}, [send, show]);
+	const dashboard = useMemo(
+		() => ({ send, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, connected: state.connected, starts: { fork, resume, quick, resumeAll } }),
+		[send, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, state.connected, fork, resume, quick, resumeAll],
+	);
 	const onPaneLayout = useCallback((index: number, kind: "max" | "close") => {
 		const current = latest.current.layout;
 		show(kind === "max" ? { ...current, focus: index, maximized: !current.maximized } : closePane(current, index));
@@ -201,17 +205,7 @@ export function App() {
 		case "inbox":
 			// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
 			main = state.listed ? (
-				<InboxPage
-					project={project}
-					hosts={visible.hosts}
-					past={visible.past}
-					target={page.target}
-					onOpen={open}
-					section={sectionTarget}
-					quick={quick}
-					onQuickAction={start}
-					onDismissQuick={() => dismissStart("quick")}
-				/>
+				<InboxPage project={project} hosts={visible.hosts} past={visible.past} target={page.target} section={sectionTarget} />
 			) : (
 				<p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>
 			);
@@ -221,15 +215,7 @@ export function App() {
 			// Until the sessions are listed, the workspace a quick action starts in is not known yet.
 			else if (state.listed) {
 				main = (
-					<TicketsPage
-						target={page.target}
-						section={sectionTarget}
-						cwd={defaultCwd(view, visible.hosts, visible.past, project)}
-						quick={quick}
-						onQuickAction={start}
-						onDismissQuick={() => dismissStart("quick")}
-						onOpen={open}
-					/>
+					<TicketsPage target={page.target} section={sectionTarget} cwd={defaultCwd(view, visible.hosts, visible.past, project)} />
 				);
 			} else main = <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
 			break;
@@ -261,14 +247,7 @@ export function App() {
 								lastHost={pane.kind === "live" ? state.lastHosts.get(pane.instanceId) ?? null : null}
 								session={pane.kind === "past" ? state.past.find(s => s.sessionId === pane.sessionId) ?? null : null}
 								initialDraft={state.draft && sameView(state.draft.view, pane) ? state.draft.text : ""}
-								models={pane.kind === "live" ? state.models.get(pane.instanceId) ?? null : null}
-								fork={fork}
-								resume={resume}
-								send={send}
-								startSession={start}
-								focus={focus}
-								open={open}
-								onEnd={endHost}
+								models={(pane.kind === "live" && state.models.get(pane.instanceId)) || UNREAD}
 								onLayout={onPaneLayout}
 								toggleRight={toggleRight}
 								rightOpen={sidebars.panels.right.open}
@@ -297,71 +276,57 @@ export function App() {
 	}
 
 	return (
-		<SidebarProvider persist={false} shortcut={null} className="h-svh min-h-0 flex-col">
-			<Tabs value={tab} onValueChange={value => showTab(value as SidebarTab)} className="flex min-h-0 flex-1 flex-col">
-				<DashboardHeader ticketsShown={ticketsShown} sidebarOpen={sidebars.panels.left.open} />
-				<div className="flex min-h-0 flex-1">
-					<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
-						<Roster
-							hosts={visible.hosts}
-							past={visible.past}
-							lists={lists}
-							onTogglePin={togglePin}
-							open={page ? [] : layout.panes}
-							connected={state.connected}
-							newSessionOpen={page?.kind === "new"}
-							settingsHref={settingsHref}
-							settingsOpen={page?.kind === "settings"}
-							ticketsShown={ticketsShown}
-							tab={tab}
-							sidebarOpen={sidebars.panels.left.open}
-							userTodos={state.userTodos}
-							todoCategory={todoCategory}
-							onTodoChange={changeTodo}
-							sectionTarget={sectionTarget}
-							onSectionTarget={setSectionTarget}
-							project={project}
-							onPickProject={pickProject}
-							onOpen={open}
-							onNewSession={openNewSession}
-							resume={resume}
-							onResume={sessionId => {
-								// The pane shows the resume's progress and failure, and the live session takes it over.
-								open({ kind: "past", sessionId }, "replace");
-								start({ kind: "resume", sessionId });
-							}}
-							resumeAll={resumeAll}
-							onResumeAll={sessionIds => start({ kind: "resume-all", sessionIds })}
-							onDismissResumeAll={() => dismissStart("resume-all")}
-							onDismissInterrupted={sessionId => send({ t: "dismiss-interrupted", sessionId })}
-							onEnd={endHost}
-							onShowShortcuts={() => setShortcutsOpen(true)}
-							toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
-						/>
-						<PlanUsageFooter usage={state.usage} />
-					</DashboardSidebar>
-					<SidebarInset>
-						<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
-					</SidebarInset>
-					{planView && (
-						<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-							<PlanPanel key={hashForView(planView)} view={planView} />
+		<DashboardContext.Provider value={dashboard}>
+			<SidebarProvider persist={false} shortcut={null} className="h-svh min-h-0 flex-col">
+				<Tabs value={tab} onValueChange={value => showTab(value as SidebarTab)} className="flex min-h-0 flex-1 flex-col">
+					<DashboardHeader ticketsShown={ticketsShown} sidebarOpen={sidebars.panels.left.open} />
+					<div className="flex min-h-0 flex-1">
+						<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
+							<Roster
+								projects={projects}
+								lists={lists}
+								onTogglePin={togglePin}
+								open={page ? [] : layout.panes}
+								newSessionOpen={page?.kind === "new"}
+								settingsHref={settingsHref}
+								settingsOpen={page?.kind === "settings"}
+								ticketsShown={ticketsShown}
+								tab={tab}
+								sidebarOpen={sidebars.panels.left.open}
+								userTodos={state.userTodos}
+								todoCategory={todoCategory}
+								sectionTarget={sectionTarget}
+								onSectionTarget={setSectionTarget}
+								project={project}
+								onPickProject={pickProject}
+								onShowShortcuts={() => setShortcutsOpen(true)}
+								toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
+							/>
+							<PlanUsageFooter usage={state.usage} />
 						</DashboardSidebar>
-					)}
-				</div>
-			</Tabs>
-			<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-			<SessionSwitcher
-				open={switcherOpen}
-				onOpenChange={setSwitcherOpen}
-				hosts={visible.hosts}
-				past={visible.past}
-				onPick={(picked, cwd) => {
-					const next = projectSwitch(project, cwd);
-					if (next !== null) pickProject(next);
-					open(picked, "replace");
-				}}
-			/>
-		</SidebarProvider>
+						<SidebarInset>
+							<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
+						</SidebarInset>
+						{planView && (
+							<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
+								<PlanPanel key={hashForView(planView)} view={planView} />
+							</DashboardSidebar>
+						)}
+					</div>
+				</Tabs>
+				<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+				<SessionSwitcher
+					open={switcherOpen}
+					onOpenChange={setSwitcherOpen}
+					hosts={visible.hosts}
+					past={visible.past}
+					onPick={(picked, cwd) => {
+						const next = projectSwitch(project, cwd);
+						if (next !== null) pickProject(next);
+						open(picked, "replace");
+					}}
+				/>
+			</SidebarProvider>
+		</DashboardContext.Provider>
 	);
 }

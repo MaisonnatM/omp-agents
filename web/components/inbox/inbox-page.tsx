@@ -1,15 +1,15 @@
 import type { ReactNode } from "react";
-import { type Inbox, type InboxPullRequest, type PastSession, type PullRequest, type RepoInbox, type RosterHost, repoKey, samePullRequest, type View } from "../../../src/shared";
+import { type Inbox, type InboxPullRequest, type PastSession, type PullRequest, type RepoInbox, type RosterHost, repoKey, samePullRequest } from "../../../src/shared";
 import { projectName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
-import { pendingOf, pullRequestActions, pullRequestStart } from "../../quick-actions";
+import { pendingOf, type PullRequestActionId, pullRequestActions, pullRequestStart } from "../../quick-actions";
 import { inboxSection, inboxSections } from "../../inbox-model";
 import { inboxStore } from "../../reads";
-import { hashForInbox, type OpenMode } from "../../routing";
+import { hashForInbox } from "../../routing";
 import type { SectionTarget } from "../../section";
-import type { QuickOp, StartOf } from "../../starts";
 import { useStoredKeys } from "../../stored-state";
-import { FoldButton, useRevealRow, useRevealSection } from "../fold";
+import { useDashboardContext } from "../dashboard-context";
+import { FoldButton, useReveal } from "../fold";
 import { ListSheetPage, TargetSheet } from "../list-sheet-page";
 import { QuickStartNotice, SheetQuickActions } from "../quick-actions";
 import { PullRequestSheetContent } from "./pr-details";
@@ -25,12 +25,10 @@ interface RepoProps {
 	target: PullRequest | null;
 	collapsed: ReadonlySet<string>;
 	onToggle: (key: string) => void;
-	onOpen: (view: View, mode: OpenMode) => void;
-	quick: StartOf<"quick"> | null;
-	onQuickAction: (op: QuickOp) => void;
 }
 
-function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen, quick, onQuickAction }: RepoProps) {
+function RepoSection({ inbox, hosts, past, target, collapsed, onToggle }: RepoProps) {
+	const { open: onOpen, start, starts: { quick } } = useDashboardContext();
 	const name = `${inbox.owner}/${inbox.repo}`;
 	const key = repoKey(inbox);
 	const headingId = `inbox-${name}`;
@@ -71,7 +69,7 @@ function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen, 
 									targeted={target !== null && samePullRequest(pr, target)}
 									onOpen={onOpen}
 									pending={pendingOf(quick, { kind: "pull-request", pr })}
-									onQuickAction={action => onQuickAction(pullRequestStart(pr, action, inbox.cwds[0]!, readPinnedSkill()))}
+									onQuickAction={(action: PullRequestActionId) => start(pullRequestStart(pr, action, inbox.cwds[0]!, readPinnedSkill()))}
 								/>
 							))}
 						</ul>
@@ -138,23 +136,20 @@ interface InboxPageProps {
 	past: PastSession[];
 	/** The PR an inbox link named: its row unfolds, scrolls into view, and stays highlighted while its details show in a sheet. */
 	target: PullRequest | null;
-	onOpen: (view: View, mode: OpenMode) => void;
 	/** The section a sidebar link last chose, to unfold, scroll to, and focus. */
 	section: SectionTarget | null;
-	/** The quick action's start under way, failed, or started, whichever the page last asked for. */
-	quick: StartOf<"quick"> | null;
-	onQuickAction: (op: QuickOp) => void;
-	onDismissQuick: () => void;
 }
 
 /** The pull requests of the sidebar's project, or of every project, in Graphite's inbox sections, read from GitHub. */
-export function InboxPage({ project, hosts, past, target, onOpen, section, quick, onQuickAction, onDismissQuick }: InboxPageProps) {
+export function InboxPage({ project, hosts, past, target, section }: InboxPageProps) {
+	const { open, start, dismissStart, starts: { quick } } = useDashboardContext();
 	const poll = inboxStore.usePolling(project);
 	const { read } = poll;
 	const [collapsed, toggleCollapsed, expand] = useStoredKeys(COLLAPSED_KEY);
 	const place = read && target ? placeOf(read.data, target) : null;
-	useRevealRow(target && place && { id: rowId(target), folds: [place.repo, place.section] }, collapsed, expand);
-	useRevealSection(section, collapsed, expand);
+	const row = target && place ? { id: rowId(target), folds: [place.repo, place.section] } : null;
+	useReveal(row, collapsed, expand, { token: row?.id, block: "center", focus: false });
+	useReveal(section, collapsed, expand, { token: section, block: "start", focus: true });
 
 	return (
 		<ListSheetPage
@@ -165,7 +160,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 			poll={poll}
 			onRefresh={() => void inboxStore.refresh(project, { fresh: true })}
 			missing={read && target && !place ? whyMissing(target, read.data, project === null) : null}
-			notice={quick && <QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />}
+			notice={quick && <QuickStartNotice quick={quick} onOpen={open} onDismiss={() => dismissStart("quick")} />}
 			spacing="space-y-10"
 			sheet={
 				<TargetSheet target={target} onClose={() => (location.hash = hashForInbox(null))}>
@@ -180,10 +175,10 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 										<SheetQuickActions
 											item={{ kind: "pull-request", pr: listed.pr }}
 											actions={pullRequestActions(listed.pr)}
-											onRun={action => onQuickAction(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()))}
+											onRun={(action: PullRequestActionId) => start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()))}
 											quick={quick}
-											onOpen={onOpen}
-											onDismiss={onDismissQuick}
+											onOpen={open}
+											onDismiss={() => dismissStart("quick")}
 										/>
 									)
 								}
@@ -205,9 +200,6 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 							target={target}
 							collapsed={collapsed}
 							onToggle={toggleCollapsed}
-							onOpen={onOpen}
-							quick={quick}
-							onQuickAction={onQuickAction}
 						/>
 					))}
 					{unmatched.length > 0 && (

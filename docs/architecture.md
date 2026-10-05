@@ -139,9 +139,8 @@ It writes the `extension_ui_response` to the child's stdin as one line, the way 
 omp sends a `cancel` frame when a question ends without an answer, for example after Stop.
 A question with a timeout ends with no frame, so the server drops it at its deadline.
 omp's RPC mode does not title a session from its first prompt, as its terminal does.
-While a session has no title, the `message_end` event of each user message makes the server send a bare `/rename` prompt, which omp runs as its own command: it titles the session from the conversation in the background and announces the title with a `session_info_update` frame.
+While a session has no title, each user message's `message_end` event makes the server send a bare `/rename` prompt, which omp runs as its own command: it titles the session from the conversation in the background and announces the title with a `session_info_update` frame.
 `RpcClient` drops that frame too, so the same stdout copy reads it, and the server then reads omp's state again for the new `sessionName`.
-A `/skill:` prompt counts as a user message here, although omp records it as a `custom` message of type `skill-prompt` and reads it as the user's prompt when it titles the session.
 Stopping the dashboard stops every session that it started.
 The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one.
 
@@ -239,9 +238,7 @@ It runs `git worktree list --porcelain`, `git for-each-ref`, and `git symbolic-r
 Like a new session's `start`, `cwd` may name any directory.
 The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
 
-`GET /api/models/connected` answers `{ models, capabilities }` for the new-session draft's model picker.
-`models` contains `{ provider, id }` identities from connected providers in `omp models`.
-Each capability contains a `model` identity and `thinkingLevels` from that catalog entry's `thinking` efforts.
+`GET /api/models/connected` answers `{ models }`, each `{ provider, id }`: the models that `omp models` lists from the providers you are connected to, for the new-session draft's model picker.
 A live session's `list-models` answer applies the same filter to the models that its omp RPC process offers.
 A `start` of kind `new` carries a `model`, `null` for omp's default; the server sends omp `set_model` once it is ready and before the first prompt, and a model that omp refuses fails the start.
 
@@ -250,11 +247,6 @@ Like `/api/git`, `cwd` may name any directory.
 `connectedRoles` in `src/omp/models.ts` loads `modelRoles` with omp's read-only loader for that directory, so a project's `.omp/config.yml` overrides count, and reads each role's selector against `omp models`: a `:level` suffix becomes `thinking`, and `@role` or `*` takes the named role's model and level unless it adds its own.
 Roles that name a model by a fuzzy pattern, or one on a provider you are not connected to, are left out.
 A `start` of kind `new` and a `set-model` each carry a `thinking`, `null` to keep omp's level; the server sends omp `set_thinking_level` after `set_model`.
-Before starting with an explicit thinking level, the server checks omp's live `get_available_thinking_levels`, so a changed default or catalog cannot silently clamp an unsupported draft choice.
-A dashboard roster row carries `modelSwitch`, whose `pending` flag disables model and thinking changes while a model switch runs.
-Its `revision` advances after the server refreshes the model and thinking capabilities, including after a failed switch.
-The picker uses that revision to disable thinking choices immediately after a local selection, before the first pending roster arrives.
-In-flight state reads from before a model switch cannot replace the refreshed capabilities.
 
 `GET /api/skills?cwd=<directory>` answers `{ skills }`, each `{ name, description }`: the skills that `/skill:<name>` invokes in a session started in that directory, from the same discovery as the composer's `/` completions (`listSkills` in `src/commands.ts`), and none when omp's `skills.enableSkillCommands` is off.
 The settings page lists them to pin one, and the new-session draft reads them to show whether the pinned skill exists there.
@@ -311,19 +303,21 @@ A failure, or no return within five minutes, shows as `signIn: { phase: "failed"
 ## Front-end components
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
-The **Inbox**, **Tickets**, **Sessions**, and **Todo** navigation uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
-One controlled root in `web/app.tsx` connects the navigation to the roster's panels.
-`web/components/navigation.tsx` owns the tab registry and the header's bundled logo.
-Desktop navigation stays in the header.
-Narrow windows show navigation in the open sidebar, or in the header when the sidebar is hidden.
+The roster uses `sidebar`.
+`web/components/navigation.tsx` owns the **Inbox**, **Tickets**, **Sessions**, and **Todo** switch, built from `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
+Desktop navigation stays in the header, with the logo.
+Narrow windows show it in the open sidebar, or in the header when the sidebar is hidden.
 User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
 `thinking-indicator` shows while the agent works.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
 The model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern.
 Fluid's built-in sidebar rail resizes by pointer only and collapses on click.
 The dashboard turns it off and uses `web/components/sidebar-panel.tsx`, which gives each sidebar its own width and open state, because Fluid's provider holds only one of each.
+Sidebar widths and the split between panes share `web/components/drag-separator.tsx`: `useDragSeparator` owns the pointer capture, arrow keys, and double-click reset, and `Separator` is the element.
+Each call site still clamps its own domain, pixels for a sidebar and a ratio for a split.
 
-Fluid Functionalism has no sheet, so the sheet that the inbox shows a pull request in, `web/components/ui/sheet.tsx`, follows the sidebar's mobile sheet: Radix `Dialog` for focus and dismissal, and a framer-motion slide on the `moderate` spring. The tickets page shows an issue in the main content instead.
+Fluid Functionalism has no sheet, so the sheet that the inbox shows a pull request in, `web/components/ui/sheet.tsx`, follows the sidebar's mobile sheet: Radix `Dialog` for focus and dismissal, and a framer-motion slide on the `moderate` spring.
+The tickets page shows an issue in the main content instead.
 
 The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items.
 Both share Base UI's menu items, so each row builds one item list and both menus render it.
@@ -347,22 +341,24 @@ The server lives in `src/`:
 - `src/server/socket.ts`: handles each socket message.
   `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`.
-  It builds the roster rows.
+  Each session's `row()` returns a `LiveRow`, what its transport knows; `rows()` adds `cwdDisplay` and the session's facts to make the roster rows.
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and folds live events into it.
 - `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, the inbox, pull request, and ticket shapes).
+  `selectorOf` names a model as `provider/id`, which both session transports and the model picker use.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
-- `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON, `src/fs.ts` replaces a file through a temporary one beside it, and `src/paths.ts` names the home directory, the token file, the interrupted sessions' file, and the todo list's file.
+- `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json` and `todos.json`, and `src/paths.ts` names the home directory, the token file, the interrupted sessions' file, and the todo list's file.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
 - `src/guest.ts`: runs one Collab guest per terminal session.
-  `src/subagents.ts` finds each subagent's transcript file.
+  `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, and finds each subagent's transcript file.
 - `src/user-requests.ts`: parses the RPC and Collab question frames into one request shape, writes the answers back, and keeps each session's pending questions.
 - `src/commands.ts`: the composer's `/` and `@` completions, and the expansion of file commands and skills before a guest prompt.
 - `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below, and reads the plan file that the second fold names.
+- `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, and `toolResultOf`, which the three folds below and `src/guest.ts` read instead of walking the entry shape themselves.
 - `src/transcript.ts`: folds session-file lines and live events into display items.
 - `src/work.ts`: folds session-file lines into the plan and changes: the latest todo list, the plan file changed last, and the files changed.
-- `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, and its latest /ship step.
+- `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, and its latest /ship step (`parseShipProgress`); `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
 - `src/session-links.ts`: writes the session block into a pull request's description.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
@@ -370,7 +366,7 @@ The server lives in `src/`:
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
-- `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query.
+- `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
 - `src/user-todos.ts`: the rules of the Todo page's list, `applyUserTodo`, which the server applies to its file and the page to what it shows before the server answers.
   The list is `UserTodoList` in `src/shared.ts`: categories, then top-level todos, each with a title, markdown notes, a category or none, and todos of its own, which share its category.
   `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token, and reads a file from before categories and notes with none of either.
@@ -389,15 +385,18 @@ The page lives in `web/`.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which stays in the background and is kept as started so the inbox or the tickets page can offer it.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
+  It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
+- `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it.
   `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's sheet or an issue's details, and the note that names the session a start began in the background, or why it failed.
 - `web/api.ts`: the page's HTTP client, and `errorText`, which says what any failure was.
-  `web/settings-api.ts` holds the settings page's settings load and its writes.
+  `settingsUrl` names a settings route for one workspace, or for the user's own files.
 - `web/reads.ts`: the server reads that components hold.
   `useRead` reads one URL, such as the pull request a sheet shows, the Linear issue the tickets page shows in its main content, the settings page's model catalog, or the new-session draft's model list.
+  `useReplaceableRead` shows the version a save answered until that URL is read again.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, and one for whether omp is signed in to Linear.
-  The issue detail shows the version a field change answered in place of its read; `web/components/tickets/ticket-fields.tsx` holds its field pickers and sends their changes.
+  `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header.
   `web/components/git.tsx` holds the branch picker and the repository and branch in a header's meta line.
   `web/use-default-model.ts` reads the model that the `default` role names, which the draft's model picker shows until a pick.
@@ -409,20 +408,26 @@ The page lives in `web/`.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
 - `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's project, and the pinned skill; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
-  `discoverableCwd` is the rule for `/tmp`, `/private/tmp`, and their descendants. `discoverableSessions` derives discovery rows from it, while the raw session state remains available to already-open panes and direct links. `projectSwitch` uses the same rule, so a start or pick in a hidden directory leaves the saved project alone. The empty roster is the raw registry, not the filtered list.
-  The app passes these rows to project and workspace pickers, session lists and counts, search, default workspace selection, and the inbox's session associations.
-  The roster keeps collapsed session-group IDs with `useStoredKeys`, so tab changes, project changes, and reloads preserve each group's choice.
+  `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
 - `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
+  `SessionRow` is the one row a past session and a live host both render.
   `web/components/todo-categories.tsx` holds its Todo tab, the categories.
 - `web/components/user-todos.tsx`: the Todo page, its lists, and the open todo, whose notes `web/components/markdown-editor.tsx` edits and previews through `message-markdown.tsx`.
 - `web/components/pane.tsx`: a pane.
-  `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript, whose `task` rows link to their subagents.
+  `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button and the checkout read, `past-conversation.tsx` a past session's view, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
+  `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` the project, pull request, and ticket chips of a header.
+  `composer.tsx` holds `blockedShortcut`, `ComposerNote`, and `EmptyConversation`, which the new-session draft and the pages share, and `page-header.tsx` the `Header` every page uses.
+  `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeTextarea` and `afterActions` slots.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
+- `web/components/dashboard-context.tsx`: the stable dashboard actions (`send`, `open`, `start`, `end`, …) and the last start of each kind, provided once by `App`, which the sidebar, the panes, and the pages read instead of taking them as props.
 - `web/components/plan-panel.tsx`: the right sidebar's plan and changes for the focused pane.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
-  The inbox and tickets pages share `web/components/list-sheet-page.tsx` for their frame, header, and load and refresh states. The inbox also uses its sheet, which keeps its target through its exit slide. The tickets page replaces the list with the issue in the main content instead. Both use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
-  `web/components/fold.tsx` holds the fold button that both pages share, and the hooks that reveal the section a sidebar link chose and, on the inbox, the row a page link named; `web/section.ts` names such a section target.
-- `web/components/ui`, `web/lib`, and `web/hooks`: mostly files from the Fluid registry; see below.
+  The inbox and tickets pages share `web/components/list-sheet-page.tsx` for their frame, header, and load and refresh states.
+  The inbox also uses its sheet, which keeps its target through its exit slide. The tickets page replaces the list with the issue in the main content instead.
+  Both use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
+  `SheetFrame` is the pull request sheet's header and scrolling body, and `LoadNote` is the loading or error line that sheet, the issue detail, and the list page share.
+  `web/components/fold.tsx` holds the fold button that both pages share and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
+- `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
 Its `agent/` files are copies of the maintainer's `~/.omp/agent` files, except for `AGENTS.md`, which is a generic version.
@@ -434,14 +439,11 @@ After you edit one of those live files, copy it back.
 `desktop/icon.svg` is the app icon, the logo mark on a macOS-style tile, and `desktop/icon.png` is that SVG rendered at 1024 px, because Electron reads no SVG; render it again after you change the SVG.
 The page's favicon, `web/favicon.svg`, is the bare mark.
 
-Changes the dashboard makes to Fluid's components:
-
-- It adds an `onKeyDown` hook to `InputMessage`, so the completion list can intercept arrow keys, Tab, Enter, and Esc before the normal submit behavior, and makes a pasted file that `accept` takes attach instead of pasting as text.
-- It adds an `images` prop to `ChatMessage`, the addresses of the images a sent prompt carried, since `files` takes only `File`s held in the browser.
-- It replaces `InputMessage`'s queue, which held every message sent during a response in the browser, with rows that the page passes in, each with a tag and edit and remove callbacks, because omp or the server holds the queue.
-- It adds a `header` prop to `AskUserQuestions`, which replaces the `Question 1 of 1` line with the question's status and **Dismiss**, and a `description` field for a question, which shows a confirm's message.
-- It makes `InputMessage`'s suggested prompts send instead of filling the composer: each row shows its number, its number key sends it (with Shift too, for layouts that type digits with it), Enter on the highlighted row and a click send it, and Tab fills it.
-  `LiveConversation` passes the prompts that the last turn's reply ends on, which `splitSuggestions` in `src/transcript.ts` splits off the reply into the assistant item's `suggestions`.
+Changes the dashboard makes to Fluid's components are listed in `web/components/ui/PATCHES.md`, each with its reason, so an upgrade is a merge that checks each entry.
+The dashboard keeps them mechanical where it can.
+`InputMessage` gets an `onKeyDown` and `onPaste` passthrough for its textarea, so the completion list and the composer shortcuts see a key before the submit and history handling and a pasted image attaches, and a `stopShortcut`.
+It also gets two slots, `beforeTextarea` and `afterActions`: `composer-queue.tsx` renders the queued rows that omp or the server holds into the first, and `composer-suggestions.tsx` into the second the prompts that the last turn's reply ends on, which `splitSuggestions` in `src/transcript.ts` splits off the reply into the assistant item's `suggestions`.
+`ChatMessage` gets `images`, the addresses of the images a sent prompt carried, and `AskUserQuestions` a `header`, the question's status and **Dismiss**, and a `description` per question, a confirm's message.
 
 Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight` (`web/components/message-markdown.tsx`).
 In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL.

@@ -2,10 +2,11 @@
 import { existsSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import { isObject } from "./json";
-import type { AgentStatus } from "./shared";
+import { isObject, nonEmptyStr, oneOf, str } from "./json";
+import { oneLine } from "./session-entries";
+import { AGENT_STATUSES, type AgentStatus, type ContextUsage } from "./shared";
 
-const AGENT_STATUSES: Record<string, AgentStatus> = { running: "running", idle: "idle", parked: "parked", aborted: "aborted" };
+const isAgentStatus = oneOf(AGENT_STATUSES);
 
 export interface HostAgent {
 	id: string;
@@ -22,19 +23,76 @@ export function parseAgents(value: unknown): HostAgent[] {
 	return value.flatMap(raw => {
 		if (!isObject(raw)) return [];
 		const { id, displayName, kind, parentId, status, createdAt } = raw;
-		const parsed = typeof status === "string" ? AGENT_STATUSES[status] : undefined;
-		if (typeof id !== "string" || !parsed) return [];
+		if (typeof id !== "string" || !isAgentStatus(status)) return [];
 		return [
 			{
 				id,
 				type: typeof displayName === "string" ? displayName : "agent",
 				isMain: kind === "main",
 				parentId: typeof parentId === "string" ? parentId : null,
-				status: parsed,
+				status,
 				createdAt: typeof createdAt === "number" ? createdAt : 0,
 			},
 		];
 	});
+}
+
+export const SUBAGENT_LIFECYCLE = "task:subagent:lifecycle";
+export const SUBAGENT_PROGRESS = "task:subagent:progress";
+
+/** omp's subagent lifecycle and progress statuses, as the roster's agent statuses. */
+const FRAME_STATUSES: Record<string, AgentStatus> = {
+	started: "running",
+	pending: "running",
+	running: "running",
+	completed: "idle",
+	failed: "aborted",
+	aborted: "aborted",
+};
+
+/** What one `task:subagent:*` frame says of its subagent; a field the frame does not carry is absent. */
+export interface SubagentFrame {
+	id: string;
+	kind?: string;
+	status?: AgentStatus;
+	/** One line saying what the subagent is doing. */
+	activity?: string;
+	sessionFile?: string;
+}
+
+/** A `task:subagent:lifecycle` or `task:subagent:progress` payload (a Collab `bus` frame or an RPC subagent frame), or `null` when it names no subagent. */
+export function parseSubagentFrame(channel: unknown, payload: unknown): SubagentFrame | null {
+	if ((channel !== SUBAGENT_LIFECYCLE && channel !== SUBAGENT_PROGRESS) || !isObject(payload)) return null;
+	const progress = channel === SUBAGENT_PROGRESS && isObject(payload.progress) ? payload.progress : null;
+	const body = progress ?? payload;
+	if (typeof body.id !== "string") return null;
+	const text = progress
+		? (nonEmptyStr(progress.currentToolIntent) ??
+			nonEmptyStr(progress.lastIntent) ??
+			nonEmptyStr(progress.description) ??
+			nonEmptyStr(payload.assignment) ??
+			nonEmptyStr(progress.task))
+		: channel === SUBAGENT_LIFECYCLE
+			? nonEmptyStr(payload.description)
+			: undefined;
+	const frame: SubagentFrame = { id: body.id };
+	const kind = str(payload.agent);
+	if (kind !== undefined) frame.kind = kind;
+	const status = typeof body.status === "string" ? FRAME_STATUSES[body.status] : undefined;
+	if (status) frame.status = status;
+	if (text) frame.activity = oneLine(text);
+	const sessionFile = str(payload.sessionFile);
+	if (sessionFile !== undefined) frame.sessionFile = sessionFile;
+	return frame;
+}
+
+/** omp's `ContextUsage` (a Collab state frame or an RPC state), as the roster's context numbers. */
+export function contextOf(value: unknown): ContextUsage | null {
+	if (!isObject(value)) return null;
+	const { tokens, contextWindow } = value;
+	return typeof tokens === "number" && typeof contextWindow === "number" && contextWindow > 0
+		? { tokens, window: contextWindow }
+		: null;
 }
 
 /**

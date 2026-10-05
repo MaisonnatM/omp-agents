@@ -1,6 +1,6 @@
-import { type KeyboardEvent, type PointerEvent, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useStoredState } from "../stored-state";
+import { Separator, useDragSeparator } from "./drag-separator";
 
 /**
  * The line between split panes, as a separator laid over the grid's 1px gap: pointer drag, arrow keys,
@@ -42,79 +42,40 @@ interface SplitResizeHandleProps {
 	span?: number;
 }
 
-/** Where a drag started along the axis, the ratio then, and the grid's size along the axis. */
-interface Drag {
-	start: number;
-	startRatio: number;
-	size: number;
-}
-
 export function SplitResizeHandle({ axis, ratio, onRatio, span = 1 }: SplitResizeHandleProps) {
 	const columns = axis === "columns";
-	const drag = useRef<Drag | null>(null);
-	const gridSize = (element: HTMLElement): number => {
+	const size = (element: HTMLDivElement): number => {
 		const rect = (element.parentElement as HTMLElement).getBoundingClientRect();
 		return columns ? rect.width : rect.height;
 	};
-	const pointer = (event: PointerEvent<HTMLDivElement>): number => (columns ? event.clientX : event.clientY);
-	const dragged = (event: PointerEvent<HTMLDivElement>, { start, startRatio, size }: Drag): number =>
-		clamp(startRatio + (pointer(event) - start) / (size - 1), axis, size);
-
-	const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
-		drag.current = { start: pointer(event), startRatio: ratio, size: gridSize(event.currentTarget) };
-		event.currentTarget.setPointerCapture(event.pointerId);
-	};
-	const onPointerMove = (event: PointerEvent<HTMLDivElement>): void => {
-		if (drag.current) onRatio(dragged(event, drag.current));
-	};
-	const onPointerUp = (event: PointerEvent<HTMLDivElement>): void => {
-		if (!drag.current) return;
-		onRatio(dragged(event, drag.current));
-		drag.current = null;
-	};
-	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-		const step = event.shiftKey ? STEP * 5 : STEP;
-		const next: Record<string, number> = columns
-			? { ArrowLeft: ratio - step, ArrowRight: ratio + step, Home: 0, End: 1 }
-			: { ArrowUp: ratio - step, ArrowDown: ratio + step, Home: 0, End: 1 };
-		const target = next[event.key];
-		if (target === undefined) return;
-		event.preventDefault();
-		onRatio(clamp(target, axis, gridSize(event.currentTarget)));
-	};
-
+	const events = useDragSeparator({
+		value: ratio,
+		onValue: onRatio,
+		axis: columns ? "vertical" : "horizontal",
+		keyStep: STEP,
+		shiftSteps: 5,
+		min: 0,
+		max: 1,
+		reset: DEFAULT_RATIO,
+		size,
+		clamp: (next, element) => clamp(next, axis, size(element)),
+		read: (event, start) => {
+			const at = columns ? event.clientX : event.clientY;
+			return clamp(start.value + (at - start.coordinate) / (start.size - 1), axis, start.size);
+		},
+	});
 	const along = `calc(${splitAt(ratio)} + 0.5px)`;
 	const across = span === 1 ? "100%" : splitAt(span);
 	return (
-		<div
-			role="separator"
-			aria-orientation={columns ? "vertical" : "horizontal"}
-			aria-label={columns ? "Resize columns" : "Resize rows"}
-			aria-valuemin={0}
-			aria-valuemax={100}
-			aria-valuenow={Math.round(ratio * 100)}
-			title="Drag or use arrow keys to resize. Double-click to reset."
-			tabIndex={0}
-			onPointerDown={onPointerDown}
-			onPointerMove={onPointerMove}
-			onPointerUp={onPointerUp}
-			onPointerCancel={() => {
-				drag.current = null;
-			}}
-			onKeyDown={onKeyDown}
-			onDoubleClick={() => onRatio(DEFAULT_RATIO)}
+		<Separator
+			{...events}
+			axis={columns ? "vertical" : "horizontal"}
+			label={columns ? "Resize columns" : "Resize rows"}
+			min={0}
+			max={100}
+			now={Math.round(ratio * 100)}
 			style={columns ? { left: along, height: across } : { top: along, width: across }}
-			className={cn(
-				"group absolute z-30 flex touch-none select-none justify-center outline-none",
-				columns ? "top-0 w-3 -translate-x-1/2 cursor-col-resize" : "left-0 h-3 -translate-y-1/2 cursor-row-resize flex-col",
-			)}
-		>
-			<span
-				className={cn(
-					"bg-transparent transition-colors group-hover:bg-foreground/25 group-focus-visible:bg-ring group-active:bg-foreground/40",
-					columns ? "h-full w-px" : "h-px w-full",
-				)}
-			/>
-		</div>
+			className={cn("select-none", columns ? "top-0 w-3 -translate-x-1/2 cursor-col-resize" : "left-0 h-3 -translate-y-1/2 cursor-row-resize flex-col")}
+		/>
 	);
 }

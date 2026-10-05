@@ -1,14 +1,17 @@
 import { Plus, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { type CatalogModel, type ModelChain, type ModelRouting, type RetrySettings, type RoleRoute, splitSelector } from "../../../src/shared";
+import { type CatalogModel, type ModelChain, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit, splitSelector } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { putJson, settingsUrl } from "../../api";
 import { providerOrg } from "../../labels";
-import { saveRouting } from "../../settings-api";
-import { CommandPicker } from "../command-picker";
+import { CommandPicker, fromList } from "../command-picker";
 import { MODEL_LIST, Model, modelDescription, modelGroups } from "../model-picker";
 import { OrgIcon } from "../org-icon";
 import { type Catalog, EditBar, type Editing, OrderedList, SaveError, Section, useEditor } from "./editor";
+
+/** Each save answers with the settings as they load afterwards. */
+const saveRouting = (cwd: string | null, edit: RoutingEdit): Promise<OmpSettings> => putJson<OmpSettings>(settingsUrl("/routing", cwd), edit);
 
 const onOff = (value: boolean | number | string): string => (value ? "On" : "Off");
 const duration = (value: boolean | number | string): string =>
@@ -47,7 +50,7 @@ function Chain({ fallbacks }: { fallbacks: string[] }) {
 
 /** A model `omp models` lists, then its thinking level. The value is omp's selector, `provider/id` with an optional `:level`. */
 function SelectorPicker({ value, catalog, label, onPick }: { value: string | null; catalog: Catalog; label: string; onPick: (selector: string) => void }) {
-	const models = catalog.phase === "loaded" ? catalog.bySelector : null;
+	const models = catalog.data?.bySelector ?? null;
 	const { model, level } = value && models ? splitSelector(value, models) : { model: value, level: null };
 	const levels = (model && models?.get(model)?.thinking) || [];
 	const pickModel = (next: CatalogModel): void => onPick(level && next.thinking.includes(level) ? `${next.selector}:${level}` : next.selector);
@@ -59,21 +62,14 @@ function SelectorPicker({ value, catalog, label, onPick }: { value: string | nul
 				className="min-w-0"
 				search={MODEL_LIST.search}
 				width="lg"
-				list={
-					catalog.phase === "loading"
-						? { kind: "loading", message: MODEL_LIST.loading }
-						: catalog.phase === "failed"
-							? { kind: "failed", error: catalog.error }
-							: {
-									kind: "ready",
-									groups: modelGroups(
-										catalog.byProvider,
-										option => ({ selector: option.selector, id: option.selector.slice(option.provider.length + 1), keyword: option.name }),
-										model,
-										pickModel,
-									),
-								}
-				}
+				list={fromList(catalog, MODEL_LIST.loading, ({ byProvider }) =>
+					modelGroups(
+						byProvider,
+						option => ({ selector: option.selector, id: option.selector.slice(option.provider.length + 1), keyword: option.name }),
+						model,
+						pickModel,
+					),
+				)}
 				empty={MODEL_LIST.empty}
 			/>
 			{model && (levels.length > 0 || level) && (
@@ -315,7 +311,7 @@ function ProviderPicker({ providers, onPick }: { providers: string[]; onPick: (p
 function ProviderOrderSection({ order, editing }: { order: string[]; editing: Editing }) {
 	const editor = useEditor(order, providers => saveRouting(editing.cwd, { kind: "provider-order", providers }), editing.saved);
 	const { catalog } = editing;
-	const unlisted = catalog.phase === "loaded" ? catalog.byProvider.map(([provider]) => provider).filter(provider => !editor.draft.includes(provider)) : [];
+	const unlisted = catalog.data ? [...catalog.data.byProvider.keys()].filter(provider => !editor.draft.includes(provider)) : [];
 	const row = (provider: string): ReactNode => (
 		<span className="flex items-center gap-2">
 			<OrgIcon org={providerOrg(provider)} />

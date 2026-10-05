@@ -2,9 +2,45 @@
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import type { PullRequestComment } from "../../src/shared";
+import { SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { age } from "../labels";
 import { MessageMarkdown } from "./message-markdown";
+
+/** What a sheet shows before its details arrive: the loading line, or the error once the read failed. */
+export function LoadNote({ loading, error }: { loading: string; error: string | null }) {
+	if (error) return <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>;
+	return <p className="text-sm text-muted-foreground">{loading}</p>;
+}
+
+interface SheetFrameProps {
+	title: ReactNode;
+	icon?: ReactNode;
+	meta: ReactNode;
+	/** Fields, labels, and buttons under the meta line. */
+	actions?: ReactNode;
+	/** The loading line, until `children` is ready. */
+	loading: string;
+	error: string | null;
+	children: ReactNode | null;
+}
+
+/** A sheet's header and its scrolling body: `children` once the read arrived, otherwise {@link LoadNote}. */
+export function SheetFrame({ title, icon, meta, actions, loading, error, children }: SheetFrameProps) {
+	return (
+		<>
+			<header className="space-y-1.5 border-b border-border py-3 pr-12 pl-5">
+				<SheetTitle className="flex items-start gap-2.5 text-base leading-snug font-semibold">
+					{icon}
+					<span className="min-w-0">{title}</span>
+				</SheetTitle>
+				<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">{meta}</p>
+				{actions}
+			</header>
+			<div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">{children ?? <LoadNote loading={loading} error={error} />}</div>
+		</>
+	);
+}
 
 /** A titled part of a pull request's or issue's details. */
 export function DetailSection({ title, children }: { title: ReactNode; children: ReactNode }) {

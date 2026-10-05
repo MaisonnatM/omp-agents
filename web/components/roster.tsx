@@ -1,6 +1,6 @@
 import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Keyboard, ListRestart, Loader, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import { type PastSession, type PullRequest, type RosterHost, repoKey, type UserTodoChange, type UserTodoList, type View } from "../../src/shared";
+import { type PastSession, type PullRequest, type RosterHost, repoKey, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,16 +35,66 @@ import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLI
 import { inboxStore, ticketsStore } from "../reads";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";
 import type { SectionTarget } from "../section";
-import { type SidebarSessions, workspaces } from "../sessions";
+import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
-import type { StartOf } from "../starts";
 import { useStoredKeys, useStoredState } from "../stored-state";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
+import { useDashboardContext } from "./dashboard-context";
 import { NavigationTabs, type SidebarTab } from "./navigation";
 import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TodoCategories } from "./todo-categories";
+
+/** The muted facts after a session's name: the parts that apply, and a title listing its pull requests. */
+function sessionFacts(parts: (string | false)[], pullRequests: PullRequest[]): { text: string; title?: string } | null {
+	const text = parts.filter(part => part !== false).join(" · ");
+	if (!text) return null;
+	const title = pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n");
+	return { text, title: title || undefined };
+}
+
+function SessionRow({
+	view,
+	label,
+	title,
+	badge,
+	ship,
+	facts,
+	when,
+	dot,
+	open,
+	onOpen,
+}: {
+	view: View;
+	label: string;
+	title: string;
+	badge: ReactNode;
+	ship: ShipProgress | null;
+	/** Muted facts after the ship step, joined already; `title` is the fuller list, such as each pull request. */
+	facts: { text: string; title?: string } | null;
+	when: number;
+	dot?: ReactNode;
+	open: boolean;
+	onOpen: (view: View, mode: OpenMode) => void;
+}) {
+	return (
+		<SidebarMenuButton isActive={open} onClick={event => onOpen(view, modeOf(event))} title={title}>
+			{dot}
+			<span className="flex min-w-0 flex-1 items-baseline gap-2">
+				{badge}
+				<span className="truncate font-medium text-foreground">{label}</span>
+				<ShipStep ship={ship} />
+				{facts && (
+					<span className="shrink-0 text-xs text-muted-foreground" title={facts.title}>
+						{facts.text}
+					</span>
+				)}
+				<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(when)}</span>
+			</span>
+		</SidebarMenuButton>
+	);
+}
 
 /** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
 const PROJECT_KEY = "omp-agents.sidebar-project";
@@ -331,15 +381,14 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 }
 
 interface RosterProps {
-	hosts: RosterHost[];
-	past: PastSession[];
+	/** Directories sessions ran in, as {@link workspaces} lists them. */
+	projects: { cwd: string; cwdDisplay: string }[];
 	/** The sessions tab's lists, under the selected project. */
 	lists: SidebarSessions;
 	/** Pin session `sessionId`, or unpin it when it is pinned. */
 	onTogglePin: (sessionId: string) => void;
 	/** Views on screen, highlighted in the list. */
 	open: View[];
-	connected: boolean;
 	/** The new-session draft is open. */
 	newSessionOpen: boolean;
 	/** The settings page, for the open session's workspace. */
@@ -347,46 +396,30 @@ interface RosterProps {
 	settingsOpen: boolean;
 	/** omp is signed in to Linear, so the Tickets tab shows. */
 	ticketsShown: boolean;
+	/** The sidebar's tab: the inbox, the tickets, or the todos with their pages, or the sessions over the panes. */
 	tab: SidebarTab;
+	/** The sessions sidebar is open, which on a narrow window shows the tabs here instead of the header. */
 	sidebarOpen: boolean;
 	/** The Todo page's list, `null` until the server sends it. */
 	userTodos: UserTodoList | null;
 	/** The category the Todo page shows, `null` for every todo. */
 	todoCategory: string | null;
-	onTodoChange: (change: UserTodoChange) => void;
 	/** The inbox or tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
 	/** The selected project's `cwd`, or `null` for all projects. */
 	project: string | null;
 	onPickProject: (cwd: string | null) => void;
-	onOpen: (view: View, mode: OpenMode) => void;
-	/** Open the new-session draft; no omp starts until its first message. */
-	onNewSession: () => void;
-	resume: StartOf<"resume"> | null;
-	/** Continue past session `sessionId`, in the pane that shows it. */
-	onResume: (sessionId: string) => void;
-	/** The page's last **Resume all**, while it runs or after it failed. */
-	resumeAll: StartOf<"resume-all"> | null;
-	/** Resume every interrupted session the sidebar lists. */
-	onResumeAll: (sessionIds: string[]) => void;
-	onDismissResumeAll: () => void;
-	/** Move interrupted session `sessionId` to the past sessions. */
-	onDismissInterrupted: (sessionId: string) => void;
-	/** End running session `instanceId`, as its pane's End session does. */
-	onEnd: (instanceId: string) => void;
 	onShowShortcuts: () => void;
 	/** The button that hides the sidebar, first in the header. */
 	toggle: ReactNode;
 }
 
 export function Roster({
-	hosts,
-	past,
+	projects,
 	lists,
 	onTogglePin,
 	open,
-	connected,
 	newSessionOpen,
 	settingsHref,
 	settingsOpen,
@@ -395,26 +428,23 @@ export function Roster({
 	sidebarOpen,
 	userTodos,
 	todoCategory,
-	onTodoChange,
 	sectionTarget,
 	onSectionTarget,
 	project,
 	onPickProject,
-	onOpen,
-	onNewSession,
-	resume,
-	onResume,
-	resumeAll,
-	onResumeAll,
-	onDismissResumeAll,
-	onDismissInterrupted,
-	onEnd,
 	onShowShortcuts,
 	toggle,
 }: RosterProps) {
+	const { open: onOpen, send, start, dismissStart, end: onEnd, openNewSession: onNewSession, changeTodo: onTodoChange, connected, starts } = useDashboardContext();
+	const { resume, resumeAll } = starts;
 	const { isMobile } = useSidebar();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
-	const projects = workspaces(hosts, past);
+	/** Continue past session `sessionId`, in the pane that shows it. */
+	const onResume = (sessionId: string): void => {
+		// The pane shows the resume's progress and failure, and the live session takes it over.
+		onOpen({ kind: "past", sessionId }, "replace");
+		start({ kind: "resume", sessionId });
+	};
 	const { pinned, running, interrupted, ended } = lists;
 	const resumingAll = resumeAll?.phase === "starting";
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
@@ -438,7 +468,7 @@ export function Roster({
 							{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
 						</MenuItem>
 						{session.interrupted && (
-							<MenuItem onClick={() => onDismissInterrupted(session.sessionId)}>
+							<MenuItem onClick={() => send({ t: "dismiss-interrupted", sessionId: session.sessionId })}>
 								<Archive />
 								Move to past
 							</MenuItem>
@@ -447,25 +477,17 @@ export function Roster({
 					</>
 				}
 			>
-				<SidebarMenuButton
-					isActive={isOpen(pastView)}
-					onClick={event => onOpen(pastView, modeOf(event))}
+				<SessionRow
+					view={pastView}
+					label={pastLabel(session)}
 					title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-				>
-					<span className="flex min-w-0 flex-1 items-baseline gap-2">
-						{project === null && session.title !== null && <ProjectBadge cwdDisplay={session.cwdDisplay} />}
-						<span className="truncate font-medium text-foreground">{pastLabel(session)}</span>
-						<ShipStep ship={session.ship} />
-						{((isPinned && session.interrupted) || session.pullRequests.length > 0) && (
-							<span className="shrink-0 text-xs text-muted-foreground" title={session.pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n") || undefined}>
-								{[isPinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)]
-									.filter(Boolean)
-									.join(" · ")}
-							</span>
-						)}
-						<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(session.modifiedAt)}</span>
-					</span>
-				</SidebarMenuButton>
+					badge={project === null && session.title !== null ? <ProjectBadge cwdDisplay={session.cwdDisplay} /> : null}
+					ship={session.ship}
+					facts={sessionFacts([isPinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)], session.pullRequests)}
+					when={session.modifiedAt}
+					open={isOpen(pastView)}
+					onOpen={onOpen}
+				/>
 			</RowMenu>
 		);
 	};
@@ -494,29 +516,21 @@ export function Roster({
 					</>
 				}
 			>
-				<SidebarMenuButton
-					isActive={isOpen(hostView)}
-					onClick={event => onOpen(hostView, modeOf(event))}
+				<SessionRow
+					view={hostView}
+					label={hostLabel(host)}
 					title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-				>
-					<StatusDot status={host.status} />
-					<span className="flex min-w-0 flex-1 items-baseline gap-2">
-						{project === null && host.sessionName !== null && <ProjectBadge cwdDisplay={host.cwdDisplay} />}
-						<span className="truncate font-medium text-foreground">{hostLabel(host)}</span>
-						<ShipStep ship={host.ship} />
-						{(host.pullRequests.length > 0 || (host.source === "terminal" && !host.relayConnected)) && (
-							<span className="shrink-0 text-xs text-muted-foreground" title={host.pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n") || undefined}>
-								{[
-									host.source === "terminal" && !host.relayConnected && "relay offline",
-									host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests),
-								]
-									.filter(Boolean)
-									.join(" · ")}
-							</span>
-						)}
-						<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(host.startedAt)}</span>
-					</span>
-				</SidebarMenuButton>
+					badge={project === null && host.sessionName !== null ? <ProjectBadge cwdDisplay={host.cwdDisplay} /> : null}
+					ship={host.ship}
+					facts={sessionFacts(
+						[host.source === "terminal" && !host.relayConnected && "relay offline", host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests)],
+						host.pullRequests,
+					)}
+					when={host.startedAt}
+					dot={<StatusDot status={host.status} />}
+					open={isOpen(hostView)}
+					onOpen={onOpen}
+				/>
 			</RowMenu>
 		);
 	};
@@ -580,7 +594,7 @@ export function Roster({
 									title={resumingAll ? "Resuming…" : "Resume all"}
 									aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
 									disabled={resumingAll || !connected}
-									onClick={() => onResumeAll(interrupted.map(session => session.sessionId))}
+									onClick={() => start({ kind: "resume-all", sessionIds: interrupted.map(session => session.sessionId) })}
 								>
 									{resumingAll ? <Loader className="animate-spin" /> : <ListRestart />}
 								</button>
@@ -588,7 +602,7 @@ export function Roster({
 							{resumeAll?.phase === "failed" && (
 								<p role="alert" className="mx-2 mb-1 flex items-start gap-2 rounded-md bg-red-500/10 px-2 py-1.5 text-xs text-red-600 dark:text-red-400">
 									<span className="min-w-0 flex-1">{resumeAll.error}</span>
-									<button type="button" className="shrink-0 underline-offset-2 hover:underline" onClick={onDismissResumeAll}>
+									<button type="button" className="shrink-0 underline-offset-2 hover:underline" onClick={() => dismissStart("resume-all")}>
 										Dismiss
 									</button>
 								</p>

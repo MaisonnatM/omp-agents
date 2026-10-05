@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";
 import { hashForInbox, type OpenMode } from "../../routing";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
-import { type PullRequestActionId, pullRequestActions } from "../../quick-actions";
+import { type PullRequestActionId, pullRequestActions, type QuickActionId } from "../../quick-actions";
 import { QuickActionsMenu } from "../quick-actions";
 import { Avatar, IconTip, Reviewers, STATE_ICON } from "./avatars";
 
@@ -127,7 +127,7 @@ interface RowProps {
 	targeted: boolean;
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The quick action whose session is starting for this PR, if any. */
-	pending: PullRequestActionId | null;
+	pending: QuickActionId | null;
 	onQuickAction: (action: PullRequestActionId) => void;
 }
 

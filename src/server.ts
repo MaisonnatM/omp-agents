@@ -92,7 +92,7 @@ function onFilesChanged(): void {
 	views.sync();
 	broadcasts.pushPast();
 	// The first scan reads every transcript; the list shows before it finishes.
-	void files.linkPullRequests().then(changed => {
+	void files.refreshFacts().then(changed => {
 		if (changed) broadcasts.pushAll();
 	});
 }
@@ -165,9 +165,10 @@ try {
 				guards,
 				origin: originOf(PORT),
 				knownCwds,
-				facts: files.facts,
-				pullRequestsOf: files.pullRequestsOf,
-				onLinked: () => broadcasts.pushAll(),
+				pullRequestsOf: sessionId => files.factsOf(sessionId).pullRequests,
+				learnHeads(repo, pullRequests) {
+					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
+				},
 			}),
 		},
 		fetch(req, srv) {

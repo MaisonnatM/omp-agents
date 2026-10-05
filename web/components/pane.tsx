@@ -1,15 +1,16 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
-import type { RosterHost, PastSession, View, LiveView, ModelOption, Delivery, MessageQueue, PromptImage, UserAnswer } from "../../src/shared";
+import type { LiveView, PastSession, RosterHost, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { usePane } from "../pane-store";
-import type { StartOf } from "../starts";
+import type { ModelList } from "../reads";
 import { shortcutLabels } from "../shortcuts";
 import type { ForkPoint } from "../transcript-view";
-import type { Dashboard } from "../use-dashboard";
-import { Conversation, PastConversation } from "./conversation";
+import { Conversation } from "./conversation";
+import { useDashboardContext } from "./dashboard-context";
+import { PastConversation } from "./past-conversation";
 import { SidebarToggle } from "./sidebar-panel";
 import { SubagentLinks } from "./transcript";
 
@@ -24,15 +25,7 @@ interface PaneProps {
 	lastHost: RosterHost | null;
 	session: PastSession | null;
 	initialDraft: string;
-	models: { models: ModelOption[]; error: string | null } | null;
-	fork: StartOf<"fork"> | null;
-	resume: StartOf<"resume"> | null;
-	send: Dashboard["send"];
-	startSession: Dashboard["start"];
-	focus: Dashboard["focus"];
-	/** Opens a subagent from its `task` row. */
-	open: Dashboard["open"];
-	onEnd: (instanceId: string) => void;
+	models: ModelList;
 	onLayout: (index: number, kind: "max" | "close") => void;
 	toggleRight: () => void;
 	rightOpen: boolean;
@@ -44,9 +37,9 @@ const paneArea = (index: number, count: number): string =>
 
 /** Its own external-store subscription means another pane's token never asks this pane to render. */
 export const Pane = memo(function Pane({
-	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models,
-	fork, resume, send, startSession, focus, open, onEnd, onLayout, toggleRight, rightOpen,
+	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
+	const { send, start, focus, open, end, starts: { fork, resume } } = useDashboardContext();
 	const { items, loaded, completions, dequeued } = usePane(view);
 	const instanceId = view.kind === "live" ? view.instanceId : null;
 	const agents = host?.agents;
@@ -58,30 +51,11 @@ export const Pane = memo(function Pane({
 				: null,
 		[instanceId, agents, open, writable, send],
 	);
-	const onFork = useCallback((itemId: string, point: ForkPoint) => startSession({ kind: "fork", view, itemId, point }), [startSession, view]);
-	const onResume = useCallback(() => view.kind === "past" && startSession({ kind: "resume", sessionId: view.sessionId }), [startSession, view]);
+	const onFork = useCallback((itemId: string, point: ForkPoint) => start({ kind: "fork", view, itemId, point }), [start, view]);
+	const onResume = useCallback(() => view.kind === "past" && start({ kind: "resume", sessionId: view.sessionId }), [start, view]);
 	const onMaximize = useCallback(() => onLayout(index, "max"), [index, onLayout]);
 	const onClose = useCallback(() => onLayout(index, "close"), [index, onLayout]);
 	const onFocus = useCallback(() => !focused && focus(index), [focus, focused, index]);
-
-	const onComplete = useCallback((reqId: number, text: string, cursor: number) => {
-		if (view.kind === "live") send({ t: "complete", reqId, scope: { kind: "live", view }, text, cursor });
-	}, [send, view]);
-	const onListModels = useCallback(() => instanceId && send({ t: "list-models", instanceId }), [send, instanceId]);
-	const onSetModel = useCallback(
-		(model: ModelOption, thinking: string | null) => instanceId && send({ t: "set-model", instanceId, model, thinking }),
-		[send, instanceId],
-	);
-	const onSetThinking = useCallback((level: string) => instanceId && send({ t: "set-thinking", instanceId, level }), [send, instanceId]);
-	const onPrompt = useCallback((text: string, images: PromptImage[], delivery: Delivery) => {
-		if (view.kind === "live") send({ t: "prompt", view, text, images, delivery });
-	}, [send, view]);
-	const onDequeue = useCallback((reqId: number, messages: { queue: keyof MessageQueue; text: string }[]) => {
-		if (view.kind === "live") send({ t: "dequeue", reqId, view, messages });
-	}, [send, view]);
-	const onAbort = useCallback(() => instanceId && send({ t: "abort", instanceId }), [send, instanceId]);
-	const onEndSession = useCallback(() => instanceId && onEnd(instanceId), [onEnd, instanceId]);
-	const onAnswer = useCallback((requestId: string, answer: UserAnswer) => instanceId && send({ t: "answer", instanceId, requestId, answer }), [send, instanceId]);
 
 	const actions = (
 		<>
@@ -115,17 +89,10 @@ export const Pane = memo(function Pane({
 			fork={fork}
 			onFork={onFork}
 			completions={completions}
-			onComplete={onComplete}
 			models={models}
-			onListModels={onListModels}
-			onSetModel={onSetModel}
-			onSetThinking={onSetThinking}
-			onPrompt={onPrompt}
 			dequeued={dequeued}
-			onDequeue={onDequeue}
-			onAbort={onAbort}
-			onEnd={onEndSession}
-			onAnswer={onAnswer}
+			send={send}
+			onEnd={end}
 			actions={actions}
 			focused={focused}
 		/>

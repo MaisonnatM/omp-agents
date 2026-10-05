@@ -5,7 +5,7 @@ import { listSessionFiles, readSessionFile, type SavedSession, sessionsDir } fro
 import { displayPath } from "../paths";
 import { SessionFactsIndex } from "../session-facts";
 import type { SessionFacts } from "../live-session";
-import type { LinkedPullRequest, PastSession } from "../shared";
+import type { PastSession } from "../shared";
 
 /** omp's `.<file>.jsonl.lock` sidecars: on macOS a burst of writes to a session file can surface only as events for these. */
 const SIDECAR = /^\.(.+\.jsonl)\.lock(?:\.os)?$/;
@@ -44,21 +44,11 @@ export class SessionFiles {
 	/** The file of session `sessionId`, or `null` while it is not listed. */
 	readonly pathOf = (sessionId: string): string | null => this.#byId.get(sessionId)?.path ?? null;
 
-	/** What the pull-request index knows of session `sessionId`'s transcript. */
-	readonly pullRequestsOf = (sessionId: string): LinkedPullRequest[] => {
-		const path = this.pathOf(sessionId);
-		return path ? this.facts.pullRequestsOf(path) : [];
-	};
-
 	/** What the index knows of session `sessionId`: its pull requests, Linear issues, and /ship stage. */
 	readonly factsOf = (sessionId: string): SessionFacts => {
 		const path = this.pathOf(sessionId);
-		return path ? this.#factsAt(path) : { pullRequests: [], tickets: [], ship: null };
+		return path ? this.facts.factsOf(path) : { pullRequests: [], tickets: [], ship: null };
 	};
-
-	#factsAt(path: string): SessionFacts {
-		return { pullRequests: this.facts.pullRequestsOf(path), tickets: this.facts.ticketsOf(path), ship: this.facts.shipOf(path) };
-	}
 
 	/** Directories sessions ran in, newest first. Sessions from old omp versions recorded none. */
 	cwds(): string[] {
@@ -123,8 +113,8 @@ export class SessionFiles {
 		this.#byId = new Map(this.#files.map(file => [file.id, file]));
 	}
 
-	/** Read the transcripts for the pull requests they touched; whether any link changed. The first read covers every transcript. */
-	linkPullRequests(): Promise<boolean> {
+	/** Read the transcripts for what they link to; whether any session's pull requests, Linear issues, or /ship stage changed. The first read covers every transcript. */
+	refreshFacts(): Promise<boolean> {
 		return this.facts.refresh(this.#files);
 	}
 
@@ -138,7 +128,7 @@ export class SessionFiles {
 				cwd: session.cwd,
 				cwdDisplay: displayPath(session.cwd),
 				modifiedAt: session.modifiedAt,
-				...this.#factsAt(session.path),
+				...this.facts.factsOf(session.path),
 				interrupted: interrupted(session.id),
 			}));
 	}

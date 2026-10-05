@@ -3,8 +3,8 @@
  * Each socket message has one parser in {@link clientParsers}, so a {@link ClientMsg} variant without one does not compile.
  * Socket parsers return `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller casts what it received.
  */
-import { isObject } from "../json";
-import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, TICKET_ID } from "../shared";
+import { isObject, oneOf } from "../json";
+import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, TICKET_ID, TICKET_PRIORITIES } from "../shared";
 import type {
 	BranchChoice,
 	ClientMsg,
@@ -294,6 +294,7 @@ export function parseSessionLinks(body: unknown): SessionLinksEdit | null {
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const isTicketPriority = oneOf(TICKET_PRIORITIES);
 
 /** The body of `PUT /api/ticket`: an issue identifier and at least one field to change, each of its own type. */
 export function parseTicketEdit(body: unknown): TicketEdit | null {
@@ -309,7 +310,7 @@ export function parseTicketEdit(body: unknown): TicketEdit | null {
 		edit.assignee = assignee;
 	}
 	if (priority !== undefined) {
-		if (priority !== 0 && priority !== 1 && priority !== 2 && priority !== 3 && priority !== 4) return null;
+		if (!isTicketPriority(priority)) return null;
 		edit.priority = priority;
 	}
 	if (labels !== undefined) {
