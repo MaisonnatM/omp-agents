@@ -26,6 +26,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary: "text-background",
+        agent: "agent-button text-[color:var(--agent-action-foreground)]",
         secondary: "text-foreground",
         tertiary: "text-foreground",
         ghost: "text-muted-foreground hover:text-foreground",
@@ -112,6 +113,7 @@ interface ButtonProps
 const bgVariants: Record<string, string> = {
   primary:
     "[--btn-bg:var(--foreground)] group-hover:[--btn-bg:color-mix(in_oklab,var(--foreground)_90%,var(--background))] group-active:[--btn-bg:color-mix(in_oklab,var(--foreground)_80%,var(--background))] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",
+  agent: "agent-action agent-button-surface",
   secondary:
     "[--btn-bg:var(--tint)] group-hover:[--btn-bg:var(--tint-hover)] group-active:[--btn-bg:var(--tint)] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",
   // The border ring is an outer 1px shadow at rest that hands off to an
@@ -131,6 +133,7 @@ const bgVariants: Record<string, string> = {
 const activeBgVariants: Record<string, string> = {
   primary:
     "[--btn-bg:color-mix(in_oklab,var(--foreground)_80%,var(--background))] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",
+  agent: "agent-action agent-button-surface",
   secondary:
     "[--btn-bg:var(--tint)] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",
   tertiary:
@@ -201,6 +204,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <>
         <span
           aria-hidden
+          data-pressed={variant === "agent" && active ? "" : undefined}
           className={cn(
             "absolute inset-px rounded-[inherit] transition-[box-shadow,background-color] [transition-duration:180ms,80ms] [transition-timing-function:cubic-bezier(0.23,1,0.32,1),ease] group-active:[transition-duration:80ms,80ms]",
             bgClass

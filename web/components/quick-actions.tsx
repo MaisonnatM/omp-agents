@@ -33,7 +33,7 @@ export function QuickActionsMenu({ actions, pending, onRun, label }: QuickAction
 	return (
 		<DropdownMenu>
 			<Tooltip content={label}>
-				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={label} loading={pending !== null} />}>
+				<DropdownMenuTrigger render={<Button variant="agent" size="icon-compact" aria-label={label} loading={pending !== null} />}>
 					<Zap />
 				</DropdownMenuTrigger>
 			</Tooltip>
@@ -41,7 +41,7 @@ export function QuickActionsMenu({ actions, pending, onRun, label }: QuickAction
 				{actions.map(id => {
 					const Icon: LucideIcon = ICON[id];
 					return (
-						<MenuItem key={id} title={QUICK_ACTIONS[id].description} onClick={() => onRun(id)}>
+						<MenuItem variant="agent" key={id} title={QUICK_ACTIONS[id].description} onClick={() => onRun(id)}>
 							<Icon />
 							{QUICK_ACTIONS[id].label}
 						</MenuItem>
@@ -56,7 +56,7 @@ export function QuickActionsMenu({ actions, pending, onRun, label }: QuickAction
 export function QuickActionButton({ action, pending, onRun }: { action: QuickActionId } & Omit<QuickActionsProps, "actions">) {
 	return (
 		<Tooltip content={QUICK_ACTIONS[action].description}>
-			<Button variant="secondary" size="compact" leadingIcon={ICON[action]} loading={pending === action} disabled={pending !== null} onClick={() => onRun(action)}>
+			<Button variant="agent" size="compact" leadingIcon={ICON[action]} loading={pending === action} disabled={pending !== null} onClick={() => onRun(action)}>
 				{QUICK_ACTIONS[action].label}
 			</Button>
 		</Tooltip>

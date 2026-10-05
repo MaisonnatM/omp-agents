@@ -106,7 +106,7 @@ function MenuItem({
   variant = "default",
   ...props
 }: React.ComponentProps<typeof MenuPrimitive.Item> & {
-  variant?: "default" | "destructive"
+  variant?: "default" | "destructive" | "agent"
 }) {
   return (
     <MenuPrimitive.Item
@@ -115,6 +115,7 @@ function MenuItem({
       className={cn(
         itemClassName,
         "data-[variant=destructive]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:[&_svg]:text-current!",
+        variant === "agent" && "agent-action",
         className
       )}
       {...props}

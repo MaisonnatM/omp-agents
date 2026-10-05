@@ -993,6 +993,8 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
               registerItem={registerItem}
               role={isMulti ? "checkbox" : "radio"}
               isSelected={isSelected}
+              agentAction={!isMulti && safeIndex >= total - 1}
+              active={isHover}
               // Roving tabindex — see firstSelectedRow above. Multi-select
               // no longer puts a tab stop on every row.
               tabIndex={
@@ -1132,6 +1134,7 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
             registerItem={registerItem}
             role={null}
             isSelected={otherText.length > 0}
+            agentArrow={!isMulti && safeIndex >= total - 1}
             tabIndex={-1}
             onClick={() => otherInputRef.current?.focus()}
             shape={shape}
@@ -1541,7 +1544,7 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
                         }}
                       >
                         <Button
-                          variant="primary"
+                          variant={safeIndex >= total - 1 ? "agent" : "primary"}
                           size="sm"
                           onClick={
                             isFreeText ? handleOtherSubmit : handleMultiNext
@@ -1566,7 +1569,7 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
                                 state. ⌘↵ on macOS, ⌃↵ elsewhere. Desktop-only:
                                 mobile has no physical keyboard to trigger it. */}
                             <span className="hidden sm:contents">
-                              <ShortcutChip shape={shape} tone="inverted">
+                              <ShortcutChip shape={shape} tone={safeIndex >= total - 1 ? "agent" : "inverted"}>
                                 {isMac ? "⌘" : "⌃"}
                                 {"↵"}
                               </ShortcutChip>
@@ -1605,7 +1608,7 @@ function ShortcutChip({
   shape,
 }: {
   children: React.ReactNode;
-  tone?: "muted" | "inverted";
+  tone?: "muted" | "inverted" | "agent";
   shape: ReturnType<typeof useShape>;
 }) {
   return (
@@ -1614,9 +1617,11 @@ function ShortcutChip({
       suppressHydrationWarning
       className={cn(
         "inline-flex items-center justify-center gap-0.5 px-1 min-w-[18px] h-[18px] text-[11px] leading-none font-sans tracking-wide",
-        tone === "inverted"
-          ? "bg-background/15 text-background"
-          : "bg-foreground/10 text-muted-foreground",
+        tone === "agent"
+          ? "bg-white/15 text-white"
+          : tone === "inverted"
+            ? "bg-background/15 text-background"
+            : "bg-foreground/10 text-muted-foreground",
         shape.bg
       )}
     >
@@ -1632,6 +1637,9 @@ interface RowProps {
   registerItem: (index: number, element: HTMLElement | null) => void;
   role: "radio" | "checkbox" | null;
   isSelected: boolean;
+  agentAction?: boolean;
+  agentArrow?: boolean;
+  active?: boolean;
   tabIndex: number;
   onClick: () => void;
   onKeyDown?: (e: ReactKeyboardEvent<HTMLDivElement>) => void;
@@ -1670,6 +1678,9 @@ function Row({
   registerItem,
   role,
   isSelected,
+  agentAction = false,
+  agentArrow = false,
+  active = false,
   tabIndex,
   onClick,
   onKeyDown,
@@ -1712,7 +1723,8 @@ function Row({
               : undefined
           }
           className={cn(
-            "absolute inset-0 inline-flex items-center justify-center bg-foreground text-background",
+            "absolute inset-0 inline-flex items-center justify-center",
+            agentAction ? "bg-white/15 text-white" : agentArrow ? "agent-action" : "bg-foreground text-background",
             shape.bg,
             onArrowClick && "cursor-pointer"
           )}
@@ -1765,9 +1777,11 @@ function Row({
             ? chipFilled
               ? "bg-foreground text-background"
               : "border border-border text-muted-foreground"
-            : chipFilled
-            ? "text-foreground"
-            : "text-muted-foreground",
+            : agentAction
+              ? "text-white"
+              : chipFilled
+                ? "text-foreground"
+                : "text-muted-foreground",
           // Only fade the chip when it shares a slot with the arrow — for
           // chip-on-left the arrow has its own slot on the right, so the
           // chip stays in place.
@@ -1807,6 +1821,7 @@ function Row({
       ref={rowRef}
       data-fluid-hover-index={index}
       data-state={isSelected ? "checked" : "unchecked"}
+      data-active={agentAction && active ? "" : undefined}
       role={role ?? undefined}
       aria-checked={role === "radio" || role === "checkbox" ? !!aria["aria-checked"] : undefined}
       aria-label={ariaLabel}
@@ -1864,7 +1879,9 @@ function Row({
             ? "pl-1.5 pr-3"
             : "pl-1.5 pr-1.5"
           : "pl-3 pr-1.5",
-        shape.item
+        shape.item,
+        agentAction && "agent-action",
+        agentAction && shape.bg,
       )}
     >
       {/* Selected background is drawn at the container level so contiguous

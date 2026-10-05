@@ -45,7 +45,7 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 				<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Read-only" alert={false}>
 					{session && (
 						<Button
-							variant="secondary"
+							variant="agent"
 							size="compact"
 							onClick={onResume}
 							disabled={resume?.phase === "starting"}
