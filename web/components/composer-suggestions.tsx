@@ -37,7 +37,7 @@ function SuggestionRow({ text, index, active, optionId, registerItem, onSelect }
 			id={optionId}
 			role="option"
 			aria-selected={active}
-			data-active={active || undefined}
+			data-highlighted={active || undefined}
 			onClick={onSelect}
 			className={cn(
 				"agent-action relative flex cursor-pointer items-center gap-2",
