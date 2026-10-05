@@ -94,9 +94,9 @@ export function App() {
 	const [rows, setRows] = useSplitRatio("rows");
 	const maximized = layout.maximized && !page;
 	const lists = sidebarSessions(visible.hosts, visible.past, project, pinned);
-	// The running sessions the sidebar lists, in its order, which ending a session moves its panes along.
-	const listedHosts = [...lists.pinned.hosts, ...lists.running].map(host => host.instanceId);
 	const listed = listedViews(lists);
+	// The live rows of `listed`, whose order ending a session moves its panes along.
+	const listedHosts = listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
 	const latest = useRef({ layout, listedHosts, sidebars });
 	latest.current = { layout, listedHosts, sidebars };
 	const endHost = useCallback((instanceId: string): void => {

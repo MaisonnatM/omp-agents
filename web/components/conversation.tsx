@@ -42,7 +42,7 @@ interface ConversationProps {
 	/** The server's last answer to this view's `dequeue`. */
 	dequeued: { reqId: number; texts: string[] } | null;
 	send: Dashboard["send"];
-	/** End running session `instanceId`, as the header's End session does. */
+	/** End running session `instanceId`, as the header's End session and its shortcut do. */
 	onEnd: (instanceId: string) => void;
 	/** Header controls the page adds, such as closing a split pane. */
 	actions?: ReactNode;
@@ -168,6 +168,10 @@ function LiveConversation({
 					interrupt: () => {
 						if (!session || !writable || !working) return false;
 						interrupt();
+					},
+					endSession: () => {
+						if (!session || !subject.live) return false;
+						onEnd(view.instanceId);
 					},
 					// As ↑ edits the last message in a chat app; with a draft, ↑ keeps moving the caret.
 					dequeue: () => {

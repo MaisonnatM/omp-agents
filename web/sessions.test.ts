@@ -109,12 +109,23 @@ describe("sidebarSessions", () => {
 		expect(ids(lists.running)).toEqual(["h1", "h2"]);
 	});
 
-	test("the previous and next session keys walk pinned rows first, then running, interrupted, and past", () => {
-		const lists = sidebarSessions(hosts, sessions, "~/a", new Set(["h2", "p3"]));
+	test("an idle session leaves running for its own list, a pinned one stays pinned, and a question keeps it running", () => {
+		const statuses = { h1: "idle", h2: "needs-input", h3: "working", h4: "idle", h5: "unknown" } as const;
+		const live = Object.entries(statuses).map(([id, status]) => ({ ...host(id, "~/a"), status }));
+		const lists = sidebarSessions(live, [], null, new Set(["h4"]));
+		expect(ids(lists.pinned.hosts)).toEqual(["h4"]);
+		expect(ids(lists.running)).toEqual(["h2", "h3", "h5"]);
+		expect(ids(lists.idle)).toEqual(["h1"]);
+	});
+
+	test("the previous and next session keys walk pinned rows first, then running, idle, interrupted, and past", () => {
+		const live = [{ ...host("h0", "~/a"), status: "idle" as const }, ...hosts];
+		const lists = sidebarSessions(live, sessions, "~/a", new Set(["h2", "p3"]));
 		expect(listedViews(lists)).toEqual([
 			{ kind: "live", instanceId: "i-h2", agentId: null },
 			{ kind: "past", sessionId: "p3" },
 			{ kind: "live", instanceId: "i-h1", agentId: null },
+			{ kind: "live", instanceId: "i-h0", agentId: null },
 			{ kind: "past", sessionId: "p2" },
 			{ kind: "past", sessionId: "p1" },
 		]);

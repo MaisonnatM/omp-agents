@@ -24,7 +24,7 @@ For installation, see the [README](../README.md).
 - Under **All projects**, a session row with a title starts with a badge that names its project, the last segment of its working directory.
   With one project picked, the rows show no badge.
   A row without a title shows the project's name as its label, with no badge.
-- The project picker in the sidebar header shows only the running, interrupted, and past sessions from one working directory.
+- The project picker in the sidebar header shows only the running, idle, interrupted, and past sessions from one working directory.
   It lists the directories that a live or saved session ran in, live sessions' directories first, except temporary directories.
   The session counts then count that directory's sessions only, such as `2 running` and `9 past`.
   Choose **All projects** to list every session again.
@@ -38,13 +38,16 @@ For installation, see the [README](../README.md).
   A pinned session stays pinned when it ends, is resumed, or is interrupted, and an interrupted one says `interrupted` after its title.
   The selected project applies to the group too.
   The browser's localStorage keeps the pins, by session id.
-- Click the **Pinned**, **Running**, **Interrupted**, or **Past** group label to collapse or expand its rows.
+- A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group under it, and moves back when its next turn starts.
+  A session waiting on a question stays under **Running**, and a pinned session stays under **Pinned** whatever its state.
+  The group shows only while it has a row.
+- Click the **Pinned**, **Running**, **Idle**, **Interrupted**, or **Past** group label to collapse or expand its rows.
   The browser's localStorage keeps each group's choice across tabs, projects, navigation, and reloads, even while the group has no rows.
 - The past sessions list every saved session that has no live host, newest first, with its title (else its first prompt) and how long ago it last changed; hover a row to see its working directory.
   Select one to read its transcript.
   The page cannot write to it until you resume it.
   A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.
-- The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because the dashboard server stopped or crashed, which stops every session it started, or because omp exited on its own.
+- The interrupted sessions, between the idle and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because the dashboard server stopped or crashed, which stops every session it started, or because omp exited on its own.
   The group shows only while it has a row.
   Its **Resume all** button resumes every session it lists, under the selected project, as **Resume** does for one; a pane that shows one of them then shows it live.
   A session that was working when it stopped, or waiting on a question, also gets the prompt `continue`, so it picks its turn back up; an idle one waits for your next message.
@@ -526,6 +529,7 @@ Alt is Option on macOS.
 | ↑ | Empty composer | Move the last queued message back into the composer |
 | Cmd+K | Anywhere | Jump to a session |
 | Cmd+Shift+O | Anywhere | Start a new session |
+| Cmd+Shift+X | Anywhere | End the focused session |
 | Alt+↑ | Anywhere | Open the previous session in the sidebar |
 | Alt+↓ | Anywhere | Open the next session in the sidebar |
 | Cmd+. | Anywhere | Choose the session's model |
@@ -549,7 +553,7 @@ Alt is Option on macOS.
 | . | Inbox, outside text fields | Open the pull request's quick actions |
 
 - Press `?` outside a text field, Cmd+/ anywhere, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, the composer's Stop button, and a maximized pane's restore button.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, **End session**, the composer's Stop button, and a maximized pane's restore button.
 - No shortcut takes a key that the browser keeps for itself: Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or a digit does what the browser does.
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.
@@ -558,14 +562,15 @@ Alt is Option on macOS.
   In a maximized pane, Esc in the composer restores the split only when no turn runs there.
 - Cmd+K searches every running and past session, in every project, by title or directory, and opens the one you pick in the focused pane.
   A session from another project switches the sidebar to that project.
-  Alt+↑ and Alt+↓ walk the sidebar's list, pinned sessions, then running ones, then interrupted ones, then past ones, in the focused pane.
+  Alt+↑ and Alt+↓ walk the sidebar's list, pinned sessions, then running ones, then idle ones, then interrupted ones, then past ones, in the focused pane.
   From a subagent they step from its session's row.
 - Cmd+Shift+O opens the new-session draft, as the **+** next to the session list does.
+  Cmd+Shift+X ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.
+  It does nothing in a subagent, a read-only room, or a past session.
   `/` puts the cursor in the focused pane's composer.
 - Cmd+. opens the model picker and Cmd+J moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.
   Cmd+E expands or collapses every tool call.
   Cmd+, opens Settings, where the model roles live, and closes it again.
-  Ending a session has no shortcut: use **End session** in its header.
 - G then I opens the Inbox tab.
   G then S goes back from the inbox, the todo list, Settings, or the new-session draft to the panes.
   G then D opens the **Todo** page.
