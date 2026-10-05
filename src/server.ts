@@ -4,7 +4,7 @@ import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
-import { displayPath, interruptedFile, tokenFile } from "./paths";
+import { displayPath, interruptedFile, tokenFile, userTodosFile } from "./paths";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Broadcasts } from "./server/broadcasts";
@@ -17,7 +17,8 @@ import { createRoutes } from "./server/routes";
 import { SessionFiles } from "./server/session-files";
 import { createClientHandler } from "./server/socket";
 import { createStarter } from "./server/start";
-import { type SocketData, Views } from "./server/views";
+import { UserTodosFile } from "./server/user-todos-file";
+import { type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
 import type { View } from "./shared";
 
@@ -29,6 +30,7 @@ const page = await buildPage();
 const files = new SessionFiles();
 const sessions = new LiveSessions(onLiveUpdate);
 const interrupted = new InterruptedSessions(interruptedFile);
+const todos = new UserTodosFile(userTodosFile);
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
 const pathFor = (view: View): string | null =>
 	view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -36,6 +38,7 @@ const views = new Views(pathFor, (topic, msg) => server.publish(topic, JSON.stri
 const broadcasts = new Broadcasts({
 	rosterMsg: () => ({ t: "roster", hosts: sessions.rows(files.factsOf), error: rosterError }),
 	pastMsg: () => ({ t: "past", sessions: files.past(sessions.sessionIds(), id => interrupted.has(id)) }),
+	userTodosMsg: () => ({ t: "user-todos", todos: todos.todos }),
 	publish: (topic, json) => void server.publish(topic, json),
 	subscriberCount: topic => server.subscriberCount(topic),
 	beforeRosterPush: () => views.sync(),
@@ -70,6 +73,10 @@ const handleClientMsg = createClientHandler({
 		if (interrupted.dismiss(sessionId)) broadcasts.pushPast();
 	},
 	stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
+	changeTodo(ws, change) {
+		if (todos.apply(change)) broadcasts.pushUserTodos();
+		else send(ws, { t: "user-todos", todos: todos.todos });
+	},
 });
 
 /** Why the last registry listing failed, shown with the roster. */

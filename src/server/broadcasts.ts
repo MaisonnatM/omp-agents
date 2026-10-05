@@ -1,7 +1,7 @@
 /**
- * What every socket hears on the `roster` topic: the roster, the past-session list, and plan usage.
+ * What every socket hears on the `roster` topic: the roster, the past-session list, plan usage, and the Todo tab's list.
  * Each push publishes only what changed since the last one. Roster and past pushes wait for a listener;
- * a socket that subscribes gets all three at once.
+ * a socket that subscribes gets all four at once.
  */
 import { errorText } from "../json";
 import type { ServerMsg } from "../shared";
@@ -12,11 +12,12 @@ const TOPIC = "roster";
 /** Coalesce bursts of subagent progress into one roster push. */
 const ROSTER_PUSH_MS = 150;
 
-type Broadcast = Extract<ServerMsg, { t: "roster" | "past" | "usage" }>;
+type Broadcast = Extract<ServerMsg, { t: "roster" | "past" | "usage" | "user-todos" }>;
 
 export interface BroadcastDeps {
 	rosterMsg(): Extract<ServerMsg, { t: "roster" }>;
 	pastMsg(): Extract<ServerMsg, { t: "past" }>;
+	userTodosMsg(): Extract<ServerMsg, { t: "user-todos" }>;
 	/** Publishes `json` on the `roster` topic. */
 	publish(topic: string, json: string): void;
 	subscriberCount(topic: string): number;
@@ -28,8 +29,8 @@ export interface BroadcastDeps {
 
 export class Broadcasts {
 	readonly #deps: BroadcastDeps;
-	/** The last message of each kind published; empty for roster and past while nobody listens, empty for usage until `omp usage` first answers. */
-	readonly #last: Record<Broadcast["t"], string> = { roster: "", past: "", usage: "" };
+	/** The last message of each kind published; empty for roster and past while nobody listens, empty for usage until `omp usage` first answers, and for the todos until they first change. */
+	readonly #last: Record<Broadcast["t"], string> = { roster: "", past: "", usage: "", "user-todos": "" };
 	#rosterPush: NodeJS.Timeout | undefined;
 
 	constructor(deps: BroadcastDeps) {
@@ -41,12 +42,13 @@ export class Broadcasts {
 		return this.#deps.subscriberCount(TOPIC) > 0;
 	}
 
-	/** Subscribe `ws` and send it the current roster, past list, and usage. */
+	/** Subscribe `ws` and send it the current roster, past list, usage, and todos. */
 	open(ws: Socket): void {
 		ws.subscribe(TOPIC);
 		send(ws, this.#deps.rosterMsg());
 		send(ws, this.#deps.pastMsg());
 		if (this.#last.usage) ws.send(this.#last.usage);
+		send(ws, this.#deps.userTodosMsg());
 	}
 
 	/** A dashboard session started or exited: save which run, then push the roster and the past list. */
@@ -81,6 +83,10 @@ export class Broadcasts {
 		} catch (err) {
 			this.#publishChanged({ t: "usage", plans: [], error: errorText(err) });
 		}
+	}
+
+	pushUserTodos(): void {
+		this.#publishChanged(this.#deps.userTodosMsg());
 	}
 
 	/** Also stands in for a pending debounced push: a burst of roster updates costs one sync and one push. */

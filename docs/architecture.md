@@ -303,7 +303,7 @@ A failure, or no return within five minutes, shows as `signIn: { phase: "failed"
 ## Front-end components
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
-The roster uses `sidebar`, and its **Inbox**, **Tickets**, and **Sessions** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
+The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, and **Todo** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
 User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
 `thinking-indicator` shows while the agent works.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
@@ -341,7 +341,7 @@ The server lives in `src/`:
   `src/server/views.ts` points each open view at its file and folds live events into it.
 - `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, the inbox, pull request, and ticket shapes).
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
-- `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON, `src/fs.ts` replaces a file through a temporary one beside it, and `src/paths.ts` names the home directory, the token file, and the interrupted sessions' file.
+- `src/proc.ts` runs subprocesses, `src/json.ts` narrows untyped JSON, `src/fs.ts` replaces a file through a temporary one beside it, and `src/paths.ts` names the home directory, the token file, the interrupted sessions' file, and the todo list's file.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` finds each subagent's transcript file.
@@ -359,6 +359,9 @@ The server lives in `src/`:
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query.
+- `src/user-todos.ts`: the rules of the sidebar's Todo list, `applyUserTodo`, which the server applies to its file and the page to what it shows before the server answers.
+  `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token.
+  A `user-todo` socket message carries one change, and every socket hears the list after it as a `user-todos` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the list back to its own socket alone.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
   An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
@@ -391,9 +394,10 @@ The page lives in `web/`.
   `web/components/session-switcher.tsx` is the Cmd+K search over every session.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
-- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's project, and the pinned skill; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
+- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's tab over the panes, the sidebar's project, and the pinned skill; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
 - `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
+  `web/components/user-todos.tsx` holds its Todo tab.
 - `web/components/pane.tsx`: a pane.
   `conversation.tsx` holds its header and composer, and `transcript.tsx` its transcript, whose `task` rows link to their subagents.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.

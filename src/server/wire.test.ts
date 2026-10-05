@@ -30,6 +30,21 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "prompt", view: { kind: "past", sessionId: "s1" }, text: "go", delivery: "steer" })).toBeNull();
 	});
 
+	test("user-todo takes each change with the fields it needs, and drops any other field", () => {
+		const change = (value: unknown) => msg({ t: "user-todo", change: value });
+		expect(change({ op: "add", id: "a", parentId: null, afterId: "b", text: "Ship", extra: 1 })).toEqual({
+			t: "user-todo",
+			change: { op: "add", id: "a", parentId: null, afterId: "b", text: "Ship" },
+		});
+		expect(change({ op: "toggle", id: "a", done: true })).toEqual({ t: "user-todo", change: { op: "toggle", id: "a", done: true } });
+		expect(change({ op: "clear-done" })).toEqual({ t: "user-todo", change: { op: "clear-done" } });
+		expect(change({ op: "add", id: "a", text: "Ship" })).toBeNull();
+		expect(change({ op: "toggle", id: "a", done: "yes" })).toBeNull();
+		expect(change({ op: "indent", id: "" })).toBeNull();
+		expect(change({ op: "edit", id: "a", text: "x".repeat(2001) })).toBeNull();
+		expect(change({ op: "move", id: "a" })).toBeNull();
+	});
+
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {
 		const png = { data: "aGVsbG8=", mimeType: "image/png" };
 		const prompt = (images: unknown) => msg({ t: "prompt", view: live, text: "", images, delivery: "steer" });
