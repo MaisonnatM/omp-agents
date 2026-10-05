@@ -1,6 +1,6 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
 import { useEffect, useState } from "react";
-import type { Inbox, LinearStatus, ModelOption, TicketsAnswer } from "../src/shared";
+import type { Inbox, LinearStatus, ModelEntry, TicketsAnswer } from "../src/shared";
 import { errorText, getJson } from "./api";
 import { createPolledStore } from "./polled-store";
 
@@ -12,7 +12,7 @@ export interface ReadState<T> {
 export const UNREAD: ReadState<never> = { data: null, error: null };
 
 /** The models that omp lists, as the server answers a read or sends them to a session. */
-export type ModelList = ReadState<{ models: ModelOption[] }>;
+export type ModelList = ReadState<{ models: ModelEntry[] }>;
 
 /**
  * The server's answer at `url`, nothing while `url` is `null` or until it first answers for `url`, so an answer for a

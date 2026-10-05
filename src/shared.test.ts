@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { type CatalogModel, samePullRequest, splitSelector } from "./shared";
 
 describe("splitSelector", () => {
-	const listed = (selector: string): [string, CatalogModel] => [selector, { selector, provider: "openrouter", name: selector, thinking: ["low"] }];
+	const listed = (selector: string): [string, CatalogModel] => [selector, { selector, provider: "openrouter", name: selector, contextWindow: null, thinking: ["low"] }];
 	const models = new Map([listed("openrouter/minimax/minimax-m3"), listed("openrouter/minimax/minimax-m3:batch")]);
 
 	test("a colon that belongs to a listed model id is not a thinking level", () => {

@@ -1,5 +1,5 @@
 import { Check, ChevronsUpDown } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type KeyboardEvent, type ReactNode, type Ref, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -39,6 +39,68 @@ export function fromList<T>(read: ReadState<T>, loading: string, groups: (data: 
 	if (read.error) return { kind: "failed", error: read.error };
 	if (read.data === null) return { kind: "loading", message: loading };
 	return { kind: "ready", groups: groups(read.data) };
+}
+
+interface CommandResultsProps {
+	search?: { label: string; query?: { value: string; onChange: (value: string) => void }; ref?: Ref<HTMLInputElement> };
+	list: PickerList;
+	empty?: ReactNode;
+	disabled?: boolean;
+	selectionDisabled?: boolean;
+	closeOnSelect?: boolean;
+	/** Closes the surface that holds the list, when a choice asks to close. */
+	onClose?: () => void;
+	filter?: (value: string, search: string, keywords?: string[]) => number;
+	onKeyDown?: (event: KeyboardEvent) => void;
+	listClassName?: string;
+}
+
+/** The search field and grouped results a {@link CommandPicker} and the model menu's search share. */
+export function CommandResults({ search, list, empty, disabled, selectionDisabled = false, closeOnSelect = true, onClose, filter, onKeyDown, listClassName }: CommandResultsProps) {
+	return (
+		<Command filter={filter} onKeyDown={onKeyDown}>
+			{search && <CommandInput ref={search.ref} aria-label={search.label} placeholder={`${search.label}…`} value={search.query?.value} onValueChange={search.query?.onChange} />}
+			<CommandList className={listClassName}>
+				{list.kind === "loading" ? (
+					<p role="status" className="py-6 text-center text-sm text-muted-foreground">
+						{list.message}
+					</p>
+				) : list.kind === "failed" ? (
+					<p role="alert" className="px-3 py-6 text-center text-sm text-red-600 dark:text-red-400">
+						{list.error}
+					</p>
+				) : (
+					<>
+						{empty && <CommandEmpty className="px-3 py-6 text-center text-sm">{empty}</CommandEmpty>}
+						{list.groups
+							.filter(group => group.items.length > 0)
+							.map(group => (
+								<CommandGroup key={group.key} heading={group.heading} forceMount={group.forceMount}>
+									{group.items.map(item => (
+										<CommandItem
+											key={item.value}
+											value={item.value}
+											keywords={item.keywords}
+											title={item.title}
+											aria-label={item.ariaLabel}
+											forceMount={group.forceMount}
+											disabled={disabled || selectionDisabled}
+											onSelect={() => {
+												if (closeOnSelect) onClose?.();
+												item.onSelect();
+											}}
+										>
+											<span className="flex min-w-0 flex-1 items-center gap-2">{item.label}</span>
+											{item.selected !== undefined && <Check className={item.selected ? "opacity-100" : "opacity-0"} />}
+										</CommandItem>
+									))}
+								</CommandGroup>
+							))}
+					</>
+				)}
+			</CommandList>
+		</Command>
+	);
 }
 
 const WIDTH = {
@@ -114,49 +176,7 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 			)}
 			{/* A click in the list must not reach the composer around a picker, which would take the focus back to its text box. */}
 			<PopoverContent side={side} align="start" className={cn(WIDTH[width], "min-w-0 max-h-[var(--radix-popover-content-available-height)] overflow-x-hidden overflow-y-auto overscroll-contain p-0")} onMouseDown={event => event.stopPropagation()}>
-				{content(
-				<Command>
-					{search && <CommandInput aria-label={search.label} placeholder={`${search.label}…`} value={search.query?.value} onValueChange={search.query?.onChange} />}
-					<CommandList>
-						{list.kind === "loading" ? (
-							<p role="status" className="py-6 text-center text-sm text-muted-foreground">
-								{list.message}
-							</p>
-						) : list.kind === "failed" ? (
-							<p role="alert" className="px-3 py-6 text-center text-sm text-red-600 dark:text-red-400">
-								{list.error}
-							</p>
-						) : (
-							<>
-								{empty && <CommandEmpty className="px-3 py-6 text-center text-sm">{empty}</CommandEmpty>}
-								{list.groups
-									.filter(group => group.items.length > 0)
-									.map(group => (
-										<CommandGroup key={group.key} heading={group.heading} forceMount={group.forceMount}>
-											{group.items.map(item => (
-												<CommandItem
-													key={item.value}
-													value={item.value}
-													keywords={item.keywords}
-													title={item.title}
-													aria-label={item.ariaLabel}
-													forceMount={group.forceMount}
-													disabled={disabled || selectionDisabled}
-													onSelect={() => {
-														if (closeOnSelect) change(false);
-														item.onSelect();
-													}}
-												>
-													<span className="flex min-w-0 flex-1 items-center gap-2">{item.label}</span>
-													{item.selected !== undefined && <Check className={item.selected ? "opacity-100" : "opacity-0"} />}
-												</CommandItem>
-											))}
-										</CommandGroup>
-									))}
-							</>
-						)}
-					</CommandList>
-				</Command>)}
+				{content(<CommandResults search={search} list={list} empty={empty} disabled={disabled} selectionDisabled={selectionDisabled} closeOnSelect={closeOnSelect} onClose={() => change(false)} />)}
 			</PopoverContent>
 		</Popover>
 	);

@@ -47,8 +47,8 @@ describe("routeRoles", () => {
 });
 
 const catalog: CatalogModel[] = [
-	{ selector: "anthropic/claude-opus-5-5", provider: "anthropic", name: "Opus", thinking: ["low", "high"] },
-	{ selector: "openrouter/minimax/minimax-m3:batch", provider: "openrouter", name: "MiniMax batch", thinking: ["low"] },
+	{ selector: "anthropic/claude-opus-5-5", provider: "anthropic", name: "Opus", contextWindow: 1_000_000, thinking: ["low", "high"] },
+	{ selector: "openrouter/minimax/minimax-m3:batch", provider: "openrouter", name: "MiniMax batch", contextWindow: 200_000, thinking: ["low"] },
 ];
 const retry = {
 	enabled: true,

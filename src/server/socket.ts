@@ -118,6 +118,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	},
 	"set-model": ({ sessions }, _ws, { instanceId, model, thinking }) => sessions.started(instanceId)?.setModel(model, thinking),
 	"set-thinking": ({ sessions }, _ws, { instanceId, level }) => sessions.started(instanceId)?.setThinking(level),
+	"set-fast": ({ sessions }, _ws, { instanceId, enabled }) => sessions.started(instanceId)?.setFast(enabled),
 	answer: ({ sessions }, _ws, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
 	"user-todo": ({ changeTodo }, ws, { change }) => changeTodo(ws, change),
 	routine: ({ changeRoutine, runRoutine }, ws, { change }) => (change.op === "run-now" ? runRoutine(change.id) : changeRoutine(ws, change)),

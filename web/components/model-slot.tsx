@@ -1,25 +1,26 @@
 import { Brain } from "lucide-react";
 import type { ModelOption } from "../../src/shared";
 import type { ModelList } from "../reads";
-import { Model, ModelPicker } from "./model-picker";
+import { Model, type ModelMenuOpen, ModelPicker } from "./model-picker";
 import type { Subject } from "./subject";
 
 interface ModelSlotProps {
 	subject: Subject;
 	/** The last model list the server sent for this session; nothing while none has arrived. */
 	models: ModelList;
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
+	open: ModelMenuOpen | null;
+	onOpenChange: (open: ModelMenuOpen | null) => void;
 	/** Switch to `model` and, when `thinking` names one, thinking level. */
 	onSetModel: (model: ModelOption, thinking: string | null) => void;
 	onSetThinking: (level: string) => void;
+	onSetFast: (enabled: boolean) => void;
 	/** A model switch is in flight, so thinking changes wait. */
 	switching: boolean;
 	onBeginSwitch: () => void;
 }
 
-/** The composer's model and thinking-level switches for a session this dashboard started; what a terminal session reports, read-only; nothing for a subagent. */
-export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onSetThinking, switching, onBeginSwitch }: ModelSlotProps) {
+/** The composer's model menu for a session this dashboard started; what a terminal session reports, read-only; nothing for a subagent. */
+export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onSetThinking, onSetFast, switching, onBeginSwitch }: ModelSlotProps) {
 	if (subject.kind !== "session") return null;
 	const model = subject.shown?.model ?? null;
 	const thinking = subject.shown?.thinkingLevel ?? null;
@@ -36,14 +37,15 @@ export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onS
 					onBeginSwitch();
 					onSetModel(picked, null);
 				}}
-				thinking={{
+				pending={switching}
+				effort={{
 					current: thinking,
 					levels: switchable.thinkingLevels,
-					pending: switching,
 					onPick: level => {
 						if (level !== null && !switching) onSetThinking(level);
 					},
 				}}
+				fast={{ state: switchable.fast, onChange: onSetFast }}
 			/>
 		);
 	}

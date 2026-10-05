@@ -7,10 +7,11 @@ import { randomBytes } from "node:crypto";
 import { statSync } from "node:fs";
 import { errorText, isObject, isTexts } from "./json";
 import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
-import { connectedProviders } from "./omp/models";
+import { loadOmpConfig } from "./omp/config";
+import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
 import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
-import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type PromptImage, selectorOf, type UserAnswer, type UserRequest } from "./shared";
+import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type ModelEntry, type ModelOption, type PromptImage, selectorOf, type UserAnswer, type UserRequest } from "./shared";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { SKILL_PROMPT } from "./transcript";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
@@ -78,6 +79,8 @@ export class DashboardSession implements LiveSession {
 	/** Levels the current model accepts, `off` first. */
 	thinkingLevels: string[] = [];
 	modelSwitch = { pending: false, revision: 0 };
+	/** `null` while the model has no priority tier for `/fast` to turn on. */
+	fast: FastMode | null = null;
 	context: ContextUsage | null = null;
 	/** omp's own queues, from `get_state` and then each `queue_update`. */
 	queue: MessageQueue;
@@ -220,6 +223,7 @@ export class DashboardSession implements LiveSession {
 			thinkingLevel: this.thinkingLevel,
 			thinkingLevels: this.thinkingLevels,
 			modelSwitch: this.modelSwitch,
+			fast: this.fast,
 			context: this.context,
 			startedAt: this.startedAt,
 			status: this.status,
@@ -336,9 +340,9 @@ export class DashboardSession implements LiveSession {
 	}
 
 	/** The models omp offers this session, from the providers you are connected to. */
-	async models(): Promise<ModelOption[]> {
-		const [models, connected] = await Promise.all([this.#child.client.getAvailableModels(), connectedProviders()]);
-		return models.flatMap(({ provider, id }) => (connected.has(provider) ? [{ provider, id }] : []));
+	async models(): Promise<ModelEntry[]> {
+		const [models, connected, config] = await Promise.all([this.#child.client.getAvailableModels(), connectedProviders(), loadOmpConfig(this.cwd)]);
+		return modelEntries(models, config, connected);
 	}
 
 	/** Switch to `model`, then to `thinking` when it names a level. */
@@ -385,6 +389,16 @@ export class DashboardSession implements LiveSession {
 		}
 	}
 
+	async setFast(enabled: boolean): Promise<void> {
+		if (this.modelSwitch.pending) return;
+		try {
+			await this.#child.client.setFastMode(enabled);
+		} catch (err) {
+			this.#fail("Fast mode switch failed", err);
+		}
+		this.#refresh();
+	}
+
 	end(): Promise<void> {
 		this.#ended = true;
 		return this.#child.client.stop();
@@ -417,6 +431,7 @@ export class DashboardSession implements LiveSession {
 		this.model = state.model ? selectorOf(state.model) : this.model;
 		this.thinkingLevel = state.thinkingLevel ?? null;
 		this.context = contextOf(state.contextUsage);
+		this.fast = state.model && fastAvailable(state.model) ? { enabled: state.fastModeEnabled, active: state.fastModeActive } : null;
 	}
 
 	/** Re-read omp's state; a request that arrives mid-read runs once more after it, so the last change always lands. */

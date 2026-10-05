@@ -217,17 +217,20 @@ For installation, see the [README](../README.md).
   The host shows guests no queue, so a terminal session lists only the follow-ups that the dashboard holds, not the steers waiting in the host.
   A follow-up held when the room closes shows as a warning in the conversation instead.
   Esc in the host's terminal during a tool call looks to a guest like a turn that ended, so a follow-up that the dashboard holds still runs after it.
-- Sessions started from the dashboard have a model picker with provider tabs and thinking choices in the same popover.
-  Opening it selects the active model's provider tab.
-  Provider tabs only filter the list, and the arrow keys move between tabs.
-  Search matches labels or selectors within the selected provider.
+- Sessions started from the dashboard have a model menu, as Cursor's does: the button reads the model and its effort, such as **Opus 5.5 High**.
+  **Fast** turns omp's `/fast` on or off; it is greyed out for a model without a priority tier, and reads **not active** when omp has it on but the provider refused the fast tier.
+  **Context** shows the model's context window and switches to a variant of the same model with another window, such as Cursor's `claude-opus-5-5` (300K) and `claude-opus-5-5-1m` (1M); models without such a variant have no Context row.
+  **Effort** chooses the thinking level among the ones the live model supports.
+  **Model** opens the model search beside the menu, with the cursor in its field.
+  Before you type, it lists the models that your `modelRoles` and `retry.fallbackChains` name, plus the current one, grouped by provider.
+  Typing searches every connected model, and every word typed must appear in the model's selector, label, or name, in any order.
+  Each provider's heading shows how much of its plan is used, by the tightest window of the account with the most left, since omp moves to that account; hover the number for that account's windows.
   The list contains models that the session's omp RPC process offers from providers you are connected to, the ones omp's `/login` marks as signed in or given a key.
   Models that omp finds without a login, such as Apple's on-device model or a local Ollama, stay out of the list.
-  A login made in a terminal shows the next time the picker opens.
+  A login made in a terminal shows the next time the menu opens.
   Each row shows the logo of the org that makes the model, its label (`Opus 5.5`), and its id, muted, to tell apart models that share a label.
-  Choosing a model keeps the picker open so you can also choose its thinking level.
-  Thinking choices come from the current live model's supported levels.
-  While a model switch runs, thinking choices are unavailable until omp reports the new model and its levels.
+  Choosing a model, a context, or an effort closes the menu.
+  While a model switch runs, Fast, Context, and Effort wait until omp reports the new model and its levels.
   Terminal sessions show their model and thinking level in the same place, but Collab has no frame that changes them, so make those changes in the terminal.
   Subagents have no pickers.
 - The ring before the paperclip and the send button shows how full the session's context window is.
@@ -284,15 +287,15 @@ For installation, see the [README](../README.md).
   When omp is ready, the dashboard opens the session in the focused pane.
   The draft is in the URL hash, `#new` or `#new/<encoded directory>`, and leaves the panes behind it, as **Settings** does.
   A session that you start or fork in another directory than the selected project switches the project picker to that directory, so the sidebar lists it.
-- The draft's composer has the model picker at its bottom left, as a running session's does.
+- The draft's composer has the model menu at its bottom left, as a running session's does, without its Fast row.
   Until you pick one, it names the `default` role's model, such as **Opus 5.5**, which is the model omp starts on without `--model`.
   It reads **Default model** only when no `default` role names a model you are connected to.
-  Provider tabs and search work as in a running session.
-  The thinking choices come from the selected model's omp catalog entry.
+  Context and the model search work as in a running session, and the curated models come from the draft directory's config.
+  The effort choices come from the selected model's omp catalog entry.
   **Default** leaves omp's configured thinking level unchanged.
-  Choosing a level starts the session at that level, and choosing another model resets the thinking choice to **Default**.
+  Choosing a level starts the session at that level, and choosing another model resets the effort to **Default**.
   Models without selectable thinking levels offer only **Default**.
-  Cmd+. opens the model picker here too, and Cmd+J cycles the supported thinking levels after the catalog loads.
+  Cmd+. opens the model search here too, and Cmd+J cycles the supported thinking levels after the catalog loads.
 - A skill pinned in **Settings** shows as a toggle after the pickers, with the skill's name.
   While it is on, the first message goes through the skill, as if you had typed `/skill:<name>` before it, and the transcript shows the skill's pill.
   Click it to start this one session without the skill.

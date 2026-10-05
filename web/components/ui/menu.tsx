@@ -1,6 +1,7 @@
 import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
+import { Check, ChevronRight } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -149,6 +150,102 @@ function MenuSeparator({
   )
 }
 
+function MenuSubmenu({
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.SubmenuRoot>) {
+  return <MenuPrimitive.SubmenuRoot data-slot="menu-submenu" {...props} />
+}
+
+/** A row that opens its submenu on hover, click, or →; `value` reads the current choice before the chevron. */
+function MenuSubmenuTrigger({
+  className,
+  value,
+  children,
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.SubmenuTrigger> & { value?: React.ReactNode }) {
+  return (
+    <MenuPrimitive.SubmenuTrigger
+      data-slot="menu-submenu-trigger"
+      className={cn(itemClassName, "data-popup-open:bg-accent data-popup-open:text-accent-foreground", className)}
+      {...props}
+    >
+      {children}
+      <span className="ml-auto flex min-w-0 items-center gap-1 pl-4 text-muted-foreground">
+        {value !== undefined && <span className="truncate">{value}</span>}
+        <ChevronRight aria-hidden />
+      </span>
+    </MenuPrimitive.SubmenuTrigger>
+  )
+}
+
+function MenuSubmenuContent({
+  className,
+  sideOffset = 4,
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.Popup> &
+  Pick<React.ComponentProps<typeof MenuPrimitive.Positioner>, "sideOffset">) {
+  return (
+    <MenuPrimitive.Portal>
+      <MenuPrimitive.Positioner className="z-50 outline-hidden" side="inline-end" align="start" sideOffset={sideOffset} alignOffset={-5}>
+        <MenuPrimitive.Popup
+          data-slot="menu-submenu-content"
+          className={cn(popupClassName, className)}
+          {...props}
+        />
+      </MenuPrimitive.Positioner>
+    </MenuPrimitive.Portal>
+  )
+}
+
+/** A row that turns a setting on and off, drawn as a switch at its end. */
+function MenuSwitchItem({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.CheckboxItem>) {
+  return (
+    <MenuPrimitive.CheckboxItem
+      data-slot="menu-switch-item"
+      className={cn(itemClassName, "group", className)}
+      {...props}
+    >
+      {children}
+      <span
+        aria-hidden
+        className="ml-auto inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-input p-0.5 transition-colors group-data-checked:bg-primary motion-reduce:transition-none"
+      >
+        <span className="size-3 rounded-full bg-background shadow-xs transition-transform group-data-checked:translate-x-3 motion-reduce:transition-none" />
+      </span>
+    </MenuPrimitive.CheckboxItem>
+  )
+}
+
+function MenuRadioGroup({
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.RadioGroup>) {
+  return <MenuPrimitive.RadioGroup data-slot="menu-radio-group" {...props} />
+}
+
+/** One choice of a {@link MenuRadioGroup}, checked at its end while chosen. */
+function MenuRadioItem({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof MenuPrimitive.RadioItem>) {
+  return (
+    <MenuPrimitive.RadioItem
+      data-slot="menu-radio-item"
+      className={cn(itemClassName, className)}
+      {...props}
+    >
+      {children}
+      <MenuPrimitive.RadioItemIndicator className="ml-auto pl-4">
+        <Check aria-hidden />
+      </MenuPrimitive.RadioItemIndicator>
+    </MenuPrimitive.RadioItem>
+  )
+}
+
 function MenuShortcut({
   className,
   ...props
@@ -173,4 +270,10 @@ export {
   MenuLinkItem,
   MenuSeparator,
   MenuShortcut,
+  MenuSubmenu,
+  MenuSubmenuTrigger,
+  MenuSubmenuContent,
+  MenuSwitchItem,
+  MenuRadioGroup,
+  MenuRadioItem,
 }

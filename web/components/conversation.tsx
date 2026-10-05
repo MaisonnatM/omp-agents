@@ -16,6 +16,7 @@ import { useSuggestions } from "./composer-suggestions";
 import { ContextRing } from "./context-ring";
 import { ConversationHeader } from "./conversation-header";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
+import type { ModelMenuOpen } from "./model-picker";
 import { ModelSlot } from "./model-slot";
 import { type Subject, subjectOf } from "./subject";
 import { Transcript } from "./transcript";
@@ -85,7 +86,7 @@ function LiveConversation({
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const [draft, setDraft] = useState(initialDraft);
-	const [modelsOpen, setModelsOpen] = useState(false);
+	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
 	const [pendingModelRevision, setPendingModelRevision] = useState<number | null>(null);
 	const attachments = useImageAttachments();
 
@@ -149,10 +150,10 @@ function LiveConversation({
 		},
 	});
 
-	// The list refreshes on every open, whether a click or the model shortcut opened it.
-	const openModels = (open: boolean): void => {
+	// The list refreshes on every open, whether a click or the model shortcut opened the menu.
+	const openModels = (open: ModelMenuOpen | null): void => {
+		if (open !== null && modelsOpen === null) send({ t: "list-models", instanceId: view.instanceId });
 		setModelsOpen(open);
-		if (open) send({ t: "list-models", instanceId: view.instanceId });
 	};
 	const setThinking = (level: string): void => send({ t: "set-thinking", instanceId: view.instanceId, level });
 
@@ -182,7 +183,7 @@ function LiveConversation({
 					},
 					model: () => {
 						if (!switchable) return false;
-						openModels(true);
+						openModels("models");
 					},
 					thinking: () => {
 						const levels = switchingModel ? [] : switchable?.thinkingLevels ?? [];
@@ -260,6 +261,7 @@ function LiveConversation({
 							}}
 							onSetModel={(model, level) => send({ t: "set-model", instanceId: view.instanceId, model, thinking: level })}
 							onSetThinking={setThinking}
+							onSetFast={enabled => send({ t: "set-fast", instanceId: view.instanceId, enabled })}
 						/>
 					}
 					files={attachable ? attachments.files : undefined}

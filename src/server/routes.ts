@@ -65,8 +65,11 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	/** `GET /api/models`: the models omp lists, for the settings page's pickers. */
 	const models = get(() => answer(async () => ({ models: await listModels() })));
 
-	/** `GET /api/models/connected`: the models of the providers you are connected to, for the new-session draft's model picker. */
-	const connected = get(() => answer(connectedModels));
+	/** `GET /api/models/connected?cwd=<dir>`: the models of the providers you are connected to, for the new-session draft's model picker. */
+	const connected = get(params => {
+		const cwd = dirParam(params);
+		return cwd instanceof Response ? cwd : answer(() => connectedModels(cwd));
+	});
 
 	/** `GET /api/models/roles?cwd=<dir>`: omp's model roles a session in that directory could switch to. */
 	const roles = get(params => {

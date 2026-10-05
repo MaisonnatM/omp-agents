@@ -1,9 +1,9 @@
 import { isObject } from "../json";
 import { runJson } from "../proc";
-import { type CatalogModel, type ConnectedModels, type ModelRole, splitSelector } from "../shared";
-import { loadOmpConfig } from "./config";
+import { type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared";
+import { loadOmpConfig, type OmpConfig } from "./config";
 import { ompCommand } from "./install";
-import { auth, oauth } from "./modules";
+import { auth, oauth, type ServiceTierModel, serviceTiers } from "./modules";
 
 const MODELS_TIMEOUT_MS = 30_000;
 
@@ -18,6 +18,7 @@ export async function listModels(): Promise<CatalogModel[]> {
 						selector: model.selector,
 						provider: model.provider,
 						name: typeof model.name === "string" ? model.name : model.selector,
+						contextWindow: typeof model.contextWindow === "number" ? model.contextWindow : null,
 						thinking: Array.isArray(model.thinking) ? model.thinking.filter(level => typeof level === "string") : [],
 					},
 				]
@@ -39,16 +40,47 @@ export async function connectedProviders(): Promise<Set<string>> {
 	}
 }
 
-/** The models of {@link connectedProviders} that `omp models` lists, in omp's order: what a new session can start on. */
-export async function connectedModels(): Promise<ConnectedModels> {
-	const [catalog, connected] = await Promise.all([listModels(), connectedProviders()]);
-	const capabilities = catalog
-		.filter(model => connected.has(model.provider))
-		.map(({ selector, provider, thinking }) => ({
-			model: { provider, id: selector.slice(provider.length + 1) },
-			thinkingLevels: thinking,
-		}));
-	return { models: capabilities.map(({ model }) => model), capabilities };
+/** A model as `omp models` or a session's RPC lists it. Extra fields ride through {@link modelEntries}. */
+interface ListedModel {
+	provider: string;
+	id: string;
+	name: string;
+	contextWindow: number | null;
+}
+
+/**
+ * The models of `connected` providers as a picker offers them, in their order. `curated` marks the ones `config` names
+ * as a role's model or in a fallback chain, with any `:level` dropped; a role alias such as `@slow` names no model of its own.
+ * Fields on `models` beyond {@link ListedModel}, such as a draft's thinking levels, stay on each entry.
+ */
+export function modelEntries<T extends ListedModel>(models: readonly T[], config: Pick<OmpConfig, "modelRoles" | "fallbackChains">, connected: ReadonlySet<string>): (ModelEntry & Omit<T, keyof ListedModel>)[] {
+	const known = new Set(models.map(selectorOf));
+	const named = [...Object.values(config.modelRoles), ...Object.entries(config.fallbackChains).flatMap(([key, chain]) => [key, ...chain])];
+	const curated = new Set(named.map(value => splitSelector(value.trim(), known).model));
+	return models.flatMap(model => {
+		if (!connected.has(model.provider)) return [];
+		const { provider, id, name, contextWindow, ...rest } = model;
+		return [{ ...rest, provider, id, name, contextWindow, curated: curated.has(`${provider}/${id}`) }];
+	});
+}
+
+/** What a new session in `cwd` can start on: the models of {@link connectedProviders} that `omp models` lists, in omp's order. */
+export async function connectedModels(cwd: string): Promise<ConnectedModels> {
+	const [catalog, connected, config] = await Promise.all([listModels(), connectedProviders(), loadOmpConfig(cwd)]);
+	const listed: (ListedModel & Pick<DraftModel, "thinkingLevels">)[] = catalog.map(({ selector, provider, name, contextWindow, thinking }) => ({
+		provider,
+		id: selector.slice(provider.length + 1),
+		name,
+		contextWindow,
+		thinkingLevels: thinking,
+	}));
+	return { models: modelEntries(listed, config, connected) };
+}
+
+/** Whether omp's `/fast` can turn on for `model`, as omp's own `setFastMode` decides. */
+export function fastAvailable(model: ServiceTierModel): boolean {
+	const family = serviceTiers.serviceTierFamily(model);
+	return family !== undefined && (family !== "openai" || serviceTiers.shouldSendServiceTier("priority", model));
 }
 
 /**
