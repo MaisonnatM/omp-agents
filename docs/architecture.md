@@ -68,6 +68,11 @@ Every transcript comes from the session files on this machine, not from a networ
   On 460 MB across 367 sessions it takes under a second, and the sidebar shows before it finishes.
   A session that names a PR by number alone costs one `git remote get-url origin` in its working directory.
   A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
+- The same scan collects the Linear issues each session worked on, by identifier, from the arguments of its Linear MCP calls: a direct `mcp__linear_<tool>` call or a `write` to `xd://mcp__linear_<tool>`, whose `content` holds the arguments as JSON.
+  `get_issue` and `save_issue` name the issue in `id`, `list_comments` and `save_comment` in `issueId`; a `save_issue` with no `id` opens one, whose identifier its result's JSON `id` names.
+  A UUID is left out, since the tickets page opens an issue by identifier.
+  The `/ship` state's `issue` counts too.
+  Session rows carry them as `tickets`, the session's own first.
 - Each inbox answer tells the server which branch heads which pull request in that repository.
   The server then links each session whose `git push` updated one of those branches to that PR, and sends the sidebar the new links.
 
@@ -345,7 +350,7 @@ The server lives in `src/`:
 - `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below, and reads the plan file that the second fold names.
 - `src/transcript.ts`: folds session-file lines and live events into display items.
 - `src/work.ts`: folds session-file lines into the plan and changes: the latest todo list, the plan file changed last, and the files changed.
-- `src/pull-requests.ts`: finds the pull requests each session submitted or worked on.
+- `src/pull-requests.ts`: finds the pull requests and Linear issues each session submitted or worked on.
 - `src/session-links.ts`: writes the session block into a pull request's description.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.

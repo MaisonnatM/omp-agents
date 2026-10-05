@@ -323,6 +323,8 @@ interface RosterHostBase {
 	agents: AgentRow[];
 	/** What the session and its subagents submitted or worked on; the session's own first. */
 	pullRequests: LinkedPullRequest[];
+	/** The Linear issues the session and its subagents read, changed, opened, or commented on, by identifier; the session's own first. */
+	tickets: string[];
 	ship: ShipProgress | null;
 	/** Questions the session waits on, oldest first. */
 	requests: UserRequest[];
@@ -354,6 +356,8 @@ export interface PastSession {
 	modifiedAt: number;
 	/** What the session and its subagents submitted or worked on; the session's own first. */
 	pullRequests: LinkedPullRequest[];
+	/** The Linear issues the session and its subagents read, changed, opened, or commented on, by identifier; the session's own first. */
+	tickets: string[];
 	ship: ShipProgress | null;
 	/** The dashboard started it, and it stopped without **End session**: with the dashboard server, or on its own. */
 	interrupted: boolean;

@@ -20,7 +20,7 @@ import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/mes
 import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestUrl } from "../inbox-model";
 import { hostLabel, pastLabel, projectName } from "../labels";
-import { hashForInbox } from "../routing";
+import { hashForInbox, hashForTickets } from "../routing";
 import { shortcutKeys, useShortcuts } from "../shortcuts";
 import { type ForkPoint, nextSuggestions } from "../transcript-view";
 import type { Completions } from "../pane-store";
@@ -170,6 +170,18 @@ function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 	});
 }
 
+/** The Linear issues a session worked on, after a separator; each opens the issue's sheet on the tickets page. */
+function Tickets({ tickets }: { tickets: string[] }) {
+	return tickets.map(id => (
+		<Fragment key={id}>
+			{" · "}
+			<a href={hashForTickets(id)} title={`${id}, which this session worked on, in the tickets page`} className="underline-offset-2 hover:text-foreground hover:underline">
+				{id}
+			</a>
+		</Fragment>
+	));
+}
+
 
 interface PastConversationProps {
 	sessionId: string;
@@ -192,6 +204,7 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 			<ShipStep ship={session.ship} />{" "}
 			<Project cwdDisplay={session.cwdDisplay} /> · last active {new Date(session.modifiedAt).toLocaleString()}
 			<PullRequests pullRequests={session.pullRequests} />
+			<Tickets tickets={session.tickets} />
 		</>
 	) : (
 		sessionId
@@ -383,6 +396,7 @@ function LiveConversation({
 					{" · "}
 					{shown.model ? <Model selector={shown.model} /> : "no model"} · pid {shown.pid}
 					<PullRequests pullRequests={shown.pullRequests} />
+					<Tickets tickets={shown.tickets} />
 				</>
 			);
 	// omp's RPC mode reaches only a running subagent, so nothing could send a follow-up held until it stopped.

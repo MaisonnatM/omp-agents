@@ -50,14 +50,14 @@ export class SessionFiles {
 		return path ? this.pullRequests.of(path) : [];
 	};
 
-	/** What the index knows of session `sessionId`: its pull requests and /ship stage. */
+	/** What the index knows of session `sessionId`: its pull requests, Linear issues, and /ship stage. */
 	readonly factsOf = (sessionId: string): SessionFacts => {
 		const path = this.pathOf(sessionId);
-		return path ? this.#factsAt(path) : { pullRequests: [], ship: null };
+		return path ? this.#factsAt(path) : { pullRequests: [], tickets: [], ship: null };
 	};
 
 	#factsAt(path: string): SessionFacts {
-		return { pullRequests: this.pullRequests.of(path), ship: this.pullRequests.shipOf(path) };
+		return { pullRequests: this.pullRequests.of(path), tickets: this.pullRequests.ticketsOf(path), ship: this.pullRequests.shipOf(path) };
 	}
 
 	/** Directories sessions ran in, newest first. Sessions from old omp versions recorded none. */
