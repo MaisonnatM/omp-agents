@@ -12,6 +12,7 @@ The full reference for the dashboard's interface. For installation, see the [REA
 - [Pull requests and the inbox](#pull-requests-and-the-inbox)
 - [Settings](#settings)
 - [Keyboard shortcuts](#keyboard-shortcuts)
+- [Desktop app](#desktop-app)
 - [Limitations](#limitations)
 
 ## Sessions sidebar
@@ -157,6 +158,17 @@ The shortcuts follow common web-app conventions, from Slack, GitHub, Gmail, Line
 - Cmd+. opens the model picker and Cmd+J moves to the next thinking level, in sessions that the dashboard started and, for the model, in the new-session draft. Cmd+E expands or collapses every tool call. Cmd+, opens Settings, where the model roles live, and closes it again. Ending a session has no shortcut: use **End session** in its header.
 - G then I opens the Inbox tab. G then S goes back from the inbox, Settings, or the new-session draft to the panes. G then P opens the project picker with its search field focused.
 - Session shortcuts act on the focused pane. The dashboard does not read `~/.omp/agent/keybindings.yml`.
+
+## Desktop app
+
+`bun run desktop` shows the dashboard in its own window; see the [README](../README.md#desktop-app) to start it.
+
+- The window is the same page as a browser tab, on the same address, `http://127.0.0.1:<port>`. It keeps its own localStorage, so pins, folded sections, the sidebar widths, the theme, and the pinned skill start fresh in the window and stay apart from a browser's.
+- At launch, the app asks the port for the dashboard's sign-in. When an omp-agents server answers, the window uses it, and quitting the app leaves it running. When nothing listens, the app starts the server from its checkout and stops it when you quit. When something else answers, the window says that the port is taken, with **Retry**. When the server that the app started stops on its own, or fails to start, the window shows the end of its output, with **Retry**. When the dashboard does not load, for example on a reload after the server it used stopped, the window says so, with **Retry**.
+- On macOS, closing the window hides it: the server, the sessions it started, and its Collab guests keep running. Click the app in the Dock, or run `bun run desktop` again, to show it. Cmd+Q quits the app; when the app started the server, it waits for the server to end its sessions first, which then show under **interrupted** at the next start. Off macOS, closing the window quits.
+- Every link to another site opens in the default browser, and so does **Connect Linear**'s sign-in page. The window never leaves the dashboard.
+- Cmd+W closes the window, Cmd+R reloads it, Cmd+Q quits, Cmd+M minimizes, and Cmd+0, Cmd++, and Cmd+- set the zoom. The menu takes none of the dashboard's own shortcuts. Right-click in a text field for cut, copy, paste, and spelling suggestions.
+- The window remembers its size and position.
 
 ## Limitations
 
