@@ -350,7 +350,7 @@ The server lives in `src/`:
 - `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below, and reads the plan file that the second fold names.
 - `src/transcript.ts`: folds session-file lines and live events into display items.
 - `src/work.ts`: folds session-file lines into the plan and changes: the latest todo list, the plan file changed last, and the files changed.
-- `src/pull-requests.ts`: finds the pull requests and Linear issues each session submitted or worked on.
+- `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, and its latest /ship step.
 - `src/session-links.ts`: writes the session block into a pull request's description.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.

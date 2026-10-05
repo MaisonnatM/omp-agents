@@ -158,7 +158,7 @@ try {
 				guards,
 				origin: originOf(PORT),
 				knownCwds,
-				pullRequestIndex: files.pullRequests,
+				facts: files.facts,
 				pullRequestsOf: files.pullRequestsOf,
 				onLinked: () => broadcasts.pushAll(),
 			}),

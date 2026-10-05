@@ -38,7 +38,7 @@ const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "mcp__lin
 const LINEAR_TOOL = /^(?:xd_)?mcp__linear_(\w+)$/;
 const LINEAR_DEVICE = /^xd:\/\/mcp__linear_(\w+)$/;
 /** The Linear tools that act on one issue, and the argument that names it. */
-const LINEAR_ISSUE_ARG: Record<string, string> = { get_issue: "id", save_issue: "id", list_comments: "issueId", save_comment: "issueId" };
+const LINEAR_ISSUE_ARG = { get_issue: "id", save_issue: "id", list_comments: "issueId", save_comment: "issueId" } as const;
 const SHIP_STAGES: Record<ShipProgress["stage"], true> = {
 	ticket: true, implement: true, draft_pr: true, thermonuclear: true, ready_gate: true, live: true, merged: true,
 };
@@ -110,7 +110,7 @@ function linearCall(name: string, args: Record<string, unknown>): { tool: string
 }
 
 /** Folds one transcript's lines, in order, into the pull requests and Linear issues it links to, each once. */
-export class PullRequestScan {
+export class SessionFactsScan {
 	/** Bash calls, then their background jobs, whose output has not been read yet, and what it can prove. */
 	readonly #pending = new Map<string, Expected>();
 	/** `save_issue` calls that open an issue, whose result names it. */
@@ -204,7 +204,7 @@ export class PullRequestScan {
 
 	#linear(callId: string, tool: string, args: Record<string, unknown>): void {
 		if (!Object.hasOwn(LINEAR_ISSUE_ARG, tool)) return;
-		const named = args[LINEAR_ISSUE_ARG[tool]!];
+		const named = args[LINEAR_ISSUE_ARG[tool as keyof typeof LINEAR_ISSUE_ARG]];
 		if (typeof named === "string") this.#ticket(named);
 		else if (tool === "save_issue") this.#opening.add(callId);
 	}
@@ -267,12 +267,12 @@ export function resolveLinks(refs: Iterable<PullRequestRef>, repo: Repo | null, 
 
 /** One transcript, read up to its last complete line. */
 class TranscriptScan {
-	scan = new PullRequestScan();
+	scan = new SessionFactsScan();
 	readonly #lines: LineReader;
 
 	constructor(path: string) {
 		this.#lines = new LineReader(path, () => {
-			this.scan = new PullRequestScan();
+			this.scan = new SessionFactsScan();
 		});
 	}
 
@@ -312,7 +312,7 @@ export interface ListedSession {
 	modifiedAt: number;
 }
 
-export class PullRequestIndex {
+export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
 	/** The PRs the inbox listed, by `owner/repo:branch` of their head. */
 	readonly #heads = new Map<string, PullRequest>();
@@ -325,7 +325,7 @@ export class PullRequestIndex {
 	}
 
 	/** What the session in `sessionPath` and its subagents submitted or worked on, or none before its first scan. */
-	of(sessionPath: string): LinkedPullRequest[] {
+	pullRequestsOf(sessionPath: string): LinkedPullRequest[] {
 		return this.#sessions.get(sessionPath)?.pullRequests ?? [];
 	}
 
@@ -375,6 +375,17 @@ export class PullRequestIndex {
 		return true;
 	}
 
+	/** Collect every transcript's refs and Linear issues into the session; returns whether its Linear issues changed. */
+	#gather(session: SessionScan): boolean {
+		const transcripts = [...session.transcripts.values()];
+		session.refs = transcripts.flatMap(transcript => [...transcript.scan.found.values()]);
+		const tickets = [...new Set(transcripts.flatMap(transcript => [...transcript.scan.tickets]))];
+		const before = session.tickets;
+		if (tickets.length === before.length && tickets.every((id, i) => id === before[i])) return false;
+		session.tickets = tickets;
+		return true;
+	}
+
 	async #refresh(sessions: readonly ListedSession[]): Promise<boolean> {
 		const listed = new Set(sessions.map(session => session.path));
 		for (const path of this.#sessions.keys()) if (!listed.has(path)) this.#sessions.delete(path);
@@ -394,12 +405,7 @@ export class PullRequestIndex {
 			for (const transcript of session.transcripts.values()) if (!(await transcript.read())) complete = false;
 			if (complete) session.modifiedAt = modifiedAt;
 			if (JSON.stringify(previousShip ?? null) !== JSON.stringify(session.transcripts.get(path)?.scan.ship ?? null)) changed = true;
-			session.refs = [...session.transcripts.values()].flatMap(transcript => [...transcript.scan.found.values()]);
-			const tickets = [...new Set([...session.transcripts.values()].flatMap(transcript => [...transcript.scan.tickets]))];
-			if (tickets.join() !== session.tickets.join()) {
-				session.tickets = tickets;
-				changed = true;
-			}
+			if (this.#gather(session)) changed = true;
 			touched.push(session);
 		}
 		// One `git` call per directory, all at once, and only for sessions that name a PR by number alone.

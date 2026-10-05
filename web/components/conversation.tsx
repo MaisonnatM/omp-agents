@@ -182,7 +182,6 @@ function Tickets({ tickets }: { tickets: string[] }) {
 	));
 }
 
-
 interface PastConversationProps {
 	sessionId: string;
 	/** The listed row, or `null` when the session is no longer listed. */

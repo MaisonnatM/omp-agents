@@ -11,7 +11,7 @@ import { loadLinearStatus, startLinearSignIn } from "../linear";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { directoryOf } from "../paths";
-import type { PullRequestIndex } from "../pull-requests";
+import type { SessionFactsIndex } from "../session-facts";
 import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
@@ -29,7 +29,7 @@ export interface RouteEnv {
 	origin: string;
 	/** Directories sessions ran in: live ones first, then saved ones newest first. */
 	knownCwds(): string[];
-	pullRequestIndex: PullRequestIndex;
+	facts: SessionFactsIndex;
 	pullRequestsOf(sessionId: string): LinkedPullRequest[];
 	/** The index learned which sessions link to which pull requests. */
 	onLinked(): void;
@@ -38,7 +38,7 @@ export interface RouteEnv {
 type Handler = (req: Request) => Promise<Response>;
 
 export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET" | "PUT", Handler>>> {
-	const { guards, knownCwds, pullRequestIndex } = env;
+	const { guards, knownCwds, facts } = env;
 
 	/**
 	 * The `cwd` a request names, `null` when it names none, or the response refusing it. `cwd` must be a
@@ -100,7 +100,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return answer(async () => {
 			const loaded = await loadInbox(cwd === null ? knownCwds() : [cwd], fresh);
 			let linked = false;
-			for (const repo of loaded.repos) if ("pullRequests" in repo && pullRequestIndex.learnHeads(repo, repo.pullRequests)) linked = true;
+			for (const repo of loaded.repos) if ("pullRequests" in repo && facts.learnHeads(repo, repo.pullRequests)) linked = true;
 			if (linked) env.onLinked();
 			return loaded;
 		});
