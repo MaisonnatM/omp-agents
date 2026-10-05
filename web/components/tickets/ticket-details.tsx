@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { age } from "../../labels";
 import { useReplaceableRead } from "../../reads";
 import { PRIORITY_LABEL } from "../../tickets-model";
+import { BranchName } from "../git";
 import { IconTip } from "../inbox/avatars";
 import { Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
 import { TicketFields } from "./ticket-fields";
@@ -97,9 +98,7 @@ function TicketSections({ detail: { description, attachments, threads, branch } 
 			</DetailSection>
 			{branch && (
 				<DetailSection title="Branch">
-					<p className="truncate font-mono text-xs" title={branch}>
-						{branch}
-					</p>
+					<BranchName name={branch} className="max-w-full truncate font-mono text-xs" />
 				</DetailSection>
 			)}
 			{attachments.length > 0 && (

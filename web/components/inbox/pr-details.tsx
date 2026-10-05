@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestUrl } from "../../inbox-model";
 import { age } from "../../labels";
 import { useRead } from "../../reads";
+import { BranchName } from "../git";
 import { Comment, DetailSection, Markdown, OutLink, SheetFrame } from "../sheet-details";
 import { Avatar, IconTip, STATE_ICON } from "./avatars";
 
@@ -89,7 +90,7 @@ export function PullRequestSheetContent({ pr, actions }: { pr: PullRequest; acti
 					{detail && (
 						<>
 							<span className="min-w-0 truncate">
-								<span className="font-mono">{detail.head}</span> into <span className="font-mono">{detail.base}</span>
+								<BranchName name={detail.head} className="font-mono" /> into <span className="font-mono">{detail.base}</span>
 							</span>
 							<span className="tabular-nums">
 								<span className="text-emerald-600 dark:text-emerald-400">+{detail.additions}</span>{" "}

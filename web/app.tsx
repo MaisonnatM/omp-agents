@@ -1,15 +1,13 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../src/shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
-import { Tabs } from "@/components/ui/tabs";
 import { DashboardContext } from "./components/dashboard-context";
 import { InboxPage } from "./components/inbox/inbox-page";
-import { DashboardHeader, type SidebarTab } from "./components/navigation";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
 import { PlanPanel } from "./components/plan-panel";
 import { PlanUsageFooter } from "./components/plan-usage";
-import { Roster, useProject } from "./components/roster";
+import { Roster, type SidebarTab, useProject } from "./components/roster";
 import { SettingsPage } from "./components/settings/settings-page";
 import { SessionSwitcher } from "./components/session-switcher";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
@@ -277,43 +275,38 @@ export function App() {
 
 	return (
 		<DashboardContext.Provider value={dashboard}>
-			<SidebarProvider persist={false} shortcut={null} className="h-svh min-h-0 flex-col">
-				<Tabs value={tab} onValueChange={value => showTab(value as SidebarTab)} className="flex min-h-0 flex-1 flex-col">
-					<DashboardHeader ticketsShown={ticketsShown} sidebarOpen={sidebars.panels.left.open} />
-					<div className="flex min-h-0 flex-1">
-						<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
-							<Roster
-								projects={projects}
-								lists={lists}
-								onTogglePin={togglePin}
-								open={page ? [] : layout.panes}
-								newSessionOpen={page?.kind === "new"}
-								settingsHref={settingsHref}
-								settingsOpen={page?.kind === "settings"}
-								ticketsShown={ticketsShown}
-								tab={tab}
-								sidebarOpen={sidebars.panels.left.open}
-								userTodos={state.userTodos}
-								todoCategory={todoCategory}
-								sectionTarget={sectionTarget}
-								onSectionTarget={setSectionTarget}
-								project={project}
-								onPickProject={pickProject}
-								onShowShortcuts={() => setShortcutsOpen(true)}
-								toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
-							/>
-							<PlanUsageFooter usage={state.usage} />
-						</DashboardSidebar>
-						<SidebarInset>
-							<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
-						</SidebarInset>
-						{planView && (
-							<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-								<PlanPanel key={hashForView(planView)} view={planView} />
-							</DashboardSidebar>
-						)}
-					</div>
-				</Tabs>
+			<SidebarProvider persist={false} shortcut={null} className="h-svh">
+				<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
+					<Roster
+						projects={projects}
+						lists={lists}
+						onTogglePin={togglePin}
+						open={page ? [] : layout.panes}
+						newSessionOpen={page?.kind === "new"}
+						settingsHref={settingsHref}
+						settingsOpen={page?.kind === "settings"}
+						ticketsShown={ticketsShown}
+						tab={tab}
+						onTab={showTab}
+						userTodos={state.userTodos}
+						todoCategory={todoCategory}
+						sectionTarget={sectionTarget}
+						onSectionTarget={setSectionTarget}
+						project={project}
+						onPickProject={pickProject}
+						onShowShortcuts={() => setShortcutsOpen(true)}
+						toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
+					/>
+					<PlanUsageFooter usage={state.usage} />
+				</DashboardSidebar>
+				<SidebarInset>
+					<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
+				</SidebarInset>
+				{planView && (
+					<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
+						<PlanPanel key={hashForView(planView)} view={planView} />
+					</DashboardSidebar>
+				)}
 				<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 				<SessionSwitcher
 					open={switcherOpen}
