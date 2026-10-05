@@ -490,7 +490,7 @@ The page lives in `web/`.
   `web/components/skill-picker.tsx` is the skill picker that the settings' pinned skill and the routine editor share.
   The checkout, the default model, and the skills are each one `useRead`.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
-  `web/components/session-switcher.tsx` is the search over every session, opened from the sidebar header or with Cmd+Shift+K.
+  `web/components/session-switcher.tsx` is the search over every session, opened from the sidebar header or with Cmd+K. What you type there can also be added as a todo.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
 - `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's project, and the pinned skill; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.

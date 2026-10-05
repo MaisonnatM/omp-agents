@@ -23,10 +23,9 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(pressOn(true, "b", "KeyB", { meta: true, shift: true })).toEqual(["planSidebar"]);
 	expect(press("b", "KeyB", { ctrl: true, alt: true })).toEqual([]);
 	expect(press("O", "KeyO", { ctrl: true, shift: true })).toEqual(["newSession"]);
-	expect(press("k", "KeyK", { ctrl: true })).toEqual(["quickTodo"]);
-	expect(press("K", "KeyK", { ctrl: true, shift: true })).toEqual(["switcher"]);
-	expect(pressOn(true, "k", "KeyK", { meta: true })).toEqual(["quickTodo"]);
-	expect(pressOn(true, "k", "KeyK", { meta: true, shift: true })).toEqual(["switcher"]);
+	expect(press("k", "KeyK", { ctrl: true })).toEqual(["switcher"]);
+	expect(pressOn(true, "k", "KeyK", { meta: true })).toEqual(["switcher"]);
+	expect(press("K", "KeyK", { ctrl: true, shift: true })).toEqual([]);
 	expect(press("k", "KeyK", { ctrl: true, alt: true })).toEqual([]);
 	expect(press("b", "KeyB")).toEqual([]);
 });
@@ -41,8 +40,8 @@ test("browser-reserved chords stay the browser's", () => {
 });
 
 test("a letter key that types no ASCII letter matches by its physical key, an ASCII symbol as typed", () => {
-	expect(press("л", "KeyK", { ctrl: true })).toEqual(["quickTodo"]);
-	expect(pressOn(true, "˚", "KeyK", { meta: true })).toEqual(["quickTodo"]);
+	expect(press("л", "KeyK", { ctrl: true })).toEqual(["switcher"]);
+	expect(pressOn(true, "˚", "KeyK", { meta: true })).toEqual(["switcher"]);
 	expect(press(",", "KeyM", { ctrl: true })).toEqual(["settings"]);
 	expect(press("?", "KeyM", { shift: true })).toEqual(["help"]);
 	expect(press("?", "Slash", { shift: true })).toEqual(["help"]);

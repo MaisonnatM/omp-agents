@@ -4,7 +4,6 @@ export type ShortcutId =
 	| "interrupt"
 	| "followUp"
 	| "dequeue"
-	| "quickTodo"
 	| "switcher"
 	| "newSession"
 	| "endSession"
@@ -71,8 +70,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		keys: [{ chord: { key: "Enter", mod: true }, scope: "composer" }],
 	},
 	{ id: "dequeue", label: "Move the last queued message back into the empty composer", keys: [{ chord: { key: "ArrowUp" }, scope: "composer" }] },
-	{ id: "quickTodo", label: "Start a new todo", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
-	{ id: "switcher", label: "Jump to a session", keys: [{ chord: { key: "k", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "switcher", label: "Jump to a session, or create a todo", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
 	{ id: "newSession", label: "Start a new session", keys: [{ chord: { key: "o", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "endSession", label: "End the focused session", keys: [{ chord: { key: "x", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "previousSession", label: "Open the previous session in the sidebar", keys: [{ chord: { key: "ArrowUp", alt: true }, scope: "anywhere" }] },
