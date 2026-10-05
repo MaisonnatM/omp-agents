@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared";
-import { applyItems, forkPoints, toBlocks, turnReplies } from "./transcript-view";
+import { applyItems, forkPoints, nextSuggestions, toBlocks, turnReplies } from "./transcript-view";
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
@@ -23,7 +23,7 @@ describe("transcript rendering", () => {
 
 describe("forkPoints", () => {
 	const prompt = (id: string, entryId: string | null): Item => ({ id, kind: "user", text: id, skill: null, from: null, entryId });
-	const reply = (id: string, streaming = false): Item => ({ id, kind: "assistant", text: id, streaming });
+	const reply = (id: string, streaming = false): Item => ({ id, kind: "assistant", text: id, streaming, suggestions: [] });
 	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] };
 
 	test("a prompt forks at itself; a turn's last reply forks at the next prompt, keeping the whole turn", () => {
@@ -57,7 +57,7 @@ describe("forkPoints", () => {
 
 describe("turnReplies", () => {
 	const prompt = (id: string): Item => ({ id, kind: "user", text: id, skill: null, from: null, entryId: id });
-	const reply = (id: string, text = id): Item => ({ id, kind: "assistant", text, streaming: false });
+	const reply = (id: string, text = id): Item => ({ id, kind: "assistant", text, streaming: false, suggestions: [] });
 	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] };
 	const items = [prompt("p1"), reply("r1a"), tool, reply("r1b"), reply("r1c", " "), prompt("p2"), reply("r2a"), tool, reply("r2b")];
 
@@ -67,5 +67,22 @@ describe("turnReplies", () => {
 
 	test("a turn still running has no reply yet", () => {
 		expect([...turnReplies(items, true)]).toEqual(["r1b"]);
+	});
+});
+
+describe("suggestions", () => {
+	test("only the last turn's finished reply suggests, until a prompt follows it", () => {
+		const prompt: Item = { id: "p", kind: "user", text: "go", skill: null, from: null, entryId: "p" };
+		const reply = (streaming: boolean): Item => ({
+			id: "r",
+			kind: "assistant",
+			text: "Done.\nSuggestions:\n1. Ship it",
+			streaming,
+			suggestions: streaming ? [] : ["Ship it"],
+		});
+		const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] };
+		expect(nextSuggestions([prompt, reply(false), tool], false)).toEqual(["Ship it"]);
+		expect(nextSuggestions([prompt, reply(true)], true)).toEqual([]);
+		expect(nextSuggestions([reply(false), prompt], false)).toEqual([]);
 	});
 });

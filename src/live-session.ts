@@ -1,6 +1,6 @@
 /** What the server asks of a running session, whether it is a terminal session it joined or one it started itself. */
 import type { HostSnapshot } from "./omp/collab";
-import type { Delivery, MessageQueue, ModelOption, PromptImage, RosterHost, UserAnswer } from "./shared";
+import type { Delivery, MessageQueue, PromptImage, RosterHost, UserAnswer } from "./shared";
 
 /** What the index of session files knows of a session: the pull requests it worked on and its /ship stage. */
 export type SessionFacts = Pick<RosterHost, "pullRequests" | "ship">;
@@ -44,8 +44,4 @@ export interface LiveSession {
 	follow(listed: ReadonlyMap<string, HostSnapshot>): boolean;
 	/** Let go of the session as the dashboard shuts down: a terminal session keeps running, one this dashboard started stops. */
 	dispose(): Promise<void>;
-	/** Models the session can switch to; only a session this dashboard started offers them. */
-	models?(): Promise<ModelOption[]>;
-	setModel?(model: ModelOption, thinking: string | null): void;
-	setThinking?(level: string): void;
 }

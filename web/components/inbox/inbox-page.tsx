@@ -1,13 +1,14 @@
 import { RefreshCw } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
-import type { Inbox, InboxPullRequest, PastSession, PullRequest, RepoInbox, RosterHost, View } from "../../../src/shared";
+import { type Inbox, type InboxPullRequest, type PastSession, type PullRequest, type RepoInbox, type RosterHost, repoKey, samePullRequest, type View } from "../../../src/shared";
 import { projectName, readTime } from "../../labels";
+import { readPinnedSkill } from "../../pinned-skill";
 import { type PullRequestActionId, pullRequestActions, pullRequestStart } from "../../quick-actions";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { inboxRepoKey, inboxSection, inboxSections, samePullRequest } from "../../inbox-model";
+import { inboxSection, inboxSections } from "../../inbox-model";
 import { hashForInbox, type OpenMode } from "../../routing";
 import type { SectionTarget } from "../../section";
 import type { QuickOp, StartOf } from "../../starts";
@@ -42,7 +43,7 @@ interface RepoProps {
 
 function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen, quick, onQuickAction }: RepoProps) {
 	const name = `${inbox.owner}/${inbox.repo}`;
-	const key = inboxRepoKey(inbox);
+	const key = repoKey(inbox);
 	const headingId = `inbox-${name}`;
 	const bodyId = `${headingId}-body`;
 	const open = !collapsed.has(key);
@@ -81,7 +82,7 @@ function RepoSection({ inbox, hosts, past, target, collapsed, onToggle, onOpen, 
 									targeted={target !== null && samePullRequest(pr, target)}
 									onOpen={onOpen}
 									pending={pendingOf(quick, pr)}
-									onQuickAction={action => onQuickAction(pullRequestStart(pr, action, inbox.cwds[0]!))}
+									onQuickAction={action => onQuickAction(pullRequestStart(pr, action, inbox.cwds[0]!, readPinnedSkill()))}
 								/>
 							))}
 						</ul>
@@ -114,7 +115,7 @@ function placeOf(inbox: Inbox, pr: PullRequest): { repo: string; section: string
 	for (const repo of inbox.repos) {
 		if ("error" in repo) continue;
 		const section = inboxSections(repo.pullRequests).find(({ pullRequests }) => pullRequests.some(other => samePullRequest(other, pr)));
-		const key = `${repo.owner}/${repo.repo}`.toLowerCase();
+		const key = repoKey(repo);
 		if (section) return { repo: key, section: `${key}:${section.title}` };
 	}
 	return null;
@@ -133,7 +134,7 @@ function listedPullRequest(inbox: Inbox, pr: PullRequest): { pr: InboxPullReques
 /** Why the inbox does not list the PR a link named. `allProjects`: the sidebar shows every project. */
 function MissingTarget({ target, inbox, allProjects }: { target: PullRequest; inbox: Inbox; allProjects: boolean }) {
 	const repo = `${target.owner}/${target.repo}`;
-	const covered = inbox.repos.some(other => `${other.owner}/${other.repo}`.toLowerCase() === repo.toLowerCase());
+	const covered = inbox.repos.some(other => repoKey(other) === repoKey(target));
 	let reason = `${repo}#${target.number} is not in this inbox, which covers only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}.`;
 	if (covered) {
 		reason = `${repo}#${target.number} is not in this inbox. The inbox lists your open pull requests, your merges from the last seven days, and the pull requests that wait for your review.`;
@@ -250,7 +251,7 @@ export function InboxPage({ project, hosts, past, target, onOpen, section, quick
 											<QuickActionButtons
 												actions={pullRequestActions(sheetListed.pr)}
 												pending={pendingOf(quick, sheetListed.pr)}
-												onRun={action => onQuickAction(pullRequestStart(sheetListed.pr, action, sheetListed.cwd))}
+												onRun={action => onQuickAction(pullRequestStart(sheetListed.pr, action, sheetListed.cwd, readPinnedSkill()))}
 											/>
 											{quick && quick.op.subject.kind === "pull-request" && samePullRequest(quick.op.subject.pr, sheetListed.pr) && (
 												<QuickStartNotice quick={quick} onOpen={onOpen} onDismiss={onDismissQuick} />

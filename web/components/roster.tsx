@@ -1,6 +1,6 @@
 import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import type { PastSession, PullRequest, RosterHost, View } from "../../src/shared";
+import { type PastSession, type PullRequest, type RosterHost, repoKey, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
-import { inboxRepoKey, inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
+import { inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";
 import type { SectionTarget } from "../section";
@@ -269,7 +269,7 @@ function InboxNav({ project, target, onTarget }: InboxNavProps) {
 	if (repos.length === 0) return <SidebarGroup>{navNote("No session ran in a GitHub repository.")}</SidebarGroup>;
 	return repos.map(repo => {
 		const name = `${repo.owner}/${repo.repo}`;
-		const key = inboxRepoKey(repo);
+		const key = repoKey(repo);
 		const sections = "error" in repo ? [] : inboxSections(repo.pullRequests);
 		let body: ReactNode;
 		if ("error" in repo) body = navNote(`Cannot read ${name} from GitHub.`);

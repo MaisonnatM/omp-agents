@@ -23,12 +23,32 @@ export interface MessageQueue {
 
 export const EMPTY_QUEUE: MessageQueue = { steering: [], followUp: [] };
 
-/** A GitHub pull request. */
-export interface PullRequest {
+/** A GitHub repository. */
+export interface Repo {
 	owner: string;
 	repo: string;
+}
+
+/** A GitHub pull request. */
+export interface PullRequest extends Repo {
 	number: number;
 }
+
+/** A GitHub repository's key in maps and lookups: `owner/repo`, lowercased, since GitHub matches names in any case. */
+export const repoKey = ({ owner, repo }: Repo): string => `${owner}/${repo}`.toLowerCase();
+
+/** A pull request's key: `owner/repo#number`, lowercased. */
+export const prKey = (pr: PullRequest): string => `${repoKey(pr)}#${pr.number}`;
+
+/** A branch's key: `owner/repo:branch`, the repository lowercased and the branch, which git keeps case-sensitive, as is. */
+export const headKey = (repo: Repo, branch: string): string => `${repoKey(repo)}:${branch}`;
+
+export const samePullRequest = (a: PullRequest, b: PullRequest): boolean => prKey(a) === prKey(b);
+
+/** What follows `#` in the page link to a session; the server writes such links into pull request descriptions. */
+export const SESSION_HASH_PREFIX = "session/";
+
+export const hashForSession = (sessionId: string): string => `#${SESSION_HASH_PREFIX}${encodeURIComponent(sessionId)}`;
 
 /**
  * How a session's tool calls touched a pull request: it submitted it with `gt submit` or `gh pr create`, or it
@@ -85,7 +105,7 @@ export interface InboxPullRequest extends PullRequest {
 }
 
 /** One GitHub repository's inbox, for the workspaces whose `origin` it is. */
-export type RepoInbox = { owner: string; repo: string; cwds: string[] } & ({ pullRequests: InboxPullRequest[] } | { error: string });
+export type RepoInbox = Repo & { cwds: string[] } & ({ pullRequests: InboxPullRequest[] } | { error: string });
 
 export interface Inbox {
 	repos: RepoInbox[];
@@ -140,6 +160,15 @@ export interface LinearStatus {
 /** A Linear issue's identifier as Linear shows it, `ENG-2368`: its team's key, a dash, and its number. */
 export const TICKET_ID = /^[A-Z][A-Z0-9_]*-\d+$/;
 
+/** Where the page loads a file that a Linear issue or its comments embed; the server fetches it from Linear. */
+export const TICKET_MEDIA_PATH = "/api/ticket/media";
+
+/** One of the things an issue's pickers offer: a person, a project, or a workflow state. */
+export interface TicketChoice {
+	id: string;
+	name: string;
+}
+
 export interface TicketComment {
 	author: string;
 	/** Markdown. */
@@ -150,15 +179,44 @@ export interface TicketComment {
 
 /** `GET /api/ticket?id=<identifier>`: a Linear issue in full, for the tickets page's sheet. */
 export interface TicketDetail extends Ticket {
-	/** Markdown, with Linear's issue mentions as links and its images as image links. */
+	/** Markdown, with Linear's issue mentions as links, and its images and videos loading through `TICKET_MEDIA_PATH`. */
 	description: string;
 	createdBy: string | null;
 	/** ISO time. */
 	createdAt: string;
+	assignee: TicketChoice | null;
+	/** Linear's id of the issue's team, whose states, labels, and projects the pickers offer. */
+	teamId: string;
 	/** What Linear links the issue to: pull requests, documents, and other pages. */
 	attachments: { title: string; url: string }[];
 	/** Comment threads, oldest first, each its first comment then the replies. */
 	threads: TicketComment[][];
+}
+
+/** `GET /api/ticket/options?team=<id>`: what the sheet's pickers offer for an issue of that team. */
+export interface TicketOptions {
+	/** In Linear's workflow order: triage, backlog, unstarted, started, completed, canceled. */
+	statuses: (TicketChoice & { type: TicketStatusType })[];
+	/** Active members, by name. */
+	users: TicketChoice[];
+	/** The team's labels and the workspace's, by name. */
+	labels: (TicketChoice & { color: string })[];
+	projects: TicketChoice[];
+}
+
+/**
+ * `PUT /api/ticket`: changes to an issue, each field left out unchanged and `null` clearing it, which answers the
+ * issue as Linear has it after the change. `state`, `assignee`, and `project` are ids; `labels` replaces every label,
+ * by name; `dueDate` is `YYYY-MM-DD`.
+ */
+export interface TicketEdit {
+	id: string;
+	state?: string;
+	assignee?: string | null;
+	priority?: TicketPriority;
+	labels?: string[];
+	project?: string | null;
+	dueDate?: string | null;
 }
 
 /** How one check on a pull request's head commit went; `skipped` covers neutral and skipped runs. */
@@ -334,7 +392,7 @@ export type Item =
 	 * when it carried none.
 	 */
 	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null; images?: string[] }
-	| { id: string; kind: "assistant"; text: string; streaming: boolean }
+	| { id: string; kind: "assistant"; text: string; streaming: boolean; suggestions: string[] }
 	/** `agents`: the subagents a `task` call spawned, by id, in the order they appeared; empty for every other tool. */
 	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[] }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
@@ -421,13 +479,20 @@ export function fileStatus(changes: ChangedFile["changes"]): FileStatus {
 	return changes[0].kind === "created" ? "created" : "edited";
 }
 
-/** What one transcript planned and changed: its latest todo list, and the files it touched in first-touch order. */
+/** The text of the plan file the agent wrote or edited last; `path` shows as a {@link ChangedFile}'s does. */
+export interface PlanDocument {
+	path: string;
+	text: string;
+}
+
+/** What one transcript planned and changed: its latest todo list, its latest plan file, and the files it touched in first-touch order. */
 export interface SessionWork {
 	phases: TodoPhase[];
 	files: ChangedFile[];
+	plan: PlanDocument | null;
 }
 
-export const EMPTY_WORK: SessionWork = { phases: [], files: [] };
+export const EMPTY_WORK: SessionWork = { phases: [], files: [], plan: null };
 
 /** One row of a select request. */
 export interface RequestOption {
@@ -474,7 +539,7 @@ export interface LocalBranch {
 /** The git checkout a directory is in: what the new-session draft's branch picker lists and a session's header names. */
 export interface GitCheckout {
 	/** The GitHub repository that `origin` names, `null` when `origin` is not on GitHub. */
-	github: { owner: string; repo: string } | null;
+	github: Repo | null;
 	/** The branch checked out in the directory, `null` when HEAD is detached. */
 	branch: string | null;
 	/** Every local branch, the checked-out one first, then the most recently committed to. */
@@ -495,13 +560,28 @@ export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; n
 /**
  * What a `start` asks for: a new session in `cwd` (absolute, or starting with `~`) that takes `prompt` and `images` as
  * its first message, on `branch` when it names one, else in `cwd` as it is, on `model` when it names one, else on omp's
- * default, at thinking level `thinking` when it names one; a fork holding the view's history before the user prompt
- * `entryId`, its file left untouched; or past session `sessionId` continued in its own file, as `omp --resume` does.
+ * default, at thinking level `thinking` when it names one, and through skill `skill`, the one pinned in the settings,
+ * when it names one; a fork holding the view's history before the user prompt `entryId`, its file left untouched; or
+ * past session `sessionId` continued in its own file, as `omp --resume` does.
  */
 export type StartRequest =
-	| { kind: "new"; cwd: string; prompt: string; images: PromptImage[]; branch: BranchChoice | null; model: ModelOption | null; thinking: string | null }
+	| {
+			kind: "new";
+			cwd: string;
+			prompt: string;
+			images: PromptImage[];
+			branch: BranchChoice | null;
+			model: ModelOption | null;
+			thinking: string | null;
+			skill: string | null;
+	  }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "resume"; sessionId: string };
+/** `GET /api/skills?cwd=<dir>`: one skill a session started in that directory can invoke as `/skill:<name>`. */
+export interface SkillOption {
+	name: string;
+	description: string | null;
+}
 /** `cwd` is the absolute directory the session runs in. `prompt` is the text of the prompt a fork branched at, for the composer; `null` for the other kinds. */
 export type StartResult = { ok: true; instanceId: string; cwd: string; prompt: string | null } | { ok: false; error: string };
 /** Where `/` and `@` resolve: an open live view's session, or the directory the new-session draft will start omp in. */

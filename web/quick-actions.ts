@@ -118,18 +118,20 @@ export const pullRequestActions = (pr: InboxPullRequest): PullRequestActionId[] 
 /** The actions that apply to `ticket`, in registry order: none once it is completed or canceled. */
 export const ticketActions = (ticket: Ticket): TicketActionId[] => TICKET_IDS.filter(id => TICKET_ACTIONS[id].applies(ticket));
 
-/** The start of `action` on `pr`, in `cwd`. */
-export const pullRequestStart = (pr: InboxPullRequest, action: PullRequestActionId, cwd: string): QuickOp => ({
+/** The start of `action` on `pr`, in `cwd`, through the pinned `skill` when one is pinned. */
+export const pullRequestStart = (pr: InboxPullRequest, action: PullRequestActionId, cwd: string, skill: string | null): QuickOp => ({
 	kind: "quick",
 	cwd,
 	prompt: PULL_REQUEST_ACTIONS[action].prompt(pr),
 	subject: { kind: "pull-request", pr: { owner: pr.owner, repo: pr.repo, number: pr.number }, action },
+	skill,
 });
 
-/** The start of `action` on `ticket`, in `cwd`. */
-export const ticketStart = (ticket: Ticket, action: TicketActionId, cwd: string): QuickOp => ({
+/** The start of `action` on `ticket`, in `cwd`, through the pinned `skill` when one is pinned. */
+export const ticketStart = (ticket: Ticket, action: TicketActionId, cwd: string, skill: string | null): QuickOp => ({
 	kind: "quick",
 	cwd,
 	prompt: TICKET_ACTIONS[action].prompt(ticket),
 	subject: { kind: "ticket", id: ticket.id, action },
+	skill,
 });
