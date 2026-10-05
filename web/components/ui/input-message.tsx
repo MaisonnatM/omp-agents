@@ -1293,7 +1293,7 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
               >
                 <Button
                   type="button"
-                  variant="primary"
+                  variant={buttonMode === "stop" ? "primary" : "agent"}
                   size="icon-sm"
                   onClick={buttonMode === "stop" ? handleStop : handleSend}
                   disabled={buttonMode === "stop" ? disabled : !canSend}

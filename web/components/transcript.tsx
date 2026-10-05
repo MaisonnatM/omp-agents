@@ -244,7 +244,7 @@ function ForkButton({ point, forking, disabled, onFork }: { point: ForkPoint; fo
 			: "Fork from here: a new session with the history through this reply";
 	return (
 		<Button
-			variant="ghost"
+			variant="agent"
 			size="icon-compact"
 			aria-label={forking ? "Forking" : "Fork from here"}
 			title={title}

@@ -493,7 +493,7 @@ export function Roster({
 				items={
 					<>
 						{/* One resume runs at a time, as the pane's Resume button allows. */}
-						<MenuItem disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
+						<MenuItem variant="agent" disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
 							<Play />
 							{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
 						</MenuItem>
@@ -646,7 +646,7 @@ export function Roster({
 						<SidebarGroup collapsible open={!collapsed.has("interrupted")} onOpenChange={() => toggleGroup("interrupted")}>
 							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
 							{/* The group action's props carry no `disabled`, so it styles a native button that does. */}
-							<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
+							<SidebarGroupAction asChild className="agent-action disabled:pointer-events-none disabled:opacity-50">
 								<button
 									type="button"
 									title={resumingAll ? "Resuming…" : "Resume all"}
