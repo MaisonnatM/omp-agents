@@ -84,6 +84,24 @@ describe("Transcript", () => {
 		expect(t.items()[1]).toEqual({ id: "m610:0", kind: "assistant", text: "pong", streaming: false, suggestions: [] });
 	});
 
+	test("a fresh session's first /skill: prompt shows at once, and its file entry replaces it in place", () => {
+		const t = new Transcript();
+		const details = { name: "mma-mode", path: "/s/SKILL.md", args: "fix the scroll", prompt: "/skill:mma-mode fix the scroll" };
+		const prompt = { role: "custom", customType: "skill-prompt", content: "[IMPORTANT: …]", display: true, details, attribution: "user", timestamp: 600 };
+		expect(t.applyEvent({ type: "message_end", message: prompt })).toEqual([
+			{ id: "m600", kind: "user", text: "fix the scroll", skill: "mma-mode", from: null, entryId: null },
+		]);
+		t.applyEvent({ type: "message_update", assistantMessageEvent: { partial: assistant(610, [text("po")]) } });
+
+		const { role: _, timestamp: __, ...fields } = prompt;
+		t.applyEntry({ type: "custom_message", id: "e1", ...fields, timestamp: new Date(600).toISOString() });
+		t.applyEntry({ type: "message", id: "e2", message: assistant(610, [text("pong")], { stopReason: "stop" }) });
+		t.applyEvent({ type: "message_end", message: prompt });
+
+		expect(t.takeReordered()).toBe(false);
+		expect(t.items().map(item => item.id)).toEqual(["m600", "m610:0"]);
+	});
+
 	test("a prompt omp can branch at carries its entry id once the file holds it", () => {
 		const t = new Transcript();
 		const prompt = { role: "user", timestamp: 700, content: "fork me" };

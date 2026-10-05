@@ -15,6 +15,7 @@ The main ones:
 
 - Collab: `pi-coding-agent/src/collab/registry.ts`, `protocol.ts`, `crypto.ts`, and `relay-client.ts`.
 - Session files: `pi-coding-agent/src/session/session-listing.ts` and `session-loader.ts`.
+  `appendCustomMessageEntry` in `pi-coding-agent/src/session/session-manager.ts` gives a `custom_message` entry the timestamp of the message it records, which `#persistMessageEnd` in `agent-session.ts` passes.
 - Interrupted turns: `pi-coding-agent/src/session/exit-diagnostics.ts` (`createInterruptedTurnAbortMessage`), which `endsMidTurn` in `src/omp/sessions.ts` uses to refuse forking a session that ended mid-turn.
 - Images: `pi-coding-agent/src/session/blob-store.ts`, which moves a prompt's image out of the session file into `blob:sha256:<hash>`, and `getBlobsDir` in `pi-utils/src/dirs.ts`; `src/transcript.ts` and the `/api/image` route read them.
 - Plan files: `listPlanFiles` in `pi-coding-agent/src/plan-mode/plan-files.ts`, whose rule `src/work.ts` copies; see [Transcripts](#transcripts).
@@ -47,6 +48,7 @@ Every transcript comes from the session files on this machine, not from a networ
   omp keeps a message's `timestamp` when it writes the message, so the file's copy replaces the streamed copy in place, and a late event cannot undo it.
   omp writes a fresh session's file only with its first reply.
   Until then the prompt shows from its live event, except a prompt sent from the dashboard to a terminal session, whose file entry has no message timestamp to merge on.
+  A `/skill:` prompt is a `custom` message of type `skill-prompt`, and omp writes its `custom_message` entry with the message's timestamp, so it merges on that.
   A queued steer or follow-up keeps the time it was sent, though the agent takes it later.
   So a message from the file never goes ahead of the file messages before it, and a live user message goes after everything already shown.
 - A reply that streams and a tool call that runs change with every token.
