@@ -6,7 +6,7 @@
   "main": "dist/main.cjs",
   "scripts": {
     "build": "bun build main.ts --target=node --format=cjs --external electron --outfile dist/main.cjs",
-    "start": "bun run build && electron .",
+    "start": "bun run build && bun launch.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

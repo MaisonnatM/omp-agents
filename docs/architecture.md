@@ -388,7 +388,7 @@ The page lives in `web/`.
 - `web/pane-store.ts`: each open view's transcript, plan and changes, and completions, outside the page state, so a token in one pane re-renders only that pane.
   It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
-- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`: the pure transforms from server messages to what the page renders, and the hash routes.
+- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the inbox and the tickets page show.
   `web/inbox-model.ts` holds the inbox's sections in one table, with whether each waits on you and whether it starts folded, sorts each stack's rows together by the chain of base branches, and says what a row's verdict and a sheet's Status show.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it.
@@ -442,7 +442,9 @@ After you edit one of those live files, copy it back.
 `bun run omp-template --dry-run` shows a copy that has drifted as `keep yours`.
 
 `desktop/` holds the desktop shell; see [Desktop shell](#desktop-shell).
-`desktop/main.ts` is its whole main process, and `bun run desktop` at the root installs the package and starts it.
+`desktop/main.ts` is its whole main process, and `bun run desktop` at the root installs the package and starts it through `desktop/launch.ts`.
+On macOS the launcher clones `node_modules/electron/dist/Electron.app` to `desktop/dist/omp agents.app`, sets its `CFBundleName`, `CFBundleDisplayName`, and `CFBundleIdentifier`, gives it an `.icns` that it renders from `icon.png` with `sips` and `iconutil`, signs it ad hoc, and runs that copy, because the Dock, the menu bar, and Cmd+Tab read an app's name and icon from its bundle.
+It rebuilds the copy when Electron's version or `icon.png` changes.
 `desktop/icon.svg` is the app icon, the logo mark on a macOS-style tile, and `desktop/icon.png` is that SVG rendered at 1024 px, because Electron reads no SVG; render it again after you change the SVG.
 The page's favicon, `web/favicon.svg`, is the bare mark.
 

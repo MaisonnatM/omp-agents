@@ -16,6 +16,7 @@ import { SplitResizeHandle, splitAt, useSplitRatio } from "./components/split-re
 import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-page";
 import { ToolsExpanded } from "./components/transcript";
 import { TodoPage } from "./components/user-todos";
+import { documentTitle } from "./document-title";
 import { SPLIT_CLICK } from "./labels";
 import { inboxStore, linearStore, UNREAD } from "./reads";
 import {
@@ -84,6 +85,10 @@ export function App() {
 	const view = focusedView(layout);
 	const viewHost = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
 	const viewPast = view?.kind === "past" ? state.past.find(s => s.sessionId === view.sessionId) : undefined;
+	const title = documentTitle(page, view, viewHost ?? (view?.kind === "live" ? state.lastHosts.get(view.instanceId) ?? null : null), viewPast ?? null);
+	useEffect(() => {
+		document.title = title;
+	}, [title]);
 	const split = layout.panes.length > 1;
 	const [columns, setColumns] = useSplitRatio("columns");
 	const [rows, setRows] = useSplitRatio("rows");
