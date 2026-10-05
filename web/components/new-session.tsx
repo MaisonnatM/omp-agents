@@ -1,9 +1,7 @@
-import { Check, ChevronsUpDown, Folder, Sparkles } from "lucide-react";
+import { Folder, Sparkles } from "lucide-react";
 import { useState } from "react";
 import type { BranchChoice, ModelOption } from "../../src/shared";
 import { Button } from "@/components/ui/button";
-import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { projectName } from "../labels";
@@ -15,6 +13,7 @@ import type { NewOp, StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { useDefaultModel } from "../use-default-model";
 import { useSkills } from "../use-skills";
+import { CommandPicker } from "./command-picker";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation, Header } from "./conversation";
 import { BranchPicker, chosenBranch, GitRef, targetOf } from "./git";
@@ -47,59 +46,66 @@ interface DirectoryPickerProps {
 
 /** The directory the session starts in: one a session ran in, or any directory typed into the search field. */
 function DirectoryPicker({ cwd, workspaces, disabled, onPick }: DirectoryPickerProps) {
-	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const typed = query.trim();
 	const pick = (next: string): void => {
-		setOpen(false);
-		setQuery("");
 		if (next !== cwd) onPick(next);
 	};
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
-				<Button
-					variant="ghost"
-					size="compact"
-					leadingIcon={Folder}
-					trailingIcon={ChevronsUpDown}
-					title={cwd}
-					aria-label={`Working directory: ${cwd}`}
-					active={open}
-					disabled={disabled}
-					className="min-w-0"
-				>
-					<span className="truncate">{projectName(cwd) ?? cwd}</span>
-				</Button>
-			</PopoverTrigger>
-			<PopoverContent align="start" className="w-[min(24rem,calc(100vw-2rem))] p-0">
-				<Command>
-					<CommandInput aria-label="Search or type a directory" placeholder="Search or type a directory…" value={query} onValueChange={setQuery} />
-					<CommandList>
-						<CommandGroup heading="Directories sessions ran in">
-							{workspaces.map(workspace => (
-								<CommandItem key={workspace.cwd} value={workspace.cwd} keywords={[workspace.cwdDisplay]} onSelect={() => pick(workspace.cwdDisplay)}>
-									<span className="flex min-w-0 flex-col">
-										<span className="truncate">{projectName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
-										<span className="truncate text-xs text-muted-foreground">{workspace.cwdDisplay}</span>
-									</span>
-									<Check className={cn("ml-auto shrink-0", workspace.cwdDisplay === cwd || workspace.cwd === cwd ? "opacity-100" : "opacity-0")} />
-								</CommandItem>
-							))}
-						</CommandGroup>
-						{typed && !workspaces.some(w => w.cwd === typed || w.cwdDisplay === typed) && (
-							<CommandGroup forceMount>
-								<CommandItem forceMount value={`use ${typed}`} onSelect={() => pick(typed)}>
-									<span className="truncate">
-										Use <span className="font-mono">{typed}</span>
-									</span>
-								</CommandItem>
-							</CommandGroup>
-						)}
-					</CommandList>
-				</Command>
-			</PopoverContent>
-		</Popover>
+		<CommandPicker
+			trigger={<span className="truncate">{projectName(cwd) ?? cwd}</span>}
+			icon={Folder}
+			ariaLabel={`Working directory: ${cwd}`}
+			title={cwd}
+			disabled={disabled}
+			className="min-w-0"
+			search={{ label: "Search or type a directory", query: { value: query, onChange: setQuery } }}
+			width="lg"
+			side="top"
+			onOpenChange={next => {
+				if (!next) setQuery("");
+			}}
+			list={{
+				kind: "ready",
+				groups: [
+					{
+						key: "workspaces",
+						heading: "Directories sessions ran in",
+						items: workspaces.map(workspace => ({
+							value: workspace.cwd,
+							keywords: [workspace.cwdDisplay],
+							label: (
+								<span className="flex min-w-0 flex-col">
+									<span className="truncate">{projectName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
+									<span className="truncate text-xs text-muted-foreground">{workspace.cwdDisplay}</span>
+								</span>
+							),
+							selected: workspace.cwdDisplay === cwd || workspace.cwd === cwd,
+							onSelect: () => pick(workspace.cwdDisplay),
+						})),
+					},
+					...(typed && !workspaces.some(w => w.cwd === typed || w.cwdDisplay === typed)
+						? [
+								{
+									key: "typed",
+									forceMount: true,
+									items: [
+										{
+											value: `use ${typed}`,
+											label: (
+												<span className="truncate">
+													Use <span className="font-mono">{typed}</span>
+												</span>
+											),
+											onSelect: () => pick(typed),
+										},
+									],
+								},
+							]
+						: []),
+				],
+			}}
+		/>
 	);
 }
 
