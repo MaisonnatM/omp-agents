@@ -1,6 +1,6 @@
 /**
- * The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, Linear's connection,
- * Linear tickets and their files, and prompt images through.
+ * The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, worktrees,
+ * Linear's connection, Linear tickets and their files, and prompt images through.
  */
 import { join } from "node:path";
 import { errorText } from "../json";
@@ -16,8 +16,9 @@ import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings
 import { createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, type PullRequest, type Repo, samePullRequest, TICKET_ID } from "../shared";
+import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit } from "./wire";
+import { parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval } from "./wire";
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -28,6 +29,7 @@ export interface RouteEnv {
 	origin: string;
 	/** Directories sessions ran in: live ones first, then saved ones newest first. */
 	knownCwds(): string[];
+	worktrees: Worktrees;
 	pullRequestsOf(sessionId: string): LinkedPullRequest[];
 	/** The inbox listed `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
@@ -220,6 +222,33 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return answer(() => linkSessions(pr, sessions, env.origin));
 	};
 
+	/** `GET /api/worktrees[?cwd=]`: every registered worktree of the repositories sessions ran in, or of the repository containing `cwd`. */
+	const worktreeInventory = get(params => answer(() => env.worktrees.inventory(params.get("cwd"))));
+
+	/** `GET /api/worktrees/metrics?repository=&path=`: disk use, last commit, and change counts for one registered checkout. */
+	const worktreeMetrics = get((params, req) => {
+		const repository = params.get("repository");
+		const path = params.get("path");
+		if (!repository || !path) return fail(400, "Expected repository and path.");
+		return answer(() => env.worktrees.metrics({ repository, path }, req.signal));
+	});
+
+	/** `PUT /api/worktrees/removal`: preview a removal, or remove checkouts whose confirmation still matches. */
+	const worktreeRemoval: Handler = async req => {
+		const write = await guards.writeBody(req);
+		if (write instanceof Response) return write;
+		const body = parseWorktreeRemoval(write.body);
+		if (!body) return fail(400, "Expected a preview with targets or removal with confirmed plans, up to 100 worktrees.");
+		if (body.action === "preview") {
+			return answer(async () => {
+				const plans = [];
+				for (const target of body.targets) plans.push(await env.worktrees.preview(target));
+				return { plans };
+			});
+		}
+		return answer(async () => ({ results: await env.worktrees.remove(body.plans) }));
+	};
+
 	return {
 		"/api/settings": { GET: settings },
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
@@ -239,6 +268,9 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/ticket/options": { GET: ticketOptions },
 		"/api/ticket/media": { GET: ticketMedia },
 		"/api/pull-request": { GET: pullRequest },
+		"/api/worktrees": { GET: worktreeInventory },
+		"/api/worktrees/metrics": { GET: worktreeMetrics },
+		"/api/worktrees/removal": { PUT: worktreeRemoval },
 		"/api/git": { GET: git },
 		"/api/image": { GET: image },
 	};

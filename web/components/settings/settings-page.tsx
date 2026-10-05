@@ -1,4 +1,4 @@
-import { FileText, FolderOpen, Palette, Plug, RotateCcw, Route, Sparkles } from "lucide-react";
+import { FileText, FolderOpen, GitBranch, Palette, Plug, RotateCcw, Route, Sparkles } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
@@ -14,6 +14,7 @@ import { Files } from "./files-tab";
 import { LinearConnection } from "./linear-connection";
 import { NewSessionsTab } from "./new-sessions-tab";
 import { RetrySection, RolesTab } from "./routing-tab";
+import { WorktreesTab } from "./worktrees-tab";
 
 type Workspace = { cwd: string; cwdDisplay: string };
 
@@ -54,6 +55,7 @@ const SETTINGS_TABS = [
 	{ value: "roles", label: "Model roles & provider order", icon: Route },
 	{ value: "retry", label: "Retry and fallback", icon: RotateCcw },
 	{ value: "files", label: "Files", icon: FileText },
+	{ value: "worktrees", label: "Worktrees", icon: GitBranch },
 	{ value: "integrations", label: "Integrations", icon: Plug },
 	{ value: "new-sessions", label: "New sessions", icon: Sparkles },
 	{ value: "appearance", label: "Appearance", icon: Palette },
@@ -114,6 +116,7 @@ export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspac
 
 	const panels: Record<SettingsTab, ReactNode> = {
 		...ompPanels(settings, cwd, editing),
+		worktrees: <WorktreesTab cwd={cwd} active={tab === "worktrees"} />,
 		integrations: <LinearConnection />,
 		"new-sessions": <NewSessionsTab cwd={cwd} />,
 		appearance: <AppearanceTab />,

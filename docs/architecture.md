@@ -290,6 +290,13 @@ The answer is `{ changed }`, or `{ error }` with the HTTP status.
 It runs `git worktree list --porcelain`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the inbox's cached lookup.
 Like a new session's `start`, `cwd` may name any directory.
 The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
+`GET /api/worktrees` lists the worktrees of every repository a session ran in, or of `?cwd=` when that directory is in a repository.
+Each row names the registered path, branch, lock, whether the directory is missing, the newest session file there, and why removal is refused.
+`GET /api/worktrees/metrics?repository=&path=` reads approximate allocated disk use, the last commit time, and the modified and untracked counts for one registered checkout.
+`PUT /api/worktrees/removal` previews a removal or performs one whose confirmation still matches that preview.
+Removal uses `git worktree remove` without `--force`, so Git keeps the branch and still refuses a dirty or locked checkout.
+A missing directory is removed the same way, which drops only that registration.
+Dashboard session starts wait while a removal runs, and a removal waits while a start runs.
 
 `GET /api/models/connected?cwd=<directory>` answers `{ models }`: the models that `omp models` lists from the providers you are connected to, for the new-session draft's model menu.
 Each model is `{ provider, id, name, contextWindow, curated, thinkingLevels }`; `curated` marks the ones that the directory's `modelRoles` or `retry.fallbackChains` name, with any `:level` dropped, and `thinkingLevels` are the ones omp's catalog lists (`modelEntries` in `src/omp/models.ts`).
@@ -422,6 +429,8 @@ The server lives in `src/`:
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
 - `src/git.ts`: the git checkout of a directory, and the worktree a new session's branch runs in.
+- `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed.
+  `src/worktrees-shared.ts` holds the shapes the page and the routes share.
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.

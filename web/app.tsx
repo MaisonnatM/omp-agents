@@ -37,11 +37,8 @@ import type { SectionTarget } from "./section";
 import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, sidebarSessions, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
-import { useStoredKeys } from "./stored-state";
+import { PINNED_SESSIONS_KEY, useStoredKeys } from "./stored-state";
 import { useDashboard } from "./use-dashboard";
-
-/** The session ids the sidebar lists under Pinned. */
-const PINNED_KEY = "omp-agents.pinned-sessions";
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
@@ -85,7 +82,7 @@ export function App() {
 	const [project, pickProject] = useProject(projects);
 	// Keeps the Inbox tab's count current on every page. Until the sessions are listed, the saved project reads as all projects.
 	inboxStore.usePolling(project, state.listed);
-	const [pinned, togglePin] = useStoredKeys(PINNED_KEY);
+	const [pinned, togglePin] = useStoredKeys(PINNED_SESSIONS_KEY);
 	const { started } = state;
 	useEffect(() => {
 		if (!started) return;

@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+export const PINNED_SESSIONS_KEY = "omp-agents.pinned-sessions";
+
 /**
  * A value that localStorage keeps under `key`, read once, and its setter, which stores it at once. `decode` turns what is
  * stored into a value; what it makes of `null`, when nothing is stored, is the default. The default is removed rather

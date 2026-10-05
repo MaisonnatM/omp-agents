@@ -26,7 +26,8 @@ import { TodoInbox } from "./server/todo-inbox";
 import { UserTodosFile } from "./server/user-todos-file";
 import { type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
-import type { UserTodoChange, View } from "./shared";
+import type { StartRequest, StartResult, UserTodoChange, View } from "./shared";
+import { Worktrees } from "./worktrees";
 
 const PORT = portFromEnv();
 
@@ -77,13 +78,28 @@ const loops = new Loops(sessionsDir, {
 	onUsageTick: () => broadcasts.refreshUsage(),
 	onRoutineTick: () => runner.tick(),
 });
-const startSession = createStarter({
+/** Directories sessions ran in: live ones first, then saved ones newest first. */
+const knownCwds = (): string[] => [...new Set([...sessions.cwds(), ...files.cwds()].filter(Boolean))];
+const starter = createStarter({
 	sessions,
 	pathFor,
 	savedFile: files.pathOf,
 	onStarted: () => broadcasts.syncRoster(),
 	linkTodo: (todoId, sessionId) => applyTodo({ op: "link", id: todoId, link: { kind: "session", sessionId } }),
 });
+const worktrees = new Worktrees({
+	knownCwds,
+	activity: () => files.activity(),
+	serverCwd: process.cwd(),
+	async live() {
+		sessions.follow(await listHosts());
+		return sessions.rows(files.factsOf).map(host => ({
+			cwd: host.cwd,
+			unknownAgents: host.control.phase !== "live" || host.agents.some(agent => (host.source === "terminal" ? agent.status !== "aborted" : agent.status === "running")),
+		}));
+	},
+});
+const startSession = (request: StartRequest): Promise<StartResult> => worktrees.lifecycle(() => starter(request));
 const runner = new RoutineRunner({
 	file: routines,
 	start: startSession,
@@ -129,9 +145,6 @@ const handleClientMsg = createClientHandler({
 let rosterError: string | null = null;
 /** Whether the registry was listed since the last poll tick found no listener. */
 let registryFresh = false;
-
-/** Directories sessions ran in: live ones first, then saved ones newest first. */
-const knownCwds = (): string[] => [...new Set([...sessions.cwds(), ...files.cwds()].filter(Boolean))];
 
 /** The session list changed: views may now find their file, and the past list is out of date. */
 function onFilesChanged(): void {
@@ -212,6 +225,7 @@ try {
 				guards,
 				origin: originOf(PORT),
 				knownCwds,
+				worktrees,
 				pullRequestsOf: sessionId => files.factsOf(sessionId).pullRequests,
 				learnHeads(repo, pullRequests) {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();

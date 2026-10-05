@@ -55,6 +55,11 @@ export class SessionFiles {
 		return this.#files.map(session => session.cwd).filter(Boolean);
 	}
 
+	/** Session-file activity for the worktree inventory, including a session whose directory sits inside a checkout. */
+	activity(): { id: string; cwd: string; modifiedAt: number }[] {
+		return this.#files.map(({ id, cwd, modifiedAt }) => ({ id, cwd, modifiedAt }));
+	}
+
 	/** Note that the watcher reported a change at `changedPath`; whether it concerns a session file. {@link refresh} reads it. */
 	touch(changedPath: string): boolean {
 		const file = sessionFileOf(changedPath, this.#root);

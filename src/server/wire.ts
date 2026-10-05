@@ -3,7 +3,7 @@
  * Each socket message has one parser in {@link clientParsers}, so a {@link ClientMsg} variant without one does not compile.
  * Socket parsers return `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller casts what it received.
  */
-import { isObject, oneOf } from "../json";
+import { isObject, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH } from "../routines";
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, ROUTINE_PR_ACTIONS, TICKET_ID, TICKET_PRIORITIES } from "../shared";
 import type {
@@ -26,6 +26,7 @@ import type {
 	Weekday,
 	WorkItem,
 } from "../shared";
+import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } from "../worktrees-shared";
 import { isDay, MAX_TODO_BODY, MAX_TODO_ID, MAX_TODO_TEXT, parseTodoChange } from "../user-todos-parse";
 
 /** The longest composer text the server completes. */
@@ -385,4 +386,33 @@ export function parseTicketEdit(body: unknown): TicketEdit | null {
 		edit.dueDate = dueDate;
 	}
 	return Object.keys(edit).length > 1 ? edit : null;
+}
+
+const SHA256 = /^[0-9a-f]{64}$/;
+
+const worktreeTarget = (value: unknown): WorktreeTarget | null =>
+	isObject(value) && isNonEmpty(value.repository) && isNonEmpty(value.path) ? { repository: value.repository, path: value.path } : null;
+
+/** The body of `PUT /api/worktrees/removal`: a preview of up to 100 registered checkouts, or the confirmations from such a preview. */
+export function parseWorktreeRemoval(body: unknown): WorktreeRemovalRequest | null {
+	if (!isObject(body)) return null;
+	if (body.action === "preview") {
+		if (!Array.isArray(body.targets) || body.targets.length === 0 || body.targets.length > 100) return null;
+		const targets: WorktreeTarget[] = [];
+		for (const item of body.targets) {
+			const target = worktreeTarget(item);
+			if (!target) return null;
+			targets.push(target);
+		}
+		return { action: "preview", targets };
+	}
+	if (body.action !== "remove" || !Array.isArray(body.plans) || body.plans.length === 0 || body.plans.length > 100) return null;
+	const plans: WorktreeConfirmation[] = [];
+	for (const item of body.plans) {
+		const target = worktreeTarget(item);
+		const confirmation = isObject(item) ? str(item.confirmation) : undefined;
+		if (!target || !confirmation || !SHA256.test(confirmation)) return null;
+		plans.push({ ...target, confirmation });
+	}
+	return { action: "remove", plans };
 }

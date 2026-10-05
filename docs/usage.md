@@ -563,9 +563,19 @@ Navigation, editing, scheduling toggles, Stop, and Delete keep their existing st
 
 ## Settings
 
-- The gear button in the sidebar header opens **Settings**, split into six tabs that look like the sidebar's **Inbox** and **Sessions** tabs: **Model roles & provider order**, **Retry and fallback**, **Files**, **Integrations**, **New sessions**, and **Appearance**.
+- The gear button in the sidebar header opens **Settings**, split into seven tabs that look like the sidebar's **Inbox** and **Sessions** tabs: **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **Integrations**, **New sessions**, and **Appearance**.
   Switching tabs keeps an unsaved edit, and the selected tab stays when you change workspace.
   **Integrations** connects Linear; see [Linear tickets](#linear-tickets).
+  **Worktrees** lists every Git worktree in repositories where a session ran, and a path you enter lists that repository too.
+  Each row shows the branch and path, the last time an omp session file in that checkout changed, the last commit, approximate disk use, and tracked or untracked changes.
+  No omp session reads as no omp session, not as unused.
+  **Delete** asks before it removes a linked worktree or forgets a registration whose directory is already gone.
+  It keeps the branch and session transcripts.
+  It refuses the main checkout, a locked checkout, unsaved changes, a nested repository, a checkout this dashboard or a live session is using, and a checkout whose subagent locations are unknown.
+  Ignored files such as dependencies and `.env` are deleted with the checkout, and the confirmation names them.
+  A detached commit that no branch contains is named before its registration can be removed.
+  The page cannot see every shell or editor, so close other tools using a checkout before you delete it.
+  Disk use is approximate, and removing a checkout may free less than the number shown.
   The first tab shows which model omp uses for each role (`default`, `slow`, `plan`, `advisor`, `vision`, `smol`, `commit`, `tiny`, `task`) and the fallbacks that omp tries after that model, in order.
   A role without its own chain says that it uses the `default` role's chain.
   Chains keyed by a model or a `provider/*` wildcard appear in their own table, and the `modelProviderOrder` follows.
