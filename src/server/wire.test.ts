@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { type ClientMsg, MAX_PROMPT_IMAGE_BYTES } from "../shared";
-import { parseClientMsg, parsePullRequestQuery, parseSessionLinks } from "./wire";
+import { parseClientMsg, parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -171,5 +171,31 @@ describe("parseSessionLinks", () => {
 		expect(parseSessionLinks({ ...body, sessionIds: [] })).toBeNull();
 		expect(parseSessionLinks({ ...body, sessionIds: ["s1", 2] })).toBeNull();
 		expect(parseSessionLinks("nope")).toBeNull();
+	});
+});
+
+describe("parseTicketEdit", () => {
+	test("keeps each field given, null clearing the ones that clear, and the labels once each", () => {
+		expect(parseTicketEdit({ id: "ENG-1", state: "s-1", priority: 0, labels: ["Bug", "Front", "Bug"], dueDate: "2026-10-09", extra: true })).toEqual({
+			id: "ENG-1",
+			state: "s-1",
+			priority: 0,
+			labels: ["Bug", "Front"],
+			dueDate: "2026-10-09",
+		});
+		expect(parseTicketEdit({ id: "ENG-1", assignee: null, project: null, dueDate: null, labels: [] })).toEqual({ id: "ENG-1", assignee: null, project: null, dueDate: null, labels: [] });
+	});
+
+	test("rejects an edit that changes nothing, names no issue, or gives a field of the wrong kind", () => {
+		expect(parseTicketEdit({ id: "ENG-1" })).toBeNull();
+		expect(parseTicketEdit({ id: "eng-1", priority: 1 })).toBeNull();
+		expect(parseTicketEdit({ priority: 1 })).toBeNull();
+		expect(parseTicketEdit({ id: "ENG-1", priority: 5 })).toBeNull();
+		expect(parseTicketEdit({ id: "ENG-1", state: null })).toBeNull();
+		expect(parseTicketEdit({ id: "ENG-1", state: " " })).toBeNull();
+		expect(parseTicketEdit({ id: "ENG-1", labels: "Bug" })).toBeNull();
+		expect(parseTicketEdit({ id: "ENG-1", labels: ["Bug", 2] })).toBeNull();
+		expect(parseTicketEdit({ id: "ENG-1", dueDate: "next week" })).toBeNull();
+		expect(parseTicketEdit({ id: "ENG-1", assignee: 3 })).toBeNull();
 	});
 });
