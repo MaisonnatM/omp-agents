@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useSyncExternalStore } from "react";
 import type { ClientMsg, LiveView, ModelOption, PastSession, PlanUsage, RosterHost, ServerMsg, View } from "../src/shared";
 import { applyPaneMessage, type Completions, isPaneMsg, type PaneMsg, retainPanes } from "./pane-store";
-import { rememberPickedRole } from "./picked-roles";
 import {
 	EMPTY_LAYOUT,
 	hashForLayout,
@@ -268,7 +267,6 @@ export function useDashboard(): Dashboard {
 				if (msg.t === "started" && msg.result.ok) {
 					const op = startsRef.current.get(msg.reqId)?.op;
 					const live: LiveView = { kind: "live", instanceId: msg.result.instanceId, agentId: null };
-					if (op?.kind === "new") rememberPickedRole(live.instanceId, op.role);
 					if (op?.kind === "resume") show(swapView(layoutRef.current, { kind: "past", sessionId: op.sessionId }, live));
 					else if (op && op.kind !== "quick") open(live, "replace");
 				}
