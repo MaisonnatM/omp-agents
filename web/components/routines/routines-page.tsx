@@ -2,6 +2,7 @@ import { ArrowLeft, Ellipsis, Pause, Pencil, Play, Plus, Trash2 } from "lucide-r
 import { type ReactNode, useEffect, useState } from "react";
 import type { Routine, RoutineChange, RoutineRun, RoutineTask, RosterHost, View } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { modeOf, readTime, SPLIT_CLICK } from "../../labels";
@@ -36,6 +37,7 @@ interface RoutineActionsProps {
 /** A routine's menu, **Run now**, **Pause** or **Resume**, **Edit**, and **Delete**, which asks first in its place. */
 function RoutineActions({ routine, disabled, onChange, onEdit, onDeleted }: RoutineActionsProps) {
 	const [confirming, setConfirming] = useState(false);
+	const [menuOpen, setMenuOpen] = useState(false);
 	const { id, name, enabled } = routine;
 	if (confirming) {
 		return (
@@ -58,10 +60,12 @@ function RoutineActions({ routine, disabled, onChange, onEdit, onDeleted }: Rout
 		);
 	}
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={`More actions for ${name}`} title="More actions" disabled={disabled} />}>
-				<Ellipsis />
-			</DropdownMenuTrigger>
+		<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+			<Tooltip content="More actions" forceOpen={menuOpen ? false : undefined}>
+				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={`More actions for ${name}`} disabled={disabled} />}>
+					<Ellipsis />
+				</DropdownMenuTrigger>
+			</Tooltip>
 			<DropdownMenuContent align="end">
 				<MenuItem variant="agent" onClick={() => onChange({ op: "run-now", id })}>
 					<Play />

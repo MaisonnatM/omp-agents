@@ -4,6 +4,7 @@ import { type BranchChoice, type ConnectedModels, type ModelOption, selectorOf }
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
+import { Tooltip } from "@/components/ui/tooltip";
 import { projectName } from "../labels";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
@@ -188,7 +189,9 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					{" · "}
 				</>
 			)}
-			<span title={target.dir}>{target.creates ? `new worktree ${target.dir}` : target.dir}</span>
+			<Tooltip content={target.dir}>
+				<span>{target.creates ? `new worktree ${target.dir}` : target.dir}</span>
+			</Tooltip>
 		</>
 	);
 	return (
@@ -275,17 +278,18 @@ function skillTitle(name: string, state: SkillState): string {
 /** The skill pinned in the settings, as a toggle in the draft's composer: while on, the first message goes through it. */
 function PinnedSkillToggle({ name, state, onToggle, disabled }: { name: string; state: SkillState; onToggle: () => void; disabled: boolean }) {
 	return (
-		<Button
-			variant="ghost"
-			size="compact"
-			leadingIcon={Sparkles}
-			aria-pressed={state === "on"}
-			aria-label={`Pinned skill ${name}`}
-			title={skillTitle(name, state)}
-			onClick={onToggle}
-			disabled={disabled || state === "missing" || state === "bypassed"}
-		>
-			<span className={cn("max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
-		</Button>
+		<Tooltip content={skillTitle(name, state)}>
+			<Button
+				variant="ghost"
+				size="compact"
+				leadingIcon={Sparkles}
+				aria-pressed={state === "on"}
+				aria-label={`Pinned skill ${name}`}
+				onClick={onToggle}
+				disabled={disabled || state === "missing" || state === "bypassed"}
+			>
+				<span className={cn("max-w-40 truncate", state !== "on" && "text-muted-foreground line-through")}>{name}</span>
+			</Button>
+		</Tooltip>
 	);
 }

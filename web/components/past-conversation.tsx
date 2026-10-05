@@ -2,6 +2,7 @@ import { type ReactNode, useMemo } from "react";
 import type { Item, PastSession } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { MessageScrollerProvider } from "@/components/ui/message-scroller";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { pastLabel } from "../labels";
 import type { StartOf } from "../starts";
@@ -44,16 +45,17 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 			<div className="flex h-full min-h-0 flex-1 flex-col">
 				<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Read-only" alert={false}>
 					{session && (
-						<Button
-							variant="agent"
-							size="compact"
-							onClick={onResume}
-							disabled={resume?.phase === "starting"}
-							aria-busy={resuming || undefined}
-							title="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here."
-						>
-							{resuming ? "Resuming…" : "Resume"}
-						</Button>
+						<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
+							<Button
+								variant="agent"
+								size="compact"
+								onClick={onResume}
+								disabled={resume?.phase === "starting"}
+								aria-busy={resuming || undefined}
+							>
+								{resuming ? "Resuming…" : "Resume"}
+							</Button>
+						</Tooltip>
 					)}
 					{actions}
 				</Header>
@@ -67,3 +69,4 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 		</MessageScrollerProvider>
 	);
 }
+

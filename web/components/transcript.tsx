@@ -53,6 +53,7 @@ import {
 } from "@/components/ui/message-scroller";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { modeOf, skillLabel, SPLIT_CLICK } from "../labels";
@@ -148,31 +149,33 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 				const facts = agent ? [agent.kind, statusLabel(agent.status), agent.activity].filter(Boolean).join(" · ") : "not registered";
 				return (
 					<span key={id} className="inline-flex max-w-full items-center gap-0.5">
-						<a
-							href={hashForView(view)}
-							title={`${facts}\n${SPLIT_CLICK} to open in a split`}
-							className={cn(chip, "text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring")}
-							onClick={event => {
-								// Shift- and middle-clicks keep the link's own new-window behavior.
-								if (event.button !== 0 || event.shiftKey || event.altKey) return;
-								event.preventDefault();
-								links.onOpen(view, modeOf(event));
-							}}
-						>
-							{agent && <StatusDot status={agent.status} />}
-							<span className="truncate">{id}</span>
-						</a>
-						{links.onCancel && agent?.status === "running" && (
-							<Button
-								variant="ghost"
-								size="icon"
-								className="size-6 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
-								aria-label={`Cancel subagent ${id}`}
-								title="Cancel subagent: stop it for good, leaving the session's turn running"
-								onClick={() => links.onCancel?.(view)}
+						<Tooltip content={`${id} · ${facts}. ${SPLIT_CLICK} to open in a split`}>
+							<a
+								href={hashForView(view)}
+								className={cn(chip, "text-foreground hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring")}
+								onClick={event => {
+									// Shift- and middle-clicks keep the link's own new-window behavior.
+									if (event.button !== 0 || event.shiftKey || event.altKey) return;
+									event.preventDefault();
+									links.onOpen(view, modeOf(event));
+								}}
 							>
-								<CircleStop className="size-3.5" />
-							</Button>
+								{agent && <StatusDot status={agent.status} />}
+								<span className="truncate">{id}</span>
+							</a>
+						</Tooltip>
+						{links.onCancel && agent?.status === "running" && (
+							<Tooltip content="Cancel subagent: stop it for good, leaving the session's turn running">
+								<Button
+									variant="ghost"
+									size="icon"
+									className="size-6 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+									aria-label={`Cancel subagent ${id}`}
+									onClick={() => links.onCancel?.(view)}
+								>
+									<CircleStop className="size-3.5" />
+								</Button>
+							</Tooltip>
 						)}
 					</span>
 				);
@@ -221,16 +224,17 @@ function CopyButton({ text }: { text: string }) {
 	const CheckIcon = useIcon("check");
 	const Icon = copied ? CheckIcon : CopyIcon;
 	return (
-		<Button
-			variant="ghost"
-			size="icon-compact"
-			aria-label={copied ? "Copied" : "Copy message"}
-			title={copied ? "Copied" : "Copy message"}
-			data-copied={copied || undefined}
-			onClick={() => copy(text)}
-		>
-			<Icon />
-		</Button>
+		<Tooltip content={copied ? "Copied" : "Copy message"}>
+			<Button
+				variant="ghost"
+				size="icon-compact"
+				aria-label={copied ? "Copied" : "Copy message"}
+				data-copied={copied || undefined}
+				onClick={() => copy(text)}
+			>
+				<Icon />
+			</Button>
+		</Tooltip>
 	);
 }
 
@@ -242,12 +246,11 @@ function ForkButton({ point, forking, disabled, onFork }: { point: ForkPoint; fo
 		: point.prefill
 			? "Fork from here: a new session with the history before this prompt, ready to edit and resend it"
 			: "Fork from here: a new session with the history through this reply";
-	return (
+	const button = (
 		<Button
 			variant="agent"
 			size="icon-compact"
 			aria-label={forking ? "Forking" : "Fork from here"}
-			title={title}
 			aria-busy={forking || undefined}
 			disabled={disabled}
 			data-fork={point.prefill ? "prompt" : "reply"}
@@ -256,6 +259,8 @@ function ForkButton({ point, forking, disabled, onFork }: { point: ForkPoint; fo
 			{forking ? <LoaderIcon className="animate-spin" /> : <BranchIcon />}
 		</Button>
 	);
+	// A disabled button takes no pointer events, so the tooltip needs a wrapper then. While it is enabled, the button itself stays the trigger and keeps keyboard focus.
+	return <Tooltip content={title}>{disabled ? <span className="inline-flex">{button}</span> : button}</Tooltip>;
 }
 
 interface TranscriptProps {
@@ -271,15 +276,16 @@ interface TranscriptProps {
 /** The skill a prompt invoked, as a pill ahead of the user's words. */
 function SkillBadge({ name }: { name: string }) {
 	return (
-		<span
-			title={`/skill:${name}`}
-			className="inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-xs font-medium text-foreground ring-1 ring-border"
-			data-skill={name}
-		>
-			<Sparkles aria-hidden className="size-3 text-violet-500 dark:text-violet-400" />
-			<span className="sr-only">Skill:</span>
-			{skillLabel(name)}
-		</span>
+		<Tooltip content={`/skill:${name}`}>
+			<span
+				className="inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-xs font-medium text-foreground ring-1 ring-border"
+				data-skill={name}
+			>
+				<Sparkles aria-hidden className="size-3 text-violet-500 dark:text-violet-400" />
+				<span className="sr-only">Skill:</span>
+				{skillLabel(name)}
+			</span>
+		</Tooltip>
 	);
 }
 

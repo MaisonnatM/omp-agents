@@ -38,6 +38,7 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
+import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { age, readTime } from "../labels";
@@ -91,8 +92,10 @@ function PlanFile({ plan }: { plan: PlanDocument }) {
 	const name = plan.path.slice(plan.path.lastIndexOf("/") + 1);
 	return (
 		<SidebarGroup>
-			<SidebarGroupLabel title={plan.path}>
-				<span className="min-w-0 flex-1 truncate">{name}</span>
+			<SidebarGroupLabel>
+				<Tooltip content={plan.path}>
+					<span className="min-w-0 flex-1 truncate">{name}</span>
+				</Tooltip>
 			</SidebarGroupLabel>
 			<article className="px-4 pb-2 text-sm leading-relaxed" aria-label={name}>
 				<MessageMarkdown text={plan.text} />
@@ -188,18 +191,20 @@ function FileRow({ file }: { file: ChangedFile }) {
 	const summary = [look.label, `${changes.length} ${changes.length === 1 ? "change" : "changes"}`, last !== null && `${age(last)} ago`].filter(Boolean).join(" · ");
 	return (
 		<SidebarMenuItem>
-			<SidebarMenuButton icon={look.icon} aria-expanded={open} title={`${file.path}\n${summary}`} onClick={() => setOpen(!open)} className="h-auto min-h-8 items-start py-1.5 [&>svg]:mt-0.5">
-				<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-					<span className="flex min-w-0 items-baseline gap-1.5">
-						<span className="min-w-0 truncate text-foreground">{name}</span>
-						<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{dir}</span>
-						<span className="text-xs">
-							<LineCounts {...lineTotals(changes)} />
+			<Tooltip content={`${file.path} · ${summary}`} side="left">
+				<SidebarMenuButton icon={look.icon} aria-expanded={open} onClick={() => setOpen(!open)} className="h-auto min-h-8 items-start py-1.5 [&>svg]:mt-0.5">
+					<span className="flex min-w-0 flex-1 flex-col gap-0.5">
+						<span className="flex min-w-0 items-baseline gap-1.5">
+							<span className="min-w-0 truncate text-foreground">{name}</span>
+							<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{dir}</span>
+							<span className="text-xs">
+								<LineCounts {...lineTotals(changes)} />
+							</span>
 						</span>
+						<span className="truncate text-xs text-muted-foreground">{summary}</span>
 					</span>
-					<span className="truncate text-xs text-muted-foreground">{summary}</span>
-				</span>
-			</SidebarMenuButton>
+				</SidebarMenuButton>
+			</Tooltip>
 			{open && (
 				<ol className="space-y-3 border-l border-border py-2 pr-1 pl-3 ml-4" aria-label={`Changes to ${file.path}, newest first`}>
 					{changes.toReversed().map((change, index) => (
@@ -218,8 +223,8 @@ const PLAN_TABS = ["plan", "files", "agents", "media"] as const;
 type PlanTab = (typeof PLAN_TABS)[number];
 
 /** Four labeled tabs overflow the sidebar's default width, so each shows its icon and its count, and names itself on hover and to screen readers. */
-function tabLabel(name: string, count: number): { label: string; "aria-label": string; title: string } {
-	return { label: count > 0 ? String(count) : "", "aria-label": count > 0 ? `${name} (${count})` : name, title: name };
+function tabLabel(name: string, count: number): { label: string; "aria-label": string; tooltip: string } {
+	return { label: count > 0 ? String(count) : "", "aria-label": count > 0 ? `${name} (${count})` : name, tooltip: name };
 }
 
 /**

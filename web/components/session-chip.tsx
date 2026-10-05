@@ -1,6 +1,7 @@
 import { Bot } from "lucide-react";
 import type { MouseEvent } from "react";
 import type { HostStatus, RosterHost, View } from "../../src/shared";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { hostLabel, modeOf, SPLIT_CLICK } from "../labels";
 import type { OpenMode } from "../routing";
@@ -19,18 +20,19 @@ interface SessionChipProps {
 /** A session named on a pull request or an issue, which opens it on click. */
 export function SessionChip({ label, status, title, filled, onClick }: SessionChipProps) {
 	return (
-		<button
-			type="button"
-			title={title}
-			onClick={onClick}
-			className={cn(
-				"flex max-w-48 items-center gap-1.5 rounded px-1.5 py-px text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
-				filled ? "bg-muted" : "ring-1 ring-inset ring-border",
-			)}
-		>
-			{status && <StatusDot status={status} />}
-			<span className="truncate">{label}</span>
-		</button>
+		<Tooltip content={`${label}. ${title}`}>
+			<button
+				type="button"
+				onClick={onClick}
+				className={cn(
+					"flex max-w-48 items-center gap-1.5 rounded px-1.5 py-px text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
+					filled ? "bg-muted" : "ring-1 ring-inset ring-border",
+				)}
+			>
+				{status && <StatusDot status={status} />}
+				<span className="truncate">{label}</span>
+			</button>
+		</Tooltip>
 	);
 }
 

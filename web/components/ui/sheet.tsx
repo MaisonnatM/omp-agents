@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { exitFallbackMs, spring } from "@/lib/springs";
 import { surfaceClasses } from "@/lib/surface-classes";
 import { SurfaceProvider, useSurface } from "@/lib/surface-context";
@@ -81,11 +82,13 @@ export function Sheet({ open, onClose, children, className }: SheetProps) {
 							}}
 						>
 							<SurfaceProvider value={level}>{children}</SurfaceProvider>
-							<DialogPrimitive.Close asChild>
-								<Button variant="ghost" size="icon-compact" aria-label="Close" title="Close (Esc)" className="absolute top-3 right-3">
-									<X />
-								</Button>
-							</DialogPrimitive.Close>
+							<Tooltip content="Close" shortcut={["Esc"]} side="left">
+								<DialogPrimitive.Close asChild>
+									<Button variant="ghost" size="icon-compact" aria-label="Close" className="absolute top-3 right-3">
+										<X />
+									</Button>
+								</DialogPrimitive.Close>
+							</Tooltip>
 						</motion.div>
 					</DialogPrimitive.Content>
 				</DialogPrimitive.Portal>

@@ -4,6 +4,7 @@ import type { TicketDetail, TicketEdit, TicketOptions, TicketPriority } from "..
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson, putJson } from "../../api";
 import { ticketsStore } from "../../reads";
@@ -62,11 +63,13 @@ function FieldPicker({ field, current, trigger, choices, error = null, selected,
 				if (next) onOpen?.();
 			}}
 		>
-			<PopoverTrigger asChild>
-				<Button variant="ghost" size="compact" className="max-w-56 px-1.5 text-muted-foreground" aria-label={`${field}: ${current}`} active={open}>
-					<span className="flex min-w-0 items-center gap-1">{trigger}</span>
-				</Button>
-			</PopoverTrigger>
+			<Tooltip content={`Change ${field.toLowerCase()}: ${current}`} side="bottom" forceOpen={open ? false : undefined}>
+				<PopoverTrigger asChild>
+					<Button variant="ghost" size="compact" className="max-w-56 px-1.5 text-muted-foreground" aria-label={`${field}: ${current}`} data-state={open ? "open" : "closed"} active={open}>
+						<span className="flex min-w-0 items-center gap-1">{trigger}</span>
+					</Button>
+				</PopoverTrigger>
+			</Tooltip>
 			<PopoverContent align="start" className="w-64 p-0">
 				<Command>
 					<CommandInput aria-label={`Search ${field.toLowerCase()}`} placeholder={`${field}…`} />
@@ -109,11 +112,13 @@ function DuePicker({ dueDate, onChange }: { dueDate: string | null; onChange: (d
 	const [open, setOpen] = useState(false);
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
-				<Button variant="ghost" size="compact" className="px-1.5 text-muted-foreground" leadingIcon={Calendar} aria-label={`Due date: ${dueDate ?? "none"}`} active={open}>
-					{dueDate ? dueLabel(dueDate) : "Due date"}
-				</Button>
-			</PopoverTrigger>
+			<Tooltip content={dueDate ? `Change the due date: ${dueLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
+				<PopoverTrigger asChild>
+					<Button variant="ghost" size="compact" className="px-1.5 text-muted-foreground" leadingIcon={Calendar} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open}>
+						{dueDate ? dueLabel(dueDate) : "Due date"}
+					</Button>
+				</PopoverTrigger>
+			</Tooltip>
 			<PopoverContent align="start" className="w-auto p-2">
 				<form
 					onSubmit={event => {

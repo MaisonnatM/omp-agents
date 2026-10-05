@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { RosterHost, Ticket, TicketPriority, TicketStatusType, View } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip } from "@/components/ui/tooltip";
 import { age } from "../../labels";
 import { type QuickActionId, type TicketActionId, ticketActions } from "../../quick-actions";
 import { hashForTickets, type OpenMode } from "../../routing";
@@ -67,37 +68,40 @@ interface TicketRowProps {
 export function TicketRow({ ticket, sessions, onOpen, pending, onQuickAction }: TicketRowProps) {
 	return (
 		<li id={ticketRowId(ticket.id)} className="flex scroll-my-6 items-center hover:bg-muted/50">
-			<a
-				href={hashForTickets(ticket.id)}
-				title={`Show the details of ${ticket.id}`}
-				className="flex h-9 min-w-0 flex-1 items-center gap-3 pl-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-			>
-				<IconTip icon={[...PRIORITY_ICON[ticket.priority], PRIORITY_LABEL[ticket.priority]]} />
-				<span className="w-20 shrink-0 truncate font-mono text-xs tabular-nums text-muted-foreground">{ticket.id}</span>
-				<IconTip icon={[...statusIcon(ticket.status, ticket.statusType), ticket.status]} />
-				<span className="min-w-0 flex-1 truncate">{ticket.title}</span>
-				{ticket.labels.length > 0 && (
-					<span className="hidden max-w-64 shrink items-center gap-1 overflow-hidden md:flex">
-						{ticket.labels.map(label => (
-							<Badge key={label} variant="dot" size="compact">
-								{label}
-							</Badge>
-						))}
-					</span>
-				)}
-				{ticket.project && (
-					<span className="hidden max-w-40 shrink-0 items-center gap-1 text-xs text-muted-foreground lg:flex" title={ticket.project}>
-						<Box aria-hidden className="size-3.5 shrink-0" />
-						<span className="truncate">{ticket.project}</span>
-					</span>
-				)}
-				{ticket.dueDate && (
-					<span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground" title={`Due ${ticket.dueDate}`}>
-						<Calendar aria-hidden className="size-3.5" />
-						{dueLabel(ticket.dueDate)}
-					</span>
-				)}
-			</a>
+			<Tooltip content={`${ticket.id} · ${ticket.title}`}>
+				<a
+					href={hashForTickets(ticket.id)}
+					className="flex h-9 min-w-0 flex-1 items-center gap-3 pl-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+				>
+					<IconTip icon={[...PRIORITY_ICON[ticket.priority], PRIORITY_LABEL[ticket.priority]]} />
+					<span className="w-20 shrink-0 truncate font-mono text-xs tabular-nums text-muted-foreground">{ticket.id}</span>
+					<IconTip icon={[...statusIcon(ticket.status, ticket.statusType), ticket.status]} />
+					<span className="min-w-0 flex-1 truncate">{ticket.title}</span>
+					{ticket.labels.length > 0 && (
+						<span className="hidden max-w-64 shrink items-center gap-1 overflow-hidden md:flex">
+							{ticket.labels.map(label => (
+								<Badge key={label} variant="dot" size="compact">
+									{label}
+								</Badge>
+							))}
+						</span>
+					)}
+					{ticket.project && (
+						<Tooltip content={ticket.project}>
+							<span className="hidden max-w-40 shrink-0 items-center gap-1 text-xs text-muted-foreground lg:flex">
+								<Box aria-hidden className="size-3.5 shrink-0" />
+								<span className="truncate">{ticket.project}</span>
+							</span>
+						</Tooltip>
+					)}
+					{ticket.dueDate && (
+						<span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground" title={`Due ${ticket.dueDate}`}>
+							<Calendar aria-hidden className="size-3.5" />
+							{dueLabel(ticket.dueDate)}
+						</span>
+					)}
+				</a>
+			</Tooltip>
 			<div className="flex shrink-0 items-center gap-3 px-3 text-xs">
 				<LiveSessionChips hosts={sessions.slice(0, 2)} onOpen={onOpen} />
 				<AddToTodo text={ticket.title} body={`Linear issue ${ticket.id}: ${ticket.url}`} link={{ kind: "ticket", identifier: ticket.id }} label={`Add ${ticket.id} to your todo list`} />

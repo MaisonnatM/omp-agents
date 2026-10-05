@@ -16,7 +16,7 @@ import {
 	type View,
 } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";
@@ -92,6 +92,7 @@ const LINK_VERB: Record<PullRequestLink, string> = { submitted: "submitted", wor
 
 /** The first session on the pull request as a chip, then the others behind a `+N` menu that lists every one. */
 function SessionChips({ sessions, onOpen }: { sessions: SessionLink[]; onOpen: (view: View, mode: OpenMode) => void }) {
+	const [menuOpen, setMenuOpen] = useState(false);
 	const [first] = sessions;
 	if (!first) return null;
 	return (
@@ -104,24 +105,27 @@ function SessionChips({ sessions, onOpen }: { sessions: SessionLink[]; onOpen: (
 				onClick={event => onOpen(first.view, modeOf(event))}
 			/>
 			{sessions.length > 1 && (
-				<DropdownMenu>
-					<DropdownMenuTrigger
-						render={
-							<button
-								type="button"
-								aria-label={`All ${sessions.length} sessions on this pull request`}
-								className="rounded px-1 py-px tabular-nums outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-							/>
-						}
-					>
-						+{sessions.length - 1}
-					</DropdownMenuTrigger>
+				<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+					<Tooltip content={`All ${sessions.length} sessions on this pull request`} forceOpen={menuOpen ? false : undefined}>
+						<DropdownMenuTrigger
+							render={
+								<button
+									type="button"
+									aria-label={`All ${sessions.length} sessions on this pull request`}
+									className="rounded px-1 py-px tabular-nums outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+								/>
+							}
+						>
+							+{sessions.length - 1}
+						</DropdownMenuTrigger>
+					</Tooltip>
 					<DropdownMenuContent align="start" className="max-w-80">
 						{sessions.map(session => (
-							<MenuItem key={session.sessionId} title={`Open it (${SPLIT_CLICK} to split)`} onClick={event => onOpen(session.view, modeOf(event))}>
+							<MenuItem key={session.sessionId} onClick={event => onOpen(session.view, modeOf(event))}>
 								{session.status ? <StatusDot status={session.status} /> : <span className="w-1.5 shrink-0" />}
 								<span className="min-w-0 flex-1 truncate">{session.label}</span>
 								<span className="shrink-0 text-xs text-muted-foreground">{LINK_VERB[session.link]}</span>
+								<MenuShortcut>{SPLIT_CLICK}</MenuShortcut>
 							</MenuItem>
 						))}
 					</DropdownMenuContent>
@@ -210,14 +214,15 @@ export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen,
 				{pr.role === "reviewer" && <Avatar person={pr.author} label={`Opened by ${pr.author.login}`} className="mt-px" />}
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<div className="flex min-w-0 items-baseline gap-2">
-						<a
-							href={hashForInbox(pr)}
-							aria-haspopup="dialog"
-							title={`Show the details of ${pr.owner}/${pr.repo}#${pr.number}`}
-							className="truncate rounded-sm text-sm font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-						>
-							{pr.title}
-						</a>
+						<Tooltip content={`${pr.owner}/${pr.repo}#${pr.number} · ${pr.title}`}>
+							<a
+								href={hashForInbox(pr)}
+								aria-haspopup="dialog"
+								className="truncate rounded-sm text-sm font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+							>
+								{pr.title}
+							</a>
+						</Tooltip>
 						<span className="shrink-0 text-xs tabular-nums text-muted-foreground">#{pr.number}</span>
 					</div>
 					<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
@@ -226,9 +231,11 @@ export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen,
 							<StackChip stack={stack} base={pr.stackedOn} />
 						) : (
 							pr.stackedOn && (
-								<span className="min-w-0 truncate" title={`Stacked on ${pr.stackedOn}`}>
-									on <span className="font-mono">{pr.stackedOn}</span>
-								</span>
+								<Tooltip content={`Stacked on ${pr.stackedOn}`}>
+									<span className="min-w-0 truncate">
+										on <span className="font-mono">{pr.stackedOn}</span>
+									</span>
+								</Tooltip>
 							)
 						)}
 						{pr.role === "reviewer" && <span className="shrink-0">· by {pr.author.login}</span>}

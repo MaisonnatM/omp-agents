@@ -1286,10 +1286,9 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
             <div className="flex items-center gap-1.5 shrink-0">
               {rightContent}
               <Tooltip
-                content="Stop"
-                shortcut={stopShortcut}
-                // Send has no tooltip; one open over Stop closes as the button turns back into Send.
-                forceOpen={buttonMode === "stop" && stopShortcut ? undefined : false}
+                content={buttonLabel}
+                shortcut={buttonMode === "stop" ? stopShortcut : ["Enter"]}
+                side="top"
               >
                 <Button
                   type="button"

@@ -1,6 +1,7 @@
 import { CircleCheck, CircleDashed, CircleSlash, CircleX, Eye, GitMerge, GitPullRequestDraft, type LucideIcon, MessageSquare } from "lucide-react";
 import type { ReactNode } from "react";
 import { type CheckRunState, type PullRequest, type PullRequestCheck, type PullRequestDetail, type PullRequestEvent, pullRequestUrl, type RosterHost, type View } from "../../../src/shared";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, pullRequestStatus, type StatusItem } from "../../inbox-model";
 import { age } from "../../labels";
@@ -119,11 +120,15 @@ function CheckRow({ check: { name, state, url } }: { check: PullRequestCheck }) 
 		<li className="flex min-w-0 items-center gap-2">
 			<Icon aria-label={state} className={cn("size-3.5 shrink-0", color)} />
 			{url ? (
-				<a href={url} target="_blank" rel="noreferrer" className="truncate underline-offset-2 hover:underline">
-					{name}
-				</a>
+				<Tooltip content={name}>
+					<a href={url} target="_blank" rel="noreferrer" className="truncate underline-offset-2 hover:underline">
+						{name}
+					</a>
+				</Tooltip>
 			) : (
-				<span className="truncate">{name}</span>
+				<Tooltip content={name}>
+					<span className="truncate">{name}</span>
+				</Tooltip>
 			)}
 		</li>
 	);

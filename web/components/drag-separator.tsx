@@ -1,4 +1,5 @@
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode, useRef } from "react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type Axis = "horizontal" | "vertical";
@@ -77,21 +78,22 @@ interface SeparatorProps extends DragSeparatorEvents {
 /** The accessible separator element and its interaction line, independent of the value's domain. */
 export function Separator({ axis, label, min, max, now, className, style, children, ...events }: SeparatorProps) {
 	return (
-		<div
-			role="separator"
-			aria-orientation={axis}
-			aria-label={label}
-			aria-valuemin={min}
-			aria-valuemax={max}
-			aria-valuenow={now}
-			title="Drag or use arrow keys to resize. Double-click to reset."
-			tabIndex={0}
-			style={style}
-			className={cn("group absolute z-30 flex touch-none justify-center outline-none", className)}
-			{...events}
-		>
-			<span className={cn("bg-transparent transition-colors group-hover:bg-foreground/25 group-focus-visible:bg-ring group-active:bg-foreground/40", axis === "vertical" ? "h-full w-px" : "h-px w-full")} />
-			{children}
-		</div>
+		<Tooltip content="Drag or use arrow keys to resize. Double-click to reset.">
+			<div
+				role="separator"
+				aria-orientation={axis}
+				aria-label={label}
+				aria-valuemin={min}
+				aria-valuemax={max}
+				aria-valuenow={now}
+				tabIndex={0}
+				style={style}
+				className={cn("group absolute z-30 flex touch-none justify-center outline-none", className)}
+				{...events}
+			>
+				<span className={cn("bg-transparent transition-colors group-hover:bg-foreground/25 group-focus-visible:bg-ring group-active:bg-foreground/40", axis === "vertical" ? "h-full w-px" : "h-px w-full")} />
+				{children}
+			</div>
+		</Tooltip>
 	);
 }

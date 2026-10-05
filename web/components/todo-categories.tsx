@@ -2,6 +2,7 @@ import { Ellipsis, type LucideIcon, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import type { UserTodoChange, UserTodoList } from "../../src/shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
 	SidebarGroup,
 	SidebarGroupAction,
@@ -62,6 +63,29 @@ interface TodoCategoriesProps {
 }
 
 /** The Todo tab of the sidebar: every todo, today's, the ones agents added, the archive, then each category, with the top-level todos left to do in each. */
+function CategoryMenu({ name, onRename, onDelete }: { name: string; onRename: () => void; onDelete: () => void }) {
+	const [open, setOpen] = useState(false);
+	return (
+		<DropdownMenu open={open} onOpenChange={setOpen}>
+			<Tooltip content="More actions" forceOpen={open ? false : undefined}>
+				<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${name}`} />}>
+					<Ellipsis />
+				</DropdownMenuTrigger>
+			</Tooltip>
+			<DropdownMenuContent align="end">
+				<MenuItem onClick={onRename}>
+					<Pencil />
+					Rename
+				</MenuItem>
+				<MenuItem variant="destructive" onClick={onDelete}>
+					<Trash2 />
+					Delete, keeping its todos
+				</MenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
 export function TodoCategories({ list, view, disabled, onChange }: TodoCategoriesProps) {
 	const [naming, setNaming] = useState<Naming>({ kind: "none" });
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your todos…</p></SidebarGroup>;
@@ -93,9 +117,11 @@ export function TodoCategories({ list, view, disabled, onChange }: TodoCategorie
 			<SidebarGroup>
 				<SidebarGroupLabel>Categories</SidebarGroupLabel>
 				{!disabled && (
-					<SidebarGroupAction title="New category" aria-label="New category" onClick={() => setNaming({ kind: "add" })}>
-						<Plus />
-					</SidebarGroupAction>
+					<Tooltip content="New category">
+						<SidebarGroupAction aria-label="New category" onClick={() => setNaming({ kind: "add" })}>
+							<Plus />
+						</SidebarGroupAction>
+					</Tooltip>
 				)}
 				<SidebarMenu aria-label="Todo categories">
 					{list.categories.map(({ id, name }) =>
@@ -114,27 +140,14 @@ export function TodoCategories({ list, view, disabled, onChange }: TodoCategorie
 							<SidebarMenuItem key={id}>
 								{link({ kind: "category", id }, name)}
 								{!disabled && (
-									<DropdownMenu>
-										<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${name}`} title="More actions" />}>
-											<Ellipsis />
-										</DropdownMenuTrigger>
-										<DropdownMenuContent align="end">
-											<MenuItem onClick={() => setNaming({ kind: "rename", id })}>
-												<Pencil />
-												Rename
-											</MenuItem>
-											<MenuItem
-												variant="destructive"
-												onClick={() => {
-													onChange({ op: "remove-category", id });
-													if (view.kind === "category" && view.id === id) location.hash = hashForTodo({ kind: "all" });
-												}}
-											>
-												<Trash2 />
-												Delete, keeping its todos
-											</MenuItem>
-										</DropdownMenuContent>
-									</DropdownMenu>
+									<CategoryMenu
+										name={name}
+										onRename={() => setNaming({ kind: "rename", id })}
+										onDelete={() => {
+											onChange({ op: "remove-category", id });
+											if (view.kind === "category" && view.id === id) location.hash = hashForTodo({ kind: "all" });
+										}}
+									/>
 								)}
 							</SidebarMenuItem>
 						),

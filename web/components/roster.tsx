@@ -81,20 +81,22 @@ function SessionRow({
 	onOpen: (view: View, mode: OpenMode) => void;
 }) {
 	return (
-		<SidebarMenuButton isActive={open} onClick={event => onOpen(view, modeOf(event))} title={title}>
-			{dot}
-			<span className="flex min-w-0 flex-1 items-baseline gap-2">
-				{badge}
-				<span className="truncate font-medium text-foreground">{label}</span>
-				<ShipStep ship={ship} />
-				{facts && (
-					<span className="shrink-0 text-xs text-muted-foreground" title={facts.title}>
-						{facts.text}
-					</span>
-				)}
-				<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(when)}</span>
-			</span>
-		</SidebarMenuButton>
+		<Tooltip content={`${label}. ${title}. ${SPLIT_CLICK} to open in a split`} side="right">
+			<SidebarMenuButton isActive={open} onClick={event => onOpen(view, modeOf(event))}>
+				{dot}
+				<span className="flex min-w-0 flex-1 items-baseline gap-2">
+					{badge}
+					<span className="truncate font-medium text-foreground">{label}</span>
+					<ShipStep ship={ship} />
+					{facts && (
+						<span className="shrink-0 text-xs text-muted-foreground" title={facts.title}>
+							{facts.text}
+						</span>
+					)}
+					<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(when)}</span>
+				</span>
+			</SidebarMenuButton>
+		</Tooltip>
 	);
 }
 
@@ -131,6 +133,7 @@ interface RowMenuProps {
 
 /** A sidebar row whose quick actions open on right-click and from its hover-revealed "More actions" button. */
 export function RowMenu({ view, label, isOpen, onOpen, children, items, style }: RowMenuProps) {
+	const [menuOpen, setMenuOpen] = useState(false);
 	const menuItems = (
 		<>
 			<MenuItem onClick={() => onOpen(view, "replace")}>
@@ -151,10 +154,12 @@ export function RowMenu({ view, label, isOpen, onOpen, children, items, style }:
 		<ContextMenu>
 			<ContextMenuTrigger render={<SidebarMenuItem style={style} />}>
 				{children}
-				<DropdownMenu>
-					<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${label}`} title="More actions" />}>
-						<Ellipsis />
-					</DropdownMenuTrigger>
+				<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+					<Tooltip content="More actions" forceOpen={menuOpen ? false : undefined}>
+						<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${label}`} />}>
+							<Ellipsis />
+						</DropdownMenuTrigger>
+					</Tooltip>
 					<DropdownMenuContent align="end">{menuItems}</DropdownMenuContent>
 				</DropdownMenu>
 			</ContextMenuTrigger>
@@ -645,18 +650,35 @@ export function Roster({
 					{interrupted.length > 0 && (
 						<SidebarGroup collapsible open={!collapsed.has("interrupted")} onOpenChange={() => toggleGroup("interrupted")}>
 							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
-							{/* The group action's props carry no `disabled`, so it styles a native button that does. */}
-							<SidebarGroupAction asChild className="agent-action disabled:pointer-events-none disabled:opacity-50">
-								<button
-									type="button"
-									title={resumingAll ? "Resuming…" : "Resume all"}
-									aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
-									disabled={resumingAll || !connected}
-									onClick={() => start({ kind: "resume-all", sessionIds: interrupted.map(session => session.sessionId) })}
-								>
-									{resumingAll ? <Loader className="animate-spin" /> : <ListRestart />}
-								</button>
-							</SidebarGroupAction>
+							{/* The action's props carry no disabled, so it styles a native button that does. */}
+							<SidebarGroupActions>
+								<Tooltip content={resumingAll ? "Resuming…" : "Resume all"}>
+									{resumingAll || !connected ? (
+										<span className="inline-flex">
+											<SidebarGroupAction asChild className="agent-action disabled:pointer-events-none disabled:opacity-50">
+												<button
+													type="button"
+													aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
+													disabled
+													onClick={() => start({ kind: "resume-all", sessionIds: interrupted.map(session => session.sessionId) })}
+												>
+													{resumingAll ? <Loader className="animate-spin" /> : <ListRestart />}
+												</button>
+											</SidebarGroupAction>
+										</span>
+									) : (
+										<SidebarGroupAction asChild className="agent-action disabled:pointer-events-none disabled:opacity-50">
+											<button
+												type="button"
+												aria-label="Resume all interrupted sessions"
+												onClick={() => start({ kind: "resume-all", sessionIds: interrupted.map(session => session.sessionId) })}
+											>
+												<ListRestart />
+											</button>
+										</SidebarGroupAction>
+									)}
+								</Tooltip>
+							</SidebarGroupActions>
 							{resumeAll?.phase === "failed" && (
 								<p role="alert" className="mx-2 mb-1 flex items-start gap-2 rounded-md bg-red-500/10 px-2 py-1.5 text-xs text-red-600 dark:text-red-400">
 									<span className="min-w-0 flex-1">{resumeAll.error}</span>

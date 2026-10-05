@@ -2,6 +2,7 @@ import { Archive, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import type { UserTodoChange, UserTodoList } from "../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { DAY_FORMAT, LIST_KINDS, matches, placeIn } from "../todo-views";
 import { PageFrame } from "./list-sheet-page";
@@ -60,24 +61,26 @@ export function ArchivePage({ list, disabled, onChange, sessions, newSessionCwd,
 								{todo.doneAt && <span className="shrink-0 text-xs text-muted-foreground">{DAY_FORMAT.format(new Date(todo.doneAt))}</span>}
 								{!disabled && (
 									<span className="flex shrink-0 gap-1 opacity-0 group-hover/todo:opacity-100 focus-within:opacity-100 [&_svg]:size-3.5">
-										<button
-											type="button"
-											title="Put back in the list"
-											aria-label={`Put ${todo.text} back`}
-											onClick={() => onChange({ op: "unarchive", id: todo.id })}
-											className="text-muted-foreground hover:text-foreground"
-										>
-											<RotateCcw />
-										</button>
-										<button
-											type="button"
-											title="Delete for good"
-											aria-label={`Delete ${todo.text} for good`}
-											onClick={() => onChange({ op: "remove", id: todo.id })}
-											className="text-muted-foreground hover:text-foreground"
-										>
-											<Trash2 />
-										</button>
+										<Tooltip content="Put back in the list">
+											<button
+												type="button"
+												aria-label={`Put ${todo.text} back`}
+												onClick={() => onChange({ op: "unarchive", id: todo.id })}
+												className="text-muted-foreground hover:text-foreground"
+											>
+												<RotateCcw />
+											</button>
+										</Tooltip>
+										<Tooltip content="Delete for good">
+											<button
+												type="button"
+												aria-label={`Delete ${todo.text} for good`}
+												onClick={() => onChange({ op: "remove", id: todo.id })}
+												className="text-muted-foreground hover:text-foreground"
+											>
+												<Trash2 />
+											</button>
+										</Tooltip>
 									</span>
 								)}
 							</li>

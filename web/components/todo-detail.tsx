@@ -2,6 +2,7 @@ import { Circle, CircleCheck, Play, Ticket, X } from "lucide-react";
 import { useState } from "react";
 import type { TicketChoice, TicketDraft, UserTodo, UserTodoChange, UserTodoList } from "../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson, putJson } from "../api";
 import { errorText } from "../../src/json";
@@ -101,21 +102,32 @@ export function TodoDetail({ list, open, readOnly, onChange, onClose, sessions, 
 	return (
 		<section aria-label={todo.text} className="flex min-w-0 flex-col gap-3 self-start md:sticky md:top-6">
 			<div className="flex items-start gap-2">
-				<button
-					type="button"
-					role="checkbox"
-					aria-checked={done}
-					aria-label={todo.text}
-					disabled={readOnly}
-					onClick={() => onChange({ op: "toggle", id: todo.id, doneAt: done ? null : new Date().toISOString() })}
-					className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground disabled:pointer-events-none [&>svg]:size-4"
-				>
-					{done ? <CircleCheck /> : <Circle />}
-				</button>
+				<Tooltip content={done ? "Mark not done" : "Mark done"}>
+					{readOnly ? (
+						<span className="inline-flex">
+							<button type="button" role="checkbox" aria-checked={done} aria-label={todo.text} disabled className="mt-0.5 shrink-0 text-muted-foreground disabled:pointer-events-none [&>svg]:size-4">
+								{done ? <CircleCheck /> : <Circle />}
+							</button>
+						</span>
+					) : (
+						<button
+							type="button"
+							role="checkbox"
+							aria-checked={done}
+							aria-label={todo.text}
+							onClick={() => onChange({ op: "toggle", id: todo.id, doneAt: done ? null : new Date().toISOString() })}
+							className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground [&>svg]:size-4"
+						>
+							{done ? <CircleCheck /> : <Circle />}
+						</button>
+					)}
+				</Tooltip>
 				<h3 className={cn("min-w-0 flex-1 break-words text-base font-semibold leading-snug", done && "text-muted-foreground line-through")}>{todo.text}</h3>
-				<Button variant="ghost" size="icon-compact" aria-label="Close the todo" title="Close" onClick={onClose}>
-					<X />
-				</Button>
+				<Tooltip content="Close">
+					<Button variant="ghost" size="icon-compact" aria-label="Close the todo" onClick={onClose}>
+						<X />
+					</Button>
+				</Tooltip>
 			</div>
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
 				{open.parent ? (

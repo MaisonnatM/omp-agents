@@ -2,6 +2,7 @@ import { Plus, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { type CatalogModel, type ModelChain, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit, splitSelector } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
 import { providerOrg } from "../../labels";
@@ -59,6 +60,7 @@ function SelectorPicker({ value, catalog, label, onPick }: { value: string | nul
 			<CommandPicker
 				trigger={<span className="max-w-56 truncate">{model ? <Model selector={model} /> : "Choose a model"}</span>}
 				ariaLabel={`${label}: ${model ? modelDescription(model) : "none"}`}
+				tooltip={model ? `Model for ${label}: ${modelDescription(model)}` : `Choose a model for ${label}`}
 				className="min-w-0"
 				search={MODEL_LIST.search}
 				width="lg"
@@ -73,19 +75,21 @@ function SelectorPicker({ value, catalog, label, onPick }: { value: string | nul
 				empty={MODEL_LIST.empty}
 			/>
 			{model && (levels.length > 0 || level) && (
-				<select
-					aria-label={`${label}: thinking level`}
-					className={FIELD}
-					value={level ?? ""}
-					onChange={event => onPick(event.target.value ? `${model}:${event.target.value}` : model)}
-				>
-					<option value="">default</option>
-					{[...new Set([...levels, ...(level ? [level] : [])])].map(option => (
-						<option key={option} value={option}>
-							{option}
-						</option>
-					))}
-				</select>
+				<Tooltip content={`Thinking level for ${label}`}>
+					<select
+						aria-label={`${label}: thinking level`}
+						className={FIELD}
+						value={level ?? ""}
+						onChange={event => onPick(event.target.value ? `${model}:${event.target.value}` : model)}
+					>
+						<option value="">default</option>
+						{[...new Set([...levels, ...(level ? [level] : [])])].map(option => (
+							<option key={option} value={option}>
+								{option}
+							</option>
+						))}
+					</select>
+				</Tooltip>
 			)}
 		</div>
 	);
