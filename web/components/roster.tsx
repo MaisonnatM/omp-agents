@@ -1,10 +1,8 @@
-import { AppWindow, Archive, Check, ChevronsUpDown, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
+import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
 import { type PastSession, type PullRequest, type RosterHost, repoKey, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -31,7 +29,6 @@ import {
 } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
-import { cn } from "@/lib/utils";
 import { inboxSection, inboxSections, pullRequestUrl } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView } from "../routing";
@@ -43,6 +40,7 @@ import { ticketGroups, ticketSection } from "../tickets-model";
 import type { ResumeAll } from "../use-dashboard";
 import { useInbox } from "../use-inbox";
 import { useTickets } from "../use-tickets";
+import { CommandPicker } from "./command-picker";
 import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
 
@@ -175,52 +173,44 @@ function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 	useShortcuts({ project: () => setOpen(shown => !shown) });
 	const selected = projects.find(project => project.cwd === current);
 	const label = selected ? (projectName(selected.cwdDisplay) ?? selected.cwdDisplay) : "All projects";
-	const pick = (cwd: string | null): void => {
-		setOpen(false);
+	const pick = (cwd: string | null) => (): void => {
 		if (cwd !== current) onPick(cwd);
 	};
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
-				<Button
-					variant="ghost"
-					size="compact"
-					leadingIcon={Folder}
-					trailingIcon={ChevronsUpDown}
-					title={selected?.cwdDisplay}
-					aria-label={`Show sessions from: ${label}`}
-					active={open}
-					className="min-w-0 font-semibold"
-				>
-					<span className="truncate">{label}</span>
-				</Button>
-			</PopoverTrigger>
-			<PopoverContent align="start" className="w-[min(18rem,calc(100vw-2rem))] p-0">
-				<Command>
-					<CommandInput aria-label="Search projects" placeholder="Search projects…" />
-					<CommandList>
-						<CommandEmpty>No project matches.</CommandEmpty>
-						<CommandGroup>
-							<CommandItem value="All projects" onSelect={() => pick(null)}>
-								All projects
-								<Check className={cn("ml-auto", current === null ? "opacity-100" : "opacity-0")} />
-							</CommandItem>
-						</CommandGroup>
-						<CommandGroup heading="Projects">
-							{projects.map(project => (
-								<CommandItem key={project.cwd} value={project.cwd} keywords={[project.cwdDisplay]} onSelect={() => pick(project.cwd)}>
-									<span className="flex min-w-0 flex-col">
-										<span className="truncate">{projectName(project.cwdDisplay) ?? project.cwdDisplay}</span>
-										<span className="truncate text-xs text-muted-foreground">{project.cwdDisplay}</span>
-									</span>
-									<Check className={cn("ml-auto shrink-0", project.cwd === current ? "opacity-100" : "opacity-0")} />
-								</CommandItem>
-							))}
-						</CommandGroup>
-					</CommandList>
-				</Command>
-			</PopoverContent>
-		</Popover>
+		<CommandPicker
+			trigger={<span className="truncate">{label}</span>}
+			icon={Folder}
+			title={selected?.cwdDisplay}
+			ariaLabel={`Show sessions from: ${label}`}
+			className="min-w-0 font-semibold"
+			search={{ label: "Search projects" }}
+			width="md"
+			open={open}
+			onOpenChange={setOpen}
+			list={{
+				kind: "ready",
+				groups: [
+					{ key: "all", items: [{ value: "All projects", label: "All projects", selected: current === null, onSelect: pick(null) }] },
+					{
+						key: "projects",
+						heading: "Projects",
+						items: projects.map(project => ({
+							value: project.cwd,
+							keywords: [project.cwdDisplay],
+							label: (
+								<span className="flex min-w-0 flex-col">
+									<span className="truncate">{projectName(project.cwdDisplay) ?? project.cwdDisplay}</span>
+									<span className="truncate text-xs text-muted-foreground">{project.cwdDisplay}</span>
+								</span>
+							),
+							selected: project.cwd === current,
+							onSelect: pick(project.cwd),
+						})),
+					},
+				],
+			}}
+			empty="No project matches."
+		/>
 	);
 }
 
