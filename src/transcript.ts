@@ -15,7 +15,7 @@ type ToolItem = Extract<Item, { kind: "tool" }>;
 
 const COLLAB_PROMPT = "collab-prompt";
 /** How omp's terminal and RPC clients record a `/skill:<name>` prompt: the skill's text, with the invocation in `details`. */
-const SKILL_PROMPT = "skill-prompt";
+export const SKILL_PROMPT = "skill-prompt";
 /**
  * omp's `prompts/skills/user-invocation.md` as rendered: the skill's name, its body, its directory, then what the user
  * typed around the `/skill:` token. Collab and subagent prompts carry only this text, since the dashboard expands

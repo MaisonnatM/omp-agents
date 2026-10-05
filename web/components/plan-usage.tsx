@@ -71,5 +71,5 @@ export function PlanUsageFooter({ usage }: { usage: DashboardState["usage"] }) {
 				))}
 			</ul>
 		);
-	return <SidebarFooter className="border-t border-border px-3 py-2 text-xs">{body}</SidebarFooter>;
+	return <SidebarFooter className="px-3 py-2 text-xs">{body}</SidebarFooter>;
 }

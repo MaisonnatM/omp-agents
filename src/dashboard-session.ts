@@ -13,6 +13,7 @@ import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rp
 import { endsMidTurn } from "./omp/sessions";
 import { displayPath } from "./paths";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type HostStatus, type MessageQueue, type ModelOption, type PromptImage, type RosterHost, type UserAnswer, type UserRequest } from "./shared";
+import { SKILL_PROMPT } from "./transcript";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
 /** omp's subagent lifecycle and progress statuses, as the roster's agent statuses. */
@@ -72,6 +73,10 @@ async function recordedCwd(sessionFile: string): Promise<string> {
 const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_changed", "auto_compaction_end"]);
 
 const isTexts = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === "string");
+
+/** A message the user's prompt became: omp records a plain one as `user`, and a `/skill:` one as a `custom` `skill-prompt`. */
+const isPrompt = (message: Record<string, unknown>): boolean =>
+	message.role === "user" || (message.role === "custom" && message.customType === SKILL_PROMPT);
 
 export class DashboardSession implements LiveSession {
 	readonly instanceId: string;
@@ -385,8 +390,9 @@ export class DashboardSession implements LiveSession {
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });
-		} else if (event.type === "message_end" && isObject(event.message) && event.message.role === "user" && this.sessionName === null) {
+		} else if (event.type === "message_end" && isObject(event.message) && isPrompt(event.message) && this.sessionName === null) {
 			// omp's RPC mode titles no prompt itself; a bare `/rename` makes omp title the session from the prompt it now holds.
+			// A `/skill:` prompt is a custom message, not a user one, and omp's title context reads it as the user's prompt.
 			this.#child.client.prompt("/rename").catch((err: unknown) => this.#fail("Titling failed", err));
 		} else if (typeof event.type === "string" && STATE_EVENTS.has(event.type)) this.#refresh();
 	}
