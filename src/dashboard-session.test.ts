@@ -143,6 +143,29 @@ describe("DashboardSession prompts", () => {
 		await expect(session.prompt(null, "!!ls", [], "steer")).rejects.toBeInstanceOf(Error);
 		expect(client.calls).toEqual([]);
 	});
+
+	test("an abort waits until a steer omp has not admitted yet is admitted", async () => {
+		const { session, client } = await startSession();
+		const admitted = Promise.withResolvers<string>();
+		const order: string[] = [];
+		client.prompt = async text => {
+			order.push(`prompt ${text}`);
+			return admitted.promise;
+		};
+		client.abort = async () => {
+			order.push("abort");
+		};
+
+		const sent = session.prompt(null, "now", [], "steer");
+		session.abort();
+		await settle();
+		expect(order).toEqual(["prompt now"]);
+
+		admitted.resolve("");
+		await sent;
+		await settle();
+		expect(order).toEqual(["prompt now", "abort"]);
+	});
 });
 
 describe("DashboardSession fast mode", () => {

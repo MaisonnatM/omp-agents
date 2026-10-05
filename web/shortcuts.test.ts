@@ -54,7 +54,7 @@ test("the follow-up is ⌘Enter on macOS, where Ctrl+Enter opens a context menu,
 	expect(pressOn(true, "Enter", "Enter", { meta: true })).toEqual(["followUp"]);
 	expect(pressOn(true, "Enter", "Enter", { ctrl: true })).toEqual([]);
 	for (const mac of [false, true]) {
-		expect(pressOn(mac, "Enter", "Enter")).toEqual([]);
+		expect(pressOn(mac, "Enter", "Enter")).toEqual(["deliverSteer"]);
 		expect(pressOn(mac, "Enter", "Enter", { shift: true, ...(mac ? { meta: true } : { ctrl: true }) })).toEqual([]);
 	}
 });

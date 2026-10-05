@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as commands from "./commands";
 import { SessionGuest } from "./guest";
 import type { LiveUpdate } from "./live-session";
 import * as collab from "./omp/collab";
@@ -153,6 +154,24 @@ describe("SessionGuest follow-ups", () => {
 		expect(socket.messages).toEqual([
 			{ t: "prompt", text: "one" },
 			{ t: "prompt", text: "two" },
+		]);
+	});
+
+	test("an abort waits until a steer that is still being prepared is sent", async () => {
+		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
+		const prepared = Promise.withResolvers<string>();
+		spyOn(commands, "expandPrompt").mockImplementation(() => prepared.promise);
+		const sending = guest.prompt(null, "now", [], "steer");
+		guest.abort();
+		await Promise.resolve();
+		expect(socket.messages).toEqual([]);
+
+		prepared.resolve("now");
+		await sending;
+		await Promise.resolve();
+		expect(socket.messages).toEqual([
+			{ t: "prompt", text: "now" },
+			{ t: "abort" },
 		]);
 	});
 

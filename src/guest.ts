@@ -11,6 +11,7 @@ import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp/collab";
 import { type AgentRow, type ContextUsage, type ControlPhase, type Delivery, type HostStatus, type MessageQueue, type PromptImage, selectorOf, type UserAnswer, type UserRequest } from "./shared";
 import { contextOf, type HostAgent, parseAgents, parseSubagentFrame, SubagentFiles } from "./subagents";
+import { TurnGate } from "./turn-gate";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
 
 const DISPLAY_NAME = "omp-agents";
@@ -104,6 +105,8 @@ export class SessionGuest implements LiveSession {
 	 * its queue back in the editor rather than run it after an interrupt, so held follow-ups wait for the next turn.
 	 */
 	#interrupted = false;
+	/** Prompt and abort, so the abort frame follows a steer that is still being prepared. */
+	readonly #turn = new TurnGate();
 
 	constructor(host: HostSnapshot, emit: (update: LiveUpdate) => void) {
 		this.instanceId = host.instanceId;
@@ -193,9 +196,11 @@ export class SessionGuest implements LiveSession {
 
 	/** Prepare `text` as the terminal would, expanding a skill or file command, then {@link send} it with `images`. */
 	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
-		if (agentId && images.length > 0) throw new Error("omp sends a subagent text only.");
-		const payload = await expandPrompt(this.instanceId, this.#host.cwd, text, agentId ? "subagent" : "session");
-		this.send(agentId, { text, payload, images }, delivery);
+		await this.#turn.run(async () => {
+			if (agentId && images.length > 0) throw new Error("omp sends a subagent text only.");
+			const payload = await expandPrompt(this.instanceId, this.#host.cwd, text, agentId ? "subagent" : "session");
+			this.send(agentId, { text, payload, images }, delivery);
+		});
 	}
 
 	/**
@@ -223,6 +228,10 @@ export class SessionGuest implements LiveSession {
 	 * guest the host's queue, so a terminal session's queue holds only this guest's own follow-ups.
 	 */
 	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean> {
+		return this.#turn.run(() => this.#dequeue(agentId, queue, text));
+	}
+
+	#dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): boolean {
 		if (queue !== "followUp") return false;
 		const key = agentId ?? "";
 		const held = this.#followUps.get(key) ?? [];
@@ -236,7 +245,9 @@ export class SessionGuest implements LiveSession {
 	abort(): void {
 		if (!this.canWrite) return;
 		this.#interrupted = true;
-		this.#socket?.send({ t: "abort" });
+		void this.#turn.run(() => {
+			this.#socket?.send({ t: "abort" });
+		});
 	}
 
 	/** omp's Agent Hub kill over Collab: the host aborts a running subagent and tombstones it. */

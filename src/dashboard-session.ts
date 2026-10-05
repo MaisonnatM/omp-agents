@@ -14,6 +14,7 @@ import { endsMidTurn } from "./omp/sessions";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type ModelEntry, type ModelOption, type PromptImage, selectorOf, type UserAnswer, type UserRequest } from "./shared";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { SKILL_PROMPT } from "./transcript";
+import { TurnGate } from "./turn-gate";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
 interface RpcAgent {
@@ -96,6 +97,8 @@ export class DashboardSession implements LiveSession {
 	#userCommand = false;
 	/** Whether **End session** stopped the process, rather than the dashboard shutting down or omp exiting on its own. */
 	#ended = false;
+	/** Prompt, dequeue, and abort, so an abort cannot land before the steer it should deliver. */
+	readonly #turn = new TurnGate();
 
 	private constructor(
 		instanceId: string,
@@ -289,18 +292,20 @@ export class DashboardSession implements LiveSession {
 	 * running one, so a follow-up held until it stopped could never be sent.
 	 */
 	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
-		if (agentId !== null) {
-			if (images.length > 0) throw new Error("omp sends a subagent text only.");
-			await this.#child.client.steerSubagent(agentId, text).catch((err: unknown) => this.#fail("Message failed", err, agentId));
-			return;
-		}
-		if (text.startsWith("!")) {
-			if (images.length > 0) throw new Error("A ! command takes no images.");
-			return this.#shell(text);
-		}
-		this.#userCommand = text.startsWith("/");
-		const content = images.map(image => ({ type: "image" as const, ...image }));
-		await this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
+		await this.#turn.run(async () => {
+			if (agentId !== null) {
+				if (images.length > 0) throw new Error("omp sends a subagent text only.");
+				await this.#child.client.steerSubagent(agentId, text).catch((err: unknown) => this.#fail("Message failed", err, agentId));
+				return;
+			}
+			if (text.startsWith("!")) {
+				if (images.length > 0) throw new Error("A ! command takes no images.");
+				return this.#shell(text);
+			}
+			this.#userCommand = text.startsWith("/");
+			const content = images.map(image => ({ type: "image" as const, ...image }));
+			await this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
+		});
 	}
 
 	/** A `!` command, which omp runs in the session's directory and records in its file for the agent to see. */
@@ -321,17 +326,19 @@ export class DashboardSession implements LiveSession {
 
 	/** Whether omp still held the message; it may have delivered it since the page saw the queue. */
 	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean> {
-		if (agentId !== null) return false;
-		try {
-			return (await this.#child.client.removeQueuedMessage(text, queue)).removed;
-		} catch (err) {
-			this.#fail("Dequeue failed", err);
-			return false;
-		}
+		return this.#turn.run(async () => {
+			if (agentId !== null) return false;
+			try {
+				return (await this.#child.client.removeQueuedMessage(text, queue)).removed;
+			} catch (err) {
+				this.#fail("Dequeue failed", err);
+				return false;
+			}
+		});
 	}
 
 	abort(): void {
-		this.#child.client.abort().catch((err: unknown) => this.#fail("Stop failed", err));
+		void this.#turn.run(() => this.#child.client.abort().catch((err: unknown) => this.#fail("Stop failed", err)));
 	}
 
 	cancelAgent(agentId: string): void {

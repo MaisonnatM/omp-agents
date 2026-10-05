@@ -3,6 +3,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRe
 export type ShortcutId =
 	| "interrupt"
 	| "followUp"
+	| "deliverSteer"
 	| "dequeue"
 	| "quickTodo"
 	| "switcher"
@@ -69,6 +70,11 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		id: "followUp",
 		label: "Send once the running turn finishes, as a follow-up (Enter steers it)",
 		keys: [{ chord: { key: "Enter", mod: true }, scope: "composer" }],
+	},
+	{
+		id: "deliverSteer",
+		label: "Deliver the queued steer now (Enter on the empty composer)",
+		keys: [{ chord: { key: "Enter" }, scope: "composer" }],
 	},
 	{ id: "dequeue", label: "Move the last queued message back into the empty composer", keys: [{ chord: { key: "ArrowUp" }, scope: "composer" }] },
 	{ id: "quickTodo", label: "Start a new todo", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
