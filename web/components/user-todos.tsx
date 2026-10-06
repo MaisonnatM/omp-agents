@@ -5,9 +5,10 @@ import { applyUserTodo, DONE_KEPT_HOURS } from "../../src/user-todos";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { localDay } from "../days";
 import { hashForNewSession, hashForTodo, type TodoListView } from "../routing";
 import { parseQuickTodo } from "../todo-quick-add";
-import { DAY_FORMAT, LIST_KINDS, lastToDo, leftIn, matches, restoreOf, type TodoEntry, titleOf, todosOf, today } from "../todo-views";
+import { DAY_FORMAT, LIST_KINDS, lastToDo, leftIn, matches, restoreOf, type TodoEntry, titleOf, todosOf } from "../todo-views";
 import { workStateOf } from "../todo-work-state";
 import { useTodoDrag } from "../use-todo-drag";
 import { useTodoKeys } from "../use-todo-keys";
@@ -114,7 +115,7 @@ function dueLabel(due: string, day: string): { text: string; overdue: boolean } 
 	const tomorrow = new Date();
 	tomorrow.setDate(tomorrow.getDate() + 1);
 	if (due === day) return { text: "Today", overdue: false };
-	if (due === today(tomorrow)) return { text: "Tomorrow", overdue: false };
+	if (due === localDay(tomorrow)) return { text: "Tomorrow", overdue: false };
 	const date = DAY_FORMAT.format(new Date(y!, m! - 1, d!));
 	return { text: due < day ? `Overdue · ${date}` : date, overdue: due < day };
 }
@@ -153,7 +154,7 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 	const [openId, setOpenId] = useState<string | null>(null);
 	const [query, setQuery] = useState("");
 	const listRef = useRef<HTMLDivElement>(null);
-	const day = today();
+	const day = localDay();
 	const kind = LIST_KINDS[view.kind];
 	const sessions: KnownSessions = { hosts, past };
 	const sections = list === null ? [] : sectionsOf(list, view, day, sessions).map(section => ({ ...section, todos: section.todos.filter(todo => matches(todo, query)) }));

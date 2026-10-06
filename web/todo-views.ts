@@ -49,12 +49,6 @@ export const titleOf = (list: UserTodoList, view: TodoListView): string =>
 /** A day as the lists show it: `Oct 5`. */
 export const DAY_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 
-/** Today in the browser's time zone, as a todo's `due` names a day: `YYYY-MM-DD`. */
-export function today(now = new Date()): string {
-	const pad = (n: number): string => String(n).padStart(2, "0");
-	return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
 /** A top-level todo the Today list shows: it, or a todo under it, is to do and due by `day`. */
 export const isDueBy = (todo: UserTodo, day: string): boolean =>
 	[todo, ...todo.children].some(leaf => leaf.doneAt === null && leaf.due !== null && leaf.due <= day);

@@ -41,7 +41,7 @@ Besides a live session's own hash, the routes are:
 - `#inbox`, `#inbox/<owner>/<repo>/<number>`;
 - `#tickets`, `#tickets/<identifier>`;
 - `#todo`, `#todo/today`, `#todo/agents`, `#todo/done`, `#todo/<category id>`;
-- `#routines`, `#routines/<id>`;
+- `#calendar`, `#routines`, `#routines/<id>`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`;
 - `#settings`, `#settings/<encoded cwd>`;
 - `#analytics`, `#analytics/<range>`.

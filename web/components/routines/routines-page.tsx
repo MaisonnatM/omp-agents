@@ -1,5 +1,5 @@
 import { ArrowLeft, Ellipsis, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { Routine, RoutineChange, RoutineRun, RoutineTask, RosterHost, View } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -9,21 +9,12 @@ import { modeOf, readTime, SPLIT_CLICK } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { hashForRoutines } from "../../routing";
 import { draftOf, lastRunWords, newDraft, nextRunWords, type RoutineDraft, runWords, scheduleWords, schedulesWords, taskWords } from "../../routines-model";
+import { useMinute } from "../../use-minute";
 import { useDashboardContext } from "../dashboard-context";
 import { PageFrame } from "../list-page";
 import { SessionChip } from "../session-chip";
 import { statusLabel } from "../status-dot";
 import { RoutineEditor } from "./routine-editor";
-
-/** The time now, renewed each minute, so "Today" turns into "Tomorrow" and a passed slot reads as due. */
-function useMinute(): number {
-	const [now, setNow] = useState(Date.now);
-	useEffect(() => {
-		const timer = setInterval(() => setNow(Date.now()), 60_000);
-		return () => clearInterval(timer);
-	}, []);
-	return now;
-}
 
 interface RoutineActionsProps {
 	routine: Routine;

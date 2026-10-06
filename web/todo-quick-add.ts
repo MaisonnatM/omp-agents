@@ -1,5 +1,5 @@
 import type { UserTodoCategory } from "../src/shared";
-import { today } from "./todo-views";
+import { localDay } from "./days";
 
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 const FULL_WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -10,15 +10,15 @@ function dueOf(word: string, day: string): string | null {
 	if (lower === "tomorrow") {
 		const date = new Date(`${day}T12:00:00`);
 		date.setDate(date.getDate() + 1);
-		return today(date);
+		return localDay(date);
 	}
 	const weekday = WEEKDAYS.indexOf(lower.slice(0, 3));
 	if (weekday >= 0 && (lower.length === 3 || FULL_WEEKDAYS[weekday] === lower)) {
 		const date = new Date(`${day}T12:00:00`);
 		date.setDate(date.getDate() + (weekday - date.getDay() + 7) % 7);
-		return today(date);
+		return localDay(date);
 	}
-	if (/^\d{4}-\d{2}-\d{2}$/.test(word) && today(new Date(`${word}T12:00:00`)) === word) return word;
+	if (/^\d{4}-\d{2}-\d{2}$/.test(word) && localDay(new Date(`${word}T12:00:00`)) === word) return word;
 	return null;
 }
 

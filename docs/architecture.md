@@ -499,7 +499,7 @@ The server lives in `src/`:
 The page lives in `web/`.
 `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
-- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for a pull request's details, tickets, todo, routines, analytics, settings, and new-session pages, and focus handling.
+- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for a pull request's details, tickets, todo, calendar, routines, analytics, settings, and new-session pages, and focus handling.
   `#inbox` alone keeps the pane grid and only switches the sidebar to its Inbox tab.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
@@ -507,7 +507,7 @@ The page lives in `web/`.
 - `web/pane-store.ts`: each open view's transcript, changed files, images, and completions, outside the page state, so a token in one pane re-renders only that pane.
   It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
-- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
+- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, `web/calendar-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
 - `web/file-paths.ts`: which paths in agent text name a text file, and the absolute path each resolves to.
   `web/delimited.ts` parses a TSV or CSV file into rows.
   `web/components/file-link.tsx` holds the link that opens such a path, and `web/components/file-dialog.tsx` the dialog that shows the file.
@@ -516,6 +516,8 @@ The page lives in `web/`.
   It also holds which sections start folded, sorts rows by move and keeps each stack's rows together by the chain of base branches, and says what the details' Status shows.
   `InboxOrder` there is the order you chose, the repositories, the sections, the sort, and the manual order of pull requests, which `placedManual` updates after a drop; a stack moves as one `unit`.
   `web/routines-model.ts` words a routine's schedule, task, next run, and last run, and turns the routine editor's form into the routine it saves.
+  `web/calendar-model.ts` lays a month's routine runs, past and planned, and its due todos and tickets out by day.
+  `web/days.ts` names a local day as todos, tickets, and the calendar do, `YYYY-MM-DD`, and walks the days between two of them.
 - `web/page-icons.ts`: the icon of each dashboard page, which its sidebar tab and every link into the page show.
 - `web/components/analytics/analytics-page.tsx`: the request usage view, including time-range links, a token chart, breakdowns, and the top sessions.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
@@ -547,14 +549,17 @@ The page lives in `web/`.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
 - `web/components/roster.tsx`: the left sidebar's tabs, its session and tickets lists, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab.
   `SessionRow` is the one row a past session and a live host both render.
-  `web/components/todo-categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Done**, then the categories, and `web/components/routines/routines-nav.tsx` its Routines tab, the routines by name.
+  `web/components/todo-categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Done**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab, the calendar and then the routines by name.
 - `web/components/user-todos.tsx`: the Todo page and its lists; `todo-archive.tsx` is the **Done** page.
   `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows, `todo-search.tsx` is the search field, and `todo-undo.tsx` the **Undo** toast.
   `web/todo-work-state.ts` derives the pill and the **Needs you** filter from the latest linked session's live status, outstanding question, submitted pull request, or recorded `/ship` merge; it keeps unknown and ended sessions distinct from new ideas.
   `web/todo-quick-add.ts` reads a trailing due day and `#category` off a new todo's title.
   `todo-detail.tsx` expands under the open row with its due day, live agent question, links, **Start session**, and **Create Linear ticket**, whose notes `web/components/markdown-editor.tsx` always renders through `message-markdown.tsx` while you edit them; `todo-links.tsx` draws a todo's link chips, and `add-to-todo.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
 - `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
+  It and the Calendar page read the time through `web/use-minute.ts`, renewed each minute.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.
+- `web/components/calendar/calendar-page.tsx`: the Calendar page, a month of `web/calendar-model.ts` entries and the chosen day's list beside it.
+  It renders the month with Kibo UI's calendar, `web/components/kibo-ui/calendar/index.tsx`, whose month and year live in jotai atoms, so the page keeps its month while you leave and come back.
 - `web/components/pane.tsx`: a pane.
   `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button and the checkout read, `past-conversation.tsx` a past session's view, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` the project, pull request, and ticket chips of a header.
@@ -566,12 +571,12 @@ The page lives in `web/`.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
   `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue.
   `web/use-drag-order.ts` drags the inbox's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
-  The tickets page uses `web/components/list-page.tsx` for its frame, header, and load and refresh states, and the pull request, Todo, and Routines pages its `PageFrame`.
+  The tickets page uses `web/components/list-page.tsx` for its frame, header, and load and refresh states, and the pull request, Todo, Routines, and Calendar pages its `PageFrame`.
   Both details views use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
   `LoadNote` is the loading or error line that the pull request's details, the issue's, and the list page share, and `Clamped` folds a long description behind **Show more**.
   `web/components/fold.tsx` holds the fold button that the inbox and tickets share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
   The sidebar's inbox binds J, K, O, E, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/inbox-model.ts` lists in sidebar order, so a folded section's rows drop out, and binds Alt+Shift+↑ and ↓ to move the focused heading or row by its `data-move` attribute.
-- `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
+- `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry, and `web/components/kibo-ui` from Kibo UI's; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
 Its `agent/` files are the default kit.

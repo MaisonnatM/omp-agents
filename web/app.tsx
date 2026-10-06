@@ -17,6 +17,7 @@ import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
 import { SplitResizeHandle, splitAt, useSplitRatio } from "./components/split-resize-handle";
 import { RoutinesPage } from "./components/routines/routines-page";
+import { CalendarPage } from "./components/calendar/calendar-page";
 import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-page";
 import { subjectOf } from "./components/subject";
 import { ToolsExpanded } from "./components/transcript";
@@ -43,6 +44,17 @@ import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { PINNED_SESSIONS_KEY, useStoredKeys } from "./stored-state";
 import { useDashboard } from "./use-dashboard";
+
+/** The sidebar tab that goes with each page; the panes keep the one you chose. */
+const PAGE_TAB: Partial<Record<Page["kind"], SidebarTab>> = { inbox: "inbox", tickets: "tickets", todo: "todo", calendar: "calendar", routines: "calendar" };
+
+/** The page each tab opens; Sessions shows the panes instead. */
+const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
+	inbox: { kind: "inbox", target: null },
+	tickets: { kind: "tickets", target: null },
+	todo: { kind: "todo", list: { kind: "all" } },
+	calendar: { kind: "calendar" },
+};
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
 	return (
@@ -163,8 +175,7 @@ export function App() {
 		setWasOnInbox(onInbox);
 		if (onInbox) setPaneTab("inbox");
 	}
-	const tab: SidebarTab =
-		page?.kind === "todo" || page?.kind === "routines" ? page.kind : page?.kind === "tickets" && ticketsShown ? "tickets" : page?.kind === "inbox" ? "inbox" : paneTab;
+	const tab: SidebarTab = (page && !(page.kind === "tickets" && !ticketsShown) && PAGE_TAB[page.kind]) || paneTab;
 	const routedTodoList = page?.kind === "todo" ? page.list : null;
 	/** The list the Todo page shows; a category another window removed shows every todo. */
 	const todoView: TodoListView =
@@ -184,11 +195,9 @@ export function App() {
 	/** The routine the Routines page shows; one another window deleted shows the list. */
 	const routinesTarget = page?.kind === "routines" && state.routines.some(({ id }) => id === page.target) ? page.target : null;
 	const showTab = (next: SidebarTab): void => {
-		if (next === "sessions") {
-			setPaneTab("sessions");
-			show(layout);
-		} else if (next === "todo") navigate({ kind: "todo", list: { kind: "all" } });
-		else navigate({ kind: next, target: null });
+		if (next !== "sessions") return navigate(TAB_PAGE[next]);
+		setPaneTab("sessions");
+		show(layout);
 	};
 	const step = (by: 1 | -1): boolean | void => {
 		const next = adjacentSession(listed, view, by);
@@ -227,9 +236,13 @@ export function App() {
 			if (page?.kind === "todo") return false;
 			showTab("todo");
 		},
+		calendar: () => {
+			if (page?.kind === "calendar") return false;
+			showTab("calendar");
+		},
 		routines: () => {
 			if (page?.kind === "routines") return false;
-			showTab("routines");
+			navigate({ kind: "routines", target: null });
 		},
 		restore: () => {
 			if (!maximized) return false;
@@ -356,6 +369,9 @@ export function App() {
 				/>
 			);
 			break;
+		case "calendar":
+			main = <CalendarPage routines={state.routines} todos={state.userTodos} ticketsShown={ticketsShown} />;
+			break;
 		case undefined:
 			main = panes();
 			break;
@@ -387,7 +403,7 @@ export function App() {
 						todoView={todoView}
 						todoSessions={{ hosts: state.hosts, past: state.past }}
 						routines={state.routines}
-						routinesTarget={routinesTarget}
+						calendarTab={page?.kind === "calendar" ? page : page?.kind === "routines" ? { kind: "routines", target: routinesTarget } : null}
 						sectionTarget={sectionTarget}
 						onSectionTarget={setSectionTarget}
 						inbox={

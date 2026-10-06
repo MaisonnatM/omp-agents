@@ -1,6 +1,6 @@
-# Dashboard patches to vendored Fluid files
+# Dashboard patches to vendored registry files
 
-Files in `web/components/ui/`, `web/lib/`, and `web/hooks/` come from the Fluid registry.
+Files in `web/components/ui/`, `web/lib/`, and `web/hooks/` come from the Fluid registry, and files in `web/components/kibo-ui/` from Kibo UI's.
 This list holds every change the dashboard makes to them, so an upgrade is a merge that checks each entry.
 Dashboard behavior that can live outside these files does: the composer's queued rows are `web/components/composer-queue.tsx`, and its suggested prompts are `web/components/composer-suggestions.tsx`.
 
@@ -45,3 +45,12 @@ Dashboard behavior that can live outside these files does: the composer's queued
 - `ui/file-thumbnail.tsx`: the PDF worker comes from the page bundle, not a CDN, which the page's Content-Security-Policy blocks.
 - `lib/icon-context.tsx`: the `git-branch` icon.
 - `ui/fluid-hover-highlight.tsx` is the registry file unchanged, moved from `web/components/` into `ui/`.
+
+## `kibo-ui/calendar/index.tsx`
+
+The registry file uses shadcn's `button`, `command`, and `popover`; the dashboard keeps Fluid's, so it imports those.
+
+- The month and year pickers' button is `variant="secondary"`, since Fluid's button has no `outline`, and takes its chevron as `trailingIcon`, since Fluid's button puts an icon among its children on a line of its own.
+- Day cells are `min-h-28`, not `aspect-square`, so a cell keeps three entries readable in a narrow grid.
+- `CalendarBody` takes `onSelectDay`, which a day's number and its **+N more** call, and `selectedDay`, whose cell it highlights.
+- The month arrows have `aria-label`s, **Previous month** and **Next month**.

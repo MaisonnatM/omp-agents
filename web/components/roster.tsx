@@ -46,7 +46,7 @@ import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { useDashboardContext } from "./dashboard-context";
 import { ShipStep } from "./ship-step";
-import { RoutinesNav } from "./routines/routines-nav";
+import { CalendarNav, type CalendarTabPage } from "./calendar/calendar-nav";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TodoCategories } from "./todo-categories";
 import type { KnownSessions } from "./todo-links";
@@ -350,7 +350,7 @@ const SIDEBAR_TABS = [
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
-	{ value: "routines", label: "Routines", icon: PAGE_ICON.routines },
+	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
 ] as const;
 
 /**
@@ -371,7 +371,7 @@ const SIDEBAR_TAB_FIT = {
 	},
 };
 
-/** The sidebar's tab; the tickets, todo, and routines tabs go with their pages, the sessions and inbox tabs with the panes. */
+/** The sidebar's tab; the tickets, todo, and calendar tabs go with their pages, the sessions and inbox tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 interface RosterProps {
@@ -395,7 +395,7 @@ interface RosterProps {
 	settingsOpen: boolean;
 	/** omp is signed in to Linear, so the Tickets tab shows. */
 	ticketsShown: boolean;
-	/** The sidebar's tab: the tickets, the todos, or the routines with their pages, or the sessions or the inbox over the panes. */
+	/** The sidebar's tab: the tickets, the todos, or the calendar with their pages, or the sessions or the inbox over the panes. */
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
 	/** The Todo page's list, `null` until the server sends it. */
@@ -405,8 +405,8 @@ interface RosterProps {
 	/** Unfiltered sessions, so the project picker does not hide a todo's linked session. */
 	todoSessions: KnownSessions;
 	routines: Routine[];
-	/** The routine the Routines page shows, `null` for the list. */
-	routinesTarget: string | null;
+	/** The page under the Calendar tab that is open. */
+	calendarTab: CalendarTabPage;
 	/** The tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
@@ -441,7 +441,7 @@ export function Roster({
 	todoView,
 	todoSessions,
 	routines,
-	routinesTarget,
+	calendarTab,
 	sectionTarget,
 	onSectionTarget,
 	inbox,
@@ -734,9 +734,9 @@ export function Roster({
 					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
 				</SidebarContent>
 			</TabPanel>
-			<TabPanel value="routines" asChild>
+			<TabPanel value="calendar" asChild>
 				<SidebarContent>
-					<RoutinesNav routines={routines} target={routinesTarget} />
+					<CalendarNav routines={routines} current={calendarTab} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>
