@@ -19,12 +19,13 @@ const LINK_ATTEMPTS = 3;
 /** Wait this long before rejoining a host whose room dropped us while it stays listed. */
 const REJOIN_MS = 5000;
 
-/** Model, thinking level, context, and whether a turn runs, from the host's status-line snapshot. */
+/** Model, thinking level, context, whether a turn runs, and how many messages wait on it, from the host's status-line snapshot. */
 interface HostState {
 	model: string | null;
 	thinkingLevel: string | null;
 	context: ContextUsage | null;
 	streaming: boolean;
+	queued: number;
 }
 
 function parseState(value: unknown): HostState | null {
@@ -35,6 +36,7 @@ function parseState(value: unknown): HostState | null {
 		thinkingLevel: nonEmptyStr(thinkingLevel) ?? null,
 		context: contextOf(value.contextUsage),
 		streaming: value.isStreaming === true,
+		queued: typeof value.queuedMessageCount === "number" ? value.queuedMessageCount : 0,
 	};
 }
 
@@ -105,8 +107,10 @@ export class SessionGuest implements LiveSession {
 	 * its queue back in the editor rather than run it after an interrupt, so held follow-ups wait for the next turn.
 	 */
 	#interrupted = false;
-	/** Prompt and abort, so the abort frame follows a steer that is still being prepared. */
+	/** Prompt, abort, and flush, so their frames follow a steer that is still being prepared. */
 	readonly #turn = new TurnGate();
+	/** Whether this guest steered the running turn since the host last reported its queue; the host's state lags the steer. */
+	#steered = false;
 
 	constructor(host: HostSnapshot, emit: (update: LiveUpdate) => void) {
 		this.instanceId = host.instanceId;
@@ -216,6 +220,7 @@ export class SessionGuest implements LiveSession {
 			return;
 		}
 		if (!key) {
+			if (this.#running("")) this.#steered = true;
 			const images = message.images?.map(image => ({ type: "image", ...image }));
 			this.#socket?.send({ t: "prompt", text: message.payload, images: images?.length ? images : undefined });
 		} else if (this.#agents.some(a => a.id === key && !a.isMain && a.status !== "aborted")) {
@@ -228,10 +233,6 @@ export class SessionGuest implements LiveSession {
 	 * guest the host's queue, so a terminal session's queue holds only this guest's own follow-ups.
 	 */
 	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean> {
-		return this.#turn.run(() => this.#dequeue(agentId, queue, text));
-	}
-
-	#dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): boolean {
 		if (queue !== "followUp") return false;
 		const key = agentId ?? "";
 		const held = this.#followUps.get(key) ?? [];
@@ -246,6 +247,16 @@ export class SessionGuest implements LiveSession {
 		if (!this.canWrite) return;
 		this.#interrupted = true;
 		void this.#turn.run(() => {
+			this.#socket?.send({ t: "abort" });
+		});
+	}
+
+	/** The host's last state counts a waiting steer, or this guest steered since that state left the host. */
+	flush(): void {
+		if (!this.canWrite) return;
+		void this.#turn.run(() => {
+			if (!this.#steered && !this.state?.queued) return;
+			this.#interrupted = true;
 			this.#socket?.send({ t: "abort" });
 		});
 	}
@@ -376,9 +387,11 @@ export class SessionGuest implements LiveSession {
 				return;
 			}
 			case "state": {
-				const state = parseState(frame.state);
-				if (sameState(state, this.state)) return;
-				this.state = state;
+				const previous = this.state;
+				this.state = parseState(frame.state);
+				// The host now counts the steer this guest sent, or the turn it steered has ended.
+				if (!this.state?.streaming || this.state.queued > 0) this.#steered = false;
+				if (sameState(this.state, previous)) return;
 				this.#emit({ kind: "roster" });
 				return;
 			}

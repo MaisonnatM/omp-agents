@@ -49,7 +49,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	async dequeue({ sessions }, ws, { view, messages, reqId }) {
 		const session = sessions.get(view.instanceId);
 		if (!session) return;
-		// Every removal reaches the session before an abort sent right after this, so none of them runs after the interrupt.
+		// Each removal enters the session's turn gate now, ahead of an abort sent right after this, so none of them runs after the interrupt.
 		const taken = await Promise.all(messages.map(({ queue, text }) => session.dequeue(view.agentId, queue, text)));
 		const texts = messages.filter((_, index) => taken[index]).map(({ text }) => text);
 		if (texts.length > 0) reply(ws, view.instanceId, { t: "dequeued", view, reqId, texts });
@@ -78,6 +78,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 		}
 	},
 	abort: ({ sessions }, _ws, { instanceId }) => sessions.get(instanceId)?.abort(),
+	flush: ({ sessions }, _ws, { instanceId }) => sessions.get(instanceId)?.flush(),
 	"cancel-agent": ({ sessions }, _ws, { view }) => sessions.get(view.instanceId)?.cancelAgent(view.agentId),
 	async start({ start }, ws, msg) {
 		send(ws, { t: "started", reqId: msg.reqId, result: await start(msg) });

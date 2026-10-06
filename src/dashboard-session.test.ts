@@ -166,6 +166,51 @@ describe("DashboardSession prompts", () => {
 		await settle();
 		expect(order).toEqual(["prompt now", "abort"]);
 	});
+
+	test("an abort does not wait for a message to a subagent, which omp does not queue on the turn", async () => {
+		const { session, client } = await startSession();
+		let aborted = false;
+		client.steerSubagent = () => Promise.withResolvers<void>().promise;
+		client.abort = async () => {
+			aborted = true;
+		};
+
+		void session.prompt("s1", "look at b", [], "steer");
+		session.abort();
+		await settle();
+		expect(aborted).toBe(true);
+	});
+
+	test("an empty Enter stops the turn only while omp still holds a steer, read after the steer it follows is admitted", async () => {
+		const { session, client } = await startSession();
+		const order: string[] = [];
+		let steering: string[] = [];
+		const admitted = Promise.withResolvers<string>();
+		client.prompt = async text => {
+			order.push(`prompt ${text}`);
+			await admitted.promise;
+			steering = [text];
+			return "";
+		};
+		client.getState = async () => ({ ...STATE, queuedMessages: { steering, followUp: [] } });
+		client.abort = async () => {
+			order.push("abort");
+		};
+
+		void session.prompt(null, "now", [], "steer");
+		session.flush();
+		await settle();
+		expect(order).toEqual(["prompt now"]);
+		admitted.resolve("");
+		await settle();
+		expect(order).toEqual(["prompt now", "abort"]);
+
+		// The turn took the steer: omp's queue is empty again, so Enter leaves the turn that answers it alone.
+		steering = [];
+		session.flush();
+		await settle();
+		expect(order).toEqual(["prompt now", "abort"]);
+	});
 });
 
 describe("DashboardSession fast mode", () => {

@@ -6,7 +6,6 @@ import { projectName } from "../labels";
 import type { Completions } from "../pane-store";
 import type { ModelList } from "../reads";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../shortcuts";
-import { type SteerDelivery, steerDelivery } from "../steer-delivery";
 import type { StartOf } from "../starts";
 import { type ForkPoint, nextSuggestions } from "../transcript-view";
 import type { Dashboard } from "../use-dashboard";
@@ -61,9 +60,9 @@ export function Conversation(props: ConversationProps) {
 	);
 }
 
-function placeholderOf({ writable, working, followUps, agent, phase }: Subject, deliver: boolean): string {
+function placeholderOf({ writable, working, followUps, agent, phase }: Subject): string {
 	if (!writable) return phase.phase === "live" && agent && !agent.canMessage ? "This subagent cannot be messaged." : "Messaging is unavailable for this view.";
-	if (working) return `Steer ${agent ? "this subagent" : "the running turn"}…${deliver ? " Enter again sends it now." : ""}${followUps ? ` ${FOLLOW_UP_KEYS} sends once it finishes` : ""}`;
+	if (working) return `Steer ${agent ? "this subagent" : "the running turn"}…${followUps ? ` ${FOLLOW_UP_KEYS} sends once it finishes` : ""}`;
 	if (agent) return agent.status === "parked" ? "Message to revive this subagent…" : "Message this subagent…";
 	return "Message this session…";
 }
@@ -87,7 +86,6 @@ function LiveConversation({
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const [draft, setDraft] = useState(initialDraft);
-	const [steerPhase, setSteerPhase] = useState<SteerDelivery>("idle");
 	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
 	const [pendingModelRevision, setPendingModelRevision] = useState<number | null>(null);
 	const attachments = useImageAttachments();
@@ -95,11 +93,6 @@ function LiveConversation({
 	const subject = subjectOf(view, host, lastHost);
 	const { shown, agent, writable, attachable, working, requests, shell } = subject;
 	const session = subject.kind === "session";
-	const steering = subject.queue?.steering.length ?? 0;
-	// The queue catching up, or the turn ending, decides whether the next empty Enter still delivers.
-	useEffect(() => {
-		setSteerPhase(phase => steerDelivery(steerDelivery(phase, { t: "working", working }), { t: "queue", steering }));
-	}, [working, steering]);
 	const switchable = subject.kind === "session" ? subject.switchable : null;
 	const thinking = shown?.thinkingLevel ?? null;
 	useEffect(() => {
@@ -123,16 +116,12 @@ function LiveConversation({
 	}, [writable]);
 	// As omp's Esc does, the session's queued messages come back into the composer instead of running after the interrupt.
 	const interrupt = (): void => {
-		setSteerPhase(phase => steerDelivery(phase, { t: "interrupt" }));
 		take(queued, true);
 		send({ t: "abort", instanceId: view.instanceId });
 	};
 
 	const submit = (text: string, delivery: Delivery): void => {
-		const prompt = (images: PromptImage[]): void => {
-			if (delivery === "steer" && session && working) setSteerPhase(phase => steerDelivery(phase, { t: "steer" }));
-			send({ t: "prompt", view, text, images, delivery });
-		};
+		const prompt = (images: PromptImage[]): void => send({ t: "prompt", view, text, images, delivery });
 		completion.close();
 		setDraft("");
 		scrollToEnd();
@@ -175,11 +164,10 @@ function LiveConversation({
 			if (!writable || !subject.followUps || (!text && (!attachable || attachments.files.length === 0)) || directCommand) return false;
 			submit(text, "followUp");
 		},
-		// Enter with a draft still steers. Enter on the empty composer delivers the steer that is waiting.
+		// Enter with a draft still steers. On the empty composer, the server stops the turn if omp still holds a steer, so omp runs it now.
 		deliverSteer: () => {
-			if (!session || !writable || !working || draft.trim() !== "" || (attachable && attachments.files.length > 0) || steerPhase !== "armed") return false;
-			setSteerPhase(phase => steerDelivery(phase, { t: "flush" }));
-			send({ t: "abort", instanceId: view.instanceId });
+			if (!session || !writable || !working || draft.trim() !== "" || (attachable && attachments.files.length > 0)) return false;
+			send({ t: "flush", instanceId: view.instanceId });
 		},
 		...(focused
 			? {
@@ -290,7 +278,7 @@ function LiveConversation({
 							{attachable && <AttachButton onClick={() => openFilePicker()} />}
 						</>
 					)}
-					placeholder={placeholderOf(subject, steerPhase === "armed")}
+					placeholder={placeholderOf(subject)}
 					disabled={!writable}
 					// While a turn runs, Enter and the send button steer it, and Stop interrupts a session's turn.
 					status={working ? "streaming" : "idle"}

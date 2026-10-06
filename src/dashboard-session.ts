@@ -97,7 +97,7 @@ export class DashboardSession implements LiveSession {
 	#userCommand = false;
 	/** Whether **End session** stopped the process, rather than the dashboard shutting down or omp exiting on its own. */
 	#ended = false;
-	/** Prompt, dequeue, and abort, so an abort cannot land before the steer it should deliver. */
+	/** Prompt, dequeue, abort, and flush, so an abort cannot land before the steer it should deliver. */
 	readonly #turn = new TurnGate();
 
 	private constructor(
@@ -292,20 +292,20 @@ export class DashboardSession implements LiveSession {
 	 * running one, so a follow-up held until it stopped could never be sent.
 	 */
 	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
-		await this.#turn.run(async () => {
-			if (agentId !== null) {
-				if (images.length > 0) throw new Error("omp sends a subagent text only.");
-				await this.#child.client.steerSubagent(agentId, text).catch((err: unknown) => this.#fail("Message failed", err, agentId));
-				return;
-			}
-			if (text.startsWith("!")) {
-				if (images.length > 0) throw new Error("A ! command takes no images.");
-				return this.#shell(text);
-			}
-			this.#userCommand = text.startsWith("/");
-			const content = images.map(image => ({ type: "image" as const, ...image }));
-			await this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
-		});
+		if (agentId !== null) {
+			if (images.length > 0) throw new Error("omp sends a subagent text only.");
+			await this.#child.client.steerSubagent(agentId, text).catch((err: unknown) => this.#fail("Message failed", err, agentId));
+			return;
+		}
+		if (text.startsWith("!")) {
+			if (images.length > 0) throw new Error("A ! command takes no images.");
+			return this.#shell(text);
+		}
+		this.#userCommand = text.startsWith("/");
+		const content = images.map(image => ({ type: "image" as const, ...image }));
+		await this.#turn
+			.run(() => this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery))
+			.catch((err: unknown) => this.#fail("Prompt failed", err));
 	}
 
 	/** A `!` command, which omp runs in the session's directory and records in its file for the agent to see. */
@@ -339,6 +339,16 @@ export class DashboardSession implements LiveSession {
 
 	abort(): void {
 		void this.#turn.run(() => this.#child.client.abort().catch((err: unknown) => this.#fail("Stop failed", err)));
+	}
+
+	/** omp's queue as it stands now, not as the page last saw it: the turn may already have taken the steer. */
+	flush(): void {
+		void this.#turn
+			.run(async () => {
+				const { queuedMessages } = await this.#child.client.getState();
+				if (queuedMessages.steering.length > 0) await this.#child.client.abort();
+			})
+			.catch((err: unknown) => this.#fail("Send now failed", err));
 	}
 
 	cancelAgent(agentId: string): void {
