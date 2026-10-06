@@ -137,7 +137,7 @@ const GO_TO_MS = 1500;
 type KeyEvent = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "altKey" | "metaKey" | "shiftKey">;
 
 function keyOf({ key, code, metaKey, ctrlKey }: KeyEvent): string {
-	// AZERTY's number row types symbols without Shift; modified digits use the physical key.
+	// AZERTY needs physical number-row keys for shortcuts; unmodified symbols must still match as typed.
 	if ((metaKey || ctrlKey) && /^Digit[0-9]$/.test(code)) return code.slice(5);
 	if (/^[a-z]$/i.test(key)) return key.toLowerCase();
 	// A letter key, or the / key, that types no ASCII character, on a Cyrillic layout or with macOS Option (Option+B

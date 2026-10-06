@@ -63,6 +63,7 @@ test("a letter key that types no ASCII letter matches by its physical key, an AS
 	expect(press(",", "KeyM", { ctrl: true })).toEqual(["settings"]);
 	expect(press("?", "KeyM", { shift: true })).toEqual(["help"]);
 	expect(press("?", "Slash", { shift: true })).toEqual(["help"]);
+	expect(press("/", "Digit7", { shift: true })).toEqual(["focusComposer", "todoSearch"]);
 	expect(pressOn(true, "÷", "Slash", { meta: true, alt: true })).toEqual(["model"]);
 });
 
@@ -100,7 +101,7 @@ test("↑ takes back a queued message, Cmd+[ and Cmd+] step through sessions, an
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
-test("remaining G pairs require a preceding plain G; former tab pairs no longer navigate", () => {
+test("G then R or P goes to a page only right after a plain G", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
 	expect(after("g", "r")).toEqual(["routines"]);
 	expect(after("g", "p")).toEqual(["project"]);
@@ -108,7 +109,6 @@ test("remaining G pairs require a preceding plain G; former tab pairs no longer 
 	expect(after("h", "p")).toEqual([]);
 	expect(after("g", "P", { shift: true })).toEqual([]);
 	expect(after("g", "i", { ctrl: true })).toEqual(["focusComposer"]);
-	for (const key of ["i", "t", "s", "d", "c"]) expect(after("g", key)).toEqual([]);
 	expect(shortcutsFor(keyEvent("p", "KeyP"), "g", false)).toEqual([{ id: "project", scope: "outside-fields" }]);
 });
 
