@@ -155,7 +155,7 @@ See the [kit's README](templates/omp/README.md) for what it contains.
 Select a session in the left sidebar to read its conversation and message it.
 Cmd-click (Ctrl-click on Linux and Windows) opens it in a split pane.
 Click **+** to start a session, **Resume** to continue a past one, and **Fork from here** under a prompt or a reply to branch a conversation.
-The **Inbox** tab shows your pull requests, the **Tickets** tab your Linear issues, and the gear button opens **Settings**.
+The **Inbox** tab shows your pull requests, the **Tickets** tab your Linear issues, and the **Settings** tab opens Settings.
 
 While a turn runs, Enter steers it and Cmd+Enter (Ctrl+Enter on Linux and Windows) queues a follow-up, as in omp's terminal.
 Esc interrupts the turn.

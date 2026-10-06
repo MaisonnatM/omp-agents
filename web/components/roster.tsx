@@ -1,4 +1,4 @@
-import { Folder, Keyboard, Search, Settings } from "lucide-react";
+import { Folder, Keyboard, Search } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import type { Routine } from "../../src/routines";
@@ -162,15 +162,15 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
  * Each switch sits where the labels fit with counts on Inbox and Sessions and the list's margins; labels never fit beside their icons once both carry counts.
  */
 const SIDEBAR_TAB_FIT = {
-	four: {
-		list: "@max-[19rem]/sidebar:self-stretch",
-		tab: "@min-[19rem]/sidebar:[&>svg]:hidden @max-[19rem]/sidebar:flex-1 @max-[19rem]/sidebar:justify-center @max-[19rem]/sidebar:px-0.5",
-		label: "@max-[19rem]/sidebar:sr-only",
-	},
 	five: {
-		list: "@max-[22rem]/sidebar:self-stretch",
-		tab: "@min-[22rem]/sidebar:[&>svg]:hidden @max-[22rem]/sidebar:flex-1 @max-[22rem]/sidebar:justify-center @max-[22rem]/sidebar:px-0.5",
-		label: "@max-[22rem]/sidebar:sr-only",
+		list: "@max-[23rem]/sidebar:self-stretch",
+		tab: "@min-[23rem]/sidebar:[&>svg]:hidden @max-[23rem]/sidebar:flex-1 @max-[23rem]/sidebar:justify-center @max-[23rem]/sidebar:px-0.5",
+		label: "@max-[23rem]/sidebar:sr-only",
+	},
+	six: {
+		list: "@max-[26rem]/sidebar:self-stretch",
+		tab: "@min-[26rem]/sidebar:[&>svg]:hidden @max-[26rem]/sidebar:flex-1 @max-[26rem]/sidebar:justify-center @max-[26rem]/sidebar:px-0.5",
+		label: "@max-[26rem]/sidebar:sr-only",
 	},
 };
 
@@ -191,12 +191,9 @@ interface RosterProps {
 	open: View[];
 	/** The new-session draft is open. */
 	newSessionOpen: boolean;
-	/** The settings page, for the open session's workspace. */
-	settingsHref: string;
-	settingsOpen: boolean;
 	/** omp is signed in to Linear, so the Tickets tab shows. */
 	ticketsShown: boolean;
-	/** The sidebar's tab: the tickets, the todos, or the calendar with their pages, or the sessions or the inbox over the panes. */
+	/** The sidebar's tab, selected by the page or kept over the panes. */
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
 	/** The Todo page's list, `null` until the server sends it. */
@@ -233,8 +230,6 @@ export function Roster({
 	onTogglePin,
 	open,
 	newSessionOpen,
-	settingsHref,
-	settingsOpen,
 	ticketsShown,
 	tab,
 	onTab,
@@ -262,7 +257,7 @@ export function Roster({
 	};
 	const selectedProject = projects.find(({ cwd }) => cwd === project);
 	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
-	const fit = ticketsShown ? SIDEBAR_TAB_FIT.five : SIDEBAR_TAB_FIT.four;
+	const fit = ticketsShown ? SIDEBAR_TAB_FIT.six : SIDEBAR_TAB_FIT.five;
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
@@ -276,13 +271,6 @@ export function Roster({
 				<Tooltip content="Keyboard shortcuts" shortcut={shortcutLabels("help")} side="bottom">
 					<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
 						<Keyboard />
-					</Button>
-				</Tooltip>
-				<Tooltip content="Settings" shortcut={shortcutLabels("settings")} side="bottom">
-					<Button asChild variant="ghost" size="icon-compact" active={settingsOpen} className="shrink-0 text-muted-foreground">
-						<a href={settingsHref} aria-label="Settings" aria-current={settingsOpen ? "page" : undefined}>
-							<Settings />
-						</a>
 					</Button>
 				</Tooltip>
 				{toggle}
@@ -344,6 +332,9 @@ export function Roster({
 				<SidebarContent>
 					<CalendarNav routines={routines} current={calendarTab} />
 				</SidebarContent>
+			</TabPanel>
+			<TabPanel value="settings" asChild>
+				<SidebarContent />
 			</TabPanel>
 		</Tabs>
 	);

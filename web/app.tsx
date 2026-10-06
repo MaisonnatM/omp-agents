@@ -31,7 +31,6 @@ import {
 	endSession,
 	focusedView,
 	hashForNewSession,
-	hashForPage,
 	hashForView,
 	type Page,
 	sameView,
@@ -48,10 +47,9 @@ import { localDay } from "./days";
 import { useDashboard } from "./use-dashboard";
 
 /** The sidebar tab that goes with each page; the panes keep the one you chose. */
-const PAGE_TAB: Partial<Record<Page["kind"], SidebarTab>> = { inbox: "inbox", tickets: "tickets", todo: "todo", calendar: "calendar", routines: "calendar" };
+const PAGE_TAB: Partial<Record<Page["kind"], SidebarTab>> = { inbox: "inbox", tickets: "tickets", todo: "todo", calendar: "calendar", routines: "calendar", settings: "settings" };
 
-/** The page each tab opens; Sessions shows the panes instead. */
-const TAB_PAGE: Record<Exclude<SidebarTab, "sessions">, Page> = {
+const TAB_PAGE: Record<Exclude<SidebarTab, "sessions" | "settings">, Page> = {
 	inbox: { kind: "inbox", target: null },
 	tickets: { kind: "tickets", target: null },
 	todo: { kind: "todo", list: { kind: "all" } },
@@ -164,7 +162,6 @@ export function App() {
 		if (next) open(next, "replace");
 	};
 	const settingsPage: Page = { kind: "settings", cwd: page?.kind === "settings" ? page.cwd : viewCwd || null };
-	const settingsHref = hashForPage(settingsPage);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -196,6 +193,7 @@ export function App() {
 	/** The routine the Routines page shows; one another window deleted shows the list. */
 	const routinesTarget = page?.kind === "routines" && state.routines.some(({ id }) => id === page.target) ? page.target : null;
 	const showTab = (next: SidebarTab): void => {
+		if (next === "settings") return navigate(settingsPage);
 		if (next !== "sessions") return navigate(TAB_PAGE[next]);
 		setPaneTab("sessions");
 		show(layout);
@@ -387,8 +385,6 @@ export function App() {
 						onTogglePin={togglePin}
 						open={cover ? [] : layout.panes}
 						newSessionOpen={page?.kind === "new"}
-						settingsHref={settingsHref}
-						settingsOpen={page?.kind === "settings"}
 						ticketsShown={ticketsShown}
 						tab={tab}
 						onTab={showTab}
