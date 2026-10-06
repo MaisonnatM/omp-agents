@@ -306,12 +306,11 @@ export interface StatsUsage {
 	totalCost: number;
 	avgTokensPerSecond: number | null;
 }
-/** Subset of omp-stats' `DashboardStats`. `agentType` is `main`, `subagent`, or `advisor`; `timestamp` starts a bucket. */
+/** Subset of omp-stats' `DashboardStats`. `agentType` is `main`, `subagent`, or `advisor`. */
 export interface StatsDashboard {
 	overall: StatsUsage;
 	byModel: (StatsUsage & { model: string; provider: string })[];
 	byAgentType: { agentType: "main" | "subagent" | "advisor"; totalInputTokens: number; totalOutputTokens: number; totalCacheReadTokens: number; totalCacheWriteTokens: number }[];
-	timeSeries: { timestamp: number; requests: number; tokens: number; cost: number }[];
 }
 /** Subset of omp-stats' `ToolDashboardStats`. */
 export interface StatsToolDashboard {
@@ -323,6 +322,18 @@ export interface StatsAggregatorModule {
 	getToolDashboardStats(range: string): Promise<StatsToolDashboard>;
 	/** `cutoff` is null for all time. */
 	getTimeRangeConfig(range: string): { cutoff: number | null; bucketMs: number };
+}
+/** Subset of omp-stats' `ProviderTimeSeriesPoint` (src/shared-types.ts); `timestamp` starts a bucket. */
+export interface StatsProviderPoint {
+	timestamp: number;
+	provider: string;
+	totalTokens: number;
+	cost: number;
+	requests: number;
+}
+/** omp-stats' rollup-aware provider series (src/rollup.ts). */
+export interface StatsRollupModule {
+	getProviderTimeSeries(window: { cutoff: number | null; bucketMs: number }): StatsProviderPoint[];
 }
 /** omp-stats' `LiveSyncStatus` (src/shared-types.ts). */
 export interface StatsSync {
@@ -471,5 +482,6 @@ export const statsAggregator = await load<StatsAggregatorModule>(join(statsSrc, 
 	getToolDashboardStats: "function",
 	getTimeRangeConfig: "function",
 });
+export const statsRollup = await load<StatsRollupModule>(join(statsSrc, "rollup.ts"), { getProviderTimeSeries: "function" });
 export const statsLive = await load<StatsLiveModule>(join(statsSrc, "live.ts"), { statsLive: "function" });
 export const statsDb = await load<StatsDbModule>(join(statsSrc, "db.ts"), { initDb: "function" });

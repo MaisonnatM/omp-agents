@@ -4,7 +4,8 @@
  * touches the database.
  */
 import type { AnalyticsRange } from "../shared/analytics";
-import { type StatsDashboard, type StatsSync, type StatsToolDashboard, statsAggregator, statsDb, statsLive } from "./modules";
+import type { StatsDashboard, StatsProviderPoint, StatsSync, StatsToolDashboard } from "./modules";
+import { statsAggregator, statsDb, statsLive, statsRollup } from "./modules";
 
 /** What one model used in one session file over the range. */
 export interface SessionModelRow {
@@ -37,6 +38,7 @@ export interface StatsRead {
 	tools: StatsToolDashboard;
 	sync: StatsSync;
 	rows: SessionModelRow[];
+	providerSeries: StatsProviderPoint[];
 }
 
 const SESSION_MODEL_ROWS = `
@@ -63,7 +65,8 @@ export async function readStats(range: AnalyticsRange): Promise<StatsRead> {
 	const { cutoff, bucketMs } = statsAggregator.getTimeRangeConfig(range);
 	const [dashboard, tools] = await Promise.all([statsAggregator.getDashboardStats(range), statsAggregator.getToolDashboardStats(range)]);
 	const rows = db.query<SessionModelRow, [number]>(SESSION_MODEL_ROWS).all(cutoff ?? 0);
-	return { window: { cutoff, bucketMs, now }, dashboard, tools, sync: live.status().sync, rows };
+	const window = { cutoff, bucketMs, now };
+	return { window, dashboard, tools, sync: live.status().sync, rows, providerSeries: statsRollup.getProviderTimeSeries(window) };
 }
 
 /** Stops the live ingest, if a read started it. */

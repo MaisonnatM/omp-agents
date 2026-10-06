@@ -28,14 +28,23 @@ export interface Usage {
 	cacheRate: number;
 }
 
+export interface AnalyticsProviderUsage {
+	provider: string;
+	tokens: number;
+	cost: number;
+	requests: number;
+}
+
 /** omp's request stats over one time range, from its stats database. */
 export interface Analytics {
 	range: AnalyticsRange;
 	/** How far omp-stats has indexed the session files; numbers grow while it syncs. */
 	sync: { phase: "idle" | "syncing" | "error"; current: number; total: number; lastSyncedAt: number | null; error: string | null };
 	totals: Usage;
-	/** Oldest first: an hour each over 24h, else a day. `start` is the bucket's start in ms. */
-	series: { start: number; tokens: number; cost: number; requests: number }[];
+	/** Recorded request providers, most tokens first, then lexical provider order. */
+	providers: AnalyticsProviderUsage[];
+	/** Oldest first: an hour each over 24h, else a UTC day. Provider entries are sparse, with no order guarantee. */
+	series: { start: number; tokens: number; cost: number; requests: number; providers: AnalyticsProviderUsage[] }[];
 	/** Most tokens first. `selector` is `provider/model`; `tokensPerSecond` is the mean output rate, null when unmeasured. */
 	models: (Usage & { selector: string; tokensPerSecond: number | null })[];
 	/** By working directory, most tokens first. */

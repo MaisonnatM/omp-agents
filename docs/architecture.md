@@ -32,7 +32,7 @@ The main ones:
   Linear's sign-in reads and writes omp's credential store through the same `discoverAuthStorage`, opened and closed on each call.
 - Completions: `pi-tui/src/autocomplete.ts`, and the skills and slash commands in `pi-coding-agent/src/extensibility/`.
 - Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
-- Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
+- Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `rollup.ts` (`getProviderTimeSeries`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
   `src/omp/stats.ts` reads omp-stats' database and starts its live sync only after the Settings page's Analytics section first reads it.
 
 ## Transcripts
@@ -232,7 +232,9 @@ omp-stats owns the request history in `~/.omp/stats.db`, under omp's config root
 `src/omp/stats.ts` starts `statsLive()` on the first Analytics read; it syncs every session transcript, watches for changes, and resyncs every five minutes until the server stops it on shutdown.
 The dashboard calls omp-stats' aggregate and tool reads for the selected range, then groups request rows by session file for the top sessions.
 `src/analytics.ts` folds nested subagent and advisor files into their top-level session, assigns the session's working directory from the saved-session index, and orders models, projects, and sessions by token usage.
-omp-stats returns only the time buckets that hold requests, so `src/analytics.ts` fills the rest of the range with zeros, starting all time at the first request.
+`src/omp/stats.ts` reads time buckets by recorded provider through omp-stats' rollup-aware `getProviderTimeSeries`, using the same source as the totals cards.
+`src/analytics.ts` derives chart totals and provider totals from those rows, fills missing buckets with zeros, and starts all time at the first request.
+`web/components/settings/provider-trend.tsx` renders Recharts stacked bars, bucket details, and an optional data table from that provider breakdown.
 The displayed cost is omp's API-equivalent list price, not the user's subscription bill.
 
 ## Routines
@@ -291,7 +293,7 @@ Each file carries the SHA-256 of its text.
 
 `GET /api/analytics?range=<range>` answers `Analytics` from omp-stats, defaulting to `7d`.
 The accepted ranges are `24h`, `7d`, `30d`, `90d`, and `all`; an unknown range returns 400.
-The answer includes totals, time buckets, models, projects, agent types, tools, the 20 sessions with the most tokens, and live indexing status.
+The answer includes totals, time buckets with per-provider usage, provider totals, models, projects, agent types, tools, the 20 sessions with the most tokens, and live indexing status.
 
 Edits go through two endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
 
@@ -561,6 +563,7 @@ The page lives in `web/`.
 - `web/components/settings/settings-nav.tsx`: the Settings sidebar's section buttons and the registry shared with `settings-page.tsx`.
   `web/app.tsx` holds the selected section for both; the page keeps inactive panels mounted to preserve unsaved drafts.
 - `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
+  `provider-trend.tsx` renders the stacked provider chart and bucket-data table; `analytics-format.ts` shares number and cost formatting across the section.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.

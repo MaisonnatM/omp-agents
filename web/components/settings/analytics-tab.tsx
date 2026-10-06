@@ -1,5 +1,6 @@
 /** The settings tab for omp's request usage by time, model, project, agent, tool, and session. */
-import { type ReactNode, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { ANALYTICS_RANGES, type Analytics, type AnalyticsRange, type AnalyticsSession } from "../../../src/shared/analytics";
 import { hashForSession } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -7,12 +8,10 @@ import { modelLabel, modelOrg, projectName, providerLabel, readTime } from "../.
 import { useRead } from "../../reads";
 import { OrgIcon } from "../org-icon";
 import { LoadNote } from "../sheet-details";
+import { compact, dollars, full } from "./analytics-format";
+import { ProviderTrend } from "./provider-trend";
 
-const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-const full = new Intl.NumberFormat("en-US");
 const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1 });
-const dollars = (value: number): string =>
-	new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: value > 0 && value < 0.01 ? 4 : 2 }).format(value);
 const rangeLabel: Record<AnalyticsRange, string> = { "24h": "24h", "7d": "7d", "30d": "30d", "90d": "90d", all: "All" };
 
 /** How many of a session's models its row names before `+N`. */
@@ -32,41 +31,6 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 			<p className="mt-1 text-xl font-semibold tabular-nums" title={value}>{value}</p>
 			{hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
 		</div>
-	);
-}
-
-function Trend({ series, range }: { series: Analytics["series"]; range: AnalyticsRange }) {
-	const max = Math.max(1, ...series.map(point => point.tokens));
-	const width = 1000 / Math.max(1, series.length);
-	// omp-stats' daily buckets start at UTC midnight, so a local date could name the day before.
-	const tick = (start: number): string => new Date(start).toLocaleString(undefined, range === "24h" ? { hour: "numeric", minute: "2-digit" } : { month: "short", day: "numeric", timeZone: "UTC" });
-	return (
-		<section className="space-y-3" aria-labelledby="analytics-trend">
-			<div className="flex items-baseline justify-between gap-4">
-				<h3 id="analytics-trend" className="text-sm font-semibold">Token usage over time</h3>
-				<span className="text-xs text-muted-foreground">{range === "24h" ? "Hourly" : "Daily"}</span>
-			</div>
-			<div className="rounded-md border border-border px-3 pb-2 pt-4">
-				<svg viewBox="0 0 1000 160" preserveAspectRatio="none" className="h-40 w-full text-primary" role="img" aria-label="Token usage by time bucket">
-					<line x1="0" y1="159" x2="1000" y2="159" className="stroke-border" />
-					{series.map(({ start, tokens, cost, requests }, index) => {
-						const height = (tokens / max) * 148;
-						return (
-							<rect key={start} x={index * width + 1} y={159 - height} width={Math.max(1, width - 2)} height={Math.max(1, height)} fill="currentColor" className="opacity-75 hover:opacity-100">
-								<title>{`${tick(start)}: ${full.format(tokens)} tokens, ${dollars(cost)}, ${full.format(requests)} requests`}</title>
-							</rect>
-						);
-					})}
-				</svg>
-				<div className="flex justify-between text-xs text-muted-foreground tabular-nums">
-					<span>{series[0] ? tick(series[0].start) : ""}</span>
-					<span>{series.length > 1 ? tick(series[series.length - 1]!.start) : ""}</span>
-				</div>
-			</div>
-			<ol className="sr-only">
-				{series.map(({ start, tokens, cost, requests }) => <li key={start}>{tick(start)}: {full.format(tokens)} tokens, {dollars(cost)}, {full.format(requests)} requests.</li>)}
-			</ol>
-		</section>
 	);
 }
 
@@ -134,7 +98,7 @@ function SessionRow({ session }: { session: AnalyticsSession }) {
 }
 
 function UsageBody({ data }: { data: Analytics }) {
-	const { totals, series, models, projects, agents, tools, sessions, range } = data;
+	const { totals, series, providers, models, projects, agents, tools, sessions, range } = data;
 	const labels = models.map(({ selector }) => modelLabel(selector));
 	/** Model names more than one provider serves, which the models table tells apart by provider. */
 	const sharedLabels = new Set(labels.filter((label, index) => labels.indexOf(label) !== index));
@@ -146,7 +110,7 @@ function UsageBody({ data }: { data: Analytics }) {
 				<Stat label="Requests" value={full.format(totals.requests)} hint={`${full.format(totals.failed)} failed`} />
 				<Stat label="Cache hit rate" value={percent.format(totals.cacheRate)} hint={`${compact.format(totals.tokens.cacheRead)} read · ${compact.format(totals.tokens.cacheWrite)} written`} />
 			</div>
-			<Trend series={series} range={range} />
+			<ProviderTrend series={series} providers={providers} range={range} />
 			<div className="grid gap-9 xl:grid-cols-2">
 				<section className="space-y-3" aria-labelledby="analytics-models">
 					<h3 id="analytics-models" className="text-sm font-semibold">Models</h3>

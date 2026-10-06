@@ -1,8 +1,8 @@
 /** The Analytics tab's numbers: omp-stats' reads, with each session's subagents folded into it. */
 import { basename, isAbsolute, relative, sep } from "node:path";
-import type { StatsDashboard, StatsUsage } from "./omp/modules";
+import type { StatsProviderPoint, StatsUsage } from "./omp/modules";
 import type { SessionModelRow, StatsRead, StatsWindow } from "./omp/stats";
-import type { Analytics, AnalyticsRange, AnalyticsSession, TokenCounts, Usage } from "./shared/analytics";
+import type { Analytics, AnalyticsProviderUsage, AnalyticsRange, AnalyticsSession, TokenCounts, Usage } from "./shared/analytics";
 
 /** How many sessions the page lists. */
 export const TOP_SESSIONS = 20;
@@ -113,18 +113,38 @@ const MAX_BUCKETS = 1500;
  * Every bucket of the window, empty ones as zeros, aligned like omp-stats' `floor(timestamp / bucketMs) * bucketMs`.
  * All time starts at the earliest point.
  */
-export function seriesOf(points: StatsDashboard["timeSeries"], { cutoff, bucketMs, now }: StatsWindow): Analytics["series"] {
-	if (cutoff === null && points.length === 0) return [];
-	const byStart = new Map(points.map(point => [point.timestamp, point]));
-	const last = Math.floor(now / bucketMs) * bucketMs;
-	const from = cutoff ?? Math.min(...points.map(point => point.timestamp));
-	const first = Math.max(Math.floor(from / bucketMs) * bucketMs, last - (MAX_BUCKETS - 1) * bucketMs);
-	const series: Analytics["series"] = [];
-	for (let start = first; start <= last; start += bucketMs) {
-		const point = byStart.get(start);
-		series.push({ start, tokens: point?.tokens ?? 0, cost: point?.cost ?? 0, requests: point?.requests ?? 0 });
+export function chartOf(points: readonly StatsProviderPoint[], { cutoff, bucketMs, now }: StatsWindow): Pick<Analytics, "providers" | "series"> {
+	const byProvider = new Map<string, AnalyticsProviderUsage>();
+	const byStart = new Map<number, AnalyticsProviderUsage[]>();
+	let earliest = Infinity;
+	for (const { timestamp: start, provider, totalTokens: tokens, cost, requests } of points) {
+		const total = byProvider.get(provider) ?? { provider, tokens: 0, cost: 0, requests: 0 };
+		total.tokens += tokens;
+		total.cost += cost;
+		total.requests += requests;
+		byProvider.set(provider, total);
+		const bucket = byStart.get(start) ?? [];
+		bucket.push({ provider, tokens, cost, requests });
+		byStart.set(start, bucket);
+		earliest = Math.min(earliest, start);
 	}
-	return series;
+	const providers = [...byProvider.values()].sort((a, b) => b.tokens - a.tokens || (a.provider < b.provider ? -1 : a.provider > b.provider ? 1 : 0));
+	const series: Analytics["series"] = [];
+	if (cutoff === null && points.length === 0) return { providers, series };
+	const last = Math.floor(now / bucketMs) * bucketMs;
+	const from = cutoff ?? earliest;
+	const first = Math.max(Math.floor(from / bucketMs) * bucketMs, last - (MAX_BUCKETS - 1) * bucketMs);
+	for (let start = first; start <= last; start += bucketMs) {
+		const bucket = byStart.get(start) ?? [];
+		const point = { start, tokens: 0, cost: 0, requests: 0, providers: bucket };
+		for (const provider of bucket) {
+			point.tokens += provider.tokens;
+			point.cost += provider.cost;
+			point.requests += provider.requests;
+		}
+		series.push(point);
+	}
+	return { providers, series };
 }
 
 /** The page's payload from one omp-stats read over `range`. */
@@ -139,7 +159,7 @@ export function buildAnalytics(range: AnalyticsRange, read: StatsRead, root: str
 		range,
 		sync: { phase: sync.phase, current: sync.current, total: sync.total, lastSyncedAt: sync.lastSyncedAt, error: sync.error },
 		totals: usageOf(dashboard.overall),
-		series: seriesOf(dashboard.timeSeries, read.window),
+		...chartOf(read.providerSeries, read.window),
 		models: dashboard.byModel
 			.map(model => ({ selector: `${model.provider}/${model.model}`, tokensPerSecond: model.avgTokensPerSecond, ...usageOf(model) }))
 			.sort((a, b) => b.tokens.total - a.tokens.total),

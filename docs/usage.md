@@ -679,6 +679,11 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Choose **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
   It shows tokens, estimated cost, requests, cache hit rate, and a chart of token usage over time.
   The cost is omp's API-equivalent list price, not what your subscription bills.
+  The chart stacks token usage by the provider that handled each request, with a fixed color and a legend entry for each provider.
+  Hover or tap a time bucket to see its total and each provider's tokens, estimated cost, and requests.
+  Focus the chart and use Left or Right to move between buckets; Escape closes the details.
+  **View bucket data** shows the same numbers in a table, including empty buckets and requests that recorded no tokens.
+  The **24h** chart labels local hours; daily charts label UTC dates.
   Models and projects are ordered by tokens, followed by the token split among main agents, subagents, and advisors, and by tool calls.
   The top 20 sessions include their subagents' usage; select a session to open it.
   omp keeps the usage of a session whose transcript you deleted, so it stays listed as **Deleted session**, without a link.
