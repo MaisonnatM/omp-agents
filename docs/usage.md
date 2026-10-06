@@ -57,6 +57,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Select one to read its transcript.
   The page cannot write to it until you resume it.
   A session that runs without publishing itself to the registry also appears in this list, and its transcript keeps updating while it runs.
+  The group lists the 100 newest at first, and **Show 100 more** at its end adds the next ones.
 - The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because the dashboard server stopped or crashed, which stops every session it started, or because omp exited on its own.
   The group shows only while it has a row.
   Its **Resume all** button resumes every session it lists, under the selected project, as **Resume** does for one; a pane that shows one of them then shows it live.

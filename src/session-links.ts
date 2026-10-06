@@ -4,7 +4,8 @@
  */
 import { ghGet, ghPatch } from "./github";
 import { isObject } from "./json";
-import { hashForSession, type PullRequest, type PullRequestLink, type SessionLinksResult } from "./shared";
+import type { PullRequest, PullRequestLink, SessionLinksResult } from "./shared/github";
+import { hashForSession } from "./shared/sessions";
 
 const START = "<!-- omp-sessions -->";
 const END = "<!-- /omp-sessions -->";

@@ -9,7 +9,7 @@
  */
 import { isObject, str } from "./json";
 import { imagesOf, oneLine, textOf, toolSummary } from "./session-entries";
-import type { Item } from "./shared";
+import type { Item } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;

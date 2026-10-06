@@ -1,6 +1,7 @@
 import { FileDiff, FileMinus, FilePen, FilePlus, Images, type LucideIcon, TableOfContents } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
-import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals, parseDiffLine, type View } from "../../src/shared";
+import type { View } from "../../src/shared/sessions";
+import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals, parseDiffLine } from "../../src/shared/transcript";
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { PastSession, RosterHost } from "../src/shared";
+import type { PastSession, RosterHost } from "../src/shared/sessions";
 import { documentTitle } from "./document-title";
 
 const host = (sessionName: string | null, cwdDisplay = "~/code/webapp") => ({ sessionName, cwdDisplay }) as RosterHost;

@@ -1,4 +1,4 @@
-import type { PastSession, RosterHost } from "../src/shared";
+import type { PastSession, RosterHost } from "../src/shared/sessions";
 import type { UserTodo } from "../src/user-todos-shared";
 
 type LiveWork = Pick<RosterHost, "sessionId" | "status" | "requests" | "pullRequests" | "ship">;

@@ -3,7 +3,7 @@ import { mkdirSync, readlinkSync, rmSync, statSync, symlinkSync, writeFileSync }
 import { join } from "node:path";
 import { agentDir } from "./omp/config";
 import { loadOmpSettings, parseRoutingEdit, Rejected, routeRoles, saveOmpFile } from "./settings";
-import type { CatalogModel, RoutingEdit } from "./shared";
+import type { CatalogModel, RoutingEdit } from "./shared/models";
 
 describe("routeRoles", () => {
 	test("a chat role without its own chain walks the default chain; a model-kind role does not", () => {

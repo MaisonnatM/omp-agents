@@ -20,7 +20,9 @@ import { LineReader } from "./line-reader";
 import { HOME } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
-import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo, SHIP_STAGES, SHIP_WORK, type SessionFacts, type ShipProgress, TICKET_ID } from "./shared";
+import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo } from "./shared/github";
+import { SHIP_STAGES, SHIP_WORK, type SessionFacts, type ShipProgress } from "./shared/sessions";
+import { TICKET_ID } from "./shared/tickets";
 
 /** `me/fe-trust-7: https://app.graphite.com/github/pr/acme/webapp/6596 (created)` */
 const GT_SUBMITTED = /^\S+: https:\/\/app\.graphite\.com\/github\/pr\/([\w.-]+)\/([\w.-]+)\/(\d+)\S* \((?:created|updated)\)[ \t\r]*$/gm;

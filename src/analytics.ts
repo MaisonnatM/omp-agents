@@ -2,7 +2,7 @@
 import { basename, isAbsolute, relative, sep } from "node:path";
 import type { StatsDashboard, StatsUsage } from "./omp/modules";
 import type { SessionModelRow, StatsRead, StatsWindow } from "./omp/stats";
-import type { Analytics, AnalyticsRange, AnalyticsSession, TokenCounts, Usage } from "./shared";
+import type { Analytics, AnalyticsRange, AnalyticsSession, TokenCounts, Usage } from "./shared/analytics";
 
 /** How many sessions the page lists. */
 export const TOP_SESSIONS = 20;

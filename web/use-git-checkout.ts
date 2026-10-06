@@ -1,4 +1,4 @@
-import type { GitCheckout } from "../src/shared";
+import type { GitCheckout } from "../src/shared/git";
 import { useRead } from "./reads";
 
 /**

@@ -1,5 +1,5 @@
 import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, type LucideIcon } from "lucide-react";
-import type { Person, PullRequestDetail, Reviewer, ReviewerState } from "../../../src/shared";
+import type { Person, PullRequestDetail, Reviewer, ReviewerState } from "../../../src/shared/github";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 

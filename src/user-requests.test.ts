@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "bun:test";
-import type { UserRequest } from "./shared";
+import type { UserRequest } from "./shared/sessions";
 import { PendingRequests, parseCollabRequest, parseRpcRequest, rpcResponse } from "./user-requests";
 
 const NOW = 1_790_000_000_000;

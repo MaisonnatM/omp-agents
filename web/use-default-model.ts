@@ -1,4 +1,4 @@
-import type { ModelOption, ModelRole } from "../src/shared";
+import type { ModelOption, ModelRole } from "../src/shared/models";
 import { useRead } from "./reads";
 
 /**

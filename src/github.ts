@@ -4,7 +4,7 @@
  */
 import { isObject, str } from "./json";
 import { run, runChecked, runJson } from "./proc";
-import type { CheckRunState, Person, PullRequestEvent, PullRequestFile, Repo, ReviewDecision, ReviewerState } from "./shared";
+import type { CheckRunState, Person, PullRequestEvent, PullRequestFile, Repo, ReviewDecision, ReviewerState } from "./shared/github";
 
 const GH_TIMEOUT_MS = 20_000;
 

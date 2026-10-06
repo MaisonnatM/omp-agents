@@ -1,4 +1,4 @@
-import type { AgentRow, ControlPhase, LiveView, MessageQueue, RosterHost, UserRequest } from "../../src/shared";
+import type { AgentRow, ControlPhase, LiveView, MessageQueue, RosterHost, UserRequest } from "../../src/shared/sessions";
 import type { ShellReach } from "./composer";
 
 const SESSION_GONE: ControlPhase = { phase: "ended", reason: "This session is no longer running." };

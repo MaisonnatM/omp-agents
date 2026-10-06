@@ -3,7 +3,7 @@
  * ingest, which syncs every session file and then watches them, so a server whose Analytics page never opens never
  * touches the database.
  */
-import type { AnalyticsRange } from "../shared";
+import type { AnalyticsRange } from "../shared/analytics";
 import { type StatsDashboard, type StatsSync, type StatsToolDashboard, statsAggregator, statsDb, statsLive } from "./modules";
 
 /** What one model used in one session file over the range. */

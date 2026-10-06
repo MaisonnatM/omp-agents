@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { RosterHost, Ticket, TicketDetail, View } from "../../../src/shared";
+import type { RosterHost, View } from "../../../src/shared/sessions";
+import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
 import { ticketsStore, useReplaceableRead } from "../../reads";

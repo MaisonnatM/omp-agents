@@ -1,5 +1,5 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
-import { type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared";
+import { type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 
 const HIDDEN_ROOTS = ["/tmp", "/private/tmp"];
 

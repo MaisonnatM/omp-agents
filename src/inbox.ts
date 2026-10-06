@@ -5,26 +5,7 @@
 import { createCache } from "./cache";
 import { CHANGE, CHECK_RUN, dataOf, ghGraphql, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
-import {
-	type CheckRunState,
-	type Inbox,
-	type InboxPullRequest,
-	type InboxRole,
-	type Person,
-	type PullRequest,
-	type PullRequestCheck,
-	type PullRequestComment,
-	type PullRequestDetail,
-	type PullRequestEvent,
-	type PullRequestFile,
-	type PullRequestThread,
-	prKey,
-	type Repo,
-	type RepoInbox,
-	type Reviewer,
-	type ReviewDecision,
-	repoKey,
-} from "./shared";
+import { type CheckRunState, type Inbox, type InboxPullRequest, type InboxRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, type Repo, type RepoInbox, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
 
 export { parseRemote, repoOf } from "./github";
 

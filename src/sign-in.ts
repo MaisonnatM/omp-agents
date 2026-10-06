@@ -1,6 +1,6 @@
 /** The sign-ins the settings start, to Linear and to Google: one at a time each, waiting for the browser at most five minutes. */
 import { errorText } from "./json";
-import type { SignInState } from "./shared";
+import type { SignInState } from "./shared/accounts";
 
 /** How long a sign-in waits for the browser, as omp's `/mcp` does. */
 const SIGN_IN_MS = 5 * 60_000;

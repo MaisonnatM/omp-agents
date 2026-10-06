@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { LiveView, RosterHost, View } from "../src/shared";
+import type { LiveView, RosterHost, View } from "../src/shared/sessions";
 import { type DashboardState, initialState, reduce } from "./dashboard-state";
 import type { Layout } from "./routing";
 

@@ -3,7 +3,7 @@ import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { MediaTree } from "./media";
-import type { AgentMedia } from "./shared";
+import type { AgentMedia } from "./shared/transcript";
 
 const dirs: string[] = [];
 afterAll(() => {

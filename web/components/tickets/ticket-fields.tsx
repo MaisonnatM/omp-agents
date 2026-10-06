@@ -1,6 +1,6 @@
 import { Box, Calendar, Check, CircleUser, Tag } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
-import type { Ticket, TicketDetail, TicketEdit, TicketOptions, TicketPriority } from "../../../src/shared";
+import type { Ticket, TicketDetail, TicketEdit, TicketOptions, TicketPriority } from "../../../src/shared/tickets";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";

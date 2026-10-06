@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { View } from "../src/shared";
+import type { View } from "../src/shared/sessions";
 import { applyPaneMessage, retainPanes, usePane } from "./pane-store";
 
 const view = (instanceId: string): View => ({ kind: "live", instanceId, agentId: null });

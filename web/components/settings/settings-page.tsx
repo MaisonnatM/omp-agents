@@ -1,6 +1,6 @@
 import { FileText, FolderOpen, GitBranch, Palette, Plug, RotateCcw, Route, Sparkles } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
-import type { CatalogModel, OmpSettings } from "../../../src/shared";
+import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { settingsUrl } from "../../api";

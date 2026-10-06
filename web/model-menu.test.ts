@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { ModelEntry, PlanUsage } from "../src/shared";
+import type { ModelEntry, PlanUsage } from "../src/shared/models";
 import { contextVariants, modelMatch, providerQuota } from "./model-menu";
 
 const entry = (provider: string, id: string, contextWindow: number | null): ModelEntry => ({ provider, id, name: id, contextWindow, curated: false });

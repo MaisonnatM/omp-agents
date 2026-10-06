@@ -3,7 +3,7 @@
  * and the sign-in the settings start, which adds the server to omp's user-level MCP config when omp has none.
  */
 import { addMcpServer, findMcpServer, type McpServer, mcpSignedIn, signInMcp } from "./omp/mcp";
-import type { LinearStatus } from "./shared";
+import type { LinearStatus } from "./shared/accounts";
 import { createSignIn } from "./sign-in";
 
 const LINEAR_HOST = "mcp.linear.app";

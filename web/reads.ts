@@ -1,6 +1,9 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
 import { useEffect, useState } from "react";
-import type { CalendarEventsAnswer, GoogleStatus, Inbox, LinearStatus, ModelEntry, TicketsAnswer } from "../src/shared";
+import type { CalendarEventsAnswer, GoogleStatus, LinearStatus } from "../src/shared/accounts";
+import type { Inbox } from "../src/shared/github";
+import type { ModelEntry } from "../src/shared/models";
+import type { TicketsAnswer } from "../src/shared/tickets";
 import { errorText, getJson } from "./api";
 import { createPolledStore } from "./polled-store";
 

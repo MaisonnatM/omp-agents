@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Ticket } from "../src/shared";
+import type { Ticket } from "../src/shared/tickets";
 import { ticketActions, ticketStart } from "./quick-actions";
 
 const ticket = (fields: Partial<Ticket>): Ticket => ({

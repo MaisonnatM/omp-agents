@@ -2,7 +2,7 @@
  * The pull request actions: which inbox pull request each applies to, and the prompt that starts its session.
  * The inbox's quick actions and the routines both read them, so the server and the page share one prompt.
  */
-import { type InboxPullRequest, pullRequestUrl } from "./shared";
+import { type InboxPullRequest, pullRequestUrl } from "./shared/github";
 
 export type PullRequestActionId = "fix-ci" | "resolve-conflicts" | "address-comments" | "review" | "thermonuclear-review";
 

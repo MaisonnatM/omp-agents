@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { HOME } from "./paths";
-import { type FileChange, lineTotals } from "./shared";
+import { type FileChange, lineTotals } from "./shared/transcript";
 import { Work } from "./work";
 
 /** A tool result; `Work` reads a write's path from `details.resolvedPath` and its lines from the matching {@link writeCall}. */

@@ -1,4 +1,4 @@
-import type { AgentStatus, HostStatus } from "../../src/shared";
+import type { AgentStatus, HostStatus } from "../../src/shared/sessions";
 import { cn } from "@/lib/utils";
 
 type Status = HostStatus | AgentStatus;

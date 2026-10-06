@@ -1,221 +1,39 @@
-import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Keyboard, ListRestart, Loader, Pin, PinOff, Play, Plus, Search, Settings } from "lucide-react";
-import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type ShipProgress, type View } from "../../src/shared";
+import { Folder, Keyboard, Search, Settings } from "lucide-react";
+import { type ReactNode, useState } from "react";
+import type { RosterHost, View } from "../../src/shared/sessions";
 import type { Routine } from "../../src/routines";
 import type { UserTodoList } from "../../src/user-todos-shared";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	ContextMenu,
-	ContextMenuContent,
-	ContextMenuTrigger,
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuTrigger,
-	MenuItem,
-	MenuLinkItem,
-	MenuSeparator,
-	MenuShortcut,
-} from "@/components/ui/menu";
-import {
-	SidebarContent,
-	SidebarGroup,
-	SidebarGroupAction,
-	SidebarGroupActions,
-	SidebarGroupLabel,
-	SidebarHeader,
-	SidebarInput,
-	SidebarMenu,
-	SidebarMenuAction,
-	SidebarMenuBadge,
-	SidebarMenuButton,
-	SidebarMenuItem,
-} from "@/components/ui/sidebar";
+import { SidebarContent, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { agentOn, yourMoveCount } from "../inbox-model";
-import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
-import { PAGE_ICON } from "../page-icons";
+import { projectName } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
-import { hashForSettings, hashForTickets, SIDEBAR_TABS, type SidebarTab, type OpenMode, sameView, type TodoListView } from "../routing";
+import { hashForTickets, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
-import { useStoredKeys, useStoredState } from "../stored-state";
+import { useStoredState } from "../stored-state";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { useDashboardContext } from "./dashboard-context";
-import { ShipStep } from "./ship-step";
 import { CalendarNav, type CalendarTabPage } from "./calendar/calendar-nav";
-import { StatusDot, statusLabel } from "./status-dot";
+import { SessionList } from "./session-list";
 import { workspaceItems } from "./workspace-picker";
 import { TodoCategories } from "./todo/categories";
 import type { KnownSessions } from "./todo/links";
 
-/** The muted facts after a session's name: the parts that apply, and a title listing its pull requests. */
-function sessionFacts(parts: (string | false)[], pullRequests: PullRequest[]): { text: string; title?: string } | null {
-	const text = parts.filter(part => part !== false).join(" · ");
-	if (!text) return null;
-	const title = pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n");
-	return { text, title: title || undefined };
-}
-
-function SessionRow({
-	view,
-	label,
-	title,
-	badge,
-	ship,
-	facts,
-	when,
-	dot,
-	open,
-	onOpen,
-}: {
-	view: View;
-	label: string;
-	title: string;
-	badge: ReactNode;
-	ship: ShipProgress | null;
-	/** Muted facts after the ship step, joined already; `title` is the fuller list, such as each pull request. */
-	facts: { text: string; title?: string } | null;
-	when: number;
-	dot?: ReactNode;
-	open: boolean;
-	onOpen: (view: View, mode: OpenMode) => void;
-}) {
-	return (
-		<Tooltip content={`${label}. ${title}. ${SPLIT_CLICK} to open in a split`} side="right">
-			<SidebarMenuButton isActive={open} onClick={event => onOpen(view, modeOf(event))}>
-				{dot}
-				<span className="flex min-w-0 flex-1 items-baseline gap-2">
-					{badge}
-					<span className="truncate font-medium text-foreground">{label}</span>
-					<ShipStep ship={ship} />
-					{facts && (
-						<span className="shrink-0 text-xs text-muted-foreground" title={facts.title}>
-							{facts.text}
-						</span>
-					)}
-					<span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(when)}</span>
-				</span>
-			</SidebarMenuButton>
-		</Tooltip>
-	);
-}
-
 /** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
 const PROJECT_KEY = "omp-agents.sidebar-project";
-const COLLAPSED_GROUPS_KEY = "omp-agents.sidebar-collapsed-groups";
 
 /** The project `cwd` the sidebar and the inbox show, `null` for all projects, and its setter, which localStorage keeps. */
 export function useProject(projects: { cwd: string }[]): [string | null, (cwd: string | null) => void] {
 	const [stored, pick] = useStoredState<string | null>(PROJECT_KEY, raw => raw, cwd => cwd ?? "");
 	// A stored project with no sessions left, or not yet loaded, shows all of them.
 	return [projects.some(({ cwd }) => cwd === stored) ? stored : null, pick];
-}
-
-/** The project a titled row ran in, before its title, shown only under all projects. An untitled row's label is already the project's name. */
-function ProjectBadge({ cwdDisplay }: { cwdDisplay: string }) {
-	const name = projectName(cwdDisplay);
-	return name ? <Badge size="compact" className="shrink-0 self-center">{name}</Badge> : null;
-}
-
-interface RowMenuProps {
-	view: View;
-	/** The row's name, which the "More actions" button is labelled after. */
-	label: string;
-	/** `view` is on screen, which leaves out Open in split. */
-	isOpen: boolean;
-	onOpen: (view: View, mode: OpenMode) => void;
-	/** The row's `SidebarMenuButton`. */
-	children: ReactElement;
-	/** The row's own items, after Open and Open in split. */
-	items?: ReactNode;
-	style?: CSSProperties;
-}
-
-/** A sidebar row whose quick actions open on right-click and from its hover-revealed "More actions" button. */
-export function RowMenu({ view, label, isOpen, onOpen, children, items, style }: RowMenuProps) {
-	const [menuOpen, setMenuOpen] = useState(false);
-	const menuItems = (
-		<>
-			<MenuItem onClick={() => onOpen(view, "replace")}>
-				<AppWindow />
-				Open
-			</MenuItem>
-			{!isOpen && (
-				<MenuItem onClick={() => onOpen(view, "split")}>
-					<Columns2 />
-					Open in split
-					<MenuShortcut>{SPLIT_CLICK}</MenuShortcut>
-				</MenuItem>
-			)}
-			{items}
-		</>
-	);
-	return (
-		<ContextMenu>
-			<ContextMenuTrigger render={<SidebarMenuItem style={style} />}>
-				{children}
-				<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-					<Tooltip content="More actions" forceOpen={menuOpen ? false : undefined}>
-						<DropdownMenuTrigger render={<SidebarMenuAction showOnHover aria-label={`More actions for ${label}`} />}>
-							<Ellipsis />
-						</DropdownMenuTrigger>
-					</Tooltip>
-					<DropdownMenuContent align="end">{menuItems}</DropdownMenuContent>
-				</DropdownMenu>
-			</ContextMenuTrigger>
-			<ContextMenuContent>{menuItems}</ContextMenuContent>
-		</ContextMenu>
-	);
-}
-
-interface SessionItemsProps {
-	row: { cwd: string; sessionId: string; pullRequests: PullRequest[]; tickets: string[] };
-	pinned: boolean;
-	onTogglePin: (sessionId: string) => void;
-}
-
-/** Items a running or past session's menu shares: pinning it, its pull requests and Linear issues, its workspace's settings, and copying its ids. */
-function SessionItems({ row, pinned, onTogglePin }: SessionItemsProps) {
-	return (
-		<>
-			<MenuItem onClick={() => onTogglePin(row.sessionId)}>
-				{pinned ? <PinOff /> : <Pin />}
-				{pinned ? "Unpin" : "Pin"}
-			</MenuItem>
-			<MenuSeparator />
-			{row.pullRequests.map(pr => (
-				<MenuLinkItem key={pullRequestUrl(pr)} href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
-					<GitPullRequest />
-					Open {pr.repo}#{pr.number}
-				</MenuLinkItem>
-			))}
-			{row.tickets.map(id => (
-				<MenuLinkItem key={id} href={hashForTickets(id)}>
-					<PAGE_ICON.tickets />
-					Open {id}
-				</MenuLinkItem>
-			))}
-			<MenuLinkItem href={hashForSettings(row.cwd)}>
-				<Settings />
-				Workspace settings
-			</MenuLinkItem>
-			<MenuSeparator />
-			<MenuItem onClick={() => void navigator.clipboard.writeText(row.cwd)}>
-				<Folder />
-				Copy path
-			</MenuItem>
-			<MenuItem onClick={() => void navigator.clipboard.writeText(row.sessionId)}>
-				<Copy />
-				Copy session ID
-			</MenuItem>
-		</>
-	);
 }
 interface ProjectPickerProps {
 	/** Directories sessions ran in, as {@link workspaces} lists them. */
@@ -435,112 +253,15 @@ export function Roster({
 	onShowShortcuts,
 	toggle,
 }: RosterProps) {
-	const { open: onOpen, send, start, dismissStart, end: onEnd, openNewSession: onNewSession, changeTodo: onTodoChange, connected, starts } = useDashboardContext();
-	const { resume, resumeAll } = starts;
-	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
+	const { changeTodo: onTodoChange, connected } = useDashboardContext();
 	const inboxRead = inboxStore.use(project).read;
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
 		inbox: { count: inboxRead ? yourMoveCount(inboxRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
-	/** Continue past session `sessionId`, in the pane that shows it. */
-	const onResume = (sessionId: string): void => {
-		// The pane shows the resume's progress and failure, and the live session takes it over.
-		onOpen({ kind: "past", sessionId }, "replace");
-		start({ kind: "resume", sessionId });
-	};
-	const { pinned, running, idle, interrupted, ended } = lists;
-	const resumingAll = resumeAll?.phase === "starting";
-	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	const selectedProject = projects.find(({ cwd }) => cwd === project);
 	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
-	/** The search field narrows the lists, so a group left empty hides rather than saying it has no sessions. */
-	const filtering = query.trim() !== "";
-	/** A past session's row; `isPinned` lists it under Pinned, where an interrupted one says so, as its own group does not. */
-	const pastRow = (session: PastSession, isPinned: boolean) => {
-		const pastView: View = { kind: "past", sessionId: session.sessionId };
-		return (
-			<RowMenu
-				key={session.sessionId}
-				view={pastView}
-				label={pastLabel(session)}
-				isOpen={isOpen(pastView)}
-				onOpen={onOpen}
-				items={
-					<>
-						{/* One resume runs at a time, as the pane's Resume button allows. */}
-						<MenuItem disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
-							<Play />
-							{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
-						</MenuItem>
-						{session.interrupted && (
-							<MenuItem onClick={() => send({ t: "dismiss-interrupted", sessionId: session.sessionId })}>
-								<Archive />
-								Move to past
-							</MenuItem>
-						)}
-						<SessionItems row={session} pinned={isPinned} onTogglePin={onTogglePin} />
-					</>
-				}
-			>
-				<SessionRow
-					view={pastView}
-					label={pastLabel(session)}
-					title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-					badge={project === null && session.title !== null ? <ProjectBadge cwdDisplay={session.cwdDisplay} /> : null}
-					ship={session.ship}
-					facts={sessionFacts([isPinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)], session.pullRequests)}
-					when={session.modifiedAt}
-					open={isOpen(pastView)}
-					onOpen={onOpen}
-				/>
-			</RowMenu>
-		);
-	};
-	const hostRow = (host: RosterHost, isPinned: boolean) => {
-		const hostView: View = { kind: "live", instanceId: host.instanceId, agentId: null };
-		return (
-			<RowMenu
-				key={host.instanceId}
-				view={hostView}
-				label={hostLabel(host)}
-				isOpen={isOpen(hostView)}
-				onOpen={onOpen}
-				items={
-					<>
-						<SessionItems row={host} pinned={isPinned} onTogglePin={onTogglePin} />
-						{/* The server ends only what it controls: a dashboard session, or a terminal room shared writable. */}
-						{host.control.phase === "live" && !host.control.readOnly && (
-							<>
-								<MenuSeparator />
-								<MenuItem variant="destructive" onClick={() => onEnd(host.instanceId)}>
-									<CircleStop />
-									End session
-								</MenuItem>
-							</>
-						)}
-					</>
-				}
-			>
-				<SessionRow
-					view={hostView}
-					label={hostLabel(host)}
-					title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-					badge={project === null && host.sessionName !== null ? <ProjectBadge cwdDisplay={host.cwdDisplay} /> : null}
-					ship={host.ship}
-					facts={sessionFacts(
-						[host.source === "terminal" && !host.relayConnected && "relay offline", host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests)],
-						host.pullRequests,
-					)}
-					when={host.startedAt}
-					dot={<StatusDot status={host.status} />}
-					open={isOpen(hostView)}
-					onOpen={onOpen}
-				/>
-			</RowMenu>
-		);
-	};
 	const fit = ticketsShown ? SIDEBAR_TAB_FIT.five : SIDEBAR_TAB_FIT.four;
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
@@ -593,105 +314,16 @@ export function Roster({
 				</p>
 			)}
 			<TabPanel value="sessions" forceMount className={tab === "sessions" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
-				<SidebarGroup className="gap-1 pb-0">
-					<SidebarMenu aria-label="Start a session">
-						<SidebarMenuItem>
-							<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
-								<SidebarMenuButton icon={Plus} isActive={newSessionOpen} aria-current={newSessionOpen ? "page" : undefined} onClick={onNewSession}>
-									<span className="truncate">{newSessionLabel}</span>
-								</SidebarMenuButton>
-							</Tooltip>
-						</SidebarMenuItem>
-					</SidebarMenu>
-					<label className="relative block">
-						<Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-						<SidebarInput
-							type="search"
-							aria-label="Filter the sidebar's sessions"
-							placeholder="Search sessions"
-							value={query}
-							onChange={event => onQuery(event.target.value)}
-							onKeyDown={event => {
-								if (event.key !== "Escape") return;
-								onQuery("");
-								event.currentTarget.blur();
-							}}
-							className="pl-8"
-						/>
-					</label>
-				</SidebarGroup>
-				<SidebarContent>
-					{filtering && pinned.hosts.length + pinned.past.length + idle.length + running.length + interrupted.length + ended.length === 0 && (
-						<p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>
-					)}
-					{pinned.hosts.length + pinned.past.length > 0 && (
-						<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
-							<SidebarGroupLabel>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
-							<SidebarMenu aria-label="Pinned omp sessions">
-								{pinned.hosts.map(host => hostRow(host, true))}
-								{pinned.past.map(session => pastRow(session, true))}
-							</SidebarMenu>
-						</SidebarGroup>
-					)}
-					{idle.length > 0 && (
-						<SidebarGroup collapsible open={!collapsed.has("idle")} onOpenChange={() => toggleGroup("idle")}>
-							<SidebarGroupLabel>{`${idle.length} idle`}</SidebarGroupLabel>
-							<SidebarMenu aria-label="Idle omp sessions">{idle.map(host => hostRow(host, false))}</SidebarMenu>
-						</SidebarGroup>
-					)}
-					{(!filtering || running.length > 0) && (
-						<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
-							<SidebarGroupLabel>
-								{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length > 0 ? "No other sessions running" : "No sessions"}
-							</SidebarGroupLabel>
-							<SidebarMenu aria-label="Running omp sessions">
-								{running.map(host => hostRow(host, false))}
-							</SidebarMenu>
-						</SidebarGroup>
-					)}
-					{interrupted.length > 0 && (
-						<SidebarGroup
-							collapsible
-							open={!collapsed.has("interrupted")}
-							onOpenChange={() => toggleGroup("interrupted")}
-							headerActions={
-								<SidebarGroupActions>
-									<Tooltip content={resumingAll ? "Resuming…" : "Resume all"} disabled={resumingAll || !connected}>
-										<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
-											<button
-												type="button"
-												aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
-												disabled={resumingAll || !connected}
-												onClick={() => start({ kind: "resume-all", sessionIds: interrupted.map(session => session.sessionId) })}
-											>
-												{resumingAll ? <Loader className="animate-spin" /> : <ListRestart />}
-											</button>
-										</SidebarGroupAction>
-									</Tooltip>
-								</SidebarGroupActions>
-							}
-						>
-							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
-							{resumeAll?.phase === "failed" && (
-								<p role="alert" className="mx-2 mb-1 flex items-start gap-2 rounded-md bg-red-500/10 px-2 py-1.5 text-xs text-red-600 dark:text-red-400">
-									<span className="min-w-0 flex-1">{resumeAll.error}</span>
-									<button type="button" className="shrink-0 underline-offset-2 hover:underline" onClick={() => dismissStart("resume-all")}>
-										Dismiss
-									</button>
-								</p>
-							)}
-							<SidebarMenu aria-label="Interrupted omp sessions">
-								{interrupted.map(session => pastRow(session, false))}
-							</SidebarMenu>
-						</SidebarGroup>
-					)}
-					{(!filtering || ended.length > 0) && (
-						<SidebarGroup collapsible open={!collapsed.has("past")} onOpenChange={() => toggleGroup("past")}>
-							<SidebarGroupLabel>{ended.length === 0 ? "No past sessions" : `${ended.length} past`}</SidebarGroupLabel>
-							<SidebarMenu aria-label="Past omp sessions">{ended.map(session => pastRow(session, false))}</SidebarMenu>
-						</SidebarGroup>
-					)}
-				</SidebarContent>
+				<SessionList
+					lists={lists}
+					query={query}
+					onQuery={onQuery}
+					onTogglePin={onTogglePin}
+					open={open}
+					showProject={project === null}
+					newSessionOpen={newSessionOpen}
+					newSessionLabel={newSessionLabel}
+				/>
 			</TabPanel>
 			<TabPanel value="inbox" asChild>
 				<SidebarContent>

@@ -1,5 +1,5 @@
 /** Pure transforms from the server's `items` messages to the blocks a transcript renders. */
-import type { Item } from "../src/shared";
+import type { Item } from "../src/shared/transcript";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
 

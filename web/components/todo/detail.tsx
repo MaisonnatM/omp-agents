@@ -1,7 +1,8 @@
 import { Play, Ticket, X } from "lucide-react";
 import { useState } from "react";
 import { errorText } from "../../../src/json";
-import { hashForSession, type TicketChoice, type TicketDraft } from "../../../src/shared";
+import { hashForSession } from "../../../src/shared/sessions";
+import type { TicketChoice, TicketDraft } from "../../../src/shared/tickets";
 import type { UserTodo, UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";

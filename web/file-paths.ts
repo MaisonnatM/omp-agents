@@ -2,7 +2,7 @@
  * The paths of text files in agent text, which open in the page's file dialog: `GET /api/file` reads the files whose
  * extension `TEXT_FILE_EXTENSIONS` lists.
  */
-import { TEXT_FILE_EXTENSIONS } from "../src/shared";
+import { TEXT_FILE_EXTENSIONS } from "../src/shared/transcript";
 
 const EXTENSIONS = TEXT_FILE_EXTENSIONS.join("|");
 const SEGMENTS = String.raw`[\w.@+~-]+(?:\/[\w.@+~-]+)*\.(?:${EXTENSIONS})`;

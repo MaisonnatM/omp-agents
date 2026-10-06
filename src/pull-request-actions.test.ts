@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { pullRequestActions } from "./pull-request-actions";
-import type { InboxPullRequest } from "./shared";
+import type { InboxPullRequest } from "./shared/github";
 
 describe("pullRequestActions", () => {
 	const pr = (fields: Partial<InboxPullRequest>): InboxPullRequest => ({

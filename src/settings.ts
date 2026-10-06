@@ -7,7 +7,7 @@ import { agentDir, assertRetryValue, expandDefaultRetryFallbackChains, loadOmpCo
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
 import { listModels } from "./omp/models";
 import { displayPath, HOME } from "./paths";
-import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared";
+import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared/models";
 
 /**
  * An edit the settings refuse, with the HTTP status the API answers it with: 400 for an edit omp could not use, 404 for

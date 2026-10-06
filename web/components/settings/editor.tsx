@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, Pencil, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { CatalogModel, OmpSettings } from "../../../src/shared";
+import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ApiError, errorText } from "../../api";

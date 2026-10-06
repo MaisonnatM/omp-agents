@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo } from "react";
-import type { Item, PastSession } from "../../src/shared";
+import type { PastSession } from "../../src/shared/sessions";
+import type { Item } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { MessageScrollerProvider } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";

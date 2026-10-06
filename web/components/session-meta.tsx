@@ -1,6 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import { Fragment } from "react";
-import { type LinkedPullRequest, pullRequestUrl } from "../../src/shared";
+import { type LinkedPullRequest, pullRequestUrl } from "../../src/shared/github";
 import { Tooltip } from "@/components/ui/tooltip";
 import { graphiteUrl } from "../inbox-model";
 import { projectName } from "../labels";

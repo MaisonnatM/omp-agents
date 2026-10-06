@@ -5,7 +5,7 @@
  */
 import { errorText } from "../json";
 import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, type RoutineRun, type RoutineTask } from "../routines";
-import type { HostStatus, StartRequest, StartResult } from "../shared";
+import type { HostStatus, StartRequest, StartResult } from "../shared/sessions";
 import type { RoutinesFile } from "./routines-file";
 
 /** Routine sessions that may run at once; a session waiting on a question holds its slot. */

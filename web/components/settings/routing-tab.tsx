@@ -1,6 +1,6 @@
 import { Plus, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { type CatalogModel, type ModelChain, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit, splitSelector } from "../../../src/shared";
+import { type CatalogModel, type ModelChain, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit, splitSelector } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";

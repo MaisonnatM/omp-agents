@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Item } from "../src/shared";
+import type { Item } from "../src/shared/transcript";
 import { editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnReplies } from "./transcript-view";
 
 describe("transcript rendering", () => {

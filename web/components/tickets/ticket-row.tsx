@@ -15,7 +15,8 @@ import {
 	SignalLow,
 	SignalMedium,
 } from "lucide-react";
-import type { RosterHost, Ticket, TicketPriority, TicketStatus, View } from "../../../src/shared";
+import type { RosterHost, View } from "../../../src/shared/sessions";
+import type { Ticket, TicketPriority, TicketStatus } from "../../../src/shared/tickets";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { age } from "../../labels";

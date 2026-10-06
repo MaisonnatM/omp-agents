@@ -1,6 +1,6 @@
 /** The files omp reads for a workspace, found through omp's own discovery. */
 import { dirname, join } from "node:path";
-import type { OmpFileKind } from "../shared";
+import type { OmpFileKind } from "../shared/models";
 import { agentDir } from "./config";
 import { agentDiscovery, configFiles, discovery } from "./modules";
 

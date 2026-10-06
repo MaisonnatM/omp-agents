@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
-import type { MessageQueue } from "../../src/shared";
+import type { MessageQueue } from "../../src/shared/sessions";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIsTouch, useRegionHeight } from "@/components/ui/input-message";
 import { fontWeights } from "@/lib/font-weight";

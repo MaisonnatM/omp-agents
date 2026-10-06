@@ -2,7 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Item, LiveView, ServerMsg } from "../shared";
+import type { ServerMsg } from "../shared/protocol";
+import type { LiveView } from "../shared/sessions";
+import type { Item } from "../shared/transcript";
 import { type Socket, type SocketData, Views } from "./views";
 
 const roots: string[] = [];

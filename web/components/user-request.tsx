@@ -2,7 +2,7 @@ import { useState } from "react";
 import { type AskUserAnswer, type AskUserQuestion, AskUserQuestions } from "@/components/ui/ask-user-questions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { UserAnswer, UserRequest } from "../../src/shared";
+import type { UserAnswer, UserRequest } from "../../src/shared/sessions";
 
 const CONFIRM_ROWS = [
 	{ id: "yes", title: "Yes" },

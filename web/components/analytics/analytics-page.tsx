@@ -1,6 +1,7 @@
 /** The Analytics page: omp's request usage by time, model, project, agent, tool, and session. */
 import { type ReactNode, useEffect, useState } from "react";
-import { ANALYTICS_RANGES, hashForSession, type Analytics, type AnalyticsRange, type AnalyticsSession } from "../../../src/shared";
+import { ANALYTICS_RANGES, type Analytics, type AnalyticsRange, type AnalyticsSession } from "../../../src/shared/analytics";
+import { hashForSession } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { modelLabel, modelOrg, projectName, providerLabel, readTime } from "../../labels";
 import { useRead } from "../../reads";

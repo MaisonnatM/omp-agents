@@ -41,7 +41,8 @@ import {
 	Wrench,
 } from "lucide-react";
 import { createContext, type KeyboardEvent, memo, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentRow, Item, LiveView, View } from "../../src/shared";
+import type { AgentRow, LiveView, View } from "../../src/shared/sessions";
+import type { Item } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
 import {

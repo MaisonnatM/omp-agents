@@ -1,19 +1,7 @@
 import { Check, Layers, Link2 } from "lucide-react";
 import { useState } from "react";
-import {
-	type HostStatus,
-	type InboxPullRequest,
-	type PastSession,
-	type PullRequest,
-	pullRequestUrl,
-	type PullRequestLink,
-	type RosterHost,
-	type SessionLinksEdit,
-	type SessionLinksResult,
-	repoKey,
-	samePullRequest,
-	type View,
-} from "../../../src/shared";
+import { type InboxPullRequest, type PullRequest, pullRequestUrl, type PullRequestLink, type SessionLinksEdit, type SessionLinksResult, repoKey, samePullRequest } from "../../../src/shared/github";
+import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";

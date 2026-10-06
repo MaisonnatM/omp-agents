@@ -1,5 +1,6 @@
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
-import { type Inbox, type InboxPullRequest, type PullRequest, type RosterHost, repoKey, type WorkItem } from "../../../src/shared";
+import { type Inbox, type InboxPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
+import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
 import { agentOn, listedPullRequest, moveAction, moveOf, reason } from "../../inbox-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { actionOn, pendingOf, pullRequestStart } from "../../quick-actions";

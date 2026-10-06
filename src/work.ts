@@ -5,7 +5,7 @@
 import { isObject, str } from "./json";
 import { displayPath } from "./paths";
 import { entryTime, toolCallsOf, toolResultOf } from "./session-entries";
-import { type ChangedFile, type FileChange, parseDiffLine } from "./shared";
+import { type ChangedFile, type FileChange, parseDiffLine } from "./shared/transcript";
 
 /** omp's edit operations (`pi-tui/src/tools/edit.ts`); an edit without one updates the file. */
 const EDIT_KINDS: Record<string, "created" | "edited" | "deleted"> = { create: "created", update: "edited", delete: "deleted" };

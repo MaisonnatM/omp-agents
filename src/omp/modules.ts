@@ -7,7 +7,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import type { Database } from "bun:sqlite";
-import type { RetrySettings } from "../shared";
+import type { RetrySettings } from "../shared/models";
 import type { Access, CollabSocket, HostSnapshot, LinkErrorCode } from "./collab";
 import { ompVersion, packageDir } from "./install";
 import type { AutocompleteProvider, FileSlashCommand, Skill } from "./prompts";

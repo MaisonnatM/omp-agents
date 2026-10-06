@@ -1,6 +1,7 @@
 /** Pull request links, what each pull request waits on next, the inbox's sections and stacks, and what stands between a pull request and its merge. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type HostStatus, type Inbox, type InboxPullRequest, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, type RosterHost, prKey, repoKey, samePullRequest } from "../src/shared";
+import { type Inbox, type InboxPullRequest, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, prKey, repoKey, samePullRequest } from "../src/shared/github";
+import type { HostStatus, RosterHost } from "../src/shared/sessions";
 import { sessionsOn } from "./sessions";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;

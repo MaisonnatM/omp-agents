@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MAX_TEXT_FILE_BYTES } from "./shared";
+import { MAX_TEXT_FILE_BYTES } from "./shared/transcript";
 import { readTextFile } from "./text-file";
 
 const dir = await mkdtemp(join(tmpdir(), "omp-agents-text-file-"));

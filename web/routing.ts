@@ -1,5 +1,8 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { type AnalyticsRange, isAnalyticsRange, type LiveView, type PullRequest, type RosterHost, SESSION_HASH_PREFIX, TICKET_ID, type View } from "../src/shared";
+import { type AnalyticsRange, isAnalyticsRange } from "../src/shared/analytics";
+import type { PullRequest } from "../src/shared/github";
+import { type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
+import { TICKET_ID } from "../src/shared/tickets";
 import type { StartOp } from "./starts";
 import { PAGE_ICON } from "./page-icons";
 

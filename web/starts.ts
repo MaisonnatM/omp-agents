@@ -1,4 +1,7 @@
-import type { BranchChoice, ClientMsg, ModelOption, PromptImage, StartResult, View } from "../src/shared";
+import type { BranchChoice } from "../src/shared/git";
+import type { ModelOption } from "../src/shared/models";
+import type { ClientMsg } from "../src/shared/protocol";
+import type { PromptImage, StartResult, View } from "../src/shared/sessions";
 import { type QuickSubject, workItemOf } from "./quick-actions";
 import type { ForkPoint } from "./transcript-view";
 

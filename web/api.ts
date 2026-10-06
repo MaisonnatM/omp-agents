@@ -1,5 +1,5 @@
 /** The page's HTTP client. Whatever the server answers, a failure is an `ApiError` with a readable message. */
-import type { SettingsError } from "../src/shared";
+import type { SettingsError } from "../src/shared/models";
 import type { WorktreeConfirmation, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalRequest, WorktreeRemovalResult, WorktreeTarget } from "../src/worktrees-shared";
 
 export class ApiError extends Error {

@@ -1,6 +1,6 @@
 /** What every HTTP route shares: refusals, answers, and the checks that keep other sites and programs' pages out. */
 import { errorText } from "../json";
-import type { SettingsError } from "../shared";
+import type { SettingsError } from "../shared/models";
 import { dashboardHosts } from "./address";
 import { COOKIE, cookieValue, fetchSiteAllowed, tokenMatches } from "./auth";
 

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { type ClientMsg, MAX_PROMPT_IMAGE_BYTES } from "../shared";
+import type { ClientMsg } from "../shared/protocol";
+import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { parseClientMsg, parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
 

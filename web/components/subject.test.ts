@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentRow, ControlPhase, LiveView, RosterHost } from "../../src/shared";
+import type { AgentRow, ControlPhase, LiveView, RosterHost } from "../../src/shared/sessions";
 import { subjectOf } from "./subject";
 
 const LIVE: ControlPhase = { phase: "live", readOnly: false };

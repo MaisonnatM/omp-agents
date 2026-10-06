@@ -4,7 +4,8 @@
  * changed, the rest whole. Roster and past pushes wait for a listener; a socket that subscribes gets all five at once.
  */
 import { errorText } from "../json";
-import type { PastSession, ServerMsg } from "../shared";
+import type { ServerMsg } from "../shared/protocol";
+import type { PastSession } from "../shared/sessions";
 import { fetchPlanUsage } from "../usage";
 import { type Socket, send } from "./views";
 

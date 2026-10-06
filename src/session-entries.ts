@@ -1,6 +1,6 @@
 /** The vocabulary of omp's session-file entries: what the folds over a transcript read out of an entry, each in one place. */
 import { isObject, str } from "./json";
-import { PROMPT_IMAGE_TYPES } from "./shared";
+import { PROMPT_IMAGE_TYPES } from "./shared/sessions";
 
 const SUMMARY_MAX = 160;
 

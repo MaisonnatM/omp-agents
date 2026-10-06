@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from "react";
-import type { ClientMsg, ServerMsg, View } from "../src/shared";
+import type { ClientMsg, ServerMsg } from "../src/shared/protocol";
+import type { View } from "../src/shared/sessions";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyPaneMessage, retainPanes } from "./pane-store";

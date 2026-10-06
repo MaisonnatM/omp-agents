@@ -7,7 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createCache } from "./cache";
 import { JsonFile } from "./fs";
 import { isObject, nonEmptyStr, str } from "./json";
-import type { CalendarEvent, CalendarEventsAnswer, GoogleClient, GoogleStatus } from "./shared";
+import type { CalendarEvent, CalendarEventsAnswer, GoogleClient, GoogleStatus } from "./shared/accounts";
 import { createSignIn } from "./sign-in";
 import { isDay } from "./user-todos-parse";
 

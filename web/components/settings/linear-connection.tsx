@@ -1,5 +1,5 @@
 import { Plug } from "lucide-react";
-import type { LinearStatus } from "../../../src/shared";
+import type { LinearStatus } from "../../../src/shared/accounts";
 import { Button } from "@/components/ui/button";
 import { linearStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";

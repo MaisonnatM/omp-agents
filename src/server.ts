@@ -28,7 +28,7 @@ import { TodoInbox } from "./server/todo-inbox";
 import { UserTodosFile } from "./server/user-todos-file";
 import { type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
-import type { StartRequest, StartResult, View } from "./shared";
+import type { StartRequest, StartResult, View } from "./shared/sessions";
 import { addTodo, DONE_KEPT_HOURS } from "./user-todos";
 import type { UserTodoChange } from "./user-todos-shared";
 import { Worktrees } from "./worktrees";

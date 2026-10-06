@@ -4,7 +4,7 @@ import { realpath } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { repoOf } from "./github";
 import { run, runChecked } from "./proc";
-import { type BranchChoice, type GitCheckout, worktreeDir } from "./shared";
+import { type BranchChoice, type GitCheckout, worktreeDir } from "./shared/git";
 
 const HEADS = "refs/heads/";
 

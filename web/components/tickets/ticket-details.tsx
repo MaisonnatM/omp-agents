@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useRef } from "react";
-import type { Ticket, TicketDetail } from "../../../src/shared";
+import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { age } from "../../labels";
 import type { ReadState } from "../../reads";
 import { BranchName } from "../git";

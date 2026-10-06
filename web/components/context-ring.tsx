@@ -1,4 +1,4 @@
-import type { ContextUsage } from "../../src/shared";
+import type { ContextUsage } from "../../src/shared/sessions";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 

@@ -1,4 +1,4 @@
-import { SHIP_STAGES, type ShipProgress } from "../../src/shared";
+import { SHIP_STAGES, type ShipProgress } from "../../src/shared/sessions";
 import { Tooltip } from "@/components/ui/tooltip";
 
 const SHIP_NAMES: Record<ShipProgress["stage"] | NonNullable<ShipProgress["work"]>, string> = {

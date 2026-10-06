@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { hashForSession, type RosterHost, type View } from "../src/shared";
+import { hashForSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { StartOp } from "./starts";
 import {
 	adjacentSession,

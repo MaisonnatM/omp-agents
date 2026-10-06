@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { CatalogModel } from "../shared";
+import type { CatalogModel } from "../shared/models";
 import { modelEntries, resolveRoles } from "./models";
 
 const listed = (selector: string): CatalogModel => ({ selector, provider: selector.slice(0, selector.indexOf("/")), name: selector, contextWindow: null, thinking: ["low", "high"] });

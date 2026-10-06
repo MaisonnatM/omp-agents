@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Brain } from "lucide-react";
-import type { ModelOption } from "../../src/shared";
+import type { ModelOption } from "../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { ModelList } from "../reads";
 import { Model, type ModelMenuOpen, ModelPicker } from "./model-picker";

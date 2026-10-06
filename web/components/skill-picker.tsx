@@ -1,5 +1,5 @@
 import { Sparkles } from "lucide-react";
-import type { SkillOption } from "../../src/shared";
+import type { SkillOption } from "../../src/shared/sessions";
 import type { ReadState } from "../reads";
 import { CommandPicker, fromList } from "./command-picker";
 

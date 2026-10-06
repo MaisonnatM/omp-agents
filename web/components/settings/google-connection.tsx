@@ -1,6 +1,6 @@
 import { CalendarDays, Plug } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import type { GoogleStatus } from "../../../src/shared";
+import type { GoogleStatus } from "../../../src/shared/accounts";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";

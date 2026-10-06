@@ -5,23 +5,15 @@
  */
 import { isObject, nonEmpty, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
-import { GOOGLE_CLIENT_ID, type GoogleClient, MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, TICKET_ID, TICKET_PRIORITIES } from "../shared";
-import type {
-	BranchChoice,
-	ClientMsg,
-	CompletionScope,
-	LiveView,
-	ModelOption,
-	PromptImage,
-	PullRequest,
-	SessionLinksEdit,
-	StartRequest,
-	TicketDraft,
-	TicketEdit,
-	UserAnswer,
-	View,
-	WorkItem,
-} from "../shared";
+import { GOOGLE_CLIENT_ID, type GoogleClient } from "../shared/accounts";
+import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
+import { TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
+import type { BranchChoice } from "../shared/git";
+import type { PullRequest, SessionLinksEdit } from "../shared/github";
+import type { ModelOption } from "../shared/models";
+import type { ClientMsg } from "../shared/protocol";
+import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
+import type { TicketDraft, TicketEdit } from "../shared/tickets";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
 import { isDay, isTodoId, parseTodoChange } from "../user-todos-parse";
 import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } from "../worktrees-shared";

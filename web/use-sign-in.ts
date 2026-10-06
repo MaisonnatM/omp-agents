@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { SignInState } from "../src/shared";
+import type { SignInState } from "../src/shared/accounts";
 import { errorText, putJson } from "./api";
 import type { PolledEntry } from "./polled-store";
 

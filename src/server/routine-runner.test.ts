@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { HostStatus, StartRequest, StartResult } from "../shared";
+import type { HostStatus, StartRequest, StartResult } from "../shared/sessions";
 import type { RoutineTask } from "../routines";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";

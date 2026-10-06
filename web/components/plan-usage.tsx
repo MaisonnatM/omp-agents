@@ -1,5 +1,5 @@
 import { createContext, type ReactNode } from "react";
-import type { PlanUsage, PlanWindow } from "../../src/shared";
+import type { PlanUsage, PlanWindow } from "../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { SidebarFooter } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";

@@ -4,7 +4,7 @@ import { readdir, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { isObject, nonEmptyStr, oneOf, str } from "./json";
 import { oneLine } from "./session-entries";
-import { AGENT_STATUSES, type AgentStatus, type ContextUsage } from "./shared";
+import { AGENT_STATUSES, type AgentStatus, type ContextUsage } from "./shared/sessions";
 
 const isAgentStatus = oneOf(AGENT_STATUSES);
 

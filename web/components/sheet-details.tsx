@@ -1,7 +1,7 @@
 /** The parts shared by the inbox's pull request details and the tickets page's issue details. */
 import { ExternalLink } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
-import type { PullRequestComment } from "../../src/shared";
+import type { PullRequestComment } from "../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";

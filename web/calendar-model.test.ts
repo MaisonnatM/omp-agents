@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import type { Routine, RoutineRun, Schedule } from "../src/routines";
-import type { CalendarEvent, Ticket } from "../src/shared";
+import type { CalendarEvent } from "../src/shared/accounts";
+import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import { type CalendarEntry, calendarEntries } from "./calendar-model";
 

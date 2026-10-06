@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import type { AgentStatus } from "./shared";
+import type { AgentStatus } from "./shared/sessions";
 import { type HostAgent, parseAgents, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS, SubagentFiles } from "./subagents";
 
 /**

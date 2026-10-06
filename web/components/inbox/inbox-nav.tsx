@@ -1,7 +1,8 @@
 import { ArrowDownUp, RefreshCw } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { pullRequestActions } from "../../../src/pull-request-actions";
-import { type Inbox, type InboxPullRequest, type PastSession, type PullRequest, prKey, pullRequestUrl, type RepoInbox, type RosterHost, repoKey, samePullRequest } from "../../../src/shared";
+import { type Inbox, type InboxPullRequest, type PullRequest, prKey, pullRequestUrl, type RepoInbox, repoKey, samePullRequest } from "../../../src/shared/github";
+import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";

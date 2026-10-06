@@ -2,7 +2,7 @@
 import { realpath, stat } from "node:fs/promises";
 import { extname, isAbsolute, join, resolve } from "node:path";
 import { HOME } from "./paths";
-import { MAX_TEXT_FILE_BYTES, TEXT_FILE_EXTENSIONS, type TextFile } from "./shared";
+import { MAX_TEXT_FILE_BYTES, TEXT_FILE_EXTENSIONS, type TextFile } from "./shared/transcript";
 
 export type TextFileRead = { ok: true; file: TextFile } | { ok: false; status: 400 | 404 | 415; error: string };
 

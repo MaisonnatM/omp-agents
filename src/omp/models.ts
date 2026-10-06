@@ -1,6 +1,6 @@
 import { isObject } from "../json";
 import { runJson } from "../proc";
-import { type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared";
+import { type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared/models";
 import { loadOmpConfig, type OmpConfig } from "./config";
 import { ompCommand } from "./install";
 import { auth, oauth, type ServiceTierModel, serviceTiers } from "./modules";

@@ -55,25 +55,27 @@ Every transcript comes from the session files on this machine, not from a networ
 - A reply that streams and a tool call that runs change with every token.
   Each open transcript sends those changes to the page at most every 50 ms; a message that finishes, a tool call that ends, a prompt, or a notice goes out at once, together with what was held back.
 - The same read folds each line into the view's changed files as well, from each `edit` result's `details.path` and `diff` (one per entry of `perFileResults` for a multi-file edit) and each `write` result's `details.resolvedPath`, which omp sets only for a file.
-  The view's socket topic carries them as a `work` message, whole, once with the transcript and again after each read that changes them.
+  The view's socket topic carries them as `work` messages: the whole list with the transcript, then only the files each later read changed, which the page puts in place by path.
   A subagent's view folds its own file, so it shows its own changes.
 - A `task` result names the subagents it spawned in `details.progress` and `details.results`; the tool item lists their ids, which name each subagent's view.
   A running `task` reports them sooner through `tool_execution_update` events.
 - Each watched view also gets a media tree (`src/media.ts`), which collects the images that tool results returned, from the view's file and from every subagent transcript, at any depth, in the directory named after it.
   About half the screenshots in a session sit in its subagents' files, so a session's view collects them all; a subagent's view collects its own and its subagents'.
   An image is a `content` block of a tool result, which omp moves to its blob store, so it reaches the page through `/api/image`; the caption is the summary of the tool call with the same id, and a user prompt's images are left out.
-  It reads each file incrementally, parses only lines holding a tool call or an image block, and reads a tool result's call id without parsing the result, so a caption is dropped once its result arrives; it lists the directory again on each read, so a subagent that starts later is found.
+  It reads each file incrementally, parses only lines holding a tool call or an image block, and reads a tool result's call id without parsing the result, so a caption is dropped once its result arrives; it lists the directory again, reading the subagent files at once, after each change under it, so a subagent that starts later is found.
   The watcher's changes poke it only for its own file, that file's `.<file>.lock` sidecar, and anything under its artifacts directory, since a subagent's appends do not touch the session file, and a sibling session's writes leave it alone.
-  The view's socket topic carries the list, newest first, as a `media` message, whole, once the files are read and again after each read that adds an image.
+  The view's socket topic carries them as `media` messages: the whole list once the files are read, then only the images each later read added, which the page sorts in newest first.
+  A file rewritten shorter, or the first read, sends the whole list again.
 - The server lists the session files through omp's session listing, the code behind omp's session picker, at startup and then once a minute, in case the watcher missed a change.
   Between listings it reads again only the session files the watcher reported, at most twice a second, so a session that streams costs one file read, not a listing of every session.
   The past list skips the empty sessions that omp's picker hides.
   The server looks up files by session id in this listing, so the page never sends a path.
   While no page is connected, it skips building the roster and the past list.
+  The past list goes out whole when a page connects; after that the server compares each session with what it last sent and sends only the sessions that changed, joined, or left, so an untouched row keeps its object on the page and skips its render.
 - Whenever the list changes, the server also scans for pull requests in each session file whose modification time changed, plus the subagent files in its artifacts directory.
   Like an open transcript, each file reads only the bytes appended since its last scan.
-  The first scan reads every session file.
-  On 460 MB across 367 sessions it takes under a second, and the sidebar shows before it finishes.
+  The first scan reads every session file, 16 sessions at a time.
+  On 641 MB across 464 sessions it takes under a second, and the sidebar shows before it finishes.
   A session that names a PR by number alone costs one `git remote get-url origin` in its working directory.
   A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
 - The same scan collects the Linear issues each session worked on, by identifier, from the arguments of its Linear MCP calls: a direct `mcp__linear_<tool>` call or a `write` to `xd://mcp__linear_<tool>`, whose `content` holds the arguments as JSON.
@@ -88,7 +90,7 @@ Every transcript comes from the session files on this machine, not from a networ
 
 Sessions started in a terminal are reached through their Collab room:
 
-- Every 1.5 seconds the server lists the local hosts through the registry.
+- Every 1.5 seconds the server lists the local hosts through the registry, and pushes the roster when a row or the registry error changed; the past list goes out again only when a session joined or left.
   That is the same call that backs `omp collab list`.
 - The server joins every listed session's room as a guest named `omp-agents`, as `omp join` would.
   The guest is how the dashboard prompts a session (`prompt` frames), stops a turn (`abort`), messages a subagent (`agent-cmd` `chat`; the host steers, prompts, or revives it), and cancels a running subagent (`agent-cmd` `kill`).
@@ -96,7 +98,7 @@ Sessions started in a terminal are reached through their Collab room:
   The composer enables as soon as the host welcomes the guest.
   Nothing waits on the transcript snapshot that the host then sends.
 - The host steers every `prompt` and `chat` that arrives during a turn.
-  The guest therefore holds follow-ups and sends the next one when a `state` frame stops reporting `isStreaming`, or when an `agents` frame shows the subagent no longer running.
+  The guest therefore holds follow-ups and sends the next one when a `state` frame stops reporting `isStreaming`, or when an `agents` frame shows the subagent no longer running; it checks after every frame but the agent events, which cannot end a turn.
   It sends none after a turn that its own `abort` or a reply cut off mid-stream ended.
 - The dashboard uses omp's discovery and autocomplete modules for file commands, skills, and file mentions.
   It expands file commands and skills before guest prompt delivery because Collab prompts bypass the host's slash-command pipeline.
@@ -192,7 +194,7 @@ A user item's `images` holds a `data:` URL for an inline image and `/api/image?h
 
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
 Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process, `bun src/server.ts`, and never imports it.
-It imports only `src/paths.ts`, `src/json.ts`, `src/shared.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/user-todos-parse.ts`, `src/user-todos-shared.ts`, and `src/user-todos.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
+It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/user-todos-parse.ts`, `src/user-todos-shared.ts`, and `src/user-todos.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
 It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching the file's directory since the server replaces the file, and its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/server/address.ts`, in the page, which `web/app.tsx` answers by opening the session switcher, where **Create todo** is.
 `src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
 
@@ -363,7 +365,7 @@ The link goes when the session ends.
 A `start` of kind `new` carries a `branch`, `null` for the directory as it is.
 For an existing branch, the server runs omp in the worktree that has it checked out, or in the starting directory when that worktree is the directory's own (`git rev-parse --show-toplevel`); with no such worktree it runs `git worktree add <dir> <branch>`.
 For a new branch, it runs `git check-ref-format --branch` and then `git worktree add -b <branch> <dir> <base>`.
-`<dir>` is `worktreeDir` in `src/shared.ts`, beside the main worktree.
+`<dir>` is `worktreeDir` in `src/shared/git.ts`, beside the main worktree.
 The server refuses a `<dir>` that already exists, because `git worktree add -b` creates the branch before it checks the path.
 A branch that git refuses answers the `start` with git's reason, and no omp spawns.
 A failed start makes the draft read the checkout again, so a branch that the start created shows as an existing one.
@@ -462,7 +464,8 @@ The server lives in `src/`:
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle.
-- `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, `Analytics`, the inbox, pull request, and ticket shapes).
+- `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
+  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the Linear and Google sign-ins and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; and `analytics.ts` the Analytics page.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
@@ -538,6 +541,7 @@ The page lives in `web/`.
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which runs in the background.
 - `web/pane-store.ts`: each open view's transcript, changed files, images, and completions, outside the page state, so a token in one pane re-renders only that pane.
   It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
+  It and the page state apply the server's list updates through `applyDelta` in `web/keyed-list.ts`, which keeps every entry an update leaves alone as the same object.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, `web/calendar-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
 - `web/file-paths.ts`: which paths in agent text name a text file, and the absolute path each resolves to.
@@ -580,8 +584,9 @@ The page lives in `web/`.
 - `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the session details tab, the sidebar's project, the pinned skill, and the inbox's order; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
-- `web/components/roster.tsx`: the left sidebar's tabs, its session and tickets lists, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab.
-  `SessionRow` is the one row a past session and a live host both render.
+- `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab.
+  `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more.
+  `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed; their ages count up on the page's one minute timer.
   `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Done**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab, the calendar and then the routines by name.
 - `web/components/todo/`: the Todo page.
   `page.tsx` is the page and its lists, **Done** included, which `LIST_KINDS` marks read-only: its rows put a todo back or delete it for good, and its header offers **Empty** where the others offer **Clear done**.
@@ -593,7 +598,7 @@ The page lives in `web/`.
   `web/todo-work-state.ts` derives the pill and the **Needs you** filter from the latest linked session's live status, outstanding question, submitted pull request, or recorded `/ship` merge; it keeps unknown and ended sessions distinct from new ideas.
   `web/todo-quick-add.ts` reads a trailing due day and `#category` off a new todo's title, in the page's new todos and in the session switcher's **Create todo**.
 - `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
-  It and the Calendar page read the time through `web/use-minute.ts`, renewed each minute.
+  It, the Calendar page, and the session rows read the time through `web/use-minute.ts`, one timer renewed each minute for every component that reads it.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.
 - `web/components/calendar/calendar-page.tsx`: the Calendar page, a month of `web/calendar-model.ts` entries and the chosen day's list beside it, including Google events read with `web/reads.ts`.
   It renders the month with Kibo UI's calendar, `web/components/kibo-ui/calendar/index.tsx`, whose month and year live in jotai atoms, so the page keeps its month while you leave and come back.

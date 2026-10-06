@@ -2,7 +2,7 @@ import { afterEach, describe, expect, jest, test } from "bun:test";
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ChangedFile, FileChange, Item } from "./shared";
+import type { ChangedFile, FileChange, Item } from "./shared/transcript";
 import { FileTail } from "./tail";
 
 const dirs: string[] = [];

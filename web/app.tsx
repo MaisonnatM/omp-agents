@@ -98,8 +98,8 @@ export function App() {
 	const sidebars = useSidebarPanels();
 	// Temporary workspaces remain in raw sessions; only discoverable sessions enter the project/sidebar view.
 	const all = { hosts: state.hosts, past: state.past };
-	const visible = discoverableSessions(all.hosts, all.past);
-	const projects = workspaces(visible.hosts, visible.past);
+	const visible = useMemo(() => discoverableSessions(all.hosts, all.past), [all.hosts, all.past]);
+	const projects = useMemo(() => workspaces(visible.hosts, visible.past), [visible]);
 	const [project, pickProject] = useProject(projects);
 	// Keeps the Inbox tab's count current on every page. Until the sessions are listed, the saved project reads as all projects.
 	inboxStore.usePolling(project, state.listed);
@@ -128,10 +128,10 @@ export function App() {
 	const [rows, setRows] = useSplitRatio("rows");
 	const maximized = layout.maximized && !cover;
 	const [sessionQuery, setSessionQuery] = useState("");
-	const projectLists = sidebarSessions(visible.hosts, visible.past, project, pinned);
+	const projectLists = useMemo(() => sidebarSessions(visible.hosts, visible.past, project, pinned), [visible, project, pinned]);
 	const defaultWorkspace = defaultCwd(view, visible.hosts, visible.past, project);
-	const lists = searchSessions(projectLists, sessionQuery);
-	const listed = listedViews(lists);
+	const lists = useMemo(() => searchSessions(projectLists, sessionQuery), [projectLists, sessionQuery]);
+	const listed = useMemo(() => listedViews(lists), [lists]);
 	// The live rows of `listed`, whose order ending a session moves its panes along.
 	const listedHosts = listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
 	const latest = useRef({ layout, listedHosts, sidebars });

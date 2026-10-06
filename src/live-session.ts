@@ -1,6 +1,6 @@
 /** What the server asks of a running session, whether it is a terminal session it joined or one it started itself. */
 import type { HostSnapshot } from "./omp/collab";
-import type { Delivery, MessageQueue, PromptImage, RosterHost, SessionFacts, UserAnswer } from "./shared";
+import type { Delivery, MessageQueue, PromptImage, RosterHost, SessionFacts, UserAnswer } from "./shared/sessions";
 
 type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 

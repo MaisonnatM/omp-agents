@@ -3,7 +3,7 @@
  * so the page loads each through this server, which keeps the latest signed address and asks Linear for a new one once
  * it expires: a video still plays, and seeks, long after the sheet opened.
  */
-import { TICKET_MEDIA_PATH } from "./shared";
+import { TICKET_MEDIA_PATH } from "./shared/tickets";
 
 const HOST = "uploads.linear.app";
 /** A signed address this close to its expiry counts as expired, so a long read does not start on one about to lapse. */

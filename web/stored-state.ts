@@ -1,20 +1,30 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 export const PINNED_SESSIONS_KEY = "omp-agents.pinned-sessions";
 
 /**
- * A value that localStorage keeps under `key`, read once, and its setter, which stores it at once. `decode` turns what is
- * stored into a value; what it makes of `null`, when nothing is stored, is the default. The default is removed rather
- * than stored, so a value reset to it follows the default if it changes.
+ * A value that localStorage keeps under `key`, read once, and its setter, which stores it at once and stays the same
+ * function across renders. `decode` turns what is stored into a value; what it makes of `null`, when nothing is stored,
+ * is the default. The default is removed rather than stored, so a value reset to it follows the default if it changes.
+ * The setter also takes an update of the value it last set, so two in one event both apply.
  */
-export function useStoredState<T>(key: string, decode: (raw: string | null) => T, encode: (value: T) => string = String): [T, (value: T) => void] {
+export function useStoredState<T>(key: string, decode: (raw: string | null) => T, encode: (value: T) => string = String): [T, (next: T | ((prev: T) => T)) => void] {
 	const [value, setValue] = useState(() => decode(localStorage.getItem(key)));
-	const store = (next: T): void => {
-		setValue(next);
-		const raw = encode(next);
-		if (raw === encode(decode(null))) localStorage.removeItem(key);
-		else localStorage.setItem(key, raw);
-	};
+	const latest = useRef({ value, decode, encode });
+	latest.current.decode = decode;
+	latest.current.encode = encode;
+	const store = useCallback(
+		(next: T | ((prev: T) => T)): void => {
+			const codec = latest.current;
+			const resolved = typeof next === "function" ? (next as (prev: T) => T)(codec.value) : next;
+			codec.value = resolved;
+			setValue(resolved);
+			const raw = codec.encode(resolved);
+			if (raw === codec.encode(codec.decode(null))) localStorage.removeItem(key);
+			else localStorage.setItem(key, raw);
+		},
+		[key],
+	);
 	return [value, store];
 }
 
@@ -30,10 +40,14 @@ function decodeKeys(raw: string | null): ReadonlySet<string> {
 /** A set of keys that localStorage keeps under `storageKey`, such as folded sections or pinned sessions, with a toggle that flips each key it names. */
 export function useStoredKeys(storageKey: string): [ReadonlySet<string>, (...keys: string[]) => void] {
 	const [keys, store] = useStoredState(storageKey, decodeKeys, stored => JSON.stringify([...stored]));
-	const toggle = (...flipped: string[]): void => {
-		const next = new Set(keys);
-		for (const key of flipped) if (!next.delete(key)) next.add(key);
-		store(next);
-	};
+	const toggle = useCallback(
+		(...flipped: string[]): void =>
+			store(prev => {
+				const next = new Set(prev);
+				for (const key of flipped) if (!next.delete(key)) next.add(key);
+				return next;
+			}),
+		[store],
+	);
 	return [keys, toggle];
 }

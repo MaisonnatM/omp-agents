@@ -22,7 +22,7 @@ import {
 	parseSkillInvocation,
 	type Skill,
 } from "./omp/prompts";
-import type { CompletionItem, SkillOption } from "./shared";
+import type { CompletionItem, SkillOption } from "./shared/sessions";
 
 /** Discovery reads disk; reuse it briefly so typing does not rescan, but new skills still show up. */
 const CATALOG_TTL_MS = 30_000;

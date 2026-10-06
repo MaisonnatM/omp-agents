@@ -3,7 +3,7 @@
  * frames for dashboard sessions and Collab `ui-request` frames for terminal sessions.
  */
 import { isObject, str } from "./json";
-import type { RequestOption, UserAnswer, UserRequest } from "./shared";
+import type { RequestOption, UserAnswer, UserRequest } from "./shared/sessions";
 
 function parseOptions(options: unknown, details: unknown): RequestOption[] | null {
 	if (!Array.isArray(options)) return null;

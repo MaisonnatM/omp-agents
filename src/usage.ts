@@ -2,7 +2,7 @@
 import { isObject, num, str } from "./json";
 import { ompCommand } from "./omp/install";
 import { run } from "./proc";
-import type { PlanUsage, PlanWindow } from "./shared";
+import type { PlanUsage, PlanWindow } from "./shared/models";
 
 const TIMEOUT_MS = 30_000;
 

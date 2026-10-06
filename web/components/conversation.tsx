@@ -1,5 +1,6 @@
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import type { Delivery, Item, LiveView, PromptImage, RosterHost } from "../../src/shared";
+import type { Delivery, LiveView, PromptImage, RosterHost } from "../../src/shared/sessions";
+import type { Item } from "../../src/shared/transcript";
 import { InputMessage } from "@/components/ui/input-message";
 import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
 import { projectName } from "../labels";

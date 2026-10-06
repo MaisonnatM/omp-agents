@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { type CatalogModel, samePullRequest, splitSelector } from "./shared";
+import { samePullRequest } from "./shared/github";
+import { type CatalogModel, splitSelector } from "./shared/models";
 
 describe("splitSelector", () => {
 	const listed = (selector: string): [string, CatalogModel] => [selector, { selector, provider: "openrouter", name: selector, contextWindow: null, thinking: ["low"] }];

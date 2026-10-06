@@ -1,4 +1,6 @@
-import { type AgentMedia, type ChangedFile, type CompletionItem, type Item, newestMediaFirst, type ServerMsg, type View } from "../src/shared";
+import type { ServerMsg } from "../src/shared/protocol";
+import type { CompletionItem, View } from "../src/shared/sessions";
+import { type AgentMedia, type ChangedFile, type Item, newestMediaFirst } from "../src/shared/transcript";
 import { applyDelta } from "./keyed-list";
 import { keyedStore } from "./keyed-store";
 import { hashForView } from "./routing";

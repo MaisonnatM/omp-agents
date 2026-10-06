@@ -1,7 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { defaultFilter } from "cmdk";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useState } from "react";
-import type { PastSession, RosterHost, View } from "../../src/shared";
+import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { age, hostLabel, pastLabel } from "../labels";
 import { IS_MAC } from "../shortcuts";

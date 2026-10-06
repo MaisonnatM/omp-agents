@@ -6,7 +6,8 @@ import { dirname } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { MediaTree } from "../media";
 import { FileTail } from "../tail";
-import type { ServerMsg, View } from "../shared";
+import type { ServerMsg } from "../shared/protocol";
+import type { View } from "../shared/sessions";
 
 export interface SocketData {
 	/** The views this socket shows, by {@link viewKey}. */

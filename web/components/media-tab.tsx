@@ -1,7 +1,8 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronLeft, ChevronRight, ExternalLink, MessageSquare, X } from "lucide-react";
 import { useState } from "react";
-import type { AgentMedia, View } from "../../src/shared";
+import type { View } from "../../src/shared/sessions";
+import type { AgentMedia } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { SidebarGroup } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";

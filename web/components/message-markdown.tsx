@@ -4,7 +4,7 @@ import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import { TICKET_MEDIA_PATH } from "../../src/shared";
+import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
 import { remarkFilePaths, textFilePath } from "../file-paths";
 import { FileLink } from "./file-link";
 

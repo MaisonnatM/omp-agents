@@ -1,6 +1,6 @@
 import { Paperclip } from "lucide-react";
 import { useState } from "react";
-import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, type PromptImage } from "../../src/shared";
+import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, type PromptImage } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 

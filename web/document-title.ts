@@ -1,4 +1,4 @@
-import type { PastSession, RosterHost, View } from "../src/shared";
+import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import { hostLabel, pastLabel } from "./labels";
 import type { Page } from "./routing";
 

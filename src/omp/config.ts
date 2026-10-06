@@ -1,5 +1,5 @@
 /** omp's config: the settings a session loads, and writing the model routing back through omp's own path. */
-import type { RetrySettings, RoutingEdit } from "../shared";
+import type { RetrySettings, RoutingEdit } from "../shared/models";
 import { ompVersion } from "./install";
 import { config, dirs, extensionSettings, fallbackChains, modelSettings, type SettingHandle, sessionSettings, settingsRegistry } from "./modules";
 

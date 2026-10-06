@@ -1,6 +1,6 @@
 import { File, Folder, Slash, Sparkles } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type TextareaHTMLAttributes, useId, useRef, useState } from "react";
-import type { CompletionItem } from "../../src/shared";
+import type { CompletionItem } from "../../src/shared/sessions";
 import { completionTrigger } from "../completion-trigger";
 import type { Completions } from "../pane-store";
 

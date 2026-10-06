@@ -1,6 +1,6 @@
 import { Bot } from "lucide-react";
 import type { MouseEvent } from "react";
-import type { HostStatus, RosterHost, View } from "../../src/shared";
+import type { HostStatus, RosterHost, View } from "../../src/shared/sessions";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { hostLabel, modeOf, SPLIT_CLICK } from "../labels";

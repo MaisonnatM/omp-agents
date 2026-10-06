@@ -1,6 +1,7 @@
 import { Sparkles } from "lucide-react";
 import { useState } from "react";
-import { type BranchChoice, type ConnectedModels, type ModelOption, selectorOf } from "../../src/shared";
+import type { BranchChoice } from "../../src/shared/git";
+import { type ConnectedModels, type ModelOption, selectorOf } from "../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";

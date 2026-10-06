@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { InboxPullRequest, PullRequestCheck, PullRequestDetail, RepoInbox, RosterHost } from "../src/shared";
+import type { InboxPullRequest, PullRequestCheck, PullRequestDetail, RepoInbox } from "../src/shared/github";
+import type { RosterHost } from "../src/shared/sessions";
 import {
 	type AgentOn,
 	agentOn,

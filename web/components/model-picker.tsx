@@ -1,4 +1,5 @@
-import { type FastMode, type ModelEntry, type ModelOption, type PlanUsage, selectorOf } from "../../src/shared";
+import { type ModelEntry, type ModelOption, type PlanUsage, selectorOf } from "../../src/shared/models";
+import type { FastMode } from "../../src/shared/sessions";
 import { ChevronDown } from "lucide-react";
 import { useContext, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";

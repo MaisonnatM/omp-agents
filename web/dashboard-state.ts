@@ -1,5 +1,7 @@
 /** What the page holds of the dashboard, and how the server's messages and the page's own actions change it. */
-import { type LiveView, newestPastFirst, type PastSession, type PlanUsage, type RosterHost, type ServerMsg, type View } from "../src/shared";
+import type { PlanUsage } from "../src/shared/models";
+import type { ServerMsg } from "../src/shared/protocol";
+import { type LiveView, newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Routine } from "../src/routines";
 import { applyUserTodo } from "../src/user-todos";
 import type { UserTodoChange, UserTodoList } from "../src/user-todos-shared";

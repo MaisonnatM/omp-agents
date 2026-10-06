@@ -3,7 +3,9 @@
  * prompt that starts its session. The pull request actions live in `src/pull-request-actions.ts`, which routines share.
  */
 import { PULL_REQUEST_ACTIONS, type PullRequestActionId, type QuickAction } from "../src/pull-request-actions";
-import { type InboxPullRequest, type PullRequest, samePullRequest, type Ticket, type WorkItem } from "../src/shared";
+import { type InboxPullRequest, type PullRequest, samePullRequest } from "../src/shared/github";
+import type { WorkItem } from "../src/shared/sessions";
+import type { Ticket } from "../src/shared/tickets";
 import type { QuickOp, StartOf } from "./starts";
 
 export type TicketActionId = "work" | "plan";

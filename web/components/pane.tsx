@@ -1,6 +1,6 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
-import type { LiveView, PastSession, RosterHost, View } from "../../src/shared";
+import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";

@@ -1,7 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Check, Copy, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared";
+import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { parseDelimited } from "../delimited";

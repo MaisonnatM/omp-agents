@@ -1,6 +1,6 @@
 import { Check, GitBranch, GitBranchPlus } from "lucide-react";
 import { Fragment, useState } from "react";
-import { type BranchChoice, type GitCheckout, worktreeDir } from "../../src/shared";
+import { type BranchChoice, type GitCheckout, worktreeDir } from "../../src/shared/git";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { projectName } from "../labels";

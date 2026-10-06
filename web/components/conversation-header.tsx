@@ -1,6 +1,6 @@
 import { ArrowLeft, CircleStop } from "lucide-react";
 import type { ReactNode } from "react";
-import type { ControlPhase, LiveView } from "../../src/shared";
+import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";

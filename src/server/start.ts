@@ -4,7 +4,7 @@ import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
 import { directoryOf } from "../paths";
-import type { PromptImage, StartRequest, StartResult, View } from "../shared";
+import type { PromptImage, StartRequest, StartResult, View } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
 
 interface Started {

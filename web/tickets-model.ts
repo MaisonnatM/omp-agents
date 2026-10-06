@@ -1,5 +1,5 @@
 /** The tickets page's status groups and the status picker's order. In Review leads; the rest follow Linear's My issues order. */
-import { TICKET_STATUS_TYPES, type Ticket, type TicketPriority, type TicketStatus } from "../src/shared";
+import { TICKET_STATUS_TYPES, type Ticket, type TicketPriority, type TicketStatus } from "../src/shared/tickets";
 import { type SectionTarget, sectionId } from "./section";
 
 export const PRIORITY_LABEL: Record<TicketPriority, string> = {

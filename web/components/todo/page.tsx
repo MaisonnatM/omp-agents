@@ -1,6 +1,6 @@
 import { ListX, Plus, Trash2 } from "lucide-react";
 import { Fragment, type ReactNode, useRef, useState } from "react";
-import type { PastSession, RosterHost } from "../../../src/shared";
+import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";

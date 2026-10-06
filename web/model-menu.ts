@@ -1,5 +1,5 @@
 /** What the model menu derives from the model list and plan usage. */
-import type { ModelEntry, PlanUsage, PlanWindow } from "../src/shared";
+import type { ModelEntry, PlanUsage, PlanWindow } from "../src/shared/models";
 
 /** A trailing context size in a model id, as Cursor's `claude-opus-5-5-1m` names its 1M-token variant. */
 const CONTEXT_SUFFIX = /-\d+[km]$/i;

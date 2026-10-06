@@ -6,7 +6,7 @@ import { basename, dirname, join } from "node:path";
 import { isObject } from "./json";
 import { LineReader, ReadQueue } from "./line-reader";
 import { entryTime, imagesOf, toolCallsOf, toolResultOf, toolSummary } from "./session-entries";
-import { type AgentMedia, newestMediaFirst } from "./shared";
+import { type AgentMedia, newestMediaFirst } from "./shared/transcript";
 import { artifactsDir, subagentFiles } from "./subagents";
 
 /** Only a line holding a tool call or an image can add media; skipping the rest before `JSON.parse` keeps a session with many subagents cheap. */

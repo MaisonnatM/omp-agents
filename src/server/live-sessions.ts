@@ -5,7 +5,7 @@ import { SessionGuest } from "../guest";
 import type { LiveSession, LiveUpdate } from "../live-session";
 import type { HostSnapshot } from "../omp/collab";
 import { displayPath } from "../paths";
-import { type RosterHost, type SessionFacts, type WorkItem, worksOn } from "../shared";
+import { type RosterHost, type SessionFacts, type WorkItem, worksOn } from "../shared/sessions";
 
 export type SessionUpdate = LiveUpdate | DashboardUpdate;
 

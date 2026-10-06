@@ -4,7 +4,7 @@
  * server pokes it when its file changes.
  */
 import { LineReader, ReadQueue } from "./line-reader";
-import type { ChangedFile, Item } from "./shared";
+import type { ChangedFile, Item } from "./shared/transcript";
 import { Transcript } from "./transcript";
 import { Work } from "./work";
 

@@ -1,7 +1,7 @@
 import { ArrowLeft, Ellipsis, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Routine, RoutineChange, RoutineRun, RoutineTask } from "../../../src/routines";
-import type { RosterHost, View } from "../../../src/shared";
+import type { RosterHost, View } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";

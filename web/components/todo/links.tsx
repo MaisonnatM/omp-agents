@@ -1,5 +1,5 @@
 import { Bot, X } from "lucide-react";
-import { hashForSession, type PastSession, type RosterHost } from "../../../src/shared";
+import { hashForSession, type PastSession, type RosterHost } from "../../../src/shared/sessions";
 import type { UserTodoLink } from "../../../src/user-todos-shared";
 import { hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
