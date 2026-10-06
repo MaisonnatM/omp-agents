@@ -9,6 +9,7 @@ import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { age, readTime } from "../labels";
 import { usePane } from "../pane-store";
+import { hashForChanges } from "../routing";
 import { useStoredState } from "../stored-state";
 import { outline } from "../transcript-view";
 import { MediaTab } from "./media-tab";
@@ -142,9 +143,10 @@ const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
 
 /**
  * The right sidebar's content for the focused view: an outline of its conversation's turns, the files its agent changed,
- * and the images its agents' tools returned, each tab apart. `working` marks the last turn as still running.
+ * and the images its agents' tools returned, each tab apart. `working` marks the last turn as still running, and
+ * `sessionId` names the session whose changes page the Files tab links to, `null` for a subagent's view.
  */
-export function SessionDetails({ view, working }: { view: View; working: boolean }) {
+export function SessionDetails({ view, working, sessionId }: { view: View; working: boolean; sessionId: string | null }) {
 	const { items, loaded, files: changedFiles, media } = usePane(view);
 	const [tab, setTab] = useStoredState<DetailsTab>(TAB_KEY, raw => DETAILS_TABS.find(tab => tab === raw) ?? "outline");
 	const turns = useMemo(() => outline(items, working), [items, working]);
@@ -181,6 +183,20 @@ export function SessionDetails({ view, working }: { view: View; working: boolean
 								{files.map(file => (
 									<FileRow key={file.path} file={file} />
 								))}
+							</SidebarMenu>
+						</SidebarGroup>
+					)}
+					{sessionId !== null && (
+						<SidebarGroup>
+							<SidebarMenu>
+								<SidebarMenuItem>
+									<SidebarMenuButton asChild>
+										<a href={hashForChanges(sessionId)}>
+											<FileDiff />
+											<span>Open the session's changes</span>
+										</a>
+									</SidebarMenuButton>
+								</SidebarMenuItem>
 							</SidebarMenu>
 						</SidebarGroup>
 					)}

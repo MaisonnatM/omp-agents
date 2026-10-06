@@ -36,6 +36,8 @@ export type ShortcutId =
 	| "todoPrevious"
 	| "todoCheck"
 	| "todoClose"
+	| "nextChangedFile"
+	| "previousChangedFile"
 	| "moveUp"
 	| "moveDown";
 
@@ -128,6 +130,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoPrevious", label: "Focus the previous todo, or open it while a todo is open", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
 	{ id: "todoCheck", label: "Check or uncheck the focused todo", keys: [{ chord: { key: "x" }, scope: "outside-fields" }] },
 	{ id: "todoClose", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
+	{ id: "nextChangedFile", label: "Changes: open the next changed file", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
+	{ id: "previousChangedFile", label: "Changes: open the previous changed file", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
 	{ id: "moveUp", label: "Move the focused todo, or the inbox's focused repository, section, or pull request, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "moveDown", label: "Move the focused todo, or the inbox's focused repository, section, or pull request, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
 ];

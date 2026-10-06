@@ -5,6 +5,7 @@ import {
 	adjacentSession,
 	closePane,
 	endSession,
+	hashForChanges,
 	hashForInbox,
 	hashForLayout,
 	hashForIntegrations,
@@ -139,6 +140,15 @@ describe("layout hash", () => {
 		expect(routeFromHash(`#routines/${id}`)).toEqual({ kind: "page", page: { kind: "routines", target: id } });
 		expect(routeFromHash("#routines/")).toEqual({ kind: "page", page: { kind: "routines", target: null } });
 		expect(routeFromHash("#routinesx").kind).toBe("panes");
+	});
+
+	test("the changes hash opens a session's first file or one by path, slashes and absolute paths kept, and is not read as a layout", () => {
+		expect(hashForChanges("01a0f6a5-181e")).toBe("#changes/01a0f6a5-181e");
+		expect(routeFromHash("#changes/01a0f6a5-181e")).toEqual({ kind: "page", page: { kind: "changes", sessionId: "01a0f6a5-181e", path: null } });
+		for (const path of ["web/components/a b.tsx", "~/.omp/agent/AGENTS.md"]) {
+			expect(routeFromHash(hashForChanges("01a0f6a5-181e", path))).toEqual({ kind: "page", page: { kind: "changes", sessionId: "01a0f6a5-181e", path } });
+		}
+		expect(routeFromHash("#changesx").kind).toBe("panes");
 	});
 
 	test("every page hash names its page and route, and a session or layout hash names none", () => {

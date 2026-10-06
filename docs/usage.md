@@ -117,6 +117,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
+  **Open the session's changes**, under the list, opens the session's [changes page](#session-changes); a subagent's Files tab has no such link.
 - Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
 - **Media** shows the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
   On a session that is every image of the session; on a subagent it is that subagent's and its own subagents'.
@@ -126,6 +127,31 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in a new tab.
   New images show up while the agents run.
 - A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
+
+## Session changes
+
+- **Changes** in a session's header, or a `#changes/<session id>` address, shows the files the session changed as an editor does, in place of the panes; a past session's header has it too.
+  The sidebar stays on **Sessions**, and the arrow before the title goes back to the session.
+- The page lists two sets of files at once.
+  One is what the session's git checkout changed: its worktree, else its directory, against the commit its branch forked from the remote's default branch, else against `HEAD`, else against nothing before the first commit, with uncommitted and untracked files included.
+  The other is what the session's own `edit` and `write` calls changed, from its transcript, including files outside the checkout and files changed back to how they were.
+  The header names the branch and the base it compares against, and totals the files and the lines added and removed.
+- **All changes** shows both sets, and **This session** keeps only the files the session's own calls changed; edits that a subagent or a shell command made count only under **All changes**.
+- The explorer on the left shows the files as folders, a folder holding only one folder joined with it, such as `web/components/changes`.
+  Click a folder to close or open it.
+  Each file shows its lines added and removed, a blue dot when the session's own calls changed it, and a letter for what git says happened: **A** added, **U** untracked, **M** modified, **D** deleted, and **S** for a file only the session's calls name, outside the checkout or no different from the base.
+  A file outside the checkout shows under a `~` or `/` folder.
+  J and K open the next and previous file in the explorer's order, outside text fields, and open the folders above it.
+- The editor shows the open file, its path above it, with **Diff** and **File** to choose how; the choice is remembered.
+  **Diff**, the default, shows the changes with both line numbers, removed lines red and added lines green, and three unchanged lines around each change; click **Show N unchanged lines** to unfold a run.
+  **File** shows the whole file as it is now: a green bar beside added lines, a blue bar beside lines that replaced others, and a red notch where lines were removed.
+  Click anywhere on a bar, or on a notch, to show the removed lines above the change, struck through.
+  The strip on the right maps every change in the file, lines removed at its end at the bottom; click a mark to scroll to it.
+- Both views color the code by its language.
+  A binary file, a file over 1 MB, and a file git cannot compare show why instead.
+  A file only the session's calls name shows whole, with nothing marked, since there is no base to compare it with.
+- The page reads the changes again each time the session's own calls change a file, and when a turn starts or ends, since a shell command or a subagent changes files without telling the dashboard; the round arrow in the header reads them again now.
+  A link names the open file by its path, so a reload returns to it.
 
 ## Panes, splits, and links
 
@@ -795,6 +821,7 @@ Alt is Option on macOS.
 | X | Todo page, outside text fields | Check or uncheck the focused todo |
 | Esc | Todo page, outside text fields | Close the open todo |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or inbox | Move the focused todo, or the inbox's focused pull request, section, or repository, up or down |
+| J / K | Changes page, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, **End session**, the composer's Stop button, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.

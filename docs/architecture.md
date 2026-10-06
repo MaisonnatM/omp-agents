@@ -331,6 +331,12 @@ It reads the first `MAX_TEXT_FILE_BYTES` (1 MB) and answers 415 when those bytes
 It runs `git worktree list --porcelain -z`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the inbox's cached lookup.
 Like a new session's `start`, `cwd` may name any directory.
 The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
+`GET /api/changes?session=<session id>` answers a session's [changes page](usage.md#session-changes) list, `SessionChanges` in `src/shared/changes.ts`, or 404 for a session it does not know.
+It reads the session's checkout from its worktree, else its directory: `git diff --name-status` and `--numstat` against the merge base of `HEAD` with `origin/HEAD`, else against `HEAD`, else against the empty tree before the first commit, and `git ls-files --others --exclude-standard` for untracked files.
+It folds the session's transcript with `Work` for the files its own `edit` and `write` calls changed, keeping each transcript's fold while its size and modification time stay the same, and lists those git does not name after git's.
+`GET /api/changes/file?session=<session id>&path=<path>` answers one file of that list in full, `ChangedFileText`, with every line of `git diff --histogram` as numbered rows, or a note for a binary file or one over `MAX_CHANGED_FILE_BYTES` (1 MB).
+It computes the list again and answers 404 for a path the list does not hold, so it reads no file the session and its checkout did not change, and passes the path with `--literal-pathspecs`, so a name such as `app/[id]/page.tsx` is not a glob.
+While the changes page of a live session shows, the page watches that session's view, so its `work` messages reach the page, which reads both routes again whenever the session's changes grow.
 `GET /api/worktrees` lists the worktrees of every repository a session ran in, or of `?cwd=` when that directory is in a repository.
 Each row names the registered path, branch, lock, whether the directory is missing, the newest session file there, and why removal is refused.
 `GET /api/worktrees/metrics?repository=&path=` reads approximate allocated disk use, the last commit time, and the modified and untracked counts for one registered checkout.
@@ -515,6 +521,7 @@ The server lives in `src/`:
 - `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `Worktrees.start` and `Worktrees.remove` order starts against removals; `removeCheckout` removes the checkout a directory is in, waiting up to 15 seconds for a session that just ended to leave it.
 - `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows.
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
+- `src/changes.ts`: the changes page's reads for `GET /api/changes` and `GET /api/changes/file`, a session's checkout diff merged with its own changed files; `src/shared/changes.ts` holds the shapes the page shares and `parseFullDiff`, which numbers the rows of a whole-file diff.
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/integrations.ts` finds omp's server for each MCP integration, checks it, and runs the sign-ins and sign-outs that the Integrations page starts; see [Integrations](#integrations).
@@ -565,6 +572,7 @@ The page lives in `web/`.
   It and the page state apply the server's list updates through `applyDelta` in `web/keyed-list.ts`, which keeps every entry an update leaves alone as the same object.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, `web/calendar-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
+- `web/changes-model.ts`: the changes page's explorer tree, the diff's folded runs, and the file view's gutter marks; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines.
 - `web/file-paths.ts`: which paths in agent text name a text file, and the absolute path each resolves to.
   `web/delimited.ts` parses a TSV or CSV file into rows.
   `web/components/file-link.tsx` holds the link that opens such a path, and `web/components/file-dialog.tsx` the dialog that shows the file.
@@ -634,6 +642,7 @@ The page lives in `web/`.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
 - `web/components/dashboard-context.tsx`: the stable dashboard actions (`send`, `open`, `start`, `end`, …) and the last start of each kind, provided once by `App`, which the sidebar, the panes, and the pages read instead of taking them as props.
 - `web/components/session-details.tsx`: the right sidebar's tabs for the focused pane: `outline-tab.tsx`, its turns from `outline` in `web/transcript-view.ts`, which scroll the focused pane's transcript to their prompt or reply and mark the turn its scroll is on; its changed files; and `media-tab.tsx`, its images and their viewer.
+- `web/components/changes/`: the changes page, `changes-page.tsx`, with its explorer, `file-tree.tsx`, and its Diff and File views, `code-view.tsx`; `changes-link.tsx` is the **Changes** button the live and past session headers share.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.
   `web/components/integrations/` holds the Integrations page, which sorts its rows into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which the tickets page also shows while Linear is not connected, and `google-calendar.tsx` is Google Calendar's, with the form that saves its OAuth client.
   Both lay out through `integration-row.tsx`, draw their brand marks from `brand-logos.tsx`, and start their sign-ins with `web/use-sign-in.ts`; `mcp-integration.tsx`'s `SignOutConfirm` asks before a sign-out and shows its failure.

@@ -257,6 +257,12 @@ try {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},
 				google,
+				placeOf(sessionId) {
+					const file = files.pathOf(sessionId);
+					const saved = files.savedOf(sessionId);
+					if (!file || !saved) return null;
+					return { file, dir: files.factsOf(sessionId).worktree ?? sessions.bySessionId(sessionId)?.cwd ?? saved.cwd };
+				},
 			}),
 		},
 		fetch(req, srv) {

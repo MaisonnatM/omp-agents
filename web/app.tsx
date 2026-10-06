@@ -21,6 +21,7 @@ import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/
 import { SplitResizeHandle, splitAt, useSplitRatio } from "./components/split-resize-handle";
 import { RoutinesPage } from "./components/routines/routines-page";
 import { CalendarPage } from "./components/calendar/calendar-page";
+import { ChangesPage } from "./components/changes/changes-page";
 import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-page";
 import { subjectOf } from "./components/subject";
 import { TodoPage } from "./components/todo/page";
@@ -49,8 +50,8 @@ import { quickAddTodo } from "./todo-quick-add";
 import { localDay } from "./days";
 import { useDashboard } from "./use-dashboard";
 
-/** The sidebar tab that goes with each page; the panes keep the one you chose. */
-const PAGE_TAB: Partial<Record<Page["kind"], SidebarTab>> = { inbox: "inbox", tickets: "tickets", todo: "todo", calendar: "calendar", routines: "calendar", settings: "settings" };
+/** The sidebar tab that goes with each page; the panes keep the one you chose. A session's changes go with the sessions. */
+const PAGE_TAB: Partial<Record<Page["kind"], SidebarTab>> = { inbox: "inbox", tickets: "tickets", todo: "todo", calendar: "calendar", routines: "calendar", settings: "settings", changes: "sessions" };
 
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions" | "settings">, Page> = {
 	inbox: { kind: "inbox", target: null },
@@ -375,6 +376,17 @@ export function App() {
 		case "calendar":
 			main = <CalendarPage routines={state.routines} todos={state.userTodos} ticketsShown={linearCallable} />;
 			break;
+		case "changes":
+			main = (
+				<ChangesPage
+					key={page.sessionId}
+					sessionId={page.sessionId}
+					path={page.path}
+					host={all.hosts.find(host => host.sessionId === page.sessionId) ?? null}
+					past={all.past.find(session => session.sessionId === page.sessionId) ?? null}
+				/>
+			);
+			break;
 		case undefined:
 			main = panes();
 			break;
@@ -438,6 +450,7 @@ export function App() {
 							key={hashForView(detailsView)}
 							view={detailsView}
 							working={detailsView.kind === "live" && subjectOf(detailsView, viewHost ?? null, viewLastHost).working}
+							sessionId={detailsView.kind === "past" ? detailsView.sessionId : detailsView.agentId === null ? ((viewHost ?? viewLastHost)?.sessionId ?? null) : null}
 						/>
 					</DashboardSidebar>
 				)}

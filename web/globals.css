@@ -419,11 +419,12 @@
 .message-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
 .message-markdown th, .message-markdown td { border: 1px solid var(--border); padding: .35em .65em; text-align: left; }
 .message-markdown th { background: var(--muted); font-weight: 600; }
-.message-markdown .hljs-keyword, .message-markdown .hljs-selector-tag { color: #a92764; }
-.message-markdown .hljs-string, .message-markdown .hljs-attr { color: #12673f; }
-.message-markdown .hljs-number, .message-markdown .hljs-literal { color: #935713; }
-.message-markdown .hljs-title, .message-markdown .hljs-function { color: #265aab; }
-.dark .message-markdown .hljs-keyword, .dark .message-markdown .hljs-selector-tag { color: #ff92bc; }
-.dark .message-markdown .hljs-string, .dark .message-markdown .hljs-attr { color: #8bdcb4; }
-.dark .message-markdown .hljs-number, .dark .message-markdown .hljs-literal { color: #f5c27b; }
-.dark .message-markdown .hljs-title, .dark .message-markdown .hljs-function { color: #9cbfff; }
+:is(.message-markdown, .code-lines) :is(.hljs-keyword, .hljs-selector-tag) { color: #a92764; }
+:is(.message-markdown, .code-lines) :is(.hljs-string, .hljs-attr) { color: #12673f; }
+:is(.message-markdown, .code-lines) :is(.hljs-number, .hljs-literal) { color: #935713; }
+:is(.message-markdown, .code-lines) :is(.hljs-title, .hljs-function) { color: #265aab; }
+.code-lines .hljs-comment { color: var(--muted-foreground); font-style: italic; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-keyword, .hljs-selector-tag) { color: #ff92bc; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-string, .hljs-attr) { color: #8bdcb4; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-number, .hljs-literal) { color: #f5c27b; }
+.dark :is(.message-markdown, .code-lines) :is(.hljs-title, .hljs-function) { color: #9cbfff; }
