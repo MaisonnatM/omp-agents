@@ -1,16 +1,20 @@
-import { Play, Ticket, X } from "lucide-react";
+import { CalendarClock, ChevronDown, ChevronRight, ChevronUp, Circle, CircleCheck, Play, Ticket, X } from "lucide-react";
 import { useState } from "react";
 import { errorText } from "../../../src/json";
 import { hashForSession } from "../../../src/shared/sessions";
 import type { TicketChoice, TicketDraft } from "../../../src/shared/tickets";
 import type { UserTodo, UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
+import { badgeColors } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { getJson, putJson } from "../../api";
 import { hashForNewSession } from "../../routing";
-import type { TodoEntry } from "../../todo-views";
+import { shortcutLabels } from "../../shortcuts";
+import { categoryColor, type TodoEntry } from "../../todo-views";
+import { workStateOf } from "../../todo-work-state";
 import { MarkdownEditor } from "../markdown-editor";
-import { AddedByChip, type KnownSessions, TodoLinkChip } from "./links";
+import { AddedByChip, type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
 
 const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60";
 
@@ -105,104 +109,174 @@ interface TodoDetailProps {
 	readOnly: boolean;
 	onChange: (change: UserTodoChange) => void;
 	onClose: () => void;
+	/** Opens the todo above or below in the list; absent at either end. */
+	onPrevious?: () => void;
+	onNext?: () => void;
 	sessions: KnownSessions;
 	/** Where **Start session** opens the new-session draft. */
 	newSessionCwd: string;
 	linearConnected: boolean;
 }
 
-/** The open todo: its title, category, due day, links, actions, and markdown notes. */
-export function TodoDetail({ list, open, readOnly, onChange, onClose, sessions, newSessionCwd, linearConnected }: TodoDetailProps) {
+const CHIP = "inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-xs text-muted-foreground [&>svg]:size-3.5 [&>svg]:shrink-0";
+
+/** The open todo: a bar with where it sits and the way to its neighbours, then its title, properties, actions, and markdown notes. */
+export function TodoDetail({ list, open, readOnly, onChange, onClose, onPrevious, onNext, sessions, newSessionCwd, linearConnected }: TodoDetailProps) {
 	const { todo } = open;
 	const top = open.parent === null ? open.todo : null;
+	const categoryId = (open.parent ?? open.todo).categoryId;
+	const category = list.categories.find(({ id }) => id === categoryId)?.name ?? "No category";
+	const done = todo.doneAt !== null;
 	const linkedSession = top?.links.findLast(link => link.kind === "session");
 	const host = linkedSession?.kind === "session" ? sessions.hosts.find(host => host.sessionId === linkedSession.sessionId) : undefined;
 	const question = host?.requests[0];
 	return (
-		<section aria-label={todo.text} className="flex min-w-0 flex-col gap-3">
-			<div className="flex justify-end">
-				<Tooltip content="Close">
+		<section aria-label={todo.text} className="flex min-w-0 flex-col">
+			<div className="sticky top-0 z-10 flex h-11 items-center gap-1 border-b border-border bg-background/95 px-4 backdrop-blur">
+				<p className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted-foreground">
+					<span className="shrink-0">{category}</span>
+					{open.parent && (
+						<>
+							<ChevronRight aria-hidden className="size-3 shrink-0" />
+							<span className="truncate">{open.parent.text}</span>
+						</>
+					)}
+				</p>
+				<Tooltip content="Previous todo" shortcut={shortcutLabels("todoPrevious")}>
+					<Button variant="ghost" size="icon-compact" aria-label="Previous todo" disabled={!onPrevious} onClick={onPrevious}>
+						<ChevronUp />
+					</Button>
+				</Tooltip>
+				<Tooltip content="Next todo" shortcut={shortcutLabels("todoNext")}>
+					<Button variant="ghost" size="icon-compact" aria-label="Next todo" disabled={!onNext} onClick={onNext}>
+						<ChevronDown />
+					</Button>
+				</Tooltip>
+				<Tooltip content="Close" shortcut={shortcutLabels("todoClose")}>
 					<Button variant="ghost" size="icon-compact" aria-label="Close the todo" onClick={onClose}>
 						<X />
 					</Button>
 				</Tooltip>
 			</div>
-			<div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-				{open.parent ? (
-					<p>Under {open.parent.text}</p>
+			<div className="flex flex-col gap-4 px-6 py-5">
+				{readOnly ? (
+					<h2 className="break-words text-xl font-semibold leading-snug text-muted-foreground">{todo.text}</h2>
 				) : (
-					<label className="flex items-center gap-2">
-						Category
-						<select
-							value={open.todo.categoryId ?? ""}
-							disabled={readOnly}
-							onChange={event => onChange({ op: "categorize", id: todo.id, categoryId: event.target.value || null })}
-							className={FIELD}
-						>
-							<option value="">No category</option>
-							{list.categories.map(category => (
-								<option key={category.id} value={category.id}>
-									{category.name}
-								</option>
-							))}
-						</select>
-					</label>
-				)}
-				<label className="flex items-center gap-2">
-					Due
-					<input
-						type="date"
-						value={todo.due ?? ""}
-						disabled={readOnly}
-						onChange={event => onChange({ op: "set-due", id: todo.id, due: event.target.value || null })}
-						className={FIELD}
+					<textarea
+						key={todo.text}
+						aria-label="Title"
+						rows={1}
+						defaultValue={todo.text}
+						onKeyDown={event => {
+							if (event.key === "Escape") event.currentTarget.value = todo.text;
+							if (event.key === "Enter" || event.key === "Escape") {
+								event.preventDefault();
+								event.currentTarget.blur();
+							}
+						}}
+						onBlur={event => {
+							const text = event.currentTarget.value.replace(/\s+/g, " ").trim();
+							if (text && text !== todo.text) onChange({ op: "edit", id: todo.id, text });
+							else event.currentTarget.value = todo.text;
+						}}
+						className="field-sizing-content -mx-1 resize-none rounded-md bg-transparent px-1 text-xl font-semibold leading-snug outline-none hover:bg-accent/50 focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-ring"
 					/>
-				</label>
-				{todo.due && !readOnly && (
-					<Tooltip content="Clear the due day">
-						<button type="button" onClick={() => onChange({ op: "set-due", id: todo.id, due: null })} className="hover:text-foreground">
-							No due day
-						</button>
-					</Tooltip>
 				)}
-			</div>
-			{question && linkedSession?.kind === "session" && (
-				<div className="rounded-md bg-amber-500/10 px-3 py-2 text-sm">
-					<p className="font-medium text-amber-900 dark:text-amber-200">Agent asks</p>
-					<p className="mt-1 whitespace-pre-wrap">{question.title}</p>
-					<a href={hashForSession(linkedSession.sessionId)} className="mt-2 inline-block text-xs font-medium text-amber-800 underline underline-offset-2 dark:text-amber-200">Reply in session</a>
-				</div>
-			)}
-			{top && (top.links.length > 0 || top.addedBy) && (
-				<div className="flex flex-wrap items-center gap-1.5" aria-label="Links">
-					{top.addedBy && <AddedByChip sessionId={top.addedBy} sessions={sessions} />}
-					{top.links.map(link => (
-						<TodoLinkChip
-							key={JSON.stringify(link)}
-							link={link}
-							sessions={sessions}
-							onRemove={readOnly ? undefined : () => onChange({ op: "unlink", id: top.id, link })}
+				<div className="flex flex-wrap items-center gap-1.5" aria-label="Properties">
+					<button
+						type="button"
+						role="checkbox"
+						aria-checked={done}
+						disabled={readOnly}
+						onClick={() => onChange({ op: "toggle", id: todo.id, doneAt: done ? null : new Date().toISOString() })}
+						className={cn(CHIP, !readOnly && "hover:text-foreground", done && "text-emerald-700 dark:text-emerald-400")}
+					>
+						{done ? <CircleCheck /> : <Circle />}
+						{done ? "Done" : "To do"}
+					</button>
+					{top && (
+						<label className={cn(CHIP, "pr-1")}>
+							<span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: top.categoryId === null ? "var(--muted-foreground)" : badgeColors[categoryColor(top.categoryId)] }} />
+							<select
+								aria-label="Category"
+								value={top.categoryId ?? ""}
+								disabled={readOnly}
+								onChange={event => onChange({ op: "categorize", id: todo.id, categoryId: event.target.value || null })}
+								className="appearance-none bg-transparent pr-1 text-foreground outline-none"
+							>
+								<option value="">No category</option>
+								{list.categories.map(category => (
+									<option key={category.id} value={category.id}>
+										{category.name}
+									</option>
+								))}
+							</select>
+						</label>
+					)}
+					<label className={CHIP}>
+						<CalendarClock aria-hidden />
+						<input
+							type="date"
+							aria-label="Due day"
+							value={todo.due ?? ""}
+							disabled={readOnly}
+							onChange={event => onChange({ op: "set-due", id: todo.id, due: event.target.value || null })}
+							className="bg-transparent text-foreground outline-none"
 						/>
-					))}
+						{todo.due && !readOnly && (
+							<Tooltip content="Clear the due day">
+								<button type="button" aria-label="No due day" onClick={() => onChange({ op: "set-due", id: todo.id, due: null })} className="hover:text-foreground [&>svg]:size-3">
+									<X />
+								</button>
+							</Tooltip>
+						)}
+					</label>
+					{top && !done && <TodoWorkPill state={workStateOf(top, sessions)} />}
 				</div>
-			)}
-			{top && !readOnly && (
-				<div className="flex flex-wrap items-center gap-2">
-					<Tooltip content="Start a session from this todo">
-						<Button variant="tertiary" size="compact" leadingIcon={Play} asChild>
-							<a href={hashForNewSession(newSessionCwd, top.id)}>Start session</a>
-						</Button>
-					</Tooltip>
-					{linearConnected && !top.links.some(link => link.kind === "ticket") && <CreateTicket todo={top} onChange={onChange} />}
+				{question && linkedSession?.kind === "session" && (
+					<div className="rounded-md bg-amber-500/10 px-3 py-2 text-sm">
+						<p className="font-medium text-amber-900 dark:text-amber-200">Agent asks</p>
+						<p className="mt-1 whitespace-pre-wrap">{question.title}</p>
+						<a href={hashForSession(linkedSession.sessionId)} className="mt-2 inline-block text-xs font-medium text-amber-800 underline underline-offset-2 dark:text-amber-200">Reply in session</a>
+					</div>
+				)}
+				{top && (top.links.length > 0 || top.addedBy) && (
+					<div className="flex flex-col gap-1.5">
+						<h3 className="text-xs font-medium text-muted-foreground">Links</h3>
+						<div className="flex flex-wrap items-center gap-1.5" aria-label="Links">
+							{top.addedBy && <AddedByChip sessionId={top.addedBy} sessions={sessions} />}
+							{top.links.map(link => (
+								<TodoLinkChip
+									key={JSON.stringify(link)}
+									link={link}
+									sessions={sessions}
+									onRemove={readOnly ? undefined : () => onChange({ op: "unlink", id: top.id, link })}
+								/>
+							))}
+						</div>
+					</div>
+				)}
+				{top && !readOnly && (
+					<div className="flex flex-wrap items-center gap-2">
+						<Tooltip content="Start a session from this todo">
+							<Button variant="primary" size="compact" leadingIcon={Play} asChild>
+								<a href={hashForNewSession(newSessionCwd, top.id)}>Start session</a>
+							</Button>
+						</Tooltip>
+						{linearConnected && !top.links.some(link => link.kind === "ticket") && <CreateTicket todo={top} onChange={onChange} />}
+					</div>
+				)}
+				<div className="flex flex-col gap-1.5 border-t border-border pt-4">
+					<h3 className="text-xs font-medium text-muted-foreground">Notes</h3>
+					<MarkdownEditor
+						key={todo.id}
+						value={todo.body}
+						label={`Notes of ${todo.text}`}
+						readOnly={readOnly}
+						onSave={body => onChange({ op: "edit-body", id: todo.id, body })}
+					/>
 				</div>
-			)}
-			<MarkdownEditor
-				key={todo.id}
-				value={todo.body}
-				label={`Notes of ${todo.text}`}
-				readOnly={readOnly}
-				onSave={body => onChange({ op: "edit-body", id: todo.id, body })}
-			/>
+			</div>
 		</section>
 	);
 }

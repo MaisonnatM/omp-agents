@@ -46,12 +46,23 @@ interface TodoLinkChipProps {
 	sessions: KnownSessions;
 	/** Takes the link off the todo; without it, the chip has no remove button. */
 	onRemove?: () => void;
+	/** Its icon alone, for a list row. */
+	compact?: boolean;
 }
 
 /** One thing a todo points to, linking to it in this dashboard; a running session shows its status dot. */
-export function TodoLinkChip({ link, sessions, onRemove }: TodoLinkChipProps) {
+export function TodoLinkChip({ link, sessions, onRemove, compact = false }: TodoLinkChipProps) {
 	const { href, label, title, host } = linkTarget(link, sessions);
 	const Icon = ICONS[link.kind];
+	if (compact) {
+		return (
+			<Tooltip content={title}>
+				<a href={href} aria-label={label} className="flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground [&>svg]:size-3.5">
+					{host ? <StatusDot status={host.status} /> : <Icon />}
+				</a>
+			</Tooltip>
+		);
+	}
 	return (
 		<span className="inline-flex max-w-56 items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-xs text-muted-foreground">
 			<Tooltip content={title}>
@@ -81,9 +92,18 @@ const WORK_LABELS: Record<TodoWorkState["kind"], { label: string; color: string 
 	unavailable: { label: "Session unavailable", color: "bg-muted-foreground" },
 };
 
-export function TodoWorkPill({ state }: { state: TodoWorkState }) {
+export function TodoWorkPill({ state, compact = false }: { state: TodoWorkState; compact?: boolean }) {
 	if (state.kind === "idea") return null;
 	const { label, color } = WORK_LABELS[state.kind];
+	if (compact) {
+		return (
+			<Tooltip content={`${label}. Open session`}>
+				<a href={hashForSession(state.sessionId)} aria-label={label} className="flex size-5 shrink-0 items-center justify-center rounded hover:bg-accent">
+					<span className={`size-2 rounded-full ${color}`} aria-hidden />
+				</a>
+			</Tooltip>
+		);
+	}
 	return (
 		<Tooltip content={`${label}. Open session`}>
 			<a href={hashForSession(state.sessionId)} className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground">

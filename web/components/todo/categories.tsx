@@ -1,6 +1,7 @@
-import { Ellipsis, type LucideIcon, Pencil, Plus, Trash2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
+import { type ReactNode, useRef, useState } from "react";
 import type { UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
+import { badgeColors } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/sidebar";
 import { localDay } from "../../days";
 import { hashForTodo, type TodoListView } from "../../routing";
-import { leftIn, SIDEBAR_LISTS, sameTodoView } from "../../todo-views";
+import { categoryColor, leftIn, SIDEBAR_LISTS, sameTodoView } from "../../todo-views";
 import type { KnownSessions } from "./links";
 
 interface NameInputProps {
@@ -93,14 +94,14 @@ export function TodoCategories({ list, view, disabled, onChange, sessions }: Tod
 	const [naming, setNaming] = useState<Naming>({ kind: "none" });
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your todos…</p></SidebarGroup>;
 	const day = localDay();
-	const link = (target: TodoListView, name: string, Icon: LucideIcon | null = null) => {
+	const link = (target: TodoListView, name: string, icon: ReactNode) => {
 		const count = leftIn(list, target, day, sessions);
 		const active = sameTodoView(view, target);
 		return (
 			<>
 				<SidebarMenuButton asChild isActive={active}>
 					<a href={hashForTodo(target)} aria-current={active ? "page" : undefined} aria-label={`${name}, ${count} ${target.kind === "done" ? "done" : "to do"}`}>
-						{Icon && <Icon className="size-4" />}
+						{icon}
 						<span className="truncate">{name}</span>
 					</a>
 				</SidebarMenuButton>
@@ -112,8 +113,8 @@ export function TodoCategories({ list, view, disabled, onChange, sessions }: Tod
 		<>
 			<SidebarGroup>
 				<SidebarMenu aria-label="Todo lists">
-					{SIDEBAR_LISTS.map(({ view: target, name, icon }) => (
-						<SidebarMenuItem key={target.kind}>{link(target, name, icon)}</SidebarMenuItem>
+					{SIDEBAR_LISTS.map(({ view: target, name, icon: Icon }) => (
+						<SidebarMenuItem key={target.kind}>{link(target, name, <Icon className="size-4" />)}</SidebarMenuItem>
 					))}
 				</SidebarMenu>
 			</SidebarGroup>
@@ -141,7 +142,7 @@ export function TodoCategories({ list, view, disabled, onChange, sessions }: Tod
 							</li>
 						) : (
 							<SidebarMenuItem key={id}>
-								{link({ kind: "category", id }, name)}
+								{link({ kind: "category", id }, name, <span aria-hidden className="mx-1 size-2 shrink-0 rounded-full" style={{ backgroundColor: badgeColors[categoryColor(id)] }} />)}
 								{!disabled && (
 									<CategoryMenu
 										name={name}

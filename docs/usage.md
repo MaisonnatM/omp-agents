@@ -542,8 +542,9 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 - The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session or a project, in place of the panes.
   The sidebar then lists **All**, **Today**, **Needs you**, **From agents**, and **Done**, then your categories, each with how many top-level todos are left to do in it.
+  Each category has a color dot, and its todos carry a badge of that color.
   Click one to show its todos alone; `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/done`, and `#todo/<category id>` address them.
-  **All** lists the todos of no category first, then each category's under its name.
+  **All** lists every todo in one list, each top-level todo with its category's badge; a category's own list shows no badges.
   **Today** lists the todos due today or before, or with a todo under them that is, earliest due first; **Add a todo due today** there adds one due today.
   **Needs you** lists unchecked todos whose latest linked session has a question open or is idle, wherever that session ran.
   **From agents** lists the todos that an agent added; see [Todos from agents](#todos-from-agents).
@@ -557,38 +558,44 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A weekday names its next date, today included.
 - Cmd+Enter or Ctrl+Enter on a new or edited top-level todo saves it and opens its **Start session** draft.
 - A todo can hold todos of its own, one level down and no deeper, and they share its category.
-  Tab while typing a todo moves it under the todo above it in its category, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
+  Tab while typing a todo moves it under the todo above it, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
   Tab does nothing on a todo that holds todos of its own, since they would end up three deep, nor on one with links, which a todo under another cannot hold.
   The **+** that shows on hover adds a todo under that one.
 - Drag a todo by its row to move it among the todos beside it of its status, top-level ones in **All** and a category, and a todo under another among its parent's.
-  Dropped beside a todo of another category, a top-level todo joins that category.
+  A dragged todo keeps its category; change it from the open todo.
   Alt+Shift+↑ and Alt+Shift+↓ move the focused todo one place the same way.
   **Today** sorts by due day and **Done** by when it was cleared, so neither moves todos.
 - Every list shows its todos to do first and its checked ones after them, at both levels, each side in its own order.
   Click the circle before a todo to check it; checking a todo checks the todos under it too.
-  A checked top-level todo moves into its section's **Logbook**, a fold below **Add a todo** that starts folded and remembers when you open it; a search opens every Logbook.
+  A checked top-level todo moves into the list's **Logbook**, a fold below **Add a todo** that starts folded and remembers when you open it; a search opens it.
   A checked todo under an unchecked one moves below the ones left to do beside it, and unchecking a todo puts it last among them.
-  An unchecked top-level todo linked to a session shows a work-state pill instead of repeating the session's name: **Agent working**, **Needs you**, **In review**, **Shipped**, **Session ended**, or **Session unavailable**.
-  The pill opens the latest linked session; it does not check the todo or change its category.
+  An unchecked top-level todo linked to a session shows a work-state dot in the list and a pill in the open todo, instead of repeating the session's name: **Agent working**, **Needs you**, **In review**, **Shipped**, **Session ended**, or **Session unavailable**.
+  Hover the dot for its state; the dot and the pill open the latest linked session, and do not check the todo or change its category.
   A todo that holds others shows how many of them are checked, as in `2/3`.
   The page's header counts the top-level todos left to do, and **Clear done** moves every checked todo it lists to **Done** at once, a checked todo under an unchecked one as a todo of its own.
   The server does the same by itself for a todo checked over 24 hours ago, when it starts and every minute after.
 - **Done** lists the cleared todos, latest first, with the day each was checked.
   Hover one to put it back last in the list, in its category if that still exists, or to delete it for good; **Empty** deletes them all, after you confirm.
-- Click a todo's title to edit it and expand its details below the row without narrowing the list.
+- Click a todo to open its details on the right of the list, as in Linear, and double-click it to rename it in the list; with no todo open, that side says how to open one.
+  Drag the line between the list and the details, or focus it and use the left and right arrow keys, to size the list; double-click it to reset, and the browser's localStorage keeps the width.
+  A page too narrow for both shows the open todo in place of the list, and its **×** goes back to the list.
+  The open todo's bar names its category, and its parent for a todo under another; its ↑ and ↓ open the todo above and below in the list, and **×** closes it.
+  A search keeps the open todo on the right even when it hides its row.
   An empty title, or Backspace in an empty one, deletes the todo, and so does the **×** that shows on hover; deleting a todo deletes the todos under it.
   **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
 - The search field in the page's header, or `/` outside a text field, keeps the todos whose title or notes, or a todo under them, hold every word typed; Esc clears it.
   Outside a text field, J and K focus the next and previous todo, X checks the focused one, and Enter opens it.
-- An open todo shows its category, which you can change for a top-level todo, its due day, and its notes in markdown.
+  While a todo is open, J and K open the next and previous one instead, and Esc closes it.
+- An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.
+  Under it, chips show whether it is checked, its category, which you can change for a top-level todo, its due day, and its work state, then its links and notes in markdown.
   When a linked live session has a question open, the details show its title and **Reply in session**, which opens that session.
-  A todo due today reads **Today** in the list, and one whose day has passed reads **Overdue** in red; **No due day** takes the day off.
-  The notes always render as the agent's messages do, with GitHub's task lists and tables, and that render stays on screen while you edit them in the same type.
-  They save when the text field loses focus and on Cmd+S; a todo with notes shows a notebook icon in the list.
-- A top-level todo shows what it links to: a session, a pull request, or a Linear issue, each a chip that opens it here.
-  Each chip shows the icon of the sidebar tab it opens: **Sessions**, **Inbox**, or **Tickets**.
-  A running session's chip shows its status dot; an open todo's **×** on a chip unlinks it.
-- An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.
+  A todo due today reads **Today** in the list, and one whose day has passed reads **Overdue** in red; the **×** in the due chip takes the day off.
+  The notes render as the agent's messages do, with GitHub's task lists and tables; click them, or press Enter on them, to edit the markdown in the same type.
+  They save and render again when the text field loses focus or on Esc, and also save on Cmd+S; a todo with notes shows a notebook icon in the list.
+- A top-level todo shows what it links to: a session, a pull request, or a Linear issue, as an icon in the list and a chip in the open todo, each opening it here.
+  Each shows the icon of the sidebar tab it opens: **Sessions**, **Inbox**, or **Tickets**.
+  A running session shows its status dot; an open todo's **×** on a chip unlinks it.
+- An open top-level todo's **Start session**, its main button, opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.
   The session links to the todo once omp starts, and its agent checks the todo off once it finishes the work; see [Todos from agents](#todos-from-agents).
 - With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, then opens an issue from the title and notes, assigned to you, and links it to the todo.
 - The list icon on an inbox pull request, a ticket, and a live session's header adds a todo of no category, last in the list, that links to it.
@@ -772,12 +779,13 @@ Alt is Option on macOS.
 | . | Inbox, outside text fields | Open the pull request's quick actions |
 | E | Inbox, outside text fields | Give the pull request's next move to an agent |
 | / | Todo page, outside text fields | Search the todos |
-| J / K | Todo page, outside text fields | Focus the next or previous todo |
+| J / K | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |
 | X | Todo page, outside text fields | Check or uncheck the focused todo |
+| Esc | Todo page, outside text fields | Close the open todo |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or inbox | Move the focused todo, or the inbox's focused pull request, section, or repository, up or down |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, **End session**, the composer's Stop button, and a maximized pane's restore button.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, **End session**, the composer's Stop button, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.
 - Cmd+1 through Cmd+5 select the dashboard's tabs, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers stay fixed when Tickets is hidden without a Linear connection; Cmd+2 then keeps its browser behavior.
   Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or another digit keeps its browser behavior.
