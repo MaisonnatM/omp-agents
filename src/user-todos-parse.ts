@@ -13,8 +13,12 @@ export const MAX_TODO_BODY = 100_000;
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** A day as `YYYY-MM-DD`, as a todo's `due` and a Linear issue's `dueDate` name one. */
-export const isDay = (value: unknown): value is string => typeof value === "string" && DAY.test(value);
+/** A day as `YYYY-MM-DD`, as a todo's `due`, a Linear issue's `dueDate`, and an all-day Google event name one, that the calendar has. */
+export const isDay = (value: unknown): value is string => {
+	if (typeof value !== "string" || !DAY.test(value)) return false;
+	const time = Date.parse(`${value}T00:00:00Z`);
+	return Number.isFinite(time) && new Date(time).toISOString().startsWith(value);
+};
 
 const isTime = (value: unknown): value is string => typeof value === "string" && !Number.isNaN(Date.parse(value));
 const isNonEmpty = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";

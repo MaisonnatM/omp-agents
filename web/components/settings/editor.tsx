@@ -6,6 +6,9 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { ApiError, errorText } from "../../api";
 import type { ReadState } from "../../reads";
 
+/** A settings text field or select. */
+export const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
 /** The models `omp models` lists, for the pickers; loaded once per page. */
 export type Catalog = ReadState<{ bySelector: ReadonlyMap<string, CatalogModel>; byProvider: ReadonlyMap<string, CatalogModel[]> }>;
 

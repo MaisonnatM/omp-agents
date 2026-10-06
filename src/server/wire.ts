@@ -5,7 +5,7 @@
  */
 import { isObject, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH } from "../routines";
-import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, TICKET_ID, TICKET_PRIORITIES } from "../shared";
+import { GOOGLE_CLIENT_ID, type GoogleClient, MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, TICKET_ID, TICKET_PRIORITIES } from "../shared";
 import type {
 	BranchChoice,
 	ClientMsg,
@@ -362,6 +362,13 @@ export function parseSessionLinks(body: unknown): SessionLinksEdit | null {
 	const { sessionIds } = body;
 	if (!pr || !Array.isArray(sessionIds) || sessionIds.length === 0) return null;
 	return sessionIds.every((id): id is string => typeof id === "string") ? { ...pr, sessionIds } : null;
+}
+
+/** The body of `PUT /api/google/client`: a desktop OAuth client's ID and secret, as Google Cloud's console shows them. */
+export function parseGoogleClient(body: unknown): GoogleClient | null {
+	if (!isObject(body) || !isNonEmpty(body.clientId) || !isNonEmpty(body.clientSecret)) return null;
+	const clientId = body.clientId.trim();
+	return GOOGLE_CLIENT_ID.test(clientId) ? { clientId, clientSecret: body.clientSecret.trim() } : null;
 }
 
 const isTicketPriority = oneOf(TICKET_PRIORITIES);

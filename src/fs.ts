@@ -29,10 +29,10 @@ export async function atomicWriteText(path: string, text: string, mode?: number)
 }
 
 /** {@link atomicWriteText} for a caller that has no way to wait: the file is replaced when this returns. */
-function atomicWriteTextSync(path: string, text: string): void {
+function atomicWriteTextSync(path: string, text: string, mode?: number): void {
 	const temp = stagingFor(path);
 	try {
-		writeFileSync(temp, text, { flag: "wx" });
+		writeFileSync(temp, text, { flag: "wx", mode });
 		renameSync(temp, path);
 	} catch (err) {
 		rmSync(temp, { force: true });
@@ -49,6 +49,8 @@ interface JsonFileOptions<T> {
 	onInvalid: "ignore" | "aside";
 	/** `JSON.stringify`'s indent for what {@link JsonFile.save} writes. */
 	indent?: string;
+	/** The file's permissions, `0o600` for one that holds a secret; a directory it creates is then `0o700`. */
+	mode?: number;
 }
 
 /**
@@ -95,9 +97,10 @@ export class JsonFile<T> {
 
 	/** Replaces the file with `value`; a crash mid-write leaves the last complete file. */
 	save(value: T): void {
+		const { indent, mode } = this.#options;
 		try {
-			mkdirSync(dirname(this.#path), { recursive: true });
-			atomicWriteTextSync(this.#path, `${JSON.stringify(value, null, this.#options.indent)}\n`);
+			mkdirSync(dirname(this.#path), { recursive: true, mode: mode === undefined ? undefined : 0o700 });
+			atomicWriteTextSync(this.#path, `${JSON.stringify(value, null, indent)}\n`, mode);
 		} catch (err) {
 			console.error(`omp-agents: cannot write ${this.#path}: ${errorText(err)}`);
 		}

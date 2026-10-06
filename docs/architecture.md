@@ -205,7 +205,7 @@ It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching t
 - The window loads `http://127.0.0.1:<port>/?token=<token>`, a navigation that sends `Sec-Fetch-Site: none`, so `guardsFor` admits it as it admits the printed address in a browser, and the socket's `Origin` matches its `Host`.
   A custom scheme for the page would fail that check.
 - `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin.
-  An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the Linear sign-in in `web/components/settings/linear-connection.tsx` then opens the address itself once the server names it.
+  An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the Linear and Google sign-ins in `web/use-sign-in.ts` then open the address themselves once the server names it.
 - The page runs with context isolation and the sandbox on, and no preload: it gets no Node or Electron API.
 - The app keeps its data, its cookie, localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
 - A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
@@ -399,11 +399,26 @@ It answers once the flow has Linear's authorization address, as `signIn: { phase
 When the browser comes back, the server stores the tokens, refresh material included, under the server's credential id, where `omp token` finds them, and adds `"linear": { "type": "http", "url": "https://mcp.linear.app/mcp" }` to omp's `mcp.json` when omp had no Linear server.
 A new sign-in abandons the one under way.
 A failure, or no return within five minutes, shows as `signIn: { phase: "failed", error }` until the next sign-in.
+`createSignIn` in `src/sign-in.ts` holds that state for both Linear and Google.
+
+### Google Calendar
+
+`src/google-calendar.ts` owns the dashboard's Google Calendar connection, separate from omp's Linear MCP sign-in.
+`PUT /api/google/client` saves a Desktop OAuth client ID and secret in `google.json` beside the access token, with owner-only file permissions, and signs out any prior account.
+`GET /api/google` answers the client ID, a `connected` flag, and the current sign-in state, never the client secret or refresh token.
+`PUT /api/google/sign-in` starts the desktop OAuth loopback flow on an ephemeral `127.0.0.1` port and answers the browser's Google authorization URL.
+The server verifies a random state and PKCE challenge, exchanges the authorization code for a refresh token, and stops the listener after success, failure, a replacing sign-in, or the five-minute timeout.
+A refresh that Google refuses with a 400 drops the refresh token, so the settings ask for a new sign-in.
+The requested scope is `https://www.googleapis.com/auth/calendar.readonly`, and access tokens remain in server memory.
+`GET /api/calendar/events?from=<ISO time>&to=<ISO time>` reads at most 62 days, caches a successful answer for 60 seconds, and expands recurring events through Google's `singleEvents=true` query.
+It reads the viewer's calendar list, then the events of each selected, visible calendar, including paginated results; canceled, declined, and working-location events are left out.
+Google's exclusive all-day end becomes the last included day before the event reaches the page.
+The Calendar page reads the open month's events through `calendarEventsStore` in `web/reads.ts` every minute while Google is connected, and puts a multi-day event on each day it covers.
 
 ## Front-end components
 
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
-The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, **Todo**, and **Routines** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
+The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, **Todo**, and **Calendar** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
 User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
 `thinking-indicator` shows while the agent works.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
@@ -443,7 +458,7 @@ The server lives in `src/`:
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
 - `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and projects, joining saved-session titles and working directories without reading transcripts.
-- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, and `routines.json`, and `src/paths.ts` names the home directory, the token file, the interrupted sessions' file, the todo list's file, and the routines' file.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, and the private `google.json`; `src/paths.ts` names these files beside the access token.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
@@ -466,6 +481,8 @@ The server lives in `src/`:
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
+- `src/google-calendar.ts`: the read-only Google Calendar OAuth sign-in, private client and refresh-token file, access-token refresh, and month-range event reads.
+- `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout that `src/linear.ts` and `src/google-calendar.ts` share.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
 - `src/user-todos.ts`: the rules of the Todo page's list, `applyUserTodo`, which the server applies to its file and the page to what it shows before the server answers.
   The list is `UserTodoList` in `src/shared.ts`: categories, top-level todos, and the archive that `clear-done` fills, latest first.
@@ -516,7 +533,7 @@ The page lives in `web/`.
   It also holds which sections start folded, sorts rows by move and keeps each stack's rows together by the chain of base branches, and says what the details' Status shows.
   `InboxOrder` there is the order you chose, the repositories, the sections, the sort, and the manual order of pull requests, which `placedManual` updates after a drop; a stack moves as one `unit`.
   `web/routines-model.ts` words a routine's schedule, task, next run, and last run, and turns the routine editor's form into the routine it saves.
-  `web/calendar-model.ts` lays a month's routine runs, past and planned, and its due todos and tickets out by day.
+  `web/calendar-model.ts` lays a month's routine runs, past and planned, its due todos and tickets, and Google events out by day.
   `web/days.ts` names a local day as todos, tickets, and the calendar do, `YYYY-MM-DD`, and walks the days between two of them.
 - `web/page-icons.ts`: the icon of each dashboard page, which its sidebar tab and every link into the page show.
 - `web/components/analytics/analytics-page.tsx`: the request usage view, including time-range links, a token chart, breakdowns, and the top sessions.
@@ -530,7 +547,7 @@ The page lives in `web/`.
 - `web/reads.ts`: the server reads that components hold.
   `useRead` reads one URL, such as the pull request or the Linear issue the main content shows, the settings page's model catalog, or the new-session draft's model list.
   `useReplaceableRead` shows the version a save answered until that URL is read again.
-  The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, and one for whether omp is signed in to Linear.
+  The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, one each for whether omp is signed in to Linear and whether Google Calendar is connected, and one for the Calendar page's Google events, with one entry per month.
   `web/app.tsx` polls the inbox instead, on every page once the sessions are listed, for the Inbox tab's count, and the sidebar's inbox reads that entry.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header.
@@ -558,7 +575,7 @@ The page lives in `web/`.
 - `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
   It and the Calendar page read the time through `web/use-minute.ts`, renewed each minute.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.
-- `web/components/calendar/calendar-page.tsx`: the Calendar page, a month of `web/calendar-model.ts` entries and the chosen day's list beside it.
+- `web/components/calendar/calendar-page.tsx`: the Calendar page, a month of `web/calendar-model.ts` entries and the chosen day's list beside it, including Google events read with `web/reads.ts`.
   It renders the month with Kibo UI's calendar, `web/components/kibo-ui/calendar/index.tsx`, whose month and year live in jotai atoms, so the page keeps its month while you leave and come back.
 - `web/components/pane.tsx`: a pane.
   `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button and the checkout read, `past-conversation.tsx` a past session's view, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
@@ -569,6 +586,7 @@ The page lives in `web/`.
 - `web/components/dashboard-context.tsx`: the stable dashboard actions (`send`, `open`, `start`, `end`, …) and the last start of each kind, provided once by `App`, which the sidebar, the panes, and the pages read instead of taking them as props.
 - `web/components/session-details.tsx`: the right sidebar's tabs for the focused pane: `outline-tab.tsx`, its prompts and turn-ending replies from `outline` in `web/transcript-view.ts`, which scroll the focused pane's transcript to their message; its changed files; and `media-tab.tsx`, its images and their viewer.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
+  `web/components/settings/google-connection.tsx` saves the Google OAuth client, and it and `linear-connection.tsx` start their sign-ins with `web/use-sign-in.ts`.
   `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue.
   `web/use-drag-order.ts` drags the inbox's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
   The tickets page uses `web/components/list-page.tsx` for its frame, header, and load and refresh states, and the pull request, Todo, Routines, and Calendar pages its `PageFrame`.

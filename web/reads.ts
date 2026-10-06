@@ -1,6 +1,6 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
 import { useEffect, useState } from "react";
-import type { Inbox, LinearStatus, ModelEntry, TicketsAnswer } from "../src/shared";
+import type { CalendarEventsAnswer, GoogleStatus, Inbox, LinearStatus, ModelEntry, TicketsAnswer } from "../src/shared";
 import { errorText, getJson } from "./api";
 import { createPolledStore } from "./polled-store";
 
@@ -73,4 +73,18 @@ export const linearStore = createPolledStore<LinearStatus>({
 	cacheKey: "omp-agents.linear-cache",
 	url: () => "/api/linear",
 	isValid: (value): value is LinearStatus => typeof (value as Partial<LinearStatus> | null)?.connected === "boolean",
+});
+
+/** The Google OAuth client and whether its sign-in can read your calendars. */
+export const googleStore = createPolledStore<GoogleStatus>({
+	cacheKey: "omp-agents.google-cache",
+	url: () => "/api/google",
+	isValid: (value): value is GoogleStatus => typeof (value as Partial<GoogleStatus> | null)?.connected === "boolean",
+});
+
+/** Your Google events over a span, by its `from` and `to` query, which the Calendar page reads a month at a time. */
+export const calendarEventsStore = createPolledStore<CalendarEventsAnswer>({
+	cacheKey: "omp-agents.calendar-events-cache",
+	url: (span, fresh) => `/api/calendar/events?${span}${fresh ? "&fresh" : ""}`,
+	isValid: (value): value is CalendarEventsAnswer => Array.isArray((value as Partial<CalendarEventsAnswer> | null)?.events),
 });
