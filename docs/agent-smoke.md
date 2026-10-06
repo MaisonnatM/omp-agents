@@ -44,7 +44,7 @@ Besides a live session's own hash, the routes are:
 - `#todo`, `#todo/today`, `#todo/agents`, `#todo/done`, `#todo/<category id>`;
 - `#calendar`, `#routines`, `#routines/<id>`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`;
-- `#settings`, `#settings/<encoded cwd>`.
+- `#settings`, `#settings/<encoded cwd>`, `#integrations`.
 
 ## Desktop smoke
 

@@ -10,8 +10,6 @@ import { AnalyticsTab } from "./analytics-tab";
 import { AppearanceTab } from "./appearance-tab";
 import type { Catalog, Editing } from "./editor";
 import { Files } from "./files-tab";
-import { GoogleConnection } from "./google-connection";
-import { LinearConnection } from "./linear-connection";
 import { NewSessionsTab } from "./new-sessions-tab";
 import { RetrySection, RolesTab } from "./routing-tab";
 import { WorktreesTab } from "./worktrees-tab";
@@ -106,7 +104,6 @@ export function SettingsPage({ cwd, workspaces, tab }: { cwd: string | null; wor
 		...ompPanels(settings, cwd, editing),
 		analytics: <AnalyticsTab active={tab === "analytics"} />,
 		worktrees: <WorktreesTab cwd={cwd} active={tab === "worktrees"} />,
-		integrations: <div className="space-y-6"><LinearConnection /><GoogleConnection /></div>,
 		"new-sessions": <NewSessionsTab cwd={cwd} />,
 		appearance: <AppearanceTab />,
 	};

@@ -1,10 +1,12 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QUICK_TODO_EVENT } from "../src/server/address";
+import { callable, signedIn } from "../src/shared/accounts";
 import type { UserTodoList } from "../src/user-todos-shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { DashboardContext } from "./components/dashboard-context";
 import { FileDialog } from "./components/file-dialog";
 import { InboxNav } from "./components/inbox/inbox-nav";
+import { IntegrationsPage } from "./components/integrations/integrations-page";
 import { PullRequestPage } from "./components/inbox/pr-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
@@ -25,7 +27,7 @@ import { TodoPage } from "./components/todo/page";
 import { ToolsExpanded } from "./components/transcript";
 import { documentTitle } from "./document-title";
 import { SPLIT_CLICK } from "./labels";
-import { inboxStore, linearStore, UNREAD } from "./reads";
+import { inboxStore, integrationsStore, UNREAD } from "./reads";
 import {
 	adjacentSession,
 	closePane,
@@ -171,9 +173,11 @@ export function App() {
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [switcherOpen, setSwitcherOpen] = useState(false);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
-	const linear = linearStore.usePolling();
-	/** The Tickets tab and its shortcut show only once omp is signed in to Linear. */
-	const ticketsShown = linear.read?.data.connected === true;
+	const linear = integrationsStore.usePolling().read?.data.integrations.linear ?? null;
+	/** The Tickets tab and its shortcut show once omp holds a sign-in to Linear, even one Linear refuses, which the tickets page then offers to reconnect. */
+	const ticketsShown = linear !== null && signedIn(linear.connection);
+	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
+	const linearCallable = linear !== null && callable(linear.connection);
 	/** The tab the sidebar shows over the panes: `#inbox` picks the inbox, and it stays while you work in the panes until you choose Sessions. */
 	const onInbox = page?.kind === "inbox";
 	const [paneTab, setPaneTab] = useState<"sessions" | "inbox">(onInbox ? "inbox" : "sessions");
@@ -327,11 +331,14 @@ export function App() {
 		case "settings":
 			main = <SettingsPage cwd={page.cwd} workspaces={projects} tab={settingsTab} />;
 			break;
+		case "integrations":
+			main = <IntegrationsPage />;
+			break;
 		case "inbox":
 			main = page.target ? <PullRequestPage project={project} hosts={visible.hosts} target={page.target} /> : panes();
 			break;
 		case "tickets":
-			if (linear.read && !ticketsShown) main = <TicketsDisconnected />;
+			if (linear && !linearCallable) main = <TicketsDisconnected linear={linear} />;
 			// Until the sessions are listed, the workspace a quick action starts in is not known yet.
 			else if (state.listed) {
 				main = (
@@ -344,7 +351,7 @@ export function App() {
 				disabled: !state.connected,
 				onChange: changeTodo,
 				newSessionCwd: defaultWorkspace,
-				linearConnected: ticketsShown,
+				linearConnected: linearCallable,
 			};
 			// A linked session resolves wherever it ran, even in a directory the sidebar does not list.
 			main = <TodoPage list={state.userTodos} view={todoView} hosts={all.hosts} past={all.past} {...todoProps} />;
@@ -366,7 +373,7 @@ export function App() {
 			);
 			break;
 		case "calendar":
-			main = <CalendarPage routines={state.routines} todos={state.userTodos} ticketsShown={ticketsShown} />;
+			main = <CalendarPage routines={state.routines} todos={state.userTodos} ticketsShown={linearCallable} />;
 			break;
 		case undefined:
 			main = panes();
@@ -390,6 +397,7 @@ export function App() {
 						onTogglePin={togglePin}
 						open={cover ? [] : layout.panes}
 						newSessionOpen={page?.kind === "new"}
+						integrationsOpen={page?.kind === "integrations"}
 						ticketsShown={ticketsShown}
 						tab={tab}
 						onTab={showTab}

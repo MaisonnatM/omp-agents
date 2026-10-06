@@ -1,14 +1,60 @@
-/** Sign-ins to Linear and Google, and the Google calendar events they read. */
+/** The integrations: omp's MCP sign-ins and the dashboard's Google sign-in, and the Google calendar events they read. */
 
-/** A sign-in that the settings started, to Linear or Google: waiting for the browser at the provider's authorization `url`, or why it failed. */
+/** A sign-in that the integrations page started: waiting for the browser at the provider's authorization `url`, or why it failed. */
 export type SignInState = { phase: "waiting"; url: string } | { phase: "failed"; error: string } | null;
 
-/** `GET /api/linear`, and `PUT /api/linear/sign-in`, which starts a sign-in. */
-export interface LinearStatus {
-	/** omp has an MCP server for Linear and a sign-in for it, so the tickets page can read the issues. */
-	connected: boolean;
+/** The services whose MCP server the integrations page signs omp in to. */
+export const MCP_INTEGRATIONS = ["linear"] as const;
+export type McpIntegrationId = (typeof MCP_INTEGRATIONS)[number];
+
+export interface McpService {
+	label: string;
+	/** The host omp's server for the service is on, whatever omp named it. */
+	host: string;
+	/** The server a sign-in adds, under `serverName` in omp's MCP config, when omp has none. */
+	url: string;
+	serverName: string;
+}
+
+export const MCP_SERVICES: Record<McpIntegrationId, McpService> = {
+	linear: { label: "Linear", host: "mcp.linear.app", url: "https://mcp.linear.app/mcp", serverName: "linear" },
+};
+
+/** omp's MCP server for a service: its name in omp's MCP config, its URL, and that URL's host. */
+export interface McpServerRef {
+	name: string;
+	url: string;
+	host: string;
+}
+
+/**
+ * Where omp stands with a service's MCP server: no server in omp's config, a server without a sign-in, or what listing
+ * its tools with the sign-in found: the tools, the server refusing the sign-in, or another failure.
+ */
+export type McpConnection =
+	| { kind: "absent" }
+	| { kind: "signed-out"; server: McpServerRef }
+	| { kind: "ready"; server: McpServerRef; tools: string[] }
+	| { kind: "refused"; server: McpServerRef; error: string }
+	| { kind: "failing"; server: McpServerRef; error: string };
+
+/** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and Linear's Tickets tab shows. */
+export const signedIn = (connection: McpConnection): boolean => connection.kind !== "absent" && connection.kind !== "signed-out";
+
+/** Whether the dashboard calls the service's tools: the server took omp's sign-in, or failed for a reason a retry may clear. */
+export const callable = (connection: McpConnection): boolean => connection.kind === "ready" || connection.kind === "failing";
+
+/** One service of `GET /api/integrations`, and what `PUT /api/integrations/sign-in` and `/sign-out` answer. */
+export interface McpIntegration {
+	id: McpIntegrationId;
+	connection: McpConnection;
 	/** The latest sign-in, while it waits or after it failed; `null` when none ran or the last one succeeded. */
 	signIn: SignInState;
+}
+
+/** `GET /api/integrations[?fresh]`: every MCP integration by its id. */
+export interface IntegrationsAnswer {
+	integrations: Record<McpIntegrationId, McpIntegration>;
 }
 
 /** `GET /api/google`, and the writes under it: the OAuth client saved in the settings, and whether it holds a sign-in. The client secret never leaves the server. */

@@ -244,6 +244,8 @@ export interface McpConfigModule {
 export interface McpCredentialsModule {
 	/** The credential ids omp looks a server's OAuth sign-in up under when its config names none. */
 	mcpOAuthCredentialIdsForServerUrl(serverUrl: string | undefined): string[];
+	/** Removes the OAuth sign-ins omp manages under `credentialIds`, as `/mcp unauth` does; whether it removed any. */
+	removeManagedMcpOAuthCredentials(storage: AuthStorage, credentialIds: readonly (string | undefined)[]): Promise<boolean>;
 }
 /** Subset of omp's `OAuthEndpoints` (src/mcp/oauth-discovery.ts). */
 export interface McpOAuthEndpoints {
@@ -468,6 +470,7 @@ export const mcpRpc = await load<McpRpcModule>(join(srcDir, "mcp", "json-rpc.ts"
 export const mcpConfig = await load<McpConfigModule>(join(srcDir, "mcp", "config.ts"), { loadAllMCPConfigs: "function" });
 export const mcpCredentials = await load<McpCredentialsModule>(join(srcDir, "mcp", "oauth-credentials.ts"), {
 	mcpOAuthCredentialIdsForServerUrl: "function",
+	removeManagedMcpOAuthCredentials: "function",
 });
 export const discoveryHelpers = await load<DiscoveryHelpersModule>(join(srcDir, "discovery", "helpers.ts"), { expandEnvVarsDeep: "function" });
 export const mcpOAuthDiscovery = await load<McpOAuthDiscoveryModule>(join(srcDir, "mcp", "oauth-discovery.ts"), {

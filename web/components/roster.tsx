@@ -11,8 +11,9 @@ import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { agentOn, yourMoveCount } from "../inbox-model";
 import { projectName } from "../labels";
+import { PAGE_ICON } from "../page-icons";
 import { inboxStore, ticketsStore } from "../reads";
-import { hashForTickets, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "../routing";
+import { hashForIntegrations, hashForTickets, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
@@ -192,6 +193,7 @@ interface RosterProps {
 	open: View[];
 	/** The new-session draft is open. */
 	newSessionOpen: boolean;
+	integrationsOpen: boolean;
 	/** omp is signed in to Linear, so the Tickets tab shows. */
 	ticketsShown: boolean;
 	/** The sidebar's tab, selected by the page or kept over the panes. */
@@ -233,6 +235,7 @@ export function Roster({
 	onTogglePin,
 	open,
 	newSessionOpen,
+	integrationsOpen,
 	ticketsShown,
 	tab,
 	onTab,
@@ -276,6 +279,13 @@ export function Roster({
 				<Tooltip content="Keyboard shortcuts" shortcut={shortcutLabels("help")} side="bottom">
 					<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
 						<Keyboard />
+					</Button>
+				</Tooltip>
+				<Tooltip content="Integrations" side="bottom">
+					<Button asChild variant="ghost" size="icon-compact" active={integrationsOpen} className="shrink-0 text-muted-foreground">
+						<a href={hashForIntegrations()} aria-label="Integrations" aria-current={integrationsOpen ? "page" : undefined}>
+							<PAGE_ICON.integrations />
+						</a>
 					</Button>
 				</Tooltip>
 				{toggle}

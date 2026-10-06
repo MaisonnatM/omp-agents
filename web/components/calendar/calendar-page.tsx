@@ -256,7 +256,7 @@ interface CalendarPageProps {
 	routines: Routine[];
 	/** `null` until the server sends it. */
 	todos: UserTodoList | null;
-	/** omp is signed in to Linear, so tickets with a due date show. */
+	/** The dashboard can read Linear, so tickets with a due date show. */
 	ticketsShown: boolean;
 }
 

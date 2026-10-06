@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ClientMsg } from "../shared/protocol";
 import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
-import { parseClientMsg, parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
+import { parseClientMsg, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -280,6 +280,17 @@ describe("parsePullRequestQuery", () => {
 		expect(query("owner=a/b&repo=c&number=1")).toBeNull();
 		expect(query("owner=a&repo=b%20c&number=1")).toBeNull();
 		expect(query("owner=&repo=b&number=1")).toBeNull();
+	});
+});
+
+describe("parseIntegrationId", () => {
+	test("takes the id of an MCP integration and nothing else", () => {
+		expect(parseIntegrationId({ id: "linear" })).toBe("linear");
+		expect(parseIntegrationId({ id: "Linear" })).toBeNull();
+		expect(parseIntegrationId({ id: "google" })).toBeNull();
+		expect(parseIntegrationId({})).toBeNull();
+		expect(parseIntegrationId("linear")).toBeNull();
+		expect(parseIntegrationId(null)).toBeNull();
 	});
 });
 

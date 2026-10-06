@@ -1,10 +1,9 @@
-import { ArrowLeft, Ellipsis, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Routine, RoutineChange, RoutineRun, RoutineTask } from "../../../src/routines";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
+import { MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { modeOf, readTime, SPLIT_CLICK } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
@@ -15,6 +14,7 @@ import { useDashboardContext } from "../dashboard-context";
 import { PageFrame } from "../list-page";
 import { SessionChip } from "../session-chip";
 import { statusLabel } from "../status-dot";
+import { MoreActionsMenu } from "../more-actions-menu";
 import { RoutineEditor } from "./routine-editor";
 
 interface RoutineActionsProps {
@@ -29,7 +29,6 @@ interface RoutineActionsProps {
 /** A routine's menu, **Run now**, **Pause** or **Resume**, **Edit**, and **Delete**, which asks first in its place. */
 function RoutineActions({ routine, disabled, onChange, onEdit, onDeleted }: RoutineActionsProps) {
 	const [confirming, setConfirming] = useState(false);
-	const [menuOpen, setMenuOpen] = useState(false);
 	const { id, name, enabled } = routine;
 	if (confirming) {
 		return (
@@ -52,31 +51,24 @@ function RoutineActions({ routine, disabled, onChange, onEdit, onDeleted }: Rout
 		);
 	}
 	return (
-		<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-			<Tooltip content="More actions" forceOpen={menuOpen ? false : undefined}>
-				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={`More actions for ${name}`} disabled={disabled} />}>
-					<Ellipsis />
-				</DropdownMenuTrigger>
-			</Tooltip>
-			<DropdownMenuContent align="end">
-				<MenuItem onClick={() => onChange({ op: "run-now", id })}>
-					<Play />
-					Run now
-				</MenuItem>
-				<MenuItem onClick={() => onChange({ op: "enable", id, enabled: !enabled })}>
-					{enabled ? <Pause /> : <Play />}
-					{enabled ? "Pause" : "Resume"}
-				</MenuItem>
-				<MenuItem onClick={onEdit}>
-					<Pencil />
-					Edit
-				</MenuItem>
-				<MenuItem variant="destructive" onClick={() => setConfirming(true)}>
-					<Trash2 />
-					Delete
-				</MenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
+		<MoreActionsMenu name={name} disabled={disabled}>
+			<MenuItem onClick={() => onChange({ op: "run-now", id })}>
+				<Play />
+				Run now
+			</MenuItem>
+			<MenuItem onClick={() => onChange({ op: "enable", id, enabled: !enabled })}>
+				{enabled ? <Pause /> : <Play />}
+				{enabled ? "Pause" : "Resume"}
+			</MenuItem>
+			<MenuItem onClick={onEdit}>
+				<Pencil />
+				Edit
+			</MenuItem>
+			<MenuItem variant="destructive" onClick={() => setConfirming(true)}>
+				<Trash2 />
+				Delete
+			</MenuItem>
+		</MoreActionsMenu>
 	);
 }
 

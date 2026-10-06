@@ -88,7 +88,7 @@ async function refusal(response: Response): Promise<string> {
 	return description ? `${message}: ${description}` : message;
 }
 
-const NOT_CONNECTED = "Google Calendar is not connected. Connect it in Settings, under Integrations.";
+const NOT_CONNECTED = "Google Calendar is not connected. Connect it on the Integrations page.";
 
 /** The Google connection the settings set up, kept in `path` with the owner's permissions only, since it holds a secret. */
 export class GoogleCalendar {
@@ -196,7 +196,7 @@ export class GoogleCalendar {
 			// A refresh token that was revoked or expired never works again; only a new sign-in helps.
 			if (err.status !== 400 || this.#stored !== stored) throw err;
 			this.#store({ ...stored, refreshToken: null });
-			throw new Error(`Google Calendar signed out (${err.message}). Sign in again in Settings, under Integrations.`);
+			throw new Error(`Google Calendar signed out (${err.message}). Reconnect it on the Integrations page.`);
 		});
 		const token = str(tokens.access_token);
 		if (!token) throw new Error("Google gave no access token");

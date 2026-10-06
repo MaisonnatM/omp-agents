@@ -1,6 +1,7 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
 import { useEffect, useState } from "react";
-import type { CalendarEventsAnswer, GoogleStatus, LinearStatus } from "../src/shared/accounts";
+import { isObject } from "../src/json";
+import { type CalendarEventsAnswer, type GoogleStatus, type IntegrationsAnswer, MCP_INTEGRATIONS } from "../src/shared/accounts";
 import type { Inbox } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
 import type { TicketsAnswer } from "../src/shared/tickets";
@@ -71,11 +72,14 @@ export const ticketsStore = createPolledStore<TicketsAnswer>({
 	isValid: (value): value is TicketsAnswer => Array.isArray((value as Partial<TicketsAnswer> | null)?.tickets),
 });
 
-/** Whether omp is signed in to Linear, which the sidebar's tabs, the tickets page, and the settings share. */
-export const linearStore = createPolledStore<LinearStatus>({
-	cacheKey: "omp-agents.linear-cache",
-	url: () => "/api/linear",
-	isValid: (value): value is LinearStatus => typeof (value as Partial<LinearStatus> | null)?.connected === "boolean",
+/** Where omp stands with each MCP integration, which the sidebar's tabs, the tickets page, and the integrations page share. */
+export const integrationsStore = createPolledStore<IntegrationsAnswer>({
+	cacheKey: "omp-agents.integrations-cache",
+	url: (_scope, fresh) => (fresh ? "/api/integrations?fresh" : "/api/integrations"),
+	isValid: (value): value is IntegrationsAnswer => {
+		const integrations = isObject(value) ? value.integrations : null;
+		return isObject(integrations) && MCP_INTEGRATIONS.every(id => isObject(integrations[id]));
+	},
 });
 
 /** The Google OAuth client and whether its sign-in can read your calendars. */

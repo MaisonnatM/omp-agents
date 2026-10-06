@@ -9,6 +9,7 @@ describe("documentTitle", () => {
 	test("a page names itself ahead of the app", () => {
 		expect(documentTitle({ kind: "settings", cwd: null }, null, null, null)).toBe("Settings · omp agents");
 		expect(documentTitle({ kind: "new", cwd: "~/code", todoId: null }, null, null, null)).toBe("New session · omp agents");
+		expect(documentTitle({ kind: "integrations" }, null, null, null)).toBe("Integrations · omp agents");
 	});
 
 	test("a ticket's page names the ticket, and the list names the tickets", () => {

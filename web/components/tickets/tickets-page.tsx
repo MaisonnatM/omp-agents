@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { RosterHost, View } from "../../../src/shared/sessions";
+import type { McpIntegration } from "../../../src/shared/accounts";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
@@ -13,7 +14,8 @@ import { useDashboardContext } from "../dashboard-context";
 import { FoldButton, useFolds, useReveal } from "../fold";
 import { DetailPage, ListPage, PageFrame } from "../list-page";
 import { DetailQuickActions, QuickStartNotice } from "../quick-actions";
-import { LinearConnection } from "../settings/linear-connection";
+import { IntegrationList } from "../integrations/integration-row";
+import { McpIntegrationRow } from "../integrations/mcp-integration";
 import { TicketDetailContent } from "./ticket-details";
 import { statusIcon, TicketRow, ticketRowId } from "./ticket-row";
 
@@ -168,12 +170,14 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	);
 }
 
-/** The tickets page while omp is not signed in to Linear: the connection, to sign in from here as from the settings. */
-export function TicketsDisconnected() {
+/** The tickets page while omp cannot read Linear: Linear's integration row, to connect from here as from the Integrations page. */
+export function TicketsDisconnected({ linear }: { linear: McpIntegration }) {
 	return (
 		<PageFrame title={TITLE} meta={META}>
-			<div className="mx-auto w-full max-w-5xl px-6 py-6">
-				<LinearConnection />
+			<div className="mx-auto w-full max-w-3xl px-6 py-6">
+				<IntegrationList label="Linear connection">
+					<McpIntegrationRow integration={linear} />
+				</IntegrationList>
 			</div>
 		</PageFrame>
 	);
