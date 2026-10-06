@@ -25,12 +25,12 @@ import { hashForInbox, type OpenMode } from "../../routing";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import type { QuickActionId } from "../../quick-actions";
-import { BranchName } from "../git";
+import { DROP_LINE, type DragItem } from "../../use-drag-order";
 import { AddToTodo } from "../add-to-todo";
 import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";
-import { Avatar, IconTip, Reviewers, STATE_ICON } from "./avatars";
+import { IconTip, STATE_ICON } from "./avatars";
 
 const CHECK_ICON: Record<Exclude<CheckState, "none">, [LucideIcon, string, string]> = {
 	passing: [CircleCheck, "text-emerald-600 dark:text-emerald-400", "Checks on the latest commit passed"],
@@ -195,86 +195,87 @@ function LinkSessionsButton({ pr, sessions }: { pr: PullRequest; sessions: Sessi
 interface RowProps {
 	row: InboxRow;
 	sessions: SessionLink[];
-	/** The PR the inbox link named, highlighted while its sheet shows. */
+	/** The pull request whose details the main area shows. */
 	targeted: boolean;
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The quick action whose session is starting for this PR, if any. */
 	pending: QuickActionId | null;
 	onQuickAction: (action: PullRequestActionId) => void;
+	drag: DragItem;
+	/** What the move shortcuts name the row by. */
+	moveId: string;
 }
 
-export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen, pending, onQuickAction }: RowProps) {
+/** A pull request in the sidebar's inbox: its title and age, then what stands out about it, with its actions on hover. */
+export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen, pending, onQuickAction, drag, moveId }: RowProps) {
 	const verdict = rowVerdict(pr);
 	return (
-		<li id={rowId(pr)} data-targeted={targeted || undefined} className={cn("group/row relative scroll-my-6", targeted && "ring-2 ring-inset ring-ring")}>
-			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-[19.5px] h-3 w-px bg-border" />}
-			{stack?.joinsBelow && <span aria-hidden className="absolute top-7 bottom-0 left-[19.5px] w-px bg-border" />}
-			<div className={cn("flex items-start gap-3 px-3 py-2.5", targeted ? "bg-accent/60" : "hover:bg-muted/50")}>
+		<li id={rowId(pr)} {...drag.handle} {...drag.target} data-move={moveId} className={cn("group/row relative", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}>
+			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-[15.5px] h-1.5 w-px bg-border" />}
+			{stack?.joinsBelow && <span aria-hidden className="absolute top-6 bottom-0 left-[15.5px] w-px bg-border" />}
+			<div className={cn("flex items-start gap-2 rounded-md px-2 py-1.5", targeted ? "bg-sidebar-accent" : "group-hover/row:bg-sidebar-accent/50")}>
 				<IconTip icon={STATE_ICON[pr.state]} className="mt-0.5" />
-				{pr.role === "reviewer" && <Avatar person={pr.author} label={`Opened by ${pr.author.login}`} className="mt-px" />}
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<div className="flex min-w-0 items-baseline gap-2">
 						<Tooltip content={`${pr.owner}/${pr.repo}#${pr.number} · ${pr.title}`}>
 							<a
 								href={hashForInbox(pr)}
-								aria-haspopup="dialog"
-								className="truncate rounded-sm text-sm font-medium underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+								// The row drags, not the link's address.
+								draggable={false}
+								aria-current={targeted ? "page" : undefined}
+								className="min-w-0 flex-1 truncate rounded-sm text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							>
 								{pr.title}
 							</a>
 						</Tooltip>
-						<span className="shrink-0 text-xs tabular-nums text-muted-foreground">#{pr.number}</span>
+						<span className="shrink-0 text-xs tabular-nums text-muted-foreground" title={new Date(pr.updatedAt).toLocaleString()}>
+							{age(pr.updatedAt)}
+						</span>
 					</div>
-					<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
-						<BranchName name={pr.head} className="min-w-0 truncate font-mono" />
+					<p className="flex min-w-0 items-center gap-x-1.5 overflow-hidden text-xs text-muted-foreground">
+						<span className="shrink-0 tabular-nums">#{pr.number}</span>
+						{pr.checks !== "none" && <IconTip icon={CHECK_ICON[pr.checks]} />}
+						{pr.conflicts && <IconTip icon={CONFLICTS_ICON} />}
+						<Unresolved unresolved={pr.unresolved} />
+						{verdict && <span className={cn("shrink-0", VERDICT_LABEL[verdict][1])}>{VERDICT_LABEL[verdict][0]}</span>}
 						{stack ? (
 							<StackChip stack={stack} base={pr.stackedOn} />
 						) : (
 							pr.stackedOn && (
 								<Tooltip content={`Stacked on ${pr.stackedOn}`}>
-									<span className="min-w-0 truncate">
+									<span className="min-w-0 shrink-0 truncate">
 										on <span className="font-mono">{pr.stackedOn}</span>
 									</span>
 								</Tooltip>
 							)
 						)}
-						{pr.role === "reviewer" && <span className="shrink-0">· by {pr.author.login}</span>}
+						{pr.role === "reviewer" && <span className="shrink-0">by {pr.author.login}</span>}
 						<SessionChips sessions={sessions} onOpen={onOpen} />
 					</p>
 				</div>
-				<div className="flex shrink-0 items-center gap-3 text-xs">
-					<Reviewers reviewers={pr.reviewers} />
-					{verdict && <span className={VERDICT_LABEL[verdict][1]}>{VERDICT_LABEL[verdict][0]}</span>}
-					<Unresolved unresolved={pr.unresolved} />
-					{pr.checks !== "none" && <IconTip icon={CHECK_ICON[pr.checks]} />}
-					{pr.conflicts && <IconTip icon={CONFLICTS_ICON} />}
-					<span
-						className={cn(
-							"flex items-center gap-1 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-busy]]:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
-							pending === null && "opacity-0",
-						)}
-					>
-						<AddToTodo
-							text={pr.title}
-							body={`Pull request ${pullRequestUrl(pr)}`}
-							link={{ kind: "pull-request", owner: pr.owner, repo: pr.repo, number: pr.number }}
-							label={`Add ${pr.repo}#${pr.number} to your todo list`}
-						/>
-						<span data-row-actions className="flex">
-							<QuickActionsMenu
-								actions={pullRequestActions(pr)}
-								pending={pending}
-								onRun={onQuickAction}
-								label="Quick actions: start a session in the background that works on this pull request"
-							/>
-						</span>
-						{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
-					</span>
-					<span className="w-14 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={new Date(pr.updatedAt).toLocaleString()}>
-						{age(pr.updatedAt)}
-					</span>
-				</div>
 			</div>
+			<span
+				className={cn(
+					"absolute top-1 right-1 flex items-center gap-0.5 rounded-md bg-sidebar transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-busy]]:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
+					pending === null && "opacity-0",
+				)}
+			>
+				<AddToTodo
+					text={pr.title}
+					body={`Pull request ${pullRequestUrl(pr)}`}
+					link={{ kind: "pull-request", owner: pr.owner, repo: pr.repo, number: pr.number }}
+					label={`Add ${pr.repo}#${pr.number} to your todo list`}
+				/>
+				<span data-row-actions className="flex">
+					<QuickActionsMenu
+						actions={pullRequestActions(pr)}
+						pending={pending}
+						onRun={onQuickAction}
+						label="Quick actions: start a session in the background that works on this pull request"
+					/>
+				</span>
+				{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
+			</span>
 		</li>
 	);
 }

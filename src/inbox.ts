@@ -33,7 +33,7 @@ const AVATAR = "avatarUrl(size: 48)";
 /** The most review threads one page lists; a PR with more counts its unresolved threads as a floor. */
 const THREADS = 100;
 
-/** The pull request's author, its requested reviewers, and its latest reviews, which the inbox's entry and its sheet both show. */
+/** The pull request's author, its requested reviewers, and its latest reviews, which the inbox's entry and its details both show. */
 const REVIEW_FIELDS = `author { login ${AVATAR} }
 	reviewRequests(first: 10) { nodes { requestedReviewer {
 		... on User { login ${AVATAR} } ... on Bot { login ${AVATAR} } ... on Mannequin { login ${AVATAR} } ... on Team { slug ${AVATAR} }
@@ -90,7 +90,7 @@ const conflictsOf = (node: Record<string, unknown>): boolean => node.state !== "
 /** A deleted account leaves no author; GitHub shows it as `ghost`. */
 const authorOf = (author: unknown): Person => parsePerson(author) ?? { login: "ghost", avatarUrl: null };
 
-/** What a pull request's inbox entry and its sheet share, or `null` when GitHub left out its title or branches. */
+/** What a pull request's inbox entry and its details share, or `null` when GitHub left out its title or branches. */
 function parsePullRequestHead(node: Record<string, unknown>) {
 	const title = str(node.title);
 	const head = str(node.headRefName);

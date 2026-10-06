@@ -89,6 +89,29 @@ export function sidebarSessions(hosts: RosterHost[], past: PastSession[], projec
 	};
 }
 
+/** `lists` with only the rows whose title or directory holds every word of `query`, ignoring case. */
+export function searchSessions(lists: SidebarSessions, query: string): SidebarSessions {
+	const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+	if (words.length === 0) return lists;
+	const matches = (title: string | null, cwdDisplay: string): boolean => {
+		const text = `${title ?? ""}\n${cwdDisplay}`.toLowerCase();
+		return words.every(word => text.includes(word));
+	};
+	const hosts = (rows: RosterHost[]): RosterHost[] => rows.filter(host => matches(host.sessionName, host.cwdDisplay));
+	const past = (rows: PastSession[]): PastSession[] => rows.filter(session => matches(session.title, session.cwdDisplay));
+	return {
+		pinned: { hosts: hosts(lists.pinned.hosts), past: past(lists.pinned.past) },
+		running: hosts(lists.running),
+		idle: hosts(lists.idle),
+		interrupted: past(lists.interrupted),
+		ended: past(lists.ended),
+	};
+}
+
+/** How many live sessions in `lists` wait on your move: a turn that finished, or a question left open. */
+export const waitingCount = ({ pinned, running, idle }: SidebarSessions): number =>
+	[...pinned.hosts, ...running, ...idle].filter(host => host.status === "idle" || host.status === "needs-input").length;
+
 /** Every row of the sessions tab in its order, which the previous and next session keys walk. */
 export function listedViews({ pinned, running, idle, interrupted, ended }: SidebarSessions): View[] {
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));

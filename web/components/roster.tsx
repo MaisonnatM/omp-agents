@@ -1,6 +1,6 @@
 import { AppWindow, Archive, CalendarClock, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Search, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type Routine, repoKey, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
+import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type Routine, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +22,7 @@ import {
 	SidebarGroupActions,
 	SidebarGroupLabel,
 	SidebarHeader,
+	SidebarInput,
 	SidebarMenu,
 	SidebarMenuAction,
 	SidebarMenuBadge,
@@ -30,12 +31,12 @@ import {
 } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
-import { fontWeights } from "@/lib/font-weight";
 import { SizeProvider } from "@/lib/size-context";
-import { inboxSection, inboxSections, type Waiting, waitingCount } from "../inbox-model";
+import { cn } from "@/lib/utils";
+import { mergeableCount } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
-import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView, type TodoListView } from "../routing";
+import { hashForSettings, hashForTickets, type OpenMode, sameView, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
@@ -276,20 +277,12 @@ interface SectionLinkProps {
 	title: string;
 	label: string;
 	count: number;
-	/** Marks the count of an inbox section that waits on your move. */
-	waiting?: Waiting;
 	/** Gets a new target each time, so choosing a section again scrolls back to it. */
 	onChoose: (target: SectionTarget) => void;
 }
 
-/** The count of an inbox section that waits on your move: a review asked of you, or a pull request a reviewer sent back. */
-const WAITING_COUNT: Record<Waiting, string> = {
-	"your-review": "text-foreground",
-	"your-fix": "text-red-600 dark:text-red-400",
-};
-
 /** A link to a section of a page, with its count. A plain click scrolls there; the page listens for `onChoose`. */
-function SectionLink({ href, section, chosen, title, label, count, waiting, onChoose }: SectionLinkProps) {
+function SectionLink({ href, section, chosen, title, label, count, onChoose }: SectionLinkProps) {
 	const isChosen = chosen?.id === section.id;
 	return (
 		<SidebarMenuItem>
@@ -309,61 +302,12 @@ function SectionLink({ href, section, chosen, title, label, count, waiting, onCh
 					{title}
 				</a>
 			</SidebarMenuButton>
-			{/* The badge sets its weight through `font-variation-settings`, which a weight class cannot override. */}
-			<SidebarMenuBadge aria-hidden className={waiting ? WAITING_COUNT[waiting] : undefined} style={waiting ? { fontVariationSettings: fontWeights.semibold } : undefined}>
-				{count}
-			</SidebarMenuBadge>
+			<SidebarMenuBadge aria-hidden>{count}</SidebarMenuBadge>
 		</SidebarMenuItem>
 	);
 }
 
 const navNote = (text: string) => <p className="px-2 py-1 text-xs text-muted-foreground">{text}</p>;
-
-interface InboxNavProps {
-	project: string | null;
-	target: SectionTarget | null;
-	onTarget: (target: SectionTarget) => void;
-}
-
-/** The inbox page's sections with their pull request counts, per repository, each a link to its section on the page. */
-function InboxNav({ project, target, onTarget }: InboxNavProps) {
-	const { read, error } = inboxStore.use(project);
-	if (!read) return <SidebarGroup>{navNote(error ? `Cannot load the inbox: ${error}` : "Asking GitHub for pull requests…")}</SidebarGroup>;
-	const { repos } = read.data;
-	if (repos.length === 0) return <SidebarGroup>{navNote("No session ran in a GitHub repository.")}</SidebarGroup>;
-	return repos.map(repo => {
-		const name = `${repo.owner}/${repo.repo}`;
-		const key = repoKey(repo);
-		const sections = "error" in repo ? [] : inboxSections(repo.pullRequests);
-		let body: ReactNode;
-		if ("error" in repo) body = navNote(`Cannot read ${name} from GitHub.`);
-		else if (sections.length === 0) body = navNote("No open pull requests and no reviews waiting.");
-		else
-			body = (
-				<SidebarMenu aria-label={repos.length > 1 ? `Inbox sections of ${name}` : "Inbox sections"}>
-					{sections.map(({ title, waiting, rows: { length } }) => (
-						<SectionLink
-							key={title}
-							href={hashForInbox(null)}
-							section={inboxSection(key, title)}
-							chosen={target}
-							title={title}
-							label={`${title}, ${length} pull request${length === 1 ? "" : "s"}`}
-							count={length}
-							waiting={waiting ?? undefined}
-							onChoose={onTarget}
-						/>
-					))}
-				</SidebarMenu>
-			);
-		return (
-			<SidebarGroup key={key}>
-				{repos.length > 1 && <SidebarGroupLabel>{name}</SidebarGroupLabel>}
-				{body}
-			</SidebarGroup>
-		);
-	});
-}
 
 interface TicketsNavProps {
 	target: SectionTarget | null;
@@ -407,14 +351,37 @@ const SIDEBAR_TABS = [
 	{ value: "routines", label: "Routines", icon: CalendarClock },
 ] as const;
 
-/** The sidebar's tab; the inbox, tickets, todo, and routines tabs go with their pages, sessions with the panes. */
+/**
+ * How the sidebar tabs fit its width, by container query: labels while they fit, then icons alone sharing the row.
+ * Icons alone keep each name in the tooltip and for screen readers.
+ * Each switch sits where the labels fit with counts on Inbox and Sessions and the list's margins; labels never fit beside their icons once both carry counts.
+ */
+const SIDEBAR_TAB_FIT = {
+	four: {
+		list: "@max-[19rem]/sidebar:self-stretch",
+		tab: "@min-[19rem]/sidebar:[&>svg]:hidden @max-[19rem]/sidebar:flex-1 @max-[19rem]/sidebar:justify-center @max-[19rem]/sidebar:px-0.5",
+		label: "@max-[19rem]/sidebar:sr-only",
+	},
+	five: {
+		list: "@max-[22rem]/sidebar:self-stretch",
+		tab: "@min-[22rem]/sidebar:[&>svg]:hidden @max-[22rem]/sidebar:flex-1 @max-[22rem]/sidebar:justify-center @max-[22rem]/sidebar:px-0.5",
+		label: "@max-[22rem]/sidebar:sr-only",
+	},
+};
+
+/** The sidebar's tab; the tickets, todo, and routines tabs go with their pages, the sessions and inbox tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 interface RosterProps {
 	/** Directories sessions ran in, as {@link workspaces} lists them. */
 	projects: { cwd: string; cwdDisplay: string }[];
-	/** The sessions tab's lists, under the selected project. */
+	/** The sessions tab's lists, under the selected project and matching `query`. */
 	lists: SidebarSessions;
+	/** Live sessions in the selected project that wait on your move, whatever the search field hides. */
+	waiting: number;
+	/** What the sessions tab's search field holds; it narrows `lists`. */
+	query: string;
+	onQuery: (query: string) => void;
 	/** Pin session `sessionId`, or unpin it when it is pinned. */
 	onTogglePin: (sessionId: string) => void;
 	/** Views on screen, highlighted in the list. */
@@ -426,7 +393,7 @@ interface RosterProps {
 	settingsOpen: boolean;
 	/** omp is signed in to Linear, so the Tickets tab shows. */
 	ticketsShown: boolean;
-	/** The sidebar's tab: the inbox, the tickets, the todos, or the routines with their pages, or the sessions over the panes. */
+	/** The sidebar's tab: the tickets, the todos, or the routines with their pages, or the sessions or the inbox over the panes. */
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
 	/** The Todo page's list, `null` until the server sends it. */
@@ -436,9 +403,11 @@ interface RosterProps {
 	routines: Routine[];
 	/** The routine the Routines page shows, `null` for the list. */
 	routinesTarget: string | null;
-	/** The inbox or tickets section a sidebar link last chose. */
+	/** The tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
+	/** The Inbox tab's content. */
+	inbox: ReactNode;
 	/** The selected project's `cwd`, or `null` for all projects. */
 	project: string | null;
 	onPickProject: (cwd: string | null) => void;
@@ -451,6 +420,9 @@ interface RosterProps {
 export function Roster({
 	projects,
 	lists,
+	waiting,
+	query,
+	onQuery,
 	onTogglePin,
 	open,
 	newSessionOpen,
@@ -465,6 +437,7 @@ export function Roster({
 	routinesTarget,
 	sectionTarget,
 	onSectionTarget,
+	inbox,
 	project,
 	onPickProject,
 	onShowSearch,
@@ -474,8 +447,12 @@ export function Roster({
 	const { open: onOpen, send, start, dismissStart, end: onEnd, openNewSession: onNewSession, changeTodo: onTodoChange, connected, starts } = useDashboardContext();
 	const { resume, resumeAll } = starts;
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
-	const inbox = inboxStore.use(project).read;
-	const waiting = inbox ? waitingCount(inbox.data) : 0;
+	const inboxRead = inboxStore.use(project).read;
+	/** The count after a tab's label, and what it counts, for its accessible name. */
+	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
+		sessions: { count: waiting, meaning: "waiting on you" },
+		inbox: { count: inboxRead ? mergeableCount(inboxRead.data) : 0, meaning: "ready to merge" },
+	};
 	/** Continue past session `sessionId`, in the pane that shows it. */
 	const onResume = (sessionId: string): void => {
 		// The pane shows the resume's progress and failure, and the live session takes it over.
@@ -487,6 +464,8 @@ export function Roster({
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	const selectedProject = projects.find(({ cwd }) => cwd === project);
 	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
+	/** The search field narrows the lists, so a group left empty hides rather than saying it has no sessions. */
+	const filtering = query.trim() !== "";
 	/** A past session's row; `isPinned` lists it under Pinned, where an interrupted one says so, as its own group does not. */
 	const pastRow = (session: PastSession, isPinned: boolean) => {
 		const pastView: View = { kind: "past", sessionId: session.sessionId };
@@ -500,7 +479,7 @@ export function Roster({
 				items={
 					<>
 						{/* One resume runs at a time, as the pane's Resume button allows. */}
-						<MenuItem variant="agent" disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
+						<MenuItem disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
 							<Play />
 							{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
 						</MenuItem>
@@ -571,6 +550,7 @@ export function Roster({
 			</RowMenu>
 		);
 	};
+	const fit = ticketsShown ? SIDEBAR_TAB_FIT.five : SIDEBAR_TAB_FIT.four;
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
@@ -596,19 +576,20 @@ export function Roster({
 				{toggle}
 			</SidebarHeader>
 			<SizeProvider size="compact">
-				<TabsList aria-label="Sidebar" className="mx-2 self-start">
-					{/* The tabs fit the sidebar's default width only with tighter padding than Fluid's, and five of them only without their icons. */}
+				<TabsList aria-label="Sidebar" className={cn("mx-2 max-w-[calc(100%-1rem)] self-start", fit.list)}>
 					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => {
-						const badge = value === "inbox" && waiting > 0 ? waiting : undefined;
+						const counted = tabCounts[value];
+						const badge = counted && counted.count > 0 ? counted : undefined;
 						return (
 							<TabItem
 								key={value}
 								value={value}
 								label={label}
 								icon={icon}
-								badge={badge}
-								aria-label={badge === undefined ? undefined : `${label}, ${badge} waiting on you`}
-								className={ticketsShown ? "px-2 @max-[25rem]/sidebar:[&>svg]:hidden" : "px-2 @max-[20rem]/sidebar:[&>svg]:hidden"}
+								badge={badge?.count}
+								aria-label={badge && `${label}, ${badge.count} ${badge.meaning}`}
+								className={cn("px-2", fit.tab)}
+								labelClassName={fit.label}
 								shortcut={shortcutLabels(value)}
 							/>
 						);
@@ -620,9 +601,38 @@ export function Roster({
 					Lost the dashboard server. Retrying…
 				</p>
 			)}
-			{/* SidebarContent puts `hidden` on its inner element, so the class hides its scroll frame too. */}
-			<TabPanel value="sessions" forceMount asChild className={tab === "sessions" ? undefined : "hidden"}>
+			<TabPanel value="sessions" forceMount className={tab === "sessions" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
+				<SidebarGroup className="gap-1 pb-0">
+					<SidebarMenu aria-label="Start a session">
+						<SidebarMenuItem>
+							<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
+								<SidebarMenuButton icon={Plus} isActive={newSessionOpen} aria-current={newSessionOpen ? "page" : undefined} onClick={onNewSession}>
+									<span className="truncate">{newSessionLabel}</span>
+								</SidebarMenuButton>
+							</Tooltip>
+						</SidebarMenuItem>
+					</SidebarMenu>
+					<label className="relative block">
+						<Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<SidebarInput
+							type="search"
+							aria-label="Filter the sidebar's sessions"
+							placeholder="Search sessions"
+							value={query}
+							onChange={event => onQuery(event.target.value)}
+							onKeyDown={event => {
+								if (event.key !== "Escape") return;
+								onQuery("");
+								event.currentTarget.blur();
+							}}
+							className="pl-8"
+						/>
+					</label>
+				</SidebarGroup>
 				<SidebarContent>
+					{filtering && pinned.hosts.length + pinned.past.length + idle.length + running.length + interrupted.length + ended.length === 0 && (
+						<p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>
+					)}
 					{pinned.hosts.length + pinned.past.length > 0 && (
 						<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
 							<SidebarGroupLabel>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
@@ -638,22 +648,16 @@ export function Roster({
 							<SidebarMenu aria-label="Idle omp sessions">{idle.map(host => hostRow(host, false))}</SidebarMenu>
 						</SidebarGroup>
 					)}
-					<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
-						<SidebarGroupLabel>
-							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length > 0 ? "No other sessions running" : "No sessions"}
-						</SidebarGroupLabel>
-						{/* The group finds its header actions by type, and the tooltip would hide this one, so its chevron would sit under the button. */}
-						<SidebarGroupActions>
-							<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")}>
-								<SidebarGroupAction aria-label={newSessionLabel} aria-current={newSessionOpen ? "page" : undefined} onClick={onNewSession}>
-									<Plus />
-								</SidebarGroupAction>
-							</Tooltip>
-						</SidebarGroupActions>
-						<SidebarMenu aria-label="Running omp sessions">
-							{running.map(host => hostRow(host, false))}
-						</SidebarMenu>
-					</SidebarGroup>
+					{(!filtering || running.length > 0) && (
+						<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
+							<SidebarGroupLabel>
+								{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length > 0 ? "No other sessions running" : "No sessions"}
+							</SidebarGroupLabel>
+							<SidebarMenu aria-label="Running omp sessions">
+								{running.map(host => hostRow(host, false))}
+							</SidebarMenu>
+						</SidebarGroup>
+					)}
 					{interrupted.length > 0 && (
 						<SidebarGroup collapsible open={!collapsed.has("interrupted")} onOpenChange={() => toggleGroup("interrupted")}>
 							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
@@ -662,7 +666,7 @@ export function Roster({
 								<Tooltip content={resumingAll ? "Resuming…" : "Resume all"}>
 									{resumingAll || !connected ? (
 										<span className="inline-flex">
-											<SidebarGroupAction asChild className="agent-action text-[color:var(--agent-action-foreground)] hover:bg-transparent hover:text-[color:var(--agent-action-foreground)] disabled:pointer-events-none disabled:opacity-50">
+											<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
 												<button
 													type="button"
 													aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
@@ -674,7 +678,7 @@ export function Roster({
 											</SidebarGroupAction>
 										</span>
 									) : (
-										<SidebarGroupAction asChild className="agent-action text-[color:var(--agent-action-foreground)] hover:bg-transparent hover:text-[color:var(--agent-action-foreground)] disabled:pointer-events-none disabled:opacity-50">
+										<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
 											<button
 												type="button"
 												aria-label="Resume all interrupted sessions"
@@ -699,15 +703,17 @@ export function Roster({
 							</SidebarMenu>
 						</SidebarGroup>
 					)}
-					<SidebarGroup collapsible open={!collapsed.has("past")} onOpenChange={() => toggleGroup("past")}>
-						<SidebarGroupLabel>{ended.length === 0 ? "No past sessions" : `${ended.length} past`}</SidebarGroupLabel>
-						<SidebarMenu aria-label="Past omp sessions">{ended.map(session => pastRow(session, false))}</SidebarMenu>
-					</SidebarGroup>
+					{(!filtering || ended.length > 0) && (
+						<SidebarGroup collapsible open={!collapsed.has("past")} onOpenChange={() => toggleGroup("past")}>
+							<SidebarGroupLabel>{ended.length === 0 ? "No past sessions" : `${ended.length} past`}</SidebarGroupLabel>
+							<SidebarMenu aria-label="Past omp sessions">{ended.map(session => pastRow(session, false))}</SidebarMenu>
+						</SidebarGroup>
+					)}
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="inbox" asChild>
 				<SidebarContent>
-					<InboxNav project={project} target={sectionTarget} onTarget={onSectionTarget} />
+					{inbox}
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="tickets" asChild>

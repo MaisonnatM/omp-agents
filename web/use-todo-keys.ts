@@ -48,7 +48,7 @@ export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onC
 			if (!place) return false;
 			onToggle(place.entry.todo);
 		},
-		todoMoveUp: () => moveBy(-1),
-		todoMoveDown: () => moveBy(1),
+		moveUp: () => moveBy(-1),
+		moveDown: () => moveBy(1),
 	});
 }

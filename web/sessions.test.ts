@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PastSession, RosterHost } from "../src/shared";
-import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, sidebarSessions } from "./sessions";
+import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, searchSessions, sidebarSessions, waitingCount } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => ({ instanceId: `i-${sessionId}`, sessionId, cwd }) as RosterHost;
 const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
@@ -134,6 +134,12 @@ describe("sidebarSessions", () => {
 		expect(ids(lists.idle)).toEqual(["h1"]);
 	});
 
+	test("the waiting count takes finished turns and open questions in the selected project, pinned ones included", () => {
+		const statuses = { h1: "idle", h2: "needs-input", h3: "working", h4: "idle", h5: "unknown" } as const;
+		const live = [...Object.entries(statuses).map(([id, status]) => ({ ...host(id, "~/a"), status })), { ...host("h6", "~/b"), status: "idle" as const }];
+		expect(waitingCount(sidebarSessions(live, [], "~/a", new Set(["h4"])))).toBe(3);
+	});
+
 	test("the previous and next session keys walk pinned rows first, then idle, running, interrupted, and past", () => {
 		const live = [{ ...host("h0", "~/a"), status: "idle" as const }, ...hosts];
 		const lists = sidebarSessions(live, sessions, "~/a", new Set(["h2", "p3"]));
@@ -145,5 +151,16 @@ describe("sidebarSessions", () => {
 			{ kind: "past", sessionId: "p2" },
 			{ kind: "past", sessionId: "p1" },
 		]);
+	});
+
+	test("a search keeps the rows whose title or directory holds every word, in any order and any case, pinned ones included", () => {
+		const titled = (row: RosterHost | PastSession, title: string | null, cwdDisplay: string) => ({ ...row, cwdDisplay, sessionName: title, title });
+		const live = [titled(host("h1", "~/a"), "Fix login", "~/code/webapp"), titled(host("h2", "~/a"), "Fix billing", "~/code/api"), titled(host("h3", "~/b"), null, "~/code/webapp")] as RosterHost[];
+		const saved = [titled(past("p1", "~/a", false), "Login copy", "~/code/webapp"), titled(past("p2", "~/a", false), "Login copy", "~/code/api")] as PastSession[];
+		const lists = searchSessions(sidebarSessions(live, saved, null, new Set(["h2", "p1"])), "  WEBAPP login ");
+		expect(ids(lists.running)).toEqual(["h1"]);
+		expect(ids(lists.pinned.past)).toEqual(["p1"]);
+		expect(ids([...lists.pinned.hosts, ...lists.ended])).toEqual([]);
+		expect(ids(searchSessions(sidebarSessions(live, saved, "~/b", new Set()), "webapp").running)).toEqual(["h3"]);
 	});
 });

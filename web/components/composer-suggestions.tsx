@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { type FocusEventHandler, type KeyboardEvent, type ReactNode, useEffect, useId, useRef } from "react";
+import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 import { useRegionHeight } from "@/components/ui/input-message";
 import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hover";
 import { fontWeights } from "@/lib/font-weight";
@@ -26,7 +27,6 @@ interface SuggestionRowProps {
 function SuggestionRow({ text, index, active, optionId, registerItem, onSelect }: SuggestionRowProps) {
 	const EnterIcon = useIcon("corner-down-left");
 	const compactStep = useSize().variant === "compact";
-	const shape = useShape();
 	const ref = useRef<HTMLDivElement>(null);
 
 	useRegisterFluidHoverItem(registerItem, index, ref);
@@ -37,13 +37,12 @@ function SuggestionRow({ text, index, active, optionId, registerItem, onSelect }
 			id={optionId}
 			role="option"
 			aria-selected={active}
-			data-highlighted={active || undefined}
 			onClick={onSelect}
 			className={cn(
-				"agent-action relative flex cursor-pointer items-center gap-2",
+				"relative flex cursor-pointer items-center gap-2",
+				active ? "text-foreground" : "text-muted-foreground",
 				// Text size mirrors the composer's textarea: the rows read as prompt candidates, not metadata.
 				compactStep ? "h-7 px-2 text-[13px]" : "h-8 px-2.5 text-[14px]",
-				shape.bg,
 				"transition-colors duration-80",
 			)}
 			style={{ fontVariationSettings: fontWeights.normal }}
@@ -52,7 +51,7 @@ function SuggestionRow({ text, index, active, optionId, registerItem, onSelect }
 			<kbd
 				aria-hidden="true"
 				className={cn(
-					"inline-flex shrink-0 items-center justify-center rounded-[5px] border border-white/30 bg-white/10 px-1 font-sans text-white tabular-nums",
+					"inline-flex shrink-0 items-center justify-center rounded-[5px] border border-border bg-background px-1 font-sans tabular-nums",
 					compactStep ? "h-4 min-w-4 text-[10px]" : "h-[18px] min-w-[18px] text-[11px]",
 				)}
 			>
@@ -99,6 +98,7 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 	const listId = useId();
 	const [regionRef, regionHeight] = useRegionHeight();
 	const hover = useFluidHover(listRef);
+	const shape = useShape();
 	const { activeIndex, setActiveIndex, handlers, registerItem, remeasure } = hover;
 
 	// Rows stay registered while the list is closed, so their rects are from a hidden layout: measure again on open.
@@ -171,6 +171,7 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 						onClick={handlers.onClick}
 						className="relative mt-2 flex flex-col border-t border-border/60 px-1.5 pt-1.5"
 					>
+						<FluidHoverHighlight hover={hover} className={shape.bg} />
 						{prompts.map((text, index) => (
 							<SuggestionRow
 								key={`${text}-${index}`}

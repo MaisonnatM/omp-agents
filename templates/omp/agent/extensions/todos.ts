@@ -1,6 +1,7 @@
 // The `user_todo` tool: lets an agent read the omp-agents dashboard's Todo list, add a todo for a step only the user
-// can take, and check one off. Changes go to the dashboard's todo inbox, one file each, which the dashboard server
-// applies and deletes, so it stays the only writer of todos.json and a todo filed while it is down waits for it.
+// can take, and check one off; a session that a todo links to is told so, to check it off once its work is done.
+// Changes go to the dashboard's todo inbox, one file each, which the dashboard server applies and deletes, so it
+// stays the only writer of todos.json and a todo filed while it is down waits for it.
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -21,6 +22,7 @@ interface Leaf {
 interface Todo extends Leaf {
 	categoryId?: string | null;
 	children?: Leaf[];
+	links?: { kind: string; sessionId?: string }[];
 }
 interface List {
 	categories?: { id: string; name: string }[];
@@ -28,6 +30,10 @@ interface List {
 }
 
 const isDone = (todo: Leaf): boolean => (todo.doneAt ?? null) !== null || todo.done === true;
+
+/** The open todo that links to session `sessionId`, such as the one it was started for. */
+const todoOf = (list: List, sessionId: string): Todo | undefined =>
+	list.todos?.find(todo => !isDone(todo) && todo.links?.some(link => link.kind === "session" && link.sessionId === sessionId));
 
 function readList(): List {
 	try {
@@ -81,6 +87,7 @@ export default function todos(pi: ExtensionAPI) {
 		description: [
 			"The user's own todo list in the omp-agents dashboard.",
 			"Use add when you stop on a step only the user can take (approve, review, decide, run on their machine), so it does not stay buried in your reply.",
+			"When you finish the work a todo asks for, check it off.",
 			"Never add your own work items; use your todo tool for those. You cannot remove or edit todos.",
 		].join(" "),
 		parameters: params,
@@ -115,5 +122,16 @@ export default function todos(pi: ExtensionAPI) {
 				}
 			}
 		},
+	});
+	// Read on every prompt, so a todo linked or checked mid-session shows in the next turn.
+	pi.on("before_agent_start", (event, ctx) => {
+		const todo = todoOf(readList(), ctx.sessionManager.getSessionId());
+		if (!todo) return;
+		return {
+			systemPrompt: [
+				...event.systemPrompt,
+				`This session works on the user's todo ${JSON.stringify(todo.text)} (id ${todo.id}). Once you have finished the work it asks for, check it off with the user_todo tool. Leave it open while the work still waits on the user's answer or approval.`,
+			],
+		};
 	});
 }

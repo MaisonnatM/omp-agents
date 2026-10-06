@@ -273,7 +273,7 @@ export interface PullRequestThread {
 	comments: PullRequestComment[];
 }
 
-/** One pull request in full, as the inbox's sheet shows it in place of opening GitHub. */
+/** One pull request in full, as the inbox's details show it in place of opening GitHub. */
 export interface PullRequestDetail extends PullRequest {
 	title: string;
 	body: string;
@@ -408,6 +408,20 @@ export type View = LiveView | PastView;
 export const PROMPT_IMAGE_TYPES: readonly string[] = ["image/png", "image/jpeg", "image/gif", "image/webp"];
 /** The most image bytes one prompt carries. The server's socket takes messages big enough for their base64. */
 export const MAX_PROMPT_IMAGE_BYTES = 32 * 1024 * 1024;
+
+/** The extensions of the files that agent text may open in the page's file dialog, `GET /api/file`. */
+export const TEXT_FILE_EXTENSIONS: readonly string[] = ["md", "markdown", "txt", "log", "csv", "tsv", "json", "jsonl", "yaml", "yml", "toml", "xml", "diff", "patch"];
+/** The most bytes of a text file that `GET /api/file` reads. */
+export const MAX_TEXT_FILE_BYTES = 1024 * 1024;
+/** A text file that `GET /api/file` read: at most its first `MAX_TEXT_FILE_BYTES`, then `truncated`. */
+export interface TextFile {
+	/** Absolute, with `~` and a relative path resolved. */
+	path: string;
+	text: string;
+	/** The whole file's size in bytes. */
+	size: number;
+	truncated: boolean;
+}
 
 /** An image sent with a prompt, as omp's `ImageContent` takes it: the file's bytes in base64 and its type. */
 export interface PromptImage {

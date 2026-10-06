@@ -97,9 +97,10 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 		if ("error" in outcome) return { ok: false, error: outcome.error };
 		const { session, prompt, first } = outcome.started;
 		sessions.add(session, request.kind === "new" ? request.subject : null);
+		// The todo links first, so the session's first turn already knows the todo it works on.
+		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
 		if (first) void session.prompt(null, first.text, first.images, "steer");
-		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
 		env.onStarted();
 		return { ok: true, instanceId: session.instanceId, cwd: session.cwd, prompt };
 	};

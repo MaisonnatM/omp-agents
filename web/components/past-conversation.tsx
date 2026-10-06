@@ -47,7 +47,6 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 					{session && (
 						<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 							<Button
-								variant="agent"
 								size="compact"
 								onClick={onResume}
 								disabled={resume?.phase === "starting"}

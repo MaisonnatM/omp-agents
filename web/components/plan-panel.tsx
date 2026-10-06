@@ -45,6 +45,7 @@ import { age, readTime } from "../labels";
 import { usePane } from "../pane-store";
 import { useStoredState } from "../stored-state";
 import { AgentsTab } from "./agents-tab";
+import { FileBaseContext } from "./file-link";
 import { MediaTab } from "./media-tab";
 import { MessageMarkdown } from "./message-markdown";
 
@@ -222,10 +223,13 @@ const TAB_KEY = "omp-agents.plan-tab";
 const PLAN_TABS = ["plan", "files", "agents", "media"] as const;
 type PlanTab = (typeof PLAN_TABS)[number];
 
-/** Four labeled tabs overflow the sidebar's default width, so each shows its icon and its count, and names itself on hover and to screen readers. */
-function tabLabel(name: string, count: number): { label: string; "aria-label": string; tooltip: string } {
-	return { label: count > 0 ? String(count) : "", "aria-label": count > 0 ? `${name} (${count})` : name, tooltip: name };
+/** Each tab names itself and counts its items in a badge, which screen readers hear through the tab's name. */
+function tabLabel(name: string, count: number): { label: string; badge: number | undefined; "aria-label": string | undefined } {
+	return count > 0 ? { label: name, badge: count, "aria-label": `${name} (${count})` } : { label: name, badge: undefined, "aria-label": undefined };
 }
+
+/** Four labeled tabs fit the sidebar's default width only with tighter padding than Fluid's, and only without their icons. */
+const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
 
 /**
  * The right sidebar's content for the focused view: its latest todo list and plan file, the files its agent changed,
@@ -238,15 +242,15 @@ export function PlanPanel({ view, host }: { view: View; host: RosterHost | null 
 	const tab = stored === "agents" && view.kind !== "live" ? "plan" : stored;
 	const files = work?.files ?? [];
 	return (
-		<Tabs value={tab} onValueChange={value => setTab(value as PlanTab)} className="flex min-h-0 flex-1 flex-col">
+		<Tabs value={tab} onValueChange={value => setTab(value as PlanTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center gap-2 px-2 pt-4">
 				<h2 className="sr-only">Session details</h2>
 				<SizeProvider size="compact">
 					<TabsList aria-label="Session details">
-						<TabItem value="plan" icon={ListTodo} {...tabLabel("Plan", 0)} />
-						<TabItem value="files" icon={FileDiff} {...tabLabel("Files", files.length)} />
-						{view.kind === "live" && <TabItem value="agents" icon={Bot} {...tabLabel("Agents", host?.agents.length ?? 0)} />}
-						<TabItem value="media" icon={Images} {...tabLabel("Media", media?.length ?? 0)} />
+						<TabItem value="plan" icon={ListTodo} className={TAB_CLASS} {...tabLabel("Plan", 0)} />
+						<TabItem value="files" icon={FileDiff} className={TAB_CLASS} {...tabLabel("Files", files.length)} />
+						{view.kind === "live" && <TabItem value="agents" icon={Bot} className={TAB_CLASS} {...tabLabel("Agents", host?.agents.length ?? 0)} />}
+						<TabItem value="media" icon={Images} className={TAB_CLASS} {...tabLabel("Media", media?.length ?? 0)} />
 					</TabsList>
 				</SizeProvider>
 			</SidebarHeader>
@@ -254,7 +258,11 @@ export function PlanPanel({ view, host }: { view: View; host: RosterHost | null 
 				<SidebarContent>
 					{work && work.phases.length === 0 && !work.plan && <p className="px-4 py-2 text-sm text-muted-foreground">No plan yet.</p>}
 					{work?.phases.map((phase, index) => <Phase key={`${index}:${phase.name}`} phase={phase} />)}
-					{work?.plan && <PlanFile plan={work.plan} />}
+					{work?.plan && (
+						<FileBaseContext.Provider value={host?.cwd ?? null}>
+							<PlanFile plan={work.plan} />
+						</FileBaseContext.Provider>
+					)}
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="files" asChild>

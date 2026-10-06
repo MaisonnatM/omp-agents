@@ -1,8 +1,7 @@
-/** Polled lists under a page header, with an optional target details sheet. */
+/** Polled lists under a page header. */
 import { RefreshCw } from "lucide-react";
-import { type ReactNode, type Ref, useRef } from "react";
+import type { ReactNode, Ref } from "react";
 import { Button } from "@/components/ui/button";
-import { Sheet } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { readTime } from "../labels";
@@ -31,35 +30,28 @@ export function PageFrame({ title, meta, actions, children }: PageFrameProps) {
 	);
 }
 
-interface ListSheetPageProps<Data> {
+interface ListPageProps<Data> {
 	title: string;
 	/** What the page lists, under its title; the time of the last read follows it once there is one. */
 	meta: string;
-	/** What the page's load and refresh errors call it: "the inbox". */
+	/** What the page's load and refresh errors call it: "the tickets". */
 	noun: string;
 	/** What shows while the first read loads. */
 	loading: string;
 	poll: PolledEntry<Data>;
 	onRefresh: () => void;
-	/** Why the page does not list the target a link named, shown once read; `null` when it lists it or no link named one. */
-	missing: string | null;
 	/** What became of the last quick action, above the lists. */
 	notice: ReactNode;
 	/** The spacing between the page's lists: a `space-y-*` class. */
 	spacing: string;
 	/** The page's lists, from its read. */
 	children: (data: Data) => ReactNode;
-	/** The sheet with a target's details, which renders after the lists, inside the page's `TooltipProvider`. */
-	sheet?: ReactNode;
 	/** Focus returns here when the lists are not mounted. */
 	contentRef?: Ref<HTMLDivElement>;
 }
 
-/**
- * A page of lists read from GitHub or Linear with a Refresh button, `notice`, the lists once the first read loads,
- * and an optional details sheet.
- */
-export function ListSheetPage<Data>({ title, meta, noun, loading, poll, onRefresh, missing, notice, spacing, children, sheet, contentRef }: ListSheetPageProps<Data>) {
+/** A page of lists read from GitHub or Linear with a Refresh button, `notice`, and the lists once the first read loads. */
+export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, spacing, children, contentRef }: ListPageProps<Data>) {
 	const { read, error, refreshing } = poll;
 	let body: ReactNode;
 	if (!read) body = <LoadNote loading={loading} error={error && `Cannot load ${noun}: ${error}`} />;
@@ -67,11 +59,6 @@ export function ListSheetPage<Data>({ title, meta, noun, loading, poll, onRefres
 		body = (
 			<>
 				{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh {noun}: {error}</p>}
-				{missing && (
-					<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-						{missing}
-					</p>
-				)}
 				{children(read.data)}
 			</>
 		);
@@ -92,27 +79,7 @@ export function ListSheetPage<Data>({ title, meta, noun, loading, poll, onRefres
 					{notice}
 					{body}
 				</div>
-				{sheet}
 			</TooltipProvider>
 		</PageFrame>
-	);
-}
-
-interface TargetSheetProps<Target> {
-	/** What a link named, whose details the sheet shows; `null` closes it. */
-	target: Target | null;
-	onClose: () => void;
-	children: (target: Target) => ReactNode;
-}
-
-/** The sheet with `target`'s details. It keeps the last target after `target` drops to `null`, so its content stays through the exit slide. */
-export function TargetSheet<Target>({ target, onClose, children }: TargetSheetProps<Target>) {
-	const kept = useRef<Target | null>(null);
-	if (target !== null) kept.current = target;
-	if (kept.current === null) return null;
-	return (
-		<Sheet open={target !== null} onClose={onClose}>
-			{children(kept.current)}
-		</Sheet>
 	);
 }

@@ -26,7 +26,6 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary: "text-background",
-        agent: "agent-button text-[color:var(--agent-action-foreground)]",
         secondary: "text-foreground",
         tertiary: "text-foreground",
         ghost: "text-muted-foreground hover:text-foreground",
@@ -113,7 +112,6 @@ interface ButtonProps
 const bgVariants: Record<string, string> = {
   primary:
     "[--btn-bg:var(--foreground)] group-hover:[--btn-bg:color-mix(in_oklab,var(--foreground)_90%,var(--background))] group-active:[--btn-bg:color-mix(in_oklab,var(--foreground)_80%,var(--background))] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",
-  agent: "agent-button-surface",
   secondary:
     "[--btn-bg:var(--tint)] group-hover:[--btn-bg:var(--tint-hover)] group-active:[--btn-bg:var(--tint)] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",
   // The border ring is an outer 1px shadow at rest that hands off to an
@@ -129,8 +127,7 @@ const bgVariants: Record<string, string> = {
 };
 
 /* Forced-active (`active` prop): pressed colors at full size; the
-   geometric press-collapse still reacts on top. Agent has no entry.
-   Its root carries data-pressed, and that selects the pressed fill. */
+   geometric press-collapse still reacts on top. */
 const activeBgVariants: Partial<Record<string, string>> = {
   primary:
     "[--btn-bg:color-mix(in_oklab,var(--foreground)_80%,var(--background))] bg-[var(--btn-bg)] shadow-[0_0_0_1px_var(--btn-bg)] group-active:shadow-[0_0_0_0px_var(--btn-bg)]",

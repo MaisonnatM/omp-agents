@@ -1,6 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import type { InboxPullRequest, PullRequestDetail, RepoInbox } from "../src/shared";
-import { foldedByDefault, inboxSections, pullRequestStatus, rowVerdict, shownPullRequests, waitingCount } from "./inbox-model";
+import {
+	DEFAULT_ORDER,
+	decodeOrder,
+	foldedByDefault,
+	type InboxOrder,
+	inboxSections,
+	mergeableCount,
+	moveKey,
+	orderedRepos,
+	placedManual,
+	pullRequestStatus,
+	rowVerdict,
+	sectionTitles,
+	shownPullRequests,
+	stepTarget,
+} from "./inbox-model";
 
 const pr = (number: number, fields: Partial<InboxPullRequest> = {}): InboxPullRequest => ({
 	owner: "acme",
@@ -92,17 +107,17 @@ test("only Recently merged sections start folded", () => {
 	expect(["acme/webapp:Recently merged", "acme/webapp:Drafts", "acme/webapp", "Recently merged"].map(foldedByDefault)).toEqual([true, false, false, false]);
 });
 
-test("the waiting count adds reviews asked of you and PRs returned to you across repositories, skipping unreadable ones", () => {
+test("the mergeable count adds your PRs ready to merge across repositories, skipping reviews, blocked PRs, and unreadable repositories", () => {
 	const repo = (pullRequests: InboxPullRequest[]): RepoInbox => ({ owner: "acme", repo: "webapp", cwds: [], pullRequests });
 	const inbox = {
 		repos: [
-			repo([pr(1, { role: "reviewer", author: teammate }), pr(2, { review: "changes-requested" }), pr(3, { review: "approved" }), pr(4, { role: "reviewer", state: "merged" })]),
-			repo([pr(5, { role: "reviewer", author: teammate })]),
+			repo([pr(1, { review: "approved" }), pr(2, { review: "none" }), pr(3, { role: "reviewer", review: "approved", author: teammate }), pr(4, { review: "changes-requested" })]),
+			repo([pr(5, { review: "approved", unresolved: { count: 1, exact: true } }), pr(6, { review: "approved", state: "merged" }), pr(7, { review: "approved" })]),
 			{ owner: "acme", repo: "down", cwds: [], error: "rate limited" },
 		],
 		unmatched: [],
 	};
-	expect(waitingCount(inbox)).toBe(3);
+	expect(mergeableCount(inbox)).toBe(3);
 });
 
 test("the shown pull requests follow page order and leave out folded repositories, folded sections, and unreadable repositories", () => {
@@ -117,6 +132,64 @@ test("the shown pull requests follow page order and leave out folded repositorie
 	};
 	const folded = new Set(["acme/folded", "acme/webapp:Recently merged"]);
 	expect(shownPullRequests(inbox, key => folded.has(key)).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
+});
+
+describe("inbox order", () => {
+	const order = (fields: Partial<InboxOrder>): InboxOrder => ({ ...DEFAULT_ORDER, ...fields });
+	const numbers = (prs: { rows: { pr: { number: number } }[] }[]) => prs.map(section => section.rows.map(row => row.pr.number));
+
+	test("newest and oldest sort by number, and a stack keeps its members together, top first", () => {
+		const prs = [pr(1, { updatedAt: 50 }), pr(2, { updatedAt: 10, stackedOn: "me/branch-1" }), pr(3, { updatedAt: 30 })];
+		expect(numbers(inboxSections(prs, order({ sort: "updated" })))).toEqual([[2, 1, 3]]);
+		expect(numbers(inboxSections(prs, order({ sort: "newest" })))).toEqual([[3, 2, 1]]);
+		expect(numbers(inboxSections(prs, order({ sort: "oldest" })))).toEqual([[2, 1, 3]]);
+	});
+
+	test("the manual sort puts pull requests you never placed first, most recently updated first, then yours in your order", () => {
+		const prs = [pr(1), pr(2), pr(3), pr(4), pr(5)];
+		expect(numbers(inboxSections(prs, order({ sort: "manual", manual: ["acme/webapp#2", "acme/webapp#4", "acme/webapp#1"] })))).toEqual([[5, 3, 2, 4, 1]]);
+	});
+
+	test("sections and repositories follow your order, and those it does not name follow in their default order", () => {
+		const prs = [pr(1, { review: "approved" }), pr(2), pr(3, { state: "draft" })];
+		const sections = inboxSections(prs, order({ sections: ["Drafts", "Gone section", "Approved"] }));
+		expect(sections.map(section => section.title)).toEqual(["Drafts", "Approved", "Waiting for review"]);
+		expect(sectionTitles(order({ sections: ["Recently merged"] }))).toEqual(["Recently merged", "Needs your review", "Returned to you", "Approved", "Waiting for review", "Drafts"]);
+		const repos = ["a", "b", "c"].map(repo => ({ owner: "acme", repo }));
+		expect(orderedRepos(repos, order({ repos: ["acme/c", "acme/gone", "acme/a"] })).map(({ repo }) => repo)).toEqual(["c", "a", "b"]);
+	});
+
+	test("moving a key puts it beside its target; a missing key or target changes nothing; a step at the edge has no target", () => {
+		expect(moveKey(["a", "b", "c", "d"], "a", "c", "after")).toEqual(["b", "c", "a", "d"]);
+		expect(moveKey(["a", "b", "c", "d"], "d", "b", "before")).toEqual(["a", "d", "b", "c"]);
+		expect(moveKey(["a", "b"], "x", "a", "before")).toEqual(["a", "b"]);
+		expect(stepTarget(["a", "b", "c"], "b", -1)).toEqual({ target: "a", where: "before" });
+		expect(stepTarget(["a", "b", "c"], "c", 1)).toBeNull();
+	});
+
+	test("placing a pull request fixes the repository's shown order, moves a stack as one, and keeps other repositories' places", () => {
+		const prs = [pr(1, { updatedAt: 5 }), pr(2, { updatedAt: 1, stackedOn: "me/branch-1" }), pr(3, { updatedAt: 9 }), pr(4, { state: "draft" })];
+		const sections = inboxSections(prs, order({ sort: "newest" }));
+		const [waiting] = sections;
+		expect(numbers(sections)).toEqual([[3, 2, 1], [4]]);
+		const stack = waiting!.rows.find(row => row.pr.number === 2)!.unit;
+		const manual = placedManual(["acme/other#7", "acme/webapp#99"], { owner: "acme", repo: "webapp" }, sections, "Waiting for review", stack, "acme/webapp#3", "before");
+		expect(manual).toEqual(["acme/webapp#2", "acme/webapp#1", "acme/webapp#3", "acme/webapp#4", "acme/other#7"]);
+		expect(numbers(inboxSections(prs, order({ sort: "manual", manual })))).toEqual([[2, 1, 3], [4]]);
+	});
+
+	test("the shown pull requests follow the custom order", () => {
+		const repo = (name: string, pullRequests: InboxPullRequest[]): RepoInbox => ({ owner: "acme", repo: name, cwds: [], pullRequests });
+		const inbox = { repos: [repo("webapp", [pr(1), pr(2, { state: "draft" })]), repo("api", [pr(3, { repo: "api" })])], unmatched: [] };
+		const shown = shownPullRequests(inbox, () => false, order({ repos: ["acme/api"], sections: ["Drafts"] }));
+		expect(shown.map(({ repo, number }) => `${repo}#${number}`)).toEqual(["api#3", "webapp#2", "webapp#1"]);
+	});
+
+	test("a stored order that cannot be read falls back to the default, field by field", () => {
+		expect(decodeOrder(null)).toEqual(DEFAULT_ORDER);
+		expect(decodeOrder("{not json")).toEqual(DEFAULT_ORDER);
+		expect(decodeOrder(JSON.stringify({ repos: ["acme/a", 3], sort: "random", manual: "acme/a#1" }))).toEqual({ repos: ["acme/a"], sections: [], sort: "updated", manual: [] });
+	});
 });
 
 describe("row verdict", () => {

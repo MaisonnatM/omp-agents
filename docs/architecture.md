@@ -293,6 +293,11 @@ It reads the description with `gh api repos/<owner>/<repo>/pulls/<number>`, puts
 The answer is `{ changed }`, or `{ error }` with the HTTP status.
 
 `GET /api/git?cwd=<directory>` answers the git checkout that the directory is in, or `null` outside one: the GitHub repository that `origin` names, the checked-out branch, every local branch with the worktree that has it checked out, and the main worktree.
+
+`GET /api/file?path=<absolute path>` answers a text file for the page's file dialog: `{ path, text, size, truncated }`.
+The path is absolute or starts with `~/`; the page resolves a relative one against the session's directory first.
+The file's real path, after symlinks, must end in one of `TEXT_FILE_EXTENSIONS`, so a link named `notes.md` cannot reach a key file.
+It reads the first `MAX_TEXT_FILE_BYTES` (1 MB) and answers 415 when those bytes are not UTF-8.
 It runs `git worktree list --porcelain`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the inbox's cached lookup.
 Like a new session's `start`, `cwd` may name any directory.
 The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
@@ -387,9 +392,6 @@ The dashboard turns it off and uses `web/components/sidebar-panel.tsx`, which gi
 Sidebar widths and the split between panes share `web/components/drag-separator.tsx`: `useDragSeparator` owns the pointer capture, arrow keys, and double-click reset, and `Separator` is the element.
 Each call site still clamps its own domain, pixels for a sidebar and a ratio for a split.
 
-Fluid Functionalism has no sheet, so the sheet that the inbox shows a pull request in, `web/components/ui/sheet.tsx`, follows the sidebar's mobile sheet: Radix `Dialog` for focus and dismissal, and a framer-motion slide on the `moderate` spring.
-The tickets page shows an issue in the main content instead.
-
 The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Menu` for the **⋯** button, wrapped in `web/components/ui/menu.tsx` with the look of the `popover` and `command` items.
 Both share Base UI's menu items, so each row builds one item list and both menus render it.
 The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
@@ -437,6 +439,7 @@ The server lives in `src/`:
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
 - `src/git.ts`: the git checkout of a directory, and the worktree a new session's branch runs in.
 - `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed.
+- `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows.
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
@@ -449,9 +452,10 @@ The server lives in `src/`:
   `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token.
   `src/user-todos-parse.ts` reads the list and its changes from JSON for the file, the socket, the todo inbox, and the desktop shell: a file from before any of those fields reads with none of them, a `done: true` todo as checked when it loads, and a change from a page or an agent is held to the length limits, a `restore` too.
   A `user-todo` socket message carries one change, and every socket hears the list after it as a `user-todos` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the list back to its own socket alone.
-  A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`.
+  A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`, before it sends the first message.
 - `src/server/todo-inbox.ts`: applies the changes that omp's `user_todo` tool (`templates/omp/agent/extensions/todos.ts`) leaves in `todo-inbox/` beside `todos.json`, one JSON file each, written under a `.tmp` name then renamed.
   It takes `add`, and `toggle` that checks, deletes each file it applies, and moves any other to `<name>.invalid` with a logged reason, so the server stays the only writer of `todos.json` and an agent cannot undo what you did.
+  The extension's `before_agent_start` handler reads `todos.json` at each prompt and, when an open top-level todo links to its session, adds that todo's title and id to the system prompt, so the agent checks it off once it finishes the work.
 - `src/tickets.ts` also lists the workspace's Linear teams (`loadTeams`, `GET /api/linear/teams`) and opens an issue from a todo (`createTicket`, `PUT /api/ticket/new`), assigned to the viewer.
 - `src/routines.ts`: the rules of routines: `nextRunAt`, `nextDueAt`, `isDue`, `applyRoutine`, which applies an edit, and a command's length, time, and output limits; see [Routines](#routines).
   `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.
@@ -465,7 +469,8 @@ The server lives in `src/`:
 The page lives in `web/`.
 `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
-- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for the inbox, tickets, todo, routines, settings, and new-session pages, and focus handling.
+- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for a pull request's details, tickets, todo, routines, settings, and new-session pages, and focus handling.
+  `#inbox` alone keeps the pane grid and only switches the sidebar to its Inbox tab.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which runs in the background.
@@ -473,21 +478,25 @@ The page lives in `web/`.
   It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
+- `web/file-paths.ts`: which paths in agent text name a text file, and the absolute path each resolves to.
+  `web/delimited.ts` parses a TSV or CSV file into rows.
+  `web/components/file-link.tsx` holds the link that opens such a path, and `web/components/file-dialog.tsx` the dialog that shows the file.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the inbox and the tickets page show.
-  `web/inbox-model.ts` holds the inbox's sections in one table, with whether each waits on you and whether it starts folded, sorts each stack's rows together by the chain of base branches, and says what a row's verdict and a sheet's Status show.
+  `web/inbox-model.ts` holds the inbox's sections in one table, with whether each waits on you and whether it starts folded, sorts each stack's rows together by the chain of base branches, and says what a row's verdict and the details' Status show.
+  `InboxOrder` there is the order you chose, the repositories, the sections, the sort, and the manual order of pull requests, which `placedManual` updates after a drop; a stack moves as one `unit`.
   `web/routines-model.ts` words a routine's schedule, task, next run, and last run, and turns the routine editor's form into the routine it saves.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
-  `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's sheet or an issue's details, and the note that says why a start failed.
-  `web/components/session-chip.tsx` holds the chip that names a session on a row or a sheet, with the status dot of a running one.
+  `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's or an issue's details, and the note that says why a start failed.
+  `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
 - `web/api.ts`: the page's HTTP client, and `errorText`, which says what any failure was.
   `settingsUrl` names a settings route for one workspace, or for the user's own files.
 - `web/reads.ts`: the server reads that components hold.
-  `useRead` reads one URL, such as the pull request a sheet shows, the Linear issue the tickets page shows in its main content, the settings page's model catalog, or the new-session draft's model list.
+  `useRead` reads one URL, such as the pull request or the Linear issue the main content shows, the settings page's model catalog, or the new-session draft's model list.
   `useReplaceableRead` shows the version a save answered until that URL is read again.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, and one for whether omp is signed in to Linear.
-  `web/app.tsx` polls the inbox instead, on every page once the sessions are listed, for the Inbox tab's count, and the inbox page reads that entry.
+  `web/app.tsx` polls the inbox instead, on every page once the sessions are listed, for the Inbox tab's count, and the sidebar's inbox reads that entry.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header.
   `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the inbox and tickets also show.
@@ -497,13 +506,13 @@ The page lives in `web/`.
   `web/components/skill-picker.tsx` is the skill picker that the settings' pinned skill and the routine editor share.
   The checkout, the default model, and the skills are each one `useRead`.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
-  `web/components/session-switcher.tsx` is the search over every session, opened from the sidebar header or with Cmd+Shift+K.
+  `web/components/session-switcher.tsx` is the search over every session, opened from the sidebar header or with Cmd+K. What you type there can also be added as a todo.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
-- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's project, and the pinned skill; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
+- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's project, the pinned skill, and the inbox's order; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
-- `web/components/roster.tsx`: the left sidebar's session, inbox, and tickets lists, and the project picker.
+- `web/components/roster.tsx`: the left sidebar's tabs, its session and tickets lists, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab.
   `SessionRow` is the one row a past session and a live host both render.
   `web/components/todo-categories.tsx` holds its Todo tab: **All**, **Today**, **From agents**, **Done**, then the categories, and `web/components/routines/routines-nav.tsx` its Routines tab, the routines by name.
 - `web/components/user-todos.tsx`: the Todo page and its lists; `todo-archive.tsx` is the **Done** page.
@@ -520,12 +529,13 @@ The page lives in `web/`.
 - `web/components/dashboard-context.tsx`: the stable dashboard actions (`send`, `open`, `start`, `end`, …) and the last start of each kind, provided once by `App`, which the sidebar, the panes, and the pages read instead of taking them as props.
 - `web/components/plan-panel.tsx`: the right sidebar's tabs for the focused pane: its plan and its changed files, then `agents-tab.tsx`, the live session's agents as a tree, and `media-tab.tsx`, its images and their viewer.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
-  The inbox and tickets pages share `web/components/list-sheet-page.tsx` for their frame, header, and load and refresh states, and the Todo and Routines pages its `PageFrame`.
-  The inbox also uses its sheet, which keeps its target through its exit slide. The tickets page replaces the list with the issue in the main content instead.
-  Both use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
-  `SheetFrame` is the pull request sheet's header and scrolling body, `LoadNote` is the loading or error line that sheet, the issue detail, and the list page share, and `Clamped` folds a long description behind **Show more**.
-  `web/components/fold.tsx` holds the fold button that both pages share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
-  The inbox page binds J, K, O, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/inbox-model.ts` lists in page order, so a folded section's rows drop out.
+  `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue.
+  `web/use-drag-order.ts` drags the inbox's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
+  The tickets page uses `web/components/list-page.tsx` for its frame, header, and load and refresh states, and the pull request, Todo, and Routines pages its `PageFrame`.
+  Both details views use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
+  `LoadNote` is the loading or error line that the pull request's details, the issue's, and the list page share, and `Clamped` folds a long description behind **Show more**.
+  `web/components/fold.tsx` holds the fold button that the inbox and tickets share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
+  The sidebar's inbox binds J, K, O, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/inbox-model.ts` lists in sidebar order, so a folded section's rows drop out, and binds Alt+Shift+↑ and ↓ to move the focused heading or row by its `data-move` attribute.
 - `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
@@ -553,6 +563,8 @@ It also gets two slots, `beforeTextarea` and `afterActions`: `composer-queue.tsx
 
 Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight` (`web/components/message-markdown.tsx`).
 In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL.
+In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text file into a link, and that link, like a `file://` one, renders as a `FileLink` from `web/components/file-link.tsx`, which opens the file dialog through the dashboard context.
+A relative path resolves against `FileBaseContext`: the pane's session directory, or the directory of the file the dialog shows.
 Text from GitHub, which means pull request descriptions and comments, and Linear issues' text, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, plus a `<video>` with only a `src`.
 It keeps images only from GitHub's image hosts and the route for a Linear issue's files, and plays a video only from that route.
 `web/index.html` sets the page's `Content-Security-Policy`.

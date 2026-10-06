@@ -21,6 +21,8 @@ The dashboard treats it that way:
 - The page names a past session by its id and a subagent by the id its host registered.
   The server reads only files from omp's own session listing, the paths omp reports over RPC, and subagent files under those sessions' directories.
   The settings endpoints read and write only the files that omp's discovery reports for the workspace, and their `cwd` must be a directory that a live or saved session ran in.
+  The exception is `GET /api/file`, which the file dialog reads: it takes any absolute path, but answers only a regular file whose real path, after symlinks, ends in a text extension such as `.md` or `.tsv`, at most its first 1 MB, and only when that is UTF-8.
+  The access token file has no extension, so this route cannot read it, nor an SSH key or a `.env` file.
 - Every `/api/` route, the WebSocket, and the page itself need the access token.
   It is 32 random bytes, kept in `~/.config/omp-agents/token` (`$XDG_CONFIG_HOME/omp-agents/token` when that is set).
   The server creates the file with mode `0600` in a directory of mode `0700`, and tightens the mode if it finds it looser, so only your account can read it.

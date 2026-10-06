@@ -34,13 +34,11 @@ Dashboard behavior that can live outside these files does: the composer's queued
 
 ## Others
 
-- `ui/sheet.tsx`: the close button uses the shared tooltip with an Esc keycap instead of a native `title`.
-
 - `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`, and the exported `TooltipKbd` chip.
   Long labels wrap at 16rem.
   `ui/sidebar-core.tsx` uses both for the sidebar toggle.
 - `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys and keeps the tab's `data-state`, since the tooltip trigger stamps its own.
-  `badge` on `TabItem` draws a count after the label, which the Inbox tab uses for the pull requests waiting on you.
+  `badge` on `TabItem` draws a count after the label, which the Sessions tab uses for the sessions waiting on you and the Inbox tab for the pull requests ready to merge.
 - `ui/thinking-steps.tsx`: `icon` takes a component as well as a name, and `iconClassName` styles it.
 - `ui/sidebar.tsx`: `scroll-fade-once-scrolled` on the scroll areas, so the fade shows only once scrolled.
 - `ui/sidebar-menu.tsx`: `gap-0.5` between rows, and the `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.

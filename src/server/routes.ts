@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, worktrees,
- * Linear's connection, Linear tickets and their files, and prompt images through.
+ * Linear's connection, Linear tickets and their files, prompt images, and the text files agent text names through.
  */
 import { join } from "node:path";
 import { errorText } from "../json";
@@ -16,6 +16,7 @@ import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings
 import { createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, type PullRequest, type Repo, samePullRequest, TICKET_ID } from "../shared";
+import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
 import { parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval } from "./wire";
@@ -155,7 +156,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		}
 	});
 
-	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for the inbox's sheet. */
+	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for the inbox's details. */
 	const pullRequest = get(params => {
 		const pr = parsePullRequestQuery(params);
 		return pr ? answer(() => loadPullRequestDetail(pr)) : fail(400, "Expected ?owner=&repo=&number=");
@@ -182,6 +183,12 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		if (!(await file.exists())) return fail(404, `No image ${hash}`);
 		// The address names the bytes, so they never change.
 		return new Response(file, { headers: { "Content-Type": type, "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" } });
+	});
+
+	/** `GET /api/file?path=<path>`: a text file that agent text names, by an absolute or `~/` path, for the page's file dialog. */
+	const textFile = get(async params => {
+		const read = await readTextFile(params.get("path") ?? "");
+		return read.ok ? Response.json(read.file) : fail(read.status, read.error);
 	});
 
 	/**
@@ -273,5 +280,6 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/worktrees/removal": { PUT: worktreeRemoval },
 		"/api/git": { GET: git },
 		"/api/image": { GET: image },
+		"/api/file": { GET: textFile },
 	};
 }

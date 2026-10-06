@@ -249,7 +249,7 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
     const reactId = useId();
     const total = questions.length;
     const safeIndex = Math.max(0, Math.min(index, Math.max(0, total - 1)));
-    // The last step submits: Finish, the gradient, and completing the flow are this predicate.
+    // The last step submits: Finish and completing the flow are this predicate.
     const submits = safeIndex >= total - 1;
     const question = questions[safeIndex];
     const qId = question ? questionKey(question, safeIndex) : "";
@@ -995,7 +995,6 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
               registerItem={registerItem}
               role={isMulti ? "checkbox" : "radio"}
               isSelected={isSelected}
-              submitAffordance={!isMulti && submits ? "row" : null}
               // Roving tabindex — see firstSelectedRow above. Multi-select
               // no longer puts a tab stop on every row.
               tabIndex={
@@ -1135,7 +1134,6 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
             registerItem={registerItem}
             role={null}
             isSelected={otherText.length > 0}
-            submitAffordance={!isMulti && submits ? "arrow" : null}
             tabIndex={-1}
             onClick={() => otherInputRef.current?.focus()}
             shape={shape}
@@ -1545,7 +1543,6 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
                         }}
                       >
                         <Button
-                          variant={submits ? "agent" : "primary"}
                           size="sm"
                           onClick={
                             isFreeText ? handleOtherSubmit : handleMultiNext
@@ -1635,8 +1632,6 @@ interface RowProps {
   registerItem: (index: number, element: HTMLElement | null) => void;
   role: "radio" | "checkbox" | null;
   isSelected: boolean;
-  /** Last-step single-select paint. "row" fills the option; "arrow" fills only the Other row's arrow. */
-  submitAffordance?: "row" | "arrow" | null;
   tabIndex: number;
   onClick: () => void;
   onKeyDown?: (e: ReactKeyboardEvent<HTMLDivElement>) => void;
@@ -1675,7 +1670,6 @@ function Row({
   registerItem,
   role,
   isSelected,
-  submitAffordance = null,
   tabIndex,
   onClick,
   onKeyDown,
@@ -1718,8 +1712,7 @@ function Row({
               : undefined
           }
           className={cn(
-            "absolute inset-0 inline-flex items-center justify-center",
-            submitAffordance === "arrow" ? "agent-action" : submitAffordance === "row" ? "bg-current/15" : "bg-foreground text-background",
+            "absolute inset-0 inline-flex items-center justify-center bg-foreground text-background",
             shape.bg,
             onArrowClick && "cursor-pointer"
           )}
@@ -1814,7 +1807,6 @@ function Row({
       ref={rowRef}
       data-fluid-hover-index={index}
       data-state={isSelected ? "checked" : "unchecked"}
-      data-highlighted={submitAffordance === "row" && showArrow ? "" : undefined}
       role={role ?? undefined}
       aria-checked={role === "radio" || role === "checkbox" ? !!aria["aria-checked"] : undefined}
       aria-label={ariaLabel}
@@ -1873,12 +1865,6 @@ function Row({
             : "pl-1.5 pr-1.5"
           : "pl-3 pr-1.5",
         shape.item,
-        // Title and description already use text-foreground and text-muted-foreground.
-        // Point those tokens at the fill so they stay distinct, instead of a global color override.
-        submitAffordance === "row" && "agent-action",
-        submitAffordance === "row" && "[--foreground:var(--agent-action-foreground)]",
-        submitAffordance === "row" && "[--muted-foreground:color-mix(in_srgb,var(--agent-action-foreground)_70%,transparent)]",
-        submitAffordance === "row" && shape.bg,
       )}
     >
       {/* Selected background is drawn at the container level so contiguous

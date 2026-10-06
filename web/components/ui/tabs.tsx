@@ -340,7 +340,10 @@ const TabsList = forwardRef<HTMLDivElement, TabsListProps>(
             // segmentPad + segmentItem add up to the ladder's control height
             // (36px default, 28px compact) so the segmented control's outer
             // box lines up with buttons, selects, and inputs beside it.
-            "relative inline-flex items-center select-none bg-muted",
+            // Tabs wider than the space scroll instead of painting past it;
+            // the pills scroll with them, as useFluidHover measures in the
+            // list's own coordinates.
+            "relative inline-flex max-w-full items-center overflow-x-auto scrollbar-hide select-none bg-muted",
             sizeClasses.segmentPad,
             shape.container,
             className
@@ -480,12 +483,14 @@ interface TabItemProps
   shortcut?: readonly string[];
   /** A count after the label, such as the items waiting on you. Name it in `aria-label` too: the pill is hidden from screen readers. */
   badge?: number;
+  /** Classes for the label, such as `sr-only` to show the icon alone while the label still names the tab. */
+  labelClassName?: string;
   /** @internal Auto-assigned by TabsList. */
   _index?: number;
 }
 
 const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
-  ({ value, icon: Icon, label, tooltip, shortcut, badge, _index = 0, className, onClick, ...props }, ref) => {
+  ({ value, icon: Icon, label, labelClassName, tooltip, shortcut, badge, _index = 0, className, onClick, ...props }, ref) => {
     const internalRef = useRef<HTMLButtonElement>(null);
     const sizeClasses = useSize();
     const { registerTab, hoveredIndex, selectedValue, setOptimisticIdx } = useTabsList();
@@ -550,7 +555,7 @@ const TabItem = forwardRef<HTMLButtonElement, TabItemProps>(
         )}
         {/* Both stacked spans carry the text-box trim so the invisible bold
             sizer and the visible label keep identical boxes. */}
-        <span className={cn("inline-grid whitespace-nowrap", sizeClasses.text)}>
+        <span className={cn("inline-grid whitespace-nowrap", sizeClasses.text, labelClassName)}>
           {/* Invisible semibold copy: reserves the bold width up front, so the
               tab doesn't widen when selected and the pills don't jump. */}
           <span

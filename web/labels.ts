@@ -123,6 +123,19 @@ export const pullRequestsLabel = ([first, ...rest]: PullRequest[]): string => (r
 export const readTime = (at: number): string =>
 	new Date(at).toDateString() === new Date().toDateString() ? new Date(at).toLocaleTimeString() : new Date(at).toLocaleString();
 
+/** A size in bytes, in the largest unit under 1024: `1536` reads `1.5 KB`. */
+export function formatBytes(bytes: number): string {
+	if (bytes < 1024) return `${bytes} B`;
+	const units = ["KB", "MB", "GB", "TB"];
+	let value = bytes / 1024;
+	let unit = 0;
+	while (value >= 1024 && unit < units.length - 1) {
+		value /= 1024;
+		unit++;
+	}
+	return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
+}
+
 /** The project a directory holds, its last segment: `~/code/webapp` reads `webapp`. */
 export const projectName = (cwdDisplay: string): string | undefined => cwdDisplay.split("/").filter(Boolean).pop();
 

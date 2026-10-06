@@ -33,7 +33,7 @@ export function QuickActionsMenu({ actions, pending, onRun, label }: QuickAction
 	return (
 		<DropdownMenu>
 			<Tooltip content={label}>
-				<DropdownMenuTrigger render={<Button variant="agent" size="icon-compact" aria-label={label} loading={pending !== null} />}>
+				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={label} loading={pending !== null} />}>
 					<Zap />
 				</DropdownMenuTrigger>
 			</Tooltip>
@@ -41,7 +41,7 @@ export function QuickActionsMenu({ actions, pending, onRun, label }: QuickAction
 				{actions.map(id => {
 					const Icon: LucideIcon = ICON[id];
 					return (
-						<MenuItem variant="agent" key={id} title={QUICK_ACTIONS[id].description} onClick={() => onRun(id)}>
+						<MenuItem key={id} title={QUICK_ACTIONS[id].description} onClick={() => onRun(id)}>
 							<Icon />
 							{QUICK_ACTIONS[id].label}
 						</MenuItem>
@@ -56,14 +56,14 @@ export function QuickActionsMenu({ actions, pending, onRun, label }: QuickAction
 export function QuickActionButton({ action, pending, onRun }: { action: QuickActionId } & Omit<QuickActionsProps, "actions">) {
 	return (
 		<Tooltip content={QUICK_ACTIONS[action].description}>
-			<Button variant="agent" size="compact" leadingIcon={ICON[action]} loading={pending === action} disabled={pending !== null} onClick={() => onRun(action)}>
+			<Button variant="secondary" size="compact" leadingIcon={ICON[action]} loading={pending === action} disabled={pending !== null} onClick={() => onRun(action)}>
 				{QUICK_ACTIONS[action].label}
 			</Button>
 		</Tooltip>
 	);
 }
 
-/** A sheet's buttons for `actions`; nothing when there is none. One start at a time: all wait while one is pending. */
+/** A details view's buttons for `actions`; nothing when there is none. One start at a time: all wait while one is pending. */
 export function QuickActionButtons({ actions, pending, onRun }: QuickActionsProps) {
 	if (actions.length === 0) return null;
 	return (
@@ -97,14 +97,14 @@ export function QuickStartNotice({ quick, onDismiss }: NoticeProps) {
 	);
 }
 
-interface SheetActionsProps extends QuickActionsProps {
-	/** The running sessions that work on the sheet's pull request or issue. */
+interface DetailActionsProps extends QuickActionsProps {
+	/** The running sessions that work on the pull request or issue. */
 	sessions: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
-/** A sheet's buttons for `actions`, then the sessions that work on its item; nothing when there is neither. */
-export function SheetQuickActions({ actions, pending, onRun, sessions, onOpen }: SheetActionsProps) {
+/** A details view's buttons for `actions`, then the sessions that work on its item; nothing when there is neither. */
+export function DetailQuickActions({ actions, pending, onRun, sessions, onOpen }: DetailActionsProps) {
 	if (actions.length === 0 && sessions.length === 0) return null;
 	return (
 		<div className="flex flex-wrap items-center gap-2">

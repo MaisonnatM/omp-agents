@@ -10,6 +10,7 @@ import { shortcutLabels } from "../shortcuts";
 import type { ForkPoint } from "../transcript-view";
 import { Conversation } from "./conversation";
 import { useDashboardContext } from "./dashboard-context";
+import { FileBaseContext } from "./file-link";
 import { PastConversation } from "./past-conversation";
 import { SidebarToggle } from "./sidebar-panel";
 import { SubagentLinks } from "./transcript";
@@ -109,7 +110,9 @@ export const Pane = memo(function Pane({
 			style={{ gridArea: maximized && focused ? "1 / 1 / -1 / -1" : paneArea(index, count) }}
 			className={cn("relative flex min-h-0 min-w-0 flex-col bg-background outline-none", maximized && (focused ? "z-10" : "invisible"))}
 		>
-			<SubagentLinks.Provider value={links}>{content}</SubagentLinks.Provider>
+			<SubagentLinks.Provider value={links}>
+				<FileBaseContext.Provider value={(view.kind === "past" ? session : (host ?? lastHost))?.cwd ?? null}>{content}</FileBaseContext.Provider>
+			</SubagentLinks.Provider>
 		</section>
 	);
 });
