@@ -85,7 +85,8 @@ Navigation, editing, scheduling toggles, Stop, and Delete keep their existing st
 - The right sidebar shows what the focused pane's agent planned, changed, spawned, and captured: a live session, one of its subagents, or a past session, each from its own transcript file.
   It hides for the inbox, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
 - Tabs split it: **Plan**, **Files**, **Agents** for a live session or subagent, and **Media**.
-  Each tab shows its icon and how many items it holds, such as `3` changed files; hover a tab for its name.
+  Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
+  When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
   The sidebar remembers the tab you chose, for every view; a past session, which has no **Agents** tab, shows **Plan** instead.
 - **Plan** shows the agent's latest todo list, by phase, with how many of each phase's tasks are done (`2/5`).
   The task in progress is highlighted, a completed task is struck through, an abandoned one is dimmed, and a blocked one has an amber mark.
