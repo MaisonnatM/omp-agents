@@ -566,12 +566,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The page's header counts the top-level todos left to do, and **Clear done** moves every checked todo it lists to **Done**, a checked todo under an unchecked one as a todo of its own.
 - **Done** lists the cleared todos, latest first, with the day each was checked.
   Hover one to put it back last in the list, in its category if that still exists, or to delete it for good; **Empty** deletes them all, after you confirm.
-- Click a todo's title to edit it and open it beside the list.
+- Click a todo's title to edit it and expand its details below the row without narrowing the list.
   An empty title, or Backspace in an empty one, deletes the todo, and so does the **×** that shows on hover; deleting a todo deletes the todos under it.
   **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
 - The search field in the page's header, or `/` outside a text field, keeps the todos whose title or notes, or a todo under them, hold every word typed; Esc clears it.
   Outside a text field, J and K focus the next and previous todo, X checks the focused one, and Enter opens it.
 - An open todo shows its category, which you can change for a top-level todo, its due day, and its notes in markdown.
+  When a linked live session has a question open, the details show its title and **Reply in session**, which opens that session.
   A todo due today reads **Today** in the list, and one whose day has passed reads **Overdue** in red; **No due day** takes the day off.
   The notes always render as the agent's messages do, with GitHub's task lists and tables, and that render stays on screen while you edit them in the same type.
   They save when the text field loses focus and on Cmd+S; a todo with notes shows a notebook icon in the list.

@@ -1,6 +1,6 @@
 import { Circle, CircleCheck, Play, Ticket, X } from "lucide-react";
 import { useState } from "react";
-import type { TicketChoice, TicketDraft, UserTodo, UserTodoChange, UserTodoList } from "../../src/shared";
+import { hashForSession, type TicketChoice, type TicketDraft, type UserTodo, type UserTodoChange, type UserTodoList } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -100,6 +100,8 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 interface TodoDetailProps {
 	list: UserTodoList;
 	open: TodoEntry;
+	/** Detail opens under its row instead of in a separate pane. */
+	inline?: boolean;
 	/** Changes would not reach the server, or the todo is archived. */
 	readOnly: boolean;
 	onChange: (change: UserTodoChange) => void;
@@ -111,12 +113,22 @@ interface TodoDetailProps {
 }
 
 /** The open todo: its title, category, due day, links, actions, and markdown notes. */
-export function TodoDetail({ list, open, readOnly, onChange, onClose, sessions, newSessionCwd, linearConnected }: TodoDetailProps) {
+export function TodoDetail({ list, open, inline = false, readOnly, onChange, onClose, sessions, newSessionCwd, linearConnected }: TodoDetailProps) {
 	const { todo } = open;
 	const done = todo.doneAt !== null;
 	const top = open.parent === null ? open.todo : null;
+	const linkedSession = top?.links.findLast(link => link.kind === "session");
+	const host = linkedSession?.kind === "session" ? sessions.hosts.find(host => host.sessionId === linkedSession.sessionId) : undefined;
+	const question = host?.requests[0];
 	return (
-		<section aria-label={todo.text} className="flex min-w-0 flex-col gap-3 self-start md:sticky md:top-6">
+		<section aria-label={todo.text} className={cn("flex min-w-0 flex-col gap-3 self-start", !inline && "md:sticky md:top-6")}>
+			{inline ? (
+				<div className="flex justify-end">
+					<Tooltip content="Close">
+						<Button variant="ghost" size="icon-compact" aria-label="Close the todo" onClick={onClose}><X /></Button>
+					</Tooltip>
+				</div>
+			) : (
 			<div className="flex items-start gap-2">
 				<Tooltip content={done ? "Mark not done" : "Mark done"}>
 					{readOnly ? (
@@ -145,6 +157,7 @@ export function TodoDetail({ list, open, readOnly, onChange, onClose, sessions, 
 					</Button>
 				</Tooltip>
 			</div>
+			)}
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
 				{open.parent ? (
 					<p>Under {open.parent.text}</p>
@@ -184,6 +197,13 @@ export function TodoDetail({ list, open, readOnly, onChange, onClose, sessions, 
 					</Tooltip>
 				)}
 			</div>
+			{question && linkedSession?.kind === "session" && (
+				<div className="rounded-md bg-amber-500/10 px-3 py-2 text-sm">
+					<p className="font-medium text-amber-900 dark:text-amber-200">Agent asks</p>
+					<p className="mt-1 whitespace-pre-wrap">{question.title}</p>
+					<a href={hashForSession(linkedSession.sessionId)} className="mt-2 inline-block text-xs font-medium text-amber-800 underline underline-offset-2 dark:text-amber-200">Reply in session</a>
+				</div>
+			)}
 			{top && (top.links.length > 0 || top.addedBy) && (
 				<div className="flex flex-wrap items-center gap-1.5" aria-label="Links">
 					{top.addedBy && <AddedByChip sessionId={top.addedBy} sessions={sessions} />}

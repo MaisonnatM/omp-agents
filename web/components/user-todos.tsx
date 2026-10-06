@@ -1,12 +1,12 @@
 import { CalendarClock, Circle, CircleCheck, GripVertical, ListX, NotebookText, Plus, X } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { Fragment, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { PastSession, RosterHost, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../src/shared";
 import { applyUserTodo } from "../../src/user-todos";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { hashForTodo, type TodoListView } from "../routing";
-import { DAY_FORMAT, LIST_KINDS, lastToDo, leftIn, matches, placeIn, restoreOf, type TodoEntry, titleOf, todosOf, today } from "../todo-views";
+import { DAY_FORMAT, LIST_KINDS, lastToDo, leftIn, matches, restoreOf, type TodoEntry, titleOf, todosOf, today } from "../todo-views";
 import { workStateOf } from "../todo-work-state";
 import { useTodoDrag } from "../use-todo-drag";
 import { useTodoKeys } from "../use-todo-keys";
@@ -297,8 +297,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 			</button>
 		);
 		return (
+			<Fragment key={todo.id}>
 			<li
-				key={todo.id}
 				data-todo-id={todo.id}
 				{...rowProps}
 				draggable={rowProps.draggable && !isEditing}
@@ -392,6 +392,23 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 					</span>
 				)}
 			</li>
+			{openId === todo.id && (
+				<li className={cn("min-w-0 rounded-lg border border-border bg-background p-4 shadow-sm", !top && "ml-6")}>
+					<TodoDetail
+						key={todo.id}
+						list={list}
+						open={entry}
+						inline
+						readOnly={disabled}
+						onChange={onChange}
+						onClose={() => setOpenId(null)}
+						sessions={sessions}
+						newSessionCwd={newSessionCwd}
+						linearConnected={linearConnected}
+					/>
+				</li>
+			)}
+			</Fragment>
 		);
 	};
 
@@ -448,7 +465,6 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 		);
 	};
 
-	const open = openId === null ? null : placeIn([list.todos], openId)?.entry;
 	return (
 		<PageFrame
 			title={title}
@@ -466,23 +482,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 				</>
 			}
 		>
-			<div className={cn("mx-auto grid w-full gap-8 px-6 py-6", open ? "max-w-6xl md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]" : "max-w-3xl")}>
-				<div ref={listRef} className="space-y-6">
-					{sections.map(sectionView)}
-				</div>
-				{open && (
-					<TodoDetail
-						key={open.todo.id}
-						list={list}
-						open={open}
-						readOnly={disabled}
-						onChange={onChange}
-						onClose={() => setOpenId(null)}
-						sessions={sessions}
-						newSessionCwd={newSessionCwd}
-						linearConnected={linearConnected}
-					/>
-				)}
+			<div ref={listRef} className="mx-auto w-full max-w-3xl space-y-6 px-6 py-6">
+				{sections.map(sectionView)}
 			</div>
 			{undo.toast}
 		</PageFrame>
