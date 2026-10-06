@@ -539,10 +539,11 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 ## Todo list
 
 - The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session or a project, in place of the panes.
-  The sidebar then lists **All**, **Today**, **From agents**, and **Done**, then your categories, each with how many top-level todos are left to do in it.
-  Click one to show its todos alone; `#todo/today`, `#todo/agents`, `#todo/done`, and `#todo/<category id>` address them.
+  The sidebar then lists **All**, **Today**, **Needs you**, **From agents**, and **Done**, then your categories, each with how many top-level todos are left to do in it.
+  Click one to show its todos alone; `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/done`, and `#todo/<category id>` address them.
   **All** lists the todos of no category first, then each category's under its name.
   **Today** lists the todos due today or before, or with a todo under them that is, earliest due first; **Add a todo due today** there adds one due today.
+  **Needs you** lists unchecked todos whose latest linked session has a question open or is idle, wherever that session ran.
   **From agents** lists the todos that an agent added; see [Todos from agents](#todos-from-agents).
 - The **+** beside **Categories** adds a category; type its name and press Enter, and the page opens it.
   A category's **⋯** menu renames it or deletes it; deleting a category keeps its todos, in no category.

@@ -2,6 +2,7 @@ import type { PastSession, RosterHost, UserTodo } from "../src/shared";
 
 type LiveWork = Pick<RosterHost, "sessionId" | "status" | "requests" | "pullRequests" | "ship">;
 type PastWork = Pick<PastSession, "sessionId" | "pullRequests" | "ship">;
+export type TodoSessions = { hosts: readonly LiveWork[]; past: readonly PastWork[] };
 
 export type TodoWorkState =
 	| { kind: "idea" }
@@ -13,7 +14,7 @@ export type TodoWorkState =
 	| { kind: "unavailable"; sessionId: string };
 
 /** The most recently linked session owns the current work state; checking a todo remains a separate decision. */
-export function workStateOf(todo: UserTodo, sessions: { hosts: readonly LiveWork[]; past: readonly PastWork[] }): TodoWorkState {
+export function workStateOf(todo: UserTodo, sessions: TodoSessions): TodoWorkState {
 	const link = todo.links.findLast(link => link.kind === "session");
 	if (!link || link.kind !== "session") return { kind: "idea" };
 	const sessionId = link.sessionId;

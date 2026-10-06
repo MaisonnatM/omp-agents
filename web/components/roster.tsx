@@ -49,6 +49,7 @@ import { ShipStep } from "./ship-step";
 import { RoutinesNav } from "./routines/routines-nav";
 import { StatusDot, statusLabel } from "./status-dot";
 import { TodoCategories } from "./todo-categories";
+import type { KnownSessions } from "./todo-links";
 
 /** The muted facts after a session's name: the parts that apply, and a title listing its pull requests. */
 function sessionFacts(parts: (string | false)[], pullRequests: PullRequest[]): { text: string; title?: string } | null {
@@ -401,6 +402,8 @@ interface RosterProps {
 	userTodos: UserTodoList | null;
 	/** The list the Todo page shows. */
 	todoView: TodoListView;
+	/** Unfiltered sessions, so the project picker does not hide a todo's linked session. */
+	todoSessions: KnownSessions;
 	routines: Routine[];
 	/** The routine the Routines page shows, `null` for the list. */
 	routinesTarget: string | null;
@@ -436,6 +439,7 @@ export function Roster({
 	onTab,
 	userTodos,
 	todoView,
+	todoSessions,
 	routines,
 	routinesTarget,
 	sectionTarget,
@@ -727,7 +731,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="todo" asChild>
 				<SidebarContent>
-					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} />
+					<TodoCategories list={userTodos} view={todoView} disabled={!connected} onChange={onTodoChange} sessions={todoSessions} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="routines" asChild>

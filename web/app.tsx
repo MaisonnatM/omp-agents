@@ -383,6 +383,7 @@ export function App() {
 						onTab={showTab}
 						userTodos={state.userTodos}
 						todoView={todoView}
+						todoSessions={{ hosts: state.hosts, past: state.past }}
 						routines={state.routines}
 						routinesTarget={routinesTarget}
 						sectionTarget={sectionTarget}

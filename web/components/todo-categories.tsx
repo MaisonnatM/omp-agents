@@ -14,6 +14,7 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { hashForTodo, type TodoListView } from "../routing";
+import type { KnownSessions } from "./todo-links";
 import { LIST_KINDS, leftIn, SIDEBAR_LISTS, sameTodoView, today } from "../todo-views";
 
 interface NameInputProps {
@@ -55,6 +56,7 @@ type Naming = { kind: "none" } | { kind: "rename"; id: string } | { kind: "add" 
 interface TodoCategoriesProps {
 	/** `null` until the server sends the list. */
 	list: UserTodoList | null;
+	sessions: KnownSessions;
 	/** The list the Todo page shows. */
 	view: TodoListView;
 	/** Changes would not reach the server. */
@@ -86,12 +88,12 @@ function CategoryMenu({ name, onRename, onDelete }: { name: string; onRename: ()
 	);
 }
 
-export function TodoCategories({ list, view, disabled, onChange }: TodoCategoriesProps) {
+export function TodoCategories({ list, view, disabled, onChange, sessions }: TodoCategoriesProps) {
 	const [naming, setNaming] = useState<Naming>({ kind: "none" });
 	if (list === null) return <SidebarGroup><p className="px-2 py-1 text-xs text-muted-foreground">Loading your todos…</p></SidebarGroup>;
 	const day = today();
 	const link = (target: TodoListView, name: string, Icon: LucideIcon | null = null) => {
-		const count = leftIn(list, target, day);
+		const count = leftIn(list, target, day, sessions);
 		const active = sameTodoView(view, target);
 		return (
 			<>

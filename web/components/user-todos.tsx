@@ -87,8 +87,8 @@ interface Section {
 }
 
 /** For every todo, the todos of no category first, then each category with todos, in its order; any other list is one section. */
-function sectionsOf(list: UserTodoList, view: TodoListView, day: string): Section[] {
-	if (view.kind !== "all") return [{ categoryId: view.kind === "category" ? view.id : null, title: null, todos: todosOf(list, view, day) }];
+function sectionsOf(list: UserTodoList, view: TodoListView, day: string, sessions: KnownSessions): Section[] {
+	if (view.kind !== "all") return [{ categoryId: view.kind === "category" ? view.id : null, title: null, todos: todosOf(list, view, day, sessions) }];
 	const inCategory = (categoryId: string | null) => list.todos.filter(todo => todo.categoryId === categoryId);
 	const named = list.categories.map(({ id, name }) => ({ categoryId: id, title: name, todos: inCategory(id) })).filter(section => section.todos.length > 0);
 	return [{ categoryId: null, title: named.length > 0 ? "No category" : null, todos: inCategory(null) }, ...named];
@@ -141,7 +141,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 	const listRef = useRef<HTMLDivElement>(null);
 	const day = today();
 	const kind = LIST_KINDS[view.kind];
-	const sections = list === null ? [] : sectionsOf(list, view, day).map(section => ({ ...section, todos: section.todos.filter(todo => matches(todo, query)) }));
+	const sessions: KnownSessions = { hosts, past };
+	const sections = list === null ? [] : sectionsOf(list, view, day, sessions).map(section => ({ ...section, todos: section.todos.filter(todo => matches(todo, query)) }));
 	const undo = useUndo(onChange);
 	const drag = useTodoDrag(kind.canMove && !disabled, onChange);
 	const toggle = (todo: UserTodoLeaf): void => onChange({ op: "toggle", id: todo.id, doneAt: todo.doneAt === null ? new Date().toISOString() : null });
@@ -173,9 +174,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 	}
 
 	const title = titleOf(list, view);
-	const left = leftIn(list, view, day);
+	const left = leftIn(list, view, day, sessions);
 	const anyDone = sections.some(section => section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null)));
-	const sessions: KnownSessions = { hosts, past };
 
 	/** Deletes todo `id` with the todos under it, and offers **Undo**, which puts it back where it was. */
 	const remove = (id: string, text: string): void => {
