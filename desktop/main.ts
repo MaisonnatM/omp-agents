@@ -14,6 +14,7 @@ import {
 	dialog,
 	globalShortcut,
 	Menu,
+	type MenuItem,
 	type MenuItemConstructorOptions,
 	type Rectangle,
 	screen,
@@ -26,7 +27,7 @@ import { dashboardHosts, isListeningLine, originOf, portFromEnv } from "../src/s
 import { loadToken } from "../src/server/auth";
 import { parseUserTodoList } from "../src/user-todos-parse";
 import { QUICK_TODO_EVENT } from "../src/shared";
-import { opensAtLogin, setOpenAtLogin } from "./login-item";
+import { opensAtLogin, removeLoginAgent, writeLoginAgent } from "./login-item";
 
 const PORT = portFromEnv();
 const ORIGIN = originOf(PORT);
@@ -249,19 +250,20 @@ function createWindow(): BrowserWindow {
 	return win;
 }
 
-/** Ticks or clears Open at Login, then rebuilds the menu, so its check mark shows what the disk holds even after a failure. */
-function toggleOpenAtLogin(open: boolean): void {
+/** Writes or removes the login agent for `item`'s new state, then shows what the disk holds, so a failure leaves no wrong check mark. */
+function toggleOpenAtLogin(item: MenuItem): void {
 	try {
-		setOpenAtLogin(PORT, open, [process.execPath, app.getAppPath()]);
+		if (item.checked) writeLoginAgent(PORT, [process.execPath, app.getAppPath()]);
+		else removeLoginAgent(PORT);
 	} catch (err) {
 		dialog.showErrorBox("Open at Login failed", errorText(err));
 	}
-	Menu.setApplicationMenu(applicationMenu());
+	item.checked = opensAtLogin(PORT);
 }
 
 /** The menu holds no shortcut the dashboard binds (web/shortcuts.ts), so every one reaches the page. */
 function applicationMenu(): Menu {
-	const openAtLogin: MenuItemConstructorOptions = { label: "Open at Login", type: "checkbox", checked: opensAtLogin(PORT), click: item => toggleOpenAtLogin(item.checked) };
+	const openAtLogin: MenuItemConstructorOptions = { label: "Open at Login", type: "checkbox", checked: IS_MAC && opensAtLogin(PORT), click: toggleOpenAtLogin };
 	const appMenu: MenuItemConstructorOptions[] = IS_MAC
 		? [{ label: app.name, submenu: [{ role: "about" }, SEPARATOR, openAtLogin, SEPARATOR, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, SEPARATOR, { role: "quit" }] }]
 		: [];

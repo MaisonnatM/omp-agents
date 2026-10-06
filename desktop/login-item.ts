@@ -19,21 +19,17 @@ const agentPath = (port: number): string => join(homedir(), "Library", "LaunchAg
 
 export const opensAtLogin = (port: number): boolean => existsSync(agentPath(port));
 
-/** Writes or removes the agent; launchd reads it at the next login, so nothing starts now. */
-export function setOpenAtLogin(port: number, open: boolean, program: string[]): void {
-	const path = agentPath(port);
-	if (!open) {
-		rmSync(path, { force: true });
-		return;
+export const removeLoginAgent = (port: number): void => rmSync(agentPath(port), { force: true });
+
+/** Writes the agent; launchd reads it at the next login, so nothing starts now. */
+export function writeLoginAgent(port: number, program: string[]): void {
+	const env: Record<string, string> = { PORT: String(port) };
+	for (const name of CARRIED_ENV) {
+		const value = process.env[name];
+		if (value) env[name] = value;
 	}
-	const env = Object.fromEntries(CARRIED_ENV.flatMap(name => (process.env[name] ? [[name, process.env[name]]] : [])));
-	const agent = {
-		Label: label(port),
-		ProgramArguments: program,
-		EnvironmentVariables: { ...env, PORT: String(port) },
-		RunAtLoad: true,
-		ProcessType: "Interactive",
-	};
+	const path = agentPath(port);
+	const agent = { Label: label(port), ProgramArguments: program, EnvironmentVariables: env, RunAtLoad: true, ProcessType: "Interactive" };
 	mkdirSync(dirname(path), { recursive: true });
 	execFileSync("plutil", ["-convert", "xml1", "-o", path, "-"], { input: JSON.stringify(agent) });
 }
