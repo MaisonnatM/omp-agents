@@ -1,16 +1,9 @@
 "use client";
 
-import { getDay, getDaysInMonth, isSameDay } from "date-fns";
 import { atom, useAtom } from "jotai";
-import {
-  Check,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronsUpDown,
-} from "lucide-react";
+import { Check, ChevronDown, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import {
   createContext,
-  memo,
   type ReactNode,
   useCallback,
   useContext,
@@ -48,27 +41,11 @@ export const useCalendarYear = () => useAtom(yearAtom);
 
 type CalendarContextProps = {
   locale: Intl.LocalesArgument;
-  startDay: number;
 };
 
 const CalendarContext = createContext<CalendarContextProps>({
   locale: "en-US",
-  startDay: 0,
 });
-
-export type Status = {
-  id: string;
-  name: string;
-  color: string;
-};
-
-export type Feature = {
-  id: string;
-  name: string;
-  startAt: Date;
-  endAt: Date;
-  status: Status;
-};
 
 type ComboboxProps = {
   value: string;
@@ -128,9 +105,9 @@ const Combobox = ({
       <PopoverTrigger asChild>
         <Button
           aria-expanded={open}
-          className={cn("w-40 justify-between capitalize", className)}
-          trailingIcon={ChevronsUpDown}
-          variant="secondary"
+          className={cn("px-2 font-semibold text-[15px] text-foreground capitalize", className)}
+          trailingIcon={ChevronDown}
+          variant="ghost"
         >
           {value
             ? data.find((item) => item.value === value)?.label
@@ -173,171 +150,6 @@ const Combobox = ({
         </Command>
       </PopoverContent>
     </Popover>
-  );
-};
-
-type OutOfBoundsDayProps = {
-  day: number;
-};
-
-const OutOfBoundsDay = ({ day }: OutOfBoundsDayProps) => (
-  <div className="relative h-full w-full bg-secondary p-1 text-muted-foreground text-xs">
-    {day}
-  </div>
-);
-
-export type CalendarBodyProps = {
-  features: Feature[];
-  children: (props: { feature: Feature }) => ReactNode;
-  /** Called with a day when its number or its "+N more" is clicked. */
-  onSelectDay?: (date: Date) => void;
-  selectedDay?: Date | null;
-};
-
-export const CalendarBody = ({
-  features,
-  children,
-  onSelectDay,
-  selectedDay,
-}: CalendarBodyProps) => {
-  const [month] = useCalendarMonth();
-  const [year] = useCalendarYear();
-  const { startDay } = useContext(CalendarContext);
-
-  // Memoize expensive date calculations
-  const currentMonthDate = useMemo(
-    () => new Date(year, month, 1),
-    [year, month]
-  );
-  const daysInMonth = useMemo(
-    () => getDaysInMonth(currentMonthDate),
-    [currentMonthDate]
-  );
-  const firstDay = useMemo(
-    () => (getDay(currentMonthDate) - startDay + 7) % 7,
-    [currentMonthDate, startDay]
-  );
-
-  // Memoize previous month calculations
-  const prevMonthData = useMemo(() => {
-    const prevMonth = month === 0 ? 11 : month - 1;
-    const prevMonthYear = month === 0 ? year - 1 : year;
-    const prevMonthDays = getDaysInMonth(new Date(prevMonthYear, prevMonth, 1));
-    const prevMonthDaysArray = Array.from(
-      { length: prevMonthDays },
-      (_, i) => i + 1
-    );
-    return { prevMonthDays, prevMonthDaysArray };
-  }, [month, year]);
-
-  // Memoize next month calculations
-  const nextMonthData = useMemo(() => {
-    const nextMonth = month === 11 ? 0 : month + 1;
-    const nextMonthYear = month === 11 ? year + 1 : year;
-    const nextMonthDays = getDaysInMonth(new Date(nextMonthYear, nextMonth, 1));
-    const nextMonthDaysArray = Array.from(
-      { length: nextMonthDays },
-      (_, i) => i + 1
-    );
-    return { nextMonthDaysArray };
-  }, [month, year]);
-
-  // Memoize features filtering by day to avoid recalculating on every render
-  const featuresByDay = useMemo(() => {
-    const result: { [day: number]: Feature[] } = {};
-    for (let day = 1; day <= daysInMonth; day++) {
-      result[day] = features.filter((feature) => {
-        return isSameDay(new Date(feature.endAt), new Date(year, month, day));
-      });
-    }
-    return result;
-  }, [features, daysInMonth, year, month]);
-
-  const days: ReactNode[] = [];
-
-  for (let i = 0; i < firstDay; i++) {
-    const day =
-      prevMonthData.prevMonthDaysArray[
-        prevMonthData.prevMonthDays - firstDay + i
-      ];
-
-    if (day) {
-      days.push(<OutOfBoundsDay day={day} key={`prev-${i}`} />);
-    }
-  }
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    const featuresForDay = featuresByDay[day] || [];
-    const date = new Date(year, month, day);
-    const selected = selectedDay != null && isSameDay(selectedDay, date);
-
-    days.push(
-      <div
-        className={cn(
-          "relative flex h-full w-full flex-col gap-1 p-1 text-muted-foreground text-xs",
-          selected && "bg-accent"
-        )}
-        key={day}
-      >
-        {onSelectDay ? (
-          <button
-            aria-label={date.toDateString()}
-            aria-pressed={selected}
-            className="self-start rounded px-1 hover:bg-accent hover:text-foreground"
-            onClick={() => onSelectDay(date)}
-            type="button"
-          >
-            {day}
-          </button>
-        ) : (
-          day
-        )}
-        <div>
-          {featuresForDay.slice(0, 3).map((feature) => children({ feature }))}
-        </div>
-        {featuresForDay.length > 3 &&
-          (onSelectDay ? (
-            <button
-              className="self-start text-muted-foreground text-xs hover:text-foreground"
-              onClick={() => onSelectDay(date)}
-              type="button"
-            >
-              +{featuresForDay.length - 3} more
-            </button>
-          ) : (
-            <span className="block text-muted-foreground text-xs">
-              +{featuresForDay.length - 3} more
-            </span>
-          ))}
-      </div>
-    );
-  }
-
-  const remainingDays = 7 - ((firstDay + daysInMonth) % 7);
-  if (remainingDays < 7) {
-    for (let i = 0; i < remainingDays; i++) {
-      const day = nextMonthData.nextMonthDaysArray[i];
-
-      if (day) {
-        days.push(<OutOfBoundsDay day={day} key={`next-${i}`} />);
-      }
-    }
-  }
-
-  return (
-    <div className="grid flex-grow grid-cols-7">
-      {days.map((day, index) => (
-        <div
-          className={cn(
-            "relative min-h-28 overflow-hidden border-t border-r",
-            index % 7 === 6 && "border-r-0"
-          )}
-          key={index}
-        >
-          {day}
-        </div>
-      ))}
-    </div>
   );
 };
 
@@ -477,64 +289,18 @@ export const CalendarDate = ({ children }: CalendarDateProps) => (
   <div className="flex items-center justify-between p-3">{children}</div>
 );
 
-export type CalendarHeaderProps = {
-  className?: string;
-};
-
-export const CalendarHeader = ({ className }: CalendarHeaderProps) => {
-  const { locale, startDay } = useContext(CalendarContext);
-
-  // Memoize days data to avoid recalculating date formatting
-  const daysData = useMemo(() => {
-    return daysForLocale(locale, startDay);
-  }, [locale, startDay]);
-
-  return (
-    <div className={cn("grid flex-grow grid-cols-7", className)}>
-      {daysData.map((day) => (
-        <div className="p-3 text-right text-muted-foreground text-xs" key={day}>
-          {day}
-        </div>
-      ))}
-    </div>
-  );
-};
-
-export type CalendarItemProps = {
-  feature: Feature;
-  className?: string;
-};
-
-export const CalendarItem = memo(
-  ({ feature, className }: CalendarItemProps) => (
-    <div className={cn("flex items-center gap-2", className)}>
-      <div
-        className="h-2 w-2 shrink-0 rounded-full"
-        style={{
-          backgroundColor: feature.status.color,
-        }}
-      />
-      <span className="truncate">{feature.name}</span>
-    </div>
-  )
-);
-
-CalendarItem.displayName = "CalendarItem";
-
 export type CalendarProviderProps = {
   locale?: Intl.LocalesArgument;
-  startDay?: number;
   children: ReactNode;
   className?: string;
 };
 
 export const CalendarProvider = ({
   locale = "en-US",
-  startDay = 0,
   children,
   className,
 }: CalendarProviderProps) => (
-  <CalendarContext.Provider value={{ locale, startDay }}>
+  <CalendarContext.Provider value={{ locale }}>
     <div className={cn("relative flex flex-col", className)}>{children}</div>
   </CalendarContext.Provider>
 );

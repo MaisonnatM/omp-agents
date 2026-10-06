@@ -615,13 +615,14 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The sidebar then lists **Calendar**, then **All** and each routine by name.
 - Each day lists its routine runs, the todos due on it, and, once connected, the Linear tickets due on it and events of your selected Google calendars.
   A green dot is a run that went through, a red one a run that failed, and a hollow one a run still to come.
-  A violet dot is a todo, an amber one a ticket, and a Google event uses its calendar's color; a checked todo, or a done or canceled ticket, is struck through.
+  A violet dot is a todo, an amber one a ticket, and a timed Google event uses its calendar's color; an all-day event is a band in that color; a checked todo, or a done or canceled ticket, is struck through.
 - Planned runs follow each routine's schedules from its last run.
   A time that passed without a run shows as now, since the next minute's check runs it.
   A paused routine shows its past runs and no planned ones.
   A routine that runs more than once a day shows once on each day from today, with how often it runs, instead of each run.
   Only the last 10 runs of a routine are kept, so older months show no past runs.
-- A day cell shows three entries and how many more there are.
+- A day cell shows three entries and how many more there are; today's number is circled.
+  Hover a day, or focus its number, to see all of its entries in a card beside it, each a link like in the day's list.
   Click a day's number, or its **+N more**, to list all of its entries beside the month; today is listed when the page opens.
 - Click an entry to open its routine, its todo list, or its ticket; Google events open in Google Calendar in a new tab.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.

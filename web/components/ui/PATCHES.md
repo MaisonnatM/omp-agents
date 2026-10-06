@@ -50,7 +50,7 @@ Dashboard behavior that can live outside these files does: the composer's queued
 
 The registry file uses shadcn's `button`, `command`, and `popover`; the dashboard keeps Fluid's, so it imports those.
 
-- The month and year pickers' button is `variant="secondary"`, since Fluid's button has no `outline`, and takes its chevron as `trailingIcon`, since Fluid's button puts an icon among its children on a line of its own.
-- Day cells are `min-h-28`, not `aspect-square`, so a cell keeps three entries readable in a narrow grid.
-- `CalendarBody` takes `onSelectDay`, which a day's number and its **+N more** call, and `selectedDay`, whose cell it highlights.
+- The month and year pickers' button is `variant="ghost"`, in the semibold month title's size, since Fluid's button has no `outline`, and takes a `ChevronDown` as `trailingIcon`, since Fluid's button puts an icon among its children on a line of its own.
+- `CalendarBody`, `CalendarHeader`, `CalendarItem`, `Feature`, and `Status` are removed, along with the provider's `startDay` and the `date-fns` import.
+  `web/components/calendar/calendar-page.tsx` draws the month from its own entries, so it needs no generic feature list.
 - The month arrows have `aria-label`s, **Previous month** and **Next month**.
