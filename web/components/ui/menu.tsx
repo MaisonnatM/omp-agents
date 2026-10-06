@@ -106,7 +106,7 @@ function MenuItem({
   variant = "default",
   ...props
 }: React.ComponentProps<typeof MenuPrimitive.Item> & {
-  variant?: "default" | "destructive" | "agent"
+  variant?: "default" | "destructive"
 }) {
   return (
     <MenuPrimitive.Item
@@ -115,9 +115,6 @@ function MenuItem({
       className={cn(
         itemClassName,
         "data-[variant=destructive]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:[&_svg]:text-current!",
-        // Highlight stays on the gradient. The shared item class would paint the accent behind it, and its icons would stay muted.
-        "data-[variant=agent]:text-[color:var(--agent-action-foreground)] data-[variant=agent]:data-highlighted:bg-transparent data-[variant=agent]:data-highlighted:text-[color:var(--agent-action-foreground)] data-[variant=agent]:[&_svg]:text-current!",
-        variant === "agent" && "agent-action",
         className
       )}
       {...props}

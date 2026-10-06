@@ -14,10 +14,6 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --agent-action-background: linear-gradient(110deg, #1d4ed8, #6d28d9);
-  --agent-action-hover-background: linear-gradient(110deg, #1e40af, #5b21b6);
-  --agent-action-pressed-background: linear-gradient(110deg, #1e3a8a, #4c1d95);
-  --agent-action-foreground: #fff;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -268,45 +264,6 @@
   }
 }
 
-/* The fill is a custom property on the element that receives the pointer.
-   A button's label sits on top of its surface, so :hover and :active on the
-   surface never see a press there. The surface and its ring only paint
-   --agent-fill. The ring is the 1px collapse other variants get from a
-   same-color box-shadow; a gradient cannot be that spread. */
-.agent-action,
-.agent-button {
-  --agent-fill: var(--agent-action-background);
-  color: var(--agent-action-foreground);
-}
-
-.agent-action:is(:hover, [data-highlighted]),
-.agent-button:is(:hover, [data-highlighted]) {
-  --agent-fill: var(--agent-action-hover-background);
-}
-
-.agent-action:is(:active, [data-pressed]),
-.agent-button:is(:active, [data-pressed]) {
-  --agent-fill: var(--agent-action-pressed-background);
-}
-
-.agent-action,
-.agent-button-surface,
-.agent-button-surface::before {
-  background: var(--agent-fill);
-}
-
-.agent-button-surface::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  transition: inset 180ms cubic-bezier(0.23, 1, 0.32, 1);
-}
-
-.agent-button:active > .agent-button-surface::before {
-  inset: 0;
-  transition-duration: 80ms;
-}
   html.transitioning *, html.transitioning *::before, html.transitioning *::after {
     transition: border-radius 180ms ease-in-out, background-color 180ms ease-in-out, color 180ms ease-in-out, border-color 180ms ease-in-out, fill 180ms ease-in-out, stroke 180ms ease-in-out !important;
 }

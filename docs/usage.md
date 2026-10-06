@@ -3,9 +3,8 @@
 The full reference for the dashboard's interface.
 For installation, see the [README](../README.md).
 
-Controls with a filled blue-to-violet gradient start or continue agent work.
-They send prompts and suggested follow-ups, answer questions, run quick actions, resume or fork sessions, and run routines now.
-Navigation, editing, scheduling toggles, Stop, and Delete keep their existing styles.
+A filled button marks the main action of its surface: Send, Finish, Resume on a past session, and Run now on a routine.
+Suggested prompts, quick actions, forking, and menu items stay quiet, so they never compete with it.
 
 - [Sessions sidebar](#sessions-sidebar)
 - [Session details sidebar](#session-details-sidebar)

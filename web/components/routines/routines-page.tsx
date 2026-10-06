@@ -67,7 +67,7 @@ function RoutineActions({ routine, disabled, onChange, onEdit, onDeleted }: Rout
 				</DropdownMenuTrigger>
 			</Tooltip>
 			<DropdownMenuContent align="end">
-				<MenuItem variant="agent" onClick={() => onChange({ op: "run-now", id })}>
+				<MenuItem onClick={() => onChange({ op: "run-now", id })}>
 					<Play />
 					Run now
 				</MenuItem>
@@ -213,7 +213,7 @@ function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: Det
 					<Button asChild variant="ghost" size="compact" leadingIcon={ArrowLeft}>
 						<a href={hashForRoutines(null)}>All routines</a>
 					</Button>
-					<Button variant="agent" size="compact" leadingIcon={Play} disabled={!connected} onClick={() => onChange({ op: "run-now", id: routine.id })}>
+					<Button size="compact" leadingIcon={Play} disabled={!connected} onClick={() => onChange({ op: "run-now", id: routine.id })}>
 						Run now
 					</Button>
 					<RoutineActions

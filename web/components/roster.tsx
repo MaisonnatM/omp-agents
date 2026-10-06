@@ -515,7 +515,7 @@ export function Roster({
 				items={
 					<>
 						{/* One resume runs at a time, as the pane's Resume button allows. */}
-						<MenuItem variant="agent" disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
+						<MenuItem disabled={resume?.phase === "starting"} onClick={() => onResume(session.sessionId)}>
 							<Play />
 							{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
 						</MenuItem>
@@ -701,7 +701,7 @@ export function Roster({
 								<Tooltip content={resumingAll ? "Resuming…" : "Resume all"}>
 									{resumingAll || !connected ? (
 										<span className="inline-flex">
-											<SidebarGroupAction asChild className="agent-action text-[color:var(--agent-action-foreground)] hover:bg-transparent hover:text-[color:var(--agent-action-foreground)] disabled:pointer-events-none disabled:opacity-50">
+											<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
 												<button
 													type="button"
 													aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
@@ -713,7 +713,7 @@ export function Roster({
 											</SidebarGroupAction>
 										</span>
 									) : (
-										<SidebarGroupAction asChild className="agent-action text-[color:var(--agent-action-foreground)] hover:bg-transparent hover:text-[color:var(--agent-action-foreground)] disabled:pointer-events-none disabled:opacity-50">
+										<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
 											<button
 												type="button"
 												aria-label="Resume all interrupted sessions"
