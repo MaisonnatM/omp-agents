@@ -524,7 +524,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - A top-level todo shows what it links to: a session, a pull request, or a Linear issue, each a chip that opens it here.
   A running session's chip shows its status dot; an open todo's **×** on a chip unlinks it.
 - An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.
-  The session links to the todo once omp starts.
+  The session links to the todo once omp starts, and its agent checks the todo off once it finishes the work; see [Todos from agents](#todos-from-agents).
 - With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, then opens an issue from the title and notes, assigned to you, and links it to the todo.
 - The list icon on an inbox pull request, a ticket, and a live session's header adds a todo of no category, last in the list, that links to it.
 - The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
@@ -538,6 +538,9 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   It comes from `~/.omp/agent/extensions/todos.ts`, which `bun run omp-template` installs.
 - An agent adds a todo when it stops on a step only you can take, such as approving a migration or reviewing a pull request.
   The todo lands last in no category, and its chip names the session that added it and opens it.
+- A session that an open top-level todo links to, such as the one its **Start session** started, is told which todo it works on at each prompt.
+  Its agent checks the todo off once it finishes the work, and leaves it open while the work still waits on you.
+  Any agent also checks off a todo whose work you ask it to do.
 - The tool leaves each change as a file in `todo-inbox/` beside `todos.json`, and the server applies it and deletes the file, so a todo an agent adds while the dashboard is down shows once it starts.
   A file that is not a change an agent may make moves to `<name>.invalid`.
 
