@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import type { UserTodo, UserTodoChange, UserTodoLeaf } from "../src/shared";
+import type { UserTodo, UserTodoChange, UserTodoLeaf } from "../src/user-todos-shared";
 import { useShortcuts } from "./shortcuts";
 import { moveTo, placeIn } from "./todo-views";
 

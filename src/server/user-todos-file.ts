@@ -1,8 +1,8 @@
 /** The Todo page's list, kept in a file so that every window of the dashboard, and the next server, shows the same one. */
 import { JsonFile } from "../fs";
-import type { UserTodoChange, UserTodoList } from "../shared";
 import { applyUserTodo } from "../user-todos";
 import { parseUserTodoList } from "../user-todos-parse";
+import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 
 const EMPTY: UserTodoList = { categories: [], todos: [], archive: [] };
 

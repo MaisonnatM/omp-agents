@@ -1,5 +1,13 @@
 /** The rules of the Todo page's list, which the server applies to its file and the page to what it shows until the server answers. */
-import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoLink, UserTodoList } from "./shared";
+import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoLink, UserTodoList } from "./user-todos-shared";
+
+type AddChange = Extract<UserTodoChange, { op: "add" }>;
+
+/** The `add` of a new todo, with a new id unless `id` names it; whatever `fields` leaves out is none, last in the top level. */
+export function addTodo(fields: Pick<AddChange, "text"> & Partial<Omit<AddChange, "op">>): AddChange {
+	const { id = crypto.randomUUID(), parentId = null, afterId = null, categoryId = null, text, body = "", due = null, links = [], addedBy = null } = fields;
+	return { op: "add", id, parentId, afterId, categoryId, text, body, due, links, addedBy };
+}
 
 /** The changes that touch the list's todos alone, not its categories or its archive. */
 type TodoChange = Exclude<
@@ -210,13 +218,13 @@ function applyChange(list: UserTodoList, change: UserTodoChange): UserTodoList {
 			const added: UserTodo = {
 				id: change.id,
 				text: change.text,
-				body: change.body ?? "",
+				body: change.body,
 				doneAt: null,
-				due: change.due ?? null,
+				due: change.due,
 				categoryId: change.categoryId,
 				children: [],
-				links: uniqueLinks(change.links ?? []),
-				addedBy: change.addedBy ?? null,
+				links: uniqueLinks(change.links),
+				addedBy: change.addedBy,
 			};
 			return withTodos(insertTodo(todos, added, change.parentId, change.afterId, isCategory));
 		}

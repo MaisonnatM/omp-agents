@@ -16,7 +16,6 @@ interface Leaf {
 	id: string;
 	text: string;
 	doneAt?: string | null;
-	done?: boolean;
 	due?: string | null;
 }
 interface Todo extends Leaf {
@@ -29,7 +28,7 @@ interface List {
 	todos?: Todo[];
 }
 
-const isDone = (todo: Leaf): boolean => (todo.doneAt ?? null) !== null || todo.done === true;
+const isDone = (todo: Leaf): boolean => (todo.doneAt ?? null) !== null;
 
 /** The open todo that links to session `sessionId`, such as the one it was started for. */
 const todoOf = (list: List, sessionId: string): Todo | undefined =>

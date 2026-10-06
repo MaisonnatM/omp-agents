@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { UserTodo } from "../src/shared";
+import type { UserTodo } from "../src/user-todos-shared";
 import { workStateOf } from "./todo-work-state";
 
 const base: UserTodo = { id: "todo", text: "Review the change", body: "", doneAt: null, due: null, categoryId: null, children: [], links: [], addedBy: null };

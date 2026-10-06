@@ -192,9 +192,9 @@ A user item's `images` holds a `data:` URL for an inline image and `/api/image?h
 
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
 Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process, `bun src/server.ts`, and never imports it.
-It imports only `src/paths.ts`, `src/json.ts`, `src/shared.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/user-todos-parse.ts`, and `src/user-todos.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
-It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching the file's directory since the server replaces the file, and its global quick-capture shortcut dispatches `QUICK_TODO_EVENT` in the page, which `web/app.tsx` answers by opening the Todo page with a new todo started.
-`src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, the line it prints once it listens, and `QUICK_TODO_EVENT`, the name of the event the shell dispatches and the page listens for.
+It imports only `src/paths.ts`, `src/json.ts`, `src/shared.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/user-todos-parse.ts`, `src/user-todos-shared.ts`, and `src/user-todos.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
+It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching the file's directory since the server replaces the file, and its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/server/address.ts`, in the page, which `web/app.tsx` answers by opening the session switcher, where **Create todo** is.
+`src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
 
 - At launch it calls `loadToken`, as the server does, so whichever runs first creates the token file, and asks `GET /?token=<token>` on the port.
   A 302 that sets the cookie can come only from an omp-agents server that holds this token, and the window uses it.
@@ -497,15 +497,17 @@ The server lives in `src/`:
 - `src/google-calendar.ts`: the read-only Google Calendar OAuth sign-in, private client and refresh-token file, access-token refresh, and month-range event reads.
 - `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout that `src/linear.ts` and `src/google-calendar.ts` share.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
-- `src/user-todos.ts`: the rules of the Todo page's list, `applyUserTodo`, which the server applies to its file and the page to what it shows before the server answers.
-  The list is `UserTodoList` in `src/shared.ts`: categories, top-level todos, and the archive that `clear-done` fills, latest first.
+- `src/user-todos-shared.ts`: the Todo page's types, which the server, the page, and the extension that reads `todos.json` all follow: `UserTodoList`, `UserTodo`, `UserTodoLink`, and `UserTodoChange`.
+  `templates/omp/agent/extensions/todos.ts` cannot import them, so it declares the shape it reads by hand.
+- `src/user-todos.ts`: the rules of the Todo page's list, `applyUserTodo`, which the server applies to its file and the page to what it shows before the server answers, and `addTodo`, which builds an `add` with every field filled.
+  The list is `UserTodoList`: categories, top-level todos, and the archive that `clear-done` fills, latest first.
   **Clear done** sends `clear-done` for the list it shows, and the server's minute tick in `src/server.ts` sends one with `before` for every todo checked over `DONE_KEPT_HOURS` ago; the socket and the todo inbox drop a `before` they receive.
   A todo has a title, markdown notes, a check time (`doneAt`), and a due day; a top-level one also has a category or none, todos of its own, which share its category, links (`UserTodoLink`: a session, a pull request, or a Linear issue), and `addedBy`, the session whose agent added it.
   `move` reorders, `restore` puts back what `remove` took at its index for the page's **Undo**, and `unarchive` and `empty-archive` act on the archive.
   Every list keeps its todos to do before its checked ones, at both levels: `applyUserTodo` orders the todos after each change through `inStatusOrder`, and loading the file does too.
   `moveTo` in `web/todo-views.ts` refuses a move among the todos of the other status, and the page adds a todo after the last one to do.
   `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token.
-  `src/user-todos-parse.ts` reads the list and its changes from JSON for the file, the socket, the todo inbox, and the desktop shell: a file from before any of those fields reads with none of them, a `done: true` todo as checked when it loads, and a change from a page or an agent is held to the length limits, a `restore` too.
+  `src/user-todos-parse.ts` reads the list and its changes from JSON for the file, the socket, the todo inbox, and the desktop shell: a file from before any of those fields reads with none of them, and a change from a page or an agent is held to the length limits, a `restore` too.
   A `user-todo` socket message carries one change, and every socket hears the list after it as a `user-todos` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the list back to its own socket alone.
   A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`, before it sends the first message.
 - `src/server/todo-inbox.ts`: applies the changes that omp's `user_todo` tool (`templates/omp/agent/extensions/todos.ts`) leaves in `todo-inbox/` beside `todos.json`, one JSON file each, written under a `.tmp` name then renamed.
@@ -580,12 +582,16 @@ The page lives in `web/`.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
 - `web/components/roster.tsx`: the left sidebar's tabs, its session and tickets lists, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab.
   `SessionRow` is the one row a past session and a live host both render.
-  `web/components/todo-categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Done**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab, the calendar and then the routines by name.
-- `web/components/user-todos.tsx`: the Todo page and its lists; `todo-archive.tsx` is the **Done** page.
-  `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows, `todo-search.tsx` is the search field, and `todo-undo.tsx` the **Undo** toast.
+  `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Done**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab, the calendar and then the routines by name.
+- `web/components/todo/`: the Todo page.
+  `page.tsx` is the page and its lists, **Done** included, which `LIST_KINDS` marks read-only: its rows put a todo back or delete it for good, and its header offers **Empty** where the others offer **Clear done**.
+  Each section lists its unchecked todos, then a **Logbook** fold of its checked ones, and the open todo's `detail.tsx` expands in a row below it.
+  `row.tsx` holds a todo's row, with its work-state pill, an archived todo's row, and the row of a todo not added yet; `check.tsx` is a todo's checkbox and `input.tsx` the input a title is typed into, whose Cmd+Enter starts a session from the todo.
+  `editing.ts` holds `useTodoEditing`, which of those inputs is open and what its keys do, and deleting with **Undo**; `undo.tsx` is the **Undo** toast and `search.tsx` the search field.
+  `detail.tsx` is the open todo, with its due day, live agent question, links, **Start session**, and **Create Linear ticket**, whose notes `web/components/markdown-editor.tsx` always renders through `message-markdown.tsx` while you edit them; `links.tsx` draws a todo's link chips and work-state pill, and `add-button.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
+  `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds and under which headings, how a due day reads, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows.
   `web/todo-work-state.ts` derives the pill and the **Needs you** filter from the latest linked session's live status, outstanding question, submitted pull request, or recorded `/ship` merge; it keeps unknown and ended sessions distinct from new ideas.
-  `web/todo-quick-add.ts` reads a trailing due day and `#category` off a new todo's title.
-  `todo-detail.tsx` expands under the open row with its due day, live agent question, links, **Start session**, and **Create Linear ticket**, whose notes `web/components/markdown-editor.tsx` always renders through `message-markdown.tsx` while you edit them; `todo-links.tsx` draws a todo's link chips, and `add-to-todo.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
+  `web/todo-quick-add.ts` reads a trailing due day and `#category` off a new todo's title, in the page's new todos and in the session switcher's **Create todo**.
 - `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
   It and the Calendar page read the time through `web/use-minute.ts`, renewed each minute.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.

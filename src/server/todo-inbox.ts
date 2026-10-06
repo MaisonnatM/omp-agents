@@ -6,8 +6,8 @@
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, watch } from "node:fs";
 import { join } from "node:path";
 import { errorText } from "../json";
-import type { UserTodoChange } from "../shared";
 import { parseTodoChange } from "../user-todos-parse";
+import type { UserTodoChange } from "../user-todos-shared";
 
 export class TodoInbox {
 	readonly #dir: string;

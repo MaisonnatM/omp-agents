@@ -1,47 +1,41 @@
 /** Which todos each of the Todo page's lists holds and what it lets you do, shared by the page and the sidebar. */
-import { Archive, Bot, CalendarClock, ListTodo, MessageCircleQuestionMark, type LucideIcon } from "lucide-react";
-import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/shared";
+import { Archive, Bot, CalendarClock, ListTodo, type LucideIcon, MessageCircleQuestionMark } from "lucide-react";
+import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
+import { localDay } from "./days";
 import type { TodoListView } from "./routing";
 import { workStateOf, type TodoSessions } from "./todo-work-state";
 
-/** What a list is called and lets you do. A category's own name replaces its `title`. */
-interface ListKind {
-	/** What the sidebar calls it. */
-	name: string;
+/** What a list shows and lets you do. A category's title is its own name. */
+export interface ListKind {
 	/** The page's title. */
 	title: string;
-	/** The sidebar's icon; a category has none. */
-	icon: LucideIcon | null;
-	canAdd: boolean;
+	/** What adding a todo here offers; `null` for a list that takes none. */
+	add: { label: string; dueToday: boolean } | null;
 	/** Today sorts by due day and Done by when it was cleared, so neither moves todos. */
 	canMove: boolean;
-	/** A todo added here is due today. */
-	dueToday: boolean;
-	addLabel: string;
+	/** Done lists the archive: its todos can be opened, put back, or deleted, not changed. */
+	readOnly: boolean;
 	/** What the list says while it holds nothing to show and no search is typed. */
 	empty: string | null;
 }
 
 export const LIST_KINDS: Record<TodoListView["kind"], ListKind> = {
-	all: { name: "All", title: "Todo", icon: ListTodo, canAdd: true, canMove: true, dueToday: false, addLabel: "Add a todo", empty: null },
-	today: { name: "Today", title: "Today", icon: CalendarClock, canAdd: true, canMove: false, dueToday: true, addLabel: "Add a todo due today", empty: "Nothing is due today." },
-	needs: { name: "Needs you", title: "Needs you", icon: MessageCircleQuestionMark, canAdd: false, canMove: false, dueToday: false, addLabel: "", empty: "No todo is waiting on you." },
-	agents: {
-		name: "From agents",
-		title: "From agents",
-		icon: Bot,
-		canAdd: false,
-		canMove: true,
-		dueToday: false,
-		addLabel: "",
-		empty: "No agent has added a todo. An omp session adds one with its `user_todo` tool.",
-	},
-	done: { name: "Done", title: "Done", icon: Archive, canAdd: false, canMove: false, dueToday: false, addLabel: "", empty: "Clear done puts checked todos here." },
-	category: { name: "", title: "Todo", icon: null, canAdd: true, canMove: true, dueToday: false, addLabel: "Add a todo", empty: null },
+	all: { title: "Todo", add: { label: "Add a todo", dueToday: false }, canMove: true, readOnly: false, empty: null },
+	today: { title: "Today", add: { label: "Add a todo due today", dueToday: true }, canMove: false, readOnly: false, empty: "Nothing is due today." },
+	needs: { title: "Needs you", add: null, canMove: false, readOnly: false, empty: "No todo is waiting on you." },
+	agents: { title: "From agents", add: null, canMove: true, readOnly: false, empty: "No agent has added a todo. An omp session adds one with its `user_todo` tool." },
+	done: { title: "Done", add: null, canMove: false, readOnly: true, empty: "Clear done puts checked todos here." },
+	category: { title: "Todo", add: { label: "Add a todo", dueToday: false }, canMove: true, readOnly: false, empty: null },
 };
 
-/** The lists the sidebar shows above the categories, in its order. */
-export const SIDEBAR_LISTS: Exclude<TodoListView, { kind: "category" }>[] = [{ kind: "all" }, { kind: "today" }, { kind: "needs" }, { kind: "agents" }, { kind: "done" }];
+/** The lists the sidebar shows above the categories, in its order, each with its name and icon. */
+export const SIDEBAR_LISTS: { view: Exclude<TodoListView, { kind: "category" }>; name: string; icon: LucideIcon }[] = [
+	{ view: { kind: "all" }, name: "All", icon: ListTodo },
+	{ view: { kind: "today" }, name: "Today", icon: CalendarClock },
+	{ view: { kind: "needs" }, name: "Needs you", icon: MessageCircleQuestionMark },
+	{ view: { kind: "agents" }, name: "From agents", icon: Bot },
+	{ view: { kind: "done" }, name: "Done", icon: Archive },
+];
 
 export const titleOf = (list: UserTodoList, view: TodoListView): string =>
 	view.kind === "category" ? (list.categories.find(({ id }) => id === view.id)?.name ?? LIST_KINDS.category.title) : LIST_KINDS[view.kind].title;
@@ -49,6 +43,18 @@ export const titleOf = (list: UserTodoList, view: TodoListView): string =>
 /** A day as the lists show it: `Oct 5`. */
 export const DAY_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 
+/** A due day as the lists read it, and whether it has passed; `day` is today. */
+export function dueLabel(due: string, day: string): { text: string; overdue: boolean } {
+	if (due === day) return { text: "Today", overdue: false };
+	const [y, m, d] = due.split("-").map(Number);
+	const overdue = due < day;
+	if (!overdue) {
+		const [ty, tm, td] = day.split("-").map(Number);
+		if (due === localDay(new Date(ty!, tm! - 1, td! + 1))) return { text: "Tomorrow", overdue };
+	}
+	const date = DAY_FORMAT.format(new Date(y!, m! - 1, d!));
+	return { text: overdue ? `Overdue · ${date}` : date, overdue };
+}
 /** A top-level todo the Today list shows: it, or a todo under it, is to do and due by `day`. */
 export const isDueBy = (todo: UserTodo, day: string): boolean =>
 	[todo, ...todo.children].some(leaf => leaf.doneAt === null && leaf.due !== null && leaf.due <= day);
@@ -87,6 +93,23 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions): number {
 	const todos = todosOf(list, view, day, sessions);
 	return view.kind === "done" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
+}
+
+/** The todos a list shows under one heading: those of one category, of none, or of a list that is not a category. */
+export interface Section {
+	/** The category a todo added here joins. */
+	categoryId: string | null;
+	/** `null` for the only section, which the page's title already names. */
+	title: string | null;
+	todos: UserTodo[];
+}
+
+/** For every todo, the todos of no category first, then each category with todos, in its order; any other list is one section. */
+export function sectionsOf(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions): Section[] {
+	if (view.kind !== "all") return [{ categoryId: view.kind === "category" ? view.id : null, title: null, todos: todosOf(list, view, day, sessions) }];
+	const inCategory = (categoryId: string | null) => list.todos.filter(todo => todo.categoryId === categoryId);
+	const named = list.categories.map(({ id, name }) => ({ categoryId: id, title: name, todos: inCategory(id) })).filter(section => section.todos.length > 0);
+	return [{ categoryId: null, title: named.length > 0 ? "No category" : null, todos: inCategory(null) }, ...named];
 }
 
 export const sameTodoView = (a: TodoListView, b: TodoListView): boolean =>

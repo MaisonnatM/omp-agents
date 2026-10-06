@@ -550,7 +550,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A category's **⋯** menu renames it or deletes it; deleting a category keeps its todos, in no category.
 - **Add a todo** at the bottom of a list starts a new todo in that list's category; type its title and press Enter.
   Enter then starts the next todo below it, and Enter on an empty one, Esc, or a click elsewhere stops.
-- A new todo's title can end with a due day: `today`, `tomorrow`, a weekday such as `fri` or `friday`, or a `YYYY-MM-DD` date.
+- A new todo's title, here or in **Create todo** in Cmd+K, can end with a due day: `today`, `tomorrow`, a weekday such as `fri` or `friday`, or a `YYYY-MM-DD` date.
   A new top-level todo's title can also end with `#` and the name of an existing category in any case, before or after the day.
   They set the todo's due day and category and leave its title, and a word that names neither stays in the title.
   A weekday names its next date, today included.
@@ -766,6 +766,7 @@ Alt is Option on macOS.
   The search button in the sidebar header, immediately before the keyboard button, opens that search.
   A session from another project switches the sidebar to that project.
   Type a title and choose **Create todo** to add it at the end of **All**, with no category. You stay on the page you were on.
+  The title can end with a due day or a `#category`, as in [Todo list](#todo-list).
   Enter still opens the highlighted session, and creates the todo when none matches. Cmd+Enter creates it either way.
   Cmd+[ and Cmd+] walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   From a subagent they step from its session's row.
@@ -810,7 +811,7 @@ Alt is Option on macOS.
 - The window title follows what the page shows, and a browser tab's title does too: the focused session's name, a subagent's name ahead of its session's, `Inbox`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, or `New session`, then `omp agents`.
   A session without a name reads as its project, and nothing open reads `omp agents`.
 - The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
-- Alt+Shift+Cmd+T, from any app, brings the window up on the **Todo** page with a new todo started, so you can type it and press Enter.
+- Alt+Shift+Cmd+T, from any app, brings the window up with Cmd+K's search open, so you can type a title and press Cmd+Enter to create a todo.
   When another app holds the keys, the app logs so and the shortcut does nothing.
 - The Dock icon's badge counts the top-level todos left to do, as **All** does, and goes away at none.
 

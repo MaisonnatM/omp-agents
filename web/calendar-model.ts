@@ -1,6 +1,7 @@
 /** What the Calendar page shows on each day of a month: Google events, routine runs, past and planned, and todos and tickets on the day they are due. */
 import { nextDueAt, type Routine, type RoutineRun } from "../src/routines";
-import type { CalendarEvent, Ticket, TicketStatusType, UserTodoList } from "../src/shared";
+import type { CalendarEvent, Ticket, TicketStatusType } from "../src/shared";
+import type { UserTodoList } from "../src/user-todos-shared";
 import { daysBetween, localDay } from "./days";
 
 /** One thing on one day; `day` is the local day, `YYYY-MM-DD`, and `at` its time, `null` for one without. */

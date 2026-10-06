@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import type { UserTodo, UserTodoList } from "../src/shared";
+import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import { hashForTodo, routeFromHash } from "./routing";
 import { leftIn, todosOf } from "./todo-views";
 

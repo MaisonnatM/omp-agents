@@ -2,8 +2,9 @@
 import { complete } from "../commands";
 import { errorText } from "../json";
 import { directoryOf } from "../paths";
-import type { ClientMsg, ServerMsg, StartRequest, StartResult, UserTodoChange } from "../shared";
 import type { RoutineChange } from "../routines";
+import type { ClientMsg, ServerMsg, StartRequest, StartResult } from "../shared";
+import type { UserTodoChange } from "../user-todos-shared";
 import type { LiveSessions } from "./live-sessions";
 import { type Socket, send, type Views, watching } from "./views";
 import type { MsgOf } from "./wire";

@@ -1,4 +1,5 @@
-import type { UserTodoCategory } from "../src/shared";
+import { addTodo } from "../src/user-todos";
+import type { UserTodoCategory, UserTodoChange } from "../src/user-todos-shared";
 import { localDay } from "./days";
 
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
@@ -38,4 +39,19 @@ export function parseQuickTodo(input: string, categories: readonly UserTodoCateg
 	}
 	const text = words.join(" ");
 	return text ? { text, due, categoryId } : null;
+}
+
+/**
+ * The `add` of the todo typed as `text`, or `null` for no title. A recognized day or `#category` sets `due` or `categoryId`
+ * over `place`'s own; a todo under another `parentId` joins its parent's category, so it takes no `#category`.
+ */
+export function quickAddTodo(
+	text: string,
+	categories: readonly UserTodoCategory[],
+	day: string,
+	place: { parentId?: string | null; afterId?: string | null; categoryId?: string | null; due?: string | null } = {},
+): Extract<UserTodoChange, { op: "add" }> | null {
+	const parsed = parseQuickTodo(text, place.parentId ? [] : categories, day);
+	if (!parsed) return null;
+	return addTodo({ ...place, text: parsed.text, categoryId: parsed.categoryId ?? place.categoryId, due: parsed.due ?? place.due });
 }

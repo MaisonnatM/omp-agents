@@ -1,5 +1,6 @@
 /** Messages and view models shared by the server and the page. */
 import type { Routine, RoutineChange } from "./routines";
+import type { UserTodoChange, UserTodoList } from "./user-todos-shared";
 
 export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
 
@@ -53,7 +54,6 @@ export const samePullRequest = (a: PullRequest, b: PullRequest): boolean => prKe
 export const SESSION_HASH_PREFIX = "session/";
 
 export const hashForSession = (sessionId: string): string => `#${SESSION_HASH_PREFIX}${encodeURIComponent(sessionId)}`;
-
 
 /**
  * How a session's tool calls touched a pull request: it submitted it with `gt submit` or `gh pr create`, or it
@@ -875,110 +875,6 @@ export interface OmpSettings {
 	routing: ModelRouting | { error: string };
 	files: OmpFile[];
 }
-
-/** What a todo points to: a session it started or came from, a pull request, or a Linear issue. */
-export type UserTodoLink =
-	| { kind: "session"; sessionId: string }
-	| { kind: "pull-request"; owner: string; repo: string; number: number }
-	| { kind: "ticket"; identifier: string };
-
-/** A todo of your own, on the Todo page, under a top-level one. It holds none, so the list is two deep at most. */
-export interface UserTodoLeaf {
-	id: string;
-	/** Its title, one line. */
-	text: string;
-	/** Its markdown content, `""` for none. */
-	body: string;
-	/** When it was checked, as an ISO 8601 time; `null` while it is to do. */
-	doneAt: string | null;
-	/** The day it is due, `YYYY-MM-DD`; `null` for none. */
-	due: string | null;
-}
-
-/** A top-level todo of the Todo page, in category `categoryId` (`null` for none), with its own todos in order, which share its category. */
-export interface UserTodo extends UserTodoLeaf {
-	categoryId: string | null;
-	children: UserTodoLeaf[];
-	/** What it points to, each once, in the order they were linked. */
-	links: UserTodoLink[];
-	/** The session whose agent added it through omp's `user_todo` tool; `null` when you did. */
-	addedBy: string | null;
-}
-
-/** A category of the Todo page, which the sidebar lists to show its todos alone. */
-export interface UserTodoCategory {
-	id: string;
-	name: string;
-}
-
-/** The Todo page's categories and todos, each in order, and the todos **Clear done** put away, latest first. */
-export interface UserTodoList {
-	categories: UserTodoCategory[];
-	todos: UserTodo[];
-	archive: UserTodo[];
-}
-
-/**
- * One edit of the Todo page's list. A change that names no todo or category, or would nest a todo three deep, changes
- * nothing. The page picks every new `id`, so an add sent twice adds once.
- */
-export type UserTodoChange =
-	/**
-	 * After todo `afterId` among `parentId`'s todos (the top level for `null`), or last for `null`. A top-level todo goes
-	 * in category `categoryId`, or in none when that category is gone; one under another goes in its parent's. A top-level
-	 * todo takes `links` and `addedBy`; any todo takes `body` and `due`. Each is none when not given.
-	 */
-	| {
-			op: "add";
-			id: string;
-			parentId: string | null;
-			afterId: string | null;
-			categoryId: string | null;
-			text: string;
-			body?: string;
-			due?: string | null;
-			links?: UserTodoLink[];
-			addedBy?: string | null;
-	  }
-	| { op: "edit"; id: string; text: string }
-	| { op: "edit-body"; id: string; body: string }
-	/** Checks a todo at `doneAt`, or unchecks it for `null`. Checking a top-level todo checks its todos too. */
-	| { op: "toggle"; id: string; doneAt: string | null }
-	/** A todo of the list or of the archive, with its todos. */
-	| { op: "remove"; id: string }
-	/** Puts back a todo `remove` took at `index` among the top-level todos, or among top-level todo `parentId`'s, which holds leaves only. */
-	| { op: "restore"; parentId: null; todo: UserTodo; index: number }
-	| { op: "restore"; parentId: string; todo: UserTodoLeaf; index: number }
-	/**
-	 * A top-level todo goes right after top-level todo `afterId`, or first among category `categoryId`'s for `null`, and
-	 * joins category `categoryId`. A todo under another goes after `afterId` among its parent's todos, or first for `null`.
-	 */
-	| { op: "move"; id: string; afterId: string | null; categoryId: string | null }
-	| { op: "set-due"; id: string; due: string | null }
-	/** On a top-level todo; a link it already holds changes nothing. */
-	| { op: "link"; id: string; link: UserTodoLink }
-	| { op: "unlink"; id: string; link: UserTodoLink }
-	/** A top-level todo without todos of its own goes last under the top-level todo above it in its category. */
-	| { op: "indent"; id: string }
-	/** A todo under another goes to the top level right after it, and takes the todos below it along, so the list reads in the same order. */
-	| { op: "outdent"; id: string }
-	/** A top-level todo, with its todos, moves to category `categoryId`, or to none for `null`. */
-	| { op: "categorize"; id: string; categoryId: string | null }
-	/**
-	 * Moves every checked todo of category `categoryId`, or of the whole list for `null`, to the archive. A checked todo
-	 * under an unchecked one goes there as a top-level todo of its parent's category. With `before`, an ISO 8601 time,
-	 * only todos checked earlier go: the server's auto-clear sends it, and the socket and the todo inbox drop it.
-	 */
-	| { op: "clear-done"; categoryId: string | null; before?: string }
-	/** An archived todo goes back last in the list, in its category when that still exists. */
-	| { op: "unarchive"; id: string }
-	| { op: "empty-archive" }
-	/** Last among the categories. */
-	| { op: "add-category"; id: string; name: string }
-	| { op: "rename-category"; id: string; name: string }
-	/** Its todos stay, in no category, archived ones too. */
-	| { op: "remove-category"; id: string };
-
 
 /** The time ranges the Analytics page reads, shortest first; `all` has no start. */
 export const ANALYTICS_RANGES = ["24h", "7d", "30d", "90d", "all"] as const;

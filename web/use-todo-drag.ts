@@ -1,5 +1,5 @@
 import { type DragEvent, useState } from "react";
-import type { UserTodoChange, UserTodoLeaf } from "../src/shared";
+import type { UserTodoChange, UserTodoLeaf } from "../src/user-todos-shared";
 import { moveTo, sameStatus, type TodoEntry } from "./todo-views";
 
 /** The row being dragged, and where a drop on the row under the pointer would put it. */
@@ -8,13 +8,29 @@ interface Drag {
 	over: { id: string; where: "before" | "after" } | null;
 }
 
+/** What a row's `<li>` takes to be dragged and dropped on. */
+export interface RowDragProps {
+	draggable: boolean;
+	onDragStart: (event: DragEvent<HTMLLIElement>) => void;
+	onDragEnd: () => void;
+	onDragOver: (event: DragEvent<HTMLLIElement>) => void;
+	onDrop: (event: DragEvent<HTMLLIElement>) => void;
+}
+
+export interface TodoDrag {
+	draggingId: string | null;
+	/** Where a drop on row `id` would land, while another row is dragged over it. */
+	overOf: (id: string) => "before" | "after" | null;
+	rowProps: (entry: TodoEntry, siblings: readonly UserTodoLeaf[]) => RowDragProps;
+}
+
 /**
  * Dragging a todo among the todos beside it of its status: a top-level one among top-level ones, joining the category
  * of the todo it drops beside, and one under another among its parent's. `rowProps` goes on each row's `<li>`.
  */
-export function useTodoDrag(enabled: boolean, onMove: (change: UserTodoChange) => void) {
+export function useTodoDrag(enabled: boolean, onMove: (change: UserTodoChange) => void): TodoDrag {
 	const [drag, setDrag] = useState<Drag | null>(null);
-	const rowProps = (entry: TodoEntry, siblings: readonly UserTodoLeaf[]) => ({
+	const rowProps = (entry: TodoEntry, siblings: readonly UserTodoLeaf[]): RowDragProps => ({
 		draggable: enabled,
 		onDragStart: (event: DragEvent<HTMLLIElement>) => {
 			event.dataTransfer.effectAllowed = "move";

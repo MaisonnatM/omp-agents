@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { addTodo } from "../user-todos";
 import { UserTodosFile } from "./user-todos-file";
 
 const dirs: string[] = [];
@@ -25,8 +26,8 @@ describe("UserTodosFile", () => {
 		const path = todosPath();
 		const first = new UserTodosFile(path);
 		expect(first.apply({ op: "add-category", id: "w", name: "Work" })).toBe(true);
-		expect(first.apply({ op: "add", id: "a", parentId: null, afterId: null, categoryId: "w", text: "Ship it" })).toBe(true);
-		expect(first.apply({ op: "add", id: "b", parentId: "a", afterId: null, categoryId: null, text: "Write the docs" })).toBe(true);
+		expect(first.apply(addTodo({ id: "a", categoryId: "w", text: "Ship it" }))).toBe(true);
+		expect(first.apply(addTodo({ id: "b", parentId: "a", text: "Write the docs" }))).toBe(true);
 		expect(first.apply({ op: "edit-body", id: "a", body: "**Friday**" })).toBe(true);
 		expect(first.apply({ op: "indent", id: "a" })).toBe(false);
 		expect(new UserTodosFile(path).list).toEqual({
@@ -48,18 +49,14 @@ describe("UserTodosFile", () => {
 		});
 	});
 
-	test("a list saved before bodies, categories, dates, links, and the archive reads with none, a todo checked then reads as checked now, after the ones to do", () => {
+	test("a list saved before bodies, categories, dates, links, and the archive reads with none", () => {
 		const path = todosPath();
-		writeTodos(path, '{"todos": [{"id": "a", "text": "Old", "done": true, "children": [{"id": "a1", "text": "Older", "done": false}]}, {"id": "b", "text": "Lost", "done": false, "categoryId": "gone", "children": []}]}');
-		const before = Date.now();
-		const { list } = new UserTodosFile(path);
-		const doneAt = list.todos[1]!.doneAt;
-		expect(doneAt !== null && Date.parse(doneAt) >= before - 1000).toBe(true);
-		expect(list).toEqual({
+		writeTodos(path, '{"todos": [{"id": "a", "text": "Old", "children": [{"id": "a1", "text": "Older"}]}, {"id": "b", "text": "Lost", "categoryId": "gone", "children": []}]}');
+		expect(new UserTodosFile(path).list).toEqual({
 			categories: [],
 			todos: [
+				{ id: "a", text: "Old", body: "", doneAt: null, due: null, categoryId: null, children: [{ id: "a1", text: "Older", body: "", doneAt: null, due: null }], links: [], addedBy: null },
 				{ id: "b", text: "Lost", body: "", doneAt: null, due: null, categoryId: null, children: [], links: [], addedBy: null },
-				{ id: "a", text: "Old", body: "", doneAt, due: null, categoryId: null, children: [{ id: "a1", text: "Older", body: "", doneAt: null, due: null }], links: [], addedBy: null },
 			],
 			archive: [],
 		});

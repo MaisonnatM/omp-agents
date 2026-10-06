@@ -1,11 +1,12 @@
 import { Bot, X } from "lucide-react";
-import { hashForSession, type PastSession, type RosterHost, type UserTodoLink } from "../../src/shared";
-import { hostLabel, pastLabel } from "../labels";
-import { PAGE_ICON } from "../page-icons";
-import { hashForInbox, hashForTickets } from "../routing";
-import type { TodoWorkState } from "../todo-work-state";
+import { hashForSession, type PastSession, type RosterHost } from "../../../src/shared";
+import type { UserTodoLink } from "../../../src/user-todos-shared";
+import { hostLabel, pastLabel } from "../../labels";
+import { PAGE_ICON } from "../../page-icons";
+import { hashForInbox, hashForTickets } from "../../routing";
+import type { TodoWorkState } from "../../todo-work-state";
 import { Tooltip } from "@/components/ui/tooltip";
-import { StatusDot } from "./status-dot";
+import { StatusDot } from "../status-dot";
 
 /** The live and past sessions, which name a linked session and tell whether it still runs. */
 export interface KnownSessions {

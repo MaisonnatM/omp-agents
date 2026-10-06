@@ -1,15 +1,15 @@
-import { Circle, CircleCheck, Play, Ticket, X } from "lucide-react";
+import { Play, Ticket, X } from "lucide-react";
 import { useState } from "react";
-import { hashForSession, type TicketChoice, type TicketDraft, type UserTodo, type UserTodoChange, type UserTodoList } from "../../src/shared";
+import { errorText } from "../../../src/json";
+import { hashForSession, type TicketChoice, type TicketDraft } from "../../../src/shared";
+import type { UserTodo, UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { getJson, putJson } from "../api";
-import { errorText } from "../../src/json";
-import { hashForNewSession } from "../routing";
-import type { TodoEntry } from "../todo-views";
-import { MarkdownEditor } from "./markdown-editor";
-import { AddedByChip, type KnownSessions, TodoLinkChip } from "./todo-links";
+import { getJson, putJson } from "../../api";
+import { hashForNewSession } from "../../routing";
+import type { TodoEntry } from "../../todo-views";
+import { MarkdownEditor } from "../markdown-editor";
+import { AddedByChip, type KnownSessions, TodoLinkChip } from "./links";
 
 const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60";
 
@@ -100,8 +100,6 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 interface TodoDetailProps {
 	list: UserTodoList;
 	open: TodoEntry;
-	/** Detail opens under its row instead of in a separate pane. */
-	inline?: boolean;
 	/** Changes would not reach the server, or the todo is archived. */
 	readOnly: boolean;
 	onChange: (change: UserTodoChange) => void;
@@ -113,44 +111,21 @@ interface TodoDetailProps {
 }
 
 /** The open todo: its title, category, due day, links, actions, and markdown notes. */
-export function TodoDetail({ list, open, inline = false, readOnly, onChange, onClose, sessions, newSessionCwd, linearConnected }: TodoDetailProps) {
+export function TodoDetail({ list, open, readOnly, onChange, onClose, sessions, newSessionCwd, linearConnected }: TodoDetailProps) {
 	const { todo } = open;
-	const done = todo.doneAt !== null;
 	const top = open.parent === null ? open.todo : null;
 	const linkedSession = top?.links.findLast(link => link.kind === "session");
 	const host = linkedSession?.kind === "session" ? sessions.hosts.find(host => host.sessionId === linkedSession.sessionId) : undefined;
 	const question = host?.requests[0];
 	return (
-		<section aria-label={todo.text} className={cn("flex min-w-0 flex-col gap-3 self-start", !inline && "md:sticky md:top-6")}>
-			{inline ? (
-				<div className="flex justify-end">
-					<Tooltip content="Close">
-						<Button variant="ghost" size="icon-compact" aria-label="Close the todo" onClick={onClose}><X /></Button>
-					</Tooltip>
-				</div>
-			) : (
-			<div className="flex items-start gap-2">
-				<Tooltip content={done ? "Mark not done" : "Mark done"} disabled={readOnly}>
-					<button
-						type="button"
-						role="checkbox"
-						aria-checked={done}
-						aria-label={todo.text}
-						disabled={readOnly}
-						onClick={() => onChange({ op: "toggle", id: todo.id, doneAt: done ? null : new Date().toISOString() })}
-						className={cn("mt-0.5 shrink-0 text-muted-foreground disabled:pointer-events-none [&>svg]:size-4", !readOnly && "hover:text-foreground")}
-					>
-						{done ? <CircleCheck /> : <Circle />}
-					</button>
-				</Tooltip>
-				<h3 className={cn("min-w-0 flex-1 break-words text-base font-semibold leading-snug", done && "text-muted-foreground line-through")}>{todo.text}</h3>
+		<section aria-label={todo.text} className="flex min-w-0 flex-col gap-3">
+			<div className="flex justify-end">
 				<Tooltip content="Close">
 					<Button variant="ghost" size="icon-compact" aria-label="Close the todo" onClick={onClose}>
 						<X />
 					</Button>
 				</Tooltip>
 			</div>
-			)}
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
 				{open.parent ? (
 					<p>Under {open.parent.text}</p>

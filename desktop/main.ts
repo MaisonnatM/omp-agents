@@ -47,7 +47,7 @@ const IS_MAC = process.platform === "darwin";
 /** `icon.svg` rendered at 1024 px; Electron reads no SVG. */
 const ICON = join(app.getAppPath(), "icon.png");
 const SEPARATOR: MenuItemConstructorOptions = { type: "separator" };
-/** Brings the window up on the Todo page with a new todo started, from any app. */
+/** Brings the window up with the command palette open, where Create todo is, from any app. */
 const QUICK_TODO_SHORTCUT = "Alt+Shift+CommandOrControl+T";
 
 // Each port is its own server, so each gets its own cookie, localStorage, window bounds, and single-instance lock.

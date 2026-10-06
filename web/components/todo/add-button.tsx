@@ -1,9 +1,10 @@
 import { Check, ListPlus } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { UserTodoLink } from "../../src/shared";
+import { addTodo } from "../../../src/user-todos";
+import type { UserTodoLink } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { useDashboardContext } from "./dashboard-context";
+import { useDashboardContext } from "../dashboard-context";
 
 /** How long the button shows that it added the todo. */
 const ADDED_MS = 2000;
@@ -36,7 +37,7 @@ export function AddToTodo({ text, body, link, label }: AddToTodoProps) {
 				aria-label={added ? "Added to your todo list" : label}
 				disabled={!connected}
 				onClick={() => {
-					changeTodo({ op: "add", id: crypto.randomUUID(), parentId: null, afterId: null, categoryId: null, text, body, links: [link] });
+					changeTodo(addTodo({ text, body, links: [link] }));
 					setAdded(true);
 				}}
 			>

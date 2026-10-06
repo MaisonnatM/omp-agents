@@ -1,6 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { UserTodoList } from "../src/shared";
 import { QUICK_TODO_EVENT } from "../src/server/address";
+import type { UserTodoList } from "../src/user-todos-shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { AnalyticsPage } from "./components/analytics/analytics-page";
 import { DashboardContext } from "./components/dashboard-context";
@@ -21,9 +21,8 @@ import { RoutinesPage } from "./components/routines/routines-page";
 import { CalendarPage } from "./components/calendar/calendar-page";
 import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-page";
 import { subjectOf } from "./components/subject";
+import { TodoPage } from "./components/todo/page";
 import { ToolsExpanded } from "./components/transcript";
-import { ArchivePage } from "./components/todo-archive";
-import { TodoPage } from "./components/user-todos";
 import { documentTitle } from "./document-title";
 import { SPLIT_CLICK } from "./labels";
 import { inboxStore, linearStore, UNREAD } from "./reads";
@@ -45,6 +44,8 @@ import { defaultCwd, discoverableSessions, listedViews, projectSession, projectS
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { PINNED_SESSIONS_KEY, useStoredKeys } from "./stored-state";
+import { quickAddTodo } from "./todo-quick-add";
+import { localDay } from "./days";
 import { useDashboard } from "./use-dashboard";
 
 /** The sidebar tab that goes with each page; the panes keep the one you chose. */
@@ -187,16 +188,12 @@ export function App() {
 		routedTodoList === null || (routedTodoList.kind === "category" && !state.userTodos?.categories.some(({ id }) => id === routedTodoList.id))
 			? { kind: "all" }
 			: routedTodoList;
-	/** The desktop shell's quick-capture shortcut asked for a new todo, which the Todo page has not started yet. */
-	const [quickTodo, setQuickTodo] = useState(false);
-	const startQuickTodo = useCallback((): void => {
-		navigate({ kind: "todo", list: { kind: "all" } });
-		setQuickTodo(true);
-	}, [navigate]);
+	/** The desktop shell's quick-capture shortcut opens the command palette, where Create todo is. */
 	useEffect(() => {
-		window.addEventListener(QUICK_TODO_EVENT, startQuickTodo);
-		return () => window.removeEventListener(QUICK_TODO_EVENT, startQuickTodo);
-	}, [startQuickTodo]);
+		const open = (): void => setSwitcherOpen(true);
+		window.addEventListener(QUICK_TODO_EVENT, open);
+		return () => window.removeEventListener(QUICK_TODO_EVENT, open);
+	}, []);
 	/** The routine the Routines page shows; one another window deleted shows the list. */
 	const routinesTarget = page?.kind === "routines" && state.routines.some(({ id }) => id === page.target) ? page.target : null;
 	const showTab = (next: SidebarTab): void => {
@@ -350,13 +347,7 @@ export function App() {
 				linearConnected: ticketsShown,
 			};
 			// A linked session resolves wherever it ran, even in a directory the sidebar does not list.
-			const sessions = all;
-			main =
-				todoView.kind === "done" && state.userTodos ? (
-					<ArchivePage list={state.userTodos} sessions={sessions} {...todoProps} />
-				) : (
-					<TodoPage list={state.userTodos} view={todoView} {...sessions} {...todoProps} quickTodo={quickTodo} onQuickTodo={() => setQuickTodo(false)} />
-				);
+			main = <TodoPage list={state.userTodos} view={todoView} hosts={all.hosts} past={all.past} {...todoProps} />;
 			break;
 		}
 		case "routines":
@@ -456,7 +447,10 @@ export function App() {
 					}}
 					onCreateTodo={
 						state.connected && state.userTodos
-							? text => changeTodo({ op: "add", id: crypto.randomUUID(), parentId: null, afterId: null, categoryId: null, text })
+							? text => {
+									const change = quickAddTodo(text, state.userTodos?.categories ?? [], localDay());
+									if (change) changeTodo(change);
+								}
 							: undefined
 					}
 				/>

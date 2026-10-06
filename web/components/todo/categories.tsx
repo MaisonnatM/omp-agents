@@ -1,6 +1,6 @@
 import { Ellipsis, type LucideIcon, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
-import type { UserTodoChange, UserTodoList } from "../../src/shared";
+import type { UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
@@ -13,10 +13,10 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { hashForTodo, type TodoListView } from "../routing";
-import { localDay } from "../days";
-import type { KnownSessions } from "./todo-links";
-import { LIST_KINDS, leftIn, SIDEBAR_LISTS, sameTodoView } from "../todo-views";
+import { localDay } from "../../days";
+import { hashForTodo, type TodoListView } from "../../routing";
+import { leftIn, SIDEBAR_LISTS, sameTodoView } from "../../todo-views";
+import type { KnownSessions } from "./links";
 
 interface NameInputProps {
 	initial: string;
@@ -112,8 +112,8 @@ export function TodoCategories({ list, view, disabled, onChange, sessions }: Tod
 		<>
 			<SidebarGroup>
 				<SidebarMenu aria-label="Todo lists">
-					{SIDEBAR_LISTS.map(target => (
-						<SidebarMenuItem key={target.kind}>{link(target, LIST_KINDS[target.kind].name, LIST_KINDS[target.kind].icon)}</SidebarMenuItem>
+					{SIDEBAR_LISTS.map(({ view: target, name, icon }) => (
+						<SidebarMenuItem key={target.kind}>{link(target, name, icon)}</SidebarMenuItem>
 					))}
 				</SidebarMenu>
 			</SidebarGroup>

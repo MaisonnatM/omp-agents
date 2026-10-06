@@ -1,6 +1,6 @@
 import { type ReactNode, useMemo, useState } from "react";
 import type { Routine } from "../../../src/routines";
-import type { UserTodoList } from "../../../src/shared";
+import type { UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import {
 	CalendarBody,

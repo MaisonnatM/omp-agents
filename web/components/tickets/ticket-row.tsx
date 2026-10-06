@@ -23,7 +23,7 @@ import { type QuickActionId, type TicketActionId, ticketActions } from "../../qu
 import { hashForTickets, type OpenMode } from "../../routing";
 import { PRIORITY_LABEL, type StatusKind, statusKind } from "../../tickets-model";
 import { IconTip } from "../inbox/avatars";
-import { AddToTodo } from "../add-to-todo";
+import { AddToTodo } from "../todo/add-button";
 import { QuickActionsMenu } from "../quick-actions";
 import { LiveSessionChips } from "../session-chip";
 

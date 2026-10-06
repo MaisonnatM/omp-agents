@@ -1,13 +1,18 @@
 import { type ReactNode, useEffect, useState } from "react";
-import type { UserTodoChange } from "../../src/shared";
+import type { UserTodoChange } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 
 /** How long **Undo** stays after a todo is deleted. */
 const UNDO_MS = 8000;
 
+export interface Undo {
+	offer: (text: string, change: UserTodoChange) => void;
+	toast: ReactNode;
+}
+
 /** **Undo** for the last delete: `offer` it with the todo's title and the change that puts it back, and render `toast`. */
-export function useUndo(onChange: (change: UserTodoChange) => void): { offer: (text: string, change: UserTodoChange) => void; toast: ReactNode } {
+export function useUndo(onChange: (change: UserTodoChange) => void): Undo {
 	const [undo, setUndo] = useState<{ text: string; change: UserTodoChange } | null>(null);
 	useEffect(() => {
 		if (!undo) return;

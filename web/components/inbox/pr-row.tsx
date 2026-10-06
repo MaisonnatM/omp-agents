@@ -26,7 +26,7 @@ import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import type { QuickActionId } from "../../quick-actions";
 import { DROP_LINE, type DragItem } from "../../use-drag-order";
-import { AddToTodo } from "../add-to-todo";
+import { AddToTodo } from "../todo/add-button";
 import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";

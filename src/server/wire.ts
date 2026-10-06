@@ -22,8 +22,9 @@ import type {
 	View,
 	WorkItem,
 } from "../shared";
+import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
+import { isDay, isTodoId, parseTodoChange } from "../user-todos-parse";
 import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } from "../worktrees-shared";
-import { isDay, MAX_TODO_BODY, MAX_TODO_ID, MAX_TODO_TEXT, parseTodoChange } from "../user-todos-parse";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
@@ -212,7 +213,7 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 			const skill = parseSkill(value.skill);
 			const subject = parseWorkItem(value.subject);
 			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !subject) return null;
-			if (todoId !== null && !(isNonEmpty(todoId) && todoId.length <= MAX_TODO_ID)) return null;
+			if (todoId !== null && !isTodoId(todoId)) return null;
 			return prompt.trim() || images.ok.length > 0
 				? { ok: { kind: "new", cwd, prompt, images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId } }
 				: null;
@@ -366,11 +367,11 @@ export function parseGoogleClient(body: unknown): GoogleClient | null {
 
 const isTicketPriority = oneOf(TICKET_PRIORITIES);
 
-/** The body of `PUT /api/ticket/new`: a todo's title and notes, so within a todo's limits, and a team by id. */
+/** The body of `PUT /api/ticket/new`: a title and a description, each within its limit, and a team by id. */
 export function parseTicketDraft(body: unknown): TicketDraft | null {
 	if (!isObject(body)) return null;
 	const { title, description, team } = body;
-	if (!isNonEmpty(title) || title.length > MAX_TODO_TEXT || typeof description !== "string" || description.length > MAX_TODO_BODY || !isNonEmpty(team)) return null;
+	if (!isNonEmpty(title) || title.length > MAX_TICKET_TITLE || typeof description !== "string" || description.length > MAX_TICKET_DESCRIPTION || !isNonEmpty(team)) return null;
 	return { title: title.trim(), description, team };
 }
 

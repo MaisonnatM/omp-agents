@@ -3,8 +3,8 @@
  * the files omp's `user_todo` tool leaves. It uses no Bun API, so the desktop shell bundles it too.
  */
 import { isObject } from "./json";
-import type { UserTodo, UserTodoCategory, UserTodoChange, UserTodoLeaf, UserTodoLink, UserTodoList } from "./shared";
 import { inStatusOrder } from "./user-todos";
+import type { UserTodo, UserTodoCategory, UserTodoChange, UserTodoLeaf, UserTodoLink, UserTodoList } from "./user-todos-shared";
 
 /** The longest todo title, category name, and id the server takes in a change, and the longest todo body. */
 export const MAX_TODO_TEXT = 2000;
@@ -38,8 +38,11 @@ const isString = (value: unknown): value is string => typeof value === "string";
 
 const STORED: Fields = { id: isString, text: isString, body: isString };
 
+/** A todo or category id a change names: not blank, within `MAX_TODO_ID`. */
+export const isTodoId = (value: unknown): value is string => isNonEmpty(value) && value.length <= MAX_TODO_ID;
+
 const SENT: Fields = {
-	id: (value): value is string => isNonEmpty(value) && value.length <= MAX_TODO_ID,
+	id: isTodoId,
 	text: (value): value is string => typeof value === "string" && value.length <= MAX_TODO_TEXT,
 	body: (value): value is string => typeof value === "string" && value.length <= MAX_TODO_BODY,
 };
@@ -74,23 +77,19 @@ function parseAll<T>(values: unknown, parse: (value: unknown) => T | null): T[] 
 	return parsed;
 }
 
-/**
- * A file written before todos had a body, a due day, or a check time reads each as having none; a todo checked then
- * reads as checked at `loadedAt`.
- */
-function parseLeaf(value: unknown, fields: Fields, loadedAt: string): UserTodoLeaf | null {
+/** A file written before todos had a body or a due day reads each as having none. */
+function parseLeaf(value: unknown, fields: Fields): UserTodoLeaf | null {
 	if (!isObject(value)) return null;
-	const { id, text, body = "", due = null } = value;
-	const doneAt = "doneAt" in value ? value.doneAt : value.done === true ? loadedAt : value.done === false ? null : undefined;
+	const { id, text, body = "", due = null, doneAt = null } = value;
 	if (!fields.id(id) || !fields.text(text) || !fields.body(body) || !isOptional(due, isDay) || !isOptional(doneAt, isTime)) return null;
 	return { id, text, body, doneAt, due };
 }
 
 /** A top-level todo; one from before categories, links, or agents has none of them. */
-function parseTodo(raw: unknown, fields: Fields, loadedAt: string): UserTodo | null {
-	const todo = parseLeaf(raw, fields, loadedAt);
+function parseTodo(raw: unknown, fields: Fields): UserTodo | null {
+	const todo = parseLeaf(raw, fields);
 	if (!todo || !isObject(raw)) return null;
-	const children = parseAll(raw.children, child => parseLeaf(child, fields, loadedAt));
+	const children = parseAll(raw.children, child => parseLeaf(child, fields));
 	const links = parseAll(raw.links ?? [], parseTodoLink);
 	const { categoryId = null, addedBy = null } = raw;
 	if (!children || !links || !isOptional(categoryId, fields.id) || !isOptional(addedBy, fields.id)) return null;
@@ -109,9 +108,8 @@ export function parseUserTodoList(value: unknown): UserTodoList | null {
 	const categories = parseAll(value.categories ?? [], parseCategory);
 	if (!categories) return null;
 	const known = new Set(categories.map(category => category.id));
-	const loadedAt = new Date().toISOString();
 	const parseKnown = (raw: unknown): UserTodo | null => {
-		const todo = parseTodo(raw, STORED, loadedAt);
+		const todo = parseTodo(raw, STORED);
 		return todo && { ...todo, categoryId: todo.categoryId !== null && known.has(todo.categoryId) ? todo.categoryId : null };
 	};
 	const todos = parseAll(value.todos, parseKnown);
@@ -130,13 +128,12 @@ export function parseTodoChange(value: unknown): UserTodoChange | null {
 	if (op === "restore") {
 		const { parentId, index } = value;
 		if (typeof index !== "number" || !Number.isSafeInteger(index) || index < 0) return null;
-		const now = new Date().toISOString();
 		if (parentId === null) {
-			const todo = parseTodo(value.todo, SENT, now);
+			const todo = parseTodo(value.todo, SENT);
 			return todo && { op, parentId, todo, index };
 		}
 		if (!isId(parentId)) return null;
-		const leaf = parseLeaf(value.todo, SENT, now);
+		const leaf = parseLeaf(value.todo, SENT);
 		return leaf && { op, parentId, todo: leaf, index };
 	}
 	if (!isId(id)) return null;

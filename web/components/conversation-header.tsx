@@ -6,7 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useGitCheckout } from "../use-git-checkout";
-import { AddToTodo } from "./add-to-todo";
+import { AddToTodo } from "./todo/add-button";
 import { useDashboardContext } from "./dashboard-context";
 import { GitRef } from "./git";
 import { Model } from "./model-picker";

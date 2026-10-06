@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import type { Routine, RoutineRun, Schedule } from "../src/routines";
-import type { CalendarEvent, Ticket, UserTodo, UserTodoList } from "../src/shared";
+import type { CalendarEvent, Ticket } from "../src/shared";
+import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import { type CalendarEntry, calendarEntries } from "./calendar-model";
 
 // Weekly slots are local wall-clock times; Paris leaves DST on 2026-10-25, inside the month below.

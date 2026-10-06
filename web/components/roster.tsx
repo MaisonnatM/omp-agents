@@ -1,7 +1,8 @@
 import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Keyboard, ListRestart, Loader, Pin, PinOff, Play, Plus, Search, Settings } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
+import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type ShipProgress, type View } from "../../src/shared";
 import type { Routine } from "../../src/routines";
+import type { UserTodoList } from "../../src/user-todos-shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,8 +51,8 @@ import { ShipStep } from "./ship-step";
 import { CalendarNav, type CalendarTabPage } from "./calendar/calendar-nav";
 import { StatusDot, statusLabel } from "./status-dot";
 import { workspaceItems } from "./workspace-picker";
-import { TodoCategories } from "./todo-categories";
-import type { KnownSessions } from "./todo-links";
+import { TodoCategories } from "./todo/categories";
+import type { KnownSessions } from "./todo/links";
 
 /** The muted facts after a session's name: the parts that apply, and a title listing its pull requests. */
 function sessionFacts(parts: (string | false)[], pullRequests: PullRequest[]): { text: string; title?: string } | null {

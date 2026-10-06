@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import type { UserTodo, UserTodoChange, UserTodoList } from "./shared";
-import { applyUserTodo } from "./user-todos";
+import { addTodo, applyUserTodo } from "./user-todos";
+import type { UserTodo, UserTodoChange, UserTodoList } from "./user-todos-shared";
 
 const AT = "2026-10-05T09:00:00.000Z";
 
@@ -32,14 +32,7 @@ const archived = ({ archive }: UserTodoList): string => words(archive);
 
 const after = (list: UserTodoList, ...changes: UserTodoChange[]): UserTodoList => changes.reduce(applyUserTodo, list);
 
-const add = (id: string, parentId: string | null, afterId: string | null, categoryId: string | null = null): UserTodoChange => ({
-	op: "add",
-	id,
-	parentId,
-	afterId,
-	categoryId,
-	text: id,
-});
+const add = (id: string, parentId: string | null, afterId: string | null, categoryId: string | null = null): UserTodoChange => addTodo({ id, parentId, afterId, categoryId, text: id });
 
 const check = (id: string): UserTodoChange => ({ op: "toggle", id, doneAt: AT });
 
@@ -62,20 +55,9 @@ describe("applyUserTodo", () => {
 
 	test("add keeps the notes, due day, links, and agent it is given, each link once, and none on a todo under another", () => {
 		const pr = { kind: "pull-request", owner: "o", repo: "r", number: 7 } as const;
-		const list = after(listOf([]), {
-			op: "add",
-			id: "a",
-			parentId: null,
-			afterId: null,
-			categoryId: null,
-			text: "Review",
-			body: "See PR",
-			due: "2026-10-06",
-			links: [pr, { ...pr }],
-			addedBy: "s1",
-		});
+		const list = after(listOf([]), addTodo({ id: "a", text: "Review", body: "See PR", due: "2026-10-06", links: [pr, { ...pr }], addedBy: "s1" }));
 		expect(list.todos[0]).toEqual({ ...todo("a"), text: "Review", body: "See PR", due: "2026-10-06", links: [pr], addedBy: "s1" });
-		const child = after(list, { op: "add", id: "c", parentId: "a", afterId: null, categoryId: null, text: "c", links: [pr], addedBy: "s1" });
+		const child = after(list, addTodo({ id: "c", parentId: "a", text: "c", links: [pr], addedBy: "s1" }));
 		expect(child.todos[0]!.children).toEqual([{ id: "c", text: "c", body: "", doneAt: null, due: null }]);
 	});
 
@@ -238,7 +220,7 @@ describe("applyUserTodo", () => {
 			{ op: "unlink", id: "a", link: { kind: "ticket", identifier: "ENG-1" } },
 			{ op: "unarchive", id: "a" },
 			{ op: "empty-archive" },
-			{ op: "add", id: "a1", parentId: null, afterId: null, categoryId: null, text: "again" },
+			addTodo({ id: "a1", text: "again" }),
 			{ op: "add-category", id: "work", name: "again" },
 			{ op: "rename-category", id: "work", name: "work" },
 			{ op: "rename-category", id: "gone", name: "x" },

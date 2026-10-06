@@ -1,6 +1,6 @@
 import { Search } from "lucide-react";
 import { useRef } from "react";
-import { useShortcuts } from "../shortcuts";
+import { useShortcuts } from "../../shortcuts";
 
 /** The Todo page's search field, which `/` focuses outside a text field and Esc clears. */
 export function TodoSearch({ query, onQuery }: { query: string; onQuery: (query: string) => void }) {

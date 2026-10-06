@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseQuickTodo } from "./todo-quick-add";
+import { parseQuickTodo, quickAddTodo } from "./todo-quick-add";
 
 const categories = [
 	{ id: "w", name: "Work" },
@@ -35,5 +35,26 @@ describe("parseQuickTodo", () => {
 	test("a lone token is the title, and blank input adds nothing", () => {
 		expect(parse("tomorrow")).toEqual({ text: "tomorrow", due: null, categoryId: null });
 		expect(parse("   ")).toBeNull();
+	});
+});
+
+describe("quickAddTodo", () => {
+	test("a parsed day and category override the place's, and the rest of the place stays", () => {
+		expect(quickAddTodo("Pay rent fri #work", categories, day, { afterId: "x", categoryId: "h", due: day })).toMatchObject({
+			op: "add",
+			text: "Pay rent",
+			afterId: "x",
+			categoryId: "w",
+			due: "2026-10-09",
+		});
+		expect(quickAddTodo("Pay rent", categories, day, { categoryId: "h", due: day })).toMatchObject({ categoryId: "h", due: day });
+	});
+
+	test("a todo under another keeps its title's #category", () => {
+		expect(quickAddTodo("Pay rent #work", categories, day, { parentId: "p" })).toMatchObject({ text: "Pay rent #work", categoryId: null });
+	});
+
+	test("an empty title adds nothing", () => {
+		expect(quickAddTodo("   ", categories, day)).toBeNull();
 	});
 });

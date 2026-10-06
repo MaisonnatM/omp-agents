@@ -24,6 +24,10 @@ import {
 	type TicketStatusType,
 } from "./shared";
 
+/** The longest title and description `PUT /api/ticket/new` takes. */
+export const MAX_TICKET_TITLE = 2000;
+export const MAX_TICKET_DESCRIPTION = 100_000;
+
 /** Linear's page size cap for `list_issues`, `list_users`, and `list_issue_labels`. */
 const PAGE = 250;
 /** `list_projects` pages at most this many. */

@@ -4,7 +4,7 @@
  */
 
 export const HOSTNAME = "127.0.0.1";
-/** The desktop shell's quick-capture event that opens a new todo in the page. */
+/** The window event the desktop shell's quick-capture shortcut dispatches; the page answers by opening the command palette, where Create todo is. */
 export const QUICK_TODO_EVENT = "omp-quick-todo";
 
 /** `PORT`, else 4317. */
