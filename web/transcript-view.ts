@@ -35,27 +35,42 @@ export function turnReplies(items: Item[], working: boolean): Set<string> {
 	return replies;
 }
 
-/** One row of a transcript's outline: a prompt, or the reply its turn ended on. */
-export interface OutlineEntry {
+/** One turn of a transcript's outline: the prompt that opened it and the reply it ended on. */
+export interface OutlineTurn {
+	/** The prompt's item id. */
 	id: string;
-	kind: "prompt" | "reply";
-	/** The message's text, or for a prompt that carried only images, how many it carried: `2 images`. */
-	text: string;
-	/** The skill a prompt invoked; `null` for any other prompt and for every reply. */
+	/** The prompt's text, or for a prompt that carried only images, how many it carried: `2 images`. */
+	prompt: string;
+	/** The skill the prompt invoked; `null` for any other prompt. */
 	skill: string | null;
+	/** The turn's final reply; `null` while the turn runs or when it ended without one. */
+	reply: { id: string; text: string } | null;
+	tools: number;
+	failed: number;
+	running: boolean;
 }
 
-/** Each prompt and each turn's final reply, in transcript order. A turn still running lists no reply until it ends. */
-export function outline(items: Item[], working: boolean): OutlineEntry[] {
+/** Each turn in transcript order. A turn still running has no reply until it ends. */
+export function outline(items: Item[], working: boolean): OutlineTurn[] {
 	const replies = turnReplies(items, working);
-	return items.flatMap((item): OutlineEntry[] => {
+	const turns: OutlineTurn[] = [];
+	for (const item of items) {
 		if (item.kind === "user") {
 			const images = item.images?.length ?? 0;
-			const text = item.text.trim() || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
-			return [{ id: item.id, kind: "prompt", text, skill: item.skill }];
+			const prompt = item.text.trim() || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
+			turns.push({ id: item.id, prompt, skill: item.skill, reply: null, tools: 0, failed: 0, running: false });
+			continue;
 		}
-		return replies.has(item.id) && item.kind === "assistant" ? [{ id: item.id, kind: "reply", text: item.text.trim(), skill: null }] : [];
-	});
+		const turn = turns.at(-1);
+		if (!turn) continue;
+		if (item.kind === "tool") {
+			turn.tools++;
+			if (item.status === "error") turn.failed++;
+		} else if (item.kind === "assistant" && replies.has(item.id)) turn.reply = { id: item.id, text: item.text.trim() };
+	}
+	const last = turns.at(-1);
+	if (last && working) last.running = true;
+	return turns;
 }
 
 /** What the last turn suggests sending next: the suggestions its reply ends on; none while it runs or once a prompt follows it. */

@@ -105,11 +105,15 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
   The sidebar remembers the tab you chose, for every view.
-- **Outline** lists your prompts and the replies that end each turn, in order, with each reply indented under its prompt.
-  Each row shows a person icon for a prompt or a bot icon for a reply, then the start of the message on one line, cut to fit; hover a row to read the whole message.
-  A prompt that invoked a skill shows the skill's name first, and a prompt of images alone reads as how many it holds, such as `2 images`.
-  The reply of a turn still running joins the list once the turn ends.
-  Click a row to scroll the pane's transcript to that message; the page stays where it is.
+- **Outline** lists the conversation's turns, numbered, in order.
+  Each turn shows your prompt in bold on up to two lines, then the reply the turn ended on, muted, on up to two lines; hover either to read the whole message.
+  A bold label that opens a reply, such as **Résumé**, is left out, so the line starts with what the reply says.
+  A line under them counts the turn's tool calls and, in red, those that failed, such as `14 tools · 2 failed`.
+  A prompt that invoked a skill shows the skill's name in an outlined chip first, and a prompt of images alone reads as how many it holds, such as `2 images`.
+  The turn still running shows **Working…** where its reply will go.
+  Click a prompt or a reply to scroll the pane's transcript to that message; the page stays where it is.
+  The turn you are reading carries a bar and a shaded background, and moves as you scroll the transcript; the outline scrolls to keep it in view.
+  After you click a turn it stays marked until you scroll the transcript yourself, since the last turns may never reach the top of the transcript.
   The list follows the conversation as it goes.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows whether the session created, edited, or deleted the file, how many times it changed it, how long ago the last change was, and the lines added and removed, which the list's heading totals.

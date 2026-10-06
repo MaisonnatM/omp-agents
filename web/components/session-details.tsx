@@ -141,13 +141,13 @@ function tabLabel(name: string, count: number): { label: string; badge: number |
 const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
 
 /**
- * The right sidebar's content for the focused view: an outline of its conversation, the files its agent changed, and
- * the images its agents' tools returned, each tab apart. `working` leaves the reply of a turn still running out of the outline.
+ * The right sidebar's content for the focused view: an outline of its conversation's turns, the files its agent changed,
+ * and the images its agents' tools returned, each tab apart. `working` marks the last turn as still running.
  */
 export function SessionDetails({ view, working }: { view: View; working: boolean }) {
 	const { items, loaded, files: changedFiles, media } = usePane(view);
 	const [tab, setTab] = useStoredState<DetailsTab>(TAB_KEY, raw => DETAILS_TABS.find(tab => tab === raw) ?? "outline");
-	const entries = useMemo(() => outline(items, working), [items, working]);
+	const turns = useMemo(() => outline(items, working), [items, working]);
 	const files = changedFiles ?? [];
 	return (
 		<Tabs value={tab} onValueChange={value => setTab(value as DetailsTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
@@ -155,7 +155,7 @@ export function SessionDetails({ view, working }: { view: View; working: boolean
 				<h2 className="sr-only">Session details</h2>
 				<SizeProvider size="compact">
 					<TabsList aria-label="Session details">
-						<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", entries.length)} />
+						<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", turns.length)} />
 						<TabItem value="files" icon={FileDiff} className={TAB_CLASS} {...tabLabel("Files", files.length)} />
 						<TabItem value="media" icon={Images} className={TAB_CLASS} {...tabLabel("Media", media?.length ?? 0)} />
 					</TabsList>
@@ -163,7 +163,7 @@ export function SessionDetails({ view, working }: { view: View; working: boolean
 			</SidebarHeader>
 			<TabPanel value="outline" asChild>
 				<SidebarContent>
-					<OutlineTab entries={entries} loaded={loaded} />
+					<OutlineTab turns={turns} loaded={loaded} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="files" asChild>
