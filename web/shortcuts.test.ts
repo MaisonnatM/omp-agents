@@ -19,9 +19,9 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(pressOn(true, "b", "KeyB", { meta: true })).toEqual(["sessionsSidebar"]);
 	expect(press("b", "KeyB", { meta: true })).toEqual([]);
 	expect(pressOn(true, "b", "KeyB", { ctrl: true })).toEqual([]);
-	expect(press("B", "KeyB", { ctrl: true, shift: true })).toEqual(["planSidebar"]);
-	expect(pressOn(true, "b", "KeyB", { meta: true, shift: true })).toEqual(["planSidebar"]);
-	expect(press("b", "KeyB", { ctrl: true, alt: true })).toEqual([]);
+	expect(press("b", "KeyB", { ctrl: true, alt: true })).toEqual(["planSidebar"]);
+	expect(pressOn(true, "b", "KeyB", { meta: true, alt: true })).toEqual(["planSidebar"]);
+	expect(press("B", "KeyB", { ctrl: true, shift: true })).toEqual([]);
 	expect(press("O", "KeyO", { ctrl: true, shift: true })).toEqual(["newSession"]);
 	expect(press("k", "KeyK", { ctrl: true })).toEqual(["switcher"]);
 	expect(pressOn(true, "k", "KeyK", { meta: true })).toEqual(["switcher"]);
@@ -45,35 +45,38 @@ test("a letter key that types no ASCII letter matches by its physical key, an AS
 	expect(press(",", "KeyM", { ctrl: true })).toEqual(["settings"]);
 	expect(press("?", "KeyM", { shift: true })).toEqual(["help"]);
 	expect(press("?", "Slash", { shift: true })).toEqual(["help"]);
+	expect(pressOn(true, "÷", "Slash", { meta: true, alt: true })).toEqual(["model"]);
 });
 
-test("the follow-up is ⌘Enter on macOS, where Ctrl+Enter opens a context menu, and Ctrl+Enter elsewhere", () => {
-	expect(press("Enter", "Enter", { ctrl: true })).toEqual(["followUp"]);
+test("Cmd+Enter steers now, Enter queues when running, and Cmd+Shift+Backspace stops the turn", () => {
+	expect(press("Enter", "Enter", { ctrl: true })).toEqual(["steer", "deliverSteer"]);
 	expect(press("Enter", "Enter", { meta: true })).toEqual([]);
-	expect(pressOn(true, "Enter", "Enter", { meta: true })).toEqual(["followUp"]);
+	expect(pressOn(true, "Enter", "Enter", { meta: true })).toEqual(["steer", "deliverSteer"]);
 	expect(pressOn(true, "Enter", "Enter", { ctrl: true })).toEqual([]);
 	for (const mac of [false, true]) {
-		expect(pressOn(mac, "Enter", "Enter")).toEqual(["deliverSteer"]);
-		expect(pressOn(mac, "Enter", "Enter", { shift: true, ...(mac ? { meta: true } : { ctrl: true }) })).toEqual([]);
+		expect(pressOn(mac, "Enter", "Enter")).toEqual([]);
+		expect(pressOn(mac, "Tab", "Tab", { shift: true })).toEqual(["thinking"]);
+		expect(pressOn(mac, "Backspace", "Backspace", { shift: true, ...(mac ? { meta: true } : { ctrl: true }) })).toEqual(["interrupt"]);
 	}
 });
 
-test("one key can name several shortcuts, tried in table order, each in its own scope", () => {
-	expect(shortcutsFor(keyEvent("Escape", "Escape"), null, false)).toEqual([
-		{ id: "interrupt", scope: "composer" },
-		{ id: "restore", scope: "anywhere" },
-	]);
-	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([{ id: "help", scope: "anywhere" }]);
+test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help", () => {
+	expect(shortcutsFor(keyEvent("Escape", "Escape"), null, false)).toEqual([{ id: "restore", scope: "anywhere" }]);
+	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([]);
+	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere" }]);
 	expect(shortcutsFor(keyEvent("/", "Slash"), null, false)).toEqual([
 		{ id: "focusComposer", scope: "outside-fields" },
 		{ id: "todoSearch", scope: "outside-fields" },
 	]);
+	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
+	expect(press("J", "KeyJ", { ctrl: true, shift: true })).toEqual(["settings"]);
 });
 
-test("↑ alone takes back a queued message, Alt+↑ and Alt+↓ step through the sessions, and with Shift they move a todo", () => {
+test("↑ takes back a queued message, Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", () => {
 	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue"]);
-	expect(press("ArrowUp", "ArrowUp", { alt: true })).toEqual(["previousSession"]);
-	expect(press("ArrowDown", "ArrowDown", { alt: true })).toEqual(["nextSession"]);
+	expect(press("[", "BracketLeft", { ctrl: true })).toEqual(["previousSession"]);
+	expect(press("]", "BracketRight", { ctrl: true })).toEqual(["nextSession"]);
+	expect(press("ArrowUp", "ArrowUp", { alt: true })).toEqual([]);
 	expect(press("ArrowDown", "ArrowDown")).toEqual([]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true, shift: true })).toEqual(["moveUp"]);
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
@@ -87,7 +90,7 @@ test("G then a key goes to a page only right after a plain G", () => {
 	expect(after(null, "i")).toEqual([]);
 	expect(after("h", "i")).toEqual([]);
 	expect(after("g", "I", { shift: true })).toEqual([]);
-	expect(after("g", "i", { ctrl: true })).toEqual([]);
+	expect(after("g", "i", { ctrl: true })).toEqual(["focusComposer"]);
 	expect(shortcutsFor(keyEvent("i", "KeyI"), "g", false)).toEqual([{ id: "inbox", scope: "outside-fields" }]);
 });
 

@@ -162,13 +162,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		pickedChoice?.kind === "new" && checkout?.branches.some(branch => branch.name === pickedChoice.name)
 			? { kind: "existing", name: pickedChoice.name }
 			: pickedChoice;
-	const completion = useCompletion({ draft, setDraft, completions, onComplete });
 	const starting = launch?.phase === "starting";
 	const openModels = (open: ModelMenuOpen | null): void => {
 		if (open !== null && modelsOpen === null) setModelOpens(count => count + 1);
 		setModelsOpen(open);
 	};
-	useShortcuts({
+	const onComposerKey = useShortcuts({
 		model: () => {
 			if (starting || !connected) return false;
 			openModels("models");
@@ -176,6 +175,24 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		thinking: () => {
 			if (starting || !connected || modelsRead.error !== null || !levels?.length) return false;
 			pickThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
+		},
+		focusComposer: () => {
+			const el = completion.composerRef.current?.querySelector("textarea");
+			if (!el || el.disabled) return false;
+			el.focus();
+		},
+	});
+	const completion = useCompletion({
+		draft,
+		setDraft,
+		completions,
+		onComplete,
+		onKeyDown: event => {
+			onComposerKey(event);
+			if (!event.defaultPrevented && event.key === "Escape") {
+				event.currentTarget.blur();
+				event.preventDefault();
+			}
 		},
 	});
 	const directCommand = blockedShortcut(draft, "new");

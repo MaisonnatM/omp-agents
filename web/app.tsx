@@ -189,8 +189,8 @@ export function App() {
 	};
 	const step = (by: 1 | -1): boolean | void => {
 		const next = adjacentSession(listed, view, by);
-		if (!next) return false;
-		open(next, "replace");
+		if (next) open(next, "replace");
+		else if (!listed.length) return false;
 	};
 	useShortcuts({
 		help: () => setShortcutsOpen(open => !open),

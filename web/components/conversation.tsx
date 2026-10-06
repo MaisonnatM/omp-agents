@@ -22,7 +22,7 @@ import { type Subject, subjectOf } from "./subject";
 import { Transcript } from "./transcript";
 import { UserRequestCard } from "./user-request";
 
-const FOLLOW_UP_KEYS = shortcutKeys("followUp");
+const STEER_KEYS = shortcutKeys("steer");
 
 interface ConversationProps {
 	view: LiveView;
@@ -62,7 +62,10 @@ export function Conversation(props: ConversationProps) {
 
 function placeholderOf({ writable, working, followUps, agent, phase }: Subject): string {
 	if (!writable) return phase.phase === "live" && agent && !agent.canMessage ? "This subagent cannot be messaged." : "Messaging is unavailable for this view.";
-	if (working) return `Steer ${agent ? "this subagent" : "the running turn"}…${followUps ? ` ${FOLLOW_UP_KEYS} sends once it finishes` : ""}`;
+	if (working) {
+		const target = agent ? "this subagent" : "the running turn";
+		return followUps ? `Queue a follow-up… ${STEER_KEYS} steers ${target} now` : `Steer ${target}…`;
+	}
 	if (agent) return agent.status === "parked" ? "Message to revive this subagent…" : "Message this subagent…";
 	return "Message this session…";
 }
@@ -116,7 +119,7 @@ function LiveConversation({
 	useEffect(() => {
 		if (focused && writable) textarea()?.focus();
 	}, [writable]);
-	// As omp's Esc does, the session's queued messages come back into the composer instead of running after the interrupt.
+	// Queued messages come back into the composer instead of running after the interrupt.
 	const interrupt = (): void => {
 		take(queued, true);
 		send({ t: "abort", instanceId: view.instanceId });
@@ -131,7 +134,7 @@ function LiveConversation({
 		attachments.take(prompt, () => setDraft(current => current || text));
 	};
 	const sendText = (text: string): void => {
-		if (blockedShortcut(text, shell) === null) submit(text, "steer");
+		if (blockedShortcut(text, shell) === null) submit(text, working && subject.followUps ? "followUp" : "steer");
 	};
 
 	const directCommand = blockedShortcut(draft, shell);
@@ -161,12 +164,12 @@ function LiveConversation({
 
 	const onComposerKey = useShortcuts({
 		// The textarea's own keys, so they need no focused pane.
-		followUp: () => {
+		steer: () => {
 			const text = draft.trim();
-			if (!writable || !subject.followUps || (!text && (!attachable || attachments.files.length === 0)) || directCommand) return false;
-			submit(text, "followUp");
+			if (!writable || (!text && (!attachable || attachments.files.length === 0)) || directCommand) return false;
+			submit(text, "steer");
 		},
-		// Enter with a draft still steers. On the empty composer, the server stops the turn if omp still holds a steer, so omp runs it now.
+		// On the empty composer, the server stops the turn if omp still holds a steer, so omp runs it now.
 		deliverSteer: () => {
 			if (!session || !writable || !working || draft.trim() !== "" || (attachable && attachments.files.length > 0)) return false;
 			send({ t: "flush", instanceId: view.instanceId });
@@ -213,6 +216,10 @@ function LiveConversation({
 		onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => {
 			onComposerKey(event);
 			if (!event.defaultPrevented) suggestions.onKeyDown(event);
+			if (!event.defaultPrevented && event.key === "Escape") {
+				event.currentTarget.blur();
+				event.preventDefault();
+			}
 		},
 	});
 
@@ -283,11 +290,10 @@ function LiveConversation({
 					)}
 					placeholder={placeholderOf(subject)}
 					disabled={!writable}
-					// While a turn runs, Enter and the send button steer it, and Stop interrupts a session's turn.
 					status={working ? "streaming" : "idle"}
 					onStop={session ? interrupt : undefined}
 					stopShortcut={shortcutLabels("interrupt")}
-					sendLabel={`${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
+					sendLabel={working && subject.followUps ? "Queue a follow-up" : `${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
 					beforeTextarea={<QueuedMessages entries={queued} onEdit={entry => take([entry], true)} onRemove={entry => take([entry], false)} />}
 					afterActions={suggestions.list}
 				/>

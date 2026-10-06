@@ -71,7 +71,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Double-click the edge to reset the width.
   The button at the outer corner of the sessions sidebar's header hides it and leaves a narrow strip whose button shows it again.
   The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
-  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Shift+B the session details sidebar.
+  Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the session details sidebar.
   Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
 - The left sidebar's session rows leave out the full working directory and the model; the pane header shows both.
 - The bottom of the sidebar shows how much quota is left on each plan that `omp usage` reports, one line per plan: its provider's logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
@@ -209,16 +209,16 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Composer
 
-- While a turn runs, the composer sends the way omp's terminal does.
-  Enter, or the send button (labeled **Steer**), steers the turn, and omp hands the message to the agent after the current tool call.
-  Enter again on the empty composer stops that turn and delivers the steer now, instead of leaving it behind a long reply or tool call.
+- While a turn runs, Enter or the send button queues a follow-up until the turn finishes.
+  Cmd+Enter (Ctrl+Enter on Linux and Windows) steers the running turn immediately.
+  Cmd+Enter again on the empty composer stops that turn and delivers a pending steer now, instead of leaving it behind a long reply or tool call.
   It does nothing once the agent has already taken the steer, and a follow-up still waits.
-  Ctrl+Enter (Cmd+Enter on macOS) sends a follow-up, which waits until the agent finishes its turn; the placeholder names the shortcut while a turn runs.
-  An idle session takes either as a new prompt.
+  When omp cannot hold a follow-up for a subagent, Enter steers instead.
+  An idle session takes either key as a new prompt.
 - Messages that wait on the turn show above the text field, each tagged **Steer** or **Follow-up**.
   Double-click a row, or press Enter on it, to move it back into the composer.
   Its **×** removes it. ↑ in the empty composer moves the last one back, the last steer before the last follow-up, as omp does.
-  **Stop** and Esc interrupt the turn and move every waiting message back into the composer, as Esc does in omp's terminal, so nothing runs after an interrupt.
+  **Stop** and Cmd+Shift+Backspace interrupt the turn and move every waiting message back into the composer, so nothing runs after an interrupt.
 - When a turn ends, its reply can suggest what to send next: a `Suggestions:` line followed by numbered prompts, as its last lines.
   The starter kit's `APPEND_SYSTEM.md` asks omp to write one when the next moves are clear, up to three.
   The transcript leaves the block out of the reply, and so does its copy button; the composer lists the prompts under its buttons, numbered, while it is empty and nothing else waits on you: no turn runs and no question is open.
@@ -666,30 +666,29 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Keyboard shortcuts
 
-The shortcuts follow common web-app conventions, from Slack, GitHub, Gmail, Linear, VS Code, and ChatGPT.
+The shortcuts follow Cursor where the browser allows it, with web-app navigation keys for the inbox, todo list, and other dashboard pages.
 Cmd stands for Command on macOS and Ctrl on Linux and Windows.
 Alt is Option on macOS.
 
 | Key | Where | Action |
 | --- | --- | --- |
-| Esc | Composer | Interrupt the running turn |
-| Cmd+Enter | Composer | Send once the running turn finishes, as a follow-up (Enter steers it) |
+| Cmd+Shift+Backspace | Composer | Stop the running turn |
+| Cmd+Enter | Composer | Steer the running turn immediately; on an empty composer, deliver a pending steer now |
+| Shift+Tab | Composer | Cycle the thinking level |
 | ↑ | Empty composer | Move the last queued message back into the composer |
 | Cmd+K | Anywhere | Jump to a session, or create a todo |
 | Cmd+Shift+O | Anywhere | Start a new session |
 | Cmd+Shift+X | Anywhere | End the focused session |
-| Alt+↑ | Anywhere | Open the previous session in the sidebar |
-| Alt+↓ | Anywhere | Open the next session in the sidebar |
-| Cmd+. | Anywhere | Choose the session's model |
-| Cmd+J | Anywhere | Cycle the thinking level |
+| Cmd+[ | Anywhere | Open the previous session in the sidebar |
+| Cmd+] | Anywhere | Open the next session in the sidebar |
+| Cmd+Alt+/ | Anywhere | Choose the session's model |
 | Cmd+E | Anywhere | Expand or collapse tool calls |
 | Cmd+B | Anywhere | Show or hide the sessions sidebar |
-| Cmd+Shift+B | Anywhere | Show or hide the session details sidebar |
-| Cmd+, | Anywhere | Open or close settings |
-| Cmd+/ | Anywhere | Show keyboard shortcuts |
+| Cmd+Alt+B | Anywhere | Show or hide the session details sidebar |
+| Cmd+, / Cmd+Shift+J | Anywhere | Open or close settings |
 | Esc | Maximized pane | Restore the split |
 | ? | Outside text fields | Show keyboard shortcuts |
-| / | Outside text fields | Focus the composer |
+| / / Cmd+I | Outside text fields / anywhere | Focus the composer |
 | G then I | Outside text fields | Go to the pull request inbox |
 | G then T | Outside text fields | Go to your Linear tickets |
 | G then S | Outside text fields | Go to the sessions |
@@ -706,28 +705,29 @@ Alt is Option on macOS.
 | X | Todo page, outside text fields | Check or uncheck the focused todo |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or inbox | Move the focused todo, or the inbox's focused pull request, section, or repository, up or down |
 
-- Press `?` outside a text field, Cmd+/ anywhere, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
+- Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, **End session**, the composer's Stop button, and a maximized pane's restore button.
 - No shortcut takes a key that the browser keeps for itself: Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or a digit does what the browser does.
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.
-- In the composer, Esc interrupts the running turn and Cmd+Enter sends a follow-up. ↑ moves the last queued message back only while the composer is empty, as ↑ edits your last message in Slack.
+- In the composer, Enter queues a follow-up while a turn runs, and Cmd+Enter steers it immediately.
+  Esc leaves the composer; Cmd+Shift+Backspace interrupts the turn.
+  ↑ moves the last queued message back only while the composer is empty, as ↑ edits your last message in Slack.
   With a draft, ↑ moves the caret as usual.
-  In a maximized pane, Esc in the composer restores the split only when no turn runs there.
 - Cmd+K searches every running and past session, in every project, by title or directory, and opens the one you pick in the focused pane.
   The search button in the sidebar header, immediately before the keyboard button, opens that search.
   A session from another project switches the sidebar to that project.
   Type a title and choose **Create todo** to add it at the end of **All**, with no category. You stay on the page you were on.
   Enter still opens the highlighted session, and creates the todo when none matches. Cmd+Enter creates it either way.
-  Alt+↑ and Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
+  Cmd+[ and Cmd+] walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   From a subagent they step from its session's row.
 - Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does.
   Cmd+Shift+X ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.
   It does nothing in a subagent, a read-only room, or a past session.
-  `/` puts the cursor in the focused pane's composer.
-- Cmd+. opens the model picker and Cmd+J moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.
+  `/` or Cmd+I puts the cursor in the focused pane's composer.
+- Cmd+Alt+/ opens the model picker, and Shift+Tab in a composer moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.
   Cmd+E expands or collapses every tool call.
-  Cmd+, opens Settings, where the model roles live, and closes it again.
+  Cmd+, or Cmd+Shift+J opens Settings, where the model roles live, and closes it again.
 - G then I opens the Inbox tab.
   G then S goes back from the inbox, the todo list, the routines, Settings, or the new-session draft to the panes.
   G then D opens the **Todo** page, and G then R the **Routines** page.

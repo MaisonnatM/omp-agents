@@ -113,7 +113,7 @@ export function useCompletion({ draft, setDraft, completions, onComplete, onKeyD
 				if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) suggest(draft, event.currentTarget.selectionStart);
 			},
 			onKeyDown: event => {
-				if (!popupOpen || event.nativeEvent.isComposing) return onKeyDown?.(event);
+				if (!popupOpen || event.nativeEvent.isComposing || (event.key === "Tab" && event.shiftKey)) return onKeyDown?.(event);
 				if (event.key === "Escape") {
 					event.preventDefault();
 					setRequestId(null);

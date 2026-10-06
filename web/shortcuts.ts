@@ -2,7 +2,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRe
 
 export type ShortcutId =
 	| "interrupt"
-	| "followUp"
+	| "steer"
 	| "deliverSteer"
 	| "dequeue"
 	| "switcher"
@@ -65,43 +65,50 @@ export interface Shortcut {
 
 /** Every dashboard shortcut, in the order a key tries them. The reference dialog lists exactly these. */
 export const SHORTCUTS: readonly Shortcut[] = [
-	{ id: "interrupt", label: "Interrupt the running turn", keys: [{ chord: { key: "Escape" }, scope: "composer" }] },
+	{ id: "interrupt", label: "Stop the running turn", keys: [{ chord: { key: "Backspace", mod: true, shift: true }, scope: "composer" }] },
 	{
-		id: "followUp",
-		label: "Send once the running turn finishes, as a follow-up (Enter steers it)",
+		id: "steer",
+		label: "Send now, steering the running turn (Enter queues a follow-up)",
 		keys: [{ chord: { key: "Enter", mod: true }, scope: "composer" }],
 	},
 	{
 		id: "deliverSteer",
-		label: "Deliver the queued steer now (Enter on the empty composer)",
-		keys: [{ chord: { key: "Enter" }, scope: "composer" }],
+		label: "Deliver the queued steer now (on the empty composer)",
+		keys: [{ chord: { key: "Enter", mod: true }, scope: "composer" }],
 	},
 	{ id: "dequeue", label: "Move the last queued message back into the empty composer", keys: [{ chord: { key: "ArrowUp" }, scope: "composer" }] },
 	{ id: "switcher", label: "Jump to a session, or create a todo", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
 	{ id: "newSession", label: "Start a new session", keys: [{ chord: { key: "o", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "endSession", label: "End the focused session", keys: [{ chord: { key: "x", mod: true, shift: true }, scope: "anywhere" }] },
-	{ id: "previousSession", label: "Open the previous session in the sidebar", keys: [{ chord: { key: "ArrowUp", alt: true }, scope: "anywhere" }] },
-	{ id: "nextSession", label: "Open the next session in the sidebar", keys: [{ chord: { key: "ArrowDown", alt: true }, scope: "anywhere" }] },
-	{ id: "model", label: "Choose the session's model", keys: [{ chord: { key: ".", mod: true }, scope: "anywhere" }] },
-	{ id: "thinking", label: "Cycle the thinking level", keys: [{ chord: { key: "j", mod: true }, scope: "anywhere" }] },
+	{ id: "previousSession", label: "Open the previous session in the sidebar", keys: [{ chord: { key: "[", mod: true }, scope: "anywhere" }] },
+	{ id: "nextSession", label: "Open the next session in the sidebar", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
+	{ id: "model", label: "Choose the session's model", keys: [{ chord: { key: "/", mod: true, alt: true }, scope: "anywhere" }] },
+	{ id: "thinking", label: "Cycle the thinking level", keys: [{ chord: { key: "Tab", shift: true }, scope: "composer" }] },
 	{ id: "tools", label: "Expand or collapse tool calls", keys: [{ chord: { key: "e", mod: true }, scope: "anywhere" }] },
 	{ id: "sessionsSidebar", label: "Show or hide the sessions sidebar, on the left", keys: [{ chord: { key: "b", mod: true }, scope: "anywhere" }] },
 	{
 		id: "planSidebar",
 		label: "Show or hide the session details sidebar, on the right",
-		keys: [{ chord: { key: "b", mod: true, shift: true }, scope: "anywhere" }],
+		keys: [{ chord: { key: "b", mod: true, alt: true }, scope: "anywhere" }],
 	},
-	{ id: "settings", label: "Open or close settings", keys: [{ chord: { key: ",", mod: true }, scope: "anywhere" }] },
 	{
-		id: "help",
-		label: "Show keyboard shortcuts",
+		id: "settings",
+		label: "Open or close settings",
 		keys: [
-			{ chord: { key: "/", mod: true }, scope: "anywhere" },
-			{ chord: { key: "?" }, scope: "outside-fields" },
+			{ chord: { key: ",", mod: true }, scope: "anywhere" },
+			{ chord: { key: "j", mod: true, shift: true }, scope: "anywhere" },
 		],
 	},
+	{ id: "help", label: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
-	{ id: "focusComposer", label: "Focus the composer", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
+	{
+		id: "focusComposer",
+		label: "Focus the composer",
+		keys: [
+			{ chord: { key: "/" }, scope: "outside-fields" },
+			{ chord: { key: "i", mod: true }, scope: "anywhere" },
+		],
+	},
 	{ id: "inbox", label: "Go to the pull request inbox", keys: [{ goTo: "i" }] },
 	{ id: "tickets", label: "Go to your Linear tickets", keys: [{ goTo: "t" }] },
 	{ id: "sessions", label: "Go to the sessions", keys: [{ goTo: "s" }] },
@@ -129,9 +136,13 @@ type KeyEvent = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "altKey" | "met
 
 function keyOf({ key, code }: KeyEvent): string {
 	if (/^[a-z]$/i.test(key)) return key.toLowerCase();
-	// A letter key that types no ASCII character, on a Cyrillic layout or with macOS Option (Option+B types ∫), matches
-	// by its physical key. An ASCII symbol matches as typed: AZERTY types `,` and `?` on the M key.
-	if (/^Key[A-Z]$/.test(code) && key.length === 1 && key.charCodeAt(0) > 127) return code.slice(3).toLowerCase();
+	// A letter key, or the / key, that types no ASCII character, on a Cyrillic layout or with macOS Option (Option+B
+	// types ∫, Option+/ types ÷), matches by its physical key. An ASCII symbol matches as typed: AZERTY types `,` and `?`
+	// on the M key.
+	if (key.length === 1 && key.charCodeAt(0) > 127) {
+		if (/^Key[A-Z]$/.test(code)) return code.slice(3).toLowerCase();
+		if (code === "Slash") return "/";
+	}
 	return key;
 }
 
@@ -172,7 +183,14 @@ export function shortcutsFor(event: KeyEvent, previous: string | null = null, ma
 
 export const scopeOf = (binding: Binding): Scope => ("goTo" in binding ? "outside-fields" : binding.scope);
 
-const KEY_LABEL: Record<string, string> = { Escape: "Esc", ArrowUp: "↑", ArrowDown: "↓", Enter: IS_MAC ? "↩" : "Enter" };
+const KEY_LABEL: Record<string, string> = {
+	Escape: "Esc",
+	ArrowUp: "↑",
+	ArrowDown: "↓",
+	Enter: IS_MAC ? "↩" : "Enter",
+	Backspace: IS_MAC ? "⌫" : "Backspace",
+	Tab: IS_MAC ? "⇥" : "Tab",
+};
 
 /** `⇧⌘O` on macOS, `Ctrl+Shift+O` elsewhere, `G then I` for a pair. */
 export function bindingLabel(binding: Binding): string {
@@ -229,7 +247,7 @@ export function pairing(): (event: KeyEvent & Pick<KeyboardEvent, "timeStamp">, 
 
 /**
  * Runs `handlers` for page-wide shortcuts, and returns the key handler a composer's textarea attaches for `composer`
- * ones. That handler runs before the page-wide listener, so Esc interrupts a turn before it restores a split.
+ * ones. That handler runs before the page-wide listener, so a composer binding wins over a page-wide one on the same key.
  */
 export function useShortcuts(handlers: ShortcutHandlers): (event: ReactKeyboardEvent) => void {
 	const latest = useRef(handlers);
