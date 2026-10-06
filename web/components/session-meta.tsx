@@ -4,6 +4,7 @@ import { type LinkedPullRequest, pullRequestUrl } from "../../src/shared";
 import { Tooltip } from "@/components/ui/tooltip";
 import { graphiteUrl } from "../inbox-model";
 import { projectName } from "../labels";
+import { PAGE_ICON } from "../page-icons";
 import { hashForInbox, hashForTickets } from "../routing";
 import { OrgIcon } from "./org-icon";
 
@@ -15,8 +16,8 @@ export const Project = ({ cwdDisplay }: { cwdDisplay: string }) => (
 );
 
 /**
- * The PRs a session submitted or worked on, after a separator. The number opens the PR's details in the inbox, the
- * arrow after it opens the PR on GitHub, and the Graphite mark opens it on Graphite.
+ * The PRs a session submitted or worked on, after a separator. The inbox icon and number open the PR's details in the
+ * inbox, the arrow after them opens the PR on GitHub, and the Graphite mark opens it on Graphite.
  */
 export function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 	return pullRequests.map(pr => {
@@ -29,6 +30,7 @@ export function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest
 						href={hashForInbox(pr)}
 						className="underline-offset-2 hover:text-foreground hover:underline"
 					>
+						<PAGE_ICON.inbox aria-hidden className="mr-0.5 inline size-3 align-[-0.125em]" />
 						#{pr.number}
 					</a>
 				</Tooltip>
@@ -66,6 +68,7 @@ export function Tickets({ tickets }: { tickets: string[] }) {
 			{" · "}
 			<Tooltip content={`${id}, which this session worked on, in the tickets page`}>
 				<a href={hashForTickets(id)} className="underline-offset-2 hover:text-foreground hover:underline">
+					<PAGE_ICON.tickets aria-hidden className="mr-0.5 inline size-3 align-[-0.125em]" />
 					{id}
 				</a>
 			</Tooltip>

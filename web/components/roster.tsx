@@ -1,4 +1,4 @@
-import { AppWindow, Archive, CalendarClock, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Search, Settings, SquareKanban } from "lucide-react";
+import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Keyboard, ListRestart, Loader, Pin, PinOff, Play, Plus, Search, Settings } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
 import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type Routine, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +35,7 @@ import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { mergeableCount } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
+import { PAGE_ICON } from "../page-icons";
 import { inboxStore, ticketsStore } from "../reads";
 import { hashForSettings, hashForTickets, type OpenMode, sameView, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
@@ -192,7 +193,7 @@ function SessionItems({ row, pinned, onTogglePin }: SessionItemsProps) {
 			))}
 			{row.tickets.map(id => (
 				<MenuLinkItem key={id} href={hashForTickets(id)}>
-					<SquareKanban />
+					<PAGE_ICON.tickets />
 					Open {id}
 				</MenuLinkItem>
 			))}
@@ -344,11 +345,11 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 }
 
 const SIDEBAR_TABS = [
-	{ value: "inbox", label: "Inbox", icon: Inbox },
-	{ value: "tickets", label: "Tickets", icon: SquareKanban },
-	{ value: "sessions", label: "Sessions", icon: MessagesSquare },
-	{ value: "todo", label: "Todo", icon: ListTodo },
-	{ value: "routines", label: "Routines", icon: CalendarClock },
+	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox },
+	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets },
+	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
+	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
+	{ value: "routines", label: "Routines", icon: PAGE_ICON.routines },
 ] as const;
 
 /**

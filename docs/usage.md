@@ -364,9 +364,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A PR the session only quoted, listed with `gh pr list`, or looked up with `gh pr view` does not count.
   A PR that a session submitted counts as submitted, even when it also worked on it.
 - In a session's header, a pull request's number opens its details in the inbox, the arrow after the number opens it on GitHub, and the Graphite logo after the arrow opens it on Graphite.
+  The number shows the **Inbox** tab's icon, since it opens there.
   Hover the number to see whether the session submitted it or worked on it.
 - A session's header also lists the Linear issues it worked on by identifier, such as `ENG-2368`, after its pull requests, and its row's menu has **Open ENG-2368** for each.
-  Both open the issue's details in the tickets page's main content (`#tickets/<identifier>`).
+  Both open the issue's details in the tickets page's main content (`#tickets/<identifier>`), and show the **Tickets** tab's icon.
   An issue counts when the session or one of its subagents read it with omp's Linear tools (`get_issue`, `list_comments`), changed or opened it (`save_issue`), commented on it (`save_comment`), or names it in its `/ship` step.
   An issue that a `list_issues` search only listed does not count.
 - Sessions that use `/ship` show their current workflow step in the sidebar and session header, for example `6/7 · Rebase`.
@@ -540,6 +541,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The notes always render as the agent's messages do, with GitHub's task lists and tables, and that render stays on screen while you edit them in the same type.
   They save when the text field loses focus and on Cmd+S; a todo with notes shows a notebook icon in the list.
 - A top-level todo shows what it links to: a session, a pull request, or a Linear issue, each a chip that opens it here.
+  Each chip shows the icon of the sidebar tab it opens: **Sessions**, **Inbox**, or **Tickets**.
   A running session's chip shows its status dot; an open todo's **×** on a chip unlinks it.
 - An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.
   The session links to the todo once omp starts, and its agent checks the todo off once it finishes the work; see [Todos from agents](#todos-from-agents).
