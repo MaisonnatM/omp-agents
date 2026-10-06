@@ -578,13 +578,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   It stops after 10 minutes, and its run keeps the last 64 KB of what it printed, stdout and stderr together.
   A command routine whose last command still runs records an error instead of running a second one.
   Its runs read **Running…**, **Succeeded**, **Failed (exit n)**, **Stopped at the time limit**, **Stopped with the dashboard**, or **Could not start**, and anything but a success also counts as an error.
-- Each row shows the routine's schedules and task, when it runs next or **Paused**, and what its last run did: how many sessions it started, how many errors it had, and **Queued: n** while it still has sessions to start.
+- Each row shows the routine's schedules and task, when it runs next or **Paused**, and what its last run did: how many sessions it started, how many errors it had, and **Queued** while its session waits for a free slot.
   Its **⋯** menu has **Run now**, which runs it at once whatever its schedules, **Pause** or **Resume**, **Edit**, and **Delete**, which asks first.
 - A routine's page shows its settings and its last 10 runs, newest first, each with the sessions it started, its command's output, and its errors.
   Output longer than 20 lines folds behind **Show output**.
   Click a session to open it, live while it runs, else its transcript (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   A run still opens a session in `/tmp`, which the sidebar does not list.
-- At most 3 routine sessions run at once, and a run starts the rest of its queue as they finish.
+- At most 3 routine sessions run at once, and a queued run starts as one of them finishes.
   Commands do not count toward that limit.
   A prompt routine whose last session still runs records an error instead of starting a second one.
 - A routine session runs unattended: its prompt tells it not to ask questions.

@@ -25,10 +25,10 @@ test("a run without a command result, or with a malformed one, reads as having n
 		createdAt: 1,
 		done: {},
 		runs: [
-			{ at: 4, queue: [], started: [], errors: [], command: { phase: "exited", code: 0, output: "ok\n", startedAt: 4, endedAt: 5 } },
-			{ at: 3, queue: [], started: [], errors: [], command: { phase: "running", startedAt: 3 } },
-			{ at: 2, queue: [], started: [], errors: [], command: { phase: "exited", code: "0", output: "ok\n", startedAt: 2, endedAt: 3 } },
-			{ at: 1, queue: [], started: [], errors: [] },
+			{ at: 4, queued: false, started: [], errors: [], command: { phase: "exited", code: 0, output: "ok\n", startedAt: 4, endedAt: 5 } },
+			{ at: 3, queued: false, started: [], errors: [], command: { phase: "running", startedAt: 3 } },
+			{ at: 2, queued: false, started: [], errors: [], command: { phase: "exited", code: "0", output: "ok\n", startedAt: 2, endedAt: 3 } },
+			{ at: 1, queued: false, started: [], errors: [] },
 		],
 	};
 	writeFileSync(path, JSON.stringify({ routines: [routine] }));
@@ -40,7 +40,7 @@ test("a run without a command result, or with a malformed one, reads as having n
 	]);
 });
 
-test("an older file keeps its other routines, reads one schedule as a list, and drops a pull request routine", () => {
+test("an older file keeps its other routines, reads one schedule as a list and a run's queue as queued, and drops a pull request routine", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);
 	const path = join(dir, "omp-agents", "routines.json");
@@ -55,7 +55,10 @@ test("an older file keeps its other routines, reads one schedule as a list, and 
 		enabled: true,
 		createdAt: 1,
 		done: {},
-		runs: [],
+		runs: [
+			{ at: 2, queue: ["single"], started: [], errors: [], command: null },
+			{ at: 1, queue: [], started: [], errors: [], command: null },
+		],
 	};
 	const reviews = {
 		...command,
@@ -65,8 +68,17 @@ test("an older file keeps its other routines, reads one schedule as a list, and 
 	};
 	writeFileSync(path, JSON.stringify({ routines: [reviews, command, { ...reviews, name: "" }] }));
 	const file = new RoutinesFile(path);
-	const { schedule, done: _done, ...kept } = command;
-	expect(file.routines).toEqual([{ ...kept, schedules: [schedule] }]);
+	const { schedule, done: _done, runs: _runs, ...kept } = command;
+	expect(file.routines).toEqual([
+		{
+			...kept,
+			schedules: [schedule],
+			runs: [
+				{ at: 2, queued: true, started: [], errors: [], command: null },
+				{ at: 1, queued: false, started: [], errors: [], command: null },
+			],
+		},
+	]);
 	expect(existsSync(`${path}.invalid`)).toBe(false);
 
 	file.apply({ op: "enable", id: "r1", enabled: false }, 2);

@@ -98,14 +98,14 @@ function commandWords(command: CommandRun | null): string | null {
 	}
 }
 
-/** A command run's result, else `1 session started, 2 errors, Queued: 3`, the parts that apply. */
+/** A command run's result, else `1 session started, 2 errors, Queued`, the parts that apply. */
 export function runWords(run: RoutineRun): string {
 	const command = commandWords(run.command);
 	if (command !== null) return command;
 	const parts = [
 		run.started.length > 0 && `${run.started.length} ${run.started.length === 1 ? "session" : "sessions"} started`,
 		run.errors.length > 0 && `${run.errors.length} ${run.errors.length === 1 ? "error" : "errors"}`,
-		run.queue.length > 0 && `Queued: ${run.queue.length}`,
+		run.queued && "Queued",
 	].filter(part => part !== false);
 	if (parts.length > 0) return parts.join(", ");
 	return "Nothing started";

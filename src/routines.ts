@@ -4,9 +4,6 @@ import { type Routine, type RoutineChange, type Schedule, type Schedules, type W
 /** What every routine session's prompt ends with, since nobody watches it. */
 export const UNATTENDED = "This session runs unattended from a routine. Do not ask questions. If something blocks you, say what and stop.";
 
-/** The one queue entry of a prompt or command task's run, which starts one thing per run; no pull request key can be it. */
-export const SINGLE_TARGET = "single";
-
 /** A command routine's command: the longest one a routine saves, how long it may run, and how much of its output a run keeps. */
 export const MAX_COMMAND_LENGTH = 10_000;
 export const COMMAND_TIMEOUT_MS = 600_000;

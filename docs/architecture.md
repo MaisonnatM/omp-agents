@@ -223,16 +223,17 @@ The prompt ends with `UNATTENDED`, which tells the session not to ask questions.
 
 `src/server/routines-file.ts` keeps the routines in `routines.json` beside the access token, and saves every change at once.
 A file from before `schedules` reads its `schedule` as a one-element list, and drops a routine whose task was pull requests. The rest of the file stays. The next save writes `schedules`. A file that is not a list of routines still moves aside.
+A run from before `queued` reads its `queue` list as queued while the list holds an entry; a run that has `queued` reads only that.
 Each routine holds its last 10 runs, newest first.
-A run holds its slot time, its queue, the sessions it started, its errors, and for a command task, its `command` result once the command ended.
-A prompt or command run's queue holds the one `SINGLE_TARGET` entry until the drain takes it.
+A run holds its slot time, whether it is still queued, the sessions it started, its errors, and for a command task, its `command` result once the command ended.
+A run stays queued from its claim until the drain starts its session or command.
 
 `src/server/routine-runner.ts` runs on a 60 s tick in `src/server/loops.ts`, whether or not a page is connected.
 Each tick does three things, in order:
 
-1. It claims each due slot: it saves a new run with its queue before it starts anything.
+1. It claims each due slot: it saves a new queued run before it starts anything.
    Slots missed while the dashboard was closed or the Mac slept coalesce into one run at the next tick.
-2. It drains the queues, oldest run first, while fewer than 3 routine sessions are busy; a command takes no session slot, so a command run drains even when they are all busy.
+2. It starts the queued runs, oldest first, while fewer than 3 routine sessions are busy; a command takes no session slot, so a command run starts even when they are all busy.
    It starts each prompt session through the same `start` the page uses.
    A failed start goes to the run's errors, and the next run tries again.
    A prompt routine whose last session still runs records an error instead of starting a second one.
@@ -248,7 +249,7 @@ Each tick does three things, in order:
    A session that waits on a question holds its slot.
 
 Running a tick twice starts nothing new, since the slot is claimed, and a tick that comes while one runs is skipped.
-A crash after a claim loses no queue, since it is on disk. A start that had not finished waits for the routine's next slot.
+A crash after a claim loses no queued run, since it is on disk. A start that had not finished waits for the routine's next slot.
 After a restart the runner tracks no session, which is right, because the dashboard's sessions die with the server.
 Stopping the server stops every running command, right before it exits, so the result of a command it stopped is never saved as a time-limit stop.
 A run saves its command as `running` before the command starts, then as `exited`, `stopped`, or `failed` when it ends.

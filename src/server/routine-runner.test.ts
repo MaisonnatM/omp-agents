@@ -93,20 +93,20 @@ function harness(file: RoutinesFile) {
 }
 
 describe("RoutineRunner", () => {
-	test("a claimed run's queue survives a restart, and the next server drains it without claiming again", async () => {
+	test("a queued run survives a restart, and the next server starts it without claiming again", async () => {
 		const path = routinesPath();
 		const firstFile = fileWith(path);
 		addPrompts(firstFile, 4);
 		const first = harness(firstFile);
 		await first.runner.tick();
 		expect(first.fake.requests).toHaveLength(3);
-		expect(firstFile.routines[3]?.runs[0]?.queue).toEqual(["single"]);
+		expect(firstFile.routines[3]?.runs[0]?.queued).toBe(true);
 
 		const file = new RoutinesFile(path);
 		const second = harness(file);
 		await second.runner.tick();
 		expect(second.fake.requests).toHaveLength(1);
-		expect(file.routines.map(routine => routine.runs[0]?.queue)).toEqual([[], [], [], []]);
+		expect(file.routines.map(routine => routine.runs[0]?.queued)).toEqual([false, false, false, false]);
 		expect(file.routines.map(routine => routine.runs.length)).toEqual([1, 1, 1, 1]);
 	});
 
@@ -198,14 +198,14 @@ describe("RoutineRunner", () => {
 			const { runner, fake } = harness(file);
 			await runner.tick();
 			expect(fake.execs.map(({ command, cwd }) => ({ command, cwd }))).toEqual([{ command: "git worktree prune", cwd: "/work/webapp" }]);
-			expect(file.routines[0]?.runs[0]).toEqual({ at: T0 + HOUR, queue: [], started: [], errors: [], command: { phase: "running", startedAt: T0 + HOUR } });
+			expect(file.routines[0]?.runs[0]).toEqual({ at: T0 + HOUR, queued: false, started: [], errors: [], command: { phase: "running", startedAt: T0 + HOUR } });
 
 			fake.now += 4000;
 			fake.execs[0]!.end({ exitCode: 0, output: "Removing worktrees/old\n" });
 			await settled();
 			expect(file.routines[0]?.runs[0]).toEqual({
 				at: T0 + HOUR,
-				queue: [],
+				queued: false,
 				started: [],
 				errors: [],
 				command: { phase: "exited", code: 0, output: "Removing worktrees/old\n", startedAt: T0 + HOUR, endedAt: T0 + HOUR + 4000 },
@@ -267,7 +267,7 @@ describe("RoutineRunner", () => {
 			expect(file.routines[0]?.runs).toEqual([
 				{
 					at: T0 + HOUR,
-					queue: [],
+					queued: false,
 					started: [],
 					errors: ["The dashboard stopped while the command ran."],
 					command: { phase: "stopped", reason: "dashboard", output: "", startedAt: T0 + HOUR, endedAt: T0 + HOUR },

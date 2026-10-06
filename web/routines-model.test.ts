@@ -20,7 +20,7 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	...fields,
 });
 
-const run = (fields: Partial<RoutineRun>): RoutineRun => ({ at: at(5, 9), queue: [], started: [], errors: [], command: null, ...fields });
+const run = (fields: Partial<RoutineRun>): RoutineRun => ({ at: at(5, 9), queued: false, started: [], errors: [], command: null, ...fields });
 
 describe("schedule words", () => {
 	test("an interval reads in its largest whole unit", () => {
@@ -88,12 +88,11 @@ describe("next run", () => {
 describe("last run", () => {
 	const started = { label: "acme/webapp#7", instanceId: "7c51", sessionId: "01a0" };
 
-	test("names the sessions it started, its errors, and what it still has queued", () => {
-		expect(runWords(run({ started: [started], errors: ["GitHub timed out", "No such directory"], queue: ["a", "b", "c"] }))).toBe(
-			"1 session started, 2 errors, Queued: 3",
-		);
+	test("names the sessions it started and its errors, or that it waits its turn", () => {
+		expect(runWords(run({ started: [started], errors: ["GitHub timed out", "No such directory"] }))).toBe("1 session started, 2 errors");
 		expect(runWords(run({ started: [started, started] }))).toBe("2 sessions started");
 		expect(runWords(run({ errors: ["GitHub timed out"] }))).toBe("1 error");
+		expect(runWords(run({ queued: true }))).toBe("Queued");
 	});
 
 	test("a run that started nothing says so, and a routine never run says so", () => {

@@ -1,6 +1,6 @@
 /**
  * The routines, kept in a file so that the next server knows which slots ran.
- * Every change saves at once: a run's queue is on disk before the runner starts anything from it.
+ * Every change saves at once: a queued run is on disk before the runner starts anything from it.
  * A routine whose task was pull requests is dropped on load. The rest of the file stays.
  */
 import { JsonFile } from "../fs";
@@ -52,13 +52,17 @@ function parseCommandRun(value: unknown): CommandRun | null {
 	}
 }
 
-/** A run; a command result that is missing, as in a file written before commands, or malformed reads as none, and the run stays. */
+/**
+ * A run; a command result that is missing, as in a file written before commands, or malformed reads as none, and the run stays.
+ * A file from before `queued` holds a `queue` list, which is queued while it holds an entry; a present `queued` does not fall back.
+ */
 function parseRun(value: unknown): RoutineRun | null {
 	if (!isObject(value)) return null;
-	const { at, queue, errors } = value;
+	const { at, errors } = value;
+	const queued = "queued" in value ? value.queued : isStrings(value.queue) && value.queue.length > 0;
 	const started = parseAll(value.started, parseStarted);
-	return typeof at === "number" && isStrings(queue) && isStrings(errors) && started
-		? { at, queue, started, errors, command: parseCommandRun(value.command) }
+	return typeof at === "number" && typeof queued === "boolean" && isStrings(errors) && started
+		? { at, queued, started, errors, command: parseCommandRun(value.command) }
 		: null;
 }
 
@@ -112,20 +116,17 @@ export class RoutinesFile {
 		return true;
 	}
 
-	/** Claims routine `id`'s slot at `at` with `queue` to start, keeping the newest {@link MAX_ROUTINE_RUNS} runs. */
-	claim(id: string, at: number, queue: string[]): void {
+	/** Claims routine `id`'s slot at `at`, queued, keeping the newest {@link MAX_ROUTINE_RUNS} runs. */
+	claim(id: string, at: number): void {
 		this.#update(id, routine => ({
 			...routine,
-			runs: [{ at, queue, started: [], errors: [], command: null }, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
+			runs: [{ at, queued: true, started: [], errors: [], command: null }, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
 		}));
 	}
 
-	/** Takes the next key off the queue of routine `id`'s run at `at`; `null` when that run is gone or its queue is empty. */
-	pop(id: string, at: number): string | null {
-		const key = this.#run(id, at)?.queue[0];
-		if (key === undefined) return null;
-		this.#updateRun(id, at, run => ({ ...run, queue: run.queue.slice(1) }));
-		return key;
+	/** Takes routine `id`'s run at `at` off the queue, saved before its session or command starts. */
+	dequeue(id: string, at: number): void {
+		this.#updateRun(id, at, run => ({ ...run, queued: false }));
 	}
 
 	/** Records a session that the run at `at` started. */
