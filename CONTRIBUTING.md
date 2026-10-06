@@ -21,34 +21,9 @@ bun start
 
 The server does not reload on change; restart `bun start` after editing `src/` or `web/`.
 
-## Checks
-
-Run both before you open a pull request:
-
-```sh
-bun test
-bun run typecheck
-```
-
-If you change the desktop shell in `desktop/`, also run its type check:
-
-```sh
-bun install --cwd desktop --frozen-lockfile
-bun run --cwd desktop typecheck
-```
-
-The tests cover the transcript reducer, file tail, open views, the Collab guest's follow-ups and room links, subagent transcript lookup, prompt expansion, pull-request scan, PR description links, inbox parsing, usage parser, role routing, settings edits, question mapping, shortcut matching, and view model.
-They run with `PI_CODING_AGENT_DIR` pointed at a temporary directory (`src/test-env.ts`, preloaded by `bunfig.toml`), so they never touch `~/.omp/agent`.
-
-GitHub Actions runs these checks on every pull request and every push to `main` (`.github/workflows/checks.yml`), against the Bun and omp versions that the README names as tested.
-Bump them there together with the README.
-
 ## Pull requests
 
-- Keep each pull request to one change, and explain why it is needed.
-- Add or update tests for behavior you change.
-- Follow [CODING_STANDARDS.md](CODING_STANDARDS.md) for importing omp's modules, where changes go, which docs to update, and Markdown style.
-
-See [docs/architecture.md](docs/architecture.md#code-layout) for where each part of the code lives.
+[CODING_STANDARDS.md](CODING_STANDARDS.md) lists what a pull request needs: the checks to run, the tests and docs to update, and the code conventions.
+[docs/architecture.md](docs/architecture.md#code-layout) says where each part of the code lives.
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).

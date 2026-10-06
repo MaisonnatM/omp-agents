@@ -6,7 +6,7 @@ For installation, see the [README](../README.md); for the interface, see [Using 
 ## omp modules
 
 The server imports omp's own modules from the installed package, so it does not reimplement a protocol, the encryption, or the session-file format, and it always speaks the same version as the sessions it shows.
-Only `src/omp/` imports them: `src/omp/modules.ts` loads every module once and checks at startup that each export this app uses exists, naming the omp version and the missing export when one does not.
+`src/omp/modules.ts` loads every module once and checks at startup that each export this app uses exists, naming the omp version and the missing export when one does not.
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 
 Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
@@ -628,8 +628,7 @@ Its `agent/` files are the default kit.
 [Template sync](../CODING_STANDARDS.md#template-sync) says how to copy an edited live file back.
 The default `agent/AGENTS.md` keeps worktree and force-push safety inline and links to the model and review references under `agent/docs/`.
 The profile's `docs/git-workflow.md` detects Graphite with `git rev-parse --path-format=absolute --git-common-dir`, so the same procedure works from a checkout, a linked worktree, or a nested directory.
-`src/docs.test.ts` checks root Markdown and all Markdown below `docs/` and `templates/omp/`, including the kit's nested commands, skills, and references, for lines that tools would truncate.
-The repository's agent guide links to [agent smoke checks](agent-smoke.md) for server authentication and lifecycle, browser verification, and desktop verification.
+The repository's agent guide links to the [coding standards](../CODING_STANDARDS.md), which every contributor follows, and to [agent smoke checks](agent-smoke.md) for server authentication and lifecycle, browser verification, and desktop verification.
 
 `desktop/` holds the desktop shell; see [Desktop shell](#desktop-shell).
 `desktop/main.ts` is its whole main process but for Open at Login, in `desktop/login-item.ts`, and `bun run desktop` at the root installs the package and starts it through `desktop/launch.ts`.
