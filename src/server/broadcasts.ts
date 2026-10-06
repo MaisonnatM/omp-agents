@@ -1,10 +1,10 @@
 /**
  * What every socket hears on the `roster` topic: the roster, the past-session list, plan usage, the Todo page's list,
- * and the routines. Each push publishes only what changed since the last one. Roster and past pushes wait for a
- * listener; a socket that subscribes gets all five at once.
+ * and the routines. Each push publishes only what changed since the last one: the past list as the sessions that
+ * changed, the rest whole. Roster and past pushes wait for a listener; a socket that subscribes gets all five at once.
  */
 import { errorText } from "../json";
-import type { ServerMsg } from "../shared";
+import type { PastSession, ServerMsg } from "../shared";
 import { fetchPlanUsage } from "../usage";
 import { type Socket, send } from "./views";
 
@@ -12,11 +12,11 @@ const TOPIC = "roster";
 /** Coalesce bursts of subagent progress into one roster push. */
 const ROSTER_PUSH_MS = 150;
 
-type Broadcast = Extract<ServerMsg, { t: "roster" | "past" | "usage" | "user-todos" | "routines" }>;
+type Broadcast = Extract<ServerMsg, { t: "roster" | "usage" | "user-todos" | "routines" }>;
 
 export interface BroadcastDeps {
 	rosterMsg(): Extract<ServerMsg, { t: "roster" }>;
-	pastMsg(): Extract<ServerMsg, { t: "past" }>;
+	past(): PastSession[];
 	userTodosMsg(): Extract<ServerMsg, { t: "user-todos" }>;
 	routinesMsg(): Extract<ServerMsg, { t: "routines" }>;
 	/** Publishes `json` on the `roster` topic. */
@@ -30,8 +30,10 @@ export interface BroadcastDeps {
 
 export class Broadcasts {
 	readonly #deps: BroadcastDeps;
-	/** The last message of each kind published; empty for roster and past while nobody listens, empty for usage until `omp usage` first answers, and for the todos and routines until they first change. */
-	readonly #last: Record<Broadcast["t"], string> = { roster: "", past: "", usage: "", "user-todos": "", routines: "" };
+	/** The last message of each kind published; empty for the roster while nobody listens, empty for usage until `omp usage` first answers, and for the todos and routines until they first change. */
+	readonly #last: Record<Broadcast["t"], string> = { roster: "", usage: "", "user-todos": "", routines: "" };
+	/** The past list as the listeners last heard it: each session's JSON, by session id. */
+	#past = new Map<string, string>();
 	#rosterPush: NodeJS.Timeout | undefined;
 
 	constructor(deps: BroadcastDeps) {
@@ -45,9 +47,11 @@ export class Broadcasts {
 
 	/** Subscribe `ws` and send it the current roster, past list, usage, todos, and routines. */
 	open(ws: Socket): void {
+		// The sockets that listen already hear what changed first, so the list `ws` starts from is theirs too.
+		const past = this.#syncPast();
 		ws.subscribe(TOPIC);
 		send(ws, this.#deps.rosterMsg());
-		send(ws, this.#deps.pastMsg());
+		send(ws, { t: "past", reset: true, sessions: past, removed: [] });
 		if (this.#last.usage) ws.send(this.#last.usage);
 		send(ws, this.#deps.userTodosMsg());
 		send(ws, this.#deps.routinesMsg());
@@ -62,20 +66,18 @@ export class Broadcasts {
 	/** A turn started or ended, or a subagent progressed: saved at once, so a crash right after still knows it; pushed debounced through {@link ROSTER_PUSH_MS}. */
 	rosterChanged(): void {
 		this.#deps.saveRunning();
-		this.#rosterPush ??= setTimeout(() => this.#pushRoster(), ROSTER_PUSH_MS);
+		this.#rosterPush ??= setTimeout(() => this.pushRoster(), ROSTER_PUSH_MS);
 	}
 
+	/** Something both lists show changed, such as a session's pull requests. */
 	pushAll(): void {
-		this.#pushRoster();
+		this.pushRoster();
 		this.pushPast();
 	}
 
+	/** Publish the sessions of the past list that changed, joined, or left since the listeners last heard it. */
 	pushPast(): void {
-		if (!this.listening()) {
-			this.#last.past = "";
-			return;
-		}
-		this.#publishChanged(this.#deps.pastMsg());
+		if (this.listening()) this.#syncPast();
 	}
 
 	/** Run `omp usage` and publish its report, or why it failed. */
@@ -96,7 +98,7 @@ export class Broadcasts {
 	}
 
 	/** Also stands in for a pending debounced push: a burst of roster updates costs one sync and one push. */
-	#pushRoster(): void {
+	pushRoster(): void {
 		clearTimeout(this.#rosterPush);
 		this.#rosterPush = undefined;
 		if (!this.listening()) {
@@ -105,6 +107,19 @@ export class Broadcasts {
 		}
 		this.#deps.beforeRosterPush();
 		this.#publishChanged(this.#deps.rosterMsg());
+	}
+
+	/** The past list now; the listeners hear what changed since they last heard it. */
+	#syncPast(): PastSession[] {
+		const sessions = this.#deps.past();
+		const next = new Map(sessions.map(session => [session.sessionId, JSON.stringify(session)]));
+		const changed = sessions.filter(session => this.#past.get(session.sessionId) !== next.get(session.sessionId));
+		const removed = [...this.#past.keys()].filter(sessionId => !next.has(sessionId));
+		this.#past = next;
+		if (this.listening() && (changed.length > 0 || removed.length > 0)) {
+			this.#deps.publish(TOPIC, JSON.stringify({ t: "past", reset: false, sessions: changed, removed } satisfies ServerMsg));
+		}
+		return sessions;
 	}
 
 	#publishChanged(msg: Broadcast): void {

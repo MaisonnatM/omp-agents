@@ -34,14 +34,16 @@ function session(): { path: string; artifacts: string } {
 	return { path: `${artifacts}.jsonl`, artifacts };
 }
 
-/** A tree over `path` whose `read` pokes it and resolves with the list that poke emits. */
-function treeOf(path: string): { tree: MediaTree; read: () => Promise<AgentMedia[]> } {
-	let resolve: ((media: AgentMedia[]) => void) | null = null;
-	const tree = new MediaTree(path, null, media => resolve?.(media));
-	const read = (): Promise<AgentMedia[]> => {
-		const next = Promise.withResolvers<AgentMedia[]>();
+type Emit = { reset: boolean; media: AgentMedia[] };
+
+/** A tree over `path` whose `read` pokes it with a change at `changedPath` and resolves with what that poke emits. */
+function treeOf(path: string): { tree: MediaTree; read: (changedPath?: string) => Promise<Emit> } {
+	let resolve: ((emit: Emit) => void) | null = null;
+	const tree = new MediaTree(path, null, (reset, media) => resolve?.({ reset, media }));
+	const read = (changedPath = path): Promise<Emit> => {
+		const next = Promise.withResolvers<Emit>();
 		resolve = next.resolve;
-		tree.poke();
+		tree.poke(changedPath);
 		return next.promise;
 	};
 	return { tree, read };
@@ -59,8 +61,9 @@ describe("MediaTree", () => {
 		writeFileSync(join(artifacts, "Smoke.jsonl"), call("c2", "eval", { code: "tab.screenshot()" }, "Screenshotting the sidebar") + result("c2", "eval", HASH_B, "2026-10-05T10:05:00Z"));
 		writeFileSync(join(artifacts, "Smoke", "Nested.jsonl"), call("c3", "eval", {}) + result("c3", "eval", HASH_C, "2026-10-05T10:02:00Z"));
 
-		const media = await treeOf(path).read();
+		const { reset, media } = await treeOf(path).read();
 
+		expect(reset).toBe(true);
 		expect(media).toEqual([
 			{ src: src(HASH_B), agentId: "Smoke", tool: "eval", summary: "Screenshotting the sidebar", at: Date.parse("2026-10-05T10:05:00Z") },
 			{ src: src(HASH_C), agentId: "Nested", tool: "eval", summary: "", at: Date.parse("2026-10-05T10:02:00Z") },
@@ -68,22 +71,22 @@ describe("MediaTree", () => {
 		]);
 	});
 
-	test("a subagent that starts later and an image appended to a file both arrive on the next poke", async () => {
+	test("a subagent that starts later arrives with a change under the artifacts directory, an image appended to the file with a change to it, each alone", async () => {
 		const { path, artifacts } = session();
 		writeFileSync(path, "");
 		const { tree, read } = treeOf(path);
-		expect(await read()).toEqual([]);
+		expect(await read()).toEqual({ reset: true, media: [] });
 
 		const later = join(artifacts, "Later.jsonl");
 		expect(tree.covers(later)).toBe(true);
 		writeFileSync(later, call("c1", "eval", {}, "Shooting") + result("c1", "eval", HASH_A, "2026-10-05T10:00:00Z"));
-		expect((await read()).map(item => item.agentId)).toEqual(["Later"]);
+		const joined = await read(later);
+		expect([joined.reset, joined.media.map(item => item.agentId)]).toEqual([false, ["Later"]]);
 
 		appendFileSync(path, call("c2", "read", { path: "/tmp/b.webp" }) + result("c2", "read", HASH_B, "2026-10-05T11:00:00Z"));
-		expect((await read()).map(item => [item.agentId, item.src])).toEqual([
-			[null, src(HASH_B)],
-			["Later", src(HASH_A)],
-		]);
+		const appended = await read();
+		expect([appended.reset, appended.media.map(item => [item.agentId, item.src])]).toEqual([false, [[null, src(HASH_B)]]]);
+		expect(tree.media.map(item => item.src)).toEqual([src(HASH_B), src(HASH_A)]);
 	});
 
 	test("only its own file, that file's lock sidecar, and its subagents' files are this tree's changes, not a sibling session's", () => {

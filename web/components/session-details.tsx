@@ -144,10 +144,10 @@ const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
  * the images its agents' tools returned, each tab apart. `working` leaves the reply of a turn still running out of the outline.
  */
 export function SessionDetails({ view, working }: { view: View; working: boolean }) {
-	const { items, loaded, work, media } = usePane(view);
+	const { items, loaded, files: changedFiles, media } = usePane(view);
 	const [tab, setTab] = useStoredState<DetailsTab>(TAB_KEY, raw => DETAILS_TABS.find(tab => tab === raw) ?? "outline");
 	const entries = useMemo(() => outline(items, working), [items, working]);
-	const files = work?.files ?? [];
+	const files = changedFiles ?? [];
 	return (
 		<Tabs value={tab} onValueChange={value => setTab(value as DetailsTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center gap-2 px-2 pt-4">
@@ -167,7 +167,7 @@ export function SessionDetails({ view, working }: { view: View; working: boolean
 			</TabPanel>
 			<TabPanel value="files" asChild>
 				<SidebarContent>
-					{work && files.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p>}
+					{changedFiles && files.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p>}
 					{files.length > 0 && (
 						<SidebarGroup>
 							<SidebarGroupLabel>

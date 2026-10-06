@@ -1,7 +1,7 @@
-import type { AgentMedia, CompletionItem, Item, ServerMsg, SessionWork, View } from "../src/shared";
+import { type AgentMedia, type ChangedFile, type CompletionItem, type Item, newestMediaFirst, type ServerMsg, type View } from "../src/shared";
+import { applyDelta } from "./keyed-list";
 import { keyedStore } from "./keyed-store";
 import { hashForView } from "./routing";
-import { applyItems } from "./transcript-view";
 
 export interface Completions {
 	reqId: number;
@@ -17,13 +17,13 @@ export interface PaneData {
 	completions: Completions | null;
 	/** The last texts the server took out of the view's queue, answering the composer's `dequeue` `reqId`. */
 	dequeued: { reqId: number; texts: string[] } | null;
-	/** The files the view's agent changed; `null` until the server sends them. */
-	work: SessionWork | null;
+	/** The files the view's agent changed, in first-touch order; `null` until the server sends them. */
+	files: ChangedFile[] | null;
 	/** The images its agent's and its subagents' tools returned, newest first; `null` until the server sends them. */
 	media: AgentMedia[] | null;
 }
 
-export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, dequeued: null, work: null, media: null };
+export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, dequeued: null, files: null, media: null };
 
 /** The server messages that belong to one open view: its transcript, its changed files, its images, its composer's suggestions, and its dequeued texts. */
 export type PaneMsg =
@@ -52,13 +52,13 @@ export function applyPaneMessage(msg: PaneMsg): void {
 	const pane = panes.get(key) ?? EMPTY_PANE;
 	switch (msg.t) {
 		case "items":
-			panes.set(key, { ...pane, items: applyItems(pane.items, msg.reset, msg.items), loaded: true });
+			panes.set(key, { ...pane, items: applyDelta(pane.items, msg.reset, msg.items, item => item.id, []), loaded: true });
 			break;
 		case "work":
-			panes.set(key, { ...pane, work: msg.work });
+			panes.set(key, { ...pane, files: applyDelta(pane.files ?? [], msg.reset, msg.files, file => file.path, []) });
 			break;
 		case "media":
-			panes.set(key, { ...pane, media: msg.media });
+			panes.set(key, { ...pane, media: msg.reset ? msg.media : [...(pane.media ?? []), ...msg.media].sort(newestMediaFirst) });
 			break;
 		case "completions":
 			panes.set(key, { ...pane, completions: { reqId: msg.reqId, items: msg.items, error: msg.error } });

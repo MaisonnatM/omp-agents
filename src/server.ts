@@ -63,7 +63,7 @@ const pathFor = (view: View): string | null =>
 const views = new Views(pathFor, (topic, msg) => server.publish(topic, JSON.stringify(msg)));
 const broadcasts = new Broadcasts({
 	rosterMsg: () => ({ t: "roster", hosts: sessions.rows(files.factsOf), error: rosterError }),
-	pastMsg: () => ({ t: "past", sessions: files.past(sessions.sessionIds(), id => interrupted.has(id)) }),
+	past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
 	userTodosMsg: () => ({ t: "user-todos", list: todos.list }),
 	routinesMsg: () => ({ t: "routines", routines: routines.routines }),
 	publish: (topic, json) => void server.publish(topic, json),
@@ -224,10 +224,12 @@ async function listRegistry(): Promise<void> {
 		rosterError = errorText(err);
 	}
 	registryFresh = true;
-	sessions.follow(hosts);
+	const joinedOrLeft = sessions.follow(hosts);
 	// A terminal session that asked to end before the registry listed it.
 	void endInbox.drain();
-	broadcasts.pushAll();
+	// Every listing can change a host's row or the registry error; only a session that joins or leaves changes the past list.
+	broadcasts.pushRoster();
+	if (joinedOrLeft) broadcasts.pushPast();
 }
 
 function upgrade(req: Request, srv: Server<SocketData>): Response | undefined {

@@ -82,15 +82,18 @@ export class LiveSessions {
 		return [...this.#sessions.values()].map(session => session.cwd);
 	}
 
-	/** Follow the registry: drop what it no longer lists, join new hosts. */
-	follow(hosts: HostSnapshot[]): void {
+	/** Follow the registry: drop what it no longer lists, join new hosts. Whether a session joined or left. */
+	follow(hosts: HostSnapshot[]): boolean {
+		const before = this.#sessions.size;
 		const listed = new Map(hosts.map(host => [host.instanceId, host]));
 		for (const [instanceId, session] of this.#sessions) if (!session.follow(listed)) this.remove(instanceId);
+		const kept = this.#sessions.size;
 		for (const host of hosts) {
 			if (!this.#sessions.has(host.instanceId)) {
 				this.#sessions.set(host.instanceId, new SessionGuest(host, update => this.#onUpdate(host.instanceId, update)));
 			}
 		}
+		return kept !== before || this.#sessions.size !== kept;
 	}
 
 	async dispose(): Promise<void> {

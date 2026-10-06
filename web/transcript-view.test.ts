@@ -1,15 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared";
-import { applyItems, editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnReplies } from "./transcript-view";
+import { editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnReplies } from "./transcript-view";
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
 	const tool = (id: string, status: "running" | "ok"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status, agents: [] });
-
-	test("upserts keep position and append new ids", () => {
-		const items = applyItems([user, tool("t1", "running")], false, [tool("t1", "ok"), tool("t2", "running")]);
-		expect(items.map(item => (item.kind === "tool" ? `${item.id}:${item.status}` : item.id))).toEqual(["u", "t1:ok", "t2:running"]);
-	});
 
 	test("consecutive tools group into one block; a message splits groups", () => {
 		const blocks = toBlocks([tool("t1", "ok"), tool("t2", "ok"), user, tool("t3", "running")]);

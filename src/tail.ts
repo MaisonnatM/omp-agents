@@ -4,7 +4,7 @@
  * server pokes it when its file changes.
  */
 import { LineReader, ReadQueue } from "./line-reader";
-import type { Item, SessionWork } from "./shared";
+import type { ChangedFile, Item } from "./shared";
 import { Transcript } from "./transcript";
 import { Work } from "./work";
 
@@ -27,10 +27,10 @@ export class FileTail {
 	#pendingReset = false;
 	#window: Timer | undefined;
 	readonly #emit: (reset: boolean, items: Item[]) => void;
-	readonly #emitWork: (work: SessionWork) => void;
+	readonly #emitWork: (reset: boolean, files: ChangedFile[]) => void;
 
-	/** `emitWork` gets the whole {@link Work} once the first read finishes, then again each time a read changes it. */
-	constructor(path: string, emit: (reset: boolean, items: Item[]) => void, emitWork: (work: SessionWork) => void) {
+	/** `emitWork` gets every changed file once the first read finishes, then the files each later read changed. */
+	constructor(path: string, emit: (reset: boolean, items: Item[]) => void, emitWork: (reset: boolean, files: ChangedFile[]) => void) {
 		this.path = path;
 		this.#lines = new LineReader(path, () => this.#restart());
 		this.#emit = emit;
@@ -42,8 +42,8 @@ export class FileTail {
 	}
 
 	/** The changed files, as of the last read. */
-	get work(): SessionWork {
-		return this.#work.snapshot();
+	get files(): ChangedFile[] {
+		return this.#work.files();
 	}
 
 	/** Read what was appended since the last read. Calls that arrive before a queued read starts share it. */
@@ -107,17 +107,17 @@ export class FileTail {
 		// Unreadable for now: the next poke retries from the same offset.
 		if (!complete) return;
 		const changed = entries.flatMap(entry => this.transcript.applyEntry(entry));
-		// Every entry goes through both folds, so `some` would skip the rest.
-		const worked = entries.reduce<boolean>((any, entry) => this.#work.applyEntry(entry) || any, false);
+		for (const entry of entries) this.#work.applyEntry(entry);
+		const changedFiles = this.#work.takeChanged();
 		if (!this.#loaded) {
 			this.#loaded = true;
 			this.#discardPending();
 			this.transcript.takeReordered();
 			this.#emit(true, this.transcript.items());
-			this.#emitWork(this.work);
+			this.#emitWork(true, this.files);
 		} else {
 			this.#publish(changed);
-			if (worked) this.#emitWork(this.work);
+			if (changedFiles.length > 0) this.#emitWork(false, changedFiles);
 		}
 	}
 }

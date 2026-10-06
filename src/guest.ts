@@ -361,6 +361,11 @@ export class SessionGuest implements LiveSession {
 
 	#onFrame(frame: Frame): void {
 		if (this.#closed) return;
+		// Only the host's state and its agents end a turn; a turn streams as `event` frames, which leave nothing to release.
+		if (frame.t === "event" || this.#followUps.size === 0) {
+			this.#apply(frame);
+			return;
+		}
 		const running = [...this.#followUps.keys()].filter(key => this.#running(key));
 		this.#apply(frame);
 		this.#release(running);

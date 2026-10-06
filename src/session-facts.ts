@@ -348,6 +348,9 @@ export interface ListedSession {
 	modifiedAt: number;
 }
 
+/** Sessions a refresh reads at once. */
+const SCAN_PARALLEL = 16;
+
 export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
 	/** The PRs the inbox listed, by `owner/repo:branch` of their head. */
@@ -426,34 +429,19 @@ export class SessionFactsIndex {
 	async #refresh(sessions: readonly ListedSession[]): Promise<boolean> {
 		const listed = new Set(sessions.map(session => session.path));
 		for (const path of this.#sessions.keys()) if (!listed.has(path)) this.#sessions.delete(path);
-		let changed = false;
-		const touched: SessionScan[] = [];
+		// A subagent's writes do not touch the session file, but its result does once it finishes.
+		const stale = sessions.filter(({ path, modifiedAt }) => this.#sessions.get(path)?.modifiedAt !== modifiedAt);
+		const scans: { session: SessionScan; changed: boolean; moved: boolean }[] = [];
+		// The first refresh reads every transcript; a few sessions at a time keep the disk busy without opening every file at once.
+		let next = 0;
+		const worker = async (): Promise<void> => {
+			while (next < stale.length) scans.push(await this.#scan(stale[next++]!));
+		};
+		await Promise.all(Array.from({ length: Math.min(SCAN_PARALLEL, stale.length) }, worker));
+		let changed = scans.some(scan => scan.changed);
+		const touched = scans.map(scan => scan.session);
 		/** Sessions whose bash calls named a new `cwd`, or whose worktree is gone: the others keep theirs without asking git. */
-		const moved: SessionScan[] = [];
-		for (const { path, cwd, modifiedAt } of sessions) {
-			let session = this.#sessions.get(path);
-			// A subagent's writes do not touch the session file, but its result does once it finishes.
-			if (session?.modifiedAt === modifiedAt) continue;
-			const previousShip = session?.transcripts.get(path)?.scan.ship;
-			session ??= { modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path)]]), refs: [], repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null };
-			this.#sessions.set(path, session);
-			for (const file of await subagentFiles(path)) {
-				if (!session.transcripts.has(file)) session.transcripts.set(file, new TranscriptScan(file));
-			}
-			let complete = true;
-			for (const transcript of session.transcripts.values()) if (!(await transcript.read())) complete = false;
-			if (complete) session.modifiedAt = modifiedAt;
-			const own = session.transcripts.get(path)!.scan;
-			if (JSON.stringify(previousShip ?? null) !== JSON.stringify(own.ship ?? null)) changed = true;
-			// omp resolves a bash `cwd` from the home directory after `~`, else from the session's directory.
-			const workDirs = [...own.workDirs].reverse().map(dir => (dir === "~" || dir.startsWith("~/") ? HOME + dir.slice(1) : resolve(cwd, dir)));
-			const before = session.workDirs;
-			const same = workDirs.length === before.length && workDirs.every((dir, i) => dir === before[i]);
-			if (!same || (session.worktree !== null && !existsSync(session.worktree))) moved.push(session);
-			session.workDirs = workDirs;
-			if (this.#gather(session)) changed = true;
-			touched.push(session);
-		}
+		const moved = scans.filter(scan => scan.moved).map(scan => scan.session);
 		// One `git` call per directory, all at once, and only for sessions that name a PR by number alone.
 		await Promise.all(
 			touched
@@ -477,5 +465,28 @@ export class SessionFactsIndex {
 			changed = true;
 		});
 		return changed;
+	}
+
+	/** Read what session `path` and its subagents appended: whether its /ship stage or Linear issues changed, and whether its worktree needs asking again. */
+	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; moved: boolean }> {
+		let session = this.#sessions.get(path);
+		const previousShip = session?.transcripts.get(path)?.scan.ship;
+		session ??= { modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path)]]), refs: [], repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null };
+		this.#sessions.set(path, session);
+		for (const file of await subagentFiles(path)) {
+			if (!session.transcripts.has(file)) session.transcripts.set(file, new TranscriptScan(file));
+		}
+		const reads = await Promise.all([...session.transcripts.values()].map(transcript => transcript.read()));
+		if (!reads.includes(false)) session.modifiedAt = modifiedAt;
+		const own = session.transcripts.get(path)!.scan;
+		const shipChanged = JSON.stringify(previousShip ?? null) !== JSON.stringify(own.ship ?? null);
+		// omp resolves a bash `cwd` from the home directory after `~`, else from the session's directory.
+		const workDirs = [...own.workDirs].reverse().map(dir => (dir === "~" || dir.startsWith("~/") ? HOME + dir.slice(1) : resolve(cwd, dir)));
+		const before = session.workDirs;
+		const same = workDirs.length === before.length && workDirs.every((dir, i) => dir === before[i]);
+		const moved = !same || (session.worktree !== null && !existsSync(session.worktree));
+		session.workDirs = workDirs;
+		const ticketsChanged = this.#gather(session);
+		return { session, changed: shipChanged || ticketsChanged, moved };
 	}
 }

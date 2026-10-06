@@ -31,7 +31,7 @@ describe("Work", () => {
 			result("edit", { path: "/repo/src/a.ts", diff: "+2|c" }, { isError: true }),
 			result("write", { resolvedPath: `${HOME}/notes.md` }),
 		);
-		expect(work.snapshot().files).toEqual([
+		expect(work.files()).toEqual([
 			{ path: "src/a.ts", changes: [edited("+1|a", 1, 0, Date.parse("2026-10-04T10:00:00.000Z")), edited(" 1|x\n-2|a\n+2|b\n\n+9|c", 2, 1)] },
 			{ path: "README.md", changes: [{ tool: "write", kind: "created", at: null, lines: null }] },
 			{ path: "~/notes.md", changes: [{ tool: "write", kind: "created", at: null, lines: null }] },
@@ -52,7 +52,7 @@ describe("Work", () => {
 			writeCall("w4", "back"),
 			result("write", { resolvedPath: "/repo/new.ts" }, { id: "w4" }),
 		);
-		const [created, rewritten] = work.snapshot().files;
+		const [created, rewritten] = work.files();
 		expect(created.path).toBe("new.ts");
 		expect(created.changes).toEqual([
 			{ tool: "write", kind: "created", at: null, lines: 2 },
@@ -79,7 +79,7 @@ describe("Work", () => {
 			}),
 			result("write", { message: { op: "send", to: "Main" } }),
 		);
-		expect(work.snapshot().files).toEqual([
+		expect(work.files()).toEqual([
 			{ path: "x.ts", changes: [edited("+1|x", 1, 0)] },
 			{ path: "y.ts", changes: [edited(null, 0, 0)] },
 		]);

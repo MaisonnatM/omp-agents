@@ -5,7 +5,7 @@
 import { isObject, str } from "./json";
 import { displayPath } from "./paths";
 import { entryTime, toolCallsOf, toolResultOf } from "./session-entries";
-import { type FileChange, parseDiffLine, type SessionWork } from "./shared";
+import { type ChangedFile, type FileChange, parseDiffLine } from "./shared";
 
 /** omp's edit operations (`pi-tui/src/tools/edit.ts`); an edit without one updates the file. */
 const EDIT_KINDS: Record<string, "created" | "edited" | "deleted"> = { create: "created", update: "edited", delete: "deleted" };
@@ -44,45 +44,55 @@ export class Work {
 	#cwd: string | null = null;
 	/** Each file's changes, oldest first, by the path omp reported, in first-touch order. */
 	readonly #files = new Map<string, FileChange[]>();
+	/** Paths whose changes grew since the last {@link takeChanged}. */
+	readonly #changed = new Set<string>();
 	/** Paths a `read` result named, so a later write to one rewrites the file rather than creates it. */
 	readonly #read = new Set<string>();
 	/** Lines of each `write` call's content, by tool call id, until its result arrives. */
 	readonly #writing = new Map<string, number>();
 
-	/** One session-file entry. Returns whether the changed files changed. */
-	applyEntry(entry: unknown): boolean {
-		if (!isObject(entry)) return false;
+	/** One session-file entry. */
+	applyEntry(entry: unknown): void {
+		if (!isObject(entry)) return;
 		if (entry.type === "session") {
 			this.#cwd = str(entry.cwd) ?? null;
-			return false;
+			return;
 		}
-		if (entry.type !== "message" || !isObject(entry.message)) return false;
+		if (entry.type !== "message" || !isObject(entry.message)) return;
 		this.#noteWrites(entry.message);
 		const result = toolResultOf(entry.message);
-		if (!result) return false;
+		if (!result) return;
 		const written = this.#takeWrite(result.callId);
-		if (result.isError) return false;
+		if (result.isError) return;
 		const { details } = result;
 		switch (result.toolName) {
 			case "read": {
 				const path = str(details.resolvedPath);
 				if (path) this.#read.add(path);
-				return false;
+				return;
 			}
 			case "edit":
-				return this.#touch(editedFiles(details, entryTime(entry)));
+				this.#touch(editedFiles(details, entryTime(entry)));
+				return;
 			case "write": {
 				// Only a write to a file names one; a write to a device such as `xd://` or `agent://` does not.
 				const path = str(details.resolvedPath);
-				return path ? this.#touch([[path, this.#written(path, written, entryTime(entry))]]) : false;
+				if (path) this.#touch([[path, this.#written(path, written, entryTime(entry))]]);
+				return;
 			}
-			default:
-				return false;
 		}
 	}
 
-	snapshot(): SessionWork {
-		return { files: [...this.#files].map(([path, changes]) => ({ path: this.#display(path), changes })) };
+	/** Every changed file, in first-touch order. */
+	files(): ChangedFile[] {
+		return [...this.#files].map(([path, changes]) => this.#file(path, changes));
+	}
+
+	/** The files whose changes grew since the last call, in first-touch order. */
+	takeChanged(): ChangedFile[] {
+		const files = [...this.#files].filter(([path]) => this.#changed.has(path)).map(([path, changes]) => this.#file(path, changes));
+		this.#changed.clear();
+		return files;
 	}
 
 	/** Keeps the line count of each `write` call in an assistant message, which its result does not repeat. */
@@ -109,17 +119,17 @@ export class Work {
 		return { tool: "write", kind: created ? "created" : "rewritten", at, lines };
 	}
 
-	#touch(touches: [string, FileChange][]): boolean {
+	#touch(touches: [string, FileChange][]): void {
 		for (const [path, change] of touches) {
 			const changes = this.#files.get(path);
 			if (changes) changes.push(change);
 			else this.#files.set(path, [change]);
+			this.#changed.add(path);
 		}
-		return touches.length > 0;
 	}
 
-	#display(path: string): string {
+	#file(path: string, changes: FileChange[]): ChangedFile {
 		const cwd = this.#cwd;
-		return cwd && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : displayPath(path);
+		return { path: cwd && path.startsWith(`${cwd}/`) ? path.slice(cwd.length + 1) : displayPath(path), changes };
 	}
 }

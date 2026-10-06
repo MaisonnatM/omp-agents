@@ -6,23 +6,6 @@ export type ToolItem = Extract<Item, { kind: "tool" }>;
 /** Consecutive tool calls render as one activity group between messages. */
 export type Block = { kind: "item"; item: Exclude<Item, ToolItem> } | { kind: "tools"; id: string; tools: ToolItem[] };
 
-/** Apply an `items` message: replace on reset, else upsert by id and append new ids. */
-export function applyItems(prev: Item[], reset: boolean, items: Item[]): Item[] {
-	if (reset) return items;
-	const next = [...prev];
-	const index = new Map(next.map((item, i) => [item.id, i]));
-	for (const item of items) {
-		const at = index.get(item.id);
-		if (at === undefined) {
-			index.set(item.id, next.length);
-			next.push(item);
-		} else {
-			next[at] = item;
-		}
-	}
-	return next;
-}
-
 export function toBlocks(items: Item[]): Block[] {
 	const blocks: Block[] = [];
 	for (const item of items) {

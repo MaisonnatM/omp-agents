@@ -6,7 +6,7 @@ import { dirname } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { MediaTree } from "../media";
 import { FileTail } from "../tail";
-import { EMPTY_WORK, type ServerMsg, type View } from "../shared";
+import type { ServerMsg, View } from "../shared";
 
 export interface SocketData {
 	/** The views this socket shows, by {@link viewKey}. */
@@ -33,8 +33,8 @@ function snapshot(view: View, resources: { tail: FileTail; media: MediaTree } | 
 	if (!resources) {
 		return [
 			{ t: "items", view, reset: true, items: [] },
-			{ t: "work", view, work: EMPTY_WORK },
-			{ t: "media", view, media: [] },
+			{ t: "work", view, reset: true, files: [] },
+			{ t: "media", view, reset: true, media: [] },
 		];
 	}
 	const { tail, media } = resources;
@@ -42,10 +42,10 @@ function snapshot(view: View, resources: { tail: FileTail; media: MediaTree } | 
 		...(tail.loaded
 			? [
 					{ t: "items", view, reset: true, items: tail.transcript.items() } as const,
-					{ t: "work", view, work: tail.work } as const,
+					{ t: "work", view, reset: true, files: tail.files } as const,
 				]
 			: []),
-		...(media.loaded ? [{ t: "media", view, media: media.media } as const] : []),
+		...(media.loaded ? [{ t: "media", view, reset: true, media: media.media } as const] : []),
 	];
 }
 
@@ -103,16 +103,16 @@ export class Views {
 				(reset, items) => {
 					if (this.#resources.get(key)?.tail === next) this.#publish(viewTopic(key), { t: "items", view, reset, items });
 				},
-				work => {
-					if (this.#resources.get(key)?.tail === next) this.#publish(viewTopic(key), { t: "work", view, work });
+				(reset, files) => {
+					if (this.#resources.get(key)?.tail === next) this.#publish(viewTopic(key), { t: "work", view, reset, files });
 				},
 			);
-			const media = new MediaTree(path, view.kind === "live" ? view.agentId : null, list => {
-				if (this.#resources.get(key)?.media === media) this.#publish(viewTopic(key), { t: "media", view, media: list });
+			const media = new MediaTree(path, view.kind === "live" ? view.agentId : null, (reset, list) => {
+				if (this.#resources.get(key)?.media === media) this.#publish(viewTopic(key), { t: "media", view, reset, media: list });
 			});
 			this.#resources.set(key, { tail: next, media });
 			next.poke();
-			media.poke();
+			media.poke(path);
 		}
 	}
 
@@ -125,7 +125,7 @@ export class Views {
 		const dir = dirname(changedPath);
 		for (const { tail, media } of this.#resources.values()) {
 			if (dirname(tail.path) === dir) tail.poke();
-			if (media.covers(changedPath)) media.poke();
+			if (media.covers(changedPath)) media.poke(changedPath);
 		}
 	}
 

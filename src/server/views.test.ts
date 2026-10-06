@@ -293,7 +293,7 @@ describe("Views", () => {
 			unsubscribe: () => {},
 		} as unknown as Socket;
 		views.watch(joiner, [main("a")]);
-		expect(late.find(msg => msg.t === "media")).toEqual({ t: "media", view: main("a"), media: [{ src: srcOf("a".repeat(64)), agentId: "Smoke", tool: "eval", summary: "", at: 1 }] });
+		expect(late.find(msg => msg.t === "media")).toEqual({ t: "media", view: main("a"), reset: true, media: [{ src: srcOf("a".repeat(64)), agentId: "Smoke", tool: "eval", summary: "", at: 1 }] });
 
 		path = null;
 		views.sync();

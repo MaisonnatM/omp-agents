@@ -2,7 +2,7 @@ import { afterEach, describe, expect, jest, test } from "bun:test";
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Item, SessionWork } from "./shared";
+import type { ChangedFile, FileChange, Item } from "./shared";
 import { FileTail } from "./tail";
 
 const dirs: string[] = [];
@@ -20,7 +20,7 @@ function setup() {
 	dirs.push(dir);
 	const path = join(dir, "session.jsonl");
 	const emits: { reset: boolean; items: Item[] }[] = [];
-	const works: SessionWork[] = [];
+	const works: { reset: boolean; files: ChangedFile[] }[] = [];
 	let settle: () => void = () => {};
 	const tail = new FileTail(
 		path,
@@ -28,7 +28,7 @@ function setup() {
 			emits.push({ reset, items });
 			settle();
 		},
-		work => works.push(work),
+		(reset, files) => works.push({ reset, files }),
 	);
 	const read = (): Promise<void> => {
 		const { promise, resolve } = Promise.withResolvers<void>();
@@ -74,20 +74,25 @@ describe("FileTail", () => {
 		expect(emits.at(-1)).toEqual({ reset: true, items: [{ id: "m5", kind: "user", text: "new", skill: null, from: null, entryId: "e5" }] });
 	});
 
-	test("the changed files publish with the first read, then only after a read that changes them", async () => {
+	test("the changed files publish whole with the first read, then only the files a later read changed", async () => {
 		const { path, emits, works, read } = setup();
-		const edit = `${JSON.stringify({ type: "message", id: "t1", message: { role: "toolResult", toolCallId: "c1", toolName: "edit", details: { path: "/repo/a.ts", diff: "+1|a" } } })}\n`;
+		const edit = (id: string, file: string) =>
+			`${JSON.stringify({ type: "message", id, message: { role: "toolResult", toolCallId: id, toolName: "edit", details: { path: file, diff: "+1|a" } } })}\n`;
+		const change: FileChange = { tool: "edit", kind: "edited", at: null, added: 1, removed: 0, diff: "+1|a" };
 		writeFileSync(path, user(1, "change it"));
 		await read();
 		appendFileSync(path, `{not json\n${user(2, "go on")}`);
 		await read();
-		appendFileSync(path, edit);
+		appendFileSync(path, edit("c1", "/repo/a.ts"));
+		await read();
+		appendFileSync(path, edit("c2", "/repo/b.ts"));
 		await read();
 
-		expect(emits.at(-2)).toEqual({ reset: false, items: [{ id: "m2", kind: "user", text: "go on", skill: null, from: null, entryId: "e2" }] });
+		expect(emits.at(-3)).toEqual({ reset: false, items: [{ id: "m2", kind: "user", text: "go on", skill: null, from: null, entryId: "e2" }] });
 		expect(works).toEqual([
-			{ files: [] },
-			{ files: [{ path: "/repo/a.ts", changes: [{ tool: "edit", kind: "edited", at: null, added: 1, removed: 0, diff: "+1|a" }] }] },
+			{ reset: true, files: [] },
+			{ reset: false, files: [{ path: "/repo/a.ts", changes: [change] }] },
+			{ reset: false, files: [{ path: "/repo/b.ts", changes: [change] }] },
 		]);
 	});
 

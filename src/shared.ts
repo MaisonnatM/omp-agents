@@ -574,12 +574,8 @@ export function fileStatus(changes: ChangedFile["changes"]): FileStatus {
 	return changes[0].kind === "created" ? "created" : "edited";
 }
 
-/** What one transcript changed: the files it touched, in first-touch order. */
-export interface SessionWork {
-	files: ChangedFile[];
-}
-
-export const EMPTY_WORK: SessionWork = { files: [] };
+/** The past list's order: newest first, ties by session id. */
+export const newestPastFirst = (a: PastSession, b: PastSession): number => b.modifiedAt - a.modifiedAt || b.sessionId.localeCompare(a.sessionId);
 
 /** One image an agent's tool returned, such as a browser screenshot or a `read` of an image file. */
 export interface AgentMedia {
@@ -593,6 +589,9 @@ export interface AgentMedia {
 	/** When the tool returned it, in ms since the epoch. */
 	at: number;
 }
+
+/** The media list's order: newest first. */
+export const newestMediaFirst = (a: AgentMedia, b: AgentMedia): number => b.at - a.at;
 
 /** One row of a select request. */
 export interface RequestOption {
@@ -942,14 +941,14 @@ export interface AnalyticsSession {
 
 export type ServerMsg =
 	| { t: "roster"; hosts: RosterHost[]; error: string | null }
-	/** Newest first. */
-	| { t: "past"; sessions: PastSession[] }
+	/** `reset` replaces the list with `sessions`; otherwise `sessions` replace or join by `sessionId` and `removed` leave. The page orders them with {@link newestPastFirst}. */
+	| { t: "past"; reset: boolean; sessions: PastSession[]; removed: string[] }
 	/** `reset` replaces the view's transcript; otherwise `items` are upserts by id, new ids appended. */
 	| { t: "items"; view: View; reset: boolean; items: Item[] }
-	/** The view's changed files, whole, sent with its transcript and again whenever they change. */
-	| { t: "work"; view: View; work: SessionWork }
-	/** The images the view's agent and its subagents' tools returned, newest first, whole, sent once the view's files are read and again whenever one adds an image. */
-	| { t: "media"; view: View; media: AgentMedia[] }
+	/** The files the view's agent changed, in first-touch order: `reset` replaces them; otherwise `files` replace or join by `path`, new paths appended. */
+	| { t: "work"; view: View; reset: boolean; files: ChangedFile[] }
+	/** The images the view's agent and its subagents' tools returned: `reset` replaces them; otherwise `media` joins them. The page orders them with {@link newestMediaFirst}. */
+	| { t: "media"; view: View; reset: boolean; media: AgentMedia[] }
 	/** Answers this socket's `start` with `reqId` once the session is ready, or once starting it failed. */
 	| { t: "started"; reqId: number; result: StartResult }
 	/** Answers this socket's `resume-all` with `reqId` once every session is ready or failed to start. */
