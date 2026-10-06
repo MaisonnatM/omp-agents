@@ -549,6 +549,11 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A category's **⋯** menu renames it or deletes it; deleting a category keeps its todos, in no category.
 - **Add a todo** at the bottom of a list starts a new todo in that list's category; type its title and press Enter.
   Enter then starts the next todo below it, and Enter on an empty one, Esc, or a click elsewhere stops.
+- A new todo's title can end with a due day: `today`, `tomorrow`, a weekday such as `fri` or `friday`, or a `YYYY-MM-DD` date.
+  A new top-level todo's title can also end with `#` and the name of an existing category in any case, before or after the day.
+  They set the todo's due day and category and leave its title, and a word that names neither stays in the title.
+  A weekday names its next date, today included.
+- Cmd+Enter or Ctrl+Enter on a new or edited top-level todo saves it and opens its **Start session** draft.
 - A todo can hold todos of its own, one level down and no deeper, and they share its category.
   Tab while typing a todo moves it under the todo above it in its category, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
   Tab does nothing on a todo that holds todos of its own, since they would end up three deep, nor on one with links, which a todo under another cannot hold.

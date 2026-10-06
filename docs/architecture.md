@@ -554,6 +554,7 @@ The page lives in `web/`.
 - `web/components/user-todos.tsx`: the Todo page and its lists; `todo-archive.tsx` is the **Done** page.
   `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows, `todo-search.tsx` is the search field, and `todo-undo.tsx` the **Undo** toast.
   `web/todo-work-state.ts` derives the pill and the **Needs you** filter from the latest linked session's live status, outstanding question, submitted pull request, or recorded `/ship` merge; it keeps unknown and ended sessions distinct from new ideas.
+  `web/todo-quick-add.ts` reads a trailing due day and `#category` off a new todo's title.
   `todo-detail.tsx` expands under the open row with its due day, live agent question, links, **Start session**, and **Create Linear ticket**, whose notes `web/components/markdown-editor.tsx` always renders through `message-markdown.tsx` while you edit them; `todo-links.tsx` draws a todo's link chips, and `add-to-todo.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
 - `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.

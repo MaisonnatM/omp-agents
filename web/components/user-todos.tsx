@@ -5,7 +5,8 @@ import { applyUserTodo } from "../../src/user-todos";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { hashForTodo, type TodoListView } from "../routing";
+import { hashForNewSession, hashForTodo, type TodoListView } from "../routing";
+import { parseQuickTodo } from "../todo-quick-add";
 import { DAY_FORMAT, LIST_KINDS, lastToDo, leftIn, matches, restoreOf, type TodoEntry, titleOf, todosOf, today } from "../todo-views";
 import { workStateOf } from "../todo-work-state";
 import { useTodoDrag } from "../use-todo-drag";
@@ -20,17 +21,26 @@ import { useUndo } from "./todo-undo";
 type Editing =
 	| { kind: "none" }
 	| { kind: "edit"; id: string }
-	| { kind: "draft"; parentId: string | null; afterId: string | null; categoryId: string | null; text: string };
+	| {
+			kind: "draft";
+			parentId: string | null;
+			afterId: string | null;
+			categoryId: string | null;
+			text: string;
+			/** The todo this draft last added. A todo its title moved elsewhere leaves the draft in place, and this still gives it a fresh input. */
+			addedId?: string;
+	  };
 
 type Draft = Extract<Editing, { kind: "draft" }>;
 
 const NOT_EDITING: Editing = { kind: "none" };
 
 /** The keys a todo's input acts on, beyond typing. */
-type TodoKey = "enter" | "escape" | "indent" | "outdent" | "erase";
+type TodoKey = "enter" | "start" | "escape" | "indent" | "outdent" | "erase";
 
 function todoKey(event: KeyboardEvent<HTMLInputElement>): TodoKey | null {
-	if (event.nativeEvent.isComposing || event.metaKey || event.ctrlKey || event.altKey) return null;
+	if (event.nativeEvent.isComposing || event.altKey) return null;
+	if (event.metaKey || event.ctrlKey) return event.key === "Enter" ? "start" : null;
 	switch (event.key) {
 		case "Enter":
 			return "enter";
@@ -190,12 +200,21 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 		if (!trimmed) remove(todo.id, todo.text);
 		else if (trimmed !== todo.text) onChange({ op: "edit", id: todo.id, text: trimmed });
 	};
-	const add = ({ parentId, afterId, categoryId }: Draft, text: string): string | null => {
-		const trimmed = text.trim();
-		if (!trimmed) return null;
+	/**
+	 * Adds `text` as a todo; a trailing due day or `#category` sets that field instead of staying in the title. Returns
+	 * where the next draft goes: after the new todo, or in its place when the parsed fields move the todo out of this list.
+	 */
+	const add = (draft: Draft, text: string): { id: string; afterId: string | null } | null => {
+		if (list === null) return null;
+		const { parentId } = draft;
+		const parsed = parseQuickTodo(text, parentId === null ? list.categories : [], day);
+		if (!parsed) return null;
 		const id = crypto.randomUUID();
-		onChange({ op: "add", id, parentId, afterId, categoryId, text: trimmed, due: parentId === null && kind.dueToday ? day : null });
-		return id;
+		const categoryId = parsed.categoryId ?? draft.categoryId;
+		const due = parsed.due ?? (parentId === null && kind.dueToday ? day : null);
+		onChange({ op: "add", id, parentId, afterId: draft.afterId, categoryId, text: parsed.text, due });
+		const leaves = categoryId !== draft.categoryId || (kind.dueToday && parentId === null && due !== null && due > day);
+		return { id, afterId: leaves ? draft.afterId : id };
 	};
 
 	/** Where a todo added right below `todo` among `siblings` goes: after it, or after the last one to do when it is done. */
@@ -206,6 +225,11 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 			case "enter":
 				commit(todo, text);
 				setEditing(text.trim() && kind.canAdd ? { kind: "draft", parentId, afterId: below(todo, siblings), categoryId, text: "" } : NOT_EDITING);
+				return true;
+			case "start":
+				if (parentId !== null || !text.trim()) return false;
+				commit(todo, text);
+				location.hash = hashForNewSession(newSessionCwd, todo.id);
 				return true;
 			case "escape":
 				setEditing(NOT_EDITING);
@@ -229,8 +253,16 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 	const draftKey = (draft: Draft, section: Section, key: TodoKey, text: string): boolean => {
 		switch (key) {
 			case "enter": {
-				const id = add(draft, text);
-				setEditing(id ? { ...draft, afterId: id, text: "" } : NOT_EDITING);
+				const added = add(draft, text);
+				setEditing(added ? { ...draft, afterId: added.afterId, addedId: added.id, text: "" } : NOT_EDITING);
+				return true;
+			}
+			case "start": {
+				if (draft.parentId !== null) return false;
+				const added = add(draft, text);
+				if (!added) return false;
+				setEditing(NOT_EDITING);
+				location.hash = hashForNewSession(newSessionCwd, added.id);
 				return true;
 			}
 			case "escape":
@@ -257,8 +289,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 		if (disabled || editing.kind !== "draft" || editing.parentId !== parentId || editing.afterId !== afterId || editing.categoryId !== section.categoryId) return null;
 		const draft = editing;
 		return (
-			// A new key per place, so the input starts with the draft's text wherever it moves.
-			<li key={`draft:${parentId}:${afterId}`} className={cn("flex items-start gap-2 rounded-md px-2 py-1 text-sm leading-snug", parentId !== null && "ml-6")}>
+			// A new key per place and per added todo, so the input starts with the draft's text wherever it moves.
+			<li key={`draft:${parentId}:${afterId}:${draft.addedId}`} className={cn("flex items-start gap-2 rounded-md px-2 py-1 text-sm leading-snug", parentId !== null && "ml-6")}>
 				<Circle aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground/60" />
 				<TodoInput
 					initial={draft.text}
