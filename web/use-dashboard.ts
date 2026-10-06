@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { ClientMsg, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import type { UserTodoChange } from "../src/user-todos-shared";
@@ -57,8 +57,13 @@ export function useDashboard(): Dashboard {
 	const startsRef = useRef(state.starts);
 	startsRef.current = state.starts;
 	const page = state.cover?.kind === "page" ? state.cover.page : null;
-	// A page covering the panes shows none of them, so the server stops streaming them until the panes return.
-	const watched = page ? NO_VIEWS : state.layout.panes;
+	// A page covering the panes shows none of them, so the server stops streaming them until the panes return. The
+	// Changes page of a live session watches that session, whose `work` tells the page when its calls changed a file.
+	const changesOf = page?.kind === "changes" ? (state.hosts.find(host => host.sessionId === page.sessionId)?.instanceId ?? null) : null;
+	const watched = useMemo<View[]>(
+		() => (changesOf !== null ? [{ kind: "live", instanceId: changesOf, agentId: null }] : page ? NO_VIEWS : state.layout.panes),
+		[changesOf, page, state.layout.panes],
+	);
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
 
@@ -167,7 +172,7 @@ export function useDashboard(): Dashboard {
 	}, [sessionLink, state.listed, state.hosts, replace]);
 
 	// Declared before the watch, so a view's data is kept when its transcript arrives.
-	useEffect(() => retainPanes(state.layout.panes), [state.layout.panes]);
+	useEffect(() => retainPanes([...state.layout.panes, ...watched]), [watched, state.layout.panes]);
 
 	useEffect(() => {
 		send({ t: "watch", views: watched });

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { buildAnalytics, type SessionFacts as AnalyticsSessionFacts } from "../analytics";
 import { errorText } from "../json";
 import { listSkills } from "../commands";
+import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import { gitCheckout } from "../git";
 import type { GoogleCalendar } from "../google-calendar";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
@@ -46,6 +47,8 @@ export interface RouteEnv {
 	/** The inbox listed `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
 	google: GoogleCalendar;
+	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
+	placeOf(sessionId: string): SessionPlace | null;
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -247,6 +250,28 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return read.ok ? Response.json(read.file) : fail(read.status, read.error);
 	});
 
+	/** The place of the session `?session=` names, or the response refusing it. */
+	function sessionPlace(params: URLSearchParams): SessionPlace | Response {
+		const sessionId = params.get("session") ?? "";
+		return env.placeOf(sessionId) ?? fail(404, `No session ${sessionId}`);
+	}
+
+	/** `GET /api/changes?session=<id>`: the files the session's checkout changed against its branch base, and the files its own calls changed. */
+	const changes = get(params => {
+		const place = sessionPlace(params);
+		return place instanceof Response ? place : answer(() => listChanges(place));
+	});
+
+	/** `GET /api/changes/file?session=<id>&path=<path>`: one file of that list in full, with its diff; only a path the list holds. */
+	const changedFile = get(async params => {
+		const place = sessionPlace(params);
+		if (place instanceof Response) return place;
+		const path = params.get("path") ?? "";
+		const file = await readChangedFile(place, path).catch((err: unknown) => fail(500, errorText(err)));
+		if (file instanceof Response) return file;
+		return file ? Response.json(file) : fail(404, `The session changed no file ${path}`);
+	});
+
 	/**
 	 * A settings write: `PUT /api/settings/routing` or `/api/settings/file`, `?cwd=` as for reading.
 	 * Only this app's own page may write, with a JSON body; the answer is the settings as they load after the write,
@@ -343,5 +368,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/git": { GET: git },
 		"/api/image": { GET: image },
 		"/api/file": { GET: textFile },
+		"/api/changes": { GET: changes },
+		"/api/changes/file": { GET: changedFile },
 	};
 }

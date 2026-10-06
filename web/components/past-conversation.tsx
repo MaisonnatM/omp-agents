@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { pastLabel } from "../labels";
 import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
+import { ChangesLink } from "./changes/changes-link";
 import { Header } from "./page-header";
 import { Project, PullRequests, Tickets } from "./session-meta";
 import { ShipStep } from "./ship-step";
@@ -45,6 +46,7 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 		<MessageScrollerProvider autoScroll>
 			<div className="flex h-full min-h-0 flex-1 flex-col">
 				<Header title={session ? pastLabel(session) : "Past session"} meta={meta} status="Read-only" alert={false}>
+					{session && <ChangesLink sessionId={sessionId} />}
 					{session && (
 						<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 							<Button

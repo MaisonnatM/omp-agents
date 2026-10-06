@@ -2,6 +2,7 @@
  * Folds a transcript file's entries into the files its agent's `edit` and `write` calls changed. Only the file feeds
  * it; omp writes each tool result as soon as it exists.
  */
+import { resolve } from "node:path";
 import { isObject, str } from "./json";
 import { displayPath } from "./paths";
 import { entryTime, toolCallsOf, toolResultOf } from "./session-entries";
@@ -86,6 +87,11 @@ export class Work {
 	/** Every changed file, in first-touch order. */
 	files(): ChangedFile[] {
 		return [...this.#files].map(([path, changes]) => this.#file(path, changes));
+	}
+
+	/** Every changed file's absolute path, a relative one resolved against the transcript's cwd, in first-touch order. */
+	paths(): string[] {
+		return [...this.#files.keys()].map(path => resolve(this.#cwd ?? "/", path));
 	}
 
 	/** The files whose changes grew since the last call, in first-touch order. */
