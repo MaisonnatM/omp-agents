@@ -586,7 +586,7 @@ The page lives in `web/`.
   `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeTextarea` and `afterActions` slots.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
 - `web/components/dashboard-context.tsx`: the stable dashboard actions (`send`, `open`, `start`, `end`, …) and the last start of each kind, provided once by `App`, which the sidebar, the panes, and the pages read instead of taking them as props.
-- `web/components/session-details.tsx`: the right sidebar's tabs for the focused pane: `outline-tab.tsx`, its prompts and turn-ending replies from `outline` in `web/transcript-view.ts`, which scroll the focused pane's transcript to their message; its changed files; and `media-tab.tsx`, its images and their viewer.
+- `web/components/session-details.tsx`: the right sidebar's tabs for the focused pane: `outline-tab.tsx`, its turns from `outline` in `web/transcript-view.ts`, which scroll the focused pane's transcript to their prompt or reply and mark the turn its scroll is on; its changed files; and `media-tab.tsx`, its images and their viewer.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
   `web/components/settings/google-connection.tsx` saves the Google OAuth client, and it and `linear-connection.tsx` start their sign-ins with `web/use-sign-in.ts`.
   `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue.
