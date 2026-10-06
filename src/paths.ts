@@ -20,6 +20,8 @@ export const userTodosFile = join(configDir, "todos.json");
  * The server applies and deletes them, so it stays the only writer of {@link userTodosFile}.
  */
 export const userTodoInboxDir = join(configDir, "todo-inbox");
+/** Where omp's `end_session` tool asks the server to end a session, one `<session id>.json` each, beside {@link tokenFile}. */
+export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
 export const routinesFile = join(configDir, "routines.json");
 

@@ -382,4 +382,24 @@ export class Worktrees {
 			return results;
 		});
 	}
+
+	/**
+	 * Removes the linked worktree that `cwd` is in, with the checks **Delete** makes, once no live session uses it.
+	 * A session that was just ended takes a moment to leave, so an `occupied` checkout is tried again until `waitMs` passes.
+	 */
+	async removeCheckout(cwd: string, waitMs = 15000): Promise<WorktreeRemovalResult> {
+		const target = { repository: await commonDir(cwd), path: await canonical((await git(cwd, "rev-parse", "--show-toplevel")).trim()) };
+		const until = Date.now() + waitMs;
+		for (;;) {
+			const plan = await this.preview(target);
+			if (plan.blockers.some(blocker => blocker.code === "occupied") && Date.now() < until) {
+				await Bun.sleep(500);
+				continue;
+			}
+			if (plan.blockers.length) return { ...target, removed: false, blockers: plan.blockers, error: null };
+			const [result] = await this.remove([{ ...target, confirmation: plan.confirmation }]);
+			if (!result) throw new Error("Git worktree removal returned no result.");
+			return result;
+		}
+	}
 }

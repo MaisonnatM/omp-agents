@@ -438,7 +438,7 @@ The server lives in `src/`:
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
 - `src/git.ts`: the git checkout of a directory, and the worktree a new session's branch runs in.
-- `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed.
+- `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `removeCheckout` removes the checkout a directory is in, waiting up to 15 seconds for a session that just ended to leave it.
 - `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows.
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
@@ -456,6 +456,11 @@ The server lives in `src/`:
 - `src/server/todo-inbox.ts`: applies the changes that omp's `user_todo` tool (`templates/omp/agent/extensions/todos.ts`) leaves in `todo-inbox/` beside `todos.json`, one JSON file each, written under a `.tmp` name then renamed.
   It takes `add`, and `toggle` that checks, deletes each file it applies, and moves any other to `<name>.invalid` with a logged reason, so the server stays the only writer of `todos.json` and an agent cannot undo what you did.
   The extension's `before_agent_start` handler reads `todos.json` at each prompt and, when an open top-level todo links to its session, adds that todo's title and id to the system prompt, so the agent checks it off once it finishes the work.
+- `src/server/end-inbox.ts`: ends the sessions that omp's `end_session` tool (`templates/omp/agent/extensions/end-session.ts`) asks to end, one `<session id>.json` each in `end-inbox/` beside `todos.json`.
+  The tool writes its request at `agent_end`, after the turn that called it, and deletes it at the next `agent_start` or `session_shutdown`, so a request names a session that idles.
+  The inbox drains when the directory changes and after each registry poll, finds the live session through `LiveSessions.bySessionId`, deletes the request, and calls `end()`, the path **End session** takes, so the session is not marked interrupted.
+  A request whose session the server does not follow yet stays for a later drain, and a file that is not a request, or whose name is not its session id, moves to `<name>.invalid`.
+  With `removeWorktree`, it then calls `Worktrees.removeCheckout` on the session's cwd, and a checkout that stays adds a todo naming the blockers.
 - `src/tickets.ts` also lists the workspace's Linear teams (`loadTeams`, `GET /api/linear/teams`) and opens an issue from a todo (`createTicket`, `PUT /api/ticket/new`), assigned to the viewer.
 - `src/routines.ts`: the rules of routines: `nextRunAt`, `nextDueAt`, `isDue`, `applyRoutine`, which applies an edit, and a command's length, time, and output limits; see [Routines](#routines).
   `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.

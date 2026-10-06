@@ -4,13 +4,14 @@ import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
-import { directoryOf, displayPath, interruptedFile, routinesFile, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
+import { directoryOf, displayPath, interruptedFile, routinesFile, sessionEndInboxDir, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
 import { runShell } from "./proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "./routines";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
 import { loadToken } from "./server/auth";
 import { Broadcasts } from "./server/broadcasts";
 import { fail, guardsFor } from "./server/http";
+import { EndInbox } from "./server/end-inbox";
 import { InterruptedSessions } from "./server/interrupted";
 import { LiveSessions, type SessionUpdate } from "./server/live-sessions";
 import { Loops } from "./server/loops";
@@ -99,6 +100,16 @@ const worktrees = new Worktrees({
 	},
 });
 const startSession = (request: StartRequest): Promise<StartResult> => worktrees.lifecycle(() => starter(request));
+const endInbox = new EndInbox(sessionEndInboxDir, {
+	session: sessionId => sessions.bySessionId(sessionId) ?? null,
+	async removeWorktree(cwd) {
+		const result = await worktrees.removeCheckout(cwd);
+		return result.removed ? null : (result.error ?? result.blockers.map(blocker => blocker.message).join(" "));
+	},
+	report(sessionId, text, body) {
+		applyTodo({ op: "add", id: crypto.randomUUID(), parentId: null, afterId: null, categoryId: null, text, body, addedBy: sessionId });
+	},
+});
 const runner = new RoutineRunner({
 	file: routines,
 	start: startSession,
@@ -195,6 +206,8 @@ async function listRegistry(): Promise<void> {
 	}
 	registryFresh = true;
 	sessions.follow(hosts);
+	// A terminal session that asked to end before the registry listed it.
+	void endInbox.drain();
 	broadcasts.pushAll();
 }
 
@@ -254,6 +267,7 @@ try {
 
 loops.watch();
 inbox.watch();
+endInbox.watch();
 await rescanFiles();
 await listRegistry();
 loops.start();

@@ -14,10 +14,8 @@ Before creating a branch, opening a PR, adopting an existing PR, or auditing Gra
 After merging or committing into local `main`, immediately run `git push origin main` and confirm `git status -sb` has no ahead count.
 Force-pushes and rewriting `main` still require explicit approval.
 
-At the start of a session in a Git repository, run `git worktree list`.
-If there are more than five entries beyond the main checkout, run poteto-mode's **worktree-cleanup** playbook (`scripts/worktree-audit.sh`) and report its findings before other work.
-Interrupted or failed isolated tasks can leave workspaces behind even when successful tasks apply by patch.
-Delete worktrees only through the playbook's safety gate, never by age alone; preserve `wip`, open PRs, pinned chats, and in-use worktrees.
+Remove your own worktree through `end_session` with `removeWorktree: true`, once its work is merged or pushed; the dashboard's **Settings → Worktrees** tab removes others, and both keep dirty, locked, and in-use checkouts.
+To learn where uncommitted or unmerged changes came from, read the omp session files in `~/.omp/agent/sessions/`, one directory per working directory, before guessing from git history.
 
 ## Conditional references
 

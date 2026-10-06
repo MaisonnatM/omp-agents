@@ -50,6 +50,8 @@ Files, in `agent/`:
   A five-minute cache write costs 1.25 times the input price and an hour-long one twice that, and a conversation tail is read again within seconds, so this cuts the write bill without losing the warm head after a pause.
   It also stops cache warming while the session is idle.
   Set `OMP_CACHE_TAIL_TTL=1h` to turn it off.
+- `extensions/end-session.ts`: the `end_session` tool, with which an agent ends its own session once its turn is over and, with `removeWorktree`, has the omp-agents dashboard remove its worktree, so a prompt such as "Merge on main, delete the worktree, then end the session" runs to the end.
+- `extensions/worktree-guard.ts`: holds back a session's first `edit` or `write` in a repository's main checkout and tells the agent to work in a linked worktree; trying the same call again goes through, for when you asked it to work in place.
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.
 
 ## Requirements

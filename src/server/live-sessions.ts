@@ -29,6 +29,12 @@ export class LiveSessions {
 		return this.#sessions.get(instanceId);
 	}
 
+	/** The live session that continues session file `sessionId`. */
+	bySessionId(sessionId: string): LiveSession | undefined {
+		for (const session of this.#sessions.values()) if (session.sessionId === sessionId) return session;
+		return undefined;
+	}
+
 	/** Session `instanceId` when this dashboard started it: only those switch models and thinking levels. */
 	started(instanceId: string): DashboardSession | undefined {
 		const session = this.#sessions.get(instanceId);
