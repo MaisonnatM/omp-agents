@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, worktrees,
- * Linear's connection, Linear tickets and their files, and prompt images through.
+ * Linear's connection, Linear tickets and their files, prompt images, and the text files agent text names through.
  */
 import { join } from "node:path";
 import { errorText } from "../json";
@@ -16,6 +16,7 @@ import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings
 import { createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, type PullRequest, type Repo, samePullRequest, TICKET_ID } from "../shared";
+import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
 import { parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval } from "./wire";
@@ -184,6 +185,12 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return new Response(file, { headers: { "Content-Type": type, "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" } });
 	});
 
+	/** `GET /api/file?path=<path>`: a text file that agent text names, by an absolute or `~/` path, for the page's file dialog. */
+	const textFile = get(async params => {
+		const read = await readTextFile(params.get("path") ?? "");
+		return read.ok ? Response.json(read.file) : fail(read.status, read.error);
+	});
+
 	/**
 	 * A settings write: `PUT /api/settings/routing` or `/api/settings/file`, `?cwd=` as for reading.
 	 * Only this app's own page may write, with a JSON body; the answer is the settings as they load after the write,
@@ -273,5 +280,6 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/worktrees/removal": { PUT: worktreeRemoval },
 		"/api/git": { GET: git },
 		"/api/image": { GET: image },
+		"/api/file": { GET: textFile },
 	};
 }

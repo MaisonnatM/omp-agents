@@ -410,8 +410,9 @@
 .message-markdown li { margin-block: .25em; }
 .message-markdown li > p { display: inline; }
 .message-markdown blockquote { border-left: 3px solid var(--border); padding-left: .85em; color: var(--muted-foreground); }
-.message-markdown a { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
-.message-markdown a:hover { color: var(--muted-foreground); }
+.message-markdown a, .message-markdown .file-link { color: var(--foreground); text-decoration: underline; text-underline-offset: 3px; }
+.message-markdown a:hover, .message-markdown .file-link:hover { color: var(--muted-foreground); }
+.message-markdown .file-link { cursor: pointer; text-align: inherit; text-decoration-style: dotted; }
 .message-markdown code { border-radius: .25rem; background: var(--muted); padding: .1em .25em; font-size: .9em; }
 .message-markdown pre { overflow-x: auto; border: 1px solid var(--border); border-radius: .65rem; background: var(--muted); padding: .85em 1em; }
 .message-markdown pre code { background: none; padding: 0; font-size: .9em; }

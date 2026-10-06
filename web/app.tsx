@@ -2,6 +2,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { QUICK_TODO_EVENT, type UserTodoList } from "../src/shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { DashboardContext } from "./components/dashboard-context";
+import { FileDialog } from "./components/file-dialog";
 import { InboxPage } from "./components/inbox/inbox-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
@@ -114,8 +115,9 @@ export function App() {
 		send({ t: "end", instanceId });
 		show(endSession(latest.current.layout, instanceId, latest.current.listedHosts));
 	}, [send, show]);
+	const [filePath, setFilePath] = useState<string | null>(null);
 	const dashboard = useMemo(
-		() => ({ send, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, connected: state.connected, starts: { fork, resume, quick, resumeAll } }),
+		() => ({ send, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, connected: state.connected, starts: { fork, resume, quick, resumeAll } }),
 		[send, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, state.connected, fork, resume, quick, resumeAll],
 	);
 	const onPaneLayout = useCallback((index: number, kind: "max" | "close") => {
@@ -394,6 +396,7 @@ export function App() {
 					</DashboardSidebar>
 				)}
 				<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+				{filePath !== null && <FileDialog key={filePath} path={filePath} onClose={() => setFilePath(null)} />}
 				<SessionSwitcher
 					open={switcherOpen}
 					onOpenChange={setSwitcherOpen}

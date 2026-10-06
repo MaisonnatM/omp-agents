@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { DashboardContext, type DashboardContextValue } from "./dashboard-context";
+import { FileBaseContext } from "./file-link";
 import { MessageMarkdown } from "./message-markdown";
 
 test("messages render GFM and refuse executable markup", () => {
@@ -54,4 +56,30 @@ test("GitHub text shows only GitHub-hosted images and links other image URLs", (
 	expect(html).toContain('<img src="https://github.com/user-attachments/assets/123"');
 	expect(html).not.toContain('<img src="https://attacker.example');
 	expect(html).toContain('<a href="https://attacker.example/leak"');
+});
+
+const fileLinks = (text: string, base: string | null): { html: string; count: number } => {
+	const html = renderToStaticMarkup(
+		<DashboardContext.Provider value={{ openFile: () => {} } as unknown as DashboardContextValue}>
+			<FileBaseContext.Provider value={base}>
+				<MessageMarkdown text={text} />
+			</FileBaseContext.Provider>
+		</DashboardContext.Provider>,
+	);
+	return { html, count: html.match(/class="file-link"/g)?.length ?? 0 };
+};
+
+test("agent text opens text file paths in the file dialog, not web addresses or other files", () => {
+	const { html, count } = fileLinks(
+		"Wrote /tmp/omp-token-decision.tsv and `docs/usage.md:12`, see [plan](file:///tmp/plan.md), https://example.com/readme.md, `src/app.ts`, and /tmp/shot.png.",
+		"/repo",
+	);
+	expect(count).toBe(3);
+	expect(html).toContain('<a href="https://example.com/readme.md"');
+	expect(html).toContain("<code>src/app.ts</code>");
+});
+
+test("a relative file path opens only where a session directory resolves it, and code blocks stay code", () => {
+	expect(fileLinks("`docs/usage.md` and ~/notes.md", null).count).toBe(1);
+	expect(fileLinks("```\n/tmp/notes.md\n```", "/repo").count).toBe(0);
 });

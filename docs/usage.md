@@ -181,6 +181,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Scrolling up pauses that follow; the down-arrow button jumps back to the latest message.
 - User and assistant messages render GitHub-flavored Markdown, including tables, task lists, fenced code, and links.
   An image in agent text shows as a link to its address, so opening a transcript never fetches anything from the web; only inline `data:` images show in place.
+- A path to a text file in agent text opens the file in a dialog: `.md`, `.markdown`, `.txt`, `.log`, `.csv`, `.tsv`, `.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.xml`, `.diff`, or `.patch`.
+  An absolute or `~/` path opens from plain text, inline code, or a link, `file://` included; a relative one opens from inline code or a link, against the session's directory.
+  A `:line` suffix, as in `docs/usage.md:12`, is dropped; hover the path to read the file it opens.
+  Markdown renders as the agent's messages do, a TSV or CSV file as a table of its first 1,000 rows, and anything else as plain text; **Show source** shows a rendered file's text.
+  A path in an open Markdown file opens in the dialog's place, relative to that file.
+  The dialog shows the first 1 MB of a larger file and says so; it refuses a file whose real path, past any link, has another extension, and a file that is not UTF-8.
+  The **Plan** tab's paths open the same way, and so do a todo's notes, absolute and `~/` paths only.
 - Every prompt has a copy button.
   Among the agent's messages, only the reply that ends each turn has one, not the messages it writes between tool calls.
   A turn still running shows none until it ends.

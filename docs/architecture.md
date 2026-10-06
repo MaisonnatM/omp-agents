@@ -287,6 +287,11 @@ It reads the description with `gh api repos/<owner>/<repo>/pulls/<number>`, puts
 The answer is `{ changed }`, or `{ error }` with the HTTP status.
 
 `GET /api/git?cwd=<directory>` answers the git checkout that the directory is in, or `null` outside one: the GitHub repository that `origin` names, the checked-out branch, every local branch with the worktree that has it checked out, and the main worktree.
+
+`GET /api/file?path=<absolute path>` answers a text file for the page's file dialog: `{ path, text, size, truncated }`.
+The path is absolute or starts with `~/`; the page resolves a relative one against the session's directory first.
+The file's real path, after symlinks, must end in one of `TEXT_FILE_EXTENSIONS`, so a link named `notes.md` cannot reach a key file.
+It reads the first `MAX_TEXT_FILE_BYTES` (1 MB) and answers 415 when those bytes are not UTF-8.
 It runs `git worktree list --porcelain`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the inbox's cached lookup.
 Like a new session's `start`, `cwd` may name any directory.
 The new-session draft reads it for its branch picker, and a live session's header reads it when it opens and when a turn starts or ends.
@@ -430,6 +435,7 @@ The server lives in `src/`:
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
 - `src/git.ts`: the git checkout of a directory, and the worktree a new session's branch runs in.
 - `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed.
+- `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows.
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
@@ -466,6 +472,9 @@ The page lives in `web/`.
   It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
+- `web/file-paths.ts`: which paths in agent text name a text file, and the absolute path each resolves to.
+  `web/delimited.ts` parses a TSV or CSV file into rows.
+  `web/components/file-link.tsx` holds the link that opens such a path, and `web/components/file-dialog.tsx` the dialog that shows the file.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the inbox and the tickets page show.
   `web/inbox-model.ts` holds the inbox's sections in one table, with whether each waits on you and whether it starts folded, sorts each stack's rows together by the chain of base branches, and says what a row's verdict and a sheet's Status show.
   `web/routines-model.ts` words a routine's schedule, task, next run, and last run, and turns the routine editor's form into the routine it saves.
@@ -546,6 +555,8 @@ It also gets two slots, `beforeTextarea` and `afterActions`: `composer-queue.tsx
 
 Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight` (`web/components/message-markdown.tsx`).
 In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL.
+In agent text, `remarkFilePaths` in `web/file-paths.ts` turns a path to a text file into a link, and that link, like a `file://` one, renders as a `FileLink` from `web/components/file-link.tsx`, which opens the file dialog through the dashboard context.
+A relative path resolves against `FileBaseContext`: the pane's session directory, or the directory of the file the dialog shows.
 Text from GitHub, which means pull request descriptions and comments, and Linear issues' text, renders its raw HTML through `rehype-raw` and then `rehype-sanitize` with its default schema, which follows GitHub's, plus a `<video>` with only a `src`.
 It keeps images only from GitHub's image hosts and the route for a Linear issue's files, and plays a video only from that route.
 `web/index.html` sets the page's `Content-Security-Policy`.

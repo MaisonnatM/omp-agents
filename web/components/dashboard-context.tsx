@@ -16,6 +16,8 @@ export interface DashboardContextValue {
 	changeTodo: Dashboard["changeTodo"];
 	/** End running session `instanceId`, then move its panes along. */
 	end: (instanceId: string) => void;
+	/** Open the text file at an absolute or `~/` path in the file dialog. */
+	openFile: (path: string) => void;
 	connected: boolean;
 	/** The last start of each kind, under way or failed. */
 	starts: {

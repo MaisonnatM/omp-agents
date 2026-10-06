@@ -45,6 +45,7 @@ import { age, readTime } from "../labels";
 import { usePane } from "../pane-store";
 import { useStoredState } from "../stored-state";
 import { AgentsTab } from "./agents-tab";
+import { FileBaseContext } from "./file-link";
 import { MediaTab } from "./media-tab";
 import { MessageMarkdown } from "./message-markdown";
 
@@ -257,7 +258,11 @@ export function PlanPanel({ view, host }: { view: View; host: RosterHost | null 
 				<SidebarContent>
 					{work && work.phases.length === 0 && !work.plan && <p className="px-4 py-2 text-sm text-muted-foreground">No plan yet.</p>}
 					{work?.phases.map((phase, index) => <Phase key={`${index}:${phase.name}`} phase={phase} />)}
-					{work?.plan && <PlanFile plan={work.plan} />}
+					{work?.plan && (
+						<FileBaseContext.Provider value={host?.cwd ?? null}>
+							<PlanFile plan={work.plan} />
+						</FileBaseContext.Provider>
+					)}
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="files" asChild>

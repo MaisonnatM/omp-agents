@@ -5,6 +5,8 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { TICKET_MEDIA_PATH } from "../../src/shared";
+import { remarkFilePaths, textFilePath } from "../file-paths";
+import { FileLink } from "./file-link";
 
 /** Where text written on GitHub may load images from. The page's CSP allows the same hosts. */
 const GITHUB_IMAGE_PREFIXES = [
@@ -63,7 +65,19 @@ const video: Components["video"] = ({ node: _node, src }) => {
 	);
 };
 
-const AGENT_COMPONENTS: Components = { a: link, img: imageFrom(inlineImage) };
+/** A link in agent text: a text file's path opens in the file dialog, anything else in a new tab. */
+const agentLink: Components["a"] = ({ href, children, node: _node, ...props }) => {
+	const path = href === undefined ? null : textFilePath(href);
+	return path === null ? (
+		<a {...props} href={href} target="_blank" rel="noopener noreferrer">
+			{children}
+		</a>
+	) : (
+		<FileLink path={path}>{children}</FileLink>
+	);
+};
+
+const AGENT_COMPONENTS: Components = { a: agentLink, img: imageFrom(inlineImage) };
 const GITHUB_COMPONENTS: Components = { a: link, img: imageFrom(githubImage), video };
 
 /** GitHub's schema, plus the `<video>` a Linear issue's recording becomes. */
@@ -76,15 +90,24 @@ const SANITIZE_SCHEMA = {
 const AGENT_PLUGINS = [rehypeHighlight];
 const GITHUB_PLUGINS = [rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA], rehypeHighlight] satisfies ComponentProps<typeof ReactMarkdown>["rehypePlugins"];
 const REMARK_PLUGINS = [remarkGfm];
+const AGENT_REMARK_PLUGINS = [remarkGfm, remarkFilePaths];
 
-/** react-markdown drops `data:` URLs; the images the page allows inline are the exception. */
-const urlTransform = (url: string, key: string): string => (key === "src" && inlineImage(url) ? url : defaultUrlTransform(url));
+/**
+ * react-markdown drops `data:` URLs; the images the page allows inline are the exception. A `file://` link keeps its
+ * path, which the file dialog opens.
+ */
+const urlTransform = (url: string, key: string): string => {
+	if (key === "src" && inlineImage(url)) return url;
+	if (key === "href" && url.startsWith("file:///")) return decodeURI(url.slice("file://".length));
+	return defaultUrlTransform(url);
+};
 
 /**
  * Markdown text is untrusted. react-markdown escapes raw HTML and filters unsafe link schemes. Images load only inline
  * (`data:`), or, for `github`, from GitHub's own hosts and from this server's route for a Linear issue's files, which
  * also plays its videos. `github`: text written on GitHub or Linear, whose raw HTML renders as GitHub renders it,
- * through rehype-sanitize's schema, which follows GitHub's; HTML comments drop out, as GitHub hides them.
+ * through rehype-sanitize's schema, which follows GitHub's; HTML comments drop out, as GitHub hides them. In agent
+ * text, the path of a text file opens it in the file dialog, a relative one against `FileBaseContext`.
  *
  * Parsing and highlighting a long reply is the page's costliest render, so the same text never renders twice.
  */
@@ -92,7 +115,7 @@ export const MessageMarkdown = memo(function MessageMarkdown({ text, github = fa
 	return (
 		<div className="message-markdown whitespace-normal break-words">
 			<ReactMarkdown
-				remarkPlugins={REMARK_PLUGINS}
+				remarkPlugins={github ? REMARK_PLUGINS : AGENT_REMARK_PLUGINS}
 				rehypePlugins={github ? GITHUB_PLUGINS : AGENT_PLUGINS}
 				components={github ? GITHUB_COMPONENTS : AGENT_COMPONENTS}
 				urlTransform={urlTransform}

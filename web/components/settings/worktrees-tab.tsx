@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { WorktreeEntry, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult } from "../../../src/worktrees-shared";
 import { Button } from "@/components/ui/button";
 import { changeWorktrees, errorText, readWorktreeMetrics, readWorktrees } from "../../api";
+import { formatBytes } from "../../labels";
 import { PINNED_SESSIONS_KEY, useStoredKeys } from "../../stored-state";
 
 type SortKey = "name" | "activity" | "size";
@@ -15,18 +16,6 @@ type DialogState =
 	| { phase: "error"; message: string };
 
 const keyOf = (target: { repository: string; path: string }): string => `${target.repository}\0${target.path}`;
-
-function formatBytes(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	const units = ["KB", "MB", "GB", "TB"];
-	let value = bytes / 1024;
-	let unit = 0;
-	while (value >= 1024 && unit < units.length - 1) {
-		value /= 1024;
-		unit++;
-	}
-	return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
-}
 
 function formatAgo(at: number): string {
 	const minutes = Math.round((Date.now() - at) / 60000);
