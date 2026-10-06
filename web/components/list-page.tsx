@@ -1,6 +1,6 @@
 /** Polled lists under a page header. */
-import { RefreshCw } from "lucide-react";
-import type { ReactNode, Ref } from "react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -30,6 +30,34 @@ export function PageFrame({ title, meta, actions, children }: PageFrameProps) {
 	);
 }
 
+interface DetailPageProps {
+	title: string;
+	meta: string;
+	/** The hash that the back link goes to, and what it says. */
+	backHref: string;
+	backLabel: string;
+	/** What the page tells above its content: a quick action's notice, or why the item is not listed. */
+	notice?: ReactNode;
+	children: ReactNode;
+}
+
+/** A page for one item of a list, a pull request or an issue: the frame, a link back to the list, `notice`, and the item's content. */
+export function DetailPage({ title, meta, backHref, backLabel, notice, children }: DetailPageProps) {
+	return (
+		<PageFrame title={title} meta={meta}>
+			<TooltipProvider>
+				<div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-6">
+					<Button variant="ghost" leadingIcon={ArrowLeft} render={<a href={backHref} />}>
+						{backLabel}
+					</Button>
+					{notice}
+					{children}
+				</div>
+			</TooltipProvider>
+		</PageFrame>
+	);
+}
+
 interface ListPageProps<Data> {
 	title: string;
 	/** What the page lists, under its title; the time of the last read follows it once there is one. */
@@ -46,12 +74,10 @@ interface ListPageProps<Data> {
 	spacing: string;
 	/** The page's lists, from its read. */
 	children: (data: Data) => ReactNode;
-	/** Focus returns here when the lists are not mounted. */
-	contentRef?: Ref<HTMLDivElement>;
 }
 
 /** A page of lists read from GitHub or Linear with a Refresh button, `notice`, and the lists once the first read loads. */
-export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, spacing, children, contentRef }: ListPageProps<Data>) {
+export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, spacing, children }: ListPageProps<Data>) {
 	const { read, error, refreshing } = poll;
 	let body: ReactNode;
 	if (!read) body = <LoadNote loading={loading} error={error && `Cannot load ${noun}: ${error}`} />;
@@ -75,7 +101,7 @@ export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, no
 			}
 		>
 			<TooltipProvider>
-				<div ref={contentRef} tabIndex={contentRef ? -1 : undefined} className={cn("mx-auto w-full max-w-5xl px-6 py-6", contentRef && "outline-none focus-visible:ring-2 focus-visible:ring-ring", spacing)}>
+				<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", spacing)}>
 					{notice}
 					{body}
 				</div>

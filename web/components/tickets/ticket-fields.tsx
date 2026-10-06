@@ -1,34 +1,19 @@
 import { Box, Calendar, Check, CircleUser, Tag } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
-import type { TicketDetail, TicketEdit, TicketOptions, TicketPriority } from "../../../src/shared";
+import type { Ticket, TicketDetail, TicketEdit, TicketOptions, TicketPriority } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { getJson, putJson } from "../../api";
-import { ticketsStore } from "../../reads";
-import { inReview, PRIORITY_LABEL } from "../../tickets-model";
+import { errorText, putJson } from "../../api";
+import { ticketsStore, useRead } from "../../reads";
+import { PRIORITY_LABEL, statusOrder } from "../../tickets-model";
 import { dueLabel, PRIORITY_ICON, statusIcon } from "./ticket-row";
 
 type Change = Omit<TicketEdit, "id">;
 
 const PRIORITIES: TicketPriority[] = [0, 1, 2, 3, 4];
-
-/** Each team's options, shared across issue details; a failed read is tried again on the next opening. */
-const optionReads = new Map<string, Promise<TicketOptions>>();
-
-function readOptions(team: string): Promise<TicketOptions> {
-	let read = optionReads.get(team);
-	if (!read) {
-		read = getJson<TicketOptions>(`/api/ticket/options?${new URLSearchParams({ team })}`);
-		optionReads.set(team, read);
-		read.catch(() => optionReads.delete(team));
-	}
-	return read;
-}
-
-const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 interface Choice {
 	value: string;
@@ -48,12 +33,14 @@ interface FieldPickerProps {
 	selected: string[];
 	/** Several choices at once: the list stays open while the choices toggle. */
 	multi?: boolean;
+	/** The field cannot change yet: Linear has not answered for the issue. */
+	disabled?: boolean;
 	onOpen?: () => void;
 	onPick: (value: string) => void;
 }
 
 /** A header field as a button that opens a searchable list of its choices, as Linear's issue fields do. */
-function FieldPicker({ field, current, trigger, choices, error = null, selected, multi = false, onOpen, onPick }: FieldPickerProps) {
+function FieldPicker({ field, current, trigger, choices, error = null, selected, multi = false, disabled = false, onOpen, onPick }: FieldPickerProps) {
 	const [open, setOpen] = useState(false);
 	return (
 		<Popover
@@ -65,7 +52,7 @@ function FieldPicker({ field, current, trigger, choices, error = null, selected,
 		>
 			<Tooltip content={`Change ${field.toLowerCase()}: ${current}`} side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
-					<Button variant="ghost" size="compact" className="max-w-56 px-1.5 text-muted-foreground" aria-label={`${field}: ${current}`} data-state={open ? "open" : "closed"} active={open}>
+					<Button variant="ghost" size="compact" className="max-w-56 px-1.5 text-muted-foreground" aria-label={`${field}: ${current}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
 						<span className="flex min-w-0 items-center gap-1">{trigger}</span>
 					</Button>
 				</PopoverTrigger>
@@ -108,13 +95,13 @@ function FieldPicker({ field, current, trigger, choices, error = null, selected,
 }
 
 /** The due date: a date field to set it, and a button to clear it. */
-function DuePicker({ dueDate, onChange }: { dueDate: string | null; onChange: (dueDate: string | null) => void }) {
+function DuePicker({ dueDate, disabled, onChange }: { dueDate: string | null; disabled: boolean; onChange: (dueDate: string | null) => void }) {
 	const [open, setOpen] = useState(false);
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<Tooltip content={dueDate ? `Change the due date: ${dueLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
-					<Button variant="ghost" size="compact" className="px-1.5 text-muted-foreground" leadingIcon={Calendar} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open}>
+					<Button variant="ghost" size="compact" className="px-1.5 text-muted-foreground" leadingIcon={Calendar} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
 						{dueDate ? dueLabel(dueDate) : "Due date"}
 					</Button>
 				</PopoverTrigger>
@@ -159,138 +146,158 @@ function DuePicker({ dueDate, onChange }: { dueDate: string | null; onChange: (d
 	);
 }
 
+interface TicketFieldsProps {
+	/** What the fields show: the issue as the list has it, then in full once `detail` arrives. */
+	ticket: Ticket;
+	/** Linear's answer for the issue; the pickers change nothing until it arrives. */
+	detail: TicketDetail | null;
+	replace: (detail: TicketDetail) => void;
+	/** Reads the issue again. */
+	reload: () => void;
+}
+
 /**
  * The issue's status, priority, assignee, project, due date, and labels, each a picker that changes it in Linear. A
- * change shows at once and is sent in turn after the ones before it; when Linear refuses it, the detail view reads the issue
- * again and names why.
+ * change shows at once and is sent in turn after the ones before it; when Linear refuses one, the issue is read again
+ * once every change sent has answered, and the page names why.
  */
-export function TicketFields({ detail, replace }: { detail: TicketDetail; replace: (detail: TicketDetail) => void }) {
-	const [options, setOptions] = useState<TicketOptions | null>(null);
-	const [optionsError, setOptionsError] = useState<string | null>(null);
+export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsProps) {
+	const [opened, setOpened] = useState(false);
+	const [retry, setRetry] = useState(0);
 	const [saveError, setSaveError] = useState<string | null>(null);
 	const queue = useRef<Promise<unknown>>(Promise.resolve());
+	const unsent = useRef(0);
+	const refused = useRef(false);
+	const options = useRead<TicketOptions>(opened && detail ? `/api/ticket/options?${new URLSearchParams({ team: detail.teamId })}` : null, retry);
 
-	const loadOptions = (): void => {
-		if (options || !detail.teamId) return;
-		setOptionsError(null);
-		readOptions(detail.teamId).then(setOptions, (err: unknown) => setOptionsError(messageOf(err)));
+	const open = (): void => {
+		setOpened(true);
+		if (options.error) setRetry(count => count + 1);
 	};
 
 	const save = (change: Change, shown: Partial<TicketDetail>): void => {
+		if (!detail) return;
 		replace({ ...detail, ...shown });
 		setSaveError(null);
+		unsent.current++;
 		queue.current = queue.current.then(() =>
-			putJson<TicketDetail>("/api/ticket", { id: detail.id, ...change }).then(
-				after => {
-					replace(after);
-					void ticketsStore.refresh();
-				},
-				async (err: unknown) => {
-					setSaveError(messageOf(err));
-					await getJson<TicketDetail>(`/api/ticket?${new URLSearchParams({ id: detail.id })}`).then(replace, () => {});
-				},
-			),
+			putJson<TicketDetail>("/api/ticket", { id: detail.id, ...change })
+				.then(
+					after => {
+						replace(after);
+						void ticketsStore.refresh();
+					},
+					(err: unknown) => {
+						setSaveError(errorText(err));
+						refused.current = true;
+					},
+				)
+				.then(() => {
+					if (--unsent.current > 0 || !refused.current) return;
+					refused.current = false;
+					reload();
+				}),
 		);
 	};
 
-	const [StatusIcon, statusColor] = statusIcon(detail.status, detail.statusType);
-	const [PriorityIcon, priorityColor] = PRIORITY_ICON[detail.priority];
-	const statusId = options?.statuses.find(status => status.name === detail.status)?.id;
-	const projectId = options?.projects.find(project => project.name === detail.project)?.id;
-	const labelNames = detail.labels.map(label => label.name);
+	const [StatusIcon, statusColor] = statusIcon(ticket);
+	const [PriorityIcon, priorityColor] = PRIORITY_ICON[ticket.priority];
+	const labelNames = ticket.labels.map(label => label.name);
 
 	return (
 		<>
 			<div className="-ml-1.5 flex flex-wrap items-center gap-0.5 text-xs">
 				<FieldPicker
 					field="Status"
-					current={detail.status}
+					current={ticket.status}
 					trigger={
 						<>
 							<StatusIcon aria-hidden className={cn("size-3.5", statusColor)} />
-							<span className="truncate">{detail.status}</span>
+							<span className="truncate">{ticket.status}</span>
 						</>
 					}
 					choices={
-						options?.statuses.toSorted((a, b) => Number(inReview(b.name)) - Number(inReview(a.name))).map(status => {
-							const [Icon, color] = statusIcon(status.name, status.type);
-							return { value: status.id, label: status.name, icon: <Icon aria-hidden className={color} /> };
+						options.data?.statuses.toSorted(statusOrder).map(status => {
+							const [Icon, color] = statusIcon(status);
+							return { value: status.status, label: status.status, icon: <Icon aria-hidden className={color} /> };
 						}) ?? null
 					}
-					error={optionsError}
-					selected={statusId ? [statusId] : []}
-					onOpen={loadOptions}
-					onPick={id => {
-						const status = options?.statuses.find(candidate => candidate.id === id);
-						if (status && status.name !== detail.status) save({ state: id }, { status: status.name, statusType: status.type });
+					error={options.error}
+					selected={[ticket.status]}
+					disabled={!detail}
+					onOpen={open}
+					onPick={name => {
+						const status = options.data?.statuses.find(candidate => candidate.status === name);
+						if (status && status.status !== ticket.status) save({ state: status.status }, status);
 					}}
 				/>
 				<FieldPicker
 					field="Priority"
-					current={PRIORITY_LABEL[detail.priority]}
+					current={PRIORITY_LABEL[ticket.priority]}
 					trigger={
 						<>
 							<PriorityIcon aria-hidden className={cn("size-3.5", priorityColor)} />
-							<span className="truncate">{PRIORITY_LABEL[detail.priority]}</span>
+							<span className="truncate">{PRIORITY_LABEL[ticket.priority]}</span>
 						</>
 					}
 					choices={PRIORITIES.map(priority => {
 						const [Icon, color] = PRIORITY_ICON[priority];
 						return { value: String(priority), label: PRIORITY_LABEL[priority], icon: <Icon aria-hidden className={color} /> };
 					})}
-					selected={[String(detail.priority)]}
+					selected={[String(ticket.priority)]}
+					disabled={!detail}
 					onPick={value => {
 						const priority = PRIORITIES.find(candidate => String(candidate) === value);
-						if (priority !== undefined && priority !== detail.priority) save({ priority }, { priority });
+						if (priority !== undefined && priority !== ticket.priority) save({ priority }, { priority });
 					}}
 				/>
 				<FieldPicker
 					field="Assignee"
-					current={detail.assignee?.name ?? "unassigned"}
+					current={detail ? (detail.assignee?.name ?? "unassigned") : "loading"}
 					trigger={
 						<>
 							<CircleUser aria-hidden className="size-3.5" />
-							<span className="truncate">{detail.assignee?.name ?? "Unassigned"}</span>
+							<span className="truncate">{detail ? (detail.assignee?.name ?? "Unassigned") : "Assignee"}</span>
 						</>
 					}
-					choices={options ? [{ value: "", label: "No assignee" }, ...options.users.map(user => ({ value: user.id, label: user.name }))] : null}
-					error={optionsError}
-					selected={[detail.assignee?.id ?? ""]}
-					onOpen={loadOptions}
+					choices={options.data ? [{ value: "", label: "No assignee" }, ...options.data.users.map(user => ({ value: user.id, label: user.name }))] : null}
+					error={options.error}
+					selected={[detail?.assignee?.id ?? ""]}
+					disabled={!detail}
+					onOpen={open}
 					onPick={id => {
-						if (id === (detail.assignee?.id ?? "")) return;
-						const user = options?.users.find(candidate => candidate.id === id) ?? null;
+						if (!detail || id === (detail.assignee?.id ?? "")) return;
+						const user = options.data?.users.find(candidate => candidate.id === id) ?? null;
 						save({ assignee: user?.id ?? null }, { assignee: user });
 					}}
 				/>
 				<FieldPicker
 					field="Project"
-					current={detail.project ?? "none"}
+					current={ticket.project ?? "none"}
 					trigger={
 						<>
 							<Box aria-hidden className="size-3.5" />
-							<span className="truncate">{detail.project ?? "No project"}</span>
+							<span className="truncate">{ticket.project ?? "No project"}</span>
 						</>
 					}
-					choices={options ? [{ value: "", label: "No project" }, ...options.projects.map(project => ({ value: project.id, label: project.name }))] : null}
-					error={optionsError}
-					selected={detail.project === null ? [""] : projectId ? [projectId] : []}
-					onOpen={loadOptions}
-					onPick={id => {
-						if (id === (detail.project === null ? "" : projectId)) return;
-						const project = options?.projects.find(candidate => candidate.id === id) ?? null;
-						save({ project: project?.id ?? null }, { project: project?.name ?? null });
+					choices={options.data ? [{ value: "", label: "No project" }, ...options.data.projects.map(name => ({ value: name, label: name }))] : null}
+					error={options.error}
+					selected={[ticket.project ?? ""]}
+					disabled={!detail}
+					onOpen={open}
+					onPick={name => {
+						if (name !== (ticket.project ?? "")) save({ project: name || null }, { project: name || null });
 					}}
 				/>
-				<DuePicker dueDate={detail.dueDate} onChange={dueDate => save({ dueDate }, { dueDate })} />
+				<DuePicker dueDate={ticket.dueDate} disabled={!detail} onChange={dueDate => save({ dueDate }, { dueDate })} />
 				<FieldPicker
 					field="Labels"
 					current={labelNames.join(", ") || "none"}
 					trigger={
 						<>
-							{detail.labels.length > 0 ? (
+							{ticket.labels.length > 0 ? (
 								<span aria-hidden className="flex shrink-0 -space-x-0.5">
-									{detail.labels.map(({ name, color }) => (
+									{ticket.labels.map(({ name, color }) => (
 										<span key={name} className="size-2 rounded-full ring-1 ring-background" style={{ backgroundColor: color || "currentColor" }} />
 									))}
 								</span>
@@ -301,20 +308,21 @@ export function TicketFields({ detail, replace }: { detail: TicketDetail; replac
 						</>
 					}
 					choices={
-						options?.labels.map(label => ({
+						options.data?.labels.map(label => ({
 							value: label.name,
 							label: label.name,
 							icon: <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: label.color || "currentColor" }} />,
 						})) ?? null
 					}
-					error={optionsError}
+					error={options.error}
 					selected={labelNames}
 					multi
-					onOpen={loadOptions}
+					disabled={!detail}
+					onOpen={open}
 					onPick={name => {
 						const labels = labelNames.includes(name)
-							? detail.labels.filter(label => label.name !== name)
-							: [...detail.labels, { name, color: options?.labels.find(label => label.name === name)?.color ?? "" }];
+							? ticket.labels.filter(label => label.name !== name)
+							: [...ticket.labels, { name, color: options.data?.labels.find(label => label.name === name)?.color ?? "" }];
 						save({ labels: labels.map(label => label.name) }, { labels });
 					}}
 				/>

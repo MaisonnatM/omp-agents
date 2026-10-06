@@ -66,7 +66,7 @@ const STATUS_VIEW: StatusView = {
 		text: ({ by }) => (by.length > 0 ? `Changes requested by ${AND.format(by)}` : "Changes requested"),
 		fix: "address-comments",
 	},
-	threads: { tone: "blocked", icon: MessageSquare, text: ({ count }) => `${plural(count, "review thread")} unresolved`, fix: "address-comments" },
+	threads: { tone: "blocked", icon: MessageSquare, text: ({ count, exact }) => `${count}${exact ? "" : "+"} review ${count === 1 && exact ? "thread" : "threads"} unresolved`, fix: "address-comments" },
 	"checks-pending": { tone: "waiting", icon: CircleDashed, text: ({ count }) => `${plural(count, "check")} still running` },
 	"review-required": {
 		tone: "waiting",
@@ -276,7 +276,7 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next }: 
 
 /** A pull request's status, description, checks, unresolved comments, conversation, and files. */
 function PullRequestSections({ detail, status }: { detail: PullRequestDetail; status: ReactNode }) {
-	const { body, checks, threads, conversation, files } = detail;
+	const { body, checkRuns, threads, conversation, files } = detail;
 	return (
 		<>
 			{status && <DetailSection title="Status">{status}</DetailSection>}
@@ -289,9 +289,9 @@ function PullRequestSections({ detail, status }: { detail: PullRequestDetail; st
 					<p className="text-sm text-muted-foreground">No description.</p>
 				)}
 			</DetailSection>
-			{checks.length > 0 && (
+			{checkRuns.length > 0 && (
 				<DetailSection title="Checks">
-					<Checks checks={checks} />
+					<Checks checks={checkRuns} />
 				</DetailSection>
 			)}
 			{threads.length > 0 && (

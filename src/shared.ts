@@ -154,6 +154,9 @@ export interface Ticket {
 	branch: string;
 }
 
+/** A workflow state as an issue names it: the status and its type. */
+export type TicketStatus = Pick<Ticket, "status" | "statusType">;
+
 /** `GET /api/tickets`: the viewer's assigned Linear issues. A failed read is the API's usual `{ error }` with status 500. */
 export interface TicketsAnswer {
 	tickets: Ticket[];
@@ -215,7 +218,7 @@ export const TICKET_ID = /^[A-Z][A-Z0-9_]*-\d+$/;
 /** Where the page loads a file that a Linear issue or its comments embed; the server fetches it from Linear. */
 export const TICKET_MEDIA_PATH = "/api/ticket/media";
 
-/** One of the things an issue's pickers offer: a person, a project, or a workflow state. */
+/** A person or a team the pickers and the new-issue step offer, by Linear's id. */
 export interface TicketChoice {
 	id: string;
 	name: string;
@@ -254,19 +257,21 @@ export interface TicketDetail extends Ticket {
 
 /** `GET /api/ticket/options?team=<id>`: what the issue's field pickers offer for that team. */
 export interface TicketOptions {
-	/** In Linear's workflow order: triage, backlog, unstarted, started, completed, canceled. */
-	statuses: (TicketChoice & { type: TicketStatusType })[];
+	/** As Linear lists the team's workflow states; the page orders them. */
+	statuses: TicketStatus[];
 	/** Active members, by name. */
 	users: TicketChoice[];
 	/** The team's labels and the workspace's, by name. */
-	labels: (TicketChoice & TicketLabel)[];
-	projects: TicketChoice[];
+	labels: TicketLabel[];
+	/** The team's projects' names, sorted. */
+	projects: string[];
 }
 
 /**
  * `PUT /api/ticket`: changes to an issue, each field left out unchanged and `null` clearing it, which answers the
- * issue as Linear has it after the change. `state`, `assignee`, and `project` are ids; `labels` replaces every label,
- * by name; `dueDate` is `YYYY-MM-DD`.
+ * issue as Linear has it after the change. Fields go by the names that an issue read shows (`state` and `project` are
+ * names, as is each of `labels`, which replaces every label) except `assignee`, which is the person's id, as
+ * `TicketDetail.assignee` carries; `dueDate` is `YYYY-MM-DD`. Linear's `save_issue` takes any of them.
  */
 export interface TicketEdit {
 	id: string;
@@ -333,8 +338,13 @@ export interface PullRequestDetail extends PullRequest {
 	/** All files the PR changes; `files` lists at most the first 100. */
 	changedFiles: number;
 	files: PullRequestFile[];
+	/** GitHub's rollup of the head commit's checks, as on {@link InboxPullRequest}; `checkRuns` lists at most the first 100. */
+	checks: CheckState;
 	/** The head commit's checks, failing first, then pending, passing, and skipped. */
-	checks: PullRequestCheck[];
+	checkRuns: PullRequestCheck[];
+	/** Review threads not yet resolved, as on {@link InboxPullRequest}. */
+	unresolved: InboxPullRequest["unresolved"];
+	/** The unresolved threads in full: those among the first 100 that GitHub lists. */
 	threads: PullRequestThread[];
 	/** Comments and reviews, oldest first: the latest 50 of each. */
 	conversation: PullRequestEvent[];
@@ -413,6 +423,9 @@ export interface FastMode {
 	enabled: boolean;
 	active: boolean;
 }
+
+/** What the index of session files knows of a session: the pull requests and Linear issues it worked on, its /ship stage, and its worktree. */
+export type SessionFacts = Pick<RosterHost, "pullRequests" | "tickets" | "ship" | "worktree">;
 
 /** Context-window occupancy as omp's status line counts it. */
 export interface ContextUsage {

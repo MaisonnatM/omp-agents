@@ -1,5 +1,6 @@
 import { ArrowDownUp, RefreshCw } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { pullRequestActions } from "../../../src/pull-request-actions";
 import { type Inbox, type InboxPullRequest, type PastSession, type PullRequest, prKey, pullRequestUrl, type RepoInbox, type RosterHost, repoKey, samePullRequest } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/menu";
@@ -41,7 +42,7 @@ import { DROP_LINE, useDragOrder } from "../../use-drag-order";
 import { useDashboardContext } from "../dashboard-context";
 import { FoldButton, useFolds, useReveal } from "../fold";
 import { QuickStartNotice } from "../quick-actions";
-import { PullRequestRow, rowId, sessionsFor } from "./pr-row";
+import { PullRequestRow, rowElement, rowId, rowLink, sessionsFor } from "./pr-row";
 
 /** The repositories and sections flipped from their default fold: `owner/repo`, and `owner/repo:<section title>`. */
 const FOLDS_KEY = "omp-agents.inbox-collapsed";
@@ -92,10 +93,9 @@ function placeOf(inbox: Inbox, pr: PullRequest, agent: AgentOn): { repo: string;
  * one. O opens the pull request on GitHub, `.` opens a row's quick actions, and E runs `giveToAgent` on the focused row's
  * pull request, or the one whose details show. A key that has nothing to act on keeps its usual meaning.
  */
-function useTriageKeys(shown: InboxPullRequest[], target: PullRequest | null, giveToAgent: (pr: PullRequest) => boolean): void {
-	const rowOf = (pr: PullRequest): HTMLElement | null => document.getElementById(rowId(pr));
+function useTriageKeys(shown: InboxPullRequest[], target: PullRequest | null, giveToAgent: (pr: PullRequest) => boolean, openActions: (pr: InboxPullRequest) => boolean): void {
 	const current = (): number =>
-		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowOf(pr)?.contains(document.activeElement) ?? false);
+		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowElement(pr)?.contains(document.activeElement) ?? false);
 	const step = (by: 1 | -1): boolean => {
 		const at = current();
 		if (target) {
@@ -105,9 +105,9 @@ function useTriageKeys(shown: InboxPullRequest[], target: PullRequest | null, gi
 			return true;
 		}
 		const next = at < 0 ? shown[by === 1 ? 0 : shown.length - 1] : shown[at + by];
-		const row = next && rowOf(next);
-		if (!row) return at >= 0;
-		row.querySelector("a")?.focus({ preventScroll: true });
+		const row = next && rowElement(next);
+		if (!next || !row) return at >= 0;
+		rowLink(next)?.focus({ preventScroll: true });
 		row.scrollIntoView({ block: "nearest" });
 		return true;
 	};
@@ -121,9 +121,7 @@ function useTriageKeys(shown: InboxPullRequest[], target: PullRequest | null, gi
 		},
 		pullRequestActions: () => {
 			const pr = target ? undefined : shown[current()];
-			const trigger = pr && rowOf(pr)?.querySelector<HTMLButtonElement>("[data-row-actions] button");
-			if (!trigger) return false;
-			trigger.click();
+			return pr ? openActions(pr) : false;
 		},
 		giveToAgent: () => {
 			const pr = target ?? shown[current()];
@@ -214,7 +212,14 @@ export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 		start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()));
 		return true;
 	};
-	useTriageKeys(read ? shownPullRequests(read.data, folds.isFolded, order, agent) : [], target, giveToAgent);
+	/** The row, by {@link rowId}, whose quick actions menu is open. */
+	const [actionsOpen, setActionsOpen] = useState<string | null>(null);
+	const openActions = (pr: InboxPullRequest): boolean => {
+		if (pullRequestActions(pr).length === 0) return false;
+		setActionsOpen(rowId(pr));
+		return true;
+	};
+	useTriageKeys(read ? shownPullRequests(read.data, folds.isFolded, order, agent) : [], target, giveToAgent, openActions);
 	useMoveKeys(moves);
 
 	const repos = read ? orderedRepos(read.data.repos, order) : [];
@@ -311,6 +316,8 @@ export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 											onOpen={open}
 											pending={pendingOf(quick, { kind: "pull-request", pr: row.pr })}
 											onQuickAction={action => start(pullRequestStart(row.pr, action, repo.cwds[0]!, readPinnedSkill()))}
+											actionsOpen={actionsOpen === rowId(row.pr)}
+											onActionsOpenChange={next => setActionsOpen(next ? rowId(row.pr) : null)}
 											drag={{ ...rowItem, dropAt: edge?.unit === row.unit ? null : rowItem.dropAt }}
 											moveId={rowMoveId}
 										/>

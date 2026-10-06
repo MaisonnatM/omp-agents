@@ -150,6 +150,10 @@ function StackChip({ stack, base }: { stack: StackPlace; base: string | null }) 
 /** The DOM id of a pull request's row, which an inbox link to that PR scrolls to. */
 export const rowId = (pr: PullRequest): string => `inbox-pr-${repoKey(pr)}/${pr.number}`;
 
+/** The row's element and its link: what the inbox's keys reach by id, so the markup below is their contract. */
+export const rowElement = (pr: PullRequest): HTMLElement | null => document.getElementById(rowId(pr));
+export const rowLink = (pr: PullRequest): HTMLAnchorElement | null => rowElement(pr)?.querySelector("a") ?? null;
+
 type Writing = { phase: "idle" | "writing" } | { phase: "done"; changed: boolean } | { phase: "failed"; error: string };
 
 /** Writes links to the PR's sessions into its description on GitHub. Only a click writes, and a rerun replaces the links it wrote. */
@@ -200,13 +204,16 @@ interface RowProps {
 	/** The quick action whose session is starting for this PR, if any. */
 	pending: QuickActionId | null;
 	onQuickAction: (action: PullRequestActionId) => void;
+	/** Whether the row's quick actions menu is open, which the `.` shortcut also sets. */
+	actionsOpen: boolean;
+	onActionsOpenChange: (open: boolean) => void;
 	drag: DragItem;
 	/** What the move shortcuts name the row by. */
 	moveId: string;
 }
 
 /** A pull request in the sidebar's inbox: its move, title, and age, then why it waits on that move, with its actions on hover. */
-export function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, pending, onQuickAction, drag, moveId }: RowProps) {
+export function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, pending, onQuickAction, actionsOpen, onActionsOpenChange, drag, moveId }: RowProps) {
 	return (
 		<li id={rowId(pr)} {...drag.handle} {...drag.target} data-move={moveId} className={cn("group/row relative", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}>
 			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-[39.5px] h-1.5 w-px bg-border" />}
@@ -262,14 +269,14 @@ export function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, o
 					link={{ kind: "pull-request", owner: pr.owner, repo: pr.repo, number: pr.number }}
 					label={`Add ${pr.repo}#${pr.number} to your todo list`}
 				/>
-				<span data-row-actions className="flex">
-					<QuickActionsMenu
-						actions={pullRequestActions(pr)}
-						pending={pending}
-						onRun={onQuickAction}
-						label="Quick actions: start a session in the background that works on this pull request"
-					/>
-				</span>
+				<QuickActionsMenu
+					actions={pullRequestActions(pr)}
+					pending={pending}
+					onRun={onQuickAction}
+					open={actionsOpen}
+					onOpenChange={onActionsOpenChange}
+					label="Quick actions: start a session in the background that works on this pull request"
+				/>
 				{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
 			</span>
 		</li>

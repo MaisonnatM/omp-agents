@@ -36,7 +36,7 @@ function socket() {
 	return { ws: ws as unknown as Socket, sent, topics };
 }
 
-/** Views over files that tests name per view, publishing their transcripts into a list that a test can wait on; `work` and `media` messages are left out. */
+/** Views over files that tests name per view, publishing their transcripts into a list that a test can wait on; `work`, `plan`, and `media` messages are left out. */
 function setup() {
 	const root = mkdtempSync(join(tmpdir(), "omp-agents-views-"));
 	roots.push(root);

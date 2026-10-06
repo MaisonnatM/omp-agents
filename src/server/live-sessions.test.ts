@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { SessionFacts } from "../live-session";
+import type { SessionFacts } from "../shared";
 import { withSubject } from "./live-sessions";
 
 const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], tickets: ["ENG-1"], ship: null, worktree: null };

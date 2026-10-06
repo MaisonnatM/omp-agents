@@ -110,6 +110,9 @@ function parsePullRequestHead(node: Record<string, unknown>) {
 	if (title === undefined || head === undefined || base === undefined) return null;
 	const author = authorOf(node.author);
 	const reviewers = parseReviewers(node, author.login);
+	const commits = nodesOf(node.commits);
+	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
+	const rollup = isObject(commit.statusCheckRollup) ? str(commit.statusCheckRollup.state) : undefined;
 	return {
 		title,
 		head,
@@ -118,6 +121,9 @@ function parsePullRequestHead(node: Record<string, unknown>) {
 		reviewers,
 		state: node.state === "MERGED" ? ("merged" as const) : node.isDraft === true ? ("draft" as const) : ("open" as const),
 		review: reviewOf(str(node.reviewDecision), reviewers),
+		checks: STATUS[rollup ?? ""] ?? "none",
+		conflicts: conflictsOf(node),
+		unresolved: parseUnresolved(node.reviewThreads),
 	};
 }
 
@@ -129,19 +135,13 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole)
 	const { base, ...head } = parsed;
 	const repository = isObject(node.repository) ? node.repository : {};
 	const defaultBranch = isObject(repository.defaultBranchRef) ? str(repository.defaultBranchRef.name) : undefined;
-	const commits = nodesOf(node.commits);
-	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
-	const rollup = isObject(commit.statusCheckRollup) ? str(commit.statusCheckRollup.state) : undefined;
 	return {
 		owner,
 		repo,
 		number: node.number,
 		...head,
 		role,
-		checks: STATUS[rollup ?? ""] ?? "none",
-		conflicts: conflictsOf(node),
 		stackedOn: defaultBranch !== undefined && base !== defaultBranch ? base : null,
-		unresolved: parseUnresolved(node.reviewThreads),
 		updatedAt,
 	};
 }
@@ -178,14 +178,14 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	repository(owner: $owner, name: $repo) { pullRequest(number: $number) {
 		number title body isDraft state reviewDecision mergeable headRefName baseRefName createdAt additions deletions changedFiles
 		${REVIEW_FIELDS}
-		commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
+		commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
 			... on CheckRun { name status conclusion detailsUrl }
 			... on StatusContext { context state targetUrl }
 		} } } } } }
 		files(first: 100) { nodes { path additions deletions changeType } }
 		comments(last: 50) { nodes { ${COMMENT_FIELDS} } }
 		reviews(last: 50) { nodes { state submittedAt author { login ${AVATAR} } body url } }
-		reviewThreads(first: ${THREADS}) { nodes { isResolved path line comments(first: 20) { nodes { ${COMMENT_FIELDS} } } } }
+		reviewThreads(first: ${THREADS}) { totalCount nodes { isResolved path line comments(first: 20) { nodes { ${COMMENT_FIELDS} } } } }
 	} }
 }`;
 
@@ -222,7 +222,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 	const commits = nodesOf(node.commits);
 	const commit = isObject(commits[0]) && isObject(commits[0].commit) ? commits[0].commit : {};
 	const rollup = isObject(commit.statusCheckRollup) ? commit.statusCheckRollup.contexts : null;
-	const checks = nodesOf(rollup)
+	const checkRuns = nodesOf(rollup)
 		.map(parseCheck)
 		.filter(check => check !== null)
 		.toSorted((a, b) => CHECK_ORDER.indexOf(a.state) - CHECK_ORDER.indexOf(b.state) || a.name.localeCompare(b.name));
@@ -255,11 +255,10 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		body: str(node.body) ?? "",
 		state: node.state === "CLOSED" ? "closed" : head.state,
 		additions: num(node.additions) ?? 0,
-		conflicts: conflictsOf(node),
 		deletions: num(node.deletions) ?? 0,
 		changedFiles: num(node.changedFiles) ?? 0,
 		files,
-		checks,
+		checkRuns,
 		threads,
 		conversation: [...comments, ...reviews].toSorted((a, b) => a.at - b.at),
 		createdAt,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { InboxPullRequest, PullRequestDetail, RepoInbox, RosterHost } from "../src/shared";
+import type { InboxPullRequest, PullRequestCheck, PullRequestDetail, RepoInbox, RosterHost } from "../src/shared";
 import {
 	type AgentOn,
 	agentOn,
@@ -307,13 +307,15 @@ describe("pull request status", () => {
 		deletions: 0,
 		changedFiles: 0,
 		files: [],
-		checks: [],
+		checks: "none",
+		checkRuns: [],
+		unresolved: { count: 0, exact: true },
 		threads: [],
 		conversation: [],
 		createdAt: 0,
 		...fields,
 	});
-	const check = (state: PullRequestDetail["checks"][number]["state"]) => ({ name: state, state, url: null });
+	const check = (state: PullRequestCheck["state"]) => ({ name: state, state, url: null });
 
 	test("lists blockers first, then what waits, then what is done", () => {
 		expect(
@@ -325,22 +327,23 @@ describe("pull request status", () => {
 						{ ...teammate, state: "changes-requested" },
 						{ login: "lead", avatarUrl: null, state: "requested" },
 					],
-					checks: [check("failing"), check("pending"), check("passing")],
-					threads: [{ path: "a.ts", line: 1, comments: [] }],
+					checks: "failing",
+					checkRuns: [check("failing"), check("pending"), check("passing")],
+					unresolved: { count: 1, exact: true },
 				}),
 			),
 		).toEqual([
 			{ kind: "conflicts", base: "main" },
 			{ kind: "checks-failing", count: 1 },
 			{ kind: "changes-requested", by: ["teammate"] },
-			{ kind: "threads", count: 1 },
+			{ kind: "threads", count: 1, exact: true },
 			{ kind: "checks-pending", count: 1 },
 		]);
 	});
 
 	test("an approved PR with settled checks and no open thread leads with ready to merge", () => {
 		expect(
-			pullRequestStatus(detail({ review: "approved", reviewers: [{ ...teammate, state: "approved" }], checks: [check("passing"), check("skipped")] })),
+			pullRequestStatus(detail({ review: "approved", reviewers: [{ ...teammate, state: "approved" }], checks: "passing", checkRuns: [check("passing"), check("skipped")] })),
 		).toEqual([{ kind: "ready" }, { kind: "approved", by: ["teammate"] }, { kind: "checks-passing", passed: 1, skipped: 1 }]);
 	});
 

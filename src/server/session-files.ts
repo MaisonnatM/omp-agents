@@ -5,8 +5,7 @@ import { repoOf } from "../github";
 import { listSessionFiles, readSessionFile, type SavedSession, sessionsDir } from "../omp/sessions";
 import { displayPath } from "../paths";
 import { SessionFactsIndex } from "../session-facts";
-import type { SessionFacts } from "../live-session";
-import type { PastSession } from "../shared";
+import type { PastSession, SessionFacts } from "../shared";
 
 /** omp's `.<file>.jsonl.lock` sidecars: on macOS a burst of writes to a session file can surface only as events for these. */
 const SIDECAR = /^\.(.+\.jsonl)\.lock(?:\.os)?$/;

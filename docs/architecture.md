@@ -383,19 +383,21 @@ It threads the comments by `parentId`, oldest first.
 An identifier that is not a team key, a dash, and a number answers 400.
 
 Linear hands out its files as `uploads.linear.app` addresses whose `signature` JWT expires five minutes after the read.
-`src/linear-uploads.ts` rewrites each one in the description and comments to `GET /api/ticket/media?issue=<identifier>&path=<upload path>`, and keeps the latest signed address of each path in memory.
+`loadTicketDetail` reads the raw texts of `get_issue` and `list_comments`, and `rememberUploads` in `src/linear-uploads.ts` keeps the latest signed address of each upload path found in them, in memory.
+`linearMarkdown` is a pure text rewrite: it turns each upload address in the description and comments into `GET /api/ticket/media?issue=<identifier>&path=<upload path>`.
 That route fetches the kept address, passing the `Range` header on, and streams Linear's answer back with its type, length, range, and validators.
-When the kept address is within 30 seconds of expiring, missing after a restart, or refused by Linear, the route reads the issue again, which signs every file in it anew; requests for one issue within 10 seconds share that read.
+When the kept address is within 30 seconds of expiring, missing after a restart, or refused by Linear, the route reads the issue again and remembers its uploads anew, which signs every file in it; requests for one issue within 10 seconds share that read.
 Only paths that a read of the issue named are fetched, so the route reaches nothing but Linear's own uploads.
 It serves each file with `Content-Security-Policy: sandbox` and `nosniff`, and anything other than an image, a video, or audio as an attachment, since a file that someone uploaded to Linear is served from the dashboard's origin.
 The page's CSP stays `'self'` for media.
 `message-markdown.tsx` lets Linear's text load images and play `<video>` only from that route.
 
-`GET /api/ticket/options?team=<team id>` answers `TicketOptions` for the issue detail's field pickers: the team's workflow states (`list_issue_statuses`) in Linear's workflow order, the workspace's active members (`list_users`), the team's and the workspace's live labels (`list_issue_labels`), and the team's projects (`list_projects`, 50 a page), each paged to its end.
+`GET /api/ticket/options?team=<team id>` answers `TicketOptions` for the issue detail's field pickers: the team's workflow states (`list_issue_statuses`) as `{ status, statusType }` in the order Linear lists them, the workspace's active members (`list_users`), the team's and the workspace's live labels (`list_issue_labels`), and the names of the team's projects (`list_projects`, 50 a page), each paged to its end.
+The issue detail's status picker orders the states with the same `statusOrder` as the tickets page's groups.
 The server keeps each team's answer for five minutes.
-`PUT /api/ticket` takes a `TicketEdit`, `{ id, state?, assignee?, priority?, labels?, project?, dueDate? }`, checked by `parseTicketEdit` in `src/server/wire.ts`, where `null` clears a field and `labels` replaces the whole set by name.
+`PUT /api/ticket` takes a `TicketEdit`, `{ id, state?, assignee?, priority?, labels?, project?, dueDate? }`, checked by `parseTicketEdit` in `src/server/wire.ts`, where `state` and `project` name the status and the project as the issue shows them, `assignee` is a user's id, `null` clears a field, and `labels` replaces the whole set by name.
 It calls `save_issue` with those fields, drops the cached tickets list, and answers the issue as `GET /api/ticket` reads it after the change.
-The issue detail shows a change at once, sends its changes one at a time, and on a failure reads the issue again.
+The issue detail shows a change at once and sends its changes one at a time, and once every change sent has answered, it reads the issue again if Linear refused one.
 
 `GET /api/linear` answers `{ connected, signIn }`.
 `connected` is true when omp's user-level MCP config has an enabled server on `mcp.linear.app` and omp's credential store, read again on each call, holds an OAuth sign-in under that server's credential id.
@@ -483,7 +485,9 @@ The server lives in `src/`:
 - `src/session-links.ts`: writes the session block into a pull request's description.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
-- `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), and the worktree a new session's branch runs in. It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, and `worktreesOf`, which parses `git worktree list --porcelain -z`.
+  A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `MergeFacts` in `web/inbox-model.ts` takes either.
+- `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), and the worktree a new session's branch runs in.
+  It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, and `worktreesOf`, which parses `git worktree list --porcelain -z`.
 - `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `Worktrees.start` and `Worktrees.remove` order starts against removals; `removeCheckout` removes the checkout a directory is in, waiting up to 15 seconds for a session that just ended to leave it.
 - `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows.
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
@@ -597,9 +601,10 @@ The page lives in `web/`.
 - `web/components/session-details.tsx`: the right sidebar's tabs for the focused pane: `outline-tab.tsx`, its prompts and turn-ending replies from `outline` in `web/transcript-view.ts`, which scroll the focused pane's transcript to their message; its changed files; and `media-tab.tsx`, its images and their viewer.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
   `web/components/settings/google-connection.tsx` saves the Google OAuth client, and it and `linear-connection.tsx` start their sign-ins with `web/use-sign-in.ts`.
-  `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue.
+  `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue; both wrap their details in `DetailPage` from `web/components/list-page.tsx`.
+  `pr-row.tsx` exports the DOM lookups of a row and its link that the inbox's keys use.
   `web/use-drag-order.ts` drags the inbox's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
-  The tickets page uses `web/components/list-page.tsx` for its frame, header, and load and refresh states, and the pull request, Todo, Routines, and Calendar pages its `PageFrame`.
+  The tickets page uses `web/components/list-page.tsx` for its frame, header, and load and refresh states, its issue details use its `DetailPage`, and the pull request, Todo, Routines, and Calendar pages its `PageFrame`.
   Both details views use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
   `LoadNote` is the loading or error line that the pull request's details, the issue's, and the list page share, and `Clamped` folds a long description behind **Show more**.
   `web/components/fold.tsx` holds the fold button that the inbox and tickets share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.

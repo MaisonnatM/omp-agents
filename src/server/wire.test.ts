@@ -302,9 +302,9 @@ describe("parseSessionLinks", () => {
 
 describe("parseTicketEdit", () => {
 	test("keeps each field given, null clearing the ones that clear, and the labels once each", () => {
-		expect(parseTicketEdit({ id: "ENG-1", state: "s-1", priority: 0, labels: ["Bug", "Front", "Bug"], dueDate: "2026-10-09", extra: true })).toEqual({
+		expect(parseTicketEdit({ id: "ENG-1", state: "In Review", priority: 0, labels: ["Bug", "Front", "Bug"], dueDate: "2026-10-09", extra: true })).toEqual({
 			id: "ENG-1",
-			state: "s-1",
+			state: "In Review",
 			priority: 0,
 			labels: ["Bug", "Front"],
 			dueDate: "2026-10-09",

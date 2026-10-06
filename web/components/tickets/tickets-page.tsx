@@ -1,7 +1,4 @@
-import { ArrowLeft } from "lucide-react";
-import { useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { useEffect, useRef, useState } from "react";
 import type { RosterHost, Ticket, TicketDetail, View } from "../../../src/shared";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
@@ -13,7 +10,7 @@ import type { StartOf } from "../../starts";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { useDashboardContext } from "../dashboard-context";
 import { FoldButton, useFolds, useReveal } from "../fold";
-import { ListPage, PageFrame } from "../list-page";
+import { DetailPage, ListPage, PageFrame } from "../list-page";
 import { DetailQuickActions, QuickStartNotice } from "../quick-actions";
 import { LinearConnection } from "../settings/linear-connection";
 import { TicketDetailContent } from "./ticket-details";
@@ -37,7 +34,7 @@ interface GroupProps {
 
 function GroupSection({ group, open, onToggle, hosts, onOpen, quick, onQuickAction }: GroupProps) {
 	const { id } = ticketSection(group.status);
-	const [Icon, color] = statusIcon(group.status, group.statusType);
+	const [Icon, color] = statusIcon(group);
 	return (
 		// Focused when its sidebar link is chosen.
 		<section id={id} tabIndex={-1} aria-labelledby={`${id}-heading`} className="scroll-mt-6 overflow-hidden rounded-md border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -85,63 +82,53 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	const { open, start: startSession, dismissStart, starts: { quick } } = useDashboardContext();
 	const poll = ticketsStore.usePolling();
 	const tickets = poll.read?.data.tickets ?? [];
-	const detailRead = useReplaceableRead<TicketDetail>(target && `/api/ticket?${new URLSearchParams({ id: target })}`);
+	const [version, setVersion] = useState(0);
+	const detailRead = useReplaceableRead<TicketDetail>(target && `/api/ticket?${new URLSearchParams({ id: target })}`, version);
 	const folds = useFolds(COLLAPSED_KEY);
 	const start = (ticket: Ticket, action: TicketActionId) => startSession(ticketStart(ticket, action, cwd, readPinnedSkill()));
 	const listRef = useRef<HTMLDivElement>(null);
-	const listPageRef = useRef<HTMLDivElement>(null);
-	const previousTarget = useRef(target);
+	const returnTo = useRef<string | null>(null);
 	useEffect(() => {
-		if (target !== null) {
-			previousTarget.current = target;
-			return;
-		}
-		if (previousTarget.current === null) return;
-		const link = document.getElementById(ticketRowId(previousTarget.current))?.querySelector("a");
-		const destination = link ?? listRef.current;
-		if (destination) {
-			destination.focus();
-			previousTarget.current = null;
-			return;
-		}
-		// The lists mount only after a read. Until then, wait; a failed read never mounts them.
-		if (!poll.read && poll.error && listPageRef.current) {
-			listPageRef.current.focus();
-			previousTarget.current = null;
-		}
-	});
+		if (target !== null) returnTo.current = target;
+	}, [target]);
+	// Back from an issue's details, focus returns to its row, else the list: the lists mount only after a read.
+	useEffect(() => {
+		if (target !== null || returnTo.current === null) return;
+		const destination = document.getElementById(ticketRowId(returnTo.current))?.querySelector("a") ?? listRef.current;
+		if (!destination) return;
+		destination.focus();
+		returnTo.current = null;
+	}, [target, poll.read]);
 	useReveal(target === null ? section : null, folds, { token: section, block: "start", focus: true });
 
 	if (target !== null) {
 		const listed = tickets.find(ticket => ticket.id === target) ?? null;
 		return (
-			<PageFrame title={target} meta={(detailRead.data ?? listed)?.title ?? "Linear issue"}>
-				<TooltipProvider>
-					<div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-6">
-						<Button variant="ghost" leadingIcon={ArrowLeft} render={<a href={hashForTickets(null)} />}>
-							Back to tickets
-						</Button>
-						{quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
-						<TicketDetailContent
-							key={target}
-							id={target}
-							listed={listed}
-							read={detailRead}
-							actions={ticket => (
-								<DetailQuickActions
-									actions={ticketActions(ticket)}
-									pending={pendingOf(quick, { kind: "ticket", id: target })}
-									onRun={action => {
-										if (action === "work" || action === "plan") start(ticket, action);
-									}}
-									sessions={sessionsOn({ kind: "ticket", id: target }, hosts)}
-									onOpen={open}
-								/>
-							)}
+			<DetailPage
+				title={target}
+				meta={(detailRead.data ?? listed)?.title ?? "Linear issue"}
+				backHref={hashForTickets(null)}
+				backLabel="Back to tickets"
+				notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
+			>
+				<TicketDetailContent
+					key={target}
+					id={target}
+					listed={listed}
+					read={{ ...detailRead, reload: () => setVersion(count => count + 1) }}
+					actions={ticket => (
+						<DetailQuickActions
+							actions={ticketActions(ticket)}
+							pending={pendingOf(quick, { kind: "ticket", id: target })}
+							onRun={action => {
+								if (action === "work" || action === "plan") start(ticket, action);
+							}}
+							sessions={sessionsOn({ kind: "ticket", id: target }, hosts)}
+							onOpen={open}
 						/>
-					</div>
-				</TooltipProvider>
-			</PageFrame>
+					)}
+				/>
+			</DetailPage>
 		);
 	}
 
@@ -155,7 +142,6 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 			onRefresh={() => void ticketsStore.refresh(null, { fresh: true })}
 			notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 			spacing="space-y-4"
-			contentRef={listPageRef}
 		>
 			{() => {
 				const groups = ticketGroups(tickets);

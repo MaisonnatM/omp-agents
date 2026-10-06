@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Ticket } from "../src/shared";
-import { ticketGroups } from "./tickets-model";
+import { statusOrder, ticketGroups } from "./tickets-model";
 
 describe("ticket groups", () => {
 	const ticket = (id: string, fields: Partial<Ticket>): Ticket => ({
@@ -52,5 +52,19 @@ describe("ticket groups", () => {
 			ticket("high", { priority: 2 }),
 		]);
 		expect(groups).toEqual([["Todo", ["urgent", "high", "medium-new", "medium-old", "low", "none"]]]);
+	});
+});
+
+describe("status order", () => {
+	test("puts In Review first, then follows the page's groups, so the picker reads as the page does", () => {
+		const statuses = [
+			{ status: "Backlog", statusType: "backlog" },
+			{ status: "Todo", statusType: "unstarted" },
+			{ status: "In Progress", statusType: "started" },
+			{ status: "Triage", statusType: "triage" },
+			{ status: "In Review", statusType: "started" },
+			{ status: "Blocked", statusType: "started" },
+		] as const;
+		expect(statuses.toSorted(statusOrder).map(({ status }) => status)).toEqual(["In Review", "Triage", "Blocked", "In Progress", "Todo", "Backlog"]);
 	});
 });

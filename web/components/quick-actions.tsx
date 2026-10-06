@@ -27,11 +27,14 @@ export interface QuickActionsProps {
 	onRun(action: QuickActionId): void;
 }
 
-/** A row's menu of `actions`, named by `label`; nothing when there is none. */
-export function QuickActionsMenu({ actions, pending, onRun, label }: QuickActionsProps & { label: string }) {
+/**
+ * A row's menu of `actions`, named by `label`; nothing when there is none.
+ * `open` and `onOpenChange` let a keyboard shortcut open it; without them it keeps its own state.
+ */
+export function QuickActionsMenu({ actions, pending, onRun, label, open, onOpenChange }: QuickActionsProps & { label: string; open?: boolean; onOpenChange?: (open: boolean) => void }) {
 	if (actions.length === 0) return null;
 	return (
-		<DropdownMenu>
+		<DropdownMenu open={open} onOpenChange={onOpenChange}>
 			<Tooltip content={label}>
 				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={label} loading={pending !== null} />}>
 					<Zap />

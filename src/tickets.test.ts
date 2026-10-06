@@ -1,10 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { uploadAddress } from "./linear-uploads";
 import { linearMarkdown, parseIssueDetail, parseIssues, parsePage, parseTicketOptions } from "./tickets";
 
 const signed = (path: string): string => `https://uploads.linear.app${path}?signature=x`;
 const proxied = (path: string): string => `/api/ticket/media?issue=ENG-1&path=${encodeURIComponent(path)}`;
-const media = (url: string): string => uploadAddress("ENG-1", url);
 
 const issue = (id: string, fields: Record<string, unknown> = {}) => ({
 	id,
@@ -19,6 +17,7 @@ const issue = (id: string, fields: Record<string, unknown> = {}) => ({
 	dueDate: null,
 	updatedAt: "2026-10-01T14:46:18.399Z",
 	gitBranchName: `${id.toLowerCase()}-issue`,
+	teamId: "t-1",
 	...fields,
 });
 
@@ -90,7 +89,7 @@ describe("linearMarkdown", () => {
 			`<linear-image>{"type":"image","attrs":{"src":"${signed("/a/b")}"}}</linear-image>`,
 			"<linear-image>{}</linear-image>",
 		].join("\n");
-		expect(linearMarkdown(text, media)).toBe(`Fixed in [ENG-2305](<https://linear.app/acme/issue/ENG-2305/count>); see\n![image](<${proxied("/a/b")}>)\n`);
+		expect(linearMarkdown(text, "ENG-1")).toBe(`Fixed in [ENG-2305](<https://linear.app/acme/issue/ENG-2305/count>); see\n![image](<${proxied("/a/b")}>)\n`);
 	});
 
 	test("plays a video embed, links another embedded file, and loads every Linear upload through the server", () => {
@@ -100,7 +99,7 @@ describe("linearMarkdown", () => {
 			`<linear-embed node-type="file">{"src":"${signed("/org/f")}"}</linear-embed>`,
 			`[log](<${signed("/org/log")}>) and [docs](<https://example.com/a?b=c>)`,
 		].join("\n");
-		expect(linearMarkdown(text, media)).toBe(
+		expect(linearMarkdown(text, "ENG-1")).toBe(
 			[
 				"Recording:\n\n",
 				`<video controls preload="metadata" src="${proxied("/org/v")}"></video>\n\n`,
@@ -135,7 +134,7 @@ describe("parseIssueDetail", () => {
 				comment("root", "2026-09-02T00:00:00.000Z", null),
 			],
 		});
-		const detail = parseIssueDetail(issueText, commentsText, colors, media);
+		const detail = parseIssueDetail(issueText, commentsText, colors);
 		expect(detail.labels).toEqual([{ name: "Front", color: "#f2c94c" }]);
 		expect(detail.description).toBe("Do it");
 		expect(detail.createdBy).toBe("Grace");
@@ -150,18 +149,19 @@ describe("parseIssueDetail", () => {
 	});
 
 	test("reads an issue without an assignee as unassigned", () => {
-		const detail = parseIssueDetail(JSON.stringify(issue("ENG-1", { assignee: null, assigneeId: null })), JSON.stringify({ comments: [] }), colors, media);
+		const detail = parseIssueDetail(JSON.stringify(issue("ENG-1", { assignee: null, assigneeId: null })), JSON.stringify({ comments: [] }), colors);
 		expect(detail.assignee).toBeNull();
 	});
 
-	test("throws when get_issue answers no issue", () => {
-		expect(() => parseIssueDetail("Issue not found", JSON.stringify({ comments: [] }), colors, media)).toThrow("get_issue answered something other than JSON");
-		expect(() => parseIssueDetail(JSON.stringify({ title: "No id" }), JSON.stringify({ comments: [] }), colors, media)).toThrow("without an issue");
+	test("throws when get_issue answers no issue, or one without its team", () => {
+		expect(() => parseIssueDetail("Issue not found", JSON.stringify({ comments: [] }), colors)).toThrow("get_issue answered something other than JSON");
+		expect(() => parseIssueDetail(JSON.stringify({ title: "No id" }), JSON.stringify({ comments: [] }), colors)).toThrow("without an issue");
+		expect(() => parseIssueDetail(JSON.stringify(issue("ENG-1", { teamId: undefined })), JSON.stringify({ comments: [] }), colors)).toThrow("without its team's id");
 	});
 });
 
 describe("parseTicketOptions", () => {
-	test("orders states as Linear's workflow does, keeps only active people and live labels, and sorts the rest by name", () => {
+	test("keeps the states as Linear lists them, only active people and live labels, and sorts the rest by name", () => {
 		const statuses = JSON.stringify([
 			{ id: "s-done", type: "completed", name: "Done" },
 			{ id: "s-dup", type: "duplicate", name: "Duplicate" },
@@ -173,27 +173,24 @@ describe("parseTicketOptions", () => {
 			statuses,
 			[{ id: "u-2", name: "Zoe", isActive: true }, { id: "u-3", name: "Gone", isActive: false }, { id: "u-1", name: "Ada" }],
 			[{ id: "l-1", name: "Front", color: "#f00", archivedAt: null }, { id: "l-2", name: "Old", archivedAt: "2026-01-01" }, { id: "l-3", name: "Bug" }],
-			[{ id: "P-2", name: "Widget" }, { id: "P-1", name: "Analytics" }, { name: "No id" }],
+			[{ id: "P-2", name: "Widget" }, { id: "P-1", name: "Analytics" }, { id: "P-3" }],
 		);
 		expect(options).toEqual({
 			statuses: [
-				{ id: "s-back", name: "Backlog", type: "backlog" },
-				{ id: "s-todo", name: "Todo", type: "unstarted" },
-				{ id: "s-done", name: "Done", type: "completed" },
-				{ id: "s-dup", name: "Duplicate", type: "canceled" },
+				{ status: "Done", statusType: "completed" },
+				{ status: "Duplicate", statusType: "canceled" },
+				{ status: "Todo", statusType: "unstarted" },
+				{ status: "Backlog", statusType: "backlog" },
 			],
 			users: [
 				{ id: "u-1", name: "Ada" },
 				{ id: "u-2", name: "Zoe" },
 			],
 			labels: [
-				{ id: "l-3", name: "Bug", color: "" },
-				{ id: "l-1", name: "Front", color: "#f00" },
+				{ name: "Bug", color: "" },
+				{ name: "Front", color: "#f00" },
 			],
-			projects: [
-				{ id: "P-1", name: "Analytics" },
-				{ id: "P-2", name: "Widget" },
-			],
+			projects: ["Analytics", "Widget"],
 		});
 	});
 });

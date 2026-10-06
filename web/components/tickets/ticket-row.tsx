@@ -15,20 +15,21 @@ import {
 	SignalLow,
 	SignalMedium,
 } from "lucide-react";
-import type { RosterHost, Ticket, TicketPriority, TicketStatusType, View } from "../../../src/shared";
+import type { RosterHost, Ticket, TicketPriority, TicketStatus, View } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { age } from "../../labels";
 import { type QuickActionId, type TicketActionId, ticketActions } from "../../quick-actions";
 import { hashForTickets, type OpenMode } from "../../routing";
-import { inReview, PRIORITY_LABEL } from "../../tickets-model";
+import { PRIORITY_LABEL, type StatusKind, statusKind } from "../../tickets-model";
 import { IconTip } from "../inbox/avatars";
 import { AddToTodo } from "../add-to-todo";
 import { QuickActionsMenu } from "../quick-actions";
 import { LiveSessionChips } from "../session-chip";
 
-/** Linear's glyph for each state type. */
-export const STATUS_ICON: Record<TicketStatusType, [LucideIcon, string]> = {
+/** Linear's glyph for each state type, and In Review's own green one. */
+const STATUS_ICON: Record<StatusKind, [LucideIcon, string]> = {
+	review: [CircleDot, "text-green-600 dark:text-green-400"],
 	triage: [CircleArrowOutUpRight, "text-orange-500 dark:text-orange-400"],
 	started: [Contrast, "text-amber-500 dark:text-amber-400"],
 	unstarted: [Circle, "text-muted-foreground"],
@@ -37,9 +38,7 @@ export const STATUS_ICON: Record<TicketStatusType, [LucideIcon, string]> = {
 	canceled: [CircleX, "text-muted-foreground"],
 };
 
-/** In Review is a started state in Linear, and it gets its own green mark so it does not look like In Progress. */
-export const statusIcon = (status: string, type: TicketStatusType): [LucideIcon, string] =>
-	inReview(status) ? [CircleDot, "text-green-600 dark:text-green-400"] : STATUS_ICON[type];
+export const statusIcon = (status: TicketStatus): [LucideIcon, string] => STATUS_ICON[statusKind(status)];
 
 export const PRIORITY_ICON: Record<TicketPriority, [LucideIcon, string]> = {
 	0: [Ellipsis, "text-muted-foreground"],
@@ -75,7 +74,7 @@ export function TicketRow({ ticket, sessions, onOpen, pending, onQuickAction }: 
 				>
 					<IconTip icon={[...PRIORITY_ICON[ticket.priority], PRIORITY_LABEL[ticket.priority]]} />
 					<span className="w-20 shrink-0 truncate font-mono text-xs tabular-nums text-muted-foreground">{ticket.id}</span>
-					<IconTip icon={[...statusIcon(ticket.status, ticket.statusType), ticket.status]} />
+					<IconTip icon={[...statusIcon(ticket), ticket.status]} />
 					<span className="min-w-0 flex-1 truncate">{ticket.title}</span>
 					{ticket.labels.length > 0 && (
 						<span className="hidden max-w-64 shrink items-center gap-1 overflow-hidden md:flex">

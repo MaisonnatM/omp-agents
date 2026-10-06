@@ -30,22 +30,36 @@ function expiryOf(url: URL): number {
 	return Date.now() + DEFAULT_TTL_MS;
 }
 
-/**
- * The address the page loads `address` from: for one of Linear's uploads, this server's media route, which remembers
- * the signed address; any other address unchanged.
- */
-export function uploadAddress(issue: string, address: string): string {
-	let url: URL;
+/** Every Linear upload address in a text; it stops at a quote, a bracket, or a backslash, so it also reads raw tool JSON. */
+const UPLOAD_URL = /https:\/\/uploads\.linear\.app\/[^\s"'<>()[\]\\]+/g;
+
+/** `address` as a URL when it is one of Linear's uploads. */
+function uploadUrl(address: string): URL | null {
 	try {
-		url = new URL(address);
+		const url = new URL(address);
+		return url.host === HOST && UPLOAD_PATH.test(url.pathname) ? url : null;
 	} catch {
-		return address;
+		return null;
 	}
-	if (url.host !== HOST || !UPLOAD_PATH.test(url.pathname)) return address;
+}
+
+/** `text` with each of Linear's upload addresses made this server's media route for issue `issue`; the rest unchanged. */
+export const proxyUploads = (issue: string, text: string): string =>
+	text.replace(UPLOAD_URL, address => {
+		const url = uploadUrl(address);
+		return url ? `${TICKET_MEDIA_PATH}?${new URLSearchParams({ issue, path: url.pathname })}` : address;
+	});
+
+/** Keeps the signed address of each upload in `texts`, the raw answers of Linear's tools, for the media route to fetch. */
+export function rememberUploads(...texts: string[]): void {
 	const now = Date.now();
 	for (const [path, entry] of signed) if (entry.expiresAt <= now) signed.delete(path);
-	signed.set(url.pathname, { url: url.href, expiresAt: expiryOf(url) });
-	return `${TICKET_MEDIA_PATH}?${new URLSearchParams({ issue, path: url.pathname })}`;
+	for (const text of texts) {
+		for (const [address] of text.matchAll(UPLOAD_URL)) {
+			const url = uploadUrl(address);
+			if (url) signed.set(url.pathname, { url: url.href, expiresAt: expiryOf(url) });
+		}
+	}
 }
 
 export const isUploadPath = (path: string): boolean => UPLOAD_PATH.test(path);
@@ -57,10 +71,10 @@ function current(path: string): string | undefined {
 
 /**
  * Upload `path` as Linear serves it, the `range` header passed on, or `null` when no read of its issue names it.
- * `refresh` reads the issue again, which signs its uploads anew; it runs when the kept address expired, or Linear
- * refused it.
+ * `refresh` reads the issue again and `rememberUploads` its answers, which signs its uploads anew; it runs when the kept
+ * address expired, or Linear refused it.
  */
-export async function serveUpload(path: string, range: string | null, signal: AbortSignal, refresh: () => Promise<unknown>): Promise<Response | null> {
+export async function serveUpload(path: string, range: string | null, signal: AbortSignal, refresh: () => Promise<void>): Promise<Response | null> {
 	const read = (url: string) => fetch(url, { headers: range ? { range } : {}, signal });
 	let url = current(path);
 	if (!url) {

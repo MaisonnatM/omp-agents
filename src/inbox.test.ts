@@ -259,14 +259,15 @@ describe("parseDetailAnswer", () => {
 		},
 	});
 
-	test("lists failing checks first, an unfinished run as pending, and a commit status by its context", () => {
-		const { checks } = parseDetailAnswer(
+	test("lists failing checks first, an unfinished run as pending, and a commit status by its context, beside GitHub's rollup", () => {
+		const { checkRuns, checks, unresolved } = parseDetailAnswer(
 			answer({
 				commits: {
 					nodes: [
 						{
 							commit: {
 								statusCheckRollup: {
+									state: "FAILURE",
 									contexts: {
 										nodes: [
 											{ name: "lint", status: "COMPLETED", conclusion: "SUCCESS", detailsUrl: "https://ci.example/lint" },
@@ -284,7 +285,9 @@ describe("parseDetailAnswer", () => {
 			}),
 			pr,
 		);
-		expect(checks).toEqual([
+		expect(checks).toBe("failing");
+		expect(unresolved).toEqual({ count: 0, exact: true });
+		expect(checkRuns).toEqual([
 			{ name: "deploy", state: "failing", url: "https://ci.example/deploy" },
 			{ name: "test", state: "failing", url: null },
 			{ name: "build", state: "pending", url: null },

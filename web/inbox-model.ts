@@ -1,6 +1,6 @@
 /** Pull request links, what each pull request waits on next, the inbox's sections and stacks, and what stands between a pull request and its merge. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type CheckState, type HostStatus, type Inbox, type InboxPullRequest, type PullRequest, type PullRequestDetail, type Repo, type ReviewDecision, type RosterHost, prKey, repoKey, samePullRequest } from "../src/shared";
+import { type HostStatus, type Inbox, type InboxPullRequest, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, type RosterHost, prKey, repoKey, samePullRequest } from "../src/shared";
 import { sessionsOn } from "./sessions";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
@@ -58,20 +58,15 @@ export const agentOn = (hosts: RosterHost[]): AgentOn => pr => {
 	return statuses.has("needs-input") ? "needs-input" : statuses.has("working") ? "working" : null;
 };
 
-interface MergeFacts {
-	state: PullRequestDetail["state"];
-	review: ReviewDecision;
-	conflicts: boolean;
-	checks: CheckState;
-	/** Some review thread waits for a resolution, or GitHub listed too few threads to tell. */
-	threadsOpen: boolean;
-}
+/** What decides whether a pull request can merge, as a list entry and the details both carry it. */
+type MergeFacts = Pick<InboxPullRequest, "review" | "checks" | "conflicts" | "unresolved"> & { state: PullRequestDetail["state"] };
+
+/** Some review thread waits for a resolution, or GitHub listed too few threads to tell. */
+const hasOpenThreads = ({ unresolved }: Pick<MergeFacts, "unresolved">): boolean => unresolved.count > 0 || !unresolved.exact;
 
 /** Open, approved or needing no review, its checks passed or absent, no conflicts, and no review thread left open. */
-const readyToMerge = ({ state, review, conflicts, checks, threadsOpen }: MergeFacts): boolean =>
-	state === "open" && (review === "approved" || review === "none") && !conflicts && (checks === "passing" || checks === "none") && !threadsOpen;
-
-const hasOpenThreads = ({ unresolved }: InboxPullRequest): boolean => unresolved.count > 0 || !unresolved.exact;
+const readyToMerge = (facts: MergeFacts): boolean =>
+	facts.state === "open" && (facts.review === "approved" || facts.review === "none") && !facts.conflicts && (facts.checks === "passing" || facts.checks === "none") && !hasOpenThreads(facts);
 
 /** What `pr` waits on next, given where the sessions on it stand. */
 export function moveOf(pr: InboxPullRequest, agent: AgentState | null): MoveId {
@@ -84,7 +79,7 @@ export function moveOf(pr: InboxPullRequest, agent: AgentState | null): MoveId {
 	if (pr.checks === "failing") return "fix-ci";
 	if (pr.review === "changes-requested" || hasOpenThreads(pr)) return "reply";
 	if (pr.state === "draft") return "draft";
-	if (readyToMerge({ state: pr.state, review: pr.review, conflicts: pr.conflicts, checks: pr.checks, threadsOpen: hasOpenThreads(pr) })) return "merge";
+	if (readyToMerge(pr)) return "merge";
 	if (pr.checks === "pending") return "checks-running";
 	return "in-review";
 }
@@ -347,27 +342,26 @@ export type StatusItem =
 	| { kind: "changes-requested"; by: string[] }
 	| { kind: "approved"; by: string[] }
 	| { kind: "review-required"; waitingOn: string[] }
-	| { kind: "threads"; count: number }
+	| { kind: "threads"; count: number; exact: boolean }
 	| { kind: "ready" };
 
 /** What stands between an open or draft pull request and its merge, blockers first; nothing once it is merged or closed. */
 export function pullRequestStatus(detail: PullRequestDetail): StatusItem[] {
 	if (detail.state === "merged" || detail.state === "closed") return [];
-	const count = (state: PullRequestDetail["checks"][number]["state"]): number => detail.checks.filter(check => check.state === state).length;
+	const count = (state: PullRequestCheck["state"]): number => detail.checkRuns.filter(check => check.state === state).length;
 	const by = (state: PullRequestDetail["reviewers"][number]["state"]): string[] => detail.reviewers.filter(reviewer => reviewer.state === state).map(({ login }) => login);
 	const failing = count("failing");
 	const pending = count("pending");
-	const checks: CheckState = failing > 0 ? "failing" : pending > 0 ? "pending" : detail.checks.length > 0 ? "passing" : "none";
 	const items: StatusItem[] = [];
-	if (readyToMerge({ state: detail.state, review: detail.review, conflicts: detail.conflicts, checks, threadsOpen: detail.threads.length > 0 })) items.push({ kind: "ready" });
+	if (readyToMerge(detail)) items.push({ kind: "ready" });
 	if (detail.state === "draft") items.push({ kind: "draft" });
 	if (detail.conflicts) items.push({ kind: "conflicts", base: detail.base });
 	if (failing > 0) items.push({ kind: "checks-failing", count: failing });
 	if (detail.review === "changes-requested") items.push({ kind: "changes-requested", by: by("changes-requested") });
-	if (detail.threads.length > 0) items.push({ kind: "threads", count: detail.threads.length });
+	if (hasOpenThreads(detail)) items.push({ kind: "threads", count: detail.unresolved.count, exact: detail.unresolved.exact });
 	if (pending > 0) items.push({ kind: "checks-pending", count: pending });
 	if (detail.review === "review-required") items.push({ kind: "review-required", waitingOn: by("requested") });
 	if (detail.review === "approved") items.push({ kind: "approved", by: by("approved") });
-	if (checks === "passing") items.push({ kind: "checks-passing", passed: count("passing"), skipped: count("skipped") });
+	if (detail.checks === "passing") items.push({ kind: "checks-passing", passed: count("passing"), skipped: count("skipped") });
 	return items;
 }

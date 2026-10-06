@@ -17,11 +17,10 @@ import type { WorktreeAt } from "./git";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
 import { LineReader } from "./line-reader";
-import type { SessionFacts } from "./live-session";
 import { HOME } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
-import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo, SHIP_STAGES, SHIP_WORK, type ShipProgress, TICKET_ID } from "./shared";
+import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo, SHIP_STAGES, SHIP_WORK, type SessionFacts, type ShipProgress, TICKET_ID } from "./shared";
 
 /** `me/fe-trust-7: https://app.graphite.com/github/pr/acme/webapp/6596 (created)` */
 const GT_SUBMITTED = /^\S+: https:\/\/app\.graphite\.com\/github\/pr\/([\w.-]+)\/([\w.-]+)\/(\d+)\S* \((?:created|updated)\)[ \t\r]*$/gm;
@@ -45,7 +44,12 @@ const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "mcp__lin
 const LINEAR_TOOL = /^(?:xd_)?mcp__linear_(\w+)$/;
 const LINEAR_DEVICE = /^xd:\/\/mcp__linear_(\w+)$/;
 /** The Linear tools that act on one issue, and the argument that names it. */
-const LINEAR_ISSUE_ARG = { get_issue: "id", save_issue: "id", list_comments: "issueId", save_comment: "issueId" } as const;
+const LINEAR_ISSUE_ARG = new Map([
+	["get_issue", "id"],
+	["save_issue", "id"],
+	["list_comments", "issueId"],
+	["save_comment", "issueId"],
+]);
 const isShipStage = oneOf(SHIP_STAGES);
 const isShipWork = oneOf(SHIP_WORK);
 
@@ -223,8 +227,9 @@ export class SessionFactsScan {
 	}
 
 	#linear(callId: string, tool: string, args: Record<string, unknown>): void {
-		if (!Object.hasOwn(LINEAR_ISSUE_ARG, tool)) return;
-		const named = args[LINEAR_ISSUE_ARG[tool as keyof typeof LINEAR_ISSUE_ARG]];
+		const arg = LINEAR_ISSUE_ARG.get(tool);
+		if (!arg) return;
+		const named = args[arg];
 		if (typeof named === "string") this.#ticket(named);
 		else if (tool === "save_issue") this.#opening.add(callId);
 	}

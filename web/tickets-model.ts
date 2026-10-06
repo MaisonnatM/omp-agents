@@ -1,5 +1,5 @@
-/** The tickets page's status groups. In Review leads; the rest follow Linear's My issues order. */
-import { TICKET_STATUS_TYPES, type Ticket, type TicketPriority, type TicketStatusType } from "../src/shared";
+/** The tickets page's status groups and the status picker's order. In Review leads; the rest follow Linear's My issues order. */
+import { TICKET_STATUS_TYPES, type Ticket, type TicketPriority, type TicketStatus } from "../src/shared";
 import { type SectionTarget, sectionId } from "./section";
 
 export const PRIORITY_LABEL: Record<TicketPriority, string> = {
@@ -13,18 +13,26 @@ export const PRIORITY_LABEL: Record<TicketPriority, string> = {
 /** Urgent first, then high, medium, and low; no priority after all of them. */
 const priorityRank = (priority: TicketPriority): number => (priority === 0 ? 5 : priority);
 
-export interface TicketGroup {
-	/** The workflow state's name, which names the group. */
-	status: string;
-	statusType: TicketStatusType;
+export interface TicketGroup extends TicketStatus {
 	/** By priority, then most recently updated first. */
 	tickets: Ticket[];
 }
 
-/** Linear's In Review state. It leads the tickets page, ahead of every other workflow state. */
-export const inReview = (status: string): boolean => status.trim().toLowerCase() === "in review";
+/**
+ * What a status looks and sorts as: its state type, except In Review, which Linear makes a started state but this
+ * page leads with and marks on its own so it does not look like In Progress.
+ */
+export type StatusKind = "review" | TicketStatus["statusType"];
 
-/** The tickets grouped by workflow state. In Review first, then Linear's state-type order, then name. */
+const STATUS_KINDS: readonly StatusKind[] = ["review", ...TICKET_STATUS_TYPES];
+
+export const statusKind = ({ status, statusType }: TicketStatus): StatusKind => (status.trim().toLowerCase() === "in review" ? "review" : statusType);
+
+/** In Review first, then Linear's state-type order, then name: the order of the groups and of the status picker. */
+export const statusOrder = (a: TicketStatus, b: TicketStatus): number =>
+	STATUS_KINDS.indexOf(statusKind(a)) - STATUS_KINDS.indexOf(statusKind(b)) || a.status.localeCompare(b.status);
+
+/** The tickets grouped by workflow state, in `statusOrder`. */
 export function ticketGroups(tickets: Ticket[]): TicketGroup[] {
 	const groups = new Map<string, TicketGroup>();
 	const sorted = tickets.toSorted((a, b) => priorityRank(a.priority) - priorityRank(b.priority) || b.updatedAt.localeCompare(a.updatedAt));
@@ -33,9 +41,7 @@ export function ticketGroups(tickets: Ticket[]): TicketGroup[] {
 		if (group) group.tickets.push(ticket);
 		else groups.set(ticket.status, { status: ticket.status, statusType: ticket.statusType, tickets: [ticket] });
 	}
-	return [...groups.values()].sort(
-		(a, b) => Number(inReview(b.status)) - Number(inReview(a.status)) || TICKET_STATUS_TYPES.indexOf(a.statusType) - TICKET_STATUS_TYPES.indexOf(b.statusType) || a.status.localeCompare(b.status),
-	);
+	return [...groups.values()].sort(statusOrder);
 }
 
 /** A status group of the tickets page, which a sidebar link scrolls to. */

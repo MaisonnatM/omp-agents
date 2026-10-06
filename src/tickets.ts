@@ -6,7 +6,7 @@
 import { createCache } from "./cache";
 import { isObject, num, oneOf, str } from "./json";
 import { linearServer } from "./linear";
-import { serveUpload, uploadAddress } from "./linear-uploads";
+import { proxyUploads, rememberUploads, serveUpload } from "./linear-uploads";
 import { callMcpTool, type McpServer, toolJson } from "./omp/mcp";
 import {
 	TICKET_ID,
@@ -41,9 +41,6 @@ const CLOSED_STATES: readonly string[] = ["completed", "canceled", "duplicate"];
 
 /** Every open state type in full, and closed ones updated lately. */
 const QUERIES: Record<string, unknown>[] = QUERY_STATES.map(state => (CLOSED_STATES.includes(state) ? { state, updatedAt: `-P${CLOSED_DAYS}D` } : { state }));
-
-/** Linear's workflow order, which its status menu follows. */
-const WORKFLOW_ORDER: TicketStatusType[] = ["triage", "backlog", "unstarted", "started", "completed", "canceled"];
 
 const isPriority = oneOf(TICKET_PRIORITIES);
 const isStatusType = oneOf(TICKET_STATUS_TYPES);
@@ -114,30 +111,30 @@ function tagSrc(json: string): string | undefined {
 	}
 }
 
-const UPLOAD_URL = /https:\/\/uploads\.linear\.app\/[^\s"'<>()[\]\\]+/g;
-
 /**
  * Linear's markdown with its own tags made plain markdown: an issue mention becomes a link to the issue, an image an
- * image link, a video a `<video>` player, and another embedded file a link. `media` gives the address the page loads
- * each of Linear's uploads from.
+ * image link, a video a `<video>` player, and another embedded file a link. Each of Linear's uploads loads from this
+ * server's media route for `issue`.
  */
-export function linearMarkdown(text: string, media: (url: string) => string): string {
-	return text
-		.replace(/<issue\b[^>]*\bhref="([^"]+)"[^>]*>(.*?)<\/issue>/gs, (_, href: string, label: string) => `[${label}](<${href}>)`)
-		.replace(/<linear-image>(.*?)<\/linear-image>/gs, (_, json: string) => {
-			const src = tagSrc(json);
-			return src ? `![image](<${src}>)` : "";
-		})
-		.replace(/<linear-embed\b([^>]*)>(.*?)<\/linear-embed>/gs, (_, attrs: string, json: string) => {
-			const src = tagSrc(json);
-			if (!src) return "";
-			return /\bnode-type="video"/.test(attrs) ? `\n\n<video controls preload="metadata" src="${src}"></video>\n\n` : `[Attached file](<${src}>)`;
-		})
-		.replace(UPLOAD_URL, url => media(url));
+export function linearMarkdown(text: string, issue: string): string {
+	return proxyUploads(
+		issue,
+		text
+			.replace(/<issue\b[^>]*\bhref="([^"]+)"[^>]*>(.*?)<\/issue>/gs, (_, href: string, label: string) => `[${label}](<${href}>)`)
+			.replace(/<linear-image>(.*?)<\/linear-image>/gs, (_, json: string) => {
+				const src = tagSrc(json);
+				return src ? `![image](<${src}>)` : "";
+			})
+			.replace(/<linear-embed\b([^>]*)>(.*?)<\/linear-embed>/gs, (_, attrs: string, json: string) => {
+				const src = tagSrc(json);
+				if (!src) return "";
+				return /\bnode-type="video"/.test(attrs) ? `\n\n<video controls preload="metadata" src="${src}"></video>\n\n` : `[Attached file](<${src}>)`;
+			}),
+	);
 }
 
 /** The comments of one `list_comments` answer as threads, oldest first; a reply whose first comment is missing starts its own. */
-function parseThreads(toolText: string, media: (url: string) => string): TicketComment[][] {
+function parseThreads(toolText: string, issue: string): TicketComment[][] {
 	const data = toolJson("Linear", "list_comments", toolText);
 	const raw = isObject(data) && Array.isArray(data.comments) ? data.comments.filter(isObject) : [];
 	const comments = raw
@@ -145,7 +142,7 @@ function parseThreads(toolText: string, media: (url: string) => string): TicketC
 			id: str(comment.id) ?? "",
 			parentId: str(comment.parentId) ?? null,
 			author: (isObject(comment.author) ? str(comment.author.name) : undefined) ?? "Someone",
-			body: linearMarkdown(str(comment.body) ?? "", media),
+			body: linearMarkdown(str(comment.body) ?? "", issue),
 			createdAt: str(comment.createdAt) ?? "",
 		}))
 		.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -158,26 +155,28 @@ function parseThreads(toolText: string, media: (url: string) => string): TicketC
 	return [...threads.values()];
 }
 
-/** One issue in full from the texts of its `get_issue` and `list_comments` answers; `media` as for `linearMarkdown`. */
-export function parseIssueDetail(issueText: string, commentsText: string, colors: LabelColors, media: (url: string) => string): TicketDetail {
+/** One issue in full from the texts of its `get_issue` and `list_comments` answers. */
+export function parseIssueDetail(issueText: string, commentsText: string, colors: LabelColors): TicketDetail {
 	const raw = toolJson("Linear", "get_issue", issueText);
 	const ticket = parseIssue(raw, colors);
 	if (!ticket || !isObject(raw)) throw new Error("Linear's get_issue answered without an issue");
+	const teamId = str(raw.teamId);
+	if (!teamId) throw new Error(`Linear's get_issue answered ${ticket.id} without its team's id`);
 	const attachments = Array.isArray(raw.attachments) ? raw.attachments.filter(isObject) : [];
 	const assigneeId = str(raw.assigneeId);
 	const assignee = str(raw.assignee);
 	return {
 		...ticket,
-		description: linearMarkdown(str(raw.description) ?? "", media),
+		description: linearMarkdown(str(raw.description) ?? "", ticket.id),
 		createdBy: str(raw.createdBy) ?? null,
 		createdAt: str(raw.createdAt) ?? ticket.updatedAt,
 		assignee: assigneeId && assignee ? { id: assigneeId, name: assignee } : null,
-		teamId: str(raw.teamId) ?? "",
+		teamId,
 		attachments: attachments.flatMap(attachment => {
 			const url = str(attachment.url);
 			return url ? [{ title: str(attachment.title) || url, url }] : [];
 		}),
-		threads: parseThreads(commentsText, media),
+		threads: parseThreads(commentsText, ticket.id),
 	};
 }
 
@@ -195,12 +194,12 @@ async function allPages<T>(server: McpServer, tool: string, args: Record<string,
 }
 
 /** Live labels with their colors from `list_issue_labels` answers. */
-function parseLabels(labels: Record<string, unknown>[]): (TicketChoice & TicketLabel)[] {
+function parseLabels(labels: Record<string, unknown>[]): TicketLabel[] {
 	return labels
 		.filter(label => !label.archivedAt)
 		.flatMap(raw => {
-			const choice = choiceOf(raw);
-			return choice ? [{ ...choice, color: str(raw.color) ?? "" }] : [];
+			const name = str(raw.name);
+			return name ? [{ name, color: str(raw.color) ?? "" }] : [];
 		});
 }
 
@@ -238,23 +237,28 @@ export async function loadTickets(fresh: boolean): Promise<TicketsAnswer> {
 	return { tickets: await loaded.get("", () => queryTickets(fresh), fresh) };
 }
 
+/** The raw `get_issue` and `list_comments` answers for issue `id`. */
+const readIssueTexts = (server: McpServer, id: string): Promise<[string, string]> =>
+	Promise.all([callMcpTool(server, "get_issue", { id }), callMcpTool(server, "list_comments", { issueId: id, limit: PAGE })]);
+
 /** Issue `id` (`ENG-2368`) in full, with its description and comments; a failed read throws Linear's or omp's message. */
 export async function loadTicketDetail(id: string): Promise<TicketDetail> {
 	const server = await linearServer();
-	const [issue, comments, colors] = await Promise.all([
-		callMcpTool(server, "get_issue", { id }),
-		callMcpTool(server, "list_comments", { issueId: id, limit: PAGE }),
-		loadLabelColors(server, [id]),
-	]);
-	return parseIssueDetail(issue, comments, colors, url => uploadAddress(id, url));
+	const [[issue, comments], colors] = await Promise.all([readIssueTexts(server, id), loadLabelColors(server, [id])]);
+	rememberUploads(issue, comments);
+	return parseIssueDetail(issue, comments, colors);
 }
 
 /** The files of one issue whose addresses expired share one read of the issue, which signs them all anew. */
-const resigned = createCache<TicketDetail>(10_000);
+const resigned = createCache<void>(10_000);
 
 /** Upload `path` that issue `id` embeds, as `serveUpload` answers it. */
 export const loadTicketMedia = (id: string, path: string, range: string | null, signal: AbortSignal): Promise<Response | null> =>
-	serveUpload(path, range, signal, () => resigned.get(id, () => loadTicketDetail(id)));
+	serveUpload(path, range, signal, () =>
+		resigned.get(id, async () => {
+			rememberUploads(...(await readIssueTexts(await linearServer(), id)));
+		}),
+	);
 
 function choiceOf(raw: Record<string, unknown>): TicketChoice | null {
 	const id = str(raw.id);
@@ -269,24 +273,20 @@ export function parseTicketOptions(statusesText: string, users: Record<string, u
 	const statuses = toolJson("Linear", "list_issue_statuses", statusesText);
 	if (!Array.isArray(statuses)) throw new Error("Linear's list_issue_statuses answered without statuses");
 	return {
-		statuses: statuses
-			.filter(isObject)
-			.flatMap(raw => {
-				const choice = choiceOf(raw);
-				const type = statusTypeOf(str(raw.type));
-				return choice && type ? [{ ...choice, type }] : [];
-			})
-			.sort((a, b) => WORKFLOW_ORDER.indexOf(a.type) - WORKFLOW_ORDER.indexOf(b.type)),
+		statuses: statuses.filter(isObject).flatMap(raw => {
+			const status = str(raw.name);
+			const statusType = statusTypeOf(str(raw.type));
+			return status && statusType ? [{ status, statusType }] : [];
+		}),
 		users: users
 			.filter(user => user.isActive !== false)
 			.map(choiceOf)
 			.filter(user => user !== null)
 			.sort(byName),
-		labels: parseLabels(labels).sort(byName),
+		labels: parseLabels(labels).sort((a, b) => a.name.localeCompare(b.name)),
 		projects: projects
-			.map(choiceOf)
-			.filter(project => project !== null)
-			.sort(byName),
+			.flatMap(project => str(project.name) ?? [])
+			.sort((a, b) => a.localeCompare(b)),
 	};
 }
 
