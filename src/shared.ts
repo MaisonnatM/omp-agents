@@ -273,7 +273,7 @@ export interface PullRequestThread {
 	comments: PullRequestComment[];
 }
 
-/** One pull request in full, as the inbox's sheet shows it in place of opening GitHub. */
+/** One pull request in full, as the inbox's details show it in place of opening GitHub. */
 export interface PullRequestDetail extends PullRequest {
 	title: string;
 	body: string;

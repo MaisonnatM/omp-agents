@@ -10,7 +10,7 @@ import { readPinnedSkill } from "../../pinned-skill";
 import { hashForRoutines } from "../../routing";
 import { draftOf, lastRunWords, newDraft, nextRunWords, type RoutineDraft, runWords, scheduleWords, schedulesWords, taskWords } from "../../routines-model";
 import { useDashboardContext } from "../dashboard-context";
-import { PageFrame } from "../list-sheet-page";
+import { PageFrame } from "../list-page";
 import { SessionChip } from "../session-chip";
 import { statusLabel } from "../status-dot";
 import { RoutineEditor } from "./routine-editor";

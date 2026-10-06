@@ -1,6 +1,6 @@
 import { AppWindow, Archive, CalendarClock, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Inbox, Keyboard, ListRestart, ListTodo, Loader, MessagesSquare, Pin, PinOff, Play, Plus, Search, Settings, SquareKanban } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type Routine, repoKey, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
+import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type Routine, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,13 +31,12 @@ import {
 } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
-import { fontWeights } from "@/lib/font-weight";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { inboxSection, inboxSections, mergeableCount, type Waiting } from "../inbox-model";
+import { mergeableCount } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
-import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView, type TodoListView } from "../routing";
+import { hashForSettings, hashForTickets, type OpenMode, sameView, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
@@ -278,20 +277,12 @@ interface SectionLinkProps {
 	title: string;
 	label: string;
 	count: number;
-	/** Marks the count of an inbox section that waits on your move. */
-	waiting?: Waiting;
 	/** Gets a new target each time, so choosing a section again scrolls back to it. */
 	onChoose: (target: SectionTarget) => void;
 }
 
-/** The count of an inbox section that waits on your move: a review asked of you, or a pull request a reviewer sent back. */
-const WAITING_COUNT: Record<Waiting, string> = {
-	"your-review": "text-foreground",
-	"your-fix": "text-red-600 dark:text-red-400",
-};
-
 /** A link to a section of a page, with its count. A plain click scrolls there; the page listens for `onChoose`. */
-function SectionLink({ href, section, chosen, title, label, count, waiting, onChoose }: SectionLinkProps) {
+function SectionLink({ href, section, chosen, title, label, count, onChoose }: SectionLinkProps) {
 	const isChosen = chosen?.id === section.id;
 	return (
 		<SidebarMenuItem>
@@ -311,61 +302,12 @@ function SectionLink({ href, section, chosen, title, label, count, waiting, onCh
 					{title}
 				</a>
 			</SidebarMenuButton>
-			{/* The badge sets its weight through `font-variation-settings`, which a weight class cannot override. */}
-			<SidebarMenuBadge aria-hidden className={waiting ? WAITING_COUNT[waiting] : undefined} style={waiting ? { fontVariationSettings: fontWeights.semibold } : undefined}>
-				{count}
-			</SidebarMenuBadge>
+			<SidebarMenuBadge aria-hidden>{count}</SidebarMenuBadge>
 		</SidebarMenuItem>
 	);
 }
 
 const navNote = (text: string) => <p className="px-2 py-1 text-xs text-muted-foreground">{text}</p>;
-
-interface InboxNavProps {
-	project: string | null;
-	target: SectionTarget | null;
-	onTarget: (target: SectionTarget) => void;
-}
-
-/** The inbox page's sections with their pull request counts, per repository, each a link to its section on the page. */
-function InboxNav({ project, target, onTarget }: InboxNavProps) {
-	const { read, error } = inboxStore.use(project);
-	if (!read) return <SidebarGroup>{navNote(error ? `Cannot load the inbox: ${error}` : "Asking GitHub for pull requests…")}</SidebarGroup>;
-	const { repos } = read.data;
-	if (repos.length === 0) return <SidebarGroup>{navNote("No session ran in a GitHub repository.")}</SidebarGroup>;
-	return repos.map(repo => {
-		const name = `${repo.owner}/${repo.repo}`;
-		const key = repoKey(repo);
-		const sections = "error" in repo ? [] : inboxSections(repo.pullRequests);
-		let body: ReactNode;
-		if ("error" in repo) body = navNote(`Cannot read ${name} from GitHub.`);
-		else if (sections.length === 0) body = navNote("No open pull requests and no reviews waiting.");
-		else
-			body = (
-				<SidebarMenu aria-label={repos.length > 1 ? `Inbox sections of ${name}` : "Inbox sections"}>
-					{sections.map(({ title, waiting, rows: { length } }) => (
-						<SectionLink
-							key={title}
-							href={hashForInbox(null)}
-							section={inboxSection(key, title)}
-							chosen={target}
-							title={title}
-							label={`${title}, ${length} pull request${length === 1 ? "" : "s"}`}
-							count={length}
-							waiting={waiting ?? undefined}
-							onChoose={onTarget}
-						/>
-					))}
-				</SidebarMenu>
-			);
-		return (
-			<SidebarGroup key={key}>
-				{repos.length > 1 && <SidebarGroupLabel>{name}</SidebarGroupLabel>}
-				{body}
-			</SidebarGroup>
-		);
-	});
-}
 
 interface TicketsNavProps {
 	target: SectionTarget | null;
@@ -427,7 +369,7 @@ const SIDEBAR_TAB_FIT = {
 	},
 };
 
-/** The sidebar's tab; the inbox, tickets, todo, and routines tabs go with their pages, sessions with the panes. */
+/** The sidebar's tab; the tickets, todo, and routines tabs go with their pages, the sessions and inbox tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 interface RosterProps {
@@ -451,7 +393,7 @@ interface RosterProps {
 	settingsOpen: boolean;
 	/** omp is signed in to Linear, so the Tickets tab shows. */
 	ticketsShown: boolean;
-	/** The sidebar's tab: the inbox, the tickets, the todos, or the routines with their pages, or the sessions over the panes. */
+	/** The sidebar's tab: the tickets, the todos, or the routines with their pages, or the sessions or the inbox over the panes. */
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
 	/** The Todo page's list, `null` until the server sends it. */
@@ -461,9 +403,11 @@ interface RosterProps {
 	routines: Routine[];
 	/** The routine the Routines page shows, `null` for the list. */
 	routinesTarget: string | null;
-	/** The inbox or tickets section a sidebar link last chose. */
+	/** The tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
+	/** The Inbox tab's content. */
+	inbox: ReactNode;
 	/** The selected project's `cwd`, or `null` for all projects. */
 	project: string | null;
 	onPickProject: (cwd: string | null) => void;
@@ -493,6 +437,7 @@ export function Roster({
 	routinesTarget,
 	sectionTarget,
 	onSectionTarget,
+	inbox,
 	project,
 	onPickProject,
 	onShowSearch,
@@ -502,11 +447,11 @@ export function Roster({
 	const { open: onOpen, send, start, dismissStart, end: onEnd, openNewSession: onNewSession, changeTodo: onTodoChange, connected, starts } = useDashboardContext();
 	const { resume, resumeAll } = starts;
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
-	const inbox = inboxStore.use(project).read;
+	const inboxRead = inboxStore.use(project).read;
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
-		inbox: { count: inbox ? mergeableCount(inbox.data) : 0, meaning: "ready to merge" },
+		inbox: { count: inboxRead ? mergeableCount(inboxRead.data) : 0, meaning: "ready to merge" },
 	};
 	/** Continue past session `sessionId`, in the pane that shows it. */
 	const onResume = (sessionId: string): void => {
@@ -768,7 +713,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="inbox" asChild>
 				<SidebarContent>
-					<InboxNav project={project} target={sectionTarget} onTarget={onSectionTarget} />
+					{inbox}
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="tickets" asChild>

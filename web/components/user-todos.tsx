@@ -9,7 +9,7 @@ import { hashForTodo, type TodoListView } from "../routing";
 import { DAY_FORMAT, LIST_KINDS, leftIn, matches, placeIn, restoreOf, type TodoEntry, titleOf, todosOf, today } from "../todo-views";
 import { useTodoDrag } from "../use-todo-drag";
 import { useTodoKeys } from "../use-todo-keys";
-import { PageFrame } from "./list-sheet-page";
+import { PageFrame } from "./list-page";
 import { TodoDetail } from "./todo-detail";
 import { AddedByChip, type KnownSessions, TodoLinkChip } from "./todo-links";
 import { TodoSearch } from "./todo-search";

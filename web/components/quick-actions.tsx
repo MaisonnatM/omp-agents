@@ -63,7 +63,7 @@ export function QuickActionButton({ action, pending, onRun }: { action: QuickAct
 	);
 }
 
-/** A sheet's buttons for `actions`; nothing when there is none. One start at a time: all wait while one is pending. */
+/** A details view's buttons for `actions`; nothing when there is none. One start at a time: all wait while one is pending. */
 export function QuickActionButtons({ actions, pending, onRun }: QuickActionsProps) {
 	if (actions.length === 0) return null;
 	return (
@@ -97,14 +97,14 @@ export function QuickStartNotice({ quick, onDismiss }: NoticeProps) {
 	);
 }
 
-interface SheetActionsProps extends QuickActionsProps {
-	/** The running sessions that work on the sheet's pull request or issue. */
+interface DetailActionsProps extends QuickActionsProps {
+	/** The running sessions that work on the pull request or issue. */
 	sessions: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
 }
 
-/** A sheet's buttons for `actions`, then the sessions that work on its item; nothing when there is neither. */
-export function SheetQuickActions({ actions, pending, onRun, sessions, onOpen }: SheetActionsProps) {
+/** A details view's buttons for `actions`, then the sessions that work on its item; nothing when there is neither. */
+export function DetailQuickActions({ actions, pending, onRun, sessions, onOpen }: DetailActionsProps) {
 	if (actions.length === 0 && sessions.length === 0) return null;
 	return (
 		<div className="flex flex-wrap items-center gap-2">

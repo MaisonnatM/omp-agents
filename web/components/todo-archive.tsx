@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { DAY_FORMAT, LIST_KINDS, matches, placeIn } from "../todo-views";
-import { PageFrame } from "./list-sheet-page";
+import { PageFrame } from "./list-page";
 import { TodoDetail } from "./todo-detail";
 import type { KnownSessions } from "./todo-links";
 import { TodoSearch } from "./todo-search";

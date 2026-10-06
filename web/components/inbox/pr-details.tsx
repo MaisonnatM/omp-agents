@@ -1,5 +1,5 @@
 import { CircleCheck, CircleDashed, CircleSlash, CircleX, Eye, GitMerge, GitPullRequestDraft, type LucideIcon, MessageSquare } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { type CheckRunState, type PullRequest, type PullRequestCheck, type PullRequestDetail, type PullRequestEvent, pullRequestUrl, type RosterHost, type View } from "../../../src/shared";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -10,9 +10,9 @@ import type { QuickActionId } from "../../quick-actions";
 import type { OpenMode } from "../../routing";
 import { useRead } from "../../reads";
 import { BranchName } from "../git";
-import { QuickActionButton, type QuickActionsProps, SheetQuickActions } from "../quick-actions";
-import { Clamped, Comment, DetailSection, Markdown, OutLink, SheetFrame } from "../sheet-details";
-import { Avatar, IconTip, STATE_ICON } from "./avatars";
+import { DetailQuickActions, QuickActionButton, type QuickActionsProps } from "../quick-actions";
+import { Clamped, Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
+import { Avatar, IconTip, Reviewers, STATE_ICON } from "./avatars";
 
 const CHECK_RUN_ICON: Record<CheckRunState, [LucideIcon, string]> = {
 	passing: [CircleCheck, "text-emerald-600 dark:text-emerald-400"],
@@ -52,7 +52,7 @@ interface ItemView<Item> {
 
 type StatusView = { [Kind in StatusItem["kind"]]: ItemView<Extract<StatusItem, { kind: Kind }>> };
 
-/** How the sheet's Status says each fact. */
+/** How the details' Status says each fact. */
 const STATUS_VIEW: StatusView = {
 	ready: { tone: "done", icon: GitMerge, text: () => "Ready to merge" },
 	draft: { tone: "waiting", icon: GitPullRequestDraft, text: () => "Draft, not ready for review" },
@@ -166,41 +166,37 @@ function Checks({ checks }: { checks: PullRequestCheck[] }) {
 	);
 }
 
-interface SheetContentProps {
+interface DetailContentProps {
 	pr: PullRequest;
 	/** The quick actions on it; none apply when the inbox does not list it, since a start needs the workspace the inbox names. */
 	quick: QuickActionsProps;
 	/** The running sessions that work on it. */
 	sessions: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
-	/** What became of the last quick action on it. */
-	notice?: ReactNode;
 }
 
 /**
- * A pull request read from GitHub, as the inbox's sheet shows it: a header that names it, then its Status, where each
- * blocker offers the quick action that works on it, then its details. The header offers the other quick actions once
- * the read settles, so the buttons do not move when the details arrive, and the sessions that work on it.
+ * A pull request read from GitHub, in the main area: a header that names it, then its Status, where each blocker offers
+ * the quick action that works on it, then its details. The header offers the other quick actions once the read settles,
+ * so the buttons do not move when the details arrive, and the sessions that work on it.
  */
-export function PullRequestSheetContent({ pr, quick, sessions, onOpen, notice }: SheetContentProps) {
+export function PullRequestDetailContent({ pr, quick, sessions, onOpen }: DetailContentProps) {
 	const { data: detail, error } = useRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
+	const headingRef = useRef<HTMLHeadingElement>(null);
+	useEffect(() => {
+		headingRef.current?.focus({ preventScroll: true });
+	}, []);
 	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
 	const placed = detail ? placeFixes(pullRequestStatus(detail), quick.actions) : [];
 	const headerActions = detail || error ? quick.actions.filter(action => !placed.some(({ fix }) => fix === action)) : [];
 	return (
-		<SheetFrame
-			title={detail?.title ?? name}
-			icon={detail && <IconTip icon={STATE_ICON[detail.state]} className="mt-1" />}
-			loading="Asking GitHub for the pull request…"
-			error={error && `Cannot load the pull request: ${error}`}
-			actions={
-				<>
-					<SheetQuickActions actions={headerActions} pending={quick.pending} onRun={quick.onRun} sessions={sessions} onOpen={onOpen} />
-					{notice}
-				</>
-			}
-			meta={
-				<>
+		<>
+			<header className="space-y-3">
+				<h1 ref={headingRef} tabIndex={-1} className="flex items-start gap-2.5 text-base leading-snug font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
+					{detail && <IconTip icon={STATE_ICON[detail.state]} className="mt-1" />}
+					<span className="min-w-0">{detail?.title ?? name}</span>
+				</h1>
+				<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
 					<span className="tabular-nums">{name}</span>
 					{detail && (
 						<>
@@ -215,17 +211,22 @@ export function PullRequestSheetContent({ pr, quick, sessions, onOpen, notice }:
 							<span title={new Date(detail.createdAt).toLocaleString()}>
 								opened by {detail.author.login} {age(detail.createdAt)} ago
 							</span>
+							<Reviewers reviewers={detail.reviewers} />
 						</>
 					)}
 					<span className="ml-auto flex gap-3">
 						<OutLink href={pullRequestUrl(pr)}>GitHub</OutLink>
 						<OutLink href={graphiteUrl(pr)}>Graphite</OutLink>
 					</span>
-				</>
-			}
-		>
-			{detail ? <PullRequestSections detail={detail} status={placed.length > 0 && <Status placed={placed} quick={quick} />} /> : null}
-		</SheetFrame>
+				</p>
+				<DetailQuickActions actions={headerActions} pending={quick.pending} onRun={quick.onRun} sessions={sessions} onOpen={onOpen} />
+			</header>
+			{detail ? (
+				<PullRequestSections detail={detail} status={placed.length > 0 && <Status placed={placed} quick={quick} />} />
+			) : (
+				<LoadNote loading="Asking GitHub for the pull request…" error={error && `Cannot load the pull request: ${error}`} />
+			)}
+		</>
 	);
 }
 

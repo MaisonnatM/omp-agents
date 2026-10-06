@@ -156,7 +156,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		}
 	});
 
-	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for the inbox's sheet. */
+	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for the inbox's details. */
 	const pullRequest = get(params => {
 		const pr = parsePullRequestQuery(params);
 		return pr ? answer(() => loadPullRequestDetail(pr)) : fail(400, "Expected ?owner=&repo=&number=");

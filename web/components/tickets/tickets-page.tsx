@@ -13,8 +13,8 @@ import type { StartOf } from "../../starts";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { useDashboardContext } from "../dashboard-context";
 import { FoldButton, useFolds, useReveal } from "../fold";
-import { ListSheetPage, PageFrame } from "../list-sheet-page";
-import { QuickStartNotice, SheetQuickActions } from "../quick-actions";
+import { ListPage, PageFrame } from "../list-page";
+import { DetailQuickActions, QuickStartNotice } from "../quick-actions";
 import { LinearConnection } from "../settings/linear-connection";
 import { TicketDetailContent } from "./ticket-details";
 import { statusIcon, TicketRow, ticketRowId } from "./ticket-row";
@@ -126,7 +126,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 							id={target}
 							listed={listed}
 							actions={ticket => (
-								<SheetQuickActions
+								<DetailQuickActions
 									actions={ticketActions(ticket)}
 									pending={pendingOf(quick, { kind: "ticket", id: target })}
 									onRun={action => {
@@ -144,14 +144,13 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	}
 
 	return (
-		<ListSheetPage
+		<ListPage
 			title={TITLE}
 			meta={META}
 			noun="the tickets"
 			loading="Asking Linear for your issues…"
 			poll={poll}
 			onRefresh={() => void ticketsStore.refresh(null, { fresh: true })}
-			missing={null}
 			notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 			spacing="space-y-4"
 			contentRef={listPageRef}
@@ -176,7 +175,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 					</div>
 				);
 			}}
-		</ListSheetPage>
+		</ListPage>
 	);
 }
 

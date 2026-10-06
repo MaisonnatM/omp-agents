@@ -34,8 +34,6 @@ Dashboard behavior that can live outside these files does: the composer's queued
 
 ## Others
 
-- `ui/sheet.tsx`: the close button uses the shared tooltip with an Esc keycap instead of a native `title`.
-
 - `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`, and the exported `TooltipKbd` chip.
   Long labels wrap at 16rem.
   `ui/sidebar-core.tsx` uses both for the sidebar toggle.

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type RoutineSpec, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";
 import { useSkills } from "../../use-skills";
-import { PageFrame } from "../list-sheet-page";
+import { PageFrame } from "../list-page";
 import { DirectoryPicker } from "../new-session";
 import { SkillPicker } from "../skill-picker";
 

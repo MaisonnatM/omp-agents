@@ -4,7 +4,7 @@ import type { StartOp } from "./starts";
 
 const PAST_PREFIX = "past/";
 
-/** The inbox page, and the pull request whose row it scrolls to and highlights; `null` for none. */
+/** The sidebar's inbox, and the pull request whose details the main content shows; `null` keeps the panes. */
 export interface InboxRoute {
 	target: PullRequest | null;
 }
@@ -66,8 +66,9 @@ const TODO_LISTS = { today: { kind: "today" }, agents: { kind: "agents" }, done:
  * - `#settings` opens the settings page, `#settings/<cwd>` with that workspace's project files and config.
  * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, and `?todo=<id>` with that todo's
  *   title and notes as its first message. No omp runs until its first message.
- * - `#inbox` opens the inbox page, which lists the pull requests of the sidebar's project, and
- *   `#inbox/<owner>/<repo>/<number>` opens it at that pull request's row. Any other `#inbox/…` opens the page alone.
+ * - `#inbox` shows the sidebar's Inbox tab, which lists the pull requests of the sidebar's project, beside the panes,
+ *   and `#inbox/<owner>/<repo>/<number>` shows that pull request's details in the main content. Any other `#inbox/…`
+ *   shows the tab alone.
  * - `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
  *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/agents`, and `#todo/done` with the todos due by

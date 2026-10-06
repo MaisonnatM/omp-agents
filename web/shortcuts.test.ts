@@ -75,8 +75,8 @@ test("↑ alone takes back a queued message, Alt+↑ and Alt+↓ step through th
 	expect(press("ArrowUp", "ArrowUp", { alt: true })).toEqual(["previousSession"]);
 	expect(press("ArrowDown", "ArrowDown", { alt: true })).toEqual(["nextSession"]);
 	expect(press("ArrowDown", "ArrowDown")).toEqual([]);
-	expect(press("ArrowUp", "ArrowUp", { alt: true, shift: true })).toEqual(["todoMoveUp"]);
-	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["todoMoveDown"]);
+	expect(press("ArrowUp", "ArrowUp", { alt: true, shift: true })).toEqual(["moveUp"]);
+	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
 test("G then a key goes to a page only right after a plain G", () => {
