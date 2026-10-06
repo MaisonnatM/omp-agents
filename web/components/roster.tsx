@@ -22,6 +22,7 @@ import {
 	SidebarGroupActions,
 	SidebarGroupLabel,
 	SidebarHeader,
+	SidebarInput,
 	SidebarMenu,
 	SidebarMenuAction,
 	SidebarMenuBadge,
@@ -37,7 +38,7 @@ import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLI
 import { inboxStore, ticketsStore } from "../reads";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
-import { type SidebarSessions, waitingCount } from "../sessions";
+import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredKeys, useStoredState } from "../stored-state";
 import { ticketGroups, ticketSection } from "../tickets-model";
@@ -413,8 +414,13 @@ export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 interface RosterProps {
 	/** Directories sessions ran in, as {@link workspaces} lists them. */
 	projects: { cwd: string; cwdDisplay: string }[];
-	/** The sessions tab's lists, under the selected project. */
+	/** The sessions tab's lists, under the selected project and matching `query`. */
 	lists: SidebarSessions;
+	/** Live sessions in the selected project that wait on your move, whatever the search field hides. */
+	waiting: number;
+	/** What the sessions tab's search field holds; it narrows `lists`. */
+	query: string;
+	onQuery: (query: string) => void;
 	/** Pin session `sessionId`, or unpin it when it is pinned. */
 	onTogglePin: (sessionId: string) => void;
 	/** Views on screen, highlighted in the list. */
@@ -451,6 +457,9 @@ interface RosterProps {
 export function Roster({
 	projects,
 	lists,
+	waiting,
+	query,
+	onQuery,
 	onTogglePin,
 	open,
 	newSessionOpen,
@@ -477,7 +486,7 @@ export function Roster({
 	const inbox = inboxStore.use(project).read;
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
-		sessions: { count: waitingCount(lists), meaning: "waiting on you" },
+		sessions: { count: waiting, meaning: "waiting on you" },
 		inbox: { count: inbox ? mergeableCount(inbox.data) : 0, meaning: "ready to merge" },
 	};
 	/** Continue past session `sessionId`, in the pane that shows it. */
@@ -491,6 +500,8 @@ export function Roster({
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	const selectedProject = projects.find(({ cwd }) => cwd === project);
 	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
+	/** The search field narrows the lists, so a group left empty hides rather than saying it has no sessions. */
+	const filtering = query.trim() !== "";
 	/** A past session's row; `isPinned` lists it under Pinned, where an interrupted one says so, as its own group does not. */
 	const pastRow = (session: PastSession, isPinned: boolean) => {
 		const pastView: View = { kind: "past", sessionId: session.sessionId };
@@ -625,9 +636,38 @@ export function Roster({
 					Lost the dashboard server. Retrying…
 				</p>
 			)}
-			{/* SidebarContent puts `hidden` on its inner element, so the class hides its scroll frame too. */}
-			<TabPanel value="sessions" forceMount asChild className={tab === "sessions" ? undefined : "hidden"}>
+			<TabPanel value="sessions" forceMount className={tab === "sessions" ? "flex min-h-0 flex-1 flex-col" : "hidden"}>
+				<SidebarGroup className="gap-1 pb-0">
+					<SidebarMenu aria-label="Start a session">
+						<SidebarMenuItem>
+							<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
+								<SidebarMenuButton icon={Plus} isActive={newSessionOpen} aria-current={newSessionOpen ? "page" : undefined} onClick={onNewSession}>
+									<span className="truncate">{newSessionLabel}</span>
+								</SidebarMenuButton>
+							</Tooltip>
+						</SidebarMenuItem>
+					</SidebarMenu>
+					<label className="relative block">
+						<Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<SidebarInput
+							type="search"
+							aria-label="Filter the sidebar's sessions"
+							placeholder="Search sessions"
+							value={query}
+							onChange={event => onQuery(event.target.value)}
+							onKeyDown={event => {
+								if (event.key !== "Escape") return;
+								onQuery("");
+								event.currentTarget.blur();
+							}}
+							className="pl-8"
+						/>
+					</label>
+				</SidebarGroup>
 				<SidebarContent>
+					{filtering && pinned.hosts.length + pinned.past.length + idle.length + running.length + interrupted.length + ended.length === 0 && (
+						<p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>
+					)}
 					{pinned.hosts.length + pinned.past.length > 0 && (
 						<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
 							<SidebarGroupLabel>{`${pinned.hosts.length + pinned.past.length} pinned`}</SidebarGroupLabel>
@@ -643,22 +683,16 @@ export function Roster({
 							<SidebarMenu aria-label="Idle omp sessions">{idle.map(host => hostRow(host, false))}</SidebarMenu>
 						</SidebarGroup>
 					)}
-					<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
-						<SidebarGroupLabel>
-							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length > 0 ? "No other sessions running" : "No sessions"}
-						</SidebarGroupLabel>
-						{/* The group finds its header actions by type, and the tooltip would hide this one, so its chevron would sit under the button. */}
-						<SidebarGroupActions>
-							<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")}>
-								<SidebarGroupAction aria-label={newSessionLabel} aria-current={newSessionOpen ? "page" : undefined} onClick={onNewSession}>
-									<Plus />
-								</SidebarGroupAction>
-							</Tooltip>
-						</SidebarGroupActions>
-						<SidebarMenu aria-label="Running omp sessions">
-							{running.map(host => hostRow(host, false))}
-						</SidebarMenu>
-					</SidebarGroup>
+					{(!filtering || running.length > 0) && (
+						<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
+							<SidebarGroupLabel>
+								{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length > 0 ? "No other sessions running" : "No sessions"}
+							</SidebarGroupLabel>
+							<SidebarMenu aria-label="Running omp sessions">
+								{running.map(host => hostRow(host, false))}
+							</SidebarMenu>
+						</SidebarGroup>
+					)}
 					{interrupted.length > 0 && (
 						<SidebarGroup collapsible open={!collapsed.has("interrupted")} onOpenChange={() => toggleGroup("interrupted")}>
 							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
@@ -704,10 +738,12 @@ export function Roster({
 							</SidebarMenu>
 						</SidebarGroup>
 					)}
-					<SidebarGroup collapsible open={!collapsed.has("past")} onOpenChange={() => toggleGroup("past")}>
-						<SidebarGroupLabel>{ended.length === 0 ? "No past sessions" : `${ended.length} past`}</SidebarGroupLabel>
-						<SidebarMenu aria-label="Past omp sessions">{ended.map(session => pastRow(session, false))}</SidebarMenu>
-					</SidebarGroup>
+					{(!filtering || ended.length > 0) && (
+						<SidebarGroup collapsible open={!collapsed.has("past")} onOpenChange={() => toggleGroup("past")}>
+							<SidebarGroupLabel>{ended.length === 0 ? "No past sessions" : `${ended.length} past`}</SidebarGroupLabel>
+							<SidebarMenu aria-label="Past omp sessions">{ended.map(session => pastRow(session, false))}</SidebarMenu>
+						</SidebarGroup>
+					)}
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="inbox" asChild>

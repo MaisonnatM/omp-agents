@@ -34,7 +34,7 @@ import {
 	type TodoListView,
 } from "./routing";
 import type { SectionTarget } from "./section";
-import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, sidebarSessions, workspaces } from "./sessions";
+import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, searchSessions, sidebarSessions, waitingCount, workspaces } from "./sessions";
 import { useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { PINNED_SESSIONS_KEY, useStoredKeys } from "./stored-state";
@@ -102,7 +102,9 @@ export function App() {
 	const [columns, setColumns] = useSplitRatio("columns");
 	const [rows, setRows] = useSplitRatio("rows");
 	const maximized = layout.maximized && !page;
-	const lists = sidebarSessions(visible.hosts, visible.past, project, pinned);
+	const [sessionQuery, setSessionQuery] = useState("");
+	const projectLists = sidebarSessions(visible.hosts, visible.past, project, pinned);
+	const lists = searchSessions(projectLists, sessionQuery);
 	const listed = listedViews(lists);
 	// The live rows of `listed`, whose order ending a session moves its panes along.
 	const listedHosts = listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
@@ -356,6 +358,9 @@ export function App() {
 					<Roster
 						projects={projects}
 						lists={lists}
+						waiting={waitingCount(projectLists)}
+						query={sessionQuery}
+						onQuery={setSessionQuery}
 						onTogglePin={togglePin}
 						open={page ? [] : layout.panes}
 						newSessionOpen={page?.kind === "new"}

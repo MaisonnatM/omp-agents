@@ -36,6 +36,10 @@ Navigation, editing, scheduling toggles, Stop, and Delete keep their existing st
   Choose **All projects** to list every session again.
   The choice is saved in the browser's localStorage.
   If no session from the saved directory is left, the sidebar lists every session.
+- **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected project when there is one, and stays highlighted while the draft is open.
+- The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected project.
+  A group left without a match hides, and `No sessions match` shows when none is left; Esc clears the field.
+  Cmd+K searches every project instead and opens the session you pick.
 - Sessions in `/tmp` or `/private/tmp`, including their subdirectories, are hidden from project and workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved project.
   Their saved transcripts remain available through a direct session link.
@@ -280,7 +284,7 @@ Navigation, editing, scheduling toggles, Stop, and Delete keep their existing st
 
 ## Starting, ending, resuming, and forking
 
-- To start a session, click **+** next to the session count.
+- To start a session, click **New session** at the top of the **Sessions** tab.
   The page shows a new-session draft with the same composer as a running session, and the header names the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
   The directory is the selected project's, else the open session's, else the newest live session's, else the newest past session's.
@@ -361,7 +365,7 @@ Navigation, editing, scheduling toggles, Stop, and Delete keep their existing st
   Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
-  The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the project that the sidebar's picker shows, pinned ones included.
+  The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the project that the sidebar's picker shows, pinned ones included, whatever the sidebar's search hides.
   **Routines** opens the sessions that start on a schedule; see [Routines](#routines).
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
   **Inbox** opens a pull request inbox like Graphite's, and the sidebar then lists the inbox's sections with their pull request counts, under each repository's name when there are several.
@@ -662,9 +666,9 @@ Alt is Option on macOS.
   A session from another project switches the sidebar to that project.
   Type a title and choose **Create todo** to add it at the end of **All**, with no category. You stay on the page you were on.
   Enter still opens the highlighted session, and creates the todo when none matches. Cmd+Enter creates it either way.
-  Alt+↑ and Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane.
+  Alt+↑ and Alt+↓ walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   From a subagent they step from its session's row.
-- Cmd+Shift+O opens the new-session draft, as the **+** next to the session list does.
+- Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does.
   Cmd+Shift+X ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.
   It does nothing in a subagent, a read-only room, or a past session.
   `/` puts the cursor in the focused pane's composer.
