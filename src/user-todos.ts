@@ -61,6 +61,21 @@ function sameLink(a: UserTodoLink, b: UserTodoLink): boolean {
 const uniqueLinks = (links: readonly UserTodoLink[]): UserTodoLink[] =>
 	links.filter((link, index) => links.findIndex(other => sameLink(link, other)) === index);
 
+/** `todos` to do first, then the done ones, each group in its order; `todos` itself when already so. */
+function toDoFirst<T extends UserTodoLeaf>(todos: T[]): T[] {
+	const sorted = [...todos.filter(todo => todo.doneAt === null), ...todos.filter(todo => todo.doneAt !== null)];
+	return sorted.every((todo, index) => todo === todos[index]) ? todos : sorted;
+}
+
+/** `todos` with each level to do first, then done, as every list keeps them; `todos` itself when already so. */
+export function inStatusOrder(todos: UserTodo[]): UserTodo[] {
+	const nested = todos.map(todo => {
+		const children = toDoFirst(todo.children);
+		return children === todo.children ? todo : { ...todo, children };
+	});
+	return toDoFirst(nested.every((todo, index) => todo === todos[index]) ? todos : nested);
+}
+
 /** `todo` placed after `afterId` among `parentId`'s todos, or `todos` itself when `parentId` names none. */
 function insertTodo(todos: UserTodo[], todo: UserTodo, parentId: string | null, afterId: string | null, isCategory: (id: string) => boolean): UserTodo[] {
 	if (parentId === null) return insertAfter(todos, afterId, { ...todo, categoryId: validCategory(todo.categoryId, isCategory) });
@@ -170,6 +185,12 @@ function clearDone(list: UserTodoList, categoryId: string | null): UserTodoList 
 
 /** `list` after `change`, or `list` itself when the change changes nothing. */
 export function applyUserTodo(list: UserTodoList, change: UserTodoChange): UserTodoList {
+	const next = applyChange(list, change);
+	const todos = inStatusOrder(next.todos);
+	return todos === next.todos ? next : { ...next, todos };
+}
+
+function applyChange(list: UserTodoList, change: UserTodoChange): UserTodoList {
 	const { categories, todos, archive } = list;
 	const indexOf = (id: string): number => categories.findIndex(category => category.id === id);
 	const isCategory = (id: string): boolean => indexOf(id) >= 0;

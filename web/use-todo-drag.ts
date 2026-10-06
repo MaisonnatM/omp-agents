@@ -1,6 +1,6 @@
 import { type DragEvent, useState } from "react";
 import type { UserTodoChange, UserTodoLeaf } from "../src/shared";
-import { moveTo, type TodoEntry } from "./todo-views";
+import { moveTo, sameStatus, type TodoEntry } from "./todo-views";
 
 /** The row being dragged, and where a drop on the row under the pointer would put it. */
 interface Drag {
@@ -9,8 +9,8 @@ interface Drag {
 }
 
 /**
- * Dragging a todo among the todos beside it: a top-level one among top-level ones, joining the category of the todo it
- * drops beside, and one under another among its parent's. `rowProps` goes on each row's `<li>`.
+ * Dragging a todo among the todos beside it of its status: a top-level one among top-level ones, joining the category
+ * of the todo it drops beside, and one under another among its parent's. `rowProps` goes on each row's `<li>`.
  */
 export function useTodoDrag(enabled: boolean, onMove: (change: UserTodoChange) => void) {
 	const [drag, setDrag] = useState<Drag | null>(null);
@@ -23,7 +23,7 @@ export function useTodoDrag(enabled: boolean, onMove: (change: UserTodoChange) =
 		},
 		onDragEnd: () => setDrag(null),
 		onDragOver: (event: DragEvent<HTMLLIElement>) => {
-			if (!drag || (drag.entry.parent?.id ?? null) !== (entry.parent?.id ?? null) || drag.entry.todo.id === entry.todo.id) return;
+			if (!drag || (drag.entry.parent?.id ?? null) !== (entry.parent?.id ?? null) || drag.entry.todo.id === entry.todo.id || !sameStatus(drag.entry.todo, entry.todo)) return;
 			event.preventDefault();
 			const box = event.currentTarget.getBoundingClientRect();
 			const where = event.clientY < box.top + box.height / 2 ? "before" : "after";

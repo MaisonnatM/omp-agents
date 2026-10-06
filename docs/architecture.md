@@ -188,7 +188,7 @@ A user item's `images` holds a `data:` URL for an inline image and `/api/image?h
 
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
 Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process, `bun src/server.ts`, and never imports it.
-It imports only `src/paths.ts`, `src/json.ts`, `src/shared.ts`, `src/server/auth.ts`, `src/server/address.ts`, and `src/user-todos-parse.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
+It imports only `src/paths.ts`, `src/json.ts`, `src/shared.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/user-todos-parse.ts`, and `src/user-todos.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
 It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching the file's directory since the server replaces the file, and its global quick-capture shortcut dispatches `QUICK_TODO_EVENT` in the page, which `web/app.tsx` answers by opening the Todo page with a new todo started.
 `src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
 
@@ -449,6 +449,8 @@ The server lives in `src/`:
   The list is `UserTodoList` in `src/shared.ts`: categories, top-level todos, and the archive that **Clear done** fills, latest first.
   A todo has a title, markdown notes, a check time (`doneAt`), and a due day; a top-level one also has a category or none, todos of its own, which share its category, links (`UserTodoLink`: a session, a pull request, or a Linear issue), and `addedBy`, the session whose agent added it.
   `move` reorders, `restore` puts back what `remove` took at its index for the page's **Undo**, and `unarchive` and `empty-archive` act on the archive.
+  Every list keeps its todos to do before its checked ones, at both levels: `applyUserTodo` orders the todos after each change through `inStatusOrder`, and loading the file does too.
+  `moveTo` in `web/todo-views.ts` refuses a move among the todos of the other status, and the page adds a todo after the last one to do.
   `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token.
   `src/user-todos-parse.ts` reads the list and its changes from JSON for the file, the socket, the todo inbox, and the desktop shell: a file from before any of those fields reads with none of them, a `done: true` todo as checked when it loads, and a change from a page or an agent is held to the length limits, a `restore` too.
   A `user-todo` socket message carries one change, and every socket hears the list after it as a `user-todos` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the list back to its own socket alone.

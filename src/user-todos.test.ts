@@ -126,6 +126,14 @@ describe("applyUserTodo", () => {
 		expect(shape(after(checked, { op: "toggle", id: "a", doneAt: null }))).toBe("a(a1✓ a2✓)");
 	});
 
+	test("every list keeps its todos to do before the done ones, each side in its order", () => {
+		const list = after(listOf([], todo("a", ["a1", "a2"]), todo("b"), todo("c")), check("a1"), check("b"));
+		expect(shape(list)).toBe("a(a2 a1✓) c b✓");
+		expect(shape(after(list, check("a")))).toBe("c a✓(a2✓ a1✓) b✓");
+		expect(shape(after(list, { op: "toggle", id: "b", doneAt: null }))).toBe("a(a2 a1✓) c b");
+		expect(shape(after(list, add("n", null, "b"), add("n1", "a", null)))).toBe("a(a2 n1 a1✓) c n b✓");
+	});
+
 	test("move puts a top-level todo after another, joining its category, or first in a category", () => {
 		const list = listOf(["work"], todo("a"), todo("b", [], { categoryId: "work" }), todo("c"), todo("d", [], { categoryId: "work" }));
 		expect(shape(after(list, { op: "move", id: "c", afterId: null, categoryId: null }))).toBe("c a b@work d@work");

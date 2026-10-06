@@ -48,18 +48,18 @@ describe("UserTodosFile", () => {
 		});
 	});
 
-	test("a list saved before bodies, categories, dates, links, and the archive reads with none, and a todo checked then reads as checked now", () => {
+	test("a list saved before bodies, categories, dates, links, and the archive reads with none, a todo checked then reads as checked now, after the ones to do", () => {
 		const path = todosPath();
 		writeTodos(path, '{"todos": [{"id": "a", "text": "Old", "done": true, "children": [{"id": "a1", "text": "Older", "done": false}]}, {"id": "b", "text": "Lost", "done": false, "categoryId": "gone", "children": []}]}');
 		const before = Date.now();
 		const { list } = new UserTodosFile(path);
-		const doneAt = list.todos[0]!.doneAt;
+		const doneAt = list.todos[1]!.doneAt;
 		expect(doneAt !== null && Date.parse(doneAt) >= before - 1000).toBe(true);
 		expect(list).toEqual({
 			categories: [],
 			todos: [
-				{ id: "a", text: "Old", body: "", doneAt, due: null, categoryId: null, children: [{ id: "a1", text: "Older", body: "", doneAt: null, due: null }], links: [], addedBy: null },
 				{ id: "b", text: "Lost", body: "", doneAt: null, due: null, categoryId: null, children: [], links: [], addedBy: null },
+				{ id: "a", text: "Old", body: "", doneAt, due: null, categoryId: null, children: [{ id: "a1", text: "Older", body: "", doneAt: null, due: null }], links: [], addedBy: null },
 			],
 			archive: [],
 		});

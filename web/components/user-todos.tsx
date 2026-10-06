@@ -1,12 +1,12 @@
 import { CalendarClock, Circle, CircleCheck, GripVertical, ListX, NotebookText, Plus, X } from "lucide-react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { PastSession, RosterHost, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../src/shared";
 import { applyUserTodo } from "../../src/user-todos";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { hashForTodo, type TodoListView } from "../routing";
-import { DAY_FORMAT, LIST_KINDS, leftIn, matches, placeIn, restoreOf, type TodoEntry, titleOf, todosOf, today } from "../todo-views";
+import { DAY_FORMAT, LIST_KINDS, lastToDo, leftIn, matches, placeIn, restoreOf, type TodoEntry, titleOf, todosOf, today } from "../todo-views";
 import { useTodoDrag } from "../use-todo-drag";
 import { useTodoKeys } from "../use-todo-keys";
 import { PageFrame } from "./list-page";
@@ -160,7 +160,7 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 		if (!quickTodo || list === null || disabled || view.kind !== "all") return;
 		onQuickTodo();
 		const section = sections[0];
-		if (section) setEditing({ kind: "draft", parentId: null, afterId: section.todos.at(-1)?.id ?? null, categoryId: section.categoryId, text: "" });
+		if (section) setEditing({ kind: "draft", parentId: null, afterId: lastToDo(section.todos), categoryId: section.categoryId, text: "" });
 	}, [quickTodo, list === null, disabled, view.kind]);
 
 	if (list === null) {
@@ -197,11 +197,14 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 		return id;
 	};
 
-	const editKey = (todo: UserTodoLeaf, parentId: string | null, categoryId: string | null, key: TodoKey, text: string): boolean => {
+	/** Where a todo added right below `todo` among `siblings` goes: after it, or after the last one to do when it is done. */
+	const below = (todo: UserTodoLeaf, siblings: readonly UserTodoLeaf[]): string | null => (todo.doneAt === null ? todo.id : lastToDo(siblings));
+
+	const editKey = (todo: UserTodoLeaf, siblings: readonly UserTodoLeaf[], parentId: string | null, categoryId: string | null, key: TodoKey, text: string): boolean => {
 		switch (key) {
 			case "enter":
 				commit(todo, text);
-				setEditing(text.trim() && kind.canAdd ? { kind: "draft", parentId, afterId: todo.id, categoryId, text: "" } : NOT_EDITING);
+				setEditing(text.trim() && kind.canAdd ? { kind: "draft", parentId, afterId: below(todo, siblings), categoryId, text: "" } : NOT_EDITING);
 				return true;
 			case "escape":
 				setEditing(NOT_EDITING);
@@ -234,16 +237,18 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 				setEditing(NOT_EDITING);
 				return true;
 			case "indent": {
-				// Under the top-level todo it follows, or the section's last one when it ends the section.
-				const parentId = draft.parentId === null ? (draft.afterId ?? section.todos.at(-1)?.id ?? null) : null;
+				// Under the top-level todo it follows, or the last one to do when it ends them.
+				const parentId = draft.parentId === null ? (draft.afterId ?? lastToDo(section.todos)) : null;
 				if (parentId === null) return false;
 				setEditing({ ...draft, parentId, afterId: null, text });
 				return true;
 			}
-			case "outdent":
-				if (draft.parentId === null) return false;
-				setEditing({ ...draft, parentId: null, afterId: draft.parentId, text });
+			case "outdent": {
+				const parent = draft.parentId === null ? undefined : section.todos.find(todo => todo.id === draft.parentId);
+				if (!parent) return false;
+				setEditing({ ...draft, parentId: null, afterId: below(parent, section.todos), text });
 				return true;
+			}
 		}
 	};
 
@@ -315,7 +320,7 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 					<TodoInput
 						initial={todo.text}
 						label="Todo"
-						onKey={(key, text) => editKey(todo, entry.parent?.id ?? null, section.categoryId, key, text)}
+						onKey={(key, text) => editKey(todo, siblings, entry.parent?.id ?? null, section.categoryId, key, text)}
 						onLeave={text => {
 							commit(todo, text);
 							setEditing(NOT_EDITING);
@@ -389,6 +394,13 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 		);
 	};
 
+	/** The rows of `todos`, done ones last, with `end`, the draft that ends the ones to do, between the two. */
+	const rowsAround = <T extends UserTodoLeaf>(todos: readonly T[], rowsOf: (todo: T) => ReactNode[], end: ReactNode): ReactNode[] => {
+		const done = todos.findIndex(todo => todo.doneAt !== null);
+		const at = done < 0 ? todos.length : done;
+		return [...todos.slice(0, at).flatMap(rowsOf), end, ...todos.slice(at).flatMap(rowsOf)];
+	};
+
 	const sectionView = (section: Section) => {
 		const label = section.title ?? title;
 		const sectionLeft = section.todos.filter(todo => todo.doneAt === null).length;
@@ -408,20 +420,22 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 					</h3>
 				)}
 				<ul aria-label={`Todos of ${label}`} className="flex flex-col gap-0.5">
-					{section.todos.flatMap(todo => [
-						row(section, { todo, parent: null }, section.todos),
-						...todo.children.flatMap(child => [row(section, { todo: child, parent: todo }, todo.children), draftAt(section, todo.id, child.id)]),
-						draftAt(section, todo.id, null),
-						draftAt(section, null, todo.id),
-					])}
-					{draftAt(section, null, null)}
+					{rowsAround(
+						section.todos,
+						todo => [
+							row(section, { todo, parent: null }, section.todos),
+							...rowsAround(todo.children, child => [row(section, { todo: child, parent: todo }, todo.children), draftAt(section, todo.id, child.id)], draftAt(section, todo.id, null)),
+							draftAt(section, null, todo.id),
+						],
+						draftAt(section, null, null),
+					)}
 				</ul>
 				{empty && <p className="px-2 text-sm text-muted-foreground">{empty}</p>}
 				{!disabled && kind.canAdd && (
 					<Tooltip content={kind.dueToday ? "Add a todo due today" : "Add a todo at the end of this list"}>
 						<button
 							type="button"
-							onClick={() => setEditing({ kind: "draft", parentId: null, afterId: section.todos.at(-1)?.id ?? null, categoryId: section.categoryId, text: "" })}
+							onClick={() => setEditing({ kind: "draft", parentId: null, afterId: lastToDo(section.todos), categoryId: section.categoryId, text: "" })}
 							className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground [&>svg]:size-4"
 						>
 							<Plus />

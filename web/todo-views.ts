@@ -63,7 +63,7 @@ export function earliestDue(todo: UserTodo): string | null {
 	return days.length === 0 ? null : days.reduce((a, b) => (a < b ? a : b));
 }
 
-/** The top-level todos `view` lists, in its order: the list's, by earliest due day for Today, or the archive's, latest first. */
+/** The top-level todos `view` lists, in its order: the list's, to do first then by earliest due day for Today, or the archive's, latest first. */
 export function todosOf(list: UserTodoList, view: TodoListView, day: string): UserTodo[] {
 	switch (view.kind) {
 		case "all":
@@ -71,7 +71,9 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string): Us
 		case "category":
 			return list.todos.filter(todo => todo.categoryId === view.id);
 		case "today":
-			return list.todos.filter(todo => isDueBy(todo, day)).toSorted((a, b) => earliestDue(a)!.localeCompare(earliestDue(b)!));
+			return list.todos
+				.filter(todo => isDueBy(todo, day))
+				.toSorted((a, b) => Number(a.doneAt !== null) - Number(b.doneAt !== null) || earliestDue(a)!.localeCompare(earliestDue(b)!));
 		case "agents":
 			return list.todos.filter(todo => todo.addedBy !== null);
 		case "done":
@@ -100,18 +102,28 @@ export function matches(todo: UserTodo, query: string): boolean {
 	return words.every(word => text.includes(word));
 }
 
+/** Whether two todos sit on the same side of a list, which keeps the ones to do before the done ones. */
+export const sameStatus = (a: UserTodoLeaf, b: UserTodoLeaf): boolean => (a.doneAt === null) === (b.doneAt === null);
+
+/** The last of `todos` still to do, after which a new todo ends them; `null` for none, which adds it last, still before the done ones. */
+export const lastToDo = (todos: readonly UserTodoLeaf[]): string | null => todos.findLast(todo => todo.doneAt === null)?.id ?? null;
+
 /** A todo as a list shows it: a top-level one, or one under top-level todo `parent`. */
 export type TodoEntry = { todo: UserTodo; parent: null } | { todo: UserTodoLeaf; parent: UserTodo };
 
 /**
  * The `move` that puts `entry` at `position` among `siblings`, the todos a list shows beside it, counted once `entry`
- * is out of them; a top-level todo joins `categoryId`. `null` when that is where it is.
+ * is out of them; a top-level todo joins `categoryId`. `null` when that is where it is, or among the todos of the other status.
  */
 export function moveTo(entry: TodoEntry, siblings: readonly UserTodoLeaf[], position: number, categoryId: string | null): Extract<UserTodoChange, { op: "move" }> | null {
 	const { id } = entry.todo;
 	const rest = siblings.filter(todo => todo.id !== id);
 	if (position < 0 || position > rest.length || siblings[position]?.id === id) return null;
-	return { op: "move", id, afterId: rest[position - 1]?.id ?? null, categoryId: entry.parent === null ? categoryId : null };
+	const before = rest[position - 1];
+	const after = rest[position];
+	const crosses = entry.todo.doneAt === null ? before !== undefined && before.doneAt !== null : after !== undefined && after.doneAt === null;
+	if (crosses) return null;
+	return { op: "move", id, afterId: before?.id ?? null, categoryId: entry.parent === null ? categoryId : null };
 }
 
 /** Where todo `id` sits among the lists' `groups` of top-level todos: as an entry, with the todos shown beside it. */

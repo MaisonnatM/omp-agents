@@ -518,11 +518,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Tab while typing a todo moves it under the todo above it in its category, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
   Tab does nothing on a todo that holds todos of its own, since they would end up three deep, nor on one with links, which a todo under another cannot hold.
   The **+** that shows on hover adds a todo under that one.
-- Drag a todo by its row to move it among the todos beside it, top-level ones in **All** and a category, and a todo under another among its parent's.
+- Drag a todo by its row to move it among the todos beside it of its status, top-level ones in **All** and a category, and a todo under another among its parent's.
   Dropped beside a todo of another category, a top-level todo joins that category.
   Alt+Shift+↑ and Alt+Shift+↓ move the focused todo one place the same way.
   **Today** sorts by due day and **Done** by when it was cleared, so neither moves todos.
-- Click the circle before a todo to check it; checking a todo checks the todos under it too.
+- Every list shows its todos to do first and its checked ones after them, at both levels, each side in its own order.
+  Click the circle before a todo to check it; checking a todo checks the todos under it too.
+  A checked todo moves below the ones left to do, and unchecking one puts it last among them.
   A todo that holds others shows how many of them are checked, as in `2/3`.
   The page's header counts the top-level todos left to do, and **Clear done** moves every checked todo it lists to **Done**, a checked todo under an unchecked one as a todo of its own.
 - **Done** lists the cleared todos, latest first, with the day each was checked.

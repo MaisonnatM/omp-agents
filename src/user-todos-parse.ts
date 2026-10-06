@@ -4,6 +4,7 @@
  */
 import { isObject } from "./json";
 import type { UserTodo, UserTodoCategory, UserTodoChange, UserTodoLeaf, UserTodoLink, UserTodoList } from "./shared";
+import { inStatusOrder } from "./user-todos";
 
 /** The longest todo title, category name, and id the server takes in a change, and the longest todo body. */
 export const MAX_TODO_TEXT = 2000;
@@ -98,7 +99,7 @@ function parseCategory(value: unknown): UserTodoCategory | null {
 	return typeof id === "string" && typeof name === "string" ? { id, name } : null;
 }
 
-/** The list `todos.json` holds, `null` when it holds none. A file written before categories or the archive reads as having none of either. */
+/** The list `todos.json` holds, to do before done, `null` when it holds none. A file written before categories or the archive reads as having none of either. */
 export function parseUserTodoList(value: unknown): UserTodoList | null {
 	if (!isObject(value)) return null;
 	const categories = parseAll(value.categories ?? [], parseCategory);
@@ -111,7 +112,7 @@ export function parseUserTodoList(value: unknown): UserTodoList | null {
 	};
 	const todos = parseAll(value.todos, parseKnown);
 	const archive = parseAll(value.archive ?? [], parseKnown);
-	return todos && archive && { categories, todos, archive };
+	return todos && archive && { categories, todos: inStatusOrder(todos), archive };
 }
 
 /** One change to the list, from a page or an agent, each string within its limit; `null` for anything else. */
