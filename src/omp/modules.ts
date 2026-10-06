@@ -198,6 +198,10 @@ export interface FallbackChainsModule {
 		lookup: { find(provider: string, id: string): unknown },
 	): { provider: string; id: string; thinkingLevel: string | undefined } | undefined;
 }
+export interface ModelResolverModule {
+	/** The listed model that omp runs for `provider/id`, following retired variant ids such as `grok-4.7-high` and dotted revision spellings. */
+	resolveProviderModelReference<M extends { provider: string; id: string }>(provider: string, modelId: string, models: readonly M[]): M | undefined;
+}
 
 /** Subset of omp's capability items (src/capability/types.ts): every item names the file it came from. */
 export interface CapabilityItem {
@@ -443,6 +447,7 @@ export const fallbackChains = await load<FallbackChainsModule>(join(srcDir, "ses
 	expandDefaultRetryFallbackChains: "function",
 	parseRetryFallbackSelector: "function",
 });
+export const modelResolver = await load<ModelResolverModule>(join(srcDir, "config", "model-resolver.ts"), { resolveProviderModelReference: "function" });
 export const settingsRegistry = await load<SettingsRegistryModule>(join(srcDir, "config", "registry.ts"), { lookup: "function" });
 
 export const discovery = await load<DiscoveryModule>(join(srcDir, "discovery", "index.ts"), { loadCapability: "function" });

@@ -1,9 +1,9 @@
 import { isObject } from "../json";
 import { runJson } from "../proc";
 import { type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared/models";
-import { loadOmpConfig, type OmpConfig } from "./config";
+import { loadOmpConfig, type OmpConfig, parseRetryFallbackSelector } from "./config";
 import { ompCommand } from "./install";
-import { auth, oauth, type ServiceTierModel, serviceTiers } from "./modules";
+import { auth, modelResolver, oauth, type ServiceTierModel, serviceTiers } from "./modules";
 
 const MODELS_TIMEOUT_MS = 30_000;
 
@@ -49,22 +49,39 @@ interface ListedModel {
 }
 
 /**
- * The models of `connected` providers as a picker offers them, in their order. `curated` marks the ones `config` names
- * as a role's model or in a fallback chain, with any `:level` dropped; a role alias such as `@slow` names no model of its own.
- * Fields on `models` beyond {@link ListedModel}, such as a draft's thinking levels, stay on each entry.
+ * The models of `connected` providers as a picker offers them: the providers `config.modelProviderOrder` names first, in
+ * that order, then the rest, each in omp's order. `curated` marks the models that `config` names as a role's model or in a
+ * fallback chain, resolved as omp resolves them, so `cursor/grok-4.7-high` marks `cursor/grok-4.7`; a role alias such as
+ * `@slow` and a `provider/*` wildcard name no model of their own. Fields on `models` beyond {@link ListedModel}, such as a
+ * draft's thinking levels, stay on each entry.
  */
-export function modelEntries<T extends ListedModel>(models: readonly T[], config: Pick<OmpConfig, "modelRoles" | "fallbackChains">, connected: ReadonlySet<string>): (ModelEntry & Omit<T, keyof ListedModel>)[] {
+export function modelEntries<T extends ListedModel>(
+	models: readonly T[],
+	config: Pick<OmpConfig, "modelRoles" | "fallbackChains" | "modelProviderOrder">,
+	connected: ReadonlySet<string>,
+): (ModelEntry & Omit<T, keyof ListedModel>)[] {
 	const known = new Set(models.map(selectorOf));
+	const lookup = { find: (provider: string, id: string) => (known.has(`${provider}/${id}`) ? true : undefined) };
 	const named = [...Object.values(config.modelRoles), ...Object.entries(config.fallbackChains).flatMap(([key, chain]) => [key, ...chain])];
-	const curated = new Set(named.map(value => splitSelector(value.trim(), known).model));
-	return models.flatMap(model => {
-		if (!connected.has(model.provider)) return [];
-		const { provider, id, name, contextWindow, ...rest } = model;
-		return [{ ...rest, provider, id, name, contextWindow, curated: curated.has(`${provider}/${id}`) }];
-	});
+	const curated = new Set(
+		named.flatMap(value => {
+			const parsed = parseRetryFallbackSelector(value, lookup);
+			const model = parsed && modelResolver.resolveProviderModelReference(parsed.provider, parsed.id, models);
+			return model ? [selectorOf(model)] : [];
+		}),
+	);
+	const order = config.modelProviderOrder;
+	const rank = (provider: string): number => (order.includes(provider) ? order.indexOf(provider) : order.length);
+	return models
+		.filter(model => connected.has(model.provider))
+		.toSorted((a, b) => rank(a.provider) - rank(b.provider))
+		.map(model => {
+			const { provider, id, name, contextWindow, ...rest } = model;
+			return { ...rest, provider, id, name, contextWindow, curated: curated.has(`${provider}/${id}`) };
+		});
 }
 
-/** What a new session in `cwd` can start on: the models of {@link connectedProviders} that `omp models` lists, in omp's order. */
+/** What a new session in `cwd` can start on: the models of {@link connectedProviders} that `omp models` lists, as {@link modelEntries} orders them. */
 export async function connectedModels(cwd: string): Promise<ConnectedModels> {
 	const [catalog, connected, config] = await Promise.all([listModels(), connectedProviders(), loadOmpConfig(cwd)]);
 	const listed: (ListedModel & Pick<DraftModel, "thinkingLevels">)[] = catalog.map(({ selector, provider, name, contextWindow, thinking }) => ({
