@@ -22,6 +22,7 @@ import { CommandPicker } from "./command-picker";
 import { useDashboardContext } from "./dashboard-context";
 import { CalendarNav, type CalendarTabPage } from "./calendar/calendar-nav";
 import { SessionList } from "./session-list";
+import { SettingsNav, type SettingsTab } from "./settings/settings-nav";
 import { workspaceItems } from "./workspace-picker";
 import { TodoCategories } from "./todo/categories";
 import type { KnownSessions } from "./todo/links";
@@ -205,6 +206,8 @@ interface RosterProps {
 	routines: Routine[];
 	/** The page under the Calendar tab that is open. */
 	calendarTab: CalendarTabPage;
+	settingsTab: SettingsTab;
+	onSettingsTab: (tab: SettingsTab) => void;
 	/** The tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
@@ -238,6 +241,8 @@ export function Roster({
 	todoSessions,
 	routines,
 	calendarTab,
+	settingsTab,
+	onSettingsTab,
 	sectionTarget,
 	onSectionTarget,
 	inbox,
@@ -334,7 +339,9 @@ export function Roster({
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="settings" asChild>
-				<SidebarContent />
+				<SidebarContent>
+					<SettingsNav tab={settingsTab} onTab={onSettingsTab} />
+				</SidebarContent>
 			</TabPanel>
 		</Tabs>
 	);

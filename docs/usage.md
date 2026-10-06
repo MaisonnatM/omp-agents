@@ -671,9 +671,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - **Settings** is the last sidebar tab, after **Calendar**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
-  Settings has eight tabs: **Analytics**, **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **Integrations**, **New sessions**, and **Appearance**.
+  The sidebar lists eight sections: **Analytics**, **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **Integrations**, **New sessions**, and **Appearance**.
   It opens on **Analytics**.
-  Switching tabs keeps an unsaved edit, and the selected tab stays when you change workspace.
+  Switching sections keeps an unsaved edit, and the selected section stays when you change workspace.
+  The arrow keys move between section buttons; Enter or Space opens the focused section.
 - **Analytics** shows request usage for the last seven days.
   Choose **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
   It shows tokens, estimated cost, requests, cache hit rate, and a chart of token usage over time.
@@ -707,12 +708,12 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Removing every fallback of a role removes its own chain, so it walks the `default` chain again.
   The retry settings and the provider order save the same way.
   A workspace's `.omp/config.yml` still overrides what you save there.
-- The **Files** tab lists the files that omp reads: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
+- The **Files** section lists the files that omp reads: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
   Select a file to read its content, and choose **Edit** to change it in place (**Create** for a file marked `missing`).
   Save with the button or with Cmd+S. If the file changed on disk after the page read it, the save is refused and your edits stay in the editor, so you can copy them before you load the file from disk.
   A `.yml`, `.yaml`, or `.json` file must parse before it saves, and a settings file must hold a mapping.
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
-  If omp cannot load `config.yml`, the two routing tabs show omp's error and **Files** still lists the files, so you can fix the broken file there.
+  If omp cannot load `config.yml`, the two routing sections show omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
 - **New sessions** pins a skill.
   Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request or a Linear issue, then sends its first message through that skill.

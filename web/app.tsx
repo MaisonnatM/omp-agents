@@ -12,6 +12,7 @@ import { NO_PLANS, PlanUsageFooter, Plans } from "./components/plan-usage";
 import { Roster, useProject } from "./components/roster";
 import { SessionDetails } from "./components/session-details";
 import { SettingsPage } from "./components/settings/settings-page";
+import type { SettingsTab } from "./components/settings/settings-nav";
 import { SessionSwitcher } from "./components/session-switcher";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
@@ -162,6 +163,10 @@ export function App() {
 		if (next) open(next, "replace");
 	};
 	const settingsPage: Page = { kind: "settings", cwd: page?.kind === "settings" ? page.cwd : viewCwd || null };
+	const [settingsTab, setSettingsTab] = useState<SettingsTab>("analytics");
+	useEffect(() => {
+		if (page?.kind !== "settings") setSettingsTab("analytics");
+	}, [page?.kind]);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -320,7 +325,7 @@ export function App() {
 			break;
 		}
 		case "settings":
-			main = <SettingsPage cwd={page.cwd} workspaces={projects} />;
+			main = <SettingsPage cwd={page.cwd} workspaces={projects} tab={settingsTab} />;
 			break;
 		case "inbox":
 			main = page.target ? <PullRequestPage project={project} hosts={visible.hosts} target={page.target} /> : panes();
@@ -393,6 +398,8 @@ export function App() {
 						todoSessions={{ hosts: state.hosts, past: state.past }}
 						routines={state.routines}
 						calendarTab={page?.kind === "calendar" ? page : page?.kind === "routines" ? { kind: "routines", target: routinesTarget } : null}
+						settingsTab={settingsTab}
+						onSettingsTab={setSettingsTab}
 						sectionTarget={sectionTarget}
 						onSectionTarget={setSectionTarget}
 						inbox={

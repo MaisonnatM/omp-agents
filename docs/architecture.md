@@ -33,7 +33,7 @@ The main ones:
 - Completions: `pi-tui/src/autocomplete.ts`, and the skills and slash commands in `pi-coding-agent/src/extensibility/`.
 - Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
 - Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
-  `src/omp/stats.ts` reads omp-stats' database and starts its live sync only after the Settings page's Analytics tab first reads it.
+  `src/omp/stats.ts` reads omp-stats' database and starts its live sync only after the Settings page's Analytics section first reads it.
 
 ## Transcripts
 
@@ -467,7 +467,7 @@ The server lives in `src/`:
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle.
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
-  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the Linear and Google sign-ins and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; and `analytics.ts` the Analytics tab.
+  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the Linear and Google sign-ins and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; and `analytics.ts` the Analytics section.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
@@ -558,7 +558,9 @@ The page lives in `web/`.
   `web/days.ts` names a local day as todos, tickets, and the calendar do, `YYYY-MM-DD`, and walks the days between two of them.
 - `web/page-icons.ts`: the icon of each dashboard page, which its sidebar tab and every link into the page show.
   `web/routing.ts` owns the sidebar tab vocabulary and the page/hash routes; `web/components/workspace-picker.tsx` owns the directory picker and the workspace rows it shares with the sidebar's project picker.
-- `web/components/settings/analytics-tab.tsx`: the Settings tab for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
+- `web/components/settings/settings-nav.tsx`: the Settings sidebar's section buttons and the registry shared with `settings-page.tsx`.
+  `web/app.tsx` holds the selected section for both; the page keeps inactive panels mounted to preserve unsaved drafts.
+- `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.

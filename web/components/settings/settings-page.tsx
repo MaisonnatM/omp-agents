@@ -1,8 +1,6 @@
-import { BarChart3, FileText, FolderOpen, GitBranch, Palette, Plug, RotateCcw, Route, Sparkles } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
-import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
-import { SizeProvider } from "@/lib/size-context";
 import { settingsUrl } from "../../api";
 import { type ReadState, useRead, useReplaceableRead } from "../../reads";
 import { hashForSettings } from "../../routing";
@@ -17,6 +15,7 @@ import { LinearConnection } from "./linear-connection";
 import { NewSessionsTab } from "./new-sessions-tab";
 import { RetrySection, RolesTab } from "./routing-tab";
 import { WorktreesTab } from "./worktrees-tab";
+import { SETTINGS_TABS, type SettingsTab } from "./settings-nav";
 
 type Workspace = { cwd: string; cwdDisplay: string };
 
@@ -53,22 +52,9 @@ function WorkspacePicker({ cwd, workspaces }: { cwd: string | null; workspaces: 
 	);
 }
 
-const SETTINGS_TABS = [
-	{ value: "analytics", label: "Analytics", icon: BarChart3 },
-	{ value: "roles", label: "Model roles & provider order", icon: Route },
-	{ value: "retry", label: "Retry and fallback", icon: RotateCcw },
-	{ value: "files", label: "Files", icon: FileText },
-	{ value: "worktrees", label: "Worktrees", icon: GitBranch },
-	{ value: "integrations", label: "Integrations", icon: Plug },
-	{ value: "new-sessions", label: "New sessions", icon: Sparkles },
-	{ value: "appearance", label: "Appearance", icon: Palette },
-] as const;
+const PANEL = "space-y-10 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background";
 
-type SettingsTab = (typeof SETTINGS_TABS)[number]["value"];
-
-const PANEL = "space-y-10 rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background data-[state=inactive]:hidden";
-
-/** What the omp tabs show: their content once omp's settings are read, else why they are empty. */
+/** The omp sections' content once settings are read, else why they are empty. */
 function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Editing): Record<"roles" | "retry" | "files", ReactNode> {
 	if (read.data === null) {
 		const note =
@@ -100,8 +86,7 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 }
 
 /** omp's request usage, then its model routing and the files it reads, for one workspace or for the user only, each editable in place. */
-export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspaces: Workspace[] }) {
-	const [tab, setTab] = useState<SettingsTab>("analytics");
+export function SettingsPage({ cwd, workspaces, tab }: { cwd: string | null; workspaces: Workspace[]; tab: SettingsTab }) {
 	const models = useRead<{ models: CatalogModel[] }>("/api/models");
 	const catalog = useMemo(
 		(): Catalog => ({
@@ -125,23 +110,12 @@ export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspac
 		"new-sessions": <NewSessionsTab cwd={cwd} />,
 		appearance: <AppearanceTab />,
 	};
-	// Panels stay mounted so an unsaved draft survives switching tabs; PANEL hides the inactive ones.
-	const body = (
-		<Tabs value={tab} onValueChange={value => setTab(SETTINGS_TABS.find(option => option.value === value)?.value ?? tab)} className="space-y-6">
-			<SizeProvider size="compact">
-				<TabsList aria-label="Settings">
-					{SETTINGS_TABS.map(({ value, label, icon }) => (
-						<TabItem key={value} value={value} label={label} icon={icon} />
-					))}
-				</TabsList>
-			</SizeProvider>
-			{SETTINGS_TABS.map(({ value }) => (
-				<TabPanel key={value} value={value} forceMount className={PANEL}>
-					{panels[value]}
-				</TabPanel>
-			))}
-		</Tabs>
-	);
+	// Hidden panels stay mounted so an unsaved draft survives switching sections.
+	const body = SETTINGS_TABS.map(({ value, label }) => (
+		<section key={value} id={`settings-panel-${value}`} aria-label={label} hidden={tab !== value} tabIndex={0} className={PANEL}>
+			{panels[value]}
+		</section>
+	));
 
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
