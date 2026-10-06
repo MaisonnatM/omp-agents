@@ -442,7 +442,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A folded section's heading sums up its moves, such as `2 in review · 1 CI running`.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
   A line under the list shows the inbox's main keys.
-  Click the title to show the pull request's details in the main area, in place of the panes; **Back to the sessions** brings the panes back.
+  Click the title to show the pull request's details in the main area, in place of the panes; the back arrow at the start of the page header, **Back to the sessions**, brings the panes back.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Inbox** tab's count stays current.
   Reopening the inbox, even after a reload, shows the last inbox read for the chosen project at once; the top of the list says when that inbox was read, and the browser's localStorage keeps the last one of each project.
@@ -504,8 +504,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Hover an icon to read what it means.
   Click a state's heading to fold it; the browser's localStorage keeps folded ones folded across reloads.
 - Click a row to replace the tickets list with the issue's details in the main content.
-  The page header then names the issue: its identifier, with its title under it.
-  **Back to tickets** returns to the list with its folded states preserved.
+  The page header then names the issue: its identifier, with its title under it, after a back arrow.
+  The back arrow, **Back to tickets**, stays in the header while the details scroll, and returns to the list with its folded states preserved.
   The detail view shows the title, the state, the priority, the assignee, the project, the due date, the labels, who opened the issue and when, the description, Linear's branch name for it, the links Linear keeps for it (such as its pull requests), and the comment threads, with a link to the issue on Linear.
   Each opening reads the issue again through Linear's `get_issue` and `list_comments` tools.
   Linear's issue mentions in the text become links.
@@ -518,7 +518,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   When Linear refuses a change, the detail view says why and shows the issue as Linear has it.
   The lists come from the issue's team in Linear, read when you first open one, and the server keeps them for five minutes.
 - `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens that issue's details directly, even when the tickets list does not include it or cannot load.
-  **Back to tickets** opens the list from a direct link too.
+  The header's back arrow opens the list from a direct link too.
 - A lightning button on the row, and buttons in the issue's details, start a new dashboard session in the background, with a prompt that names the issue.
   The page stays on screen, and the session shows at once as a chip with its status dot on the issue's row and after the buttons in its details; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   A row and the details show a chip for every running session that works on the issue, whether a quick action started it or it read or changed the issue with omp's Linear tools, so they say whether an agent still works on it, after a reload too.
