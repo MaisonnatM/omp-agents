@@ -83,10 +83,22 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Hover or focus a window to see omp's full limit name and when it resets.
   The server runs `omp usage --json` at startup and every minute after that.
 
+## Analytics
+
+- **Analytics** at the bottom of the left sidebar, or `#analytics`, opens request usage for the last seven days.
+  Choose **24h**, **7d**, **30d**, **90d**, or **All** to change the range; the URL keeps the choice.
+- The page shows tokens, estimated cost, requests, cache hit rate, and a chart of token usage over time.
+  The cost is omp's API-equivalent list price, not what your subscription bills.
+- Models and projects are ordered by tokens, followed by the token split among main agents, subagents, and advisors, and by tool calls.
+  The top 20 sessions include their subagents' usage; select a session to open it.
+  omp keeps the usage of a session whose transcript you deleted, so it stays listed as **Deleted session**, without a link.
+- omp indexes session files when you first open Analytics and updates the page while indexing continues.
+  New requests appear as omp syncs them, including requests from sessions started outside the dashboard.
+
 ## Session details sidebar
 
 - The right sidebar shows what the focused pane's agent planned, changed, spawned, and captured: a live session, one of its subagents, or a past session, each from its own transcript file.
-  It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
+  It hides for a pull request's details, the tickets, **Analytics**, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
 - Tabs split it: **Plan**, **Files**, **Agents** for a live session or subagent, and **Media**.
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.

@@ -4,6 +4,7 @@ import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
+import { stopStats } from "./omp/stats";
 import { directoryOf, displayPath, interruptedFile, routinesFile, sessionEndInboxDir, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
 import { runShell } from "./proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "./routines";
@@ -234,6 +235,7 @@ try {
 				guards,
 				origin: originOf(PORT),
 				knownCwds,
+				savedOf: files.savedOf,
 				worktrees,
 				pullRequestsOf: sessionId => files.factsOf(sessionId).pullRequests,
 				learnHeads(repo, pullRequests) {
@@ -285,6 +287,7 @@ let shuttingDown: Promise<void> | undefined;
 function shutdown(): Promise<void> {
 	shuttingDown ??= (async () => {
 		await sessions.dispose();
+		stopStats();
 		// Last, right before exit, so a stopped command's result is not saved as one stopped at its time limit.
 		stopping.abort();
 		server.stop(true);

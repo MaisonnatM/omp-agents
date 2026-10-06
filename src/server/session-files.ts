@@ -44,6 +44,9 @@ export class SessionFiles {
 	/** The file of session `sessionId`, or `null` while it is not listed. */
 	readonly pathOf = (sessionId: string): string | null => this.#byId.get(sessionId)?.path ?? null;
 
+	/** Session `sessionId`'s listed file, or `null` while it is not listed. */
+	readonly savedOf = (sessionId: string): SavedSession | null => this.#byId.get(sessionId) ?? null;
+
 	/** What the index knows of session `sessionId`: its pull requests, Linear issues, and /ship stage. */
 	readonly factsOf = (sessionId: string): SessionFacts => {
 		const path = this.pathOf(sessionId);

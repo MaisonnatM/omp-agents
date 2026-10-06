@@ -1,8 +1,9 @@
 /**
- * The HTTP API the page reads and writes omp's settings, the inbox, pull requests, git checkouts, worktrees,
- * Linear's connection, Linear tickets and their files, prompt images, and the text files agent text names through.
+ * The HTTP API the page reads and writes omp's settings, analytics, the inbox, pull requests, git checkouts,
+ * worktrees, Linear's connection, Linear tickets and their files, prompt images, and the text files agent text names through.
  */
 import { join } from "node:path";
+import { buildAnalytics, type SessionFacts as AnalyticsSessionFacts } from "../analytics";
 import { errorText } from "../json";
 import { listSkills } from "../commands";
 import { gitCheckout } from "../git";
@@ -10,12 +11,14 @@ import { loadInbox, loadPullRequestDetail } from "../inbox";
 import { loadLinearStatus, startLinearSignIn } from "../linear";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
+import { sessionsDir } from "../omp/sessions";
+import { readStats } from "../omp/stats";
 import { directoryOf } from "../paths";
 import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
-import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, type PullRequest, type Repo, samePullRequest, TICKET_ID } from "../shared";
+import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, type PullRequest, type Repo, samePullRequest, TICKET_ID, isAnalyticsRange } from "../shared";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
@@ -31,6 +34,8 @@ export interface RouteEnv {
 	/** Directories sessions ran in: live ones first, then saved ones newest first. */
 	knownCwds(): string[];
 	worktrees: Worktrees;
+	/** The listed file of a session, for Analytics' title and working directory. */
+	savedOf(sessionId: string): AnalyticsSessionFacts | null;
 	pullRequestsOf(sessionId: string): LinkedPullRequest[];
 	/** The inbox listed `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
@@ -78,6 +83,14 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	const roles = get(params => {
 		const cwd = dirParam(params);
 		return cwd instanceof Response ? cwd : answer(async () => ({ roles: await connectedRoles(cwd) }));
+	});
+
+	/** `GET /api/analytics?range=`: omp-stats' request usage and live sync state. */
+	const analytics = get(params => {
+		const value = params.get("range") ?? "7d";
+		return isAnalyticsRange(value)
+			? answer(async () => buildAnalytics(value, await readStats(value), sessionsDir, env.savedOf))
+			: fail(400, "Unknown analytics range");
 	});
 
 	/** `GET /api/skills?cwd=<dir>`: the skills a session started in that directory can invoke. */
@@ -263,6 +276,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/models": { GET: models },
 		"/api/models/connected": { GET: connected },
 		"/api/models/roles": { GET: roles },
+		"/api/analytics": { GET: analytics },
 		"/api/skills": { GET: skills },
 		"/api/pull-request/sessions": { PUT: sessionLinks },
 		"/api/inbox": { GET: inbox },
