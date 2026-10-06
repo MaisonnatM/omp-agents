@@ -28,6 +28,7 @@ import { UserTodosFile } from "./server/user-todos-file";
 import { type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
 import type { StartRequest, StartResult, UserTodoChange, View } from "./shared";
+import { DONE_KEPT_HOURS } from "./user-todos";
 import { Worktrees } from "./worktrees";
 
 const PORT = portFromEnv();
@@ -44,6 +45,10 @@ function applyTodo(change: UserTodoChange): boolean {
 	const changed = todos.apply(change);
 	if (changed) broadcasts.pushUserTodos();
 	return changed;
+}
+/** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */
+function clearOldDone(): void {
+	applyTodo({ op: "clear-done", categoryId: null, before: new Date(Date.now() - DONE_KEPT_HOURS * 3_600_000).toISOString() });
 }
 const inbox = new TodoInbox(userTodoInboxDir, applyTodo);
 const routines = new RoutinesFile(routinesFile);
@@ -77,7 +82,10 @@ const loops = new Loops(sessionsDir, {
 	},
 	onRescanTick: rescanFiles,
 	onUsageTick: () => broadcasts.refreshUsage(),
-	onRoutineTick: () => runner.tick(),
+	async onMinuteTick() {
+		clearOldDone();
+		await runner.tick();
+	},
 });
 /** Directories sessions ran in: live ones first, then saved ones newest first. */
 const knownCwds = (): string[] => [...new Set([...sessions.cwds(), ...files.cwds()].filter(Boolean))];
@@ -277,6 +285,7 @@ inbox.watch();
 endInbox.watch();
 await rescanFiles();
 await listRegistry();
+clearOldDone();
 loops.start();
 console.log(listeningLine(PORT, ompVersion));
 console.log(`Sign in at ${originOf(PORT)}/?token=${token}`);

@@ -539,15 +539,21 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 ## Todo list
 
 - The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session or a project, in place of the panes.
-  The sidebar then lists **All**, **Today**, **From agents**, and **Done**, then your categories, each with how many top-level todos are left to do in it.
-  Click one to show its todos alone; `#todo/today`, `#todo/agents`, `#todo/done`, and `#todo/<category id>` address them.
+  The sidebar then lists **All**, **Today**, **Needs you**, **From agents**, and **Done**, then your categories, each with how many top-level todos are left to do in it.
+  Click one to show its todos alone; `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/done`, and `#todo/<category id>` address them.
   **All** lists the todos of no category first, then each category's under its name.
   **Today** lists the todos due today or before, or with a todo under them that is, earliest due first; **Add a todo due today** there adds one due today.
+  **Needs you** lists unchecked todos whose latest linked session has a question open or is idle, wherever that session ran.
   **From agents** lists the todos that an agent added; see [Todos from agents](#todos-from-agents).
 - The **+** beside **Categories** adds a category; type its name and press Enter, and the page opens it.
   A category's **⋯** menu renames it or deletes it; deleting a category keeps its todos, in no category.
 - **Add a todo** at the bottom of a list starts a new todo in that list's category; type its title and press Enter.
   Enter then starts the next todo below it, and Enter on an empty one, Esc, or a click elsewhere stops.
+- A new todo's title can end with a due day: `today`, `tomorrow`, a weekday such as `fri` or `friday`, or a `YYYY-MM-DD` date.
+  A new top-level todo's title can also end with `#` and the name of an existing category in any case, before or after the day.
+  They set the todo's due day and category and leave its title, and a word that names neither stays in the title.
+  A weekday names its next date, today included.
+- Cmd+Enter or Ctrl+Enter on a new or edited top-level todo saves it and opens its **Start session** draft.
 - A todo can hold todos of its own, one level down and no deeper, and they share its category.
   Tab while typing a todo moves it under the todo above it in its category, and Shift+Tab moves it back out, with the todos below it, so the list reads in the same order.
   Tab does nothing on a todo that holds todos of its own, since they would end up three deep, nor on one with links, which a todo under another cannot hold.
@@ -558,17 +564,22 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   **Today** sorts by due day and **Done** by when it was cleared, so neither moves todos.
 - Every list shows its todos to do first and its checked ones after them, at both levels, each side in its own order.
   Click the circle before a todo to check it; checking a todo checks the todos under it too.
-  A checked todo moves below the ones left to do, and unchecking one puts it last among them.
+  A checked top-level todo moves into its section's **Logbook**, a fold below **Add a todo** that starts folded and remembers when you open it; a search opens every Logbook.
+  A checked todo under an unchecked one moves below the ones left to do beside it, and unchecking a todo puts it last among them.
+  An unchecked top-level todo linked to a session shows a work-state pill instead of repeating the session's name: **Agent working**, **Needs you**, **In review**, **Shipped**, **Session ended**, or **Session unavailable**.
+  The pill opens the latest linked session; it does not check the todo or change its category.
   A todo that holds others shows how many of them are checked, as in `2/3`.
-  The page's header counts the top-level todos left to do, and **Clear done** moves every checked todo it lists to **Done**, a checked todo under an unchecked one as a todo of its own.
+  The page's header counts the top-level todos left to do, and **Clear done** moves every checked todo it lists to **Done** at once, a checked todo under an unchecked one as a todo of its own.
+  The server does the same by itself for a todo checked over 24 hours ago, when it starts and every minute after.
 - **Done** lists the cleared todos, latest first, with the day each was checked.
   Hover one to put it back last in the list, in its category if that still exists, or to delete it for good; **Empty** deletes them all, after you confirm.
-- Click a todo's title to edit it and open it beside the list.
+- Click a todo's title to edit it and expand its details below the row without narrowing the list.
   An empty title, or Backspace in an empty one, deletes the todo, and so does the **×** that shows on hover; deleting a todo deletes the todos under it.
   **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
 - The search field in the page's header, or `/` outside a text field, keeps the todos whose title or notes, or a todo under them, hold every word typed; Esc clears it.
   Outside a text field, J and K focus the next and previous todo, X checks the focused one, and Enter opens it.
 - An open todo shows its category, which you can change for a top-level todo, its due day, and its notes in markdown.
+  When a linked live session has a question open, the details show its title and **Reply in session**, which opens that session.
   A todo due today reads **Today** in the list, and one whose day has passed reads **Overdue** in red; **No due day** takes the day off.
   The notes always render as the agent's messages do, with GitHub's task lists and tables, and that render stays on screen while you edit them in the same type.
   They save when the text field loses focus and on Cmd+S; a todo with notes shows a notebook icon in the list.

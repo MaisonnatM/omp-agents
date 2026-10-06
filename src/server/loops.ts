@@ -15,8 +15,8 @@ const LIST_THROTTLE_MS = 500;
 const RESCAN_MS = 60_000;
 /** `omp usage` caches provider reports itself; each run still costs a process and up to one network round trip per provider. */
 const USAGE_POLL_MS = 60_000;
-/** Routine schedules count in minutes, and a Mac that wakes from sleep catches up at the next tick. */
-const ROUTINE_TICK_MS = 60_000;
+/** Routine schedules count in minutes, and a Mac that wakes from sleep catches up at the next tick; checked todos clear on it too. */
+const MINUTE_TICK_MS = 60_000;
 
 export interface LoopHandlers {
 	/** Every {@link POLL_MS}. */
@@ -29,8 +29,8 @@ export interface LoopHandlers {
 	onRescanTick(): Promise<void>;
 	/** At once, then every {@link USAGE_POLL_MS}. */
 	onUsageTick(): Promise<void>;
-	/** Every {@link ROUTINE_TICK_MS}, listener or not. */
-	onRoutineTick(): Promise<void>;
+	/** Every {@link MINUTE_TICK_MS}, listener or not. */
+	onMinuteTick(): Promise<void>;
 }
 
 /** Run `tick`, then again `ms` after each run finishes. */
@@ -57,12 +57,12 @@ export class Loops {
 		});
 	}
 
-	/** Start the registry poll, the rescans, the usage poll, and the routine tick. */
+	/** Start the registry poll, the rescans, the usage poll, and the minute tick. */
 	start(): void {
 		setTimeout(() => void repeat(this.#on.onRegistryTick, POLL_MS), POLL_MS);
 		setInterval(() => void this.#on.onRescanTick(), RESCAN_MS);
 		void repeat(this.#on.onUsageTick, USAGE_POLL_MS);
-		setInterval(() => void this.#on.onRoutineTick(), ROUTINE_TICK_MS);
+		setInterval(() => void this.#on.onMinuteTick(), MINUTE_TICK_MS);
 	}
 
 	/** A file changed, reported by the watcher or by the session that wrote it. */

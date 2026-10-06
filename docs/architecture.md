@@ -472,7 +472,8 @@ The server lives in `src/`:
   `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
 - `src/user-todos.ts`: the rules of the Todo page's list, `applyUserTodo`, which the server applies to its file and the page to what it shows before the server answers.
-  The list is `UserTodoList` in `src/shared.ts`: categories, top-level todos, and the archive that **Clear done** fills, latest first.
+  The list is `UserTodoList` in `src/shared.ts`: categories, top-level todos, and the archive that `clear-done` fills, latest first.
+  **Clear done** sends `clear-done` for the list it shows, and the server's minute tick in `src/server.ts` sends one with `before` for every todo checked over `DONE_KEPT_HOURS` ago; the socket and the todo inbox drop a `before` they receive.
   A todo has a title, markdown notes, a check time (`doneAt`), and a due day; a top-level one also has a category or none, todos of its own, which share its category, links (`UserTodoLink`: a session, a pull request, or a Linear issue), and `addedBy`, the session whose agent added it.
   `move` reorders, `restore` puts back what `remove` took at its index for the page's **Undo**, and `unarchive` and `empty-archive` act on the archive.
   Every list keeps its todos to do before its checked ones, at both levels: `applyUserTodo` orders the todos after each change through `inStatusOrder`, and loading the file does too.
@@ -550,10 +551,12 @@ The page lives in `web/`.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
 - `web/components/roster.tsx`: the left sidebar's tabs, its session and tickets lists, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab.
   `SessionRow` is the one row a past session and a live host both render.
-  `web/components/todo-categories.tsx` holds its Todo tab: **All**, **Today**, **From agents**, **Done**, then the categories, and `web/components/routines/routines-nav.tsx` its Routines tab, the routines by name.
+  `web/components/todo-categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Done**, then the categories, and `web/components/routines/routines-nav.tsx` its Routines tab, the routines by name.
 - `web/components/user-todos.tsx`: the Todo page and its lists; `todo-archive.tsx` is the **Done** page.
   `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows, `todo-search.tsx` is the search field, and `todo-undo.tsx` the **Undo** toast.
-  `todo-detail.tsx` is the open todo, with its due day, links, **Start session**, and **Create Linear ticket**, whose notes `web/components/markdown-editor.tsx` always renders through `message-markdown.tsx` while you edit them; `todo-links.tsx` draws a todo's link chips, and `add-to-todo.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
+  `web/todo-work-state.ts` derives the pill and the **Needs you** filter from the latest linked session's live status, outstanding question, submitted pull request, or recorded `/ship` merge; it keeps unknown and ended sessions distinct from new ideas.
+  `web/todo-quick-add.ts` reads a trailing due day and `#category` off a new todo's title.
+  `todo-detail.tsx` expands under the open row with its due day, live agent question, links, **Start session**, and **Create Linear ticket**, whose notes `web/components/markdown-editor.tsx` always renders through `message-markdown.tsx` while you edit them; `todo-links.tsx` draws a todo's link chips, and `add-to-todo.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
 - `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.
 - `web/components/pane.tsx`: a pane.

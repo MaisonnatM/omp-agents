@@ -1,35 +1,50 @@
 import { CalendarClock, Circle, CircleCheck, GripVertical, ListX, NotebookText, Plus, X } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import { Fragment, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { PastSession, RosterHost, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../src/shared";
-import { applyUserTodo } from "../../src/user-todos";
+import { applyUserTodo, DONE_KEPT_HOURS } from "../../src/user-todos";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { hashForTodo, type TodoListView } from "../routing";
-import { DAY_FORMAT, LIST_KINDS, lastToDo, leftIn, matches, placeIn, restoreOf, type TodoEntry, titleOf, todosOf, today } from "../todo-views";
+import { hashForNewSession, hashForTodo, type TodoListView } from "../routing";
+import { parseQuickTodo } from "../todo-quick-add";
+import { DAY_FORMAT, LIST_KINDS, lastToDo, leftIn, matches, restoreOf, type TodoEntry, titleOf, todosOf, today } from "../todo-views";
+import { workStateOf } from "../todo-work-state";
 import { useTodoDrag } from "../use-todo-drag";
 import { useTodoKeys } from "../use-todo-keys";
+import { FoldButton, useFolds } from "./fold";
 import { PageFrame } from "./list-page";
 import { TodoDetail } from "./todo-detail";
-import { AddedByChip, type KnownSessions, TodoLinkChip } from "./todo-links";
+import { type KnownSessions, TodoLinkChip, TodoWorkPill } from "./todo-links";
 import { TodoSearch } from "./todo-search";
 import { useUndo } from "./todo-undo";
+
+/** Sections whose Logbook you unfolded, by category id, `""` for none; a Logbook starts folded. */
+const LOGBOOK_KEY = "omp-agents.todo-logbook-open";
 
 /** What the Todo page types into: a todo's title, or a todo not added yet, at its place in the list, with what it holds so far. */
 type Editing =
 	| { kind: "none" }
 	| { kind: "edit"; id: string }
-	| { kind: "draft"; parentId: string | null; afterId: string | null; categoryId: string | null; text: string };
+	| {
+			kind: "draft";
+			parentId: string | null;
+			afterId: string | null;
+			categoryId: string | null;
+			text: string;
+			/** The todo this draft last added. A todo its title moved elsewhere leaves the draft in place, and this still gives it a fresh input. */
+			addedId?: string;
+	  };
 
 type Draft = Extract<Editing, { kind: "draft" }>;
 
 const NOT_EDITING: Editing = { kind: "none" };
 
 /** The keys a todo's input acts on, beyond typing. */
-type TodoKey = "enter" | "escape" | "indent" | "outdent" | "erase";
+type TodoKey = "enter" | "start" | "escape" | "indent" | "outdent" | "erase";
 
 function todoKey(event: KeyboardEvent<HTMLInputElement>): TodoKey | null {
-	if (event.nativeEvent.isComposing || event.metaKey || event.ctrlKey || event.altKey) return null;
+	if (event.nativeEvent.isComposing || event.altKey) return null;
+	if (event.metaKey || event.ctrlKey) return event.key === "Enter" ? "start" : null;
 	switch (event.key) {
 		case "Enter":
 			return "enter";
@@ -86,8 +101,8 @@ interface Section {
 }
 
 /** For every todo, the todos of no category first, then each category with todos, in its order; any other list is one section. */
-function sectionsOf(list: UserTodoList, view: TodoListView, day: string): Section[] {
-	if (view.kind !== "all") return [{ categoryId: view.kind === "category" ? view.id : null, title: null, todos: todosOf(list, view, day) }];
+function sectionsOf(list: UserTodoList, view: TodoListView, day: string, sessions: KnownSessions): Section[] {
+	if (view.kind !== "all") return [{ categoryId: view.kind === "category" ? view.id : null, title: null, todos: todosOf(list, view, day, sessions) }];
 	const inCategory = (categoryId: string | null) => list.todos.filter(todo => todo.categoryId === categoryId);
 	const named = list.categories.map(({ id, name }) => ({ categoryId: id, title: name, todos: inCategory(id) })).filter(section => section.todos.length > 0);
 	return [{ categoryId: null, title: named.length > 0 ? "No category" : null, todos: inCategory(null) }, ...named];
@@ -140,9 +155,11 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 	const listRef = useRef<HTMLDivElement>(null);
 	const day = today();
 	const kind = LIST_KINDS[view.kind];
-	const sections = list === null ? [] : sectionsOf(list, view, day).map(section => ({ ...section, todos: section.todos.filter(todo => matches(todo, query)) }));
+	const sessions: KnownSessions = { hosts, past };
+	const sections = list === null ? [] : sectionsOf(list, view, day, sessions).map(section => ({ ...section, todos: section.todos.filter(todo => matches(todo, query)) }));
 	const undo = useUndo(onChange);
 	const drag = useTodoDrag(kind.canMove && !disabled, onChange);
+	const logbook = useFolds(LOGBOOK_KEY, () => true);
 	const toggle = (todo: UserTodoLeaf): void => onChange({ op: "toggle", id: todo.id, doneAt: todo.doneAt === null ? new Date().toISOString() : null });
 	useTodoKeys({
 		listRef,
@@ -172,9 +189,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 	}
 
 	const title = titleOf(list, view);
-	const left = leftIn(list, view, day);
+	const left = leftIn(list, view, day, sessions);
 	const anyDone = sections.some(section => section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null)));
-	const sessions: KnownSessions = { hosts, past };
 
 	/** Deletes todo `id` with the todos under it, and offers **Undo**, which puts it back where it was. */
 	const remove = (id: string, text: string): void => {
@@ -189,12 +205,21 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 		if (!trimmed) remove(todo.id, todo.text);
 		else if (trimmed !== todo.text) onChange({ op: "edit", id: todo.id, text: trimmed });
 	};
-	const add = ({ parentId, afterId, categoryId }: Draft, text: string): string | null => {
-		const trimmed = text.trim();
-		if (!trimmed) return null;
+	/**
+	 * Adds `text` as a todo; a trailing due day or `#category` sets that field instead of staying in the title. Returns
+	 * where the next draft goes: after the new todo, or in its place when the parsed fields move the todo out of this list.
+	 */
+	const add = (draft: Draft, text: string): { id: string; afterId: string | null } | null => {
+		if (list === null) return null;
+		const { parentId } = draft;
+		const parsed = parseQuickTodo(text, parentId === null ? list.categories : [], day);
+		if (!parsed) return null;
 		const id = crypto.randomUUID();
-		onChange({ op: "add", id, parentId, afterId, categoryId, text: trimmed, due: parentId === null && kind.dueToday ? day : null });
-		return id;
+		const categoryId = parsed.categoryId ?? draft.categoryId;
+		const due = parsed.due ?? (parentId === null && kind.dueToday ? day : null);
+		onChange({ op: "add", id, parentId, afterId: draft.afterId, categoryId, text: parsed.text, due });
+		const leaves = categoryId !== draft.categoryId || (kind.dueToday && parentId === null && due !== null && due > day);
+		return { id, afterId: leaves ? draft.afterId : id };
 	};
 
 	/** Where a todo added right below `todo` among `siblings` goes: after it, or after the last one to do when it is done. */
@@ -205,6 +230,11 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 			case "enter":
 				commit(todo, text);
 				setEditing(text.trim() && kind.canAdd ? { kind: "draft", parentId, afterId: below(todo, siblings), categoryId, text: "" } : NOT_EDITING);
+				return true;
+			case "start":
+				if (parentId !== null || !text.trim()) return false;
+				commit(todo, text);
+				location.hash = hashForNewSession(newSessionCwd, todo.id);
 				return true;
 			case "escape":
 				setEditing(NOT_EDITING);
@@ -228,8 +258,16 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 	const draftKey = (draft: Draft, section: Section, key: TodoKey, text: string): boolean => {
 		switch (key) {
 			case "enter": {
-				const id = add(draft, text);
-				setEditing(id ? { ...draft, afterId: id, text: "" } : NOT_EDITING);
+				const added = add(draft, text);
+				setEditing(added ? { ...draft, afterId: added.afterId, addedId: added.id, text: "" } : NOT_EDITING);
+				return true;
+			}
+			case "start": {
+				if (draft.parentId !== null) return false;
+				const added = add(draft, text);
+				if (!added) return false;
+				setEditing(NOT_EDITING);
+				location.hash = hashForNewSession(newSessionCwd, added.id);
 				return true;
 			}
 			case "escape":
@@ -256,8 +294,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 		if (disabled || editing.kind !== "draft" || editing.parentId !== parentId || editing.afterId !== afterId || editing.categoryId !== section.categoryId) return null;
 		const draft = editing;
 		return (
-			// A new key per place, so the input starts with the draft's text wherever it moves.
-			<li key={`draft:${parentId}:${afterId}`} className={cn("flex items-start gap-2 rounded-md px-2 py-1 text-sm leading-snug", parentId !== null && "ml-6")}>
+			// A new key per place and per added todo, so the input starts with the draft's text wherever it moves.
+			<li key={`draft:${parentId}:${afterId}:${draft.addedId}`} className={cn("flex items-start gap-2 rounded-md px-2 py-1 text-sm leading-snug", parentId !== null && "ml-6")}>
 				<Circle aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground/60" />
 				<TodoInput
 					initial={draft.text}
@@ -296,8 +334,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 			</button>
 		);
 		return (
+			<Fragment key={todo.id}>
 			<li
-				key={todo.id}
 				data-todo-id={todo.id}
 				{...rowProps}
 				draggable={rowProps.draggable && !isEditing}
@@ -344,8 +382,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 						</button>
 					</Tooltip>
 				)}
-				{top?.addedBy && <AddedByChip sessionId={top.addedBy} sessions={sessions} />}
-				{top?.links.map(link => <TodoLinkChip key={JSON.stringify(link)} link={link} sessions={sessions} />)}
+				{top && !done && <TodoWorkPill state={workStateOf(top, sessions)} />}
+				{top?.links.filter(link => link.kind !== "session").map(link => <TodoLinkChip key={JSON.stringify(link)} link={link} sessions={sessions} />)}
 				{todo.due && !done && <DueChip due={todo.due} day={day} />}
 				{todo.body.trim() && (
 					<Tooltip content="Has notes">
@@ -391,6 +429,23 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 					</span>
 				)}
 			</li>
+			{openId === todo.id && (
+				<li className={cn("min-w-0 rounded-lg border border-border bg-background p-4 shadow-sm", !top && "ml-6")}>
+					<TodoDetail
+						key={todo.id}
+						list={list}
+						open={entry}
+						inline
+						readOnly={disabled}
+						onChange={onChange}
+						onClose={() => setOpenId(null)}
+						sessions={sessions}
+						newSessionCwd={newSessionCwd}
+						linearConnected={linearConnected}
+					/>
+				</li>
+			)}
+			</Fragment>
 		);
 	};
 
@@ -403,10 +458,20 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 
 	const sectionView = (section: Section) => {
 		const label = section.title ?? title;
-		const sectionLeft = section.todos.filter(todo => todo.doneAt === null).length;
+		const toDo = section.todos.filter(todo => todo.doneAt === null);
+		const done = section.todos.filter(todo => todo.doneAt !== null);
 		const empty = section.todos.length === 0 ? (query ? `No todo matches “${query}”.` : kind.empty) : null;
+		const foldKey = section.categoryId ?? "";
+		// A search shows every match, done ones too.
+		const logbookOpen = query !== "" || !logbook.isFolded(foldKey);
+		const logbookId = `todo-logbook-${foldKey}`;
+		const rowsOf = (todo: UserTodo): ReactNode[] => [
+			row(section, { todo, parent: null }, section.todos),
+			...rowsAround(todo.children, child => [row(section, { todo: child, parent: todo }, todo.children), draftAt(section, todo.id, child.id)], draftAt(section, todo.id, null)),
+			draftAt(section, null, todo.id),
+		];
 		return (
-			<section key={section.categoryId ?? ""} aria-label={label} className="space-y-1">
+			<section key={foldKey} aria-label={label} className="space-y-1">
 				{section.title !== null && (
 					<h3 className="flex items-baseline gap-2 px-2 text-sm font-medium">
 						{section.categoryId === null ? (
@@ -416,19 +481,12 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 								{section.title}
 							</a>
 						)}
-						<span className="text-xs tabular-nums text-muted-foreground">{sectionLeft}</span>
+						<span className="text-xs tabular-nums text-muted-foreground">{toDo.length}</span>
 					</h3>
 				)}
 				<ul aria-label={`Todos of ${label}`} className="flex flex-col gap-0.5">
-					{rowsAround(
-						section.todos,
-						todo => [
-							row(section, { todo, parent: null }, section.todos),
-							...rowsAround(todo.children, child => [row(section, { todo: child, parent: todo }, todo.children), draftAt(section, todo.id, child.id)], draftAt(section, todo.id, null)),
-							draftAt(section, null, todo.id),
-						],
-						draftAt(section, null, null),
-					)}
+					{toDo.flatMap(rowsOf)}
+					{draftAt(section, null, null)}
 				</ul>
 				{empty && <p className="px-2 text-sm text-muted-foreground">{empty}</p>}
 				{!disabled && kind.canAdd && (
@@ -443,11 +501,26 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 						</button>
 					</Tooltip>
 				)}
+				{done.length > 0 && (
+					<div className="space-y-1 pt-2">
+						<h4 className="flex items-baseline gap-2 px-2 text-sm text-muted-foreground">
+							<FoldButton open={logbookOpen} onToggle={() => logbook.toggle(foldKey)} controls={logbookId}>
+								<span className="font-medium text-foreground/80">Logbook</span>
+								<span className="text-xs tabular-nums">{done.length} done</span>
+							</FoldButton>
+							<span className="ml-auto text-xs text-muted-foreground/70">Moves to Done after {DONE_KEPT_HOURS} hours</span>
+						</h4>
+						{logbookOpen && (
+							<ul id={logbookId} aria-label={`Done todos of ${label}`} className="flex flex-col gap-0.5">
+								{done.flatMap(rowsOf)}
+							</ul>
+						)}
+					</div>
+				)}
 			</section>
 		);
 	};
 
-	const open = openId === null ? null : placeIn([list.todos], openId)?.entry;
 	return (
 		<PageFrame
 			title={title}
@@ -465,23 +538,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 				</>
 			}
 		>
-			<div className={cn("mx-auto grid w-full gap-8 px-6 py-6", open ? "max-w-6xl md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]" : "max-w-3xl")}>
-				<div ref={listRef} className="space-y-6">
-					{sections.map(sectionView)}
-				</div>
-				{open && (
-					<TodoDetail
-						key={open.todo.id}
-						list={list}
-						open={open}
-						readOnly={disabled}
-						onChange={onChange}
-						onClose={() => setOpenId(null)}
-						sessions={sessions}
-						newSessionCwd={newSessionCwd}
-						linearConnected={linearConnected}
-					/>
-				)}
+			<div ref={listRef} className="mx-auto w-full max-w-3xl space-y-6 px-6 py-6">
+				{sections.map(sectionView)}
 			</div>
 			{undo.toast}
 		</PageFrame>

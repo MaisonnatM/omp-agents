@@ -932,9 +932,10 @@ export type UserTodoChange =
 	| { op: "categorize"; id: string; categoryId: string | null }
 	/**
 	 * Moves every checked todo of category `categoryId`, or of the whole list for `null`, to the archive. A checked todo
-	 * under an unchecked one goes there as a top-level todo of its parent's category.
+	 * under an unchecked one goes there as a top-level todo of its parent's category. With `before`, an ISO 8601 time,
+	 * only todos checked earlier go: the server's auto-clear sends it, and the socket and the todo inbox drop it.
 	 */
-	| { op: "clear-done"; categoryId: string | null }
+	| { op: "clear-done"; categoryId: string | null; before?: string }
 	/** An archived todo goes back last in the list, in its category when that still exists. */
 	| { op: "unarchive"; id: string }
 	| { op: "empty-archive" }
