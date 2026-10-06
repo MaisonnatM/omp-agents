@@ -963,11 +963,11 @@ export type CommandRun =
 	/** `sh` could not start, as when the workspace is gone. */
 	| { phase: "failed"; error: string; startedAt: number; endedAt: number };
 
-/** A run claims its slot first, then drains its queue as session slots free up. */
+/** A run claims its slot first, then waits, queued, until a session slot frees up. */
 export interface RoutineRun {
 	at: number;
-	/** What this run still has to start. Empty once a prompt or command run has started. */
-	queue: string[];
+	/** Claimed, and its session or command not yet started. */
+	queued: boolean;
 	started: { label: string; instanceId: string; sessionId: string }[];
 	errors: string[];
 	/** Null until a command run launches. A prompt run leaves it null. */

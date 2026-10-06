@@ -1,10 +1,10 @@
 /**
- * Starts the sessions and runs the commands that routines ask for. Each tick claims the slots that came due, starts what their
- * queues hold while session slots are free, and ends the sessions that finished their turn.
+ * Starts the sessions and runs the commands that routines ask for. Each tick claims the slots that came due, starts the
+ * queued runs while session slots are free, and ends the sessions that finished their turn.
  * Every step converges: a slot claimed is on disk, so a second tick, or the next server, starts nothing twice.
  */
 import { errorText } from "../json";
-import { COMMAND_TIME_LIMIT, isDue, SINGLE_TARGET, UNATTENDED } from "../routines";
+import { COMMAND_TIME_LIMIT, isDue, UNATTENDED } from "../routines";
 import { type CommandRun, type HostStatus, type Routine, type RoutineRun, type RoutineTask, type StartRequest, type StartResult } from "../shared";
 import type { RoutinesFile } from "./routines-file";
 
@@ -34,12 +34,6 @@ const turnRuns = (status: HostStatus | undefined): boolean => status === "workin
 
 /** A command runs without an omp session, so it holds no session slot. */
 const takesSession = (task: RoutineTask): boolean => task.kind !== "command";
-
-/** What one start runs: its prompt, and the label its run lists. */
-interface Target {
-	label: string;
-	prompt: string;
-}
 
 export class RoutineRunner {
 	readonly #deps: RoutineRunnerDeps;
@@ -104,12 +98,12 @@ export class RoutineRunner {
 
 	/** Saves the run before anything starts from it, so a crash after the claim loses no slot. */
 	#claim(routine: Routine, at: number): void {
-		this.#deps.file.claim(routine.id, at, [SINGLE_TARGET]);
+		this.#deps.file.claim(routine.id, at);
 		this.#deps.onChange();
 	}
 
 	/**
-	 * Starts queued targets, oldest run first: sessions while fewer than {@link MAX_ROUTINE_SESSIONS} routine sessions are busy,
+	 * Starts queued runs, oldest first: sessions while fewer than {@link MAX_ROUTINE_SESSIONS} routine sessions are busy,
 	 * and commands whatever the sessions, since they take no slot.
 	 */
 	async #drain(): Promise<void> {
@@ -119,27 +113,25 @@ export class RoutineRunner {
 			if (!next) return;
 			const { routine, run } = next;
 			const { task } = routine;
-			// A queue entry other than the single target starts nothing.
-			if (file.pop(routine.id, run.at) !== SINGLE_TARGET) {
-				this.#deps.onChange();
-			} else if (task.kind === "command") {
+			file.dequeue(routine.id, run.at);
+			if (task.kind === "command") {
 				this.#launch(routine, run.at, task.command);
 			} else if ([...this.#tracked.values()].some(tracked => tracked.routineId === routine.id)) {
 				file.failed(routine.id, run.at, "The last run's session is still running.");
 				this.#deps.onChange();
 			} else {
-				await this.#start(routine, run.at, { label: routine.name, prompt: task.prompt });
+				await this.#start(routine, run.at, task.prompt);
 			}
 		}
 	}
 
-	/** Starts `target` for the run at `at`. */
-	async #start(routine: Routine, at: number, target: Target): Promise<void> {
+	/** Starts a session on `prompt` for routine `routine`'s run at `at`. */
+	async #start(routine: Routine, at: number, prompt: string): Promise<void> {
 		const { file } = this.#deps;
 		const result = await this.#deps.start({
 			kind: "new",
 			cwd: routine.cwd,
-			prompt: `${target.prompt} ${UNATTENDED}`,
+			prompt: `${prompt} ${UNATTENDED}`,
 			images: [],
 			branch: null,
 			model: null,
@@ -150,10 +142,10 @@ export class RoutineRunner {
 		});
 		const session = result.ok ? this.#deps.session(result.instanceId) : null;
 		if (!result.ok || !session) {
-			file.failed(routine.id, at, `${target.label}: ${result.ok ? "the session exited as it started." : result.error}`);
+			file.failed(routine.id, at, `${routine.name}: ${result.ok ? "the session exited as it started." : result.error}`);
 		} else {
 			this.#tracked.set(result.instanceId, { routineId: routine.id, phase: turnRuns(session.status) ? "working" : "starting" });
-			file.started(routine.id, at, { label: target.label, instanceId: result.instanceId, sessionId: session.sessionId });
+			file.started(routine.id, at, { label: routine.name, instanceId: result.instanceId, sessionId: session.sessionId });
 		}
 		this.#deps.onChange();
 	}
@@ -208,12 +200,12 @@ export class RoutineRunner {
 	}
 }
 
-/** The oldest run with something queued, and only commands once `sessionsFull`. */
+/** The oldest queued run, and only commands once `sessionsFull`. */
 function oldestQueued(routines: Routine[], sessionsFull: boolean): { routine: Routine; run: RoutineRun } | null {
 	let oldest: { routine: Routine; run: RoutineRun } | null = null;
 	for (const routine of routines) {
 		if (sessionsFull && takesSession(routine.task)) continue;
-		for (const run of routine.runs) if (run.queue.length > 0 && (!oldest || run.at < oldest.run.at)) oldest = { routine, run };
+		for (const run of routine.runs) if (run.queued && (!oldest || run.at < oldest.run.at)) oldest = { routine, run };
 	}
 	return oldest;
 }
