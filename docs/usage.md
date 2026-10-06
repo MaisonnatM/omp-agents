@@ -14,6 +14,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - [Questions](#questions)
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
 - [Pull requests and the inbox](#pull-requests-and-the-inbox)
+- [Integrations](#integrations)
 - [Todo list](#todo-list)
 - [Calendar](#calendar)
 - [Routines](#routines)
@@ -531,12 +532,23 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The page reads Linear when it opens and every minute after, and shows the last read at once on a reopen, even after a reload.
   The server keeps Linear's answer for 30 seconds, and **Refresh** asks again at once.
 - The dashboard reads Linear through omp's Linear MCP server and its sign-in, so there is no key to set.
-  Until omp is signed in to that server, the sidebar has no **Tickets** tab, Cmd+2 keeps its browser behavior, and a `#tickets` address shows how to connect instead of the issues.
-- To connect, open **Settings › Integrations** and choose **Connect Linear**.
+  Until omp is signed in to that server, the sidebar has no **Tickets** tab, Cmd+2 keeps its browser behavior, and a `#tickets` address shows Linear's integration row instead of the issues.
+- To connect, open the **Integrations** page and choose **Connect** on Linear's row; see [Integrations](#integrations).
   A new browser tab opens Linear's sign-in page; approve omp there, and the **Tickets** tab appears within a few seconds.
-  The dashboard signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds Linear's MCP server, `https://mcp.linear.app/mcp`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use Linear's tools too.
-  Linear's page sends the browser back to `localhost:3000`, so that port must be free while you sign in.
-  When Linear later refuses the sign-in, the tickets page says to run `/mcp reauth <name>` in omp; **Sign in again** in the settings does the same.
+  When Linear later refuses the sign-in, the **Tickets** tab stays and its page shows Linear's row with **Reconnect**.
+
+## Integrations
+
+- The plug button in the sidebar header, or a `#integrations` address, opens the **Integrations** page: a row for each service omp's sessions reach through an MCP server, Linear so far, and one for Google Calendar, which only the dashboard reads.
+  **Connected** lists the services that hold a sign-in, working or not, and **Available** lists the rest.
+- Each MCP row shows whether omp is connected, by listing the server's tools with omp's sign-in: **Connected** with the server's host and the number of tools, which unfolds to their names, **Needs reconnecting** when the server refuses the sign-in, **Unreachable** with the server's error and **Check again**, or **Not connected** or **Signed out** when omp has no server or no sign-in for it.
+  The page checks again every minute, and **Refresh** checks at once.
+- **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
+  The service's page sends the browser back to `localhost:3000`, so that port must be free while you sign in.
+  While it waits, the row says so and links to the sign-in page again.
+- A connected row's ⋯ menu holds **Reconnect**, which signs in again over a sign-in that the server refused or that still works, and **Sign out**.
+  **Sign out** asks first, then removes omp's sign-in for the service, as omp's `/mcp unauth` does, so omp's sessions lose its tools too; the server stays in `mcp.json`.
+- Google Calendar's **Set up** opens the steps to create its OAuth client and the fields for its ID and secret; once saved, **Connect** signs in, and the ⋯ menu holds **Reconnect** and **Replace OAuth client**.
 
 ## Todo list
 
@@ -634,7 +646,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - Click an entry to open its routine, its todo list, or its ticket; Google events open in Google Calendar in a new tab.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
 - To show Google events, enable the Google Calendar API in your Google Cloud project and create a Desktop OAuth client.
-  For a Workspace account, set the OAuth consent screen to **Internal** if available, then open **Settings › Integrations** to save the client ID and secret and choose **Connect Google**.
+  For a Workspace account, set the OAuth consent screen to **Internal** if available, then open the **Integrations** page, choose **Set up** on Google Calendar's row to save the client ID and secret, and choose **Connect**.
   Approve the dashboard's read-only `calendar.readonly` scope in the browser; a local callback at `127.0.0.1` completes sign-in.
   The server keeps the client secret and refresh token in `google.json` beside its access token with owner-only file permissions, and never sends them to the page.
   Replacing the OAuth client signs out of Google Calendar until you connect again.
@@ -678,7 +690,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - **Settings** is the last sidebar tab, after **Calendar**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
-  The sidebar lists eight sections: **Analytics**, **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **Integrations**, **New sessions**, and **Appearance**.
+  The sidebar lists seven sections: **Analytics**, **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **New sessions**, and **Appearance**.
   It opens on **Analytics**.
   Switching sections keeps an unsaved edit, and the selected section stays when you change workspace.
   The arrow keys move between section buttons; Enter or Space opens the focused section.
@@ -697,8 +709,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   It covers every session whatever workspace the header picks.
   omp indexes session files when you first open **Settings** and updates the tab while indexing continues.
   New requests appear as omp syncs them, including requests from sessions started outside the dashboard.
-- **Integrations** connects Linear; see [Linear tickets](#linear-tickets).
-  **Worktrees** lists every Git worktree in repositories where a session ran, and a path you enter lists that repository too.
+- **Worktrees** lists every Git worktree in repositories where a session ran, and a path you enter lists that repository too.
   Each row shows the branch and path, the last time an omp session file in that checkout changed, the last commit, approximate disk use, and tracked or untracked changes.
   No omp session reads as no omp session, not as unused.
   **Delete** asks before it removes a linked worktree or forgets a registration whose directory is already gone.
@@ -835,7 +846,7 @@ Alt is Option on macOS.
   Off macOS, closing the window quits.
 - On macOS, **omp agents › Open at Login** starts the app, and with it the server, when you log in.
   It carries `PATH`, `PORT`, `XDG_CONFIG_HOME`, `OMP_PACKAGE_DIR`, and `PI_CODING_AGENT_DIR` from the environment you ticked it in, since an app started at login gets no shell environment; tick it off and on again after one of them changes.
-- Every link to another site opens in the default browser, and so does **Connect Linear**'s sign-in page.
+- Every link to another site opens in the default browser, and so does an integration's sign-in page.
   The window never leaves the dashboard.
 - Cmd+W closes the window, Cmd+R reloads it, Cmd+Q quits, Cmd+M minimizes, and Cmd+0, Cmd++, and Cmd+- set the zoom.
   The menu takes none of the dashboard's own shortcuts.

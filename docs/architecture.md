@@ -28,8 +28,8 @@ The main ones:
   It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.
 - Model roles: `pi-coding-agent/src/config/model-resolver.ts` (`expandRoleAlias`, `resolveRoleChain`), whose `@role` aliases `resolveRoles` in `src/omp/models.ts` follows for `GET /api/models/roles`.
   `modelEntries` reads each role and fallback selector with `parseRetryFallbackSelector` and maps it to a listed model with `resolveProviderModelReference`, which follows retired variant ids such as `grok-4.7-high` and dotted spellings such as `claude-fable-5.1`.
-- MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `oauth-credentials.ts`, `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`), which `src/omp/mcp.ts` wraps for the tickets page and Linear's sign-in.
-  Linear's sign-in reads and writes omp's credential store through the same `discoverAuthStorage`, opened and closed on each call.
+- MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `oauth-credentials.ts` (`removeManagedMcpOAuthCredentials`), `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`), which `src/omp/mcp.ts` wraps for the tickets page and the Integrations page.
+  The MCP sign-ins and sign-outs read and write omp's credential store through the same `discoverAuthStorage`, opened and closed on each call.
 - Completions: `pi-tui/src/autocomplete.ts`, and the skills and slash commands in `pi-coding-agent/src/extensibility/`.
 - Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
 - Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `rollup.ts` (`getProviderTimeSeries`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
@@ -210,7 +210,7 @@ It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching t
 - The window loads `http://127.0.0.1:<port>/?token=<token>`, a navigation that sends `Sec-Fetch-Site: none`, so `guardsFor` admits it as it admits the printed address in a browser, and the socket's `Origin` matches its `Host`.
   A custom scheme for the page would fail that check.
 - `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin.
-  An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the Linear and Google sign-ins in `web/use-sign-in.ts` then open the address themselves once the server names it.
+  An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the MCP and Google sign-ins in `web/use-sign-in.ts` then open the address themselves once the server names it.
 - The page runs with context isolation and the sandbox on, and no preload: it gets no Node or Electron API.
 - The app keeps its data, its cookie, localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
 - A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
@@ -377,7 +377,7 @@ A failed start makes the draft read the checkout again, so a branch that the sta
 `GET /api/tickets`, or `GET /api/tickets?fresh` to skip the server's 30-second cache, answers the tickets page with `{ tickets }`.
 A failed read is the API's usual `{ error }` with status 500, and the page keeps showing the last tickets it has with the error above them.
 The server reads Linear through Linear's MCP server, with the OAuth sign-in that omp keeps for it, through `src/omp/mcp.ts`: it loads omp's own MCP config for the enabled server whose `url` has the `mcp.linear.app` host, and gets an access token for its `auth.credentialId`, or for the id omp files a sign-in for that URL under, from `omp token <credentialId>`, which refreshes the token through omp's credential owner.
-The token stays in memory for five minutes and is dropped when Linear answers 401, which the page reports as a `/mcp reauth <name>` hint; it is never logged.
+The token stays in memory for five minutes and is dropped when Linear answers 401, which the page reports as a hint to reconnect Linear on the Integrations page or run `/mcp reauth <name>`; it is never logged.
 Linear's GraphQL API refuses that token, so the server calls the MCP endpoint's `list_issues` tool through omp's `callMCP`, a stateless JSON-RPC `tools/call` POST.
 It asks for each open state type in full, following the cursor, and for completed, canceled, and duplicate issues updated in the last seven days, in parallel, then drops repeats by identifier.
 `list_issues` and `get_issue` name an issue's labels without their colors, so the server reads each team's labels with `list_issue_labels`, by the team key that prefixes the identifier, and keeps them for five minutes; `?fresh` reads them again too.
@@ -405,19 +405,31 @@ The server keeps each team's answer for five minutes.
 It calls `save_issue` with those fields, drops the cached tickets list, and answers the issue as `GET /api/ticket` reads it after the change.
 The issue detail shows a change at once and sends its changes one at a time, and once every change sent has answered, it reads the issue again if Linear refused one.
 
-`GET /api/linear` answers `{ connected, signIn }`.
-`connected` is true when omp's user-level MCP config has an enabled server on `mcp.linear.app` and omp's credential store, read again on each call, holds an OAuth sign-in under that server's credential id.
-The page hides the **Tickets** tab until a read says `connected`, and keeps the last read in localStorage.
-`PUT /api/linear/sign-in` starts a sign-in the way omp's `/mcp reauth` does, in `src/linear.ts` and `src/omp/mcp.ts`: it reads Linear's OAuth endpoints from its metadata, registers a client, and starts omp's `MCPOAuthFlow`, whose callback server listens on `localhost:3000`.
-It answers once the flow has Linear's authorization address, as `signIn: { phase: "waiting", url }`, which the page opens in a new tab.
-When the browser comes back, the server stores the tokens, refresh material included, under the server's credential id, where `omp token` finds them, and adds `"linear": { "type": "http", "url": "https://mcp.linear.app/mcp" }` to omp's `mcp.json` when omp had no Linear server.
+### Integrations
+
+`src/integrations.ts` holds the services whose MCP server the **Integrations** page signs omp in to, one row each in `SERVICES`, keyed by the ids in `MCP_INTEGRATIONS` in `src/shared/accounts.ts`; Linear is the only one so far.
+A row names the host omp's server for the service is on, and the name and URL of the server a sign-in adds when omp has none.
+
+`GET /api/integrations` answers `{ integrations }`, one `McpIntegration`, `{ id, connection, signIn }`, per service.
+`connection` is `absent` while omp's user-level MCP config has no enabled server on the service's host, and `signed-out` while omp's credential store, read again on each call, holds no OAuth sign-in for it.
+Otherwise `checkMcpServer` in `src/omp/mcp.ts` lists the server's tools with `tools/list`, following `nextCursor`, through the same token as the tickets' calls: `ready` carries the tool names, `refused` the 401 that asks for a new sign-in, and `failing` any other error.
+The server keeps each list for a minute, `?fresh` lists again, and a sign-in, a sign-out, or a 401 drops it.
+The page shows the **Tickets** tab while Linear's connection is `ready`, `refused`, or `failing`, and keeps the last read in localStorage; the tickets page shows Linear's integration row instead of the issues while it is not `ready` or `failing`.
+
+`PUT /api/integrations/sign-in`, with `{ id }`, starts a sign-in the way omp's `/mcp reauth` does: it reads the service's OAuth endpoints from its metadata, registers a client, and starts omp's `MCPOAuthFlow`, whose callback server listens on `localhost:3000`.
+It answers the integration once the flow has the service's authorization address, as `signIn: { phase: "waiting", url }`, which the page opens in a new tab.
+When the browser comes back, the server stores the tokens, refresh material included, under the server's credential id, where `omp token` finds them, and adds the service's server, such as `"linear": { "type": "http", "url": "https://mcp.linear.app/mcp" }`, to omp's `mcp.json` when omp had none.
 A new sign-in abandons the one under way.
 A failure, or no return within five minutes, shows as `signIn: { phase: "failed", error }` until the next sign-in.
-`createSignIn` in `src/sign-in.ts` holds that state for both Linear and Google.
+`createSignIn` in `src/sign-in.ts` holds that state for every MCP integration and for Google.
+
+`PUT /api/integrations/sign-out`, with `{ id }`, abandons a sign-in under way and signs out the way omp's `/mcp unauth` does: omp's `removeManagedMcpOAuthCredentials` removes the sign-ins omp manages under the server's credential id and the ids it files a sign-in for the URL under, and `mcp.json` keeps the server.
+A sign-in that omp does not manage stays, and the route answers an error that says so.
+`parseIntegrationId` in `src/server/wire.ts` checks both bodies.
 
 ### Google Calendar
 
-`src/google-calendar.ts` owns the dashboard's Google Calendar connection, separate from omp's Linear MCP sign-in.
+`src/google-calendar.ts` owns the dashboard's Google Calendar connection, separate from omp's MCP sign-ins.
 `PUT /api/google/client` saves a Desktop OAuth client ID and secret in `google.json` beside the access token, with owner-only file permissions, and signs out any prior account.
 `GET /api/google` answers the client ID, a `connected` flag, and the current sign-in state, never the client secret or refresh token.
 `PUT /api/google/sign-in` starts the desktop OAuth loopback flow on an ephemeral `127.0.0.1` port and answers the browser's Google authorization URL.
@@ -469,7 +481,7 @@ The server lives in `src/`:
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle.
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
-  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the Linear and Google sign-ins and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; and `analytics.ts` the Analytics section.
+  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations, the Google sign-in, and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; and `analytics.ts` the Analytics section.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
@@ -500,9 +512,9 @@ The server lives in `src/`:
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
-  `src/linear.ts` finds omp's server for Linear, tells whether omp is signed in to it, and runs the sign-in that the settings start.
+  `src/integrations.ts` finds omp's server for each MCP integration, checks it, and runs the sign-ins and sign-outs that the Integrations page starts; see [Integrations](#integrations).
 - `src/google-calendar.ts`: the read-only Google Calendar OAuth sign-in, private client and refresh-token file, access-token refresh, and month-range event reads.
-- `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout that `src/linear.ts` and `src/google-calendar.ts` share.
+- `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout that `src/integrations.ts` and `src/google-calendar.ts` share.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
 - `src/user-todos-shared.ts`: the Todo page's types, which the server, the page, and the extension that reads `todos.json` all follow: `UserTodoList`, `UserTodo`, `UserTodoLink`, and `UserTodoChange`.
   `templates/omp/agent/extensions/todos.ts` cannot import them, so it declares the shape it reads by hand.
@@ -574,7 +586,7 @@ The page lives in `web/`.
 - `web/reads.ts`: the server reads that components hold.
   `useRead` reads one URL, such as the pull request or the Linear issue the main content shows, the settings page's model catalog, or the new-session draft's model list.
   `useReplaceableRead` shows the version a save answered until that URL is read again.
-  The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, one each for whether omp is signed in to Linear and whether Google Calendar is connected, and one for the Calendar page's Google events, with one entry per month.
+  The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, one for the MCP integrations, one for whether Google Calendar is connected, and one for the Calendar page's Google events, with one entry per month.
   `web/app.tsx` polls the inbox instead, on every page once the sessions are listed, for the Inbox tab's count, and the sidebar's inbox reads that entry.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header.
@@ -617,8 +629,9 @@ The page lives in `web/`.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
 - `web/components/dashboard-context.tsx`: the stable dashboard actions (`send`, `open`, `start`, `end`, …) and the last start of each kind, provided once by `App`, which the sidebar, the panes, and the pages read instead of taking them as props.
 - `web/components/session-details.tsx`: the right sidebar's tabs for the focused pane: `outline-tab.tsx`, its turns from `outline` in `web/transcript-view.ts`, which scroll the focused pane's transcript to their prompt or reply and mark the turn its scroll is on; its changed files; and `media-tab.tsx`, its images and their viewer.
-- `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
-  `web/components/settings/google-connection.tsx` saves the Google OAuth client, and it and `linear-connection.tsx` start their sign-ins with `web/use-sign-in.ts`.
+- `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.
+  `web/components/integrations/` holds the Integrations page, which sorts its rows into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which the tickets page also shows while Linear is not connected, and `google-calendar.tsx` is Google Calendar's, with the form that saves its OAuth client.
+  Both lay out through `integration-row.tsx`, draw their brand marks from `brand-logos.tsx`, and start their sign-ins with `web/use-sign-in.ts`.
   `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue; both wrap their details in `DetailPage` from `web/components/list-page.tsx`.
   `pr-row.tsx` exports the DOM lookups of a row and its link that the inbox's keys use.
   `web/use-drag-order.ts` drags the inbox's repositories, sections, and pull requests, each within its own scope, and draws the drop line.

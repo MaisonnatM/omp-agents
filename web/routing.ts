@@ -62,6 +62,7 @@ export type Page =
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "routines" } & RoutinesRoute)
 	| { kind: "calendar" }
+	| { kind: "integrations" }
 	| ({ kind: "new" } & NewSessionRoute);
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
@@ -91,6 +92,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone.
  * - `#routines` opens the Routines page with every routine, and `#routines/<id>` with that routine's settings and runs.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
+ * - `#integrations` opens the Integrations page, which connects omp to Linear and the dashboard to Google Calendar.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	settings: rest => ({ kind: "settings", cwd: decodeCwd(rest) }),
@@ -107,6 +109,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	},
 	routines: rest => ({ kind: "routines", target: rest ? decodeURIComponent(rest) : null }),
 	calendar: () => ({ kind: "calendar" }),
+	integrations: () => ({ kind: "integrations" }),
 };
 
 const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, head);
@@ -126,6 +129,7 @@ function restOfPage(page: Page): string | null {
 		case "routines":
 			return page.target === null ? null : encodeURIComponent(page.target);
 		case "calendar":
+		case "integrations":
 			return null;
 		default: {
 			const never: never = page;
@@ -145,6 +149,7 @@ export const hashForTickets = (target: string | null): string => hashForPage({ k
 export const hashForTodo = (list: TodoListView): string => hashForPage({ kind: "todo", list });
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
+export const hashForIntegrations = (): string => hashForPage({ kind: "integrations" });
 export const hashForSettings = (cwd: string | null): string => hashForPage({ kind: "settings", cwd });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 
@@ -196,7 +201,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `todo`, `routines`, `session`, or `new`. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `todo`, `routines`, `integrations`, `session`, or `new`. */
 function viewFromPane(pane: string): View {
 	if (pane.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(pane.slice(PAST_PREFIX.length)) };
 	const slash = pane.indexOf("/");

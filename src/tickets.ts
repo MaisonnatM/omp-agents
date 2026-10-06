@@ -5,10 +5,12 @@
  */
 import { createCache } from "./cache";
 import { isObject, num, oneOf, str } from "./json";
-import { linearServer } from "./linear";
+import { integrationServer } from "./integrations";
 import { proxyUploads, rememberUploads, serveUpload } from "./linear-uploads";
 import { callMcpTool, type McpServer, toolJson } from "./omp/mcp";
 import { TICKET_ID, TICKET_PRIORITIES, TICKET_STATUS_TYPES, type Ticket, type TicketChoice, type TicketComment, type TicketDetail, type TicketDraft, type TicketEdit, type TicketLabel, type TicketOptions, type TicketsAnswer, type TicketStatusType } from "./shared/tickets";
+
+const linearServer = (): Promise<McpServer> => integrationServer("linear");
 
 /** The longest title and description `PUT /api/ticket/new` takes. */
 export const MAX_TICKET_TITLE = 2000;

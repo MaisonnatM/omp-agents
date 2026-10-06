@@ -1,4 +1,4 @@
-import { BarChart3, FileText, GitBranch, Palette, Plug, RotateCcw, Route, Sparkles } from "lucide-react";
+import { BarChart3, FileText, GitBranch, Palette, RotateCcw, Route, Sparkles } from "lucide-react";
 import { SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 
 export const SETTINGS_TABS = [
@@ -7,7 +7,6 @@ export const SETTINGS_TABS = [
 	{ value: "retry", label: "Retry and fallback", icon: RotateCcw },
 	{ value: "files", label: "Files", icon: FileText },
 	{ value: "worktrees", label: "Worktrees", icon: GitBranch },
-	{ value: "integrations", label: "Integrations", icon: Plug },
 	{ value: "new-sessions", label: "New sessions", icon: Sparkles },
 	{ value: "appearance", label: "Appearance", icon: Palette },
 ] as const;

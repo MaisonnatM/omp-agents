@@ -1,9 +1,9 @@
 /**
- * omp's MCP servers: finding one by its URL's host, signing in to one as `/mcp reauth` does, adding one to omp's
- * user-level config, and calling its tools with the OAuth sign-in omp keeps for it.
+ * omp's MCP servers: finding one by its URL's host, signing in to one as `/mcp reauth` does and out as `/mcp unauth`
+ * does, adding one to omp's user-level config, and listing and calling its tools with the OAuth sign-in omp keeps for it.
  */
 import { createCache } from "../cache";
-import { isObject, str } from "../json";
+import { errorText, isObject, str } from "../json";
 import { runChecked } from "../proc";
 import { ompCommand } from "./install";
 import {
@@ -21,6 +21,8 @@ import {
 const TIMEOUT_MS = 20_000;
 /** How long an `omp token` answer serves later calls; omp refreshes it before handing it out. */
 const TOKEN_MS = 5 * 60_000;
+/** How long a server's tool list serves the integrations page's reads. */
+const CHECK_MS = 60_000;
 
 export interface McpServer {
 	name: string;
@@ -114,6 +116,23 @@ export async function signInMcp(server: Pick<McpServer, "url"> & Partial<Pick<Mc
 		storage.close();
 	}
 	tokens.drop(credentialId);
+	checks.drop(credentialId);
+}
+
+/**
+ * Signs omp out of `server` as `/mcp unauth` does: removes the sign-ins omp manages for it, under its credential id
+ * and under the ids omp files a sign-in for its URL under. omp's config keeps the server.
+ */
+export async function signOutMcp(server: McpServer): Promise<void> {
+	const storage = await auth.discoverAuthStorage();
+	try {
+		await mcpCredentials.removeManagedMcpOAuthCredentials(storage, [server.credentialId, ...mcpCredentials.mcpOAuthCredentialIdsForServerUrl(server.url)]);
+		if (storage.credentials.hasOAuth(server.credentialId)) throw new Error(`omp does not manage the sign-in under ${server.credentialId}, so it stays. Remove it from omp's credentials yourself.`);
+	} finally {
+		storage.close();
+	}
+	tokens.drop(server.credentialId);
+	checks.drop(server.credentialId);
 }
 
 /** Adds an HTTP server to omp's user-level MCP config, which new omp sessions load. */
@@ -130,29 +149,64 @@ function toolError(text: string): string {
 	return text || "The MCP server reported an error";
 }
 
+/** The server refused omp's sign-in, so only a new sign-in helps. */
+class McpRefused extends Error {}
+
+/** `method`'s result on `server`, called with omp's sign-in for it; the server's own message thrown when it answers an error. */
+async function request(server: McpServer, method: string, params: Record<string, unknown>): Promise<unknown> {
+	const response = await mcpRpc.callMCP(server.url, method, params, {
+		headers: { Authorization: `Bearer ${await tokenOf(server.credentialId)}` },
+		signal: AbortSignal.timeout(TIMEOUT_MS),
+		onHttpError: ({ status }) => {
+			if (status !== 401) return new Error(`The "${server.name}" MCP server answered HTTP ${status}`);
+			tokens.drop(server.credentialId);
+			checks.drop(server.credentialId);
+			return new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it on the Integrations page, or run /mcp reauth ${server.name} in omp.`);
+		},
+	});
+	if (response.error) throw new Error(response.error.message || "The MCP server answered an error");
+	return response.result;
+}
+
 /** The text that `tool` answers for `args` on `server`; the server's own message thrown when the call fails. */
 export async function callMcpTool(server: McpServer, tool: string, args: Record<string, unknown>): Promise<string> {
-	const response = await mcpRpc.callMCP(
-		server.url,
-		"tools/call",
-		{ name: tool, arguments: args },
-		{
-			headers: { Authorization: `Bearer ${await tokenOf(server.credentialId)}` },
-			signal: AbortSignal.timeout(TIMEOUT_MS),
-			onHttpError: ({ status }) => {
-				if (status !== 401) return new Error(`The "${server.name}" MCP server answered HTTP ${status}`);
-				tokens.drop(server.credentialId);
-				return new Error(`The "${server.name}" MCP server refused omp's sign-in. Run /mcp reauth ${server.name} in omp.`);
-			},
-		},
-	);
-	if (response.error) throw new Error(response.error.message || "The MCP server answered an error");
-	const result = isObject(response.result) ? response.result : {};
+	const answered = await request(server, "tools/call", { name: tool, arguments: args });
+	const result = isObject(answered) ? answered : {};
 	const content = Array.isArray(result.content) ? result.content : [];
 	const text = content.map(part => (isObject(part) && part.type === "text" ? str(part.text) : undefined)).find(part => part !== undefined) ?? "";
 	if (result.isError === true) throw new Error(toolError(text));
 	return text;
 }
+
+/** What listing a server's tools found: their names, or why it failed and whether the server refused omp's sign-in. */
+export type McpCheck = { ok: true; tools: string[] } | { ok: false; refused: boolean; error: string };
+
+const checks = createCache<McpCheck>(CHECK_MS);
+
+/** Every tool `server` offers, following its cursor; a failure, which a session starting now would also meet, is an answer. */
+export const checkMcpServer = (server: McpServer, fresh: boolean): Promise<McpCheck> =>
+	checks.get(
+		server.credentialId,
+		async () => {
+			try {
+				const tools: string[] = [];
+				let cursor: string | undefined;
+				do {
+					const page = await request(server, "tools/list", cursor ? { cursor } : {});
+					if (!isObject(page)) break;
+					for (const tool of Array.isArray(page.tools) ? page.tools : []) {
+						const name = isObject(tool) ? str(tool.name) : undefined;
+						if (name) tools.push(name);
+					}
+					cursor = str(page.nextCursor);
+				} while (cursor);
+				return { ok: true, tools };
+			} catch (err) {
+				return { ok: false, refused: err instanceof McpRefused, error: errorText(err) };
+			}
+		},
+		fresh,
+	);
 
 /** `text`, what `service`'s `tool` answered, as JSON; the start of the text thrown when it is not JSON. */
 export function toolJson(service: string, tool: string, text: string): unknown {

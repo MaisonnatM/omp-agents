@@ -21,6 +21,8 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return "Routines";
 		case "calendar":
 			return "Calendar";
+		case "integrations":
+			return "Integrations";
 		case undefined: {
 			if (view?.kind === "past") return past ? pastLabel(past) : null;
 			if (view?.kind !== "live") return null;

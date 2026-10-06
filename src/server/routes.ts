@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, the inbox, pull requests, git checkouts,
- * worktrees, Linear's connection, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
+ * worktrees, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
  */
 import { join } from "node:path";
 import { buildAnalytics, type SessionFacts as AnalyticsSessionFacts } from "../analytics";
@@ -9,7 +9,7 @@ import { listSkills } from "../commands";
 import { gitCheckout } from "../git";
 import type { GoogleCalendar } from "../google-calendar";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
-import { loadLinearStatus, startLinearSignIn } from "../linear";
+import { loadIntegrations, signOutIntegration, startIntegrationSignIn } from "../integrations";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { sessionsDir } from "../omp/sessions";
@@ -19,6 +19,7 @@ import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
+import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type LinkedPullRequest, type PullRequest, type Repo, samePullRequest } from "../shared/github";
 import { PROMPT_IMAGE_TYPES } from "../shared/sessions";
@@ -26,7 +27,7 @@ import { TICKET_ID } from "../shared/tickets";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseGoogleClient, parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseGoogleClient, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
@@ -123,14 +124,24 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	/** `GET /api/tickets[?fresh]`: the viewer's assigned Linear issues, or why they could not be read. */
 	const tickets = get(params => answer(() => loadTickets(params.has("fresh"))));
 
-	/** `GET /api/linear`: whether omp is signed in to Linear's MCP server, and the sign-in the settings last started. */
-	const linear = get(() => answer(loadLinearStatus));
+	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server, and the sign-in the page last started. */
+	const integrations = get(params => answer(() => loadIntegrations(params.has("fresh"))));
 
-	/** `PUT /api/linear/sign-in`: starts a sign-in to Linear and answers with its authorization address to open. */
-	const linearSignIn: Handler = async req => {
-		const write = await guards.writeBody(req);
-		return write instanceof Response ? write : answer(startLinearSignIn);
-	};
+	/** A write of `{ id }` naming an MCP integration, answered with that integration as `act` leaves it. */
+	const integrationWrite =
+		(act: (id: McpIntegrationId) => Promise<McpIntegration>): Handler =>
+		async req => {
+			const write = await guards.writeBody(req);
+			if (write instanceof Response) return write;
+			const id = parseIntegrationId(write.body);
+			return id ? answer(() => act(id)) : fail(400, "Expected { id } naming an integration");
+		};
+
+	/** `PUT /api/integrations/sign-in`: starts a sign-in and answers with its authorization address to open. */
+	const integrationSignIn = integrationWrite(startIntegrationSignIn);
+
+	/** `PUT /api/integrations/sign-out`: signs omp out of the integration's server, as `/mcp unauth` does. */
+	const integrationSignOut = integrationWrite(signOutIntegration);
 
 	/** `GET /api/google`: the OAuth client saved for Google Calendar, whether it holds a sign-in, and the sign-in the settings last started. */
 	const googleStatus = get(() => Response.json(google.status()));
@@ -313,8 +324,9 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/pull-request/sessions": { PUT: sessionLinks },
 		"/api/inbox": { GET: inbox },
 		"/api/tickets": { GET: tickets },
-		"/api/linear": { GET: linear },
-		"/api/linear/sign-in": { PUT: linearSignIn },
+		"/api/integrations": { GET: integrations },
+		"/api/integrations/sign-in": { PUT: integrationSignIn },
+		"/api/integrations/sign-out": { PUT: integrationSignOut },
 		"/api/google": { GET: googleStatus },
 		"/api/google/client": { PUT: googleClient },
 		"/api/google/sign-in": { PUT: googleSignIn },
