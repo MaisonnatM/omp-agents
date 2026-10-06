@@ -1,6 +1,7 @@
 import { ArrowLeft, Ellipsis, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { Routine, RoutineChange, RoutineRun, RoutineTask, RosterHost, View } from "../../../src/shared";
+import type { Routine, RoutineChange, RoutineRun, RoutineTask } from "../../../src/routines";
+import type { RosterHost, View } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
@@ -80,7 +81,7 @@ function RoutineActions({ routine, disabled, onChange, onEdit, onDeleted }: Rout
 }
 
 /** The view a run's session opens: live while it still runs, else its transcript. */
-function sessionView(started: RoutineRun["started"][number], hosts: RosterHost[]): { view: View; host: RosterHost | null } {
+function sessionView(started: { instanceId: string; sessionId: string }, hosts: RosterHost[]): { view: View; host: RosterHost | null } {
 	const host = hosts.find(h => h.instanceId === started.instanceId || h.sessionId === started.sessionId) ?? null;
 	return { view: host ? { kind: "live", instanceId: host.instanceId, agentId: null } : { kind: "past", sessionId: started.sessionId }, host };
 }
@@ -112,30 +113,26 @@ function CommandOutput({ output }: { output: string }) {
 
 function RunItem({ run, routine, hosts }: { run: RoutineRun; routine: Routine; hosts: RosterHost[] }) {
 	const { open } = useDashboardContext();
+	const { outcome } = run;
+	const started = outcome.kind === "session" ? sessionView(outcome, hosts) : null;
 	return (
 		<li className="space-y-1.5 px-3 py-2.5">
 			<p className="flex items-baseline gap-2 text-sm">
 				<span className="font-medium tabular-nums">{readTime(run.at)}</span>
 				<span className="text-xs text-muted-foreground">{runWords(run)}</span>
 			</p>
-			{run.started.length > 0 && (
-				<div role="group" aria-label="Sessions it started" className="flex flex-wrap gap-1.5 text-xs">
-					{run.started.map(started => {
-						const { view, host } = sessionView(started, hosts);
-						return (
-							<SessionChip
-								key={started.sessionId || started.instanceId}
-								label={started.label}
-								status={host?.status ?? null}
-								title={`Open the session${host ? `, ${statusLabel(host.status)}` : ", which ended"} (${SPLIT_CLICK} to split)`}
-								filled={false}
-								onClick={event => open(view, modeOf(event))}
-							/>
-						);
-					})}
+			{started && (
+				<div role="group" aria-label="Session it started" className="flex flex-wrap gap-1.5 text-xs">
+					<SessionChip
+						label={routine.name}
+						status={started.host?.status ?? null}
+						title={`Open the session${started.host ? `, ${statusLabel(started.host.status)}` : ", which ended"} (${SPLIT_CLICK} to split)`}
+						filled={false}
+						onClick={event => open(started.view, modeOf(event))}
+					/>
 				</div>
 			)}
-			{run.command && "output" in run.command && run.command.output.trim() !== "" && <CommandOutput output={run.command.output} />}
+			{outcome.kind === "command" && "output" in outcome.run && outcome.run.output.trim() !== "" && <CommandOutput output={outcome.run.output} />}
 			{run.errors.length > 0 && (
 				<ul aria-label="Errors" className="space-y-0.5 text-xs text-red-600 dark:text-red-400">
 					{run.errors.map((error, index) => (

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Routine, RoutineRun, Schedule, Weekday } from "../src/shared";
+import type { Routine, RoutineRun, Schedule, Weekday } from "../src/routines";
 import { draftOf, lastRunWords, newDraft, nextRunWords, runWords, type RoutineDraft, schedulesWords, scheduleWords, specOf, taskWords, whenWords } from "./routines-model";
 
 // Local times, so the expected words hold in any time zone. Oct 5 2026 is a Monday.
@@ -20,7 +20,7 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	...fields,
 });
 
-const run = (fields: Partial<RoutineRun>): RoutineRun => ({ at: at(5, 9), queued: false, started: [], errors: [], command: null, ...fields });
+const run = (fields: Partial<RoutineRun>): RoutineRun => ({ at: at(5, 9), outcome: { kind: "pending", queued: false }, errors: [], ...fields });
 
 describe("schedule words", () => {
 	test("an interval reads in its largest whole unit", () => {
@@ -86,19 +86,18 @@ describe("next run", () => {
 });
 
 describe("last run", () => {
-	const started = { label: "acme/webapp#7", instanceId: "7c51", sessionId: "01a0" };
+	const session = { kind: "session", instanceId: "7c51", sessionId: "01a0" } as const;
 
-	test("names the sessions it started and its errors, or that it waits its turn", () => {
-		expect(runWords(run({ started: [started], errors: ["GitHub timed out", "No such directory"] }))).toBe("1 session started, 2 errors");
-		expect(runWords(run({ started: [started, started] }))).toBe("2 sessions started");
+	test("names the session it started and its errors, or that it waits its turn", () => {
+		expect(runWords(run({ outcome: session, errors: ["GitHub timed out", "No such directory"] }))).toBe("1 session started, 2 errors");
 		expect(runWords(run({ errors: ["GitHub timed out"] }))).toBe("1 error");
-		expect(runWords(run({ queued: true }))).toBe("Queued");
+		expect(runWords(run({ outcome: { kind: "pending", queued: true } }))).toBe("Queued");
 	});
 
 	test("a run that started nothing says so, and a routine never run says so", () => {
 		expect(runWords(run({}))).toBe("Nothing started");
 		expect(lastRunWords(routine({}))).toBe("Not run yet");
-		expect(lastRunWords(routine({ runs: [run({ started: [started] }), run({ errors: ["old"] })] }))).toBe("1 session started");
+		expect(lastRunWords(routine({ runs: [run({ outcome: session }), run({ errors: ["old"] })] }))).toBe("1 session started");
 	});
 });
 
@@ -111,12 +110,12 @@ describe("command runs", () => {
 
 	test("a run reads as how its command stands", () => {
 		expect(runWords(run({}))).toBe("Nothing started");
-		expect(runWords(run({ command: { phase: "running", startedAt: at(5, 9) } }))).toBe("Running…");
-		expect(runWords(run({ command: { phase: "exited", code: 0, output: "", ...window } }))).toBe("Succeeded");
-		expect(runWords(run({ command: { phase: "exited", code: 3, output: "", ...window }, errors: ["Exited with code 3."] }))).toBe("Failed (exit 3)");
-		expect(runWords(run({ command: { phase: "stopped", reason: "time-limit", output: "", ...window } }))).toBe("Stopped at the time limit");
-		expect(runWords(run({ command: { phase: "stopped", reason: "dashboard", output: "", ...window } }))).toBe("Stopped with the dashboard");
-		expect(runWords(run({ command: { phase: "failed", error: "/gone is not a directory.", ...window } }))).toBe("Could not start");
+		expect(runWords(run({ outcome: { kind: "command", run: { phase: "running", startedAt: at(5, 9) } } }))).toBe("Running…");
+		expect(runWords(run({ outcome: { kind: "command", run: { phase: "exited", code: 0, output: "", ...window } } }))).toBe("Succeeded");
+		expect(runWords(run({ outcome: { kind: "command", run: { phase: "exited", code: 3, output: "", ...window } }, errors: ["Exited with code 3."] }))).toBe("Failed (exit 3)");
+		expect(runWords(run({ outcome: { kind: "command", run: { phase: "stopped", reason: "time-limit", output: "", ...window } } }))).toBe("Stopped at the time limit");
+		expect(runWords(run({ outcome: { kind: "command", run: { phase: "stopped", reason: "dashboard", output: "", ...window } } }))).toBe("Stopped with the dashboard");
+		expect(runWords(run({ outcome: { kind: "command", run: { phase: "failed", error: "/gone is not a directory.", ...window } } }))).toBe("Could not start");
 	});
 
 	test("a run that ran nothing because the last command still ran counts its error", () => {

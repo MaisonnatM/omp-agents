@@ -47,16 +47,19 @@ export interface WorktreeMetrics extends WorktreeTarget {
 	errors: string[];
 }
 
-export interface WorktreeRemovalPlan extends WorktreeTarget {
-	kind: "remove" | "registration";
-	branch: string | null;
-	head: string;
-	ignored: string[];
-	detachedCommitLoss: boolean;
-	savedSessionIds: string[];
-	blockers: WorktreeBlocker[];
-	confirmation: string;
-}
+/** Every plan says what blocks removal; only a checkout the server could read carries what removal would do. */
+export type WorktreeRemovalPlan = WorktreeTarget & { blockers: WorktreeBlocker[] } & (
+	| { kind: "unreadable" }
+	| {
+		kind: "remove" | "registration";
+		branch: string | null;
+		head: string;
+		ignored: string[];
+		detachedCommitLoss: boolean;
+		savedSessionIds: string[];
+		confirmation: string;
+	}
+);
 
 export interface WorktreeRemovalResult extends WorktreeTarget {
 	removed: boolean;

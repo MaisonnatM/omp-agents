@@ -1,6 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { applyRoutine, isDue, nextRunAt } from "./routines";
-import type { Routine, Schedule } from "./shared";
+import { applyRoutine, isDue, nextRunAt, type Routine, type Schedule } from "./routines";
 
 // Weekly slots are local wall-clock times; Paris has both DST changes in the dates below.
 const savedTz = process.env.TZ;
@@ -56,7 +55,7 @@ describe("nextRunAt", () => {
 });
 
 describe("isDue", () => {
-	const fridayRun = { at: at("2026-10-09T09:00:00+02:00"), queued: false, started: [], errors: [], command: null };
+	const fridayRun = { at: at("2026-10-09T09:00:00+02:00"), outcome: { kind: "pending", queued: false } as const, errors: [] };
 
 	test("slots missed over a weekend coalesce into one run, which is not due again once claimed", () => {
 		const monday = at("2026-10-12T11:00:00+02:00");
@@ -100,7 +99,7 @@ describe("applyRoutine", () => {
 	});
 
 	test("an edit keeps the routine's creation and runs", () => {
-		const run = { at: at("2026-10-05T09:00:00+02:00"), queued: true, started: [], errors: [], command: null };
+		const run = { at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "pending", queued: true } as const, errors: [] };
 		const saved = routine({ runs: [run] });
 		expect(applyRoutine([saved], { op: "save", routine: { ...spec, name: "Morning notes", schedules: [daily] } }, now)).toEqual([
 			{ ...saved, name: "Morning notes", schedules: [daily] },

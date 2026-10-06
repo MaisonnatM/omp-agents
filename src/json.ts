@@ -20,3 +20,6 @@ export const oneOf =
 		values.includes(value as T);
 
 export const isTexts = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === "string");
+
+/** `list` as a tuple that has a first member, or `null` when it is empty. */
+export const nonEmpty = <T>(list: readonly T[]): [T, ...T[]] | null => (list.length === 0 ? null : (list as [T, ...T[]]));

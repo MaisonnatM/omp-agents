@@ -102,15 +102,14 @@ const worktrees = new Worktrees({
 	knownCwds,
 	activity: () => files.activity(),
 	serverCwd: process.cwd(),
-	async live() {
-		sessions.follow(await listHosts());
+	live() {
 		return sessions.rows(files.factsOf).map(host => ({
 			cwd: host.cwd,
 			unknownAgents: host.control.phase !== "live" || host.agents.some(agent => (host.source === "terminal" ? agent.status !== "aborted" : agent.status === "running")),
 		}));
 	},
 });
-const startSession = (request: StartRequest): Promise<StartResult> => worktrees.lifecycle(() => starter(request));
+const startSession = (request: StartRequest): Promise<StartResult> => worktrees.start(() => starter(request), request.kind === "new" && request.branch !== null);
 const endInbox = new EndInbox(sessionEndInboxDir, {
 	session(sessionId) {
 		const session = sessions.bySessionId(sessionId);

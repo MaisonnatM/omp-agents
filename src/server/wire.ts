@@ -3,8 +3,8 @@
  * Each socket message has one parser in {@link clientParsers}, so a {@link ClientMsg} variant without one does not compile.
  * Socket parsers return `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller casts what it received.
  */
-import { isObject, oneOf, str } from "../json";
-import { MAX_COMMAND_LENGTH } from "../routines";
+import { isObject, nonEmpty, oneOf, str } from "../json";
+import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
 import { GOOGLE_CLIENT_ID, type GoogleClient, MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, TICKET_ID, TICKET_PRIORITIES } from "../shared";
 import type {
 	BranchChoice,
@@ -14,17 +14,12 @@ import type {
 	ModelOption,
 	PromptImage,
 	PullRequest,
-	RoutineChange,
-	RoutineTask,
-	Schedule,
-	Schedules,
 	SessionLinksEdit,
 	StartRequest,
 	TicketDraft,
 	TicketEdit,
 	UserAnswer,
 	View,
-	Weekday,
 	WorkItem,
 } from "../shared";
 import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } from "../worktrees-shared";
@@ -148,16 +143,15 @@ function parseSchedule(value: unknown): Parsed<Schedule> {
 
 /** One or more schedules. An empty list is not one. */
 function parseSchedules(value: unknown): Parsed<Schedules> {
-	if (!Array.isArray(value) || value.length === 0) return null;
+	if (!Array.isArray(value)) return null;
 	const schedules: Schedule[] = [];
 	for (const entry of value) {
 		const schedule = parseSchedule(entry);
 		if (!schedule) return null;
 		schedules.push(schedule.ok);
 	}
-	const [first, ...rest] = schedules;
-	if (!first) return null;
-	return { ok: [first, ...rest] };
+	const nonEmptySchedules = nonEmpty(schedules);
+	return nonEmptySchedules && { ok: nonEmptySchedules };
 }
 
 function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
@@ -179,8 +173,7 @@ export type RoutineSpec = Extract<RoutineChange, { op: "save" }>["routine"];
 export function parseRoutineSpec(value: unknown): RoutineSpec | null {
 	if (!isObject(value)) return null;
 	const { id, name, cwd, enabled } = value;
-	// A file from before `schedules` holds one `schedule`. A present `schedules`, even an empty one, does not fall back.
-	const schedules = "schedules" in value ? parseSchedules(value.schedules) : parseSchedules([value.schedule]);
+	const schedules = parseSchedules(value.schedules);
 	const task = parseRoutineTask(value.task);
 	const skill = parseSkill(value.skill);
 	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !skill) return null;
@@ -413,7 +406,7 @@ export function parseTicketEdit(body: unknown): TicketEdit | null {
 	return Object.keys(edit).length > 1 ? edit : null;
 }
 
-const SHA256 = /^[0-9a-f]{64}$/;
+export const SHA256 = /^[0-9a-f]{64}$/;
 
 const worktreeTarget = (value: unknown): WorktreeTarget | null =>
 	isObject(value) && isNonEmpty(value.repository) && isNonEmpty(value.path) ? { repository: value.repository, path: value.path } : null;

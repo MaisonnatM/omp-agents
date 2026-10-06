@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runChecked } from "./proc";
 import { Worktrees } from "./worktrees";
+import type { WorktreeRemovalPlan } from "./worktrees-shared";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -34,19 +35,25 @@ async function linked(parent: string, main: string, name = "wip"): Promise<strin
 const quiet = new Worktrees({
 	knownCwds: () => [],
 	activity: () => [],
-	live: async () => [],
+	live: () => [],
 	serverCwd: "/no/such/dashboard",
 });
+
+/** A plan the server could read, which carries its confirmation. */
+function readable(plan: WorktreeRemovalPlan): Exclude<WorktreeRemovalPlan, { kind: "unreadable" }> {
+	if (plan.kind === "unreadable") throw new Error(plan.blockers.map(blocker => blocker.message).join(" "));
+	return plan;
+}
 
 describe("worktree removal", () => {
 	test("lists every registered worktree of a known repository and refuses the main checkout", async () => {
 		const { parent, main } = await repo();
 		const path = await linked(parent, main);
-		const listed = await new Worktrees({ knownCwds: () => [main], activity: () => [{ id: "s", cwd: path, modifiedAt: 50 }], live: async () => [], serverCwd: "/no/such/dashboard" }).inventory(null);
+		const listed = await new Worktrees({ knownCwds: () => [main], activity: () => [{ id: "s", cwd: path, modifiedAt: 50 }], live: () => [], serverCwd: "/no/such/dashboard" }).inventory(null);
 		expect(listed.repositories.map(item => item.worktrees.map(entry => entry.path))).toEqual([[main, path]]);
 		expect(listed.repositories[0]?.worktrees[1]?.lastActivity).toBe(50);
 		const repository = listed.repositories[0]?.repository ?? "";
-		const plan = await quiet.preview({ repository, path: main });
+		const plan = readable(await quiet.preview({ repository, path: main }));
 		expect(plan.blockers.some(blocker => blocker.code === "main")).toBe(true);
 		expect((await quiet.remove([plan])).map(result => result.removed)).toEqual([false]);
 		expect(existsSync(main)).toBe(true);
@@ -59,7 +66,7 @@ describe("worktree removal", () => {
 		writeFileSync(join(path, ".env"), "SECRET=1\n");
 		await git(path, "add", ".gitignore");
 		await git(path, "commit", "-q", "-m", "ignore");
-		const plan = await quiet.preview({ repository: await common(main), path });
+		const plan = readable(await quiet.preview({ repository: await common(main), path }));
 		expect(plan.blockers).toEqual([]);
 		expect(plan.ignored).toContain(".env");
 		expect((await quiet.remove([plan]))[0]?.removed).toBe(true);
@@ -74,14 +81,14 @@ describe("worktree removal", () => {
 		const worktrees = new Worktrees({
 			knownCwds: () => [],
 			activity: () => [],
-			live: async () => (leaving-- > 0 ? [{ cwd: join(path, "src"), unknownAgents: false }] : []),
+			live: () => (leaving-- > 0 ? [{ cwd: join(path, "src"), unknownAgents: false }] : []),
 			serverCwd: "/no/such/dashboard",
 		});
 		expect((await worktrees.removeCheckout(join(path, "."))).removed).toBe(true);
 		expect(existsSync(path)).toBe(false);
 		expect((await worktrees.removeCheckout(main)).blockers.map(blocker => blocker.code)).toContain("main");
 		const stuck = await linked(parent, main, "stuck");
-		const busy = new Worktrees({ knownCwds: () => [], activity: () => [], live: async () => [{ cwd: stuck, unknownAgents: false }], serverCwd: "/no/such/dashboard" });
+		const busy = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ cwd: stuck, unknownAgents: false }], serverCwd: "/no/such/dashboard" });
 		expect((await busy.removeCheckout(stuck, 0)).blockers.map(blocker => blocker.code)).toEqual(["occupied"]);
 	});
 
@@ -96,7 +103,7 @@ describe("worktree removal", () => {
 		const trees = new Worktrees({
 			knownCwds: () => [main],
 			activity: () => [],
-			live: async () => [
+			live: () => [
 				{ cwd: join(occupied, "src"), unknownAgents: false },
 				{ cwd: main, unknownAgents: true },
 			],
@@ -104,7 +111,7 @@ describe("worktree removal", () => {
 		});
 		const repository = await common(main);
 		expect((await trees.preview({ repository, path: dirty })).blockers.some(blocker => blocker.code === "changed")).toBe(true);
-		const lockedPlan = await trees.preview({ repository, path: locked });
+		const lockedPlan = readable(await trees.preview({ repository, path: locked }));
 		expect(lockedPlan.blockers.map(blocker => blocker.code)).toContain("locked");
 		expect(lockedPlan.blockers.map(blocker => blocker.code)).toContain("server");
 		expect((await trees.preview({ repository, path: occupied })).blockers.map(blocker => blocker.code)).toEqual(expect.arrayContaining(["occupied", "unknown-agent-location"]));
@@ -116,7 +123,7 @@ describe("worktree removal", () => {
 	test("refuses a confirmation after the checkout changes", async () => {
 		const { parent, main } = await repo();
 		const path = await linked(parent, main, "drift");
-		const plan = await quiet.preview({ repository: await common(main), path });
+		const plan = readable(await quiet.preview({ repository: await common(main), path }));
 		writeFileSync(join(path, "later.txt"), "later\n");
 		const result = (await quiet.remove([plan]))[0];
 		expect(result?.removed).toBe(false);
@@ -129,7 +136,7 @@ describe("worktree removal", () => {
 		const gone = await linked(parent, main, "gone");
 		rmSync(gone, { recursive: true, force: true });
 		const repository = await common(main);
-		const registration = await quiet.preview({ repository, path: gone });
+		const registration = readable(await quiet.preview({ repository, path: gone }));
 		expect(registration.kind).toBe("registration");
 		expect(registration.detachedCommitLoss).toBe(false);
 		expect((await quiet.remove([registration]))[0]?.removed).toBe(true);
@@ -140,7 +147,7 @@ describe("worktree removal", () => {
 		await git(main, "worktree", "add", "-q", "--detach", detached);
 		await git(detached, "commit", "-q", "--allow-empty", "-m", "only-here");
 		rmSync(detached, { recursive: true, force: true });
-		const loss = await quiet.preview({ repository, path: detached });
+		const loss = readable(await quiet.preview({ repository, path: detached }));
 		expect(loss.kind).toBe("registration");
 		expect(loss.detachedCommitLoss).toBe(true);
 	});
@@ -151,7 +158,7 @@ describe("worktree removal", () => {
 		const { main: other } = await repo();
 		writeFileSync(join(path, ".git"), `gitdir: ${join(other, ".git")}\n`);
 		const repository = await common(main);
-		const foreign = await quiet.preview({ repository, path });
+		const foreign = readable(await quiet.preview({ repository, path }));
 		expect(foreign.blockers.some(blocker => blocker.code === "foreign" || blocker.code === "unreadable")).toBe(true);
 		expect((await quiet.remove([foreign]))[0]?.removed).toBe(false);
 		expect(existsSync(path)).toBe(true);
@@ -163,7 +170,7 @@ describe("worktree removal", () => {
 		const inner = join(nested, "node_modules", "inner");
 		mkdirSync(inner, { recursive: true });
 		await git(inner, "init", "-q", "-b", "main");
-		const plan = await quiet.preview({ repository, path: nested });
+		const plan = readable(await quiet.preview({ repository, path: nested }));
 		expect(plan.blockers.some(blocker => blocker.code === "nested-repository")).toBe(true);
 		expect((await quiet.remove([plan]))[0]?.removed).toBe(false);
 		expect(existsSync(join(inner, ".git"))).toBe(true);

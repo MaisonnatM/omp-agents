@@ -1,6 +1,6 @@
 /** What the Routines page says about a routine, and the editor's form and how it becomes a routine to save. */
-import { MAX_COMMAND_LENGTH, nextDueAt } from "../src/routines";
-import type { CommandRun, Routine, RoutineChange, RoutineRun, RoutineTask, Schedule, Weekday } from "../src/shared";
+import { nonEmpty } from "../src/json";
+import { MAX_COMMAND_LENGTH, nextDueAt, type CommandRun, type Routine, type RoutineChange, type RoutineRun, type RoutineTask, type Schedule, type Weekday } from "../src/routines";
 
 /** What the editor saves: a routine without what the server keeps. */
 export type RoutineSpec = Extract<RoutineChange, { op: "save" }>["routine"];
@@ -82,11 +82,9 @@ export function nextRunWords(routine: Routine, now: number): string {
 	return next <= now ? "Due now" : whenWords(next, now);
 }
 
-/** How a run's command stands, `null` for a run without one. */
-function commandWords(command: CommandRun | null): string | null {
-	switch (command?.phase) {
-		case undefined:
-			return null;
+/** How a command stands. */
+function commandWords(command: CommandRun): string {
+	switch (command.phase) {
 		case "running":
 			return "Running…";
 		case "exited":
@@ -98,17 +96,16 @@ function commandWords(command: CommandRun | null): string | null {
 	}
 }
 
-/** A command run's result, else `1 session started, 2 errors, Queued`, the parts that apply. */
+/** A run's result: `1 session started, 2 errors, Queued`, the parts that apply, or how its command stands. */
 export function runWords(run: RoutineRun): string {
-	const command = commandWords(run.command);
-	if (command !== null) return command;
+	const { outcome } = run;
+	if (outcome.kind === "command") return commandWords(outcome.run);
 	const parts = [
-		run.started.length > 0 && `${run.started.length} ${run.started.length === 1 ? "session" : "sessions"} started`,
+		outcome.kind === "session" && "1 session started",
 		run.errors.length > 0 && `${run.errors.length} ${run.errors.length === 1 ? "error" : "errors"}`,
-		run.queued && "Queued",
+		outcome.kind === "pending" && outcome.queued && "Queued",
 	].filter(part => part !== false);
-	if (parts.length > 0) return parts.join(", ");
-	return "Nothing started";
+	return parts.length > 0 ? parts.join(", ") : "Nothing started";
 }
 
 /** The last run's result, or that there was none. */
@@ -221,18 +218,17 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 			return unhandled;
 		}
 	}
-	if (draft.schedules.length === 0) return { fix: "Add a schedule." };
 	const schedules: Schedule[] = [];
 	for (const [index, schedule] of draft.schedules.entries()) {
 		const parsed = scheduleOf(schedule, draft.schedules.length > 1 ? index : null);
 		if ("fix" in parsed) return parsed;
 		schedules.push(parsed.ok);
 	}
-	const [first, ...rest] = schedules;
-	if (!first) return { fix: "Add a schedule." };
+	const schedulesOf = nonEmpty(schedules);
+	if (!schedulesOf) return { fix: "Add a schedule." };
 	// A command runs without a session, so it has no skill to start one with.
 	const skill = task.kind === "command" ? null : draft.skill;
-	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill, task, schedules: [first, ...rest] } };
+	return { ok: { id: draft.id, name, cwd, enabled: draft.enabled, skill, task, schedules: schedulesOf } };
 }
 
 /** `draft` as a schedule, or what to fix. `index` names it when the routine has several. */

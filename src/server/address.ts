@@ -4,6 +4,8 @@
  */
 
 export const HOSTNAME = "127.0.0.1";
+/** The desktop shell's quick-capture event that opens a new todo in the page. */
+export const QUICK_TODO_EVENT = "omp-quick-todo";
 
 /** `PORT`, else 4317. */
 export const portFromEnv = (): number => Number(process.env.PORT ?? 4317);

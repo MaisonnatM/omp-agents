@@ -9,7 +9,7 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-test("a run without a command result, or with a malformed one, reads as having none, and the routine stays", () => {
+test("a run from before `outcome` reads its command result, and a malformed or missing one as pending, and the routine stays", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);
 	const path = join(dir, "omp-agents", "routines.json");
@@ -32,15 +32,15 @@ test("a run without a command result, or with a malformed one, reads as having n
 		],
 	};
 	writeFileSync(path, JSON.stringify({ routines: [routine] }));
-	expect(new RoutinesFile(path).routines[0]?.runs.map(run => run.command)).toEqual([
-		{ phase: "exited", code: 0, output: "ok\n", startedAt: 4, endedAt: 5 },
-		{ phase: "running", startedAt: 3 },
-		null,
-		null,
+	expect(new RoutinesFile(path).routines[0]?.runs.map(run => run.outcome)).toEqual([
+		{ kind: "command", run: { phase: "exited", code: 0, output: "ok\n", startedAt: 4, endedAt: 5 } },
+		{ kind: "command", run: { phase: "running", startedAt: 3 } },
+		{ kind: "pending", queued: false },
+		{ kind: "pending", queued: false },
 	]);
 });
 
-test("an older file keeps its other routines, reads one schedule as a list and a run's queue as queued, and drops a pull request routine", () => {
+test("an older file keeps its other routines, reads one schedule as a list and a run's queue and started sessions as an outcome, and drops a pull request routine", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);
 	const path = join(dir, "omp-agents", "routines.json");
@@ -56,7 +56,9 @@ test("an older file keeps its other routines, reads one schedule as a list and a
 		createdAt: 1,
 		done: {},
 		runs: [
-			{ at: 2, queue: ["single"], started: [], errors: [], command: null },
+			{ at: 4, queue: ["single"], started: [], errors: [], command: null },
+			{ at: 3, queue: [], started: [{ label: "Notes", instanceId: "i1", sessionId: "s1" }], errors: [], command: null },
+			{ at: 2, queued: false, started: [{ label: "a", instanceId: "i2", sessionId: "s2" }, { label: "b", instanceId: "i3", sessionId: "s3" }], errors: [], command: null },
 			{ at: 1, queue: [], started: [], errors: [], command: null },
 		],
 	};
@@ -74,8 +76,10 @@ test("an older file keeps its other routines, reads one schedule as a list and a
 			...kept,
 			schedules: [schedule],
 			runs: [
-				{ at: 2, queued: true, started: [], errors: [], command: null },
-				{ at: 1, queued: false, started: [], errors: [], command: null },
+				{ at: 4, outcome: { kind: "pending", queued: true }, errors: [] },
+				{ at: 3, outcome: { kind: "session", instanceId: "i1", sessionId: "s1" }, errors: [] },
+				{ at: 2, outcome: { kind: "session", instanceId: "i2", sessionId: "s2" }, errors: [] },
+				{ at: 1, outcome: { kind: "pending", queued: false }, errors: [] },
 			],
 		},
 	]);

@@ -1,5 +1,6 @@
 /** What the page holds of the dashboard, and how the server's messages and the page's own actions change it. */
-import type { LiveView, PastSession, PlanUsage, Routine, RosterHost, ServerMsg, UserTodoChange, UserTodoList, View } from "../src/shared";
+import type { LiveView, PastSession, PlanUsage, RosterHost, ServerMsg, UserTodoChange, UserTodoList, View } from "../src/shared";
+import type { Routine } from "../src/routines";
 import { applyUserTodo } from "../src/user-todos";
 import type { Completions } from "./pane-store";
 import type { ModelList } from "./reads";

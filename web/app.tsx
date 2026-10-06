@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { QUICK_TODO_EVENT, type UserTodoList } from "../src/shared";
+import type { UserTodoList } from "../src/shared";
+import { QUICK_TODO_EVENT } from "../src/server/address";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { AnalyticsPage } from "./components/analytics/analytics-page";
 import { DashboardContext } from "./components/dashboard-context";
@@ -94,7 +95,9 @@ export function App() {
 	const quick = startOf(state.starts, "quick");
 	const resumeAll = startOf(state.starts, "resume-all");
 	const sidebars = useSidebarPanels();
-	const visible = discoverableSessions(state.hosts, state.past);
+	// Temporary workspaces remain in raw sessions; only discoverable sessions enter the project/sidebar view.
+	const all = { hosts: state.hosts, past: state.past };
+	const visible = discoverableSessions(all.hosts, all.past);
 	const projects = workspaces(visible.hosts, visible.past);
 	const [project, pickProject] = useProject(projects);
 	// Keeps the Inbox tab's count current on every page. Until the sessions are listed, the saved project reads as all projects.
@@ -111,8 +114,8 @@ export function App() {
 	const inboxTarget = page?.kind === "inbox" ? page.target : null;
 	const cover = page?.kind === "inbox" && !inboxTarget ? null : page;
 	const view = focusedView(layout);
-	const viewHost = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
-	const viewPast = view?.kind === "past" ? state.past.find(s => s.sessionId === view.sessionId) : undefined;
+	const viewHost = view?.kind === "live" ? all.hosts.find(h => h.instanceId === view.instanceId) : undefined;
+	const viewPast = view?.kind === "past" ? all.past.find(s => s.sessionId === view.sessionId) : undefined;
 	const viewLastHost = view?.kind === "live" ? state.lastHosts.get(view.instanceId) ?? null : null;
 	const title = documentTitle(cover, view, viewHost ?? viewLastHost, viewPast ?? null);
 	useEffect(() => {
@@ -125,6 +128,7 @@ export function App() {
 	const maximized = layout.maximized && !cover;
 	const [sessionQuery, setSessionQuery] = useState("");
 	const projectLists = sidebarSessions(visible.hosts, visible.past, project, pinned);
+	const defaultWorkspace = defaultCwd(view, visible.hosts, visible.past, project);
 	const lists = searchSessions(projectLists, sessionQuery);
 	const listed = listedViews(lists);
 	// The live rows of `listed`, whose order ending a session moves its panes along.
@@ -272,9 +276,9 @@ export function App() {
 							focused={index === layout.focus}
 							maximized={maximized}
 							topRight={index === topRightPane && detailsView !== null}
-							host={pane.kind === "live" ? state.hosts.find(h => h.instanceId === pane.instanceId) ?? null : null}
+							host={pane.kind === "live" ? all.hosts.find(h => h.instanceId === pane.instanceId) ?? null : null}
 							lastHost={pane.kind === "live" ? state.lastHosts.get(pane.instanceId) ?? null : null}
-							session={pane.kind === "past" ? state.past.find(s => s.sessionId === pane.sessionId) ?? null : null}
+							session={pane.kind === "past" ? all.past.find(s => s.sessionId === pane.sessionId) ?? null : null}
 							initialDraft={state.draft && sameView(state.draft.view, pane) ? state.draft.text : ""}
 							models={(pane.kind === "live" && state.models.get(pane.instanceId)) || UNREAD}
 							onLayout={onPaneLayout}
@@ -287,7 +291,7 @@ export function App() {
 				</div>
 			);
 		}
-		if (state.hosts.length === 0) return <EmptyState rosterError={state.rosterError} />;
+		if (all.hosts.length === 0) return <EmptyState rosterError={state.rosterError} />;
 		return (
 			<p className="m-auto max-w-sm text-center text-sm text-muted-foreground">
 				Select a session to see its conversation. {SPLIT_CLICK} more to see up to four side by side.
@@ -297,7 +301,7 @@ export function App() {
 	let main: ReactNode;
 	switch (page?.kind) {
 		case "new": {
-			const cwd = page.cwd ?? defaultCwd(view, visible.hosts, visible.past, project);
+			const cwd = page.cwd ?? defaultWorkspace;
 			const seed = todoSeed(state.userTodos, page.todoId);
 			main = (
 				<NewSession
@@ -334,7 +338,7 @@ export function App() {
 			// Until the sessions are listed, the workspace a quick action starts in is not known yet.
 			else if (state.listed) {
 				main = (
-					<TicketsPage target={page.target} section={sectionTarget} cwd={defaultCwd(view, visible.hosts, visible.past, project)} hosts={visible.hosts} />
+					<TicketsPage target={page.target} section={sectionTarget} cwd={defaultWorkspace} hosts={visible.hosts} />
 				);
 			} else main = <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
 			break;
@@ -342,11 +346,11 @@ export function App() {
 			const todoProps = {
 				disabled: !state.connected,
 				onChange: changeTodo,
-				newSessionCwd: defaultCwd(view, visible.hosts, visible.past, project),
+				newSessionCwd: defaultWorkspace,
 				linearConnected: ticketsShown,
 			};
 			// A linked session resolves wherever it ran, even in a directory the sidebar does not list.
-			const sessions = { hosts: state.hosts, past: state.past };
+			const sessions = all;
 			main =
 				todoView.kind === "done" && state.userTodos ? (
 					<ArchivePage list={state.userTodos} sessions={sessions} {...todoProps} />
@@ -363,9 +367,9 @@ export function App() {
 					routines={state.routines}
 					target={routinesTarget}
 					// Every host, since a routine may run in `/tmp`, which the sidebar hides, and its runs still name their sessions.
-					hosts={state.hosts}
+					hosts={all.hosts}
 					workspaces={projects}
-					defaultCwd={defaultCwd(view, visible.hosts, visible.past, project)}
+					defaultCwd={defaultWorkspace}
 					connected={state.connected}
 				/>
 			);

@@ -1,5 +1,65 @@
 /** The rules of routines: when one is due, and how a change edits the list. */
-import { type Routine, type RoutineChange, type Schedule, type Schedules, type Weekday } from "./shared";
+
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export type Schedule =
+	/** Every `minutes`, counted from the last run. The page offers minutes, hours, and days. */
+	| { kind: "every"; minutes: number }
+	/** At `time`, local wall-clock time, on each of `days` (0 is Sunday). Daily is all seven. */
+	| { kind: "weekly"; days: Weekday[]; time: { hour: number; minute: number } };
+
+/** One or more. A routine is due at the earliest. */
+export type Schedules = [Schedule, ...Schedule[]];
+
+export type RoutineTask =
+	/** One session in `cwd` that takes `prompt`. */
+	| { kind: "prompt"; prompt: string }
+	/** `command` through `sh -c` in the routine's cwd, with no omp session. */
+	| { kind: "command"; command: string };
+
+/** A run's command: `running` from its launch, saved before it can end, then how it ended. */
+export type CommandRun =
+	| { phase: "running"; startedAt: number }
+	| { phase: "exited"; code: number; output: string; startedAt: number; endedAt: number }
+	/** Killed at the time limit, or by a dashboard stop, which the next server records. */
+	| { phase: "stopped"; reason: "time-limit" | "dashboard"; output: string; startedAt: number; endedAt: number }
+	/** `sh` could not start, as when the workspace is gone. */
+	| { phase: "failed"; error: string; startedAt: number; endedAt: number };
+
+/** A claimed run waits `pending` until it starts the one thing it asks for: a session, or a command. */
+export type RoutineOutcome =
+	| { kind: "pending"; queued: boolean }
+	| { kind: "session"; instanceId: string; sessionId: string }
+	| { kind: "command"; run: CommandRun };
+
+export interface RoutineRun {
+	at: number;
+	outcome: RoutineOutcome;
+	errors: string[];
+}
+
+/** Schedules that start dashboard sessions, or run a command, on their own. */
+export interface Routine {
+	id: string;
+	name: string;
+	cwd: string;
+	schedules: Schedules;
+	task: RoutineTask;
+	/** Saved with the routine, since the page's pin lives in localStorage, which the server cannot read. */
+	skill: string | null;
+	enabled: boolean;
+	createdAt: number;
+	/** Newest first, the last 10. `runs[0].at` is the time every schedule counts from. */
+	runs: RoutineRun[];
+}
+
+/** One edit of the routines; the page picks a new routine's `id`, so a save sent twice saves once. */
+export type RoutineChange =
+	| { op: "save"; routine: Omit<Routine, "runs" | "createdAt"> }
+	| { op: "remove"; id: string }
+	| { op: "enable"; id: string; enabled: boolean }
+	/** Claims a run now, whatever the schedule says. */
+	| { op: "run-now"; id: string };
 
 /** What every routine session's prompt ends with, since nobody watches it. */
 export const UNATTENDED = "This session runs unattended from a routine. Do not ask questions. If something blocks you, say what and stop.";

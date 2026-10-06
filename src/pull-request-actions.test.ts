@@ -16,7 +16,6 @@ describe("pullRequestActions", () => {
 		checks: "passing",
 		conflicts: false,
 		head: "me/widgets",
-		headOid: "a1",
 		stackedOn: null,
 		unresolved: { count: 0, exact: true },
 		updatedAt: 1,

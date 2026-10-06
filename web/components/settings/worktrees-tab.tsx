@@ -1,9 +1,10 @@
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Copy, RefreshCw, Trash2 } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import type { WorktreeEntry, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult } from "../../../src/worktrees-shared";
 import { Button } from "@/components/ui/button";
 import { changeWorktrees, errorText, readWorktreeMetrics, readWorktrees } from "../../api";
-import { formatBytes } from "../../labels";
+import { age, formatBytes } from "../../labels";
 import { PINNED_SESSIONS_KEY, useStoredKeys } from "../../stored-state";
 
 type SortKey = "name" | "activity" | "size";
@@ -17,18 +18,9 @@ type DialogState =
 
 const keyOf = (target: { repository: string; path: string }): string => `${target.repository}\0${target.path}`;
 
-function formatAgo(at: number): string {
-	const minutes = Math.round((Date.now() - at) / 60000);
-	if (minutes < 1) return "Just now";
-	if (minutes < 60) return `${minutes} min ago`;
-	const hours = Math.round(minutes / 60);
-	if (hours < 48) return `${hours} hr ago`;
-	return `${Math.round(hours / 24)} days ago`;
-}
-
 function activityText(entry: WorktreeEntry): string {
 	if (entry.blockers.some(blocker => blocker.code === "occupied")) return "Session open";
-	return entry.lastActivity === null ? "No omp session" : formatAgo(entry.lastActivity);
+	return entry.lastActivity === null ? "No omp session" : `${age(entry.lastActivity)} ago`;
 }
 
 function statusText(entry: WorktreeEntry): string {
@@ -50,7 +42,6 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 	const [dialog, setDialog] = useState<DialogState | null>(null);
 	const [acceptLoss, setAcceptLoss] = useState(false);
 	const [pinned] = useStoredKeys(PINNED_SESSIONS_KEY);
-	const dialogRef = useRef<HTMLDialogElement>(null);
 
 	useEffect(() => {
 		if (!active) return;
@@ -105,13 +96,6 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 		return () => controller.abort();
 	}, [active, inventory]);
 
-	useEffect(() => {
-		const element = dialogRef.current;
-		if (!element) return;
-		if (dialog && !element.open) element.showModal();
-		if (!dialog && element.open) element.close();
-	}, [dialog]);
-
 	const rows = useMemo(() => {
 		const needle = query.trim().toLowerCase();
 		return (inventory?.repositories ?? []).map(repo => {
@@ -143,7 +127,7 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 
 	const confirm = (plans: WorktreeRemovalPlan[]): void => {
 		setDialog({ phase: "removing", plans });
-		void changeWorktrees({ action: "remove", plans: plans.map(plan => ({ repository: plan.repository, path: plan.path, confirmation: plan.confirmation })) }).then(
+		void changeWorktrees({ action: "remove", plans: plans.flatMap(plan => (plan.kind === "unreadable" ? [] : [{ repository: plan.repository, path: plan.path, confirmation: plan.confirmation }])) }).then(
 			answer => {
 				setDialog({ phase: "done", results: answer.results });
 				if (answer.results.some(result => result.removed)) setRefresh(count => count + 1);
@@ -257,7 +241,7 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 													</div>
 												</td>
 												<td className="pr-3 whitespace-nowrap">{activityText(entry)}</td>
-												<td className="pr-3 whitespace-nowrap">{!measured && !entry.missing ? "Measuring…" : measured?.lastCommit == null ? "Unknown" : formatAgo(measured.lastCommit)}</td>
+												<td className="pr-3 whitespace-nowrap">{!measured && !entry.missing ? "Measuring…" : measured?.lastCommit == null ? "Unknown" : `${age(measured.lastCommit)} ago`}</td>
 												<td className="pr-3 whitespace-nowrap">{!measured && !entry.missing ? "Measuring…" : measured?.allocatedBytes == null ? "Unknown" : formatBytes(measured.allocatedBytes)}</td>
 												<td className="pr-3 whitespace-nowrap">
 													{!measured && !entry.missing ? "Measuring…" : measured?.modified == null || measured.untracked == null ? "Unknown" : measured.modified === 0 && measured.untracked === 0 ? "None" : `${measured.modified} modified, ${measured.untracked} untracked`}
@@ -285,21 +269,14 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 					Delete selected ({chosen.length})
 				</Button>
 			) : null}
-			{dialog ? (
-				<dialog ref={dialogRef} className="w-[min(36rem,calc(100%-2rem))] rounded-lg border border-border bg-background p-5 text-foreground" aria-labelledby="worktree-removal-title" onClose={() => setDialog(null)}>
-					<RemovalBody
-						dialog={dialog}
-						acceptLoss={acceptLoss}
-						pinned={pinned}
-						onAcceptLoss={setAcceptLoss}
-						onClose={() => {
-							dialogRef.current?.close();
-							setDialog(null);
-						}}
-						onConfirm={confirm}
-					/>
-				</dialog>
-			) : null}
+			<DialogPrimitive.Root open={dialog !== null} onOpenChange={open => { if (!open) setDialog(null); }}>
+				<DialogPrimitive.Portal>
+					<DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
+					<DialogPrimitive.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-background p-5 text-foreground shadow-md">
+						{dialog && <RemovalBody dialog={dialog} acceptLoss={acceptLoss} pinned={pinned} onAcceptLoss={setAcceptLoss} onClose={() => setDialog(null)} onConfirm={confirm} />}
+					</DialogPrimitive.Content>
+				</DialogPrimitive.Portal>
+			</DialogPrimitive.Root>
 		</section>
 	);
 }
@@ -322,9 +299,7 @@ function RemovalBody({
 	if (dialog.phase === "checking") {
 		return (
 			<>
-				<h2 id="worktree-removal-title" className="text-base font-medium">
-					Checking worktrees
-				</h2>
+				<DialogPrimitive.Title className="text-base font-medium">Checking worktrees</DialogPrimitive.Title>
 				<p className="mt-2 text-sm">Checking whether these worktrees can be removed…</p>
 			</>
 		);
@@ -332,9 +307,7 @@ function RemovalBody({
 	if (dialog.phase === "error") {
 		return (
 			<>
-				<h2 id="worktree-removal-title" className="text-base font-medium">
-					Could not remove the worktree
-				</h2>
+				<DialogPrimitive.Title className="text-base font-medium">Could not remove the worktree</DialogPrimitive.Title>
 				<p role="alert" className="mt-2 text-sm text-red-600 dark:text-red-400">
 					{dialog.message}
 				</p>
@@ -347,9 +320,7 @@ function RemovalBody({
 	if (dialog.phase === "removing") {
 		return (
 			<>
-				<h2 id="worktree-removal-title" className="text-base font-medium">
-					Removing worktrees
-				</h2>
+				<DialogPrimitive.Title className="text-base font-medium">Removing worktrees</DialogPrimitive.Title>
 				<p className="mt-2 text-sm">Removing…</p>
 			</>
 		);
@@ -357,9 +328,7 @@ function RemovalBody({
 	if (dialog.phase === "done") {
 		return (
 			<>
-				<h2 id="worktree-removal-title" className="text-base font-medium">
-					Removal finished
-				</h2>
+				<DialogPrimitive.Title className="text-base font-medium">Removal finished</DialogPrimitive.Title>
 				<ul className="mt-3 space-y-2 text-sm">
 					{dialog.results.map(result => (
 						<li key={keyOf(result)}>
@@ -373,23 +342,32 @@ function RemovalBody({
 			</>
 		);
 	}
+	const validPlans = dialog.plans.flatMap(plan => (plan.kind === "unreadable" ? [] : [plan]));
 	const blocked = dialog.plans.some(plan => plan.blockers.length > 0);
-	const loss = dialog.plans.some(plan => plan.ignored.length > 0 || plan.detachedCommitLoss);
-	const pinnedHere = dialog.plans.flatMap(plan => plan.savedSessionIds.filter(id => pinned.has(id)));
+	const loss = validPlans.some(plan => plan.ignored.length > 0 || plan.detachedCommitLoss);
+	const pinnedHere = validPlans.flatMap(plan => plan.savedSessionIds.filter(id => pinned.has(id)));
 	return (
 		<>
-			<h2 id="worktree-removal-title" className="text-base font-medium">
+			<DialogPrimitive.Title className="text-base font-medium">
 				{dialog.plans.length === 1 ? "Remove this worktree?" : `Remove ${dialog.plans.length} worktrees?`}
-			</h2>
+			</DialogPrimitive.Title>
 			<ul className="mt-3 max-h-64 space-y-3 overflow-y-auto text-sm">
 				{dialog.plans.map(plan => (
 					<li key={keyOf(plan)}>
-						<p className="font-medium">{plan.branch ?? "Detached"}</p>
 						<p className="break-all text-muted-foreground">{plan.path}</p>
-						{plan.blockers.length > 0 ? <p className="text-red-600 dark:text-red-400">{plan.blockers.map(blocker => blocker.message).join(" ")}</p> : <p>The branch {plan.branch ?? "is detached"} and session transcripts stay.</p>}
-						{plan.ignored.length > 0 ? <p>Ignored files that will be deleted: {plan.ignored.join(", ")}. This includes dependencies and files such as .env.</p> : null}
-						{plan.detachedCommitLoss ? <p>This detached commit is not on a branch, tag, or remote. Removing the registration can make it unreachable.</p> : null}
-						{plan.savedSessionIds.length > 0 ? <p>{plan.savedSessionIds.length} saved omp session{plan.savedSessionIds.length === 1 ? "" : "s"} ran here. Resume may fail after the directory is gone.</p> : null}
+						{plan.kind !== "unreadable" ? <p className="font-medium">{plan.branch ?? "Detached"}</p> : null}
+						{plan.blockers.length > 0 ? (
+							<p className="text-red-600 dark:text-red-400">{plan.blockers.map(blocker => blocker.message).join(" ")}</p>
+						) : plan.kind !== "unreadable" ? (
+							<p>The branch {plan.branch ?? "is detached"} and session transcripts stay.</p>
+						) : null}
+						{plan.kind !== "unreadable" ? (
+							<>
+								{plan.ignored.length > 0 ? <p>Ignored files that will be deleted: {plan.ignored.join(", ")}. This includes dependencies and files such as .env.</p> : null}
+								{plan.detachedCommitLoss ? <p>This detached commit is not on a branch, tag, or remote. Removing the registration can make it unreachable.</p> : null}
+								{plan.savedSessionIds.length > 0 ? <p>{plan.savedSessionIds.length} saved omp session{plan.savedSessionIds.length === 1 ? "" : "s"} ran here. Resume may fail after the directory is gone.</p> : null}
+							</>
+						) : null}
 					</li>
 				))}
 			</ul>

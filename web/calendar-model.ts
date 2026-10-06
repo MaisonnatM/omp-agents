@@ -1,6 +1,6 @@
 /** What the Calendar page shows on each day of a month: Google events, routine runs, past and planned, and todos and tickets on the day they are due. */
-import { nextDueAt } from "../src/routines";
-import type { CalendarEvent, Routine, RoutineRun, Ticket, TicketStatusType, UserTodoList } from "../src/shared";
+import { nextDueAt, type Routine, type RoutineRun } from "../src/routines";
+import type { CalendarEvent, Ticket, TicketStatusType, UserTodoList } from "../src/shared";
 import { daysBetween, localDay } from "./days";
 
 /** One thing on one day; `day` is the local day, `YYYY-MM-DD`, and `at` its time, `null` for one without. */
@@ -28,8 +28,8 @@ const DAY_MINUTES = 1440;
 
 function runState(run: RoutineRun): "ran" | "failed" {
 	if (run.errors.length > 0) return "failed";
-	const command = run.command;
-	if (command === null || command.phase === "running") return "ran";
+	if (run.outcome.kind !== "command" || run.outcome.run.phase === "running") return "ran";
+	const command = run.outcome.run;
 	return command.phase === "exited" && command.code === 0 ? "ran" : "failed";
 }
 

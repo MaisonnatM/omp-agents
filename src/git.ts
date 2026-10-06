@@ -1,30 +1,56 @@
 /** The git checkout a directory is in, and the worktree a new session's branch runs in. */
 import { existsSync } from "node:fs";
+import { realpath } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { repoOf } from "./github";
 import { run, runChecked } from "./proc";
 import { type BranchChoice, type GitCheckout, worktreeDir } from "./shared";
 
 const HEADS = "refs/heads/";
 
-interface Worktree {
+export interface Registration {
 	path: string;
+	head: string;
 	/** `null` when HEAD is detached. */
 	branch: string | null;
+	locked: string | null;
+	prunable: string | null;
+	main: boolean;
+	bare: boolean;
 }
 
-/** `git worktree list --porcelain`, the main worktree first. Worktrees whose directory is gone are left out. */
-export function parseWorktrees(porcelain: string): Worktree[] {
-	return porcelain
-		.split("\n\n")
-		.map(block => block.split("\n"))
-		.filter(lines => lines[0]?.startsWith("worktree ") && !lines.some(line => line.startsWith("prunable")))
-		.map(lines => {
-			const branch = lines.find(line => line.startsWith(`branch ${HEADS}`));
-			return { path: lines[0]!.slice("worktree ".length), branch: branch ? branch.slice(`branch ${HEADS}`.length) : null };
-		});
+export const git = (cwd: string, ...args: string[]): Promise<string> => runChecked(["git", "-C", cwd, ...args], { timeoutMs: 10000 });
+
+export async function canonical(path: string): Promise<string> {
+	try {
+		return await realpath(path);
+	} catch (err) {
+		if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+		const parent = dirname(resolve(path));
+		if (parent === resolve(path)) throw err;
+		return join(await canonical(parent), basename(path));
+	}
 }
 
-const worktreesOf = async (cwd: string): Promise<Worktree[]> => parseWorktrees(await runChecked(["git", "-C", cwd, "worktree", "list", "--porcelain"]));
+export async function commonDir(cwd: string): Promise<string> {
+	return canonical((await git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")).trim());
+}
+
+/** Git's NUL-separated porcelain format preserves paths and lock reasons containing newlines. Main checkout first. */
+export function parseWorktrees(porcelain: string): Registration[] {
+	return porcelain.split("\0\0").filter(Boolean).map((block, index) => {
+		const fields = block.split("\0");
+		const value = (name: string) => fields.find(field => field === name || field.startsWith(`${name} `))?.slice(name.length + 1) ?? null;
+		const path = value("worktree");
+		if (!path) throw new Error("Git returned an unreadable worktree registration.");
+		return {
+			path, head: value("HEAD") ?? "", branch: value("branch")?.replace(/^refs\/heads\//, "") ?? null,
+			locked: value("locked"), prunable: value("prunable"), main: index === 0, bare: fields.includes("bare"),
+		};
+	});
+}
+
+export const worktreesOf = async (cwd: string): Promise<Registration[]> => parseWorktrees(await git(cwd, "worktree", "list", "--porcelain", "-z"));
 
 /** Local branch names, the most recently committed to first. */
 const branchesOf = async (cwd: string): Promise<string[]> =>
@@ -53,7 +79,7 @@ export async function gitCheckout(cwd: string): Promise<GitCheckout | null> {
 	const inside = await run(["git", "-C", cwd, "rev-parse", "--is-inside-work-tree"]);
 	if (inside.code !== 0 || inside.stdout.trim() !== "true") return null;
 	const [worktrees, names, head, github] = await Promise.all([
-		worktreesOf(cwd),
+		worktreesOf(cwd).then(rows => rows.filter(row => row.prunable === null)),
 		branchesOf(cwd),
 		run(["git", "-C", cwd, "symbolic-ref", "--quiet", "HEAD"]),
 		repoOf(cwd),
@@ -78,7 +104,7 @@ export async function gitCheckout(cwd: string): Promise<GitCheckout | null> {
  */
 export async function checkoutDir(cwd: string, choice: BranchChoice): Promise<string> {
 	const [worktrees, names, own] = await Promise.all([
-		worktreesOf(cwd),
+		worktreesOf(cwd).then(rows => rows.filter(row => row.prunable === null)),
 		branchesOf(cwd),
 		runChecked(["git", "-C", cwd, "rev-parse", "--show-toplevel"]),
 	]);

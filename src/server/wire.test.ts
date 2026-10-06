@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { type ClientMsg, MAX_PROMPT_IMAGE_BYTES, type RoutineChange, type Schedule } from "../shared";
+import { type ClientMsg, MAX_PROMPT_IMAGE_BYTES } from "../shared";
+import type { RoutineChange, Schedule } from "../routines";
 import { parseClientMsg, parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
@@ -96,11 +97,6 @@ describe("parseClientMsg", () => {
 			});
 			expect(change({ op: "enable", id: "r1", enabled: false })).toEqual({ t: "routine", change: { op: "enable", id: "r1", enabled: false } });
 			expect(change({ op: "run-now", id: "r1", at: 5 })).toEqual({ t: "routine", change: { op: "run-now", id: "r1" } });
-		});
-
-		test("an older save with one schedule reads as a list of that schedule", () => {
-			const { schedules: _schedules, ...older } = routine;
-			expect(change({ op: "save", routine: { ...older, schedule: weekdays } })).toEqual({ t: "routine", change: { op: "save", routine } });
 		});
 
 		test("save refuses a schedule that names no slot or one out of range, and an empty list", () => {

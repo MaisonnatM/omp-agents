@@ -4,8 +4,8 @@
  * Every step converges: a slot claimed is on disk, so a second tick, or the next server, starts nothing twice.
  */
 import { errorText } from "../json";
-import { COMMAND_TIME_LIMIT, isDue, UNATTENDED } from "../routines";
-import { type CommandRun, type HostStatus, type Routine, type RoutineRun, type RoutineTask, type StartRequest, type StartResult } from "../shared";
+import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, type RoutineRun, type RoutineTask } from "../routines";
+import type { HostStatus, StartRequest, StartResult } from "../shared";
 import type { RoutinesFile } from "./routines-file";
 
 /** Routine sessions that may run at once; a session waiting on a question holds its slot. */
@@ -39,7 +39,7 @@ export class RoutineRunner {
 	readonly #deps: RoutineRunnerDeps;
 	/** By instance id. Kept in memory only: the sessions die with the server, and the queued runs resume from the file. */
 	readonly #tracked = new Map<string, Tracked>();
-	/** Routine ids whose command runs. In memory only: a command dies with the server, and the next one does not resume it. */
+	/** Routines with a command running. A run holds one outcome and ten run-now claims push it out of the history, so the file cannot say whether a command still runs. */
 	readonly #commands = new Set<string>();
 	#inFlight: Promise<void> | null = null;
 
@@ -47,9 +47,9 @@ export class RoutineRunner {
 		this.#deps = deps;
 		// No command runs yet, so a run saved as running lost its command with the server that ran it.
 		for (const { id, runs } of deps.file.routines)
-			for (const { at, command } of runs)
-				if (command?.phase === "running") {
-					deps.file.command(id, at, { phase: "stopped", reason: "dashboard", output: "", startedAt: command.startedAt, endedAt: deps.now() });
+			for (const { at, outcome } of runs)
+				if (outcome.kind === "command" && outcome.run.phase === "running") {
+					deps.file.command(id, at, { phase: "stopped", reason: "dashboard", output: "", startedAt: outcome.run.startedAt, endedAt: deps.now() });
 					deps.file.failed(id, at, "The dashboard stopped while the command ran.");
 				}
 	}
@@ -144,7 +144,7 @@ export class RoutineRunner {
 			file.failed(routine.id, at, `${routine.name}: ${result.ok ? "the session exited as it started." : result.error}`);
 		} else {
 			this.#tracked.set(result.instanceId, { routineId: routine.id, phase: turnRuns(session.status) ? "working" : "starting" });
-			file.started(routine.id, at, { label: routine.name, instanceId: result.instanceId, sessionId: session.sessionId });
+			file.started(routine.id, at, { instanceId: result.instanceId, sessionId: session.sessionId });
 		}
 		this.#deps.onChange();
 	}
@@ -204,7 +204,7 @@ function oldestQueued(routines: Routine[], sessionsFull: boolean): { routine: Ro
 	let oldest: { routine: Routine; run: RoutineRun } | null = null;
 	for (const routine of routines) {
 		if (sessionsFull && takesSession(routine.task)) continue;
-		for (const run of routine.runs) if (run.queued && (!oldest || run.at < oldest.run.at)) oldest = { routine, run };
+		for (const run of routine.runs) if (run.outcome.kind === "pending" && run.outcome.queued && (!oldest || run.at < oldest.run.at)) oldest = { routine, run };
 	}
 	return oldest;
 }

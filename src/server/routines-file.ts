@@ -2,18 +2,16 @@
  * The routines, kept in a file so that the next server knows which slots ran.
  * Every change saves at once: a queued run is on disk before the runner starts anything from it.
  * A routine whose task was pull requests is dropped on load. The rest of the file stays.
+ * A file from before `schedules`, or before a run's `outcome`, migrates here, so everything else sees the current shape.
  */
 import { JsonFile } from "../fs";
-import { isObject } from "../json";
-import { applyRoutine, MAX_ROUTINE_RUNS } from "../routines";
-import type { CommandRun, Routine, RoutineChange, RoutineRun } from "../shared";
+import { isObject, isTexts } from "../json";
+import { applyRoutine, MAX_ROUTINE_RUNS, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
 import { parseRoutineSpec } from "./wire";
 
 interface Stored {
 	routines: Routine[];
 }
-
-const isStrings = (value: unknown): value is string[] => Array.isArray(value) && value.every(item => typeof item === "string");
 
 /** Every entry of `values` through `parse`, or `null` when `values` is no array or one entry does not parse. */
 function parseAll<T>(values: unknown, parse: (value: unknown) => T | null): T[] | null {
@@ -27,10 +25,11 @@ function parseAll<T>(values: unknown, parse: (value: unknown) => T | null): T[] 
 	return parsed;
 }
 
-function parseStarted(value: unknown): RoutineRun["started"][number] | null {
+/** A session a run recorded before `outcome`, which also held its `label`. */
+function parseStarted(value: unknown): { instanceId: string; sessionId: string } | null {
 	if (!isObject(value)) return null;
-	const { label, instanceId, sessionId } = value;
-	return typeof label === "string" && typeof instanceId === "string" && typeof sessionId === "string" ? { label, instanceId, sessionId } : null;
+	const { instanceId, sessionId } = value;
+	return typeof instanceId === "string" && typeof sessionId === "string" ? { instanceId, sessionId } : null;
 }
 
 const isTime = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
@@ -52,26 +51,38 @@ function parseCommandRun(value: unknown): CommandRun | null {
 	}
 }
 
-/**
- * A run; a command result that is missing, as in a file written before commands, or malformed reads as none, and the run stays.
- * A file from before `queued` holds a `queue` list, which is queued while it holds an entry; a present `queued` does not fall back.
- */
+/** A run's `outcome`, or the fields it had before: `queued` or `queue`, `started` sessions, and `command`. Of several sessions, only a pull request routine's run started more than one, and the first stays. */
 function parseRun(value: unknown): RoutineRun | null {
-	if (!isObject(value)) return null;
-	const { at, errors } = value;
-	const queued = "queued" in value ? value.queued : isStrings(value.queue) && value.queue.length > 0;
+	if (!isObject(value) || !isTime(value.at) || !isTexts(value.errors)) return null;
+	if (isObject(value.outcome)) {
+		const { outcome } = value;
+		let parsed: RoutineOutcome | null = null;
+		if (outcome.kind === "pending" && typeof outcome.queued === "boolean") parsed = { kind: "pending", queued: outcome.queued };
+		if (outcome.kind === "session" && typeof outcome.instanceId === "string" && typeof outcome.sessionId === "string") parsed = { kind: "session", instanceId: outcome.instanceId, sessionId: outcome.sessionId };
+		if (outcome.kind === "command") {
+			const run = parseCommandRun(outcome.run);
+			if (run) parsed = { kind: "command", run };
+		}
+		return parsed ? { at: value.at, outcome: parsed, errors: value.errors } : null;
+	}
+	const queued = "queued" in value ? value.queued : isTexts(value.queue) && value.queue.length > 0;
 	const started = parseAll(value.started, parseStarted);
-	return typeof at === "number" && typeof queued === "boolean" && isStrings(errors) && started
-		? { at, queued, started, errors, command: parseCommandRun(value.command) }
-		: null;
+	if (typeof queued !== "boolean" || !started) return null;
+	const command = parseCommandRun(value.command);
+	const outcome: RoutineOutcome = command ? { kind: "command", run: command }
+		: started.length > 0 ? { kind: "session", instanceId: started[0]!.instanceId, sessionId: started[0]!.sessionId }
+		: { kind: "pending", queued };
+	return { at: value.at, outcome, errors: value.errors };
 }
 
 const isPullRequestRoutine = (value: unknown): boolean => isObject(value) && isObject(value.task) && value.task.kind === "pull-requests";
 
 function parseRoutine(value: unknown): Routine | "drop" | null {
 	if (isPullRequestRoutine(value)) return "drop";
-	const spec = parseRoutineSpec(value);
-	if (!spec || !isObject(value)) return null;
+	if (!isObject(value)) return null;
+	// Only files, never socket edits, accept the historical one-schedule shape.
+	const spec = parseRoutineSpec("schedules" in value ? value : { ...value, schedules: [value.schedule] });
+	if (!spec) return null;
 	const { createdAt } = value;
 	const runs = parseAll(value.runs, parseRun);
 	return typeof createdAt === "number" && runs ? { ...spec, createdAt, runs } : null;
@@ -120,23 +131,23 @@ export class RoutinesFile {
 	claim(id: string, at: number): void {
 		this.#update(id, routine => ({
 			...routine,
-			runs: [{ at, queued: true, started: [], errors: [], command: null }, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
+			runs: [{ at, outcome: { kind: "pending", queued: true }, errors: [] } satisfies RoutineRun, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
 		}));
 	}
 
 	/** Takes routine `id`'s run at `at` off the queue, saved before its session or command starts. */
 	dequeue(id: string, at: number): void {
-		this.#updateRun(id, at, run => ({ ...run, queued: false }));
+		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "pending", queued: false } }));
 	}
 
-	/** Records a session that the run at `at` started. */
-	started(id: string, at: number, session: RoutineRun["started"][number]): void {
-		this.#updateRun(id, at, run => ({ ...run, started: [...run.started, session] }));
+	/** Records the sole session the run at `at` started. */
+	started(id: string, at: number, session: { instanceId: string; sessionId: string }): void {
+		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "session", ...session } }));
 	}
 
 	/** Records the command of the run at `at` as it launches and again as it ends. */
 	command(id: string, at: number, command: CommandRun): void {
-		this.#updateRun(id, at, run => ({ ...run, command }));
+		this.#updateRun(id, at, run => ({ ...run, outcome: { kind: "command", run: command } }));
 	}
 
 	/** Records why the run at `at` could not start something; the same error twice in a row records once, so a retry each tick does not pile up. */

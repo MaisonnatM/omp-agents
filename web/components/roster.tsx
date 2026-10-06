@@ -1,6 +1,7 @@
 import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Keyboard, ListRestart, Loader, Pin, PinOff, Play, Plus, Search, Settings } from "lucide-react";
 import { type CSSProperties, type ReactElement, type ReactNode, useState } from "react";
-import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type Routine, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
+import { type PastSession, type PullRequest, pullRequestUrl, type RosterHost, type ShipProgress, type UserTodoList, type View } from "../../src/shared";
+import type { Routine } from "../../src/routines";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

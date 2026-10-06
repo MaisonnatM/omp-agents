@@ -8,6 +8,8 @@ export interface RunOptions {
 	timeoutMs?: number;
 	/** Added to this process's environment. */
 	env?: Record<string, string>;
+	/** Stops the subprocess on abort. */
+	signal?: AbortSignal;
 }
 
 export interface RunResult {
@@ -18,6 +20,7 @@ export interface RunResult {
 
 /** Runs `argv` (no shell) and settles when it exits, whatever its exit code. Rejects only when it cannot spawn. */
 export async function run(argv: string[], opts: RunOptions = {}): Promise<RunResult> {
+	opts.signal?.throwIfAborted();
 	const child = Bun.spawn(argv, {
 		cwd: opts.cwd,
 		stdin: opts.input === undefined ? "ignore" : new Blob([opts.input]),
@@ -26,8 +29,16 @@ export async function run(argv: string[], opts: RunOptions = {}): Promise<RunRes
 		timeout: opts.timeoutMs,
 		env: opts.env ? { ...process.env, ...opts.env } : undefined,
 	});
-	const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
-	return { stdout, stderr, code };
+	const stop = (): void => { child.kill(); };
+	opts.signal?.addEventListener("abort", stop, { once: true });
+	try {
+		if (opts.signal?.aborted) stop();
+		const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+		opts.signal?.throwIfAborted();
+		return { stdout, stderr, code };
+	} finally {
+		opts.signal?.removeEventListener("abort", stop);
+	}
 }
 
 export interface ShellOptions {

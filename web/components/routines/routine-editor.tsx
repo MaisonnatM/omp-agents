@@ -1,6 +1,5 @@
 import { type ReactNode, useId, useState } from "react";
-import { COMMAND_TIME_LIMIT } from "../../../src/routines";
-import type { Weekday } from "../../../src/shared";
+import { COMMAND_TIME_LIMIT, type Weekday } from "../../../src/routines";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type RoutineSpec, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";

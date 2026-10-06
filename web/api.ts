@@ -36,12 +36,13 @@ export async function getJson<T>(url: string, signal?: AbortSignal): Promise<T> 
 	return readJson<T>(await fetch(url, { signal }));
 }
 
-export async function putJson<T>(url: string, body: unknown): Promise<T> {
+export async function putJson<T>(url: string, body: unknown, signal?: AbortSignal): Promise<T> {
 	return readJson<T>(
 		await fetch(url, {
 			method: "PUT",
 			headers: { "content-type": "application/json" },
 			body: JSON.stringify(body),
+			signal,
 		}),
 	);
 }
@@ -57,5 +58,5 @@ export const readWorktreeMetrics = (target: WorktreeTarget, signal?: AbortSignal
 export async function changeWorktrees(request: { action: "preview"; targets: WorktreeTarget[] }, signal?: AbortSignal): Promise<{ plans: WorktreeRemovalPlan[] }>;
 export async function changeWorktrees(request: { action: "remove"; plans: WorktreeConfirmation[] }, signal?: AbortSignal): Promise<{ results: WorktreeRemovalResult[] }>;
 export async function changeWorktrees(request: WorktreeRemovalRequest, signal?: AbortSignal): Promise<{ plans: WorktreeRemovalPlan[] } | { results: WorktreeRemovalResult[] }> {
-	return readJson(await fetch("/api/worktrees/removal", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(request), signal }));
+	return putJson("/api/worktrees/removal", request, signal);
 }

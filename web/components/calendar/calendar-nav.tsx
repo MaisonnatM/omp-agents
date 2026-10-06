@@ -1,4 +1,4 @@
-import type { Routine } from "../../../src/shared";
+import type { Routine } from "../../../src/routines";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { hashForCalendar, hashForRoutines } from "../../routing";
 

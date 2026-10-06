@@ -1,20 +1,11 @@
 /** Git worktree inventory and removal. Git remains the authority for what is registered. */
 import { createHash } from "node:crypto";
-import { lstat, readdir, realpath } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { lstat, readdir } from "node:fs/promises";
+import { basename, isAbsolute, join, relative, sep } from "node:path";
+import { canonical, commonDir, git, worktreesOf, type Registration } from "./git";
 import { errorText } from "./json";
-import { run, runChecked } from "./proc";
+import { run } from "./proc";
 import type { WorktreeBlocker, WorktreeConfirmation, WorktreeEntry, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult, WorktreeTarget } from "./worktrees-shared";
-
-interface Registration {
-	path: string;
-	head: string;
-	branch: string | null;
-	locked: string | null;
-	prunable: string | null;
-	main: boolean;
-	bare: boolean;
-}
 
 interface Occupant {
 	cwd: string;
@@ -24,7 +15,7 @@ interface Occupant {
 interface WorktreesEnv {
 	knownCwds(): string[];
 	activity(): { id: string; cwd: string; modifiedAt: number }[];
-	live(): Promise<Occupant[]>;
+	live(): Occupant[];
 	serverCwd: string;
 }
 
@@ -40,48 +31,11 @@ interface UseSnapshot {
 	activity: { id: string; path: string; modifiedAt: number }[];
 }
 
-const git = (cwd: string, ...args: string[]) => runChecked(["git", "-C", cwd, ...args], { timeoutMs: 10000 });
 
 const beneath = (parent: string, child: string): boolean => {
 	const suffix = relative(parent, child);
 	return suffix === "" || (!isAbsolute(suffix) && suffix !== ".." && !suffix.startsWith(`..${sep}`));
 };
-
-async function canonical(path: string): Promise<string> {
-	try {
-		return await realpath(path);
-	} catch (err) {
-		if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
-		const parent = dirname(resolve(path));
-		if (parent === resolve(path)) throw err;
-		return join(await canonical(parent), basename(path));
-	}
-}
-
-async function commonDir(cwd: string): Promise<string> {
-	return canonical((await git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")).trim());
-}
-
-function registrations(text: string): Registration[] {
-	return text
-		.split("\0\0")
-		.filter(Boolean)
-		.map((block, index) => {
-			const fields = block.split("\0");
-			const value = (name: string) => fields.find(field => field === name || field.startsWith(`${name} `))?.slice(name.length + 1) ?? null;
-			const path = value("worktree");
-			if (!path) throw new Error("Git returned an unreadable worktree registration.");
-			return {
-				path,
-				head: value("HEAD") ?? "",
-				branch: value("branch")?.replace(/^refs\/heads\//, "") ?? null,
-				locked: value("locked"),
-				prunable: value("prunable"),
-				main: index === 0,
-				bare: fields.includes("bare"),
-			};
-		});
-}
 
 /** Looks one level into ignored directories, so a dependency tree is not hashed file by file, and still sees a repository placed there. */
 async function nestedRepositories(root: string, ignoredTop: readonly string[]): Promise<string[]> {
@@ -108,46 +62,48 @@ async function nestedRepositories(root: string, ignoredTop: readonly string[]): 
 }
 
 async function allocatedUsage(path: string, signal?: AbortSignal): Promise<number> {
-	signal?.throwIfAborted();
-	const child = Bun.spawn(["du", "-sk", path], { stdout: "pipe", stderr: "pipe", timeout: 10000 });
-	const stop = () => child.kill();
-	signal?.addEventListener("abort", stop, { once: true });
-	try {
-		const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
-		signal?.throwIfAborted();
-		if (code !== 0) throw new Error(stderr.trim() || "Disk measurement exceeded its time limit.");
-		const kilobytes = Number(stdout.split(/\s/, 1)[0]);
-		if (!Number.isFinite(kilobytes) || kilobytes < 0) throw new Error("Disk measurement returned an invalid size.");
-		return kilobytes * 1024;
-	} finally {
-		signal?.removeEventListener("abort", stop);
-	}
+	const { stdout, stderr, code } = await run(["du", "-sk", path], { timeoutMs: 10000, signal });
+	if (code !== 0) throw new Error(stderr.trim() || "Disk measurement exceeded its time limit.");
+	const kilobytes = Number(stdout.split(/\s/, 1)[0]);
+	if (!Number.isFinite(kilobytes) || kilobytes < 0) throw new Error("Disk measurement returned an invalid size.");
+	return kilobytes * 1024;
 }
 
 export class Worktrees {
 	#chain: Promise<unknown> = Promise.resolve();
 	#server: Promise<string> | null = null;
+	#removing: Promise<unknown> | null = null;
+	readonly #starting = new Set<Promise<unknown>>();
 	constructor(private readonly env: WorktreesEnv) {}
 
-	/** Checkout starts and removals share one queue, through insertion in the live registry. */
-	async lifecycle<T>(task: () => Promise<T>): Promise<T> {
+	/** Only checkout and registry insertion exclude removal; independent session spawns stay parallel. */
+	async checkout<T>(task: () => Promise<T>): Promise<T> {
 		const next = this.#chain.then(task, task);
 		this.#chain = next.catch(() => {});
 		return next;
+	}
+
+	/** A start already underway finishes registering before removal snapshots; new starts wait only for removal. */
+	async start<T>(task: () => Promise<T>, checkout: boolean): Promise<T> {
+		// A removal queued while this waited would otherwise take the checkout chain ahead of this start and wait for it.
+		while (this.#removing) await this.#removing;
+		const pending = checkout ? this.checkout(task) : task();
+		this.#starting.add(pending);
+		try {
+			return await pending;
+		} finally {
+			this.#starting.delete(pending);
+		}
 	}
 
 	async #serverPath(): Promise<string> {
 		return (this.#server ??= canonical(this.env.serverCwd));
 	}
 
-	async #registered(repository: string): Promise<Registration[]> {
-		return registrations(await git(repository, "worktree", "list", "--porcelain", "-z"));
-	}
-
 	/** One canonical view of live sessions and saved activity, reused for every worktree in the request. */
 	async #snapshot(): Promise<UseSnapshot> {
 		const hosts: HostUse[] = [];
-		for (const host of await this.env.live()) {
+		for (const host of this.env.live()) {
 			const path = await canonical(host.cwd);
 			let repository: string | null = null;
 			let unknownRepository = false;
@@ -232,7 +188,7 @@ export class Worktrees {
 				const repository = await commonDir(cwd);
 				if (known.has(repository)) continue;
 				known.add(repository);
-				const listed = await this.#registered(repository);
+				const listed = await worktreesOf(repository);
 				const mainPath = listed[0] ? await canonical(listed[0].path) : "";
 				const worktrees = [];
 				for (const registration of listed) worktrees.push(await this.#entry(repository, registration, mainPath, serverPath, snapshot));
@@ -247,7 +203,7 @@ export class Worktrees {
 	async #find(target: WorktreeTarget, snapshot: UseSnapshot | null): Promise<WorktreeEntry> {
 		const repository = await canonical(target.repository);
 		if ((await commonDir(repository)) !== repository) throw new Error("Repository identity changed.");
-		const listed = await this.#registered(repository);
+		const listed = await worktreesOf(repository);
 		const main = listed.find(item => item.main);
 		const mainPath = main ? await canonical(main.path) : "";
 		const path = await canonical(target.path);
@@ -301,74 +257,54 @@ export class Worktrees {
 		return result;
 	}
 
-	async preview(target: WorktreeTarget): Promise<WorktreeRemovalPlan> {
-		const plan: WorktreeRemovalPlan = {
-			...target,
-			kind: "remove",
-			branch: null,
-			head: "",
-			ignored: [],
-			detachedCommitLoss: false,
-			savedSessionIds: [],
-			blockers: [],
-			confirmation: "",
-		};
+	async preview(target: WorktreeTarget, snapshot?: UseSnapshot): Promise<WorktreeRemovalPlan> {
 		try {
-			const entry = await this.#find(target, await this.#snapshot());
-			Object.assign(plan, {
-				repository: entry.repository,
-				path: entry.path,
-				kind: entry.missing ? "registration" : "remove",
-				branch: entry.branch,
-				head: entry.head,
-				savedSessionIds: entry.savedSessionIds,
-				blockers: entry.blockers,
-			});
+			const entry = await this.#find(target, snapshot ?? await this.#snapshot());
+			const blockers = [...entry.blockers];
+			let ignored: string[] = [];
 			let nested: string[] = [];
 			let identity = "missing";
-			const identityBlocked = entry.blockers.some(blocker => blocker.code === "foreign" || blocker.code === "unreadable");
+			let detachedCommitLoss = false;
+			const identityBlocked = blockers.some(blocker => blocker.code === "foreign" || blocker.code === "unreadable");
 			if (!entry.missing && !identityBlocked) {
 				const status = await git(entry.path, "status", "--porcelain=v1", "-z", "--untracked-files=all");
-				if (status) plan.blockers.push({ code: "changed", message: "Tracked modifications or untracked files must be preserved before removal." });
-				const ignored = await git(entry.path, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z");
-				plan.ignored = [...new Set(ignored.split("\0").filter(Boolean).map(path => path.split("/")[0] ?? path))].sort();
-				nested = await nestedRepositories(entry.path, plan.ignored);
-				if (nested.length) plan.blockers.push({ code: "nested-repository", message: "This checkout contains a nested repository, possibly ignored. Move it out before removal." });
+				if (status) blockers.push({ code: "changed", message: "Tracked modifications or untracked files must be preserved before removal." });
+				const files = await git(entry.path, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z");
+				ignored = [...new Set(files.split("\0").filter(Boolean).map(path => path.split("/")[0] ?? path))].sort();
+				nested = await nestedRepositories(entry.path, ignored);
+				if (nested.length) blockers.push({ code: "nested-repository", message: "This checkout contains a nested repository, possibly ignored. Move it out before removal." });
 				const stat = await lstat(entry.path);
 				identity = `${stat.dev}:${stat.ino}`;
 			}
 			if (entry.missing || !identityBlocked) {
 				try {
-					plan.detachedCommitLoss = await this.#detachedLoss(entry);
+					detachedCommitLoss = await this.#detachedLoss(entry);
 				} catch (err) {
-					plan.blockers.push({ code: "unreadable", message: `Cannot check whether the detached commit is reachable: ${errorText(err)}` });
+					blockers.push({ code: "unreadable", message: `Cannot check whether the detached commit is reachable: ${errorText(err)}` });
 				}
 			}
-			const fresh = this.#occupancy(await this.#snapshot(), entry.repository, entry.path);
-			plan.blockers = [...plan.blockers.filter(blocker => blocker.code !== "occupied" && blocker.code !== "unknown-agent-location"), ...fresh];
-			plan.confirmation = createHash("sha256")
-				.update(JSON.stringify({ repository: plan.repository, path: plan.path, kind: plan.kind, branch: plan.branch, head: plan.head, ignored: plan.ignored, nested, detachedCommitLoss: plan.detachedCommitLoss, identity, locked: entry.locked }))
+			const kind = entry.missing ? "registration" : "remove";
+			const confirmation = createHash("sha256")
+				.update(JSON.stringify({ repository: entry.repository, path: entry.path, kind, branch: entry.branch, head: entry.head, ignored, nested, detachedCommitLoss, identity, locked: entry.locked }))
 				.digest("hex");
+			return { repository: entry.repository, path: entry.path, kind, branch: entry.branch, head: entry.head, ignored, detachedCommitLoss, savedSessionIds: entry.savedSessionIds, blockers, confirmation };
 		} catch (err) {
 			const message = errorText(err);
-			plan.blockers.push({ code: message.includes("no longer registered") ? "unregistered" : "unreadable", message });
+			return { repository: target.repository, path: target.path, kind: "unreadable", blockers: [{ code: message.includes("no longer registered") ? "unregistered" : "unreadable", message }] };
 		}
-		return plan;
 	}
 
 	async remove(plans: WorktreeConfirmation[]): Promise<WorktreeRemovalResult[]> {
-		return this.lifecycle(async () => {
+		const removal = this.checkout(async () => {
+			await Promise.allSettled([...this.#starting]);
+			const snapshot = await this.#snapshot();
 			const results: WorktreeRemovalResult[] = [];
 			for (const confirmed of plans) {
-				const current = await this.preview(confirmed);
-				let blockers = [...current.blockers];
-				if (current.confirmation !== confirmed.confirmation) blockers.push({ code: "drift", message: "The checkout or loss plan changed. Review a new confirmation." });
-				else if (current.confirmation) {
-					const fresh = this.#occupancy(await this.#snapshot(), current.repository, current.path);
-					blockers = [...blockers.filter(blocker => blocker.code !== "occupied" && blocker.code !== "unknown-agent-location"), ...fresh];
-				}
+				const current = await this.preview(confirmed, snapshot);
+				const blockers = [...current.blockers];
+				if (current.kind !== "unreadable" && current.confirmation !== confirmed.confirmation) blockers.push({ code: "drift", message: "The checkout or loss plan changed. Review a new confirmation." });
 				const result: WorktreeRemovalResult = { repository: confirmed.repository, path: confirmed.path, removed: false, blockers, error: null };
-				if (!result.blockers.length) {
+				if (!blockers.length && current.kind !== "unreadable") {
 					try {
 						const removed = await run(["git", "-C", current.repository, "worktree", "remove", "--", current.path], { timeoutMs: 30000 });
 						if (removed.code !== 0) throw new Error(removed.stderr.trim() || "Git refused removal.");
@@ -381,6 +317,12 @@ export class Worktrees {
 			}
 			return results;
 		});
+		this.#removing = removal;
+		try {
+			return await removal;
+		} finally {
+			if (this.#removing === removal) this.#removing = null;
+		}
 	}
 
 	/**
@@ -396,7 +338,8 @@ export class Worktrees {
 				await Bun.sleep(500);
 				continue;
 			}
-			if (plan.blockers.length) return { ...target, removed: false, blockers: plan.blockers, error: null };
+			// An unreadable plan always names its blocker.
+			if (plan.blockers.length || plan.kind === "unreadable") return { ...target, removed: false, blockers: plan.blockers, error: null };
 			const [result] = await this.remove([{ ...target, confirmation: plan.confirmation }]);
 			if (!result) throw new Error("Git worktree removal returned no result.");
 			return result;

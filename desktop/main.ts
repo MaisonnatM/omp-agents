@@ -23,10 +23,9 @@ import {
 } from "electron";
 import { errorText, isObject, num } from "../src/json";
 import { tokenFile, userTodosFile } from "../src/paths";
-import { dashboardHosts, isListeningLine, originOf, portFromEnv } from "../src/server/address";
+import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { loadToken } from "../src/server/auth";
 import { parseUserTodoList } from "../src/user-todos-parse";
-import { QUICK_TODO_EVENT } from "../src/shared";
 import { opensAtLogin, removeLoginAgent, writeLoginAgent } from "./login-item";
 
 const PORT = portFromEnv();

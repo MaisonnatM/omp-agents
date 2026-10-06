@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import type { CalendarEvent, Routine, RoutineRun, Schedule, Ticket, UserTodo, UserTodoList } from "../src/shared";
+import type { Routine, RoutineRun, Schedule } from "../src/routines";
+import type { CalendarEvent, Ticket, UserTodo, UserTodoList } from "../src/shared";
 import { type CalendarEntry, calendarEntries } from "./calendar-model";
 
 // Weekly slots are local wall-clock times; Paris leaves DST on 2026-10-25, inside the month below.
@@ -16,7 +17,7 @@ const OCTOBER = { year: 2026, month: 9 };
 /** Wednesday 14 October 2026, noon. */
 const NOW = at("2026-10-14T12:00:00+02:00");
 
-const run = (iso: string, fields: Partial<RoutineRun> = {}): RoutineRun => ({ at: at(iso), queued: false, started: [], errors: [], command: null, ...fields });
+const run = (iso: string, fields: Partial<RoutineRun> = {}): RoutineRun => ({ at: at(iso), outcome: { kind: "pending", queued: false }, errors: [], ...fields });
 const routine = (fields: Partial<Routine>): Routine => ({
 	id: "r1",
 	name: "Notes",
@@ -80,9 +81,9 @@ describe("routines", () => {
 	});
 
 	test("a command that exited non-zero or was stopped failed", () => {
-		const exited = run("2026-10-12T09:00:00+02:00", { command: { phase: "exited", code: 1, output: "", startedAt: 0, endedAt: 1 } });
-		const stopped = run("2026-10-13T09:00:00+02:00", { command: { phase: "stopped", reason: "time-limit", output: "", startedAt: 0, endedAt: 1 } });
-		const passed = run("2026-10-14T09:00:00+02:00", { command: { phase: "exited", code: 0, output: "", startedAt: 0, endedAt: 1 } });
+		const exited = run("2026-10-12T09:00:00+02:00", { outcome: { kind: "command", run: { phase: "exited", code: 1, output: "", startedAt: 0, endedAt: 1 } } });
+		const stopped = run("2026-10-13T09:00:00+02:00", { outcome: { kind: "command", run: { phase: "stopped", reason: "time-limit", output: "", startedAt: 0, endedAt: 1 } } });
+		const passed = run("2026-10-14T09:00:00+02:00", { outcome: { kind: "command", run: { phase: "exited", code: 0, output: "", startedAt: 0, endedAt: 1 } } });
 		const entries = october({ routines: [routine({ enabled: false, runs: [passed, stopped, exited] })] });
 		expect(entries.map(entry => entry.kind === "routine" && entry.state)).toEqual(["failed", "failed", "ran"]);
 	});

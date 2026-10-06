@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
-import { FILE_KIND_LABELS, fileGroups } from "../../labels";
+import { FILE_KIND_LABELS, fileGroups, formatBytes } from "../../labels";
 import { EditBar, type Editing, SaveError, useEditor } from "./editor";
 
 function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
@@ -24,7 +24,7 @@ function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
 					<span className="font-mono text-foreground">{file.pathDisplay}</span>
 					{body.state === "read" && (
 						<>
-							<span className="tabular-nums">{body.size < 1024 ? `${body.size} B` : `${(body.size / 1024).toFixed(1)} KB`}</span>
+							<span className="tabular-nums">{formatBytes(body.size)}</span>
 							<span>Changed {new Date(body.modifiedAt).toLocaleString()}</span>
 						</>
 					)}

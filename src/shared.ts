@@ -1,4 +1,5 @@
 /** Messages and view models shared by the server and the page. */
+import type { Routine, RoutineChange } from "./routines";
 
 export type HostStatus = "working" | "idle" | "needs-input" | "unknown";
 
@@ -53,8 +54,6 @@ export const SESSION_HASH_PREFIX = "session/";
 
 export const hashForSession = (sessionId: string): string => `#${SESSION_HASH_PREFIX}${encodeURIComponent(sessionId)}`;
 
-/** The window event the desktop shell's quick-capture shortcut dispatches; the page opens the Todo page with a new todo started. */
-export const QUICK_TODO_EVENT = "omp-quick-todo";
 
 /**
  * How a session's tool calls touched a pull request: it submitted it with `gt submit` or `gh pr create`, or it
@@ -102,8 +101,6 @@ export interface InboxPullRequest extends PullRequest {
 	/** True when GitHub reports the PR as `CONFLICTING` with its base branch; false for `MERGEABLE`, `UNKNOWN` (not computed yet), and merged PRs. */
 	conflicts: boolean;
 	head: string;
-	/** The head commit's SHA, which tells a routine whether a session already took this version of the PR. */
-	headOid: string;
 	/** The branch it merges into when that is not the repository's default branch: the PR below it in a stack. */
 	stackedOn: string | null;
 	/** Review threads not yet resolved. `exact` is false when GitHub listed only some threads, so `count` is a floor. */
@@ -969,65 +966,6 @@ export type UserTodoChange =
 	/** Its todos stay, in no category, archived ones too. */
 	| { op: "remove-category"; id: string };
 
-export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
-
-export type Schedule =
-	/** Every `minutes`, counted from the last run. The page offers minutes, hours, and days. */
-	| { kind: "every"; minutes: number }
-	/** At `time`, local wall-clock time, on each of `days` (0 is Sunday). Daily is all seven. */
-	| { kind: "weekly"; days: Weekday[]; time: { hour: number; minute: number } };
-
-/** One or more. A routine is due at the earliest. */
-export type Schedules = [Schedule, ...Schedule[]];
-
-export type RoutineTask =
-	/** One session in `cwd` that takes `prompt`. */
-	| { kind: "prompt"; prompt: string }
-	/** `command` through `sh -c` in the routine's cwd, with no omp session. */
-	| { kind: "command"; command: string };
-
-/** A run's command: `running` from its launch, saved before it can end, then how it ended. */
-export type CommandRun =
-	| { phase: "running"; startedAt: number }
-	| { phase: "exited"; code: number; output: string; startedAt: number; endedAt: number }
-	/** Killed at the time limit, or by a dashboard stop, which the next server records. */
-	| { phase: "stopped"; reason: "time-limit" | "dashboard"; output: string; startedAt: number; endedAt: number }
-	/** `sh` could not start, as when the workspace is gone. */
-	| { phase: "failed"; error: string; startedAt: number; endedAt: number };
-
-/** A run claims its slot first, then waits, queued, until a session slot frees up. */
-export interface RoutineRun {
-	at: number;
-	/** Claimed, and its session or command not yet started. */
-	queued: boolean;
-	started: { label: string; instanceId: string; sessionId: string }[];
-	errors: string[];
-	/** Null until a command run launches. A prompt run leaves it null. */
-	command: CommandRun | null;
-}
-
-/** Schedules that start dashboard sessions, or run a command, on their own. */
-export interface Routine {
-	id: string;
-	name: string;
-	cwd: string;
-	schedules: Schedules;
-	task: RoutineTask;
-	/** Saved with the routine, since the page's pin lives in localStorage, which the server cannot read. */
-	skill: string | null;
-	enabled: boolean;
-	createdAt: number;
-	/** Newest first, the last 10. `runs[0].at` is the time every schedule counts from. */
-	runs: RoutineRun[];
-}
-
-/** One edit of the routines; the page picks a new routine's `id`, so a save sent twice saves once. */
-export type RoutineChange =
-	| { op: "save"; routine: Omit<Routine, "runs" | "createdAt"> }
-	| { op: "remove"; id: string }
-	| { op: "enable"; id: string; enabled: boolean }
-	/** Claims a run now, whatever the schedule says. */
-	| { op: "run-now"; id: string };
 
 /** The time ranges the Analytics page reads, shortest first; `all` has no start. */
 export const ANALYTICS_RANGES = ["24h", "7d", "30d", "90d", "all"] as const;

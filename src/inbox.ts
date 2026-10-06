@@ -42,7 +42,7 @@ const REVIEW_FIELDS = `author { login ${AVATAR} }
 	latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }`;
 
 const PR_FIELDS = `... on PullRequest {
-	number title isDraft state reviewDecision mergeable headRefName headRefOid baseRefName updatedAt mergedAt
+	number title isDraft state reviewDecision mergeable headRefName baseRefName updatedAt mergedAt
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
@@ -125,8 +125,7 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole)
 	if (!isObject(node) || typeof node.number !== "number") return null;
 	const parsed = parsePullRequestHead(node);
 	const updatedAt = Date.parse(str(node.mergedAt) ?? str(node.updatedAt) ?? "");
-	const headOid = str(node.headRefOid);
-	if (!parsed || headOid === undefined || Number.isNaN(updatedAt)) return null;
+	if (!parsed || Number.isNaN(updatedAt)) return null;
 	const { base, ...head } = parsed;
 	const repository = isObject(node.repository) ? node.repository : {};
 	const defaultBranch = isObject(repository.defaultBranchRef) ? str(repository.defaultBranchRef.name) : undefined;
@@ -138,7 +137,6 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole)
 		repo,
 		number: node.number,
 		...head,
-		headOid,
 		role,
 		checks: STATUS[rollup ?? ""] ?? "none",
 		conflicts: conflictsOf(node),
