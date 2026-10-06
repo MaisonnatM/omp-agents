@@ -6,6 +6,7 @@
  */
 import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import type { Database } from "bun:sqlite";
 import type { RetrySettings } from "../shared";
 import type { Access, CollabSocket, HostSnapshot, LinkErrorCode } from "./collab";
 import { ompVersion, packageDir } from "./install";
@@ -289,6 +290,53 @@ export interface DiscoveryHelpersModule {
 	expandEnvVarsDeep<T>(value: T): T;
 }
 
+/** Subset of omp-stats' `AggregatedStats` (src/shared-types.ts): one set of requests. */
+export interface StatsUsage {
+	totalRequests: number;
+	failedRequests: number;
+	totalInputTokens: number;
+	totalOutputTokens: number;
+	totalCacheReadTokens: number;
+	totalCacheWriteTokens: number;
+	cacheRate: number;
+	totalCost: number;
+	avgTokensPerSecond: number | null;
+}
+/** Subset of omp-stats' `DashboardStats`. `agentType` is `main`, `subagent`, or `advisor`; `timestamp` starts a bucket. */
+export interface StatsDashboard {
+	overall: StatsUsage;
+	byModel: (StatsUsage & { model: string; provider: string })[];
+	byAgentType: { agentType: "main" | "subagent" | "advisor"; totalInputTokens: number; totalOutputTokens: number; totalCacheReadTokens: number; totalCacheWriteTokens: number }[];
+	timeSeries: { timestamp: number; requests: number; tokens: number; cost: number }[];
+}
+/** Subset of omp-stats' `ToolDashboardStats`. */
+export interface StatsToolDashboard {
+	byTool: { tool: string; calls: number; errors: number; totalTokensShare: number }[];
+}
+/** omp-stats' aggregator (src/aggregator.ts). Ranges it does not know read as `24h`. */
+export interface StatsAggregatorModule {
+	getDashboardStats(range: string): Promise<StatsDashboard>;
+	getToolDashboardStats(range: string): Promise<StatsToolDashboard>;
+	/** `cutoff` is null for all time. */
+	getTimeRangeConfig(range: string): { cutoff: number | null; bucketMs: number };
+}
+/** omp-stats' `LiveSyncStatus` (src/shared-types.ts). */
+export interface StatsSync {
+	phase: "idle" | "syncing" | "error";
+	current: number;
+	total: number;
+	lastSyncedAt: number | null;
+	error: string | null;
+}
+/** omp-stats' live ingest (src/live.ts): `start` syncs every session file, then watches them; both are idempotent. */
+export interface StatsLiveModule {
+	statsLive(): { start(): void; stop(): void; status(): { sync: StatsSync } };
+}
+/** omp-stats' database (src/db.ts): `~/.omp/stats.db`, under omp's config root, opened once. */
+export interface StatsDbModule {
+	initDb(): Promise<Database>;
+}
+
 type Kind = "function" | "number";
 
 /** The value at a dotted export path such as `Settings.loadReadOnly`. */
@@ -411,3 +459,12 @@ export const mcpOAuthDiscovery = await load<McpOAuthDiscoveryModule>(join(srcDir
 });
 export const mcpOAuthFlow = await load<McpOAuthFlowModule>(join(srcDir, "mcp", "oauth-flow.ts"), { MCPOAuthFlow: "function" });
 export const mcpConfigWriter = await load<McpConfigWriterModule>(join(srcDir, "mcp", "config-writer.ts"), { addMCPServer: "function" });
+
+const statsSrc = join(dirname(packageDir), "omp-stats", "src");
+export const statsAggregator = await load<StatsAggregatorModule>(join(statsSrc, "aggregator.ts"), {
+	getDashboardStats: "function",
+	getToolDashboardStats: "function",
+	getTimeRangeConfig: "function",
+});
+export const statsLive = await load<StatsLiveModule>(join(statsSrc, "live.ts"), { statsLive: "function" });
+export const statsDb = await load<StatsDbModule>(join(statsSrc, "db.ts"), { initDb: "function" });

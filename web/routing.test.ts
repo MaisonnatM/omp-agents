@@ -5,6 +5,7 @@ import {
 	adjacentSession,
 	closePane,
 	endSession,
+	hashForAnalytics,
 	hashForInbox,
 	hashForLayout,
 	hashForNewSession,
@@ -138,6 +139,15 @@ describe("layout hash", () => {
 		expect(routeFromHash(`#routines/${id}`)).toEqual({ kind: "page", page: { kind: "routines", target: id } });
 		expect(routeFromHash("#routines/")).toEqual({ kind: "page", page: { kind: "routines", target: null } });
 		expect(routeFromHash("#routinesx").kind).toBe("panes");
+	});
+
+	test("the analytics hash keeps the chosen range and falls back to the last seven days", () => {
+		expect(hashForAnalytics()).toBe("#analytics");
+		expect(hashForAnalytics("90d")).toBe("#analytics/90d");
+		expect(routeFromHash("#analytics")).toEqual({ kind: "page", page: { kind: "analytics", range: "7d" } });
+		expect(routeFromHash("#analytics/90d")).toEqual({ kind: "page", page: { kind: "analytics", range: "90d" } });
+		expect(routeFromHash("#analytics/unknown")).toEqual({ kind: "page", page: { kind: "analytics", range: "7d" } });
+		expect(routeFromHash("#analyticsx").kind).toBe("panes");
 	});
 
 	test("every page hash names its page and route, and a session or layout hash names none", () => {

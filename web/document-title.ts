@@ -19,6 +19,8 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return "Todo";
 		case "routines":
 			return "Routines";
+		case "analytics":
+			return "Analytics";
 		case undefined: {
 			if (view?.kind === "past") return past ? pastLabel(past) : null;
 			if (view?.kind !== "live") return null;

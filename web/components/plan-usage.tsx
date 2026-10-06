@@ -1,10 +1,13 @@
 import { createContext, type ReactNode } from "react";
 import type { PlanUsage, PlanWindow } from "../../src/shared";
+import { Button } from "@/components/ui/button";
 import { SidebarFooter } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DashboardState } from "../dashboard-state";
 import { providerOrg } from "../labels";
+import { PAGE_ICON } from "../page-icons";
+import { hashForAnalytics } from "../routing";
 import { OrgIcon } from "./org-icon";
 
 /** Below this fraction left, a window reads as running low. */
@@ -55,8 +58,8 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 	);
 }
 
-/** Quota left on every plan `omp usage` reports, pinned to the bottom of the sidebar. */
-export function PlanUsageFooter({ usage }: { usage: DashboardState["usage"] }) {
+/** Plan quota and the Analytics link, pinned to the bottom of the sidebar. */
+export function PlanUsageFooter({ usage, analyticsOpen }: { usage: DashboardState["usage"]; analyticsOpen: boolean }) {
 	let body: ReactNode;
 	if (usage === null) body = <p className="text-muted-foreground">Checking plans…</p>;
 	else if (usage.error !== null)
@@ -75,5 +78,12 @@ export function PlanUsageFooter({ usage }: { usage: DashboardState["usage"] }) {
 				))}
 			</ul>
 		);
-	return <SidebarFooter className="px-3 py-2 text-xs">{body}</SidebarFooter>;
+	return (
+		<SidebarFooter className="gap-2 px-3 py-2 text-xs">
+			<Button asChild variant="ghost" size="compact" active={analyticsOpen} leadingIcon={PAGE_ICON.analytics} className="w-full justify-start">
+				<a href={hashForAnalytics()} aria-current={analyticsOpen ? "page" : undefined}>Analytics</a>
+			</Button>
+			{body}
+		</SidebarFooter>
+	);
 }
