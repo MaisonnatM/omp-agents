@@ -15,10 +15,19 @@ interface TodoKeysOptions {
 	disabled: boolean;
 	onChange: (change: UserTodoChange) => void;
 	onToggle: (todo: UserTodoLeaf) => void;
+	/** The todo the page shows beside the list, `null` for none. */
+	openId: string | null;
+	/** Every todo whose row shows, in the list's order: what J and K open while a todo is open. */
+	openOrder: readonly string[];
+	onOpen: (id: string | null) => void;
 }
 
-/** J and K focus the next and previous todo, X checks the focused one, and Alt+Shift+↑ and ↓ move it a place. */
-export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onChange, onToggle }: TodoKeysOptions): void {
+/**
+ * J and K focus the next and previous todo, or, while one is open, open the next or previous one and focus its row.
+ * Esc closes the open todo, X checks the focused one, and Alt+Shift+↑ and ↓ move it a place. Returns that opening step
+ * for the open todo's own buttons; `false` at either end of the list.
+ */
+export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onChange, onToggle, openId, openOrder, onOpen }: TodoKeysOptions): (step: 1 | -1) => boolean {
 	const focused = () => {
 		const id = editingId ?? (document.activeElement as HTMLElement | null)?.closest("[data-todo-id]")?.getAttribute("data-todo-id") ?? null;
 		return id === null ? null : placeIn(groups, id);
@@ -28,6 +37,14 @@ export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onC
 		if (rows.length === 0) return false;
 		const at = rows.findIndex(row => row === document.activeElement);
 		rows[at < 0 ? (step > 0 ? 0 : rows.length - 1) : Math.min(rows.length - 1, Math.max(0, at + step))]!.focus();
+		return true;
+	};
+	const openStep = (step: 1 | -1): boolean => {
+		const at = openId === null ? -1 : openOrder.indexOf(openId);
+		const id = at < 0 ? undefined : openOrder[at + step];
+		if (id === undefined) return false;
+		onOpen(id);
+		listRef.current?.querySelector<HTMLElement>(`[data-todo-id="${CSS.escape(id)}"] [data-todo-row]`)?.focus();
 		return true;
 	};
 	const moveBy = (step: 1 | -1): boolean => {
@@ -41,14 +58,19 @@ export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onC
 		return true;
 	};
 	useShortcuts({
-		todoNext: () => focusStep(1),
-		todoPrevious: () => focusStep(-1),
+		todoNext: () => (openId === null ? focusStep(1) : openStep(1)),
+		todoPrevious: () => (openId === null ? focusStep(-1) : openStep(-1)),
 		todoCheck: () => {
 			const place = disabled ? null : focused();
 			if (!place) return false;
 			onToggle(place.entry.todo);
 		},
+		todoClose: () => {
+			if (openId === null) return false;
+			onOpen(null);
+		},
 		moveUp: () => moveBy(-1),
 		moveDown: () => moveBy(1),
 	});
+	return openStep;
 }

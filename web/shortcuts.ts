@@ -35,6 +35,7 @@ export type ShortcutId =
 	| "todoNext"
 	| "todoPrevious"
 	| "todoCheck"
+	| "todoClose"
 	| "moveUp"
 	| "moveDown";
 
@@ -123,9 +124,10 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "pullRequestActions", label: "Inbox: open the pull request's quick actions", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
 	{ id: "giveToAgent", label: "Inbox: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{ id: "todoSearch", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
-	{ id: "todoNext", label: "Focus the next todo", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
-	{ id: "todoPrevious", label: "Focus the previous todo", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
+	{ id: "todoNext", label: "Focus the next todo, or open it while a todo is open", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
+	{ id: "todoPrevious", label: "Focus the previous todo, or open it while a todo is open", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
 	{ id: "todoCheck", label: "Check or uncheck the focused todo", keys: [{ chord: { key: "x" }, scope: "outside-fields" }] },
+	{ id: "todoClose", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "moveUp", label: "Move the focused todo, or the inbox's focused repository, section, or pull request, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "moveDown", label: "Move the focused todo, or the inbox's focused repository, section, or pull request, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
 ];

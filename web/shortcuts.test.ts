@@ -80,7 +80,10 @@ test("Cmd+Enter steers now, Enter queues when running, and Cmd+Shift+Backspace s
 });
 
 test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help", () => {
-	expect(shortcutsFor(keyEvent("Escape", "Escape"), null, false)).toEqual([{ id: "restore", scope: "anywhere" }]);
+	expect(shortcutsFor(keyEvent("Escape", "Escape"), null, false)).toEqual([
+		{ id: "restore", scope: "anywhere" },
+		{ id: "todoClose", scope: "outside-fields" },
+	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere" }]);
 	expect(shortcutsFor(keyEvent("/", "Slash"), null, false)).toEqual([

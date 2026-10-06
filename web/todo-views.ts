@@ -1,6 +1,7 @@
 /** Which todos each of the Todo page's lists holds and what it lets you do, shared by the page and the sidebar. */
 import { Archive, Bot, CalendarClock, ListTodo, type LucideIcon, MessageCircleQuestionMark } from "lucide-react";
 import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
+import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "./days";
 import type { TodoListView } from "./routing";
 import { workStateOf, type TodoSessions } from "./todo-work-state";
@@ -95,21 +96,19 @@ export function leftIn(list: UserTodoList, view: TodoListView, day: string, sess
 	return view.kind === "done" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
 }
 
-/** The todos a list shows under one heading: those of one category, of none, or of a list that is not a category. */
+/** What a list shows: its top-level todos, and the category a todo added there joins. */
 export interface Section {
-	/** The category a todo added here joins. */
 	categoryId: string | null;
-	/** `null` for the only section, which the page's title already names. */
-	title: string | null;
 	todos: UserTodo[];
 }
 
-/** For every todo, the todos of no category first, then each category with todos, in its order; any other list is one section. */
-export function sectionsOf(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions): Section[] {
-	if (view.kind !== "all") return [{ categoryId: view.kind === "category" ? view.id : null, title: null, todos: todosOf(list, view, day, sessions) }];
-	const inCategory = (categoryId: string | null) => list.todos.filter(todo => todo.categoryId === categoryId);
-	const named = list.categories.map(({ id, name }) => ({ categoryId: id, title: name, todos: inCategory(id) })).filter(section => section.todos.length > 0);
-	return [{ categoryId: null, title: named.length > 0 ? "No category" : null, todos: inCategory(null) }, ...named];
+const CATEGORY_COLORS: readonly BadgeColor[] = ["blue", "violet", "amber", "emerald", "rose", "cyan", "orange", "fuchsia", "lime", "indigo"];
+
+/** A category's badge color, from its id so renaming or reordering categories keeps it. */
+export function categoryColor(id: string): BadgeColor {
+	let hash = 0;
+	for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+	return CATEGORY_COLORS[hash % CATEGORY_COLORS.length]!;
 }
 
 export const sameTodoView = (a: TodoListView, b: TodoListView): boolean =>

@@ -25,8 +25,8 @@ export interface TodoDrag {
 }
 
 /**
- * Dragging a todo among the todos beside it of its status: a top-level one among top-level ones, joining the category
- * of the todo it drops beside, and one under another among its parent's. `rowProps` goes on each row's `<li>`.
+ * Dragging a todo among the todos beside it of its status: a top-level one among top-level ones, keeping its
+ * category, and one under another among its parent's. `rowProps` goes on each row's `<li>`.
  */
 export function useTodoDrag(enabled: boolean, onMove: (change: UserTodoChange) => void): TodoDrag {
 	const [drag, setDrag] = useState<Drag | null>(null);
@@ -49,8 +49,7 @@ export function useTodoDrag(enabled: boolean, onMove: (change: UserTodoChange) =
 			event.preventDefault();
 			if (drag?.over?.id === entry.todo.id) {
 				const at = siblings.filter(todo => todo.id !== drag.entry.todo.id).findIndex(todo => todo.id === entry.todo.id);
-				const categoryId = entry.parent === null ? entry.todo.categoryId : null;
-				const change = moveTo(drag.entry, siblings, drag.over.where === "after" ? at + 1 : at, categoryId);
+				const change = moveTo(drag.entry, siblings, drag.over.where === "after" ? at + 1 : at, drag.entry.parent === null ? drag.entry.todo.categoryId : null);
 				if (change) onMove(change);
 			}
 			setDrag(null);
