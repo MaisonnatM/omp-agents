@@ -177,6 +177,8 @@ An `edit-prompt` message rewinds a dashboard session in place: inside the same `
 omp writes the history before that prompt to a new file and keeps the old one, which then lists as a past session.
 The session reports `switched`, so the server points its views at the new file before it sends the edited text as a plain `prompt`, whose events then land in the new transcript.
 A Collab terminal session has no `branch` frame, so only a dashboard session offers the edit.
+The dashboard serializes model, effort, and fast-mode setters with state reads in a separate `TurnGate` from turn commands.
+Event-driven refreshes coalesce while queued, so a read cannot overwrite a later switch, and switching stays visible until every queued model change has finished.
 
 A `prompt` message, and a `start` of kind `new`, carry `images`, each `{ data, mimeType }` with the file's bytes in base64, as omp's `ImageContent` takes them.
 `src/server/wire.ts` accepts PNG, JPEG, GIF, and WebP, up to `MAX_PROMPT_IMAGE_BYTES` (32 MB) per prompt, and a prompt of images with no text.
@@ -453,13 +455,13 @@ The server lives in `src/`:
   Each session's `row()` returns a `LiveRow`, what its transport knows; `rows()` adds `cwdDisplay`, the session's facts, and the subject a quick action started it on, to make the roster rows.
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
-  `src/server/views.ts` points each open view at its file and folds live events into it, and keeps each open view's media tree.
+  `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle.
 - `src/shared.ts`: every type that crosses the socket or the HTTP API (`RosterHost`, `PastSession`, `SessionWork`, `ServerMsg`, `ClientMsg`, `Analytics`, the inbox, pull request, ticket, and routine shapes).
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
 - `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and projects, joining saved-session titles and working directories without reading transcripts.
 - `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, and the private `google.json`; `src/paths.ts` names these files beside the access token.
-- `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC.
+- `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
 - `src/turn-gate.ts`: `TurnGate`, which both transports use to run a session's prompts, aborts, and flushes in the order the page sent them.
@@ -538,6 +540,7 @@ The page lives in `web/`.
   `web/calendar-model.ts` lays a month's routine runs, past and planned, its due todos and tickets, and Google events out by day.
   `web/days.ts` names a local day as todos, tickets, and the calendar do, `YYYY-MM-DD`, and walks the days between two of them.
 - `web/page-icons.ts`: the icon of each dashboard page, which its sidebar tab and every link into the page show.
+  `web/routing.ts` owns the sidebar tab vocabulary and the page/hash routes; `web/components/workspace-picker.tsx` owns the directory picker and the workspace rows it shares with the sidebar's project picker.
 - `web/components/analytics/analytics-page.tsx`: the request usage view, including time-range links, a token chart, breakdowns, and the top sessions.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.

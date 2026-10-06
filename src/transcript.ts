@@ -29,8 +29,9 @@ const SKILL_INVOCATION =
 const messageKey = (message: Json): string | undefined =>
 	typeof message.timestamp === "number" ? `m${message.timestamp}` : undefined;
 
-/** A `/skill:` prompt the user typed, as a live message or a file entry; a subagent's skill is hidden context instead. */
-const isUserSkillPrompt = (value: Json): boolean => value.customType === SKILL_PROMPT && value.attribution === "user";
+/** Plain user messages and `/skill:` prompts the user typed; a subagent's skill is hidden context instead. */
+export const isUserPrompt = (value: Json): boolean =>
+	value.role === "user" || (value.customType === SKILL_PROMPT && value.attribution === "user");
 
 /** A prompt as the user typed it: an expanded skill reads as the skill's name and the user's words, not the skill's text. */
 function userPrompt(text: string): { text: string; skill: string | null } {
@@ -133,7 +134,7 @@ export class Transcript {
 		const written = typeof entry.timestamp === "string" ? Date.parse(entry.timestamp) : Number.NaN;
 		const sent = isObject(entry.message) ? entry.message.timestamp : undefined;
 		// omp writes a `/skill:` prompt's entry with the timestamp of the message its live events carried.
-		const skillPrompt = entry.type === "custom_message" && isUserSkillPrompt(entry) && !Number.isNaN(written);
+		const skillPrompt = entry.type === "custom_message" && isUserPrompt(entry) && !Number.isNaN(written);
 		this.#now = typeof sent === "number" ? sent : Number.isNaN(written) ? this.#latest : written;
 		// omp stamps a queued steer or follow-up when it was sent, but the agent takes it later, after what the file holds before it.
 		if ((entry.type === "message" && typeof sent === "number") || skillPrompt) {
@@ -168,7 +169,7 @@ export class Transcript {
 			: event.message;
 		this.#now = isObject(message) && typeof message.timestamp === "number" ? message.timestamp : Date.now();
 		// A prompt starts when the agent takes it, so a queued one goes after everything already shown.
-		if (isObject(message) && (message.role === "user" || isUserSkillPrompt(message))) this.#now = Math.max(this.#now, this.#latest);
+		if (isObject(message) && isUserPrompt(message)) this.#now = Math.max(this.#now, this.#latest);
 		switch (event.type) {
 			case "message_start":
 			case "message_update":
@@ -212,7 +213,7 @@ export class Transcript {
 	 * message timestamp to merge on.
 	 */
 	#applyLive(message: unknown, streaming: boolean): Item[] {
-		if (!isObject(message) || (message.role !== "assistant" && message.role !== "user" && !isUserSkillPrompt(message))) return [];
+		if (!isObject(message) || (message.role !== "assistant" && !isUserPrompt(message))) return [];
 		const key = messageKey(message);
 		if (!key || this.#settled.has(key)) return [];
 		return this.#applyMessage(key, message, streaming, null);

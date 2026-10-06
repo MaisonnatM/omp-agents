@@ -133,14 +133,10 @@ interface CommandPickerProps {
 	list: PickerList;
 	/** What the list reads when no item matches; nothing when omitted. */
 	empty?: ReactNode;
-	closeOnSelect?: boolean;
-	selectionDisabled?: boolean;
-	/** Wraps the command list with additional controls inside the same popover. */
-	content?: (command: ReactNode) => ReactNode;
 }
 
 /** A button that opens a searchable, grouped list of choices; picking one closes it. The dashboard's every combobox. */
-export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, tooltip, shortcut, disabled, className, search, width, side, open, onOpenChange, list, empty, closeOnSelect = true, selectionDisabled = false, content = command => command }: CommandPickerProps) {
+export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, tooltip, shortcut, disabled, className, search, width, side, open, onOpenChange, list, empty }: CommandPickerProps) {
 	const [inner, setInner] = useState(false);
 	const shown = open ?? inner;
 	const change = (next: boolean): void => {
@@ -168,7 +164,7 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 	return (
 		<Popover open={shown} onOpenChange={change}>
 			{tooltip ? (
-				<Tooltip content={tooltip} shortcut={shortcut && shortcutLabels(shortcut)} side={side ?? "bottom"} forceOpen={shown ? false : undefined}>
+				<Tooltip content={tooltip} shortcut={shortcut && shortcutLabels(shortcut)} side={side ?? "bottom"} forceOpen={shown ? false : undefined} disabled={disabled}>
 					{button}
 				</Tooltip>
 			) : (
@@ -176,7 +172,7 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 			)}
 			{/* A click in the list must not reach the composer around a picker, which would take the focus back to its text box. */}
 			<PopoverContent side={side} align="start" className={cn(WIDTH[width], "min-w-0 max-h-[var(--radix-popover-content-available-height)] overflow-x-hidden overflow-y-auto overscroll-contain p-0")} onMouseDown={event => event.stopPropagation()}>
-				{content(<CommandResults search={search} list={list} empty={empty} disabled={disabled} selectionDisabled={selectionDisabled} closeOnSelect={closeOnSelect} onClose={() => change(false)} />)}
+				<CommandResults search={search} list={list} empty={empty} disabled={disabled} onClose={() => change(false)} />
 			</PopoverContent>
 		</Popover>
 	);

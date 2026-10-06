@@ -89,6 +89,8 @@ interface TooltipProps {
   /** Keys that run the trigger's action, drawn as chips after `content`: `["⌘/", "?"]` reads `⌘/ or ?`. */
   shortcut?: readonly string[];
   children: React.ReactElement;
+  /** The child is a disabled control: anchor hover to a non-focusable wrapper, without making the control operable. */
+  disabled?: boolean;
   side?: TooltipSide;
   sideOffset?: number;
   /** Hover delay before this tooltip opens, in ms. Defaults to 200, or to the
@@ -143,6 +145,7 @@ function Tooltip({
   content,
   shortcut,
   children,
+  disabled = false,
   side = "top",
   sideOffset = 8,
   delayDuration,
@@ -202,7 +205,7 @@ function Tooltip({
   const tooltip = (
     <TooltipPrimitive.Root delayDuration={delayDuration} open={open} onOpenChange={(v) => { setInternalOpen(v); onOpenChangeProp?.(v); }}>
       <TooltipPrimitive.Trigger asChild onPointerMove={followCursor ? handleFollowMove : undefined}>
-        {children}
+        {disabled ? <span className="inline-flex">{children}</span> : children}
       </TooltipPrimitive.Trigger>
       {mounted && (
         <TooltipPrimitive.Portal forceMount container={portalContainer ?? undefined}>

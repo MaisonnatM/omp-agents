@@ -259,8 +259,7 @@ function ForkButton({ point, forking, disabled, onFork }: { point: ForkPoint; fo
 			{forking ? <LoaderIcon className="animate-spin" /> : <BranchIcon />}
 		</Button>
 	);
-	// A disabled button takes no pointer events, so the tooltip needs a wrapper then. While it is enabled, the button itself stays the trigger and keeps keyboard focus.
-	return <Tooltip content={title}>{disabled ? <span className="inline-flex">{button}</span> : button}</Tooltip>;
+	return <Tooltip content={title} disabled={disabled}>{button}</Tooltip>;
 }
 
 function EditButton({ onEdit }: { onEdit: () => void }) {

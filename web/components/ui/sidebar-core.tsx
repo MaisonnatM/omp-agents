@@ -1205,6 +1205,8 @@ export interface SidebarGroupProps extends SidebarSectionProps {
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Header controls kept outside the collapsible body; each receives space beside the chevron. */
+  headerActions?: ReactNode;
 }
 
 const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(
@@ -1215,6 +1217,7 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(
       open: openProp,
       defaultOpen = true,
       onOpenChange,
+      headerActions,
       children,
       ...props
     },
@@ -1265,33 +1268,17 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(
       togglingRef.current = true;
     }
 
-    // The label and any header actions stay put; everything else after the
-    // label rides in the collapse wrapper. If no SidebarGroupLabel child is
-    // found the group renders untouched.
-    const isHeaderAction = (k: ReactNode) =>
-      isValidElement(k) &&
-      (k.type === SidebarGroupAction || k.type === SidebarGroupActions);
+    // The header controls stay outside the measured collapse body. An explicit
+    // slot avoids trying to identify components by type before they render.
     let inner: ReactNode = children;
-    let actionsCount = 0;
+    const actionsCount = headerActions ? Children.count(headerActions) : 0;
     if (collapsible) {
       const kids = Children.toArray(children);
       const labelIdx = kids.findIndex(
         (k) => isValidElement(k) && k.type === SidebarGroupLabel
       );
       if (labelIdx !== -1) {
-        const tail = kids.slice(labelIdx + 1);
-        const headerActions = tail.filter(isHeaderAction);
-        const rest = tail.filter((k) => !isHeaderAction(k));
-        actionsCount = headerActions.reduce<number>(
-          (n, k) =>
-            n +
-            (isValidElement(k) && k.type === SidebarGroupActions
-              ? Children.count(
-                  (k.props as { children?: ReactNode }).children
-                )
-              : 1),
-          0
-        );
+        const rest = kids.slice(labelIdx + 1);
         inner = (
           <>
             {kids.slice(0, labelIdx)}

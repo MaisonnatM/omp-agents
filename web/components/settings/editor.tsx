@@ -117,8 +117,8 @@ function OrderButton({ label, direction, disabled, onClick }: { label: string; d
 		</Button>
 	);
 	return (
-		<Tooltip content={disabled ? `${label} is already ${direction === "up" ? "first" : "last"}` : `Move ${label} ${name}`}>
-			{disabled ? <span className="inline-flex">{button}</span> : button}
+		<Tooltip content={disabled ? `${label} is already ${direction === "up" ? "first" : "last"}` : `Move ${label} ${name}`} disabled={disabled}>
+			{button}
 		</Tooltip>
 	);
 }

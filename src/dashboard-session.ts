@@ -13,7 +13,7 @@ import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rp
 import { endsMidTurn } from "./omp/sessions";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type ModelEntry, type ModelOption, type PromptImage, selectorOf, type UserAnswer, type UserRequest } from "./shared";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
-import { SKILL_PROMPT } from "./transcript";
+import { isUserPrompt } from "./transcript";
 import { TurnGate } from "./turn-gate";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
@@ -65,10 +65,6 @@ async function recordedCwd(sessionFile: string): Promise<string> {
 /** Session events after which the model, thinking level, or context size can have changed. */
 const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_changed", "auto_compaction_end"]);
 
-/** A message the user's prompt became: omp records a plain one as `user`, and a `/skill:` one as a `custom` `skill-prompt`. */
-const isPrompt = (message: Record<string, unknown>): boolean =>
-	message.role === "user" || (message.role === "custom" && message.customType === SKILL_PROMPT);
-
 export class DashboardSession implements LiveSession {
 	readonly instanceId: string;
 	readonly startedAt = Date.now();
@@ -81,7 +77,8 @@ export class DashboardSession implements LiveSession {
 	thinkingLevel: string | null = null;
 	/** Levels the current model accepts, `off` first. */
 	thinkingLevels: string[] = [];
-	modelSwitch = { pending: false, revision: 0 };
+	switching = false;
+	#switches = 0;
 	/** `null` while the model has no priority tier for `/fast` to turn on. */
 	fast: FastMode | null = null;
 	context: ContextUsage | null = null;
@@ -93,14 +90,15 @@ export class DashboardSession implements LiveSession {
 	readonly #requests: PendingRequests;
 	#agents = new Map<string, RpcAgent>();
 	readonly #emit: (update: DashboardUpdate) => void;
-	#refreshing = false;
-	#refreshAgain = false;
 	/** Whether the last prompt the user sent was a `/` command, whose `command_output` frames the conversation shows. */
 	#userCommand = false;
 	/** Whether **End session** stopped the process, rather than the dashboard shutting down or omp exiting on its own. */
 	#ended = false;
 	/** Prompt, dequeue, abort, flush, and edit, so an abort cannot land before the steer it should deliver. */
 	readonly #turn = new TurnGate();
+	/** Model setters and state reads share a lane, separate from ordered turn commands. */
+	readonly #modelGate = new TurnGate();
+	#refreshQueued = false;
 
 	private constructor(
 		instanceId: string,
@@ -227,7 +225,7 @@ export class DashboardSession implements LiveSession {
 			model: this.model,
 			thinkingLevel: this.thinkingLevel,
 			thinkingLevels: this.thinkingLevels,
-			modelSwitch: this.modelSwitch,
+			switching: this.switching,
 			fast: this.fast,
 			context: this.context,
 			startedAt: this.startedAt,
@@ -389,58 +387,52 @@ export class DashboardSession implements LiveSession {
 		return modelEntries(models, config, connected);
 	}
 
-	/** Switch to `model`, then to `thinking` when it names a level. */
-	async setModel({ provider, id }: ModelOption, thinking: string | null): Promise<void> {
-		if (this.modelSwitch.pending) return;
-		this.modelSwitch = { ...this.modelSwitch, pending: true };
+	/** Switches serialize with state reads; the flag is set before queuing so the page can show progress immediately. */
+	setModel({ provider, id }: ModelOption, thinking: string | null): Promise<void> {
+		this.switching = ++this.#switches > 0;
 		this.thinkingLevels = [];
 		this.#emit({ kind: "roster" });
-		const { client } = this.#child;
-		try {
-			await client.setModel(provider, id);
-			if (thinking) await client.setThinkingLevel(thinking);
-		} catch (err) {
-			this.#fail("Model switch failed", err);
-		} finally {
+		return this.#modelGate.run(async () => {
+			const { client } = this.#child;
 			try {
-				const state = await client.getState();
-				const levels = await client.getAvailableThinkingLevels();
-				this.#applyState(state);
-				this.thinkingLevels = levels;
+				await client.setModel(provider, id);
+				if (thinking) await client.setThinkingLevel(thinking);
 			} catch (err) {
-				this.#fail("Model state refresh failed", err);
+				this.#fail("Model switch failed", err);
+			} finally {
+				await this.#readModelState("Model state refresh failed");
+				this.switching = --this.#switches > 0;
+				this.#emit({ kind: "roster" });
 			}
-			this.modelSwitch = { pending: false, revision: this.modelSwitch.revision + 1 };
-			this.#emit({ kind: "roster" });
-			if (this.#refreshAgain) this.#refresh();
-		}
+		});
 	}
 
-	async setThinking(level: string): Promise<void> {
-		if (this.modelSwitch.pending || !this.thinkingLevels.includes(level)) return;
-		const { client } = this.#child;
-		try {
-			const levels = await client.getAvailableThinkingLevels();
-			if (this.modelSwitch.pending) return;
-			if (!levels.includes(level)) {
-				this.#refresh();
-				return;
+	setThinking(level: string): Promise<void> {
+		return this.#modelGate.run(async () => {
+			if (!this.thinkingLevels.includes(level)) return;
+			try {
+				const levels = await this.#child.client.getAvailableThinkingLevels();
+				if (!levels.includes(level)) {
+					await this.#readModelState("Model state refresh failed");
+					return;
+				}
+				await this.#child.client.setThinkingLevel(level);
+			} catch (err) {
+				this.#fail("Thinking level switch failed", err);
 			}
-			await client.setThinkingLevel(level);
-			this.#refresh();
-		} catch (err) {
-			this.#fail("Thinking level switch failed", err);
-		}
+			await this.#readModelState("Model state refresh failed");
+		});
 	}
 
-	async setFast(enabled: boolean): Promise<void> {
-		if (this.modelSwitch.pending) return;
-		try {
-			await this.#child.client.setFastMode(enabled);
-		} catch (err) {
-			this.#fail("Fast mode switch failed", err);
-		}
-		this.#refresh();
+	setFast(enabled: boolean): Promise<void> {
+		return this.#modelGate.run(async () => {
+			try {
+				await this.#child.client.setFastMode(enabled);
+			} catch (err) {
+				this.#fail("Fast mode switch failed", err);
+			}
+			await this.#readModelState("Model state refresh failed");
+		});
 	}
 
 	end(): Promise<void> {
@@ -463,7 +455,7 @@ export class DashboardSession implements LiveSession {
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });
-		} else if (event.type === "message_end" && isObject(event.message) && isPrompt(event.message) && this.sessionName === null) {
+		} else if (event.type === "message_end" && isObject(event.message) && isUserPrompt(event.message) && this.sessionName === null) {
 			// omp's RPC mode titles no prompt itself; a bare `/rename` makes omp title the session from the prompt it now holds.
 			// A `/skill:` prompt is a custom message, not a user one, and omp's title context reads it as the user's prompt.
 			this.#child.client.prompt("/rename").catch((err: unknown) => this.#fail("Titling failed", err));
@@ -478,36 +470,32 @@ export class DashboardSession implements LiveSession {
 		this.fast = state.model && fastAvailable(state.model) ? { enabled: state.fastModeEnabled, active: state.fastModeActive } : null;
 	}
 
-	/** Re-read omp's state; a request that arrives mid-read runs once more after it, so the last change always lands. */
+	/** Coalesce bursts while one read waits, without letting a read overtake a model setter. */
 	#refresh(): void {
-		if (this.modelSwitch.pending) {
-			this.#refreshAgain = true;
-			return;
-		}
-		if (this.#refreshing) {
-			this.#refreshAgain = true;
-			return;
-		}
-		this.#refreshing = true;
-		this.#refreshAgain = false;
-		const { client } = this.#child;
-		const revision = this.modelSwitch.revision;
-		Promise.all([client.getState(), client.getAvailableThinkingLevels()])
-			.then(
-				([state, levels]) => {
-					if (this.modelSwitch.pending || this.modelSwitch.revision !== revision) return;
-					this.#applyState(state);
-					this.thinkingLevels = levels;
-					this.#emit({ kind: "roster" });
-				},
+		if (this.#refreshQueued) return;
+		this.#refreshQueued = true;
+		void this.#modelGate.run(async () => {
+			this.#refreshQueued = false;
+			try {
+				const [state, levels] = await Promise.all([this.#child.client.getState(), this.#child.client.getAvailableThinkingLevels()]);
+				this.#applyState(state);
+				this.thinkingLevels = levels;
+				this.#emit({ kind: "roster" });
+			} catch {
 				// The process exited; `exited` reports it.
-				() => {},
-			)
-			.finally(() => {
-				this.#refreshing = false;
-				if (!this.#refreshAgain) return;
-				this.#refresh();
-			});
+			}
+		});
+	}
+
+	async #readModelState(failure: string): Promise<void> {
+		try {
+			const [state, levels] = await Promise.all([this.#child.client.getState(), this.#child.client.getAvailableThinkingLevels()]);
+			this.#applyState(state);
+			this.thinkingLevels = levels;
+			this.#emit({ kind: "roster" });
+		} catch (err) {
+			this.#fail(failure, err);
+		}
 	}
 
 	#setActivity(activity: "working" | "idle"): void {

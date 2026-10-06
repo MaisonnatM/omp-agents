@@ -29,14 +29,15 @@ export const watching = (ws: Socket, instanceId: string): boolean =>
  * The messages that show `view` from scratch: `tail`'s items and work and `media`'s images once read, empty without a
  * file. A tail or tree still loading gives none: its first read publishes to every subscriber.
  */
-function snapshot(view: View, tail: FileTail | undefined, media: MediaTree | undefined): ServerMsg[] {
-	if (!tail || !media) {
+function snapshot(view: View, resources: { tail: FileTail; media: MediaTree } | undefined): ServerMsg[] {
+	if (!resources) {
 		return [
 			{ t: "items", view, reset: true, items: [] },
 			{ t: "work", view, work: EMPTY_WORK },
 			{ t: "media", view, media: [] },
 		];
 	}
+	const { tail, media } = resources;
 	return [
 		...(tail.loaded
 			? [
@@ -51,8 +52,7 @@ function snapshot(view: View, tail: FileTail | undefined, media: MediaTree | und
 export class Views {
 	/** Views some socket shows, with how many sockets show each; each has a tail and a media tree while its file is known. */
 	readonly #watched = new Map<string, { view: View; sockets: number }>();
-	readonly #tails = new Map<string, FileTail>();
-	readonly #media = new Map<string, MediaTree>();
+	readonly #resources = new Map<string, { tail: FileTail; media: MediaTree }>();
 	readonly #pathFor: (view: View) => string | null;
 	readonly #publish: (topic: string, msg: ServerMsg) => void;
 
@@ -73,8 +73,7 @@ export class Views {
 			const entry = this.#watched.get(key);
 			if (entry && --entry.sockets === 0) {
 				this.#watched.delete(key);
-				this.#tails.delete(key);
-				this.#media.delete(key);
+				this.#resources.delete(key);
 			}
 		}
 		const added = [...next].filter(([key]) => !prev.has(key));
@@ -85,35 +84,33 @@ export class Views {
 			else this.#watched.set(key, { view, sockets: 1 });
 		}
 		this.sync();
-		for (const [key, view] of added) for (const msg of snapshot(view, this.#tails.get(key), this.#media.get(key))) send(ws, msg);
+		for (const [key, view] of added) for (const msg of snapshot(view, this.#resources.get(key))) send(ws, msg);
 	}
 
 	/** Point every watched view's tail and media tree at its current file: the file shows up, the host switches sessions, a subagent registers. */
 	sync(): void {
 		for (const [key, { view }] of this.#watched) {
 			const path = this.#pathFor(view);
-			const tail = this.#tails.get(key);
-			if (tail?.path === path) continue;
-			this.#tails.delete(key);
-			this.#media.delete(key);
+			const previous = this.#resources.get(key);
+			if (previous?.tail.path === path) continue;
+			this.#resources.delete(key);
 			if (!path) {
-				if (tail) for (const msg of snapshot(view, undefined, undefined)) this.#publish(viewTopic(key), msg);
+				if (previous) for (const msg of snapshot(view, undefined)) this.#publish(viewTopic(key), msg);
 				continue;
 			}
 			const next = new FileTail(
 				path,
 				(reset, items) => {
-					if (this.#tails.get(key) === next) this.#publish(viewTopic(key), { t: "items", view, reset, items });
+					if (this.#resources.get(key)?.tail === next) this.#publish(viewTopic(key), { t: "items", view, reset, items });
 				},
 				work => {
-					if (this.#tails.get(key) === next) this.#publish(viewTopic(key), { t: "work", view, work });
+					if (this.#resources.get(key)?.tail === next) this.#publish(viewTopic(key), { t: "work", view, work });
 				},
 			);
 			const media = new MediaTree(path, view.kind === "live" ? view.agentId : null, list => {
-				if (this.#media.get(key) === media) this.#publish(viewTopic(key), { t: "media", view, media: list });
+				if (this.#resources.get(key)?.media === media) this.#publish(viewTopic(key), { t: "media", view, media: list });
 			});
-			this.#tails.set(key, next);
-			this.#media.set(key, media);
+			this.#resources.set(key, { tail: next, media });
 			next.poke();
 			media.poke();
 		}
@@ -126,17 +123,19 @@ export class Views {
 	 */
 	poke(changedPath: string): void {
 		const dir = dirname(changedPath);
-		for (const tail of this.#tails.values()) if (dirname(tail.path) === dir) tail.poke();
-		for (const media of this.#media.values()) if (media.covers(changedPath)) media.poke();
+		for (const { tail, media } of this.#resources.values()) {
+			if (dirname(tail.path) === dir) tail.poke();
+			if (media.covers(changedPath)) media.poke();
+		}
 	}
 
 	/** A live agent event of session `instanceId`'s main agent. */
 	applyEvent(instanceId: string, event: unknown): void {
-		this.#tails.get(viewKey({ kind: "live", instanceId, agentId: null }))?.live(t => t.applyEvent(event));
+		this.#resources.get(viewKey({ kind: "live", instanceId, agentId: null }))?.tail.live(t => t.applyEvent(event));
 	}
 
 	/** An out-of-band line for session `instanceId` (`agentId` null) or one of its subagents. */
 	note(instanceId: string, agentId: string | null, level: "info" | "warning" | "error", text: string): void {
-		this.#tails.get(viewKey({ kind: "live", instanceId, agentId }))?.live(t => t.note(level, text));
+		this.#resources.get(viewKey({ kind: "live", instanceId, agentId }))?.tail.live(t => t.note(level, text));
 	}
 }

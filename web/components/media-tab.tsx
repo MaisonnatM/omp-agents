@@ -76,32 +76,16 @@ function MediaViewer({ media, index, view, onShow }: { media: AgentMedia[]; inde
 						</div>
 					</div>
 					<div className="flex min-h-0 flex-1 items-center gap-2">
-						<Tooltip content="Newer image" shortcut={["←"]}>
-							{index === 0 ? (
-								<span className="inline-flex">
-									<Button variant="ghost" size="icon-compact" aria-label="Newer image" disabled onClick={() => step(-1)}>
-										<ChevronLeft />
-									</Button>
-								</span>
-							) : (
-								<Button variant="ghost" size="icon-compact" aria-label="Newer image" onClick={() => step(-1)}>
-									<ChevronLeft />
-								</Button>
-							)}
+						<Tooltip content="Newer image" shortcut={["←"]} disabled={index === 0}>
+							<Button variant="ghost" size="icon-compact" aria-label="Newer image" disabled={index === 0} onClick={() => step(-1)}>
+								<ChevronLeft />
+							</Button>
 						</Tooltip>
 						<img src={shown.src} alt={caption} className="min-h-0 min-w-0 flex-1 max-h-[calc(100vh-9rem)] object-contain" />
-						<Tooltip content="Older image" shortcut={["→"]}>
-							{index === media.length - 1 ? (
-								<span className="inline-flex">
-									<Button variant="ghost" size="icon-compact" aria-label="Older image" disabled onClick={() => step(1)}>
-										<ChevronRight />
-									</Button>
-								</span>
-							) : (
-								<Button variant="ghost" size="icon-compact" aria-label="Older image" onClick={() => step(1)}>
-									<ChevronRight />
-								</Button>
-							)}
+						<Tooltip content="Older image" shortcut={["→"]} disabled={index === media.length - 1}>
+							<Button variant="ghost" size="icon-compact" aria-label="Older image" disabled={index === media.length - 1} onClick={() => step(1)}>
+								<ChevronRight />
+							</Button>
 						</Tooltip>
 					</div>
 				</DialogPrimitive.Content>

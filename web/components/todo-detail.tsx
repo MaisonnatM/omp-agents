@@ -52,8 +52,8 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 		);
 		return (
 			<div className="flex flex-wrap items-center gap-2">
-				<Tooltip content="Create a Linear issue from this todo">
-					{loading ? <span className="inline-flex">{createButton}</span> : createButton}
+				<Tooltip content="Create a Linear issue from this todo" disabled={loading}>
+					{createButton}
 				</Tooltip>
 				{step.kind === "failed" && (
 					<p role="alert" className="text-xs text-red-600 dark:text-red-400">
@@ -87,11 +87,11 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 					))}
 				</select>
 			</label>
-			<Tooltip content="Create the issue in this team, assigned to you">
-				{creating ? <span className="inline-flex">{createButton}</span> : createButton}
+			<Tooltip content="Create the issue in this team, assigned to you" disabled={creating}>
+				{createButton}
 			</Tooltip>
-			<Tooltip content="Don't create the issue">
-				{creating ? <span className="inline-flex">{cancelButton}</span> : cancelButton}
+			<Tooltip content="Don't create the issue" disabled={creating}>
+				{cancelButton}
 			</Tooltip>
 		</div>
 	);
@@ -130,25 +130,18 @@ export function TodoDetail({ list, open, inline = false, readOnly, onChange, onC
 				</div>
 			) : (
 			<div className="flex items-start gap-2">
-				<Tooltip content={done ? "Mark not done" : "Mark done"}>
-					{readOnly ? (
-						<span className="inline-flex">
-							<button type="button" role="checkbox" aria-checked={done} aria-label={todo.text} disabled className="mt-0.5 shrink-0 text-muted-foreground disabled:pointer-events-none [&>svg]:size-4">
-								{done ? <CircleCheck /> : <Circle />}
-							</button>
-						</span>
-					) : (
-						<button
-							type="button"
-							role="checkbox"
-							aria-checked={done}
-							aria-label={todo.text}
-							onClick={() => onChange({ op: "toggle", id: todo.id, doneAt: done ? null : new Date().toISOString() })}
-							className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground [&>svg]:size-4"
-						>
-							{done ? <CircleCheck /> : <Circle />}
-						</button>
-					)}
+				<Tooltip content={done ? "Mark not done" : "Mark done"} disabled={readOnly}>
+					<button
+						type="button"
+						role="checkbox"
+						aria-checked={done}
+						aria-label={todo.text}
+						disabled={readOnly}
+						onClick={() => onChange({ op: "toggle", id: todo.id, doneAt: done ? null : new Date().toISOString() })}
+						className={cn("mt-0.5 shrink-0 text-muted-foreground disabled:pointer-events-none [&>svg]:size-4", !readOnly && "hover:text-foreground")}
+					>
+						{done ? <CircleCheck /> : <Circle />}
+					</button>
 				</Tooltip>
 				<h3 className={cn("min-w-0 flex-1 break-words text-base font-semibold leading-snug", done && "text-muted-foreground line-through")}>{todo.text}</h3>
 				<Tooltip content="Close">

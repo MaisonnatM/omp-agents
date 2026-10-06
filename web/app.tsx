@@ -9,7 +9,7 @@ import { PullRequestPage } from "./components/inbox/pr-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
 import { NO_PLANS, PlanUsageFooter, Plans } from "./components/plan-usage";
-import { Roster, type SidebarTab, useProject } from "./components/roster";
+import { Roster, useProject } from "./components/roster";
 import { SessionDetails } from "./components/session-details";
 import { SettingsPage } from "./components/settings/settings-page";
 import { SessionSwitcher } from "./components/session-switcher";
@@ -35,7 +35,7 @@ import {
 	hashForPage,
 	hashForView,
 	type Page,
-	sameView,
+	type SidebarTab,
 	type TodoListView,
 } from "./routing";
 import type { SectionTarget } from "./section";

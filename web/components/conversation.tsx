@@ -90,7 +90,6 @@ function LiveConversation({
 	const { scrollToEnd } = useMessageScroller();
 	const [draft, setDraft] = useState(initialDraft);
 	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
-	const [pendingModelRevision, setPendingModelRevision] = useState<number | null>(null);
 	const attachments = useImageAttachments();
 
 	const subject = subjectOf(view, host, lastHost);
@@ -98,13 +97,10 @@ function LiveConversation({
 	const session = subject.kind === "session";
 	const switchable = subject.kind === "session" ? subject.switchable : null;
 	const thinking = shown?.thinkingLevel ?? null;
-	useEffect(() => {
-		if (!subject.live) setPendingModelRevision(null);
-	}, [subject.live]);
-	const switchingModel = !!switchable && (switchable.modelSwitch.pending || pendingModelRevision === switchable.modelSwitch.revision);
 	const instanceId = view.instanceId;
 	const editPrompt = useCallback((entryId: string, text: string) => send({ t: "edit-prompt", instanceId, entryId, text }), [instanceId, send]);
 
+	const switchingModel = !!switchable && switchable.switching;
 	const textarea = () => completion.composerRef.current?.querySelector("textarea");
 	const { queued, take } = useQueue({
 		waiting: subject.queue,
@@ -271,9 +267,6 @@ function LiveConversation({
 							open={modelsOpen}
 							onOpenChange={openModels}
 							switching={switchingModel}
-							onBeginSwitch={() => {
-								if (switchable) setPendingModelRevision(switchable.modelSwitch.revision);
-							}}
 							onSetModel={(model, level) => send({ t: "set-model", instanceId: view.instanceId, model, thinking: level })}
 							onSetThinking={setThinking}
 							onSetFast={enabled => send({ t: "set-fast", instanceId: view.instanceId, enabled })}

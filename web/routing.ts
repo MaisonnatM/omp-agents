@@ -1,6 +1,18 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
 import { type AnalyticsRange, isAnalyticsRange, type LiveView, type PullRequest, type RosterHost, SESSION_HASH_PREFIX, TICKET_ID, type View } from "../src/shared";
 import type { StartOp } from "./starts";
+import { PAGE_ICON } from "./page-icons";
+
+export const SIDEBAR_TABS = [
+	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox },
+	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets },
+	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
+	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
+	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
+] as const;
+
+/** The sidebar's tab; the tickets, todo, and calendar tabs go with their pages, the sessions and inbox tabs with the panes. */
+export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 const PAST_PREFIX = "past/";
 

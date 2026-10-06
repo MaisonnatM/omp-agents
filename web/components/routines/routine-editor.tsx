@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type RoutineSpec, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";
 import { useSkills } from "../../use-skills";
 import { PageFrame } from "../list-page";
-import { DirectoryPicker } from "../new-session";
+import { DirectoryPicker } from "../workspace-picker";
 import { SkillPicker } from "../skill-picker";
 
 const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";

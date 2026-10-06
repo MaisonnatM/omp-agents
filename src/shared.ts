@@ -408,7 +408,7 @@ export type RosterHost = RosterHostBase &
 	(
 		| { source: "terminal"; participants: number; relayConnected: boolean }
 		/** Started by this dashboard, which can end it. */
-		| { source: "dashboard"; thinkingLevels: string[]; modelSwitch: { pending: boolean; revision: number }; fast: FastMode | null }
+		| { source: "dashboard"; thinkingLevels: string[]; switching: boolean; fast: FastMode | null }
 	);
 
 /** omp's `/fast` for the session's model: whether you turned it on, and whether requests go out on the priority tier. */

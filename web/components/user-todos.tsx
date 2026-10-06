@@ -352,8 +352,8 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 				{rowProps.draggable && !isEditing && (
 					<GripVertical aria-hidden className="absolute -left-3 top-1.5 size-3.5 cursor-grab text-muted-foreground/50 opacity-0 group-hover/todo:opacity-100" />
 				)}
-				<Tooltip content={done ? "Mark not done" : "Mark done"}>
-					{disabled ? <span className="inline-flex">{check}</span> : check}
+				<Tooltip content={done ? "Mark not done" : "Mark done"} disabled={disabled}>
+					{check}
 				</Tooltip>
 				{isEditing ? (
 					<TodoInput

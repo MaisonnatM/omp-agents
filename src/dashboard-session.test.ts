@@ -91,11 +91,10 @@ describe("DashboardSession state refresh", () => {
 		};
 
 		client.fire({ type: "turn_end" });
-		client.fire({ type: "model_changed" });
-		client.fire({ type: "turn_end" });
 		await settle();
 		expect(reads).toHaveLength(1);
-
+		client.fire({ type: "model_changed" });
+		client.fire({ type: "turn_end" });
 		reads[0]?.resolve({ ...STATE, sessionName: "first" });
 		await settle();
 		expect(reads).toHaveLength(2);
@@ -104,6 +103,38 @@ describe("DashboardSession state refresh", () => {
 		reads[1]?.resolve({ ...STATE, sessionName: "second" });
 		await settle();
 		expect(reads).toHaveLength(2);
+		expect(session.sessionName).toBe("second");
+	});
+
+	test("two quick model switches keep the spinner until the last result and a queued refresh sees that result", async () => {
+		const { session, client } = await startSession();
+		const first = Promise.withResolvers<void>();
+		const second = Promise.withResolvers<void>();
+		let model = "initial";
+		const calls: string[] = [];
+		client.setModel = async (_provider, id) => {
+			calls.push(id);
+			await (id === "first" ? first.promise : second.promise);
+			model = id;
+			return { provider: "p", id };
+		};
+		client.getState = async () => ({ ...STATE, sessionName: model });
+
+		const one = session.setModel({ provider: "p", id: "first" }, null);
+		const two = session.setModel({ provider: "p", id: "second" }, null);
+		client.fire({ type: "model_changed" });
+		await settle();
+		expect(session.switching).toBe(true);
+		expect(calls).toEqual(["first"]);
+
+		first.resolve();
+		await settle();
+		expect(session.switching).toBe(true);
+		expect(calls).toEqual(["first", "second"]);
+		second.resolve();
+		await Promise.all([one, two]);
+		await settle();
+		expect(session.switching).toBe(false);
 		expect(session.sessionName).toBe("second");
 	});
 });

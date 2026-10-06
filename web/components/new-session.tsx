@@ -1,4 +1,4 @@
-import { Folder, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useState } from "react";
 import { type BranchChoice, type ConnectedModels, type ModelOption, selectorOf } from "../../src/shared";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,13 @@ import type { NewOp, StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { useDefaultModel } from "../use-default-model";
 import { useSkills } from "../use-skills";
-import { CommandPicker } from "./command-picker";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, chosenBranch, GitRef, targetOf } from "./git";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
 import { type ModelMenuOpen, ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
+import { DirectoryPicker } from "./workspace-picker";
 
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
@@ -39,80 +39,6 @@ interface NewSessionProps {
 	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId">) => void;
 	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
 	todo: { text: string; prompt: string } | null;
-}
-
-interface DirectoryPickerProps {
-	cwd: string;
-	workspaces: { cwd: string; cwdDisplay: string }[];
-	disabled: boolean;
-	/** Which side of the trigger the list opens on; the composer's opens upward. */
-	side?: "top" | "bottom";
-	onPick: (cwd: string) => void;
-}
-
-/** The directory the session starts in: one a session ran in, or any directory typed into the search field. */
-export function DirectoryPicker({ cwd, workspaces, disabled, side = "top", onPick }: DirectoryPickerProps) {
-	const [query, setQuery] = useState("");
-	const typed = query.trim();
-	const pick = (next: string): void => {
-		if (next !== cwd) onPick(next);
-	};
-	return (
-		<CommandPicker
-			trigger={<span className="truncate">{projectName(cwd) ?? cwd}</span>}
-			icon={Folder}
-			ariaLabel={`Working directory: ${cwd}`}
-			tooltip={cwd}
-			disabled={disabled}
-			className="min-w-0"
-			search={{ label: "Search or type a directory", query: { value: query, onChange: setQuery } }}
-			width="lg"
-			side={side}
-			onOpenChange={next => {
-				if (!next) setQuery("");
-			}}
-			list={{
-				kind: "ready",
-				groups: [
-					{
-						key: "workspaces",
-						heading: "Directories sessions ran in",
-						items: workspaces.map(workspace => ({
-							value: workspace.cwd,
-							keywords: [workspace.cwdDisplay],
-							label: (
-								<span className="flex min-w-0 flex-col">
-									<span className="truncate">{projectName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
-									<span className="truncate text-xs text-muted-foreground">{workspace.cwdDisplay}</span>
-								</span>
-							),
-							selected: workspace.cwdDisplay === cwd || workspace.cwd === cwd,
-							onSelect: () => pick(workspace.cwdDisplay),
-						})),
-					},
-					...(typed && !workspaces.some(w => w.cwd === typed || w.cwdDisplay === typed)
-						? [
-								{
-									key: "typed",
-									forceMount: true,
-									items: [
-										{
-											value: `use ${typed}`,
-											label: (
-												<span className="truncate">
-													Use <span className="font-mono">{typed}</span>
-												</span>
-											),
-											onSelect: () => pick(typed),
-										},
-									],
-								},
-							]
-						: []),
-				],
-			}}
-		/>
-	);
 }
 
 /**

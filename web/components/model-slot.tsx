@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Brain } from "lucide-react";
 import type { ModelOption } from "../../src/shared";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -17,38 +18,16 @@ interface ModelSlotProps {
 	onSetFast: (enabled: boolean) => void;
 	/** A model switch is in flight, so thinking changes wait. */
 	switching: boolean;
-	onBeginSwitch: () => void;
 }
 
 /** The composer's model menu for a session this dashboard started; what a terminal session reports, read-only; nothing for a subagent. */
-export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onSetThinking, onSetFast, switching, onBeginSwitch }: ModelSlotProps) {
+export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onSetThinking, onSetFast, switching }: ModelSlotProps) {
 	if (subject.kind !== "session") return null;
 	const model = subject.shown?.model ?? null;
 	const thinking = subject.shown?.thinkingLevel ?? null;
 	const { switchable } = subject;
 	if (switchable) {
-		return (
-			<ModelPicker
-				current={model}
-				list={models}
-				open={open}
-				onOpenChange={onOpenChange}
-				onPick={picked => {
-					if (switching) return;
-					onBeginSwitch();
-					onSetModel(picked, null);
-				}}
-				pending={switching}
-				effort={{
-					current: thinking,
-					levels: switchable.thinkingLevels,
-					onPick: level => {
-						if (level !== null && !switching) onSetThinking(level);
-					},
-				}}
-				fast={{ state: switchable.fast, onChange: onSetFast }}
-			/>
-		);
+		return <SwitchableModelSlot model={model} thinking={thinking} models={models} open={open} onOpenChange={onOpenChange} onSetModel={onSetModel} onSetThinking={onSetThinking} onSetFast={onSetFast} switching={switching} switchable={switchable} />;
 	}
 	if (!model && !thinking) return null;
 	return (
@@ -68,5 +47,34 @@ export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onS
 				)}
 			</span>
 		</Tooltip>
+	);
+}
+
+function SwitchableModelSlot({ model, thinking, models, open, onOpenChange, onSetModel, onSetThinking, onSetFast, switching, switchable }: Omit<ModelSlotProps, "subject"> & { model: string | null; thinking: string | null; switchable: NonNullable<Extract<Subject, { kind: "session" }>["switchable"]> }) {
+	const [sentOn, setSentOn] = useState<typeof switchable | null>(null);
+	// A fast switch can finish before the debounced roster ever publishes `switching: true`.
+	// Keep the local pending state through the next roster row, including on failure.
+	const pending = switching || sentOn === switchable;
+	return (
+		<ModelPicker
+			current={model}
+			list={models}
+			open={open}
+			onOpenChange={onOpenChange}
+			onPick={picked => {
+				if (pending) return;
+				setSentOn(switchable);
+				onSetModel(picked, null);
+			}}
+			pending={pending}
+			effort={{
+				current: thinking,
+				levels: switchable.thinkingLevels,
+				onPick: level => {
+					if (level !== null && !pending) onSetThinking(level);
+				},
+			}}
+			fast={{ state: switchable.fast, onChange: onSetFast }}
+		/>
 	);
 }

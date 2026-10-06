@@ -147,7 +147,8 @@ interface ModelPickerProps {
 /** `Default` among the effort choices; omp's own levels are never empty. */
 const DEFAULT_LEVEL = "";
 
-/** A submenu closing for one of these keeps the menu open; for any other reason, the whole menu is closing. */
+/** @base-ui/react 1.8.0 Menu.SubmenuRoot's onOpenChange details.reason: these closes
+ * navigate to the parent. Item selection closes the outer menu instead. */
 const BACK_TO_MENU: Record<string, true> = { "trigger-hover": true, "sibling-open": true, "list-navigation": true, "escape-key": true, "trigger-press": true };
 
 /** `300K` and `1M`, as model ids name their context sizes, whatever the browser's locale. */
@@ -168,7 +169,7 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 	const [menuShown, setMenuShown] = useState(false);
 	return (
 		<DropdownMenu open={open !== null} onOpenChange={next => onOpenChange(next ? "menu" : null)} onOpenChangeComplete={setMenuShown}>
-			<Tooltip content={current ?? unset} shortcut={shortcutLabels("model")} side="top" forceOpen={open !== null ? false : undefined}>
+			<Tooltip content={current ?? unset} shortcut={shortcutLabels("model")} side="top" forceOpen={open !== null ? false : undefined} disabled={disabled}>
 				<DropdownMenuTrigger
 					disabled={disabled}
 					render={

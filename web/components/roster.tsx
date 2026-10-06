@@ -37,7 +37,7 @@ import { agentOn, yourMoveCount } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import { inboxStore, ticketsStore } from "../reads";
-import { hashForSettings, hashForTickets, type OpenMode, sameView, type TodoListView } from "../routing";
+import { hashForSettings, hashForTickets, SIDEBAR_TABS, type SidebarTab, type OpenMode, sameView, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
@@ -48,6 +48,7 @@ import { useDashboardContext } from "./dashboard-context";
 import { ShipStep } from "./ship-step";
 import { CalendarNav, type CalendarTabPage } from "./calendar/calendar-nav";
 import { StatusDot, statusLabel } from "./status-dot";
+import { workspaceItems } from "./workspace-picker";
 import { TodoCategories } from "./todo-categories";
 import type { KnownSessions } from "./todo-links";
 
@@ -250,18 +251,7 @@ function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 					{
 						key: "projects",
 						heading: "Projects",
-						items: projects.map(project => ({
-							value: project.cwd,
-							keywords: [project.cwdDisplay],
-							label: (
-								<span className="flex min-w-0 flex-col">
-									<span className="truncate">{projectName(project.cwdDisplay) ?? project.cwdDisplay}</span>
-									<span className="truncate text-xs text-muted-foreground">{project.cwdDisplay}</span>
-								</span>
-							),
-							selected: project.cwd === current,
-							onSelect: pick(project.cwd),
-						})),
+						items: workspaceItems(projects, current, project => pick(project.cwd)()),
 					},
 				],
 			}}
@@ -345,13 +335,6 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 	);
 }
 
-const SIDEBAR_TABS = [
-	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox },
-	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets },
-	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
-	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
-	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
-] as const;
 
 /**
  * How the sidebar tabs fit its width, by container query: labels while they fit, then icons alone sharing the row.
@@ -371,8 +354,6 @@ const SIDEBAR_TAB_FIT = {
 	},
 };
 
-/** The sidebar's tab; the tickets, todo, and calendar tabs go with their pages, the sessions and inbox tabs with the panes. */
-export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 interface RosterProps {
 	/** Directories sessions ran in, as {@link workspaces} lists them. */
@@ -667,37 +648,28 @@ export function Roster({
 						</SidebarGroup>
 					)}
 					{interrupted.length > 0 && (
-						<SidebarGroup collapsible open={!collapsed.has("interrupted")} onOpenChange={() => toggleGroup("interrupted")}>
-							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
-							{/* The action's props carry no disabled, so it styles a native button that does. */}
-							<SidebarGroupActions>
-								<Tooltip content={resumingAll ? "Resuming…" : "Resume all"}>
-									{resumingAll || !connected ? (
-										<span className="inline-flex">
-											<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
-												<button
-													type="button"
-													aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
-													disabled
-													onClick={() => start({ kind: "resume-all", sessionIds: interrupted.map(session => session.sessionId) })}
-												>
-													{resumingAll ? <Loader className="animate-spin" /> : <ListRestart />}
-												</button>
-											</SidebarGroupAction>
-										</span>
-									) : (
+						<SidebarGroup
+							collapsible
+							open={!collapsed.has("interrupted")}
+							onOpenChange={() => toggleGroup("interrupted")}
+							headerActions={
+								<SidebarGroupActions>
+									<Tooltip content={resumingAll ? "Resuming…" : "Resume all"} disabled={resumingAll || !connected}>
 										<SidebarGroupAction asChild className="disabled:pointer-events-none disabled:opacity-50">
 											<button
 												type="button"
-												aria-label="Resume all interrupted sessions"
+												aria-label={resumingAll ? "Resuming interrupted sessions" : "Resume all interrupted sessions"}
+												disabled={resumingAll || !connected}
 												onClick={() => start({ kind: "resume-all", sessionIds: interrupted.map(session => session.sessionId) })}
 											>
-												<ListRestart />
+												{resumingAll ? <Loader className="animate-spin" /> : <ListRestart />}
 											</button>
 										</SidebarGroupAction>
-									)}
-								</Tooltip>
-							</SidebarGroupActions>
+									</Tooltip>
+								</SidebarGroupActions>
+							}
+						>
+							<SidebarGroupLabel>{`${interrupted.length} interrupted`}</SidebarGroupLabel>
 							{resumeAll?.phase === "failed" && (
 								<p role="alert" className="mx-2 mb-1 flex items-start gap-2 rounded-md bg-red-500/10 px-2 py-1.5 text-xs text-red-600 dark:text-red-400">
 									<span className="min-w-0 flex-1">{resumeAll.error}</span>
