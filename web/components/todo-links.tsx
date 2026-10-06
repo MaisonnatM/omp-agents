@@ -1,6 +1,7 @@
-import { Bot, GitPullRequest, MessageSquare, Ticket, X } from "lucide-react";
+import { Bot, X } from "lucide-react";
 import { hashForSession, type PastSession, type RosterHost, type UserTodoLink } from "../../src/shared";
 import { hostLabel, pastLabel } from "../labels";
+import { PAGE_ICON } from "../page-icons";
 import { hashForInbox, hashForTickets } from "../routing";
 import { Tooltip } from "@/components/ui/tooltip";
 import { StatusDot } from "./status-dot";
@@ -35,7 +36,8 @@ function linkTarget(link: UserTodoLink, sessions: KnownSessions) {
 	}
 }
 
-const ICONS = { session: MessageSquare, "pull-request": GitPullRequest, ticket: Ticket } as const;
+/** Each link shows the icon of the page it opens. */
+const ICONS = { session: PAGE_ICON.sessions, "pull-request": PAGE_ICON.inbox, ticket: PAGE_ICON.tickets } as const;
 
 interface TodoLinkChipProps {
 	link: UserTodoLink;
