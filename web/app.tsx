@@ -223,23 +223,24 @@ export function App() {
 			else navigate(settingsPage);
 		},
 		inbox: () => {
-			if (tab === "inbox" && !cover) return false;
+			if (tab === "inbox" && !cover) return;
 			showTab("inbox");
 		},
 		tickets: () => {
-			if (page?.kind === "tickets" || !ticketsShown) return false;
+			if (!ticketsShown) return false;
+			if (page?.kind === "tickets") return;
 			showTab("tickets");
 		},
 		sessions: () => {
-			if (tab === "sessions" && !cover) return false;
+			if (tab === "sessions" && !cover) return;
 			showTab("sessions");
 		},
 		todo: () => {
-			if (page?.kind === "todo") return false;
+			if (page?.kind === "todo") return;
 			showTab("todo");
 		},
 		calendar: () => {
-			if (page?.kind === "calendar") return false;
+			if (page?.kind === "calendar") return;
 			showTab("calendar");
 		},
 		routines: () => {

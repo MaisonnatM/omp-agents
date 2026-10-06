@@ -33,8 +33,26 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 test("browser-reserved chords stay the browser's", () => {
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["1", "Digit1"]]) {
+		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["6", "Digit6"], ["9", "Digit9"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
+		}
+	}
+});
+
+test("Cmd+1–5 selects dashboard tabs on macOS, Ctrl+1–5 elsewhere, including AZERTY", () => {
+	const tabs = ["inbox", "tickets", "sessions", "todo", "calendar"] as const;
+	const azerty = ["&", "é", "\"", "'", "("];
+	for (const mac of [false, true]) {
+		const mod = mac ? { meta: true } : { ctrl: true };
+		for (const [index, id] of tabs.entries()) {
+			const key = String(index + 1);
+			const code = `Digit${key}`;
+			expect(shortcutsFor(keyEvent(key, code, mod), null, mac)).toEqual([{ id, scope: "anywhere" }]);
+			expect(pressOn(mac, azerty[index]!, code, mod)).toEqual([id]);
+			expect(pressOn(mac, key, code)).toEqual([]);
+			expect(pressOn(mac, key, code, { ...mod, shift: true })).toEqual([]);
+			expect(pressOn(mac, key, code, { ...mod, alt: true })).toEqual([]);
+			expect(pressOn(mac, key, code, { meta: true, ctrl: true })).toEqual([]);
 		}
 	}
 });
@@ -82,16 +100,16 @@ test("↑ takes back a queued message, Cmd+[ and Cmd+] step through sessions, an
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
-test("G then a key goes to a page only right after a plain G", () => {
+test("remaining G pairs require a preceding plain G; former tab pairs no longer navigate", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
-	expect(after("g", "i")).toEqual(["inbox"]);
-	expect(after("g", "s")).toEqual(["sessions"]);
+	expect(after("g", "r")).toEqual(["routines"]);
 	expect(after("g", "p")).toEqual(["project"]);
-	expect(after(null, "i")).toEqual([]);
-	expect(after("h", "i")).toEqual([]);
-	expect(after("g", "I", { shift: true })).toEqual([]);
+	expect(after(null, "p")).toEqual([]);
+	expect(after("h", "p")).toEqual([]);
+	expect(after("g", "P", { shift: true })).toEqual([]);
 	expect(after("g", "i", { ctrl: true })).toEqual(["focusComposer"]);
-	expect(shortcutsFor(keyEvent("i", "KeyI"), "g", false)).toEqual([{ id: "inbox", scope: "outside-fields" }]);
+	for (const key of ["i", "t", "s", "d", "c"]) expect(after("g", key)).toEqual([]);
+	expect(shortcutsFor(keyEvent("p", "KeyP"), "g", false)).toEqual([{ id: "project", scope: "outside-fields" }]);
 });
 
 test("a pair forms from a plain key outside text fields, within a second and a half", () => {

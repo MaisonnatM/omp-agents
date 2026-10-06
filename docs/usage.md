@@ -535,7 +535,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The page reads Linear when it opens and every minute after, and shows the last read at once on a reopen, even after a reload.
   The server keeps Linear's answer for 30 seconds, and **Refresh** asks again at once.
 - The dashboard reads Linear through omp's Linear MCP server and its sign-in, so there is no key to set.
-  Until omp is signed in to that server, the sidebar has no **Tickets** tab, G then T does nothing, and a `#tickets` address shows how to connect instead of the issues.
+  Until omp is signed in to that server, the sidebar has no **Tickets** tab, Cmd+2 keeps its browser behavior, and a `#tickets` address shows how to connect instead of the issues.
 - To connect, open **Settings › Integrations** and choose **Connect Linear**.
   A new browser tab opens Linear's sign-in page; approve omp there, and the **Tickets** tab appears within a few seconds.
   The dashboard signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds Linear's MCP server, `https://mcp.linear.app/mcp`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use Linear's tools too.
@@ -741,11 +741,11 @@ Alt is Option on macOS.
 | Esc | Maximized pane | Restore the split |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
-| G then I | Outside text fields | Go to the pull request inbox |
-| G then T | Outside text fields | Go to your Linear tickets |
-| G then S | Outside text fields | Go to the sessions |
-| G then D | Outside text fields | Go to your todo list |
-| G then C | Outside text fields | Go to your calendar |
+| Cmd+1 | Anywhere | Go to the pull request inbox |
+| Cmd+2 | Anywhere | Go to your Linear tickets, when connected |
+| Cmd+3 | Anywhere | Go to the sessions |
+| Cmd+4 | Anywhere | Go to your todo list |
+| Cmd+5 | Anywhere | Go to your calendar |
 | G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Choose the sidebar's project |
 | J | Inbox, outside text fields | Move to the next pull request, or show its details while one shows |
@@ -760,7 +760,9 @@ Alt is Option on macOS.
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, **End session**, the composer's Stop button, and a maximized pane's restore button.
-- No shortcut takes a key that the browser keeps for itself: Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or a digit does what the browser does.
+- Cmd+1 through Cmd+5 select the dashboard's tabs, even while typing; they replace the browser's tab selection when the dashboard handles them.
+  The numbers stay fixed when Tickets is hidden without a Linear connection; Cmd+2 then keeps its browser behavior.
+  Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or another digit keeps its browser behavior.
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.
 - In the composer, Enter queues a follow-up while a turn runs, and Cmd+Enter steers it immediately.
@@ -782,9 +784,9 @@ Alt is Option on macOS.
 - Cmd+Alt+/ opens the model picker, and Shift+Tab in a composer moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.
   Cmd+E expands or collapses every tool call.
   Cmd+, or Cmd+Shift+J opens Settings, where the model roles live, and closes it again.
-- G then I opens the Inbox tab.
-  G then S goes back from the inbox, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
-  G then D opens the **Todo** page, G then C the **Calendar** page, and G then R the **Routines** page.
+- Cmd+1 opens the Inbox tab, and Cmd+2 opens Tickets when connected to Linear.
+  Cmd+3 goes back from the inbox, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
+  Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, and G then R the **Routines** page.
   G then P opens the project picker with its search field focused.
 - Session shortcuts act on the focused pane.
   The dashboard does not read `~/.omp/agent/keybindings.yml`.

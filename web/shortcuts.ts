@@ -51,7 +51,7 @@ interface Chord {
 	key: string;
 	mod?: true;
 	alt?: true;
-	/** For letters and named keys only: which symbols need Shift depends on the layout. */
+	/** For letters, digits, and named keys only: which symbols need Shift depends on the layout. */
 	shift?: true;
 }
 
@@ -110,11 +110,11 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "i", mod: true }, scope: "anywhere" },
 		],
 	},
-	{ id: "inbox", label: "Go to the pull request inbox", keys: [{ goTo: "i" }] },
-	{ id: "tickets", label: "Go to your Linear tickets", keys: [{ goTo: "t" }] },
-	{ id: "sessions", label: "Go to the sessions", keys: [{ goTo: "s" }] },
-	{ id: "todo", label: "Go to your todo list", keys: [{ goTo: "d" }] },
-	{ id: "calendar", label: "Go to your calendar", keys: [{ goTo: "c" }] },
+	{ id: "inbox", label: "Go to the pull request inbox", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
+	{ id: "tickets", label: "Go to your Linear tickets", keys: [{ chord: { key: "2", mod: true }, scope: "anywhere" }] },
+	{ id: "sessions", label: "Go to the sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },
+	{ id: "todo", label: "Go to your todo list", keys: [{ chord: { key: "4", mod: true }, scope: "anywhere" }] },
+	{ id: "calendar", label: "Go to your calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },
 	{ id: "routines", label: "Go to your routines", keys: [{ goTo: "r" }] },
 	{ id: "project", label: "Choose the sidebar's project", keys: [{ goTo: "p" }] },
 	{ id: "nextPullRequest", label: "Inbox: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
@@ -136,7 +136,9 @@ const GO_TO_MS = 1500;
 
 type KeyEvent = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "altKey" | "metaKey" | "shiftKey">;
 
-function keyOf({ key, code }: KeyEvent): string {
+function keyOf({ key, code, metaKey, ctrlKey }: KeyEvent): string {
+	// AZERTY's number row types symbols without Shift; modified digits use the physical key.
+	if ((metaKey || ctrlKey) && /^Digit[0-9]$/.test(code)) return code.slice(5);
 	if (/^[a-z]$/i.test(key)) return key.toLowerCase();
 	// A letter key, or the / key, that types no ASCII character, on a Cyrillic layout or with macOS Option (Option+B
 	// types ∫, Option+/ types ÷), matches by its physical key. An ASCII symbol matches as typed: AZERTY types `,` and `?`
@@ -166,7 +168,7 @@ export interface Match {
 export function shortcutsFor(event: KeyEvent, previous: string | null = null, mac = IS_MAC): Match[] {
 	const key = keyOf(event);
 	// Which symbols need Shift depends on the layout (`?` is Shift+/ in US, Shift+, in AZERTY), so symbols ignore it.
-	const symbol = key.length === 1 && !/[a-z]/.test(key);
+	const symbol = key.length === 1 && !/[a-z0-9]/.test(key);
 	const presses = (binding: Binding): boolean => {
 		if ("goTo" in binding) return previous === GO && key === binding.goTo && plain(event);
 		const { chord } = binding;
@@ -194,7 +196,7 @@ const KEY_LABEL: Record<string, string> = {
 	Tab: IS_MAC ? "⇥" : "Tab",
 };
 
-/** `⇧⌘O` on macOS, `Ctrl+Shift+O` elsewhere, `G then I` for a pair. */
+/** `⇧⌘O` on macOS, `Ctrl+Shift+O` elsewhere, `G then P` for a pair. */
 export function bindingLabel(binding: Binding): string {
 	if ("goTo" in binding) return `${GO.toUpperCase()} then ${binding.goTo.toUpperCase()}`;
 	const { key, mod, alt, shift } = binding.chord;
