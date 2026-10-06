@@ -17,7 +17,7 @@ export interface PaneData {
 	completions: Completions | null;
 	/** The last texts the server took out of the view's queue, answering the composer's `dequeue` `reqId`. */
 	dequeued: { reqId: number; texts: string[] } | null;
-	/** What the view's agent planned and changed; `null` until the server sends it. */
+	/** The files the view's agent changed; `null` until the server sends them. */
 	work: SessionWork | null;
 	/** The images its agent's and its subagents' tools returned, newest first; `null` until the server sends them. */
 	media: AgentMedia[] | null;
@@ -25,7 +25,7 @@ export interface PaneData {
 
 export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, dequeued: null, work: null, media: null };
 
-/** The server messages that belong to one open view: its transcript, its plan and changes, its images, its composer's suggestions, and its dequeued texts. */
+/** The server messages that belong to one open view: its transcript, its changed files, its images, its composer's suggestions, and its dequeued texts. */
 export type PaneMsg =
 	| Extract<ServerMsg, { t: "items" | "work" | "media" | "dequeued" }>
 	| (Extract<ServerMsg, { t: "completions" }> & { scope: { kind: "live" } });

@@ -18,9 +18,6 @@ const inFlux = (item: Item): boolean => (item.kind === "assistant" && item.strea
 export class FileTail {
 	transcript = new Transcript();
 	#work = new Work();
-	/** The {@link Work.planVersion} that {@link #planText} was read at. */
-	#planVersion = 0;
-	#planText: string | null = null;
 	readonly path: string;
 	readonly #lines: LineReader;
 	#loaded = false;
@@ -44,9 +41,9 @@ export class FileTail {
 		return this.#loaded;
 	}
 
-	/** The plan, its file's text included, and the changed files, as of the last read. */
+	/** The changed files, as of the last read. */
 	get work(): SessionWork {
-		return this.#work.snapshot(this.#planText);
+		return this.#work.snapshot();
 	}
 
 	/** Read what was appended since the last read. Calls that arrive before a queued read starts share it. */
@@ -95,18 +92,7 @@ export class FileTail {
 		this.#discardPending();
 		this.transcript = new Transcript();
 		this.#work = new Work();
-		this.#planVersion = 0;
-		this.#planText = null;
 		this.#loaded = false;
-	}
-
-	/** Reads the plan file again when the transcript changed one since the last read; omp writes the file before the tool result. */
-	async #readPlan(): Promise<void> {
-		const version = this.#work.planVersion;
-		if (version === this.#planVersion) return;
-		this.#planVersion = version;
-		const path = this.#work.planFile;
-		this.#planText = path === null ? null : await Bun.file(path).text().catch(() => null);
 	}
 
 	async #read(): Promise<void> {
@@ -123,8 +109,6 @@ export class FileTail {
 		const changed = entries.flatMap(entry => this.transcript.applyEntry(entry));
 		// Every entry goes through both folds, so `some` would skip the rest.
 		const worked = entries.reduce<boolean>((any, entry) => this.#work.applyEntry(entry) || any, false);
-		// Before either emit, so the plan's text goes out with the read that changed it.
-		await this.#readPlan();
 		if (!this.#loaded) {
 			this.#loaded = true;
 			this.#discardPending();

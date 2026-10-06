@@ -449,20 +449,6 @@ export type Item =
 	| { id: string; kind: "tool"; name: string; summary: string; status: "running" | "ok" | "error"; agents: string[] }
 	| { id: string; kind: "notice"; level: "info" | "warning" | "error"; text: string };
 
-/** omp's todo statuses (`pi-tui/src/tools/todo.ts`). */
-export const TODO_STATUSES = ["pending", "in_progress", "completed", "abandoned", "blocked"] as const;
-export type TodoStatus = (typeof TODO_STATUSES)[number];
-
-export interface TodoItem {
-	content: string;
-	status: TodoStatus;
-}
-
-export interface TodoPhase {
-	name: string;
-	tasks: TodoItem[];
-}
-
 /** One successful `edit` or `write` result on a file; `at` is when omp recorded it, in ms since the epoch, or `null` when its entry carries no time. */
 export type FileChange =
 	/** An edit, with the lines its diff adds and removes; `diff` is omp's numbered-line form, `null` when omp recorded an empty one. */
@@ -532,20 +518,12 @@ export function fileStatus(changes: ChangedFile["changes"]): FileStatus {
 	return changes[0].kind === "created" ? "created" : "edited";
 }
 
-/** The text of the plan file the agent wrote or edited last; `path` shows as a {@link ChangedFile}'s does. */
-export interface PlanDocument {
-	path: string;
-	text: string;
-}
-
-/** What one transcript planned and changed: its latest todo list, its latest plan file, and the files it touched in first-touch order. */
+/** What one transcript changed: the files it touched, in first-touch order. */
 export interface SessionWork {
-	phases: TodoPhase[];
 	files: ChangedFile[];
-	plan: PlanDocument | null;
 }
 
-export const EMPTY_WORK: SessionWork = { phases: [], files: [], plan: null };
+export const EMPTY_WORK: SessionWork = { files: [] };
 
 /** One image an agent's tool returned, such as a browser screenshot or a `read` of an image file. */
 export interface AgentMedia {
@@ -1075,7 +1053,7 @@ export type ServerMsg =
 	| { t: "past"; sessions: PastSession[] }
 	/** `reset` replaces the view's transcript; otherwise `items` are upserts by id, new ids appended. */
 	| { t: "items"; view: View; reset: boolean; items: Item[] }
-	/** The view's plan and changed files, whole, sent with its transcript and again whenever either changes. */
+	/** The view's changed files, whole, sent with its transcript and again whenever they change. */
 	| { t: "work"; view: View; work: SessionWork }
 	/** The images the view's agent and its subagents' tools returned, newest first, whole, sent once the view's files are read and again whenever one adds an image. */
 	| { t: "media"; view: View; media: AgentMedia[] }

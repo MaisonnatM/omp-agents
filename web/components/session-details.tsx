@@ -1,42 +1,7 @@
-import {
-	Bot,
-	Circle,
-	CircleAlert,
-	CircleCheck,
-	CircleDot,
-	CircleSlash,
-	FileDiff,
-	FileMinus,
-	FilePen,
-	FilePlus,
-	Images,
-	ListTodo,
-	type LucideIcon,
-} from "lucide-react";
-import { type ReactNode, useState } from "react";
-import {
-	type ChangedFile,
-	type FileChange,
-	type FileChangeKind,
-	type FileStatus,
-	fileStatus,
-	lineTotals,
-	type PlanDocument,
-	parseDiffLine,
-	type RosterHost,
-	type TodoPhase,
-	type TodoStatus,
-	type View,
-} from "../../src/shared";
-import {
-	SidebarContent,
-	SidebarGroup,
-	SidebarGroupLabel,
-	SidebarHeader,
-	SidebarMenu,
-	SidebarMenuButton,
-	SidebarMenuItem,
-} from "@/components/ui/sidebar";
+import { FileDiff, FileMinus, FilePen, FilePlus, Images, type LucideIcon, TableOfContents } from "lucide-react";
+import { type ReactNode, useMemo, useState } from "react";
+import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals, parseDiffLine, type View } from "../../src/shared";
+import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
@@ -44,66 +9,9 @@ import { cn } from "@/lib/utils";
 import { age, readTime } from "../labels";
 import { usePane } from "../pane-store";
 import { useStoredState } from "../stored-state";
-import { AgentsTab } from "./agents-tab";
-import { FileBaseContext } from "./file-link";
+import { outline } from "../transcript-view";
 import { MediaTab } from "./media-tab";
-import { MessageMarkdown } from "./message-markdown";
-
-const TASK_LOOK: Record<TodoStatus, { icon: LucideIcon; label: string; className: string }> = {
-	pending: { icon: Circle, label: "Pending", className: "text-foreground" },
-	in_progress: { icon: CircleDot, label: "In progress", className: "bg-accent font-medium text-foreground [&>svg]:text-emerald-600 dark:[&>svg]:text-emerald-400" },
-	completed: { icon: CircleCheck, label: "Completed", className: "text-muted-foreground line-through" },
-	abandoned: { icon: CircleSlash, label: "Abandoned", className: "text-muted-foreground/60" },
-	blocked: { icon: CircleAlert, label: "Blocked", className: "text-foreground [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400" },
-};
-
-function Phase({ phase }: { phase: TodoPhase }) {
-	const done = phase.tasks.filter(task => task.status === "completed").length;
-	return (
-		<SidebarGroup>
-			<SidebarGroupLabel>
-				<span className="min-w-0 flex-1 truncate">{phase.name}</span>
-				<span className="tabular-nums" aria-label={`${done} of ${phase.tasks.length} done`}>
-					{done}/{phase.tasks.length}
-				</span>
-			</SidebarGroupLabel>
-			<ol className="flex flex-col gap-0.5 px-2" aria-label={phase.name}>
-				{phase.tasks.map((task, index) => {
-					const look = TASK_LOOK[task.status];
-					const Icon = look.icon;
-					return (
-						<li
-							key={index}
-							className={cn("flex items-start gap-2 rounded-md px-2 py-1 text-sm leading-snug [&>svg]:mt-0.5 [&>svg]:size-3.5 [&>svg]:shrink-0", look.className)}
-							aria-current={task.status === "in_progress" ? "step" : undefined}
-							data-status={task.status}
-						>
-							<Icon aria-label={look.label} role="img" />
-							<span className="min-w-0 break-words">{task.content}</span>
-						</li>
-					);
-				})}
-			</ol>
-		</SidebarGroup>
-	);
-}
-
-/** The plan file the agent wrote or edited last, as markdown under its file name. */
-function PlanFile({ plan }: { plan: PlanDocument }) {
-	const name = plan.path.slice(plan.path.lastIndexOf("/") + 1);
-	return (
-		<SidebarGroup>
-			<SidebarGroupLabel>
-				<Tooltip content={plan.path}>
-					<span className="min-w-0 flex-1 truncate">{name}</span>
-				</Tooltip>
-			</SidebarGroupLabel>
-			<article className="px-4 pb-2 text-sm leading-relaxed" aria-label={name}>
-				<MessageMarkdown text={plan.text} />
-			</article>
-		</SidebarGroup>
-	);
-}
+import { OutlineTab } from "./outline-tab";
 
 const CHANGE_LABEL: Record<FileChangeKind, string> = { created: "Created", edited: "Edited", rewritten: "Rewritten", deleted: "Deleted" };
 
@@ -217,52 +125,44 @@ function FileRow({ file }: { file: ChangedFile }) {
 	);
 }
 
-/** The right sidebar's tab, which localStorage keeps across views. */
+/** The right sidebar's tab, which localStorage keeps across views. The key keeps its old name, and a tab that no longer exists reads as the outline. */
 const TAB_KEY = "omp-agents.plan-tab";
 
-const PLAN_TABS = ["plan", "files", "agents", "media"] as const;
-type PlanTab = (typeof PLAN_TABS)[number];
+const DETAILS_TABS = ["outline", "files", "media"] as const;
+type DetailsTab = (typeof DETAILS_TABS)[number];
 
 /** Each tab names itself and counts its items in a badge, which screen readers hear through the tab's name. */
 function tabLabel(name: string, count: number): { label: string; badge: number | undefined; "aria-label": string | undefined } {
 	return count > 0 ? { label: name, badge: count, "aria-label": `${name} (${count})` } : { label: name, badge: undefined, "aria-label": undefined };
 }
 
-/** Four labeled tabs fit the sidebar's default width only with tighter padding than Fluid's, and only without their icons. */
+/** The labeled tabs fit the sidebar's default width only with tighter padding than Fluid's, and only without their icons. */
 const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
 
 /**
- * The right sidebar's content for the focused view: its latest todo list and plan file, the files its agent changed,
- * a live session's agents, and the images its agents' tools returned, each tab apart.
+ * The right sidebar's content for the focused view: an outline of its conversation, the files its agent changed, and
+ * the images its agents' tools returned, each tab apart. `working` leaves the reply of a turn still running out of the outline.
  */
-export function PlanPanel({ view, host }: { view: View; host: RosterHost | null }) {
-	const { work, media } = usePane(view);
-	const [stored, setTab] = useStoredState<PlanTab>(TAB_KEY, raw => PLAN_TABS.find(tab => tab === raw) ?? "plan");
-	// A past session's subagents have no view to open, so it has no Agents tab.
-	const tab = stored === "agents" && view.kind !== "live" ? "plan" : stored;
+export function SessionDetails({ view, working }: { view: View; working: boolean }) {
+	const { items, loaded, work, media } = usePane(view);
+	const [tab, setTab] = useStoredState<DetailsTab>(TAB_KEY, raw => DETAILS_TABS.find(tab => tab === raw) ?? "outline");
+	const entries = useMemo(() => outline(items, working), [items, working]);
 	const files = work?.files ?? [];
 	return (
-		<Tabs value={tab} onValueChange={value => setTab(value as PlanTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
+		<Tabs value={tab} onValueChange={value => setTab(value as DetailsTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center gap-2 px-2 pt-4">
 				<h2 className="sr-only">Session details</h2>
 				<SizeProvider size="compact">
 					<TabsList aria-label="Session details">
-						<TabItem value="plan" icon={ListTodo} className={TAB_CLASS} {...tabLabel("Plan", 0)} />
+						<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", entries.length)} />
 						<TabItem value="files" icon={FileDiff} className={TAB_CLASS} {...tabLabel("Files", files.length)} />
-						{view.kind === "live" && <TabItem value="agents" icon={Bot} className={TAB_CLASS} {...tabLabel("Agents", host?.agents.length ?? 0)} />}
 						<TabItem value="media" icon={Images} className={TAB_CLASS} {...tabLabel("Media", media?.length ?? 0)} />
 					</TabsList>
 				</SizeProvider>
 			</SidebarHeader>
-			<TabPanel value="plan" asChild>
+			<TabPanel value="outline" asChild>
 				<SidebarContent>
-					{work && work.phases.length === 0 && !work.plan && <p className="px-4 py-2 text-sm text-muted-foreground">No plan yet.</p>}
-					{work?.phases.map((phase, index) => <Phase key={`${index}:${phase.name}`} phase={phase} />)}
-					{work?.plan && (
-						<FileBaseContext.Provider value={host?.cwd ?? null}>
-							<PlanFile plan={work.plan} />
-						</FileBaseContext.Provider>
-					)}
+					<OutlineTab entries={entries} loaded={loaded} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="files" asChild>
@@ -285,13 +185,6 @@ export function PlanPanel({ view, host }: { view: View; host: RosterHost | null 
 					)}
 				</SidebarContent>
 			</TabPanel>
-			{view.kind === "live" && (
-				<TabPanel value="agents" asChild>
-					<SidebarContent>
-						<AgentsTab view={view} host={host} />
-					</SidebarContent>
-				</TabPanel>
-			)}
 			<TabPanel value="media" asChild>
 				<SidebarContent>
 					<MediaTab media={media} view={view} />

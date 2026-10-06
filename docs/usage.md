@@ -97,18 +97,18 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Session details sidebar
 
-- The right sidebar shows what the focused pane's agent planned, changed, spawned, and captured: a live session, one of its subagents, or a past session, each from its own transcript file.
+- The right sidebar shows the focused pane's conversation at a glance, and what its agent changed and captured: a live session, one of its subagents, or a past session, each from its own transcript file.
   It hides for a pull request's details, the tickets, **Analytics**, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
-- Tabs split it: **Plan**, **Files**, **Agents** for a live session or subagent, and **Media**.
+- Tabs split it: **Outline**, **Files**, and **Media**.
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
-  The sidebar remembers the tab you chose, for every view; a past session, which has no **Agents** tab, shows **Plan** instead.
-- **Plan** shows the agent's latest todo list, by phase, with how many of each phase's tasks are done (`2/5`).
-  The task in progress is highlighted, a completed task is struck through, an abandoned one is dimmed, and a blocked one has an amber mark.
-  The latest list wins, whether the agent's `todo` call wrote it or you edited it in omp's terminal.
-- Below the todo list, **Plan** shows the plan the agent wrote, rendered as markdown under its file name: the last file named like `*plan.md` that its `write` or `edit` calls changed, such as the `local://auth-plan.md` that omp's plan mode writes.
-  Hover the file name for its full path.
-  The text follows each change the agent makes to that file, and it goes away when the agent deletes it.
+  The sidebar remembers the tab you chose, for every view.
+- **Outline** lists your prompts and the replies that end each turn, in order, with each reply indented under its prompt.
+  Each row shows a person icon for a prompt or a bot icon for a reply, then the start of the message on one line, cut to fit; hover a row to read the whole message.
+  A prompt that invoked a skill shows the skill's name first, and a prompt of images alone reads as how many it holds, such as `2 images`.
+  The reply of a turn still running joins the list once the turn ends.
+  Click a row to scroll the pane's transcript to that message; the page stays where it is.
+  The list follows the conversation as it goes.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows whether the session created, edited, or deleted the file, how many times it changed it, how long ago the last change was, and the lines added and removed, which the list's heading totals.
   A path inside the session's working directory shows relative to it.
@@ -116,9 +116,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
-- **Agents** lists the live session's main agent and then its subagents, each indented under the agent that spawned it, with its status dot, its type, and what it is doing.
-  The agent the pane shows is highlighted.
-  Click a row to open that agent in the pane, or Cmd-click (Ctrl-click on Linux and Windows) to open it in a split.
+- Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
 - **Media** shows the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
   On a session that is every image of the session; on a subagent it is that subagent's and its own subagents'.
   Images you attached to your own prompts are left out, since the transcript shows them.
@@ -126,7 +124,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Click one to see it large, with the tool and what the call said it did; the arrows, or the Left and Right keys, step to newer and older images.
   **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in a new tab.
   New images show up while the agents run.
-- A tab with nothing to show says so.
+- A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
 
 ## Panes, splits, and links
 
@@ -199,7 +197,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Markdown renders as the agent's messages do, a TSV or CSV file as a table of its first 1,000 rows, and anything else as plain text; **Show source** shows a rendered file's text.
   A path in an open Markdown file opens in the dialog's place, relative to that file.
   The dialog shows the first 1 MB of a larger file and says so; it refuses a file whose real path, past any link, has another extension, and a file that is not UTF-8.
-  The **Plan** tab's paths open the same way, and so do a todo's notes, absolute and `~/` paths only.
+  A todo's notes open paths the same way, absolute and `~/` paths only.
 - Every prompt has a copy button.
   Among the agent's messages, only the reply that ends each turn has one, not the messages it writes between tool calls.
   A turn still running shows none until it ends.

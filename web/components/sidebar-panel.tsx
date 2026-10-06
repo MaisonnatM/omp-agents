@@ -44,11 +44,11 @@ const SIDEBARS: Record<SidebarSide, SidebarSpec> = {
 	},
 	right: {
 		name: "Session details",
-		id: "plan-sidebar",
+		id: "details-sidebar",
 		defaultWidth: 288,
 		widthKey: "omp-agents.plan-width",
 		openKey: "omp-agents.plan-open",
-		shortcut: "planSidebar",
+		shortcut: "detailsSidebar",
 		hideIcon: PanelRightClose,
 		showIcon: PanelRightOpen,
 	},

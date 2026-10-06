@@ -14,7 +14,6 @@ const writeCall = (id: string, content: string) => ({
 	message: { role: "assistant", content: [{ type: "toolCall", id, name: "write", arguments: { content } }] },
 });
 const edited = (diff: string | null, added: number, removed: number, at: number | null = null): FileChange => ({ tool: "edit", kind: "edited", at, added, removed, diff });
-const phase = (name: string, ...tasks: [string, string][]) => ({ name, tasks: tasks.map(([content, status]) => ({ content, status })) });
 
 function fold(...entries: unknown[]): Work {
 	const work = new Work();
@@ -23,30 +22,6 @@ function fold(...entries: unknown[]): Work {
 }
 
 describe("Work", () => {
-	test("the latest todo list wins, whether the agent's todo call or the user's edit in omp wrote it", () => {
-		const work = fold(
-			result("todo", { op: "init", phases: [phase("Build", ["Write it", "pending"])] }),
-			result("todo", { op: "start", phases: [phase("Build", ["Write it", "in_progress"])] }),
-			{ type: "custom", customType: "user_todo_edit", data: { phases: [phase("Build", ["Write it", "completed"]), phase("Ship", ["Merge", "pending"])] } },
-		);
-		expect(work.snapshot().phases).toEqual([
-			{ name: "Build", tasks: [{ content: "Write it", status: "completed" }] },
-			{ name: "Ship", tasks: [{ content: "Merge", status: "pending" }] },
-		]);
-
-		work.applyEntry(result("todo", { op: "drop", phases: [phase("Build", ["Write it", "abandoned"])] }));
-		expect(work.snapshot().phases).toEqual([{ name: "Build", tasks: [{ content: "Write it", status: "abandoned" }] }]);
-	});
-
-	test("a todo view, a failed todo call, or a malformed list leaves the plan as it was", () => {
-		const plan = [phase("Build", ["Write it", "in_progress"])];
-		const work = fold(result("todo", { op: "init", phases: plan }));
-		expect(work.applyEntry(result("todo", { op: "view", phases: [] }))).toBe(false);
-		expect(work.applyEntry(result("todo", { op: "done", phases: [phase("Build", ["Write it", "completed"])] }, { isError: true }))).toBe(false);
-		expect(work.applyEntry(result("todo", { op: "done", phases: [phase("Build", ["Write it", "finished"])] }))).toBe(false);
-		expect(work.snapshot().phases).toEqual([{ name: "Build", tasks: [{ content: "Write it", status: "in_progress" }] }]);
-	});
-
 	test("changed files keep first-touch order and every change, with its time and the lines it added and removed", () => {
 		const work = fold(
 			{ type: "session", cwd: "/repo" },
@@ -108,25 +83,5 @@ describe("Work", () => {
 			{ path: "x.ts", changes: [edited("+1|x", 1, 0)] },
 			{ path: "y.ts", changes: [edited(null, 0, 0)] },
 		]);
-	});
-
-	test("the plan is the plan file changed last, until the agent deletes that one", () => {
-		const work = fold(
-			{ type: "session", cwd: "/repo" },
-			result("write", { resolvedPath: "/s/local/auth-plan.md" }),
-			result("write", { resolvedPath: "/repo/notes.md" }),
-			result("edit", { path: "/repo/docs/PLAN.md", diff: "+1|# Ship" }),
-		);
-		expect(work.planFile).toBe("/repo/docs/PLAN.md");
-		expect(work.snapshot("# Ship").plan).toEqual({ path: "docs/PLAN.md", text: "# Ship" });
-		expect(work.snapshot(null).plan).toBeNull();
-
-		const version = work.planVersion;
-		work.applyEntry(result("edit", { path: "/repo/src/a.ts", diff: "+1|a" }));
-		expect(work.planVersion).toBe(version);
-		work.applyEntry(result("edit", { path: "/s/local/auth-plan.md", op: "delete", diff: "" }));
-		expect([work.planFile, work.planVersion]).toEqual(["/repo/docs/PLAN.md", version + 1]);
-		work.applyEntry(result("edit", { path: "/repo/docs/PLAN.md", op: "delete", diff: "" }));
-		expect(work.planFile).toBeNull();
 	});
 });

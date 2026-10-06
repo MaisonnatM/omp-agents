@@ -18,7 +18,6 @@ The main ones:
   `appendCustomMessageEntry` in `pi-coding-agent/src/session/session-manager.ts` gives a `custom_message` entry the timestamp of the message it records, which `#persistMessageEnd` in `agent-session.ts` passes.
 - Interrupted turns: `pi-coding-agent/src/session/exit-diagnostics.ts` (`createInterruptedTurnAbortMessage`), which `endsMidTurn` in `src/omp/sessions.ts` uses to refuse forking a session that ended mid-turn.
 - Images: `pi-coding-agent/src/session/blob-store.ts`, which moves a prompt's image out of the session file into `blob:sha256:<hash>`, and `getBlobsDir` in `pi-utils/src/dirs.ts`; `src/transcript.ts` and the `/api/image` route read them.
-- Plan files: `listPlanFiles` in `pi-coding-agent/src/plan-mode/plan-files.ts`, whose rule `src/work.ts` copies; see [Transcripts](#transcripts).
 - RPC: `pi-coding-agent/src/modes/rpc/rpc-client.ts`, `rpc-frame.ts`, and the frame types in `rpc-types.ts`.
   `RpcClient` drops `extension_ui_request` and `session_info_update` frames, so `src/omp/rpc.ts` reads them from its own copy of the child's stdout (`UNROUTED_FRAMES`); see [Dashboard sessions](#dashboard-sessions).
   `get_available_models` returns omp's whole `Model` objects, with `name`, `contextWindow`, `api`, `identity`, and `serviceTiers`; `get_state` adds `fastModeEnabled` and `fastModeActive`, and `setFastMode` sends `set_fast_mode`.
@@ -55,12 +54,9 @@ Every transcript comes from the session files on this machine, not from a networ
   So a message from the file never goes ahead of the file messages before it, and a live user message goes after everything already shown.
 - A reply that streams and a tool call that runs change with every token.
   Each open transcript sends those changes to the page at most every 50 ms; a message that finishes, a tool call that ends, a prompt, or a notice goes out at once, together with what was held back.
-- The same read folds each line into the view's plan and changes as well: the latest todo list, from a `todo` result's `details.phases` or a `user_todo_edit` entry, and the files changed, from each `edit` result's `details.path` and `diff` (one per entry of `perFileResults` for a multi-file edit) and each `write` result's `details.resolvedPath`, which omp sets only for a file.
+- The same read folds each line into the view's changed files as well, from each `edit` result's `details.path` and `diff` (one per entry of `perFileResults` for a multi-file edit) and each `write` result's `details.resolvedPath`, which omp sets only for a file.
   The view's socket topic carries them as a `work` message, whole, once with the transcript and again after each read that changes them.
-  A subagent's view folds its own file, so it shows its own plan and changes.
-- The `work` message also carries the plan file: the last path ending in `plan.md`, omp's own rule for a plan file (`listPlanFiles` in `pi-coding-agent/src/plan-mode/plan-files.ts`), that an `edit` or `write` result names, with its text.
-  The transcript cannot rebuild that text, since an edit records only a diff, so the server reads the file each time a read of the transcript finds a change to a plan file, before it sends that read on.
-  omp writes the file before it records the tool result, so the text matches the result.
+  A subagent's view folds its own file, so it shows its own changes.
 - A `task` result names the subagents it spawned in `details.progress` and `details.results`; the tool item lists their ids, which name each subagent's view.
   A running `task` reports them sooner through `tool_execution_update` events.
 - Each watched view also gets a media tree (`src/media.ts`), which collects the images that tool results returned, from the view's file and from every subagent transcript, at any depth, in the directory named after it.
@@ -454,10 +450,10 @@ The server lives in `src/`:
 - `src/turn-gate.ts`: `TurnGate`, which both transports use to run a session's prompts, aborts, and flushes in the order the page sent them.
 - `src/user-requests.ts`: parses the RPC and Collab question frames into one request shape, writes the answers back, and keeps each session's pending questions.
 - `src/commands.ts`: the composer's `/` and `@` completions, and the expansion of file commands and skills before a guest prompt.
-- `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below, and reads the plan file that the second fold names; `src/line-reader.ts` holds the incremental `LineReader` and the `ReadQueue` that serializes its reads, which `src/media.ts` shares.
+- `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below; `src/line-reader.ts` holds the incremental `LineReader` and the `ReadQueue` that serializes its reads, which `src/media.ts` shares.
 - `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, `toolResultOf`, `toolSummary`, and `imagesOf`, which the folds below and `src/guest.ts` read instead of walking the entry shape themselves.
 - `src/transcript.ts`: folds session-file lines and live events into display items.
-- `src/work.ts`: folds session-file lines into the plan and changes: the latest todo list, the plan file changed last, and the files changed.
+- `src/work.ts`: folds session-file lines into the files changed.
 - `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, for the `media` message.
 - `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, and its latest /ship step (`parseShipProgress`); `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
 - `src/session-links.ts`: writes the session block into a pull request's description.
@@ -508,7 +504,7 @@ The page lives in `web/`.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which runs in the background.
-- `web/pane-store.ts`: each open view's transcript, plan and changes, images, and completions, outside the page state, so a token in one pane re-renders only that pane.
+- `web/pane-store.ts`: each open view's transcript, changed files, images, and completions, outside the page state, so a token in one pane re-renders only that pane.
   It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
@@ -546,7 +542,7 @@ The page lives in `web/`.
   `web/components/session-switcher.tsx` is the search over every session, opened from the sidebar header or with Cmd+K. What you type there can also be added as a todo.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
-- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the plan tab, the sidebar's project, the pinned skill, and the inbox's order; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
+- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the session details tab, the sidebar's project, the pinned skill, and the inbox's order; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
 - `web/components/roster.tsx`: the left sidebar's tabs, its session and tickets lists, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab.
@@ -566,7 +562,7 @@ The page lives in `web/`.
   `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeTextarea` and `afterActions` slots.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
 - `web/components/dashboard-context.tsx`: the stable dashboard actions (`send`, `open`, `start`, `end`, …) and the last start of each kind, provided once by `App`, which the sidebar, the panes, and the pages read instead of taking them as props.
-- `web/components/plan-panel.tsx`: the right sidebar's tabs for the focused pane: its plan and its changed files, then `agents-tab.tsx`, the live session's agents as a tree, and `media-tab.tsx`, its images and their viewer.
+- `web/components/session-details.tsx`: the right sidebar's tabs for the focused pane: `outline-tab.tsx`, its prompts and turn-ending replies from `outline` in `web/transcript-view.ts`, which scroll the focused pane's transcript to their message; its changed files; and `media-tab.tsx`, its images and their viewer.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, and `web/components/new-session.tsx`: the other pages.
   `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue.
   `web/use-drag-order.ts` drags the inbox's repositories, sections, and pull requests, each within its own scope, and draws the drop line.

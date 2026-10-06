@@ -52,6 +52,29 @@ export function turnReplies(items: Item[], working: boolean): Set<string> {
 	return replies;
 }
 
+/** One row of a transcript's outline: a prompt, or the reply its turn ended on. */
+export interface OutlineEntry {
+	id: string;
+	kind: "prompt" | "reply";
+	/** The message's text, or for a prompt that carried only images, how many it carried: `2 images`. */
+	text: string;
+	/** The skill a prompt invoked; `null` for any other prompt and for every reply. */
+	skill: string | null;
+}
+
+/** Each prompt and each turn's final reply, in transcript order. A turn still running lists no reply until it ends. */
+export function outline(items: Item[], working: boolean): OutlineEntry[] {
+	const replies = turnReplies(items, working);
+	return items.flatMap((item): OutlineEntry[] => {
+		if (item.kind === "user") {
+			const images = item.images?.length ?? 0;
+			const text = item.text.trim() || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
+			return [{ id: item.id, kind: "prompt", text, skill: item.skill }];
+		}
+		return replies.has(item.id) && item.kind === "assistant" ? [{ id: item.id, kind: "reply", text: item.text.trim(), skill: null }] : [];
+	});
+}
+
 /** What the last turn suggests sending next: the suggestions its reply ends on; none while it runs or once a prompt follows it. */
 export function nextSuggestions(items: Item[], working: boolean): string[] {
 	if (working) return [];

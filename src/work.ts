@@ -1,35 +1,11 @@
 /**
- * Folds a transcript file's entries into what its agent planned and changed: the latest todo list, and the files its
- * `edit` and `write` calls changed. Only the file feeds it; omp writes each tool result as soon as it exists.
+ * Folds a transcript file's entries into the files its agent's `edit` and `write` calls changed. Only the file feeds
+ * it; omp writes each tool result as soon as it exists.
  */
-import { isObject, oneOf, str } from "./json";
+import { isObject, str } from "./json";
 import { displayPath } from "./paths";
 import { entryTime, toolCallsOf, toolResultOf } from "./session-entries";
-import { type FileChange, parseDiffLine, type SessionWork, TODO_STATUSES, type TodoItem, type TodoPhase } from "./shared";
-
-/** omp's rule for a plan file (`listPlanFiles` in `pi-coding-agent/src/plan-mode/plan-files.ts`): a name ending in `plan.md`, such as `local://auth-plan.md`. */
-const PLAN_FILE = /plan\.md$/i;
-
-/** omp's custom entry for a todo list the user edited in its terminal (`USER_TODO_EDIT_CUSTOM_TYPE`). */
-const USER_TODO_EDIT = "user_todo_edit";
-
-const isTodoStatus = oneOf(TODO_STATUSES);
-
-/** A todo list as omp persists it, or `null` when any part is malformed, as omp's own `isTodoPhase` rejects it. */
-function parsePhases(value: unknown): TodoPhase[] | null {
-	if (!Array.isArray(value)) return null;
-	const phases: TodoPhase[] = [];
-	for (const phase of value) {
-		if (!isObject(phase) || typeof phase.name !== "string" || !Array.isArray(phase.tasks)) return null;
-		const tasks: TodoItem[] = [];
-		for (const task of phase.tasks) {
-			if (!isObject(task) || typeof task.content !== "string" || !isTodoStatus(task.status)) return null;
-			tasks.push({ content: task.content, status: task.status });
-		}
-		phases.push({ name: phase.name, tasks });
-	}
-	return phases;
-}
+import { type FileChange, parseDiffLine, type SessionWork } from "./shared";
 
 /** omp's edit operations (`pi-tui/src/tools/edit.ts`); an edit without one updates the file. */
 const EDIT_KINDS: Record<string, "created" | "edited" | "deleted"> = { create: "created", update: "edited", delete: "deleted" };
@@ -66,24 +42,20 @@ function editedFiles(details: Record<string, unknown>, at: number | null): [stri
 export class Work {
 	/** The transcript's working directory, from its `session` header. */
 	#cwd: string | null = null;
-	#phases: TodoPhase[] = [];
 	/** Each file's changes, oldest first, by the path omp reported, in first-touch order. */
 	readonly #files = new Map<string, FileChange[]>();
 	/** Paths a `read` result named, so a later write to one rewrites the file rather than creates it. */
 	readonly #read = new Set<string>();
 	/** Lines of each `write` call's content, by tool call id, until its result arrives. */
 	readonly #writing = new Map<string, number>();
-	#planFile: string | null = null;
-	#planVersion = 0;
 
-	/** One session-file entry. Returns whether the plan or the changed files changed. */
+	/** One session-file entry. Returns whether the changed files changed. */
 	applyEntry(entry: unknown): boolean {
 		if (!isObject(entry)) return false;
 		if (entry.type === "session") {
 			this.#cwd = str(entry.cwd) ?? null;
 			return false;
 		}
-		if (entry.type === "custom" && entry.customType === USER_TODO_EDIT) return this.#plan(isObject(entry.data) ? entry.data.phases : undefined);
 		if (entry.type !== "message" || !isObject(entry.message)) return false;
 		this.#noteWrites(entry.message);
 		const result = toolResultOf(entry.message);
@@ -92,8 +64,6 @@ export class Work {
 		if (result.isError) return false;
 		const { details } = result;
 		switch (result.toolName) {
-			case "todo":
-				return details.op !== "view" && this.#plan(details.phases);
 			case "read": {
 				const path = str(details.resolvedPath);
 				if (path) this.#read.add(path);
@@ -111,24 +81,8 @@ export class Work {
 		}
 	}
 
-	/** The plan file the agent wrote or edited last, as omp resolved it, or `null` when it wrote none or deleted that one. */
-	get planFile(): string | null {
-		return this.#planFile;
-	}
-
-	/** Counts every change to a plan file, so a reader knows when to read {@link planFile} again. */
-	get planVersion(): number {
-		return this.#planVersion;
-	}
-
-	/** `planText` is {@link planFile}'s text, `null` when it could not be read. */
-	snapshot(planText: string | null = null): SessionWork {
-		const planFile = this.#planFile;
-		return {
-			phases: this.#phases,
-			files: [...this.#files].map(([path, changes]) => ({ path: this.#display(path), changes })),
-			plan: planFile !== null && planText !== null ? { path: this.#display(planFile), text: planText } : null,
-		};
+	snapshot(): SessionWork {
+		return { files: [...this.#files].map(([path, changes]) => ({ path: this.#display(path), changes })) };
 	}
 
 	/** Keeps the line count of each `write` call in an assistant message, which its result does not repeat. */
@@ -155,20 +109,8 @@ export class Work {
 		return { tool: "write", kind: created ? "created" : "rewritten", at, lines };
 	}
 
-	#plan(value: unknown): boolean {
-		const phases = parsePhases(value);
-		if (!phases) return false;
-		this.#phases = phases;
-		return true;
-	}
-
 	#touch(touches: [string, FileChange][]): boolean {
 		for (const [path, change] of touches) {
-			if (PLAN_FILE.test(path)) {
-				if (change.kind !== "deleted") this.#planFile = path;
-				else if (path === this.#planFile) this.#planFile = null;
-				this.#planVersion++;
-			}
 			const changes = this.#files.get(path);
 			if (changes) changes.push(change);
 			else this.#files.set(path, [change]);

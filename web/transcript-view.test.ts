@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared";
-import { applyItems, editablePrompt, forkPoints, nextSuggestions, toBlocks, turnReplies } from "./transcript-view";
+import { applyItems, editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnReplies } from "./transcript-view";
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
@@ -93,6 +93,39 @@ describe("turnReplies", () => {
 
 	test("a turn still running has no reply yet", () => {
 		expect([...turnReplies(items, true)]).toEqual(["r1b"]);
+	});
+});
+
+describe("outline", () => {
+	const prompt = (id: string, text: string, extra: Partial<Extract<Item, { kind: "user" }>> = {}): Item => ({ id, kind: "user", text, skill: null, from: null, entryId: id, ...extra });
+	const reply = (id: string, text: string): Item => ({ id, kind: "assistant", text, streaming: false, suggestions: [] });
+	const tool: Item = { id: "t", kind: "tool", name: "bash", summary: "ls", status: "ok", agents: [] };
+	const items = [prompt("p1", "Fix it"), reply("r1a", "Looking"), tool, reply("r1b", " Fixed. "), prompt("p2", "Ship it"), reply("r2", "Shipping")];
+
+	test("lists each prompt and each turn's final reply, and a running turn's reply only once it ends", () => {
+		expect(outline(items, true)).toEqual([
+			{ id: "p1", kind: "prompt", text: "Fix it", skill: null },
+			{ id: "r1b", kind: "reply", text: "Fixed.", skill: null },
+			{ id: "p2", kind: "prompt", text: "Ship it", skill: null },
+		]);
+		expect(outline(items, false).at(-1)).toEqual({ id: "r2", kind: "reply", text: "Shipping", skill: null });
+	});
+
+	test("a prompt without text reads as the images it carried, and a skill prompt keeps its skill", () => {
+		expect(
+			outline(
+				[
+					prompt("one", "", { images: ["data:image/png;base64,AA=="] }),
+					prompt("two", " ", { images: ["/api/image?hash=a", "/api/image?hash=b"] }),
+					prompt("skill", "", { skill: "review", images: ["/api/image?hash=c"] }),
+				],
+				false,
+			),
+		).toEqual([
+			{ id: "one", kind: "prompt", text: "1 image", skill: null },
+			{ id: "two", kind: "prompt", text: "2 images", skill: null },
+			{ id: "skill", kind: "prompt", text: "1 image", skill: "review" },
+		]);
 	});
 });
 

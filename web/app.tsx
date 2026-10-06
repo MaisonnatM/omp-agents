@@ -8,9 +8,9 @@ import { InboxNav } from "./components/inbox/inbox-nav";
 import { PullRequestPage } from "./components/inbox/pr-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
-import { PlanPanel } from "./components/plan-panel";
 import { NO_PLANS, PlanUsageFooter, Plans } from "./components/plan-usage";
 import { Roster, type SidebarTab, useProject } from "./components/roster";
+import { SessionDetails } from "./components/session-details";
 import { SettingsPage } from "./components/settings/settings-page";
 import { SessionSwitcher } from "./components/session-switcher";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
@@ -18,6 +18,7 @@ import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/
 import { SplitResizeHandle, splitAt, useSplitRatio } from "./components/split-resize-handle";
 import { RoutinesPage } from "./components/routines/routines-page";
 import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-page";
+import { subjectOf } from "./components/subject";
 import { ToolsExpanded } from "./components/transcript";
 import { ArchivePage } from "./components/todo-archive";
 import { TodoPage } from "./components/user-todos";
@@ -99,7 +100,8 @@ export function App() {
 	const view = focusedView(layout);
 	const viewHost = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
 	const viewPast = view?.kind === "past" ? state.past.find(s => s.sessionId === view.sessionId) : undefined;
-	const title = documentTitle(cover, view, viewHost ?? (view?.kind === "live" ? state.lastHosts.get(view.instanceId) ?? null : null), viewPast ?? null);
+	const viewLastHost = view?.kind === "live" ? state.lastHosts.get(view.instanceId) ?? null : null;
+	const title = documentTitle(cover, view, viewHost ?? viewLastHost, viewPast ?? null);
 	useEffect(() => {
 		document.title = title;
 	}, [title]);
@@ -130,7 +132,7 @@ export function App() {
 		show(kind === "max" ? { ...current, focus: index, maximized: !current.maximized } : closePane(current, index));
 	}, [show]);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
-	const planView = cover || (split && !maximized) ? null : view;
+	const detailsView = cover || (split && !maximized) ? null : view;
 	const toggleSidebar = useCallback((side: SidebarSide): void => {
 		const { sidebars } = latest.current;
 		sidebars.setOpen(side, !sidebars.panels[side].open);
@@ -201,8 +203,8 @@ export function App() {
 		nextSession: () => step(1),
 		tools: () => setToolsExpanded(expanded => !expanded),
 		sessionsSidebar: () => toggleSidebar("left"),
-		planSidebar: () => {
-			if (!planView) return false;
+		detailsSidebar: () => {
+			if (!detailsView) return false;
 			toggleSidebar("right");
 		},
 		settings: () => {
@@ -255,7 +257,7 @@ export function App() {
 							count={layout.panes.length}
 							focused={index === layout.focus}
 							maximized={maximized}
-							topRight={index === topRightPane && planView !== null}
+							topRight={index === topRightPane && detailsView !== null}
 							host={pane.kind === "live" ? state.hosts.find(h => h.instanceId === pane.instanceId) ?? null : null}
 							lastHost={pane.kind === "live" ? state.lastHosts.get(pane.instanceId) ?? null : null}
 							session={pane.kind === "past" ? state.past.find(s => s.sessionId === pane.sessionId) ?? null : null}
@@ -410,9 +412,13 @@ export function App() {
 						<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
 					</Plans>
 				</SidebarInset>
-				{planView && (
+				{detailsView && (
 					<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-						<PlanPanel key={hashForView(planView)} view={planView} host={viewHost ?? null} />
+						<SessionDetails
+							key={hashForView(detailsView)}
+							view={detailsView}
+							working={detailsView.kind === "live" && subjectOf(detailsView, viewHost ?? null, viewLastHost).working}
+						/>
 					</DashboardSidebar>
 				)}
 				<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
