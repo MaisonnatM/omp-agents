@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { PastSession, RosterHost } from "../src/shared";
-import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, sidebarSessions } from "./sessions";
+import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, sidebarSessions, waitingCount } from "./sessions";
 
 const host = (sessionId: string, cwd: string) => ({ instanceId: `i-${sessionId}`, sessionId, cwd }) as RosterHost;
 const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
@@ -132,6 +132,12 @@ describe("sidebarSessions", () => {
 		expect(ids(lists.pinned.hosts)).toEqual(["h4"]);
 		expect(ids(lists.running)).toEqual(["h2", "h3", "h5"]);
 		expect(ids(lists.idle)).toEqual(["h1"]);
+	});
+
+	test("the waiting count takes finished turns and open questions in the selected project, pinned ones included", () => {
+		const statuses = { h1: "idle", h2: "needs-input", h3: "working", h4: "idle", h5: "unknown" } as const;
+		const live = [...Object.entries(statuses).map(([id, status]) => ({ ...host(id, "~/a"), status })), { ...host("h6", "~/b"), status: "idle" as const }];
+		expect(waitingCount(sidebarSessions(live, [], "~/a", new Set(["h4"])))).toBe(3);
 	});
 
 	test("the previous and next session keys walk pinned rows first, then idle, running, interrupted, and past", () => {

@@ -32,12 +32,12 @@ import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { SizeProvider } from "@/lib/size-context";
-import { inboxSection, inboxSections, type Waiting, waitingCount } from "../inbox-model";
+import { inboxSection, inboxSections, mergeableCount, type Waiting } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
 import { hashForInbox, hashForSettings, hashForTickets, type OpenMode, sameView, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
-import type { SidebarSessions } from "../sessions";
+import { type SidebarSessions, waitingCount } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
 import { useStoredKeys, useStoredState } from "../stored-state";
 import { ticketGroups, ticketSection } from "../tickets-model";
@@ -475,7 +475,11 @@ export function Roster({
 	const { resume, resumeAll } = starts;
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	const inbox = inboxStore.use(project).read;
-	const waiting = inbox ? waitingCount(inbox.data) : 0;
+	/** The count after a tab's label, and what it counts, for its accessible name. */
+	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
+		sessions: { count: waitingCount(lists), meaning: "waiting on you" },
+		inbox: { count: inbox ? mergeableCount(inbox.data) : 0, meaning: "ready to merge" },
+	};
 	/** Continue past session `sessionId`, in the pane that shows it. */
 	const onResume = (sessionId: string): void => {
 		// The pane shows the resume's progress and failure, and the live session takes it over.
@@ -599,15 +603,16 @@ export function Roster({
 				<TabsList aria-label="Sidebar" className="mx-2 self-start">
 					{/* The tabs fit the sidebar's default width only with tighter padding than Fluid's, and five of them only without their icons. */}
 					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => {
-						const badge = value === "inbox" && waiting > 0 ? waiting : undefined;
+						const counted = tabCounts[value];
+						const badge = counted && counted.count > 0 ? counted : undefined;
 						return (
 							<TabItem
 								key={value}
 								value={value}
 								label={label}
 								icon={icon}
-								badge={badge}
-								aria-label={badge === undefined ? undefined : `${label}, ${badge} waiting on you`}
+								badge={badge?.count}
+								aria-label={badge && `${label}, ${badge.count} ${badge.meaning}`}
 								className={ticketsShown ? "px-2 @max-[25rem]/sidebar:[&>svg]:hidden" : "px-2 @max-[20rem]/sidebar:[&>svg]:hidden"}
 								shortcut={shortcutLabels(value)}
 							/>

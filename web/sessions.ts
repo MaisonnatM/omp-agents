@@ -89,6 +89,10 @@ export function sidebarSessions(hosts: RosterHost[], past: PastSession[], projec
 	};
 }
 
+/** How many live sessions in `lists` wait on your move: a turn that finished, or a question left open. */
+export const waitingCount = ({ pinned, running, idle }: SidebarSessions): number =>
+	[...pinned.hosts, ...running, ...idle].filter(host => host.status === "idle" || host.status === "needs-input").length;
+
 /** Every row of the sessions tab in its order, which the previous and next session keys walk. */
 export function listedViews({ pinned, running, idle, interrupted, ended }: SidebarSessions): View[] {
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));

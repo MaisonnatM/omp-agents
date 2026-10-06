@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { InboxPullRequest, PullRequestDetail, RepoInbox } from "../src/shared";
-import { foldedByDefault, inboxSections, pullRequestStatus, rowVerdict, shownPullRequests, waitingCount } from "./inbox-model";
+import { foldedByDefault, inboxSections, mergeableCount, pullRequestStatus, rowVerdict, shownPullRequests } from "./inbox-model";
 
 const pr = (number: number, fields: Partial<InboxPullRequest> = {}): InboxPullRequest => ({
 	owner: "acme",
@@ -92,17 +92,17 @@ test("only Recently merged sections start folded", () => {
 	expect(["acme/webapp:Recently merged", "acme/webapp:Drafts", "acme/webapp", "Recently merged"].map(foldedByDefault)).toEqual([true, false, false, false]);
 });
 
-test("the waiting count adds reviews asked of you and PRs returned to you across repositories, skipping unreadable ones", () => {
+test("the mergeable count adds your PRs ready to merge across repositories, skipping reviews, blocked PRs, and unreadable repositories", () => {
 	const repo = (pullRequests: InboxPullRequest[]): RepoInbox => ({ owner: "acme", repo: "webapp", cwds: [], pullRequests });
 	const inbox = {
 		repos: [
-			repo([pr(1, { role: "reviewer", author: teammate }), pr(2, { review: "changes-requested" }), pr(3, { review: "approved" }), pr(4, { role: "reviewer", state: "merged" })]),
-			repo([pr(5, { role: "reviewer", author: teammate })]),
+			repo([pr(1, { review: "approved" }), pr(2, { review: "none" }), pr(3, { role: "reviewer", review: "approved", author: teammate }), pr(4, { review: "changes-requested" })]),
+			repo([pr(5, { review: "approved", unresolved: { count: 1, exact: true } }), pr(6, { review: "approved", state: "merged" }), pr(7, { review: "approved" })]),
 			{ owner: "acme", repo: "down", cwds: [], error: "rate limited" },
 		],
 		unmatched: [],
 	};
-	expect(waitingCount(inbox)).toBe(3);
+	expect(mergeableCount(inbox)).toBe(3);
 });
 
 test("the shown pull requests follow page order and leave out folded repositories, folded sections, and unreadable repositories", () => {

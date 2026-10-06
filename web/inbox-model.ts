@@ -124,10 +124,6 @@ export function shownPullRequests({ repos }: Inbox, isFolded: (key: string) => b
 	});
 }
 
-/** How many pull requests in `inbox` wait on your move: reviews asked of you and pull requests returned to you. */
-export const waitingCount = ({ repos }: Inbox): number =>
-	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => sectionOf(pr)?.waiting).length;
-
 interface MergeFacts {
 	state: PullRequestDetail["state"];
 	review: ReviewDecision;
@@ -156,6 +152,10 @@ export function rowVerdict(pr: InboxPullRequest): RowVerdict {
 	}
 	return pr.review === "approved" || pr.review === "changes-requested" ? pr.review : null;
 }
+
+/** How many of your pull requests in `inbox` are ready to merge. */
+export const mergeableCount = ({ repos }: Inbox): number =>
+	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => rowVerdict(pr) === "ready").length;
 
 /** One fact about where a pull request stands, as its sheet's Status lists it. */
 export type StatusItem =

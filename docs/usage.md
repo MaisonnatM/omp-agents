@@ -361,11 +361,12 @@ Navigation, editing, scheduling toggles, Stop, and Delete keep their existing st
   Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
+  The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the project that the sidebar's picker shows, pinned ones included.
   **Routines** opens the sessions that start on a schedule; see [Routines](#routines).
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
   **Inbox** opens a pull request inbox like Graphite's, and the sidebar then lists the inbox's sections with their pull request counts, under each repository's name when there are several.
   The counts of the sections that wait on your move stand out: **Needs your review** in bold, and **Returned to you** in red.
-  The **Inbox** tab counts the pull requests in those two sections, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
+  The **Inbox** tab counts your pull requests that are ready to merge, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
   Click a section in the sidebar to scroll the page to it and move focus there; a folded section unfolds.
   An `#inbox` address selects the Inbox tab.
   The inbox covers the GitHub repository of the project that the sidebar's picker shows, or under **All projects** every repository that a session ran in, one section per repository.
