@@ -474,27 +474,21 @@ export class DashboardSession implements LiveSession {
 	#refresh(): void {
 		if (this.#refreshQueued) return;
 		this.#refreshQueued = true;
-		void this.#modelGate.run(async () => {
+		void this.#modelGate.run(() => {
 			this.#refreshQueued = false;
-			try {
-				const [state, levels] = await Promise.all([this.#child.client.getState(), this.#child.client.getAvailableThinkingLevels()]);
-				this.#applyState(state);
-				this.thinkingLevels = levels;
-				this.#emit({ kind: "roster" });
-			} catch {
-				// The process exited; `exited` reports it.
-			}
+			// A failure means the process exited; `exited` reports it.
+			return this.#readModelState(null);
 		});
 	}
 
-	async #readModelState(failure: string): Promise<void> {
+	async #readModelState(failure: string | null): Promise<void> {
 		try {
 			const [state, levels] = await Promise.all([this.#child.client.getState(), this.#child.client.getAvailableThinkingLevels()]);
 			this.#applyState(state);
 			this.thinkingLevels = levels;
 			this.#emit({ kind: "roster" });
 		} catch (err) {
-			this.#fail(failure, err);
+			if (failure) this.#fail(failure, err);
 		}
 	}
 
