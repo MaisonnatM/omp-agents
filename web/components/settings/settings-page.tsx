@@ -11,6 +11,7 @@ import { Header } from "../page-header";
 import { AppearanceTab } from "./appearance-tab";
 import type { Catalog, Editing } from "./editor";
 import { Files } from "./files-tab";
+import { GoogleConnection } from "./google-connection";
 import { LinearConnection } from "./linear-connection";
 import { NewSessionsTab } from "./new-sessions-tab";
 import { RetrySection, RolesTab } from "./routing-tab";
@@ -117,7 +118,7 @@ export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspac
 	const panels: Record<SettingsTab, ReactNode> = {
 		...ompPanels(settings, cwd, editing),
 		worktrees: <WorktreesTab cwd={cwd} active={tab === "worktrees"} />,
-		integrations: <LinearConnection />,
+		integrations: <div className="space-y-6"><LinearConnection /><GoogleConnection /></div>,
 		"new-sessions": <NewSessionsTab cwd={cwd} />,
 		appearance: <AppearanceTab />,
 	};

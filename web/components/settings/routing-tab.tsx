@@ -9,7 +9,7 @@ import { providerOrg } from "../../labels";
 import { CommandPicker, fromList } from "../command-picker";
 import { MODEL_LIST, Model, modelDescription, modelGroups } from "../model-picker";
 import { OrgIcon } from "../org-icon";
-import { type Catalog, EditBar, type Editing, OrderedList, SaveError, Section, useEditor } from "./editor";
+import { type Catalog, EditBar, type Editing, FIELD, OrderedList, SaveError, Section, useEditor } from "./editor";
 
 /** Each save answers with the settings as they load afterwards. */
 const saveRouting = (cwd: string | null, edit: RoutingEdit): Promise<OmpSettings> => putJson<OmpSettings>(settingsUrl("/routing", cwd), edit);
@@ -31,8 +31,6 @@ const RETRY_ROWS: [keyof RetrySettings, string, (value: boolean | number | strin
 	["maxDelayMs", "Max delay", value => (Number(value) === 0 ? "No ceiling" : duration(value)), "ms"],
 	["waitForUsageReset", "Wait for usage reset", onOff],
 ];
-
-const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 /** Fallbacks in the order omp tries them. */
 function Chain({ fallbacks }: { fallbacks: string[] }) {

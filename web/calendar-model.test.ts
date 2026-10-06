@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import type { Routine, RoutineRun, Schedule, Ticket, UserTodo, UserTodoList } from "../src/shared";
+import type { CalendarEvent, Routine, RoutineRun, Schedule, Ticket, UserTodo, UserTodoList } from "../src/shared";
 import { type CalendarEntry, calendarEntries } from "./calendar-model";
 
 // Weekly slots are local wall-clock times; Paris leaves DST on 2026-10-25, inside the month below.
@@ -48,7 +48,7 @@ const ticket = (fields: Partial<Ticket>): Ticket => ({
 });
 
 const october = (sources: Partial<Parameters<typeof calendarEntries>[0]>, now = NOW): CalendarEntry[] =>
-	calendarEntries({ routines: [], todos: null, tickets: null, ...sources }, OCTOBER.year, OCTOBER.month, now);
+	calendarEntries({ routines: [], todos: null, tickets: null, events: null, ...sources }, OCTOBER.year, OCTOBER.month, now);
 const days = (entries: CalendarEntry[], state?: string): string[] =>
 	entries.filter(entry => entry.kind === "routine" && (state === undefined || entry.state === state)).map(({ day }) => day);
 
@@ -105,7 +105,7 @@ describe("routines", () => {
 	});
 
 	test("a month after now plans from the last run through it", () => {
-		const entries = calendarEntries({ routines: [routine({})], todos: null, tickets: null }, 2026, 11, NOW);
+		const entries = calendarEntries({ routines: [routine({})], todos: null, tickets: null, events: null }, 2026, 11, NOW);
 		expect(days(entries, "planned")).toHaveLength(23);
 	});
 });
@@ -131,5 +131,32 @@ describe("todos and tickets", () => {
 	test("tickets show on their due date, untimed before the day's routine runs", () => {
 		const entries = october({ tickets: [ticket({ dueDate: "2026-10-14" }), ticket({ id: "ENG-2", dueDate: null })], routines: [routine({ enabled: false, runs: [run("2026-10-14T09:00:00+02:00")] })] });
 		expect(entries.map(entry => entry.kind)).toEqual(["ticket", "routine"]);
+	});
+});
+
+describe("Google events", () => {
+	const event = (when: CalendarEvent["when"], id = "personal/one"): CalendarEvent => ({
+		id, title: "Birthday", calendar: "Personal", color: "#4285f4", url: "https://calendar.google.com/calendar/event?eid=one", when,
+	});
+
+	test("an all-day event spanning the previous month and the next shows once on every day of October", () => {
+		const entries = october({ events: [event({ allDay: true, firstDay: "2026-09-30", lastDay: "2026-11-02" })] });
+		expect(entries.filter(entry => entry.kind === "event").map(entry => entry.day)).toEqual(
+			Array.from({ length: 31 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`),
+		);
+	});
+
+	test("a timed event crossing midnight shows on both days but ends before a midnight boundary", () => {
+		const entries = october({
+			events: [
+				event({ allDay: false, start: at("2026-10-24T23:30:00+02:00"), end: at("2026-10-25T01:30:00+02:00") }),
+				event({ allDay: false, start: at("2026-10-26T23:00:00+01:00"), end: at("2026-10-27T00:00:00+01:00") }, "personal/two"),
+			],
+		});
+		expect(entries.map(entry => [entry.day, entry.at])).toEqual([
+			["2026-10-24", at("2026-10-24T23:30:00+02:00")],
+			["2026-10-25", null],
+			["2026-10-26", at("2026-10-26T23:00:00+01:00")],
+		]);
 	});
 });

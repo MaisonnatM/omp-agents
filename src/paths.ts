@@ -24,6 +24,8 @@ export const userTodoInboxDir = join(configDir, "todo-inbox");
 export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
 export const routinesFile = join(configDir, "routines.json");
+/** The Google OAuth client you saved and its refresh token, beside {@link tokenFile}. */
+export const googleFile = join(configDir, "google.json");
 
 /** `path` with the home directory shortened to `~`. */
 export const displayPath = (path: string): string =>

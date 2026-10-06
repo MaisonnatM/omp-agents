@@ -1,12 +1,13 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, the inbox, pull requests, git checkouts,
- * worktrees, Linear's connection, Linear tickets and their files, prompt images, and the text files agent text names through.
+ * worktrees, Linear's connection, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
  */
 import { join } from "node:path";
 import { buildAnalytics, type SessionFacts as AnalyticsSessionFacts } from "../analytics";
 import { errorText } from "../json";
 import { listSkills } from "../commands";
 import { gitCheckout } from "../git";
+import type { GoogleCalendar } from "../google-calendar";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
 import { loadLinearStatus, startLinearSignIn } from "../linear";
 import { blobsDir } from "../omp/config";
@@ -22,10 +23,12 @@ import { type LinkedPullRequest, PROMPT_IMAGE_TYPES, type PullRequest, type Repo
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval } from "./wire";
+import { parseGoogleClient, parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval } from "./wire";
 
 const SHA256 = /^[0-9a-f]{64}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
+const MAX_EVENT_SPAN_MS = 62 * 86_400_000;
 
 export interface RouteEnv {
 	guards: Guards;
@@ -39,12 +42,13 @@ export interface RouteEnv {
 	pullRequestsOf(sessionId: string): LinkedPullRequest[];
 	/** The inbox listed `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
+	google: GoogleCalendar;
 }
 
 type Handler = (req: Request) => Promise<Response>;
 
 export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET" | "PUT", Handler>>> {
-	const { guards, knownCwds } = env;
+	const { guards, knownCwds, google } = env;
 
 	/** A read: admitted like every other, then handed the request's query. */
 	const get =
@@ -125,6 +129,32 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		const write = await guards.writeBody(req);
 		return write instanceof Response ? write : answer(startLinearSignIn);
 	};
+
+	/** `GET /api/google`: the OAuth client saved for Google Calendar, whether it holds a sign-in, and the sign-in the settings last started. */
+	const googleStatus = get(() => Response.json(google.status()));
+
+	/** `PUT /api/google/client`: `{ clientId, clientSecret }` of a desktop OAuth client, which replaces the saved one and signs out. */
+	const googleClient: Handler = async req => {
+		const write = await guards.writeBody(req);
+		if (write instanceof Response) return write;
+		const client = parseGoogleClient(write.body);
+		return client ? Response.json(google.saveClient(client)) : fail(400, "Expected { clientId, clientSecret } of a desktop OAuth client, its ID ending in .apps.googleusercontent.com");
+	};
+
+	/** `PUT /api/google/sign-in`: starts a sign-in to Google and answers with its authorization address to open. */
+	const googleSignIn: Handler = async req => {
+		const write = await guards.writeBody(req);
+		return write instanceof Response ? write : answer(() => google.startSignIn());
+	};
+
+	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your shown Google calendars in that span. */
+	const calendarEvents = get(params => {
+		const from = new Date(params.get("from") ?? "");
+		const to = new Date(params.get("to") ?? "");
+		const span = to.getTime() - from.getTime();
+		if (!(span > 0 && span <= MAX_EVENT_SPAN_MS)) return fail(400, "Expected ?from= and ?to= ISO times, at most 62 days apart");
+		return answer(() => google.events(from, to, params.has("fresh")));
+	});
 
 	/** `GET /api/ticket?id=<identifier>`: that Linear issue in full, for the tickets page's main content. */
 	const ticket = get(params => {
@@ -283,6 +313,10 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/tickets": { GET: tickets },
 		"/api/linear": { GET: linear },
 		"/api/linear/sign-in": { PUT: linearSignIn },
+		"/api/google": { GET: googleStatus },
+		"/api/google/client": { PUT: googleClient },
+		"/api/google/sign-in": { PUT: googleSignIn },
+		"/api/calendar/events": { GET: calendarEvents },
 		"/api/linear/teams": { GET: teams },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },
 		"/api/ticket/new": { PUT: ticketCreate },

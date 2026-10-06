@@ -1,11 +1,12 @@
 /** The dashboard server: wires the registries, the HTTP API, and the socket together, then follows omp's files and registry. */
 import type { Server } from "bun";
+import { GoogleCalendar } from "./google-calendar";
 import { errorText } from "./json";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
 import { stopStats } from "./omp/stats";
-import { directoryOf, displayPath, interruptedFile, routinesFile, sessionEndInboxDir, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
+import { directoryOf, displayPath, googleFile, interruptedFile, routinesFile, sessionEndInboxDir, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
 import { runShell } from "./proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "./routines";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
@@ -52,6 +53,7 @@ function clearOldDone(): void {
 }
 const inbox = new TodoInbox(userTodoInboxDir, applyTodo);
 const routines = new RoutinesFile(routinesFile);
+const google = new GoogleCalendar(googleFile);
 /** Aborts as the server stops, which stops every routine command still running. */
 const stopping = new AbortController();
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
@@ -249,6 +251,7 @@ try {
 				learnHeads(repo, pullRequests) {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},
+				google,
 			}),
 		},
 		fetch(req, srv) {

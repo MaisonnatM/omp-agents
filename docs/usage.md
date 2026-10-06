@@ -397,7 +397,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
   The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the project that the sidebar's picker shows, pinned ones included, whatever the sidebar's search hides.
-  **Calendar** opens a month of routine runs and due todos and tickets, with your routines listed under it; see [Calendar](#calendar) and [Routines](#routines).
+  **Calendar** opens a month of Google events, routine runs, and due todos and tickets, with your routines listed under it; see [Calendar](#calendar) and [Routines](#routines).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone across the sidebar's width; hover an icon for its name.
   The tabs never spill past the sidebar.
   **Inbox** lists your pull requests in the sidebar, like Graphite's inbox, and keeps the session panes beside it.
@@ -610,9 +610,9 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 - The **Calendar** tab, or a `#calendar` address, shows a month in place of the panes, Monday first.
   The sidebar then lists **Calendar**, then **All** and each routine by name.
-- Each day lists its routine runs, the todos due on it, and, once Linear is connected, the Linear tickets due on it.
+- Each day lists its routine runs, the todos due on it, and, once connected, the Linear tickets due on it and events of your selected Google calendars.
   A green dot is a run that went through, a red one a run that failed, and a hollow one a run still to come.
-  A violet dot is a todo, and an amber one a ticket; a checked todo, or a done or canceled ticket, is struck through.
+  A violet dot is a todo, an amber one a ticket, and a Google event uses its calendar's color; a checked todo, or a done or canceled ticket, is struck through.
 - Planned runs follow each routine's schedules from its last run.
   A time that passed without a run shows as now, since the next minute's check runs it.
   A paused routine shows its past runs and no planned ones.
@@ -620,8 +620,14 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Only the last 10 runs of a routine are kept, so older months show no past runs.
 - A day cell shows three entries and how many more there are.
   Click a day's number, or its **+N more**, to list all of its entries beside the month; today is listed when the page opens.
-- Click an entry to open its routine, its todo list, or its ticket.
+- Click an entry to open its routine, its todo list, or its ticket; Google events open in Google Calendar in a new tab.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
+- To show Google events, enable the Google Calendar API in your Google Cloud project and create a Desktop OAuth client.
+  For a Workspace account, set the OAuth consent screen to **Internal** if available, then open **Settings › Integrations** to save the client ID and secret and choose **Connect Google**.
+  Approve the dashboard's read-only `calendar.readonly` scope in the browser; a local callback at `127.0.0.1` completes sign-in.
+  The server keeps the client secret and refresh token in `google.json` beside its access token with owner-only file permissions, and never sends them to the page.
+  Replacing the OAuth client signs out of Google Calendar until you connect again.
+  The page reads events from the calendars selected in Google Calendar, expands recurring events into instances, repeats multi-day events on each day, and refreshes the open month every minute.
 
 ## Routines
 

@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { type CalendarEntry, calendarEntries } from "../../calendar-model";
 import { localDay } from "../../days";
-import { ticketsStore } from "../../reads";
+import { calendarEventsStore, googleStore, ticketsStore } from "../../reads";
 import { hashForRoutines, hashForTickets, hashForTodo } from "../../routing";
 import { scheduleWords, timeWords } from "../../routines-model";
 import { useMinute } from "../../use-minute";
@@ -35,6 +35,8 @@ function dotClass(entry: CalendarEntry): string {
 			return "bg-violet-500";
 		case "ticket":
 			return "bg-amber-500";
+		case "event":
+			return "";
 	}
 }
 
@@ -51,23 +53,24 @@ function entryHref(entry: CalendarEntry): string {
 			return hashForTodo(entry.categoryId === null ? { kind: "all" } : { kind: "category", id: entry.categoryId });
 		case "ticket":
 			return hashForTickets(entry.identifier);
+		case "event":
+			return entry.event.url;
 	}
 }
 
-/** What the entry is called: `9:00 Notes`, a todo's text, `ENG-12 Ship it`. */
+/** What the entry is called, after its time when it has one: `9:00 Notes`, a todo's text, `ENG-12 Ship it`. */
 function entryLabel(entry: CalendarEntry): string {
-	switch (entry.kind) {
-		case "routine": {
-			const date = new Date(entry.at);
-			return `${timeWords({ hour: date.getHours(), minute: date.getMinutes() })} ${entry.name}`;
-		}
-		case "routine-interval":
-			return entry.name;
-		case "todo":
-			return entry.text;
-		case "ticket":
-			return `${entry.identifier} ${entry.title}`;
-	}
+	const name =
+		entry.kind === "routine" || entry.kind === "routine-interval"
+			? entry.name
+			: entry.kind === "todo"
+				? entry.text
+				: entry.kind === "ticket"
+					? `${entry.identifier} ${entry.title}`
+					: entry.event.title;
+	if (entry.at === null) return name;
+	const date = new Date(entry.at);
+	return `${timeWords({ hour: date.getHours(), minute: date.getMinutes() })} ${name}`;
 }
 
 /** What the day's list says under the label: how a run went, how often a routine runs, or where the item comes from. */
@@ -81,6 +84,8 @@ function entryDetail(entry: CalendarEntry): string {
 			return entry.done ? "Todo, done" : "Todo due";
 		case "ticket":
 			return `Linear ticket due, ${entry.status}`;
+		case "event":
+			return `${entry.event.calendar}, ${entry.event.when.allDay ? "all day" : "Google Calendar"}`;
 	}
 }
 
@@ -94,14 +99,23 @@ function entryKey(entry: CalendarEntry): string {
 			return `todo:${entry.todoId}`;
 		case "ticket":
 			return `ticket:${entry.identifier}`;
+		case "event":
+			return `event:${entry.event.id}:${entry.day}`;
 	}
 }
 
-/** An entry as a link to what it shows, its dot, then `children`: the label in a day cell, the label and detail in the day's list. */
+/** An entry as a link to what it shows, its dot, then `children`: the label in a day cell, the label and detail in the day's list. A Google event opens in a new tab, in its calendar's color. */
 function EntryLink({ entry, className, dotClassName, children }: { entry: CalendarEntry; className: string; dotClassName?: string; children: ReactNode }) {
+	const event = entry.kind === "event" ? entry.event : null;
 	return (
-		<a href={entryHref(entry)} title={`${entryLabel(entry)}\n${entryDetail(entry)}`} className={cn("flex min-w-0 gap-1.5 hover:bg-accent", className)}>
-			<span aria-hidden className={cn("size-2 shrink-0 rounded-full", dotClass(entry), dotClassName)} />
+		<a
+			href={entryHref(entry)}
+			target={event ? "_blank" : undefined}
+			rel={event ? "noreferrer" : undefined}
+			title={`${entryLabel(entry)}\n${entryDetail(entry)}`}
+			className={cn("flex min-w-0 gap-1.5 hover:bg-accent", className)}
+		>
+			<span aria-hidden className={cn("size-2 shrink-0 rounded-full", dotClass(entry), dotClassName)} style={event ? { backgroundColor: event.color } : undefined} />
 			{children}
 		</a>
 	);
@@ -141,16 +155,20 @@ interface CalendarPageProps {
 	ticketsShown: boolean;
 }
 
-/** A month of routine runs, past and planned, and the todos and Linear tickets due on each day, with one day's list beside it. */
+/** A month of Google events, routine runs, and due todos and Linear tickets, with one day's list beside it. */
 export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProps) {
 	const now = useMinute();
 	const [month, setMonth] = useCalendarMonth();
 	const [year, setYear] = useCalendarYear();
 	const [selected, setSelected] = useState<Date | null>(() => new Date(now));
 	const tickets = ticketsStore.usePolling(null, ticketsShown).read?.data.tickets ?? null;
+	const connected = googleStore.usePolling().read?.data.connected ?? false;
+	const span = new URLSearchParams({ from: new Date(year, month, 1).toISOString(), to: new Date(year, month + 1, 1).toISOString() }).toString();
+	const eventsRead = calendarEventsStore.usePolling(span, connected);
+	const events = connected ? (eventsRead.read?.data.events ?? null) : null;
 	const entries = useMemo(
-		() => calendarEntries({ routines, todos, tickets: ticketsShown ? tickets : null }, year, month, now),
-		[routines, todos, tickets, ticketsShown, year, month, now],
+		() => calendarEntries({ routines, todos, tickets: ticketsShown ? tickets : null, events }, year, month, now),
+		[routines, todos, tickets, ticketsShown, events, year, month, now],
 	);
 	const features = useMemo(
 		(): Feature[] =>
@@ -166,7 +184,7 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 	return (
 		<PageFrame
 			title="Calendar"
-			meta={ticketsShown ? "Routine runs, and the todos and Linear tickets due each day" : "Routine runs, and the todos due each day"}
+			meta={["Routine runs", connected && "Google events", "due todos", ticketsShown && "Linear tickets"].filter(Boolean).join(", ")}
 			actions={
 				<Button
 					variant="secondary"
@@ -181,6 +199,7 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 				</Button>
 			}
 		>
+			{connected && eventsRead.error && <p role="alert" className="px-6 pt-4 text-sm text-red-600 dark:text-red-400">Cannot read Google Calendar: {eventsRead.error}</p>}
 			<div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
 				<CalendarProvider startDay={1} className="rounded-lg border border-border">
 					<CalendarDate>
