@@ -79,6 +79,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	},
 	abort: ({ sessions }, _ws, { instanceId }) => sessions.get(instanceId)?.abort(),
 	flush: ({ sessions }, _ws, { instanceId }) => sessions.get(instanceId)?.flush(),
+	"edit-prompt": ({ sessions }, _ws, { instanceId, entryId, text }) => sessions.started(instanceId)?.editPrompt(entryId, text),
 	"cancel-agent": ({ sessions }, _ws, { view }) => sessions.get(view.instanceId)?.cancelAgent(view.agentId),
 	async start({ start }, ws, msg) {
 		send(ws, { t: "started", reqId: msg.reqId, result: await start(msg) });

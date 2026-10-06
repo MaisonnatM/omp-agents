@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared";
-import { applyItems, forkPoints, nextSuggestions, toBlocks, turnReplies } from "./transcript-view";
+import { applyItems, editablePrompt, forkPoints, nextSuggestions, toBlocks, turnReplies } from "./transcript-view";
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
@@ -52,6 +52,32 @@ describe("forkPoints", () => {
 			p3: { entryId: "e3", prefill: true },
 			steer: { entryId: "e4", prefill: true },
 		});
+	});
+});
+
+describe("editablePrompt", () => {
+	const prompt = (id: string, entryId: string | null, extra: Partial<Extract<Item, { kind: "user" }>> = {}): Item => ({
+		id,
+		kind: "user",
+		text: id,
+		skill: null,
+		from: null,
+		entryId,
+		...extra,
+	});
+	const reply: Item = { id: "r", kind: "assistant", text: "r", streaming: false, suggestions: [] };
+
+	test("only the last prompt is editable, through the replies after it", () => {
+		expect(editablePrompt([prompt("p1", "e1"), reply, prompt("p2", "e2"), reply])).toEqual({ itemId: "p2", entryId: "e2" });
+	});
+
+	test("a last prompt omp has not saved yet leaves none editable, not the one before it", () => {
+		expect(editablePrompt([prompt("p1", "e1"), reply, prompt("p2", null)])).toBeNull();
+	});
+
+	test("a skill prompt or one with images is not editable, since the edit resends text alone", () => {
+		expect(editablePrompt([prompt("p1", "e1", { skill: "review" })])).toBeNull();
+		expect(editablePrompt([prompt("p1", "e1", { images: ["data:image/png;base64,AA=="] })])).toBeNull();
 	});
 });
 

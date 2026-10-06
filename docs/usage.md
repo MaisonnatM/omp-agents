@@ -350,6 +350,11 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A fork from a prompt leaves that prompt out of the history and puts it in the composer, so you can edit and resend it.
   omp writes the fork to a new session file and does not change the original.
   A session whose omp process exited mid-turn cannot be forked until you resume it once, with **Resume** or in omp, because opening it would make omp append an abort record to the original.
+- In a session started from the dashboard, double-click your last message, or click its pencil, to edit it in place.
+  Enter resends it and Esc, or clicking away, cancels; Shift+Enter starts a new line.
+  The session then rewinds to just before that message and runs the edited one, in the same pane and omp process, stopping a running turn first.
+  omp moves the session to a new file, as `/branch` does, so the conversation before the edit stays under the past sessions.
+  Only a plain text message that omp has saved can be edited: not a skill prompt, one with images, or a message in a terminal session.
 
 ## Pull requests and the inbox
 

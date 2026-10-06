@@ -31,7 +31,7 @@ class FakeClient implements RpcClient {
 	setSubagentSubscription = async () => "progress";
 	getSubagents = async () => [];
 	switchSession = async () => ({ cancelled: false });
-	branch = async () => ({ text: "", cancelled: false });
+	branch: RpcClient["branch"] = async () => ({ text: "", cancelled: false });
 	newSession = async () => ({ cancelled: false });
 	onSessionEvent = (listener: (event: Frame) => void) => {
 		this.#listeners.push(listener);
@@ -210,6 +210,40 @@ describe("DashboardSession prompts", () => {
 		session.flush();
 		await settle();
 		expect(order).toEqual(["prompt now", "abort"]);
+	});
+
+	test("an edit mid-turn stops the turn, branches, moves to omp's new file, then resends", async () => {
+		const client = new FakeClient();
+		fakeOmp(client);
+		const order: string[] = [];
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => {
+			if (update.kind === "switched") order.push(`switched ${session.sessionId}`);
+		});
+		client.abort = async () => {
+			order.push("abort");
+		};
+		client.branch = async entryId => {
+			order.push(`branch ${entryId}`);
+			return { text: "old", cancelled: false };
+		};
+		client.getState = async () => ({ ...STATE, sessionId: "session-2", sessionFile: "/tmp/session-2.jsonl" });
+		client.prompt = async text => {
+			order.push(`prompt ${text}`);
+			return "";
+		};
+
+		client.fire({ type: "agent_start" });
+		await session.editPrompt("e1", "new");
+		expect(order).toEqual(["abort", "branch e1", "switched session-2", "prompt new"]);
+		expect(session.sessionFile).toBe("/tmp/session-2.jsonl");
+	});
+
+	test("an edit an omp extension cancels keeps the session and sends nothing", async () => {
+		const { session, client } = await startSession();
+		client.branch = async () => ({ text: "old", cancelled: true });
+		await session.editPrompt("e1", "new");
+		expect(session.sessionId).toBe("session-1");
+		expect(client.calls).toEqual([]);
 	});
 });
 

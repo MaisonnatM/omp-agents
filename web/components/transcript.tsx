@@ -40,7 +40,7 @@ import {
 	TextSearch,
 	Wrench,
 } from "lucide-react";
-import { createContext, memo, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, type KeyboardEvent, memo, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentRow, Item, LiveView, View } from "../../src/shared";
 import { Button } from "@/components/ui/button";
 import { ChatMessage } from "@/components/ui/chat-message";
@@ -59,7 +59,7 @@ import { cn } from "@/lib/utils";
 import { modeOf, skillLabel, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
-import { type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies } from "../transcript-view";
+import { editablePrompt, type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies } from "../transcript-view";
 import { useCopy } from "../use-copy";
 import { MessageMarkdown } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -263,12 +263,61 @@ function ForkButton({ point, forking, disabled, onFork }: { point: ForkPoint; fo
 	return <Tooltip content={title}>{disabled ? <span className="inline-flex">{button}</span> : button}</Tooltip>;
 }
 
+function EditButton({ onEdit }: { onEdit: () => void }) {
+	const PencilIcon = useIcon("pencil");
+	return (
+		<Tooltip content="Edit and resend (or double-click the message)">
+			<Button variant="ghost" size="icon-compact" aria-label="Edit message" onClick={onEdit}>
+				<PencilIcon />
+			</Button>
+		</Tooltip>
+	);
+}
+
+/** The last prompt, rewritten in place. Enter resends it, Shift+Enter breaks the line, and Esc or leaving the field cancels. */
+function PromptEditor({ initial, onSave, onCancel }: { initial: string; onSave: (text: string) => void; onCancel: () => void }) {
+	const [text, setText] = useState(initial);
+	const ref = useRef<HTMLTextAreaElement>(null);
+	useEffect(() => {
+		const el = ref.current;
+		if (!el) return;
+		el.focus();
+		el.setSelectionRange(el.value.length, el.value.length);
+	}, []);
+	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+		if (event.nativeEvent.isComposing) return;
+		if (event.key === "Escape") {
+			event.preventDefault();
+			onCancel();
+		} else if (event.key === "Enter" && !event.shiftKey) {
+			event.preventDefault();
+			const next = text.trim();
+			if (next && next !== initial.trim()) onSave(next);
+			else onCancel();
+		}
+	};
+	return (
+		<textarea
+			ref={ref}
+			aria-label="Edit message"
+			value={text}
+			rows={1}
+			onChange={event => setText(event.target.value)}
+			onKeyDown={onKeyDown}
+			onBlur={onCancel}
+			className="block w-[36rem] max-w-full resize-none bg-transparent [field-sizing:content] outline-none"
+		/>
+	);
+}
+
 interface TranscriptProps {
 	view: View;
 	items: Item[];
 	working: boolean;
 	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
+	/** Replaces the last prompt with `text` and runs it again; omitted where the session cannot rewind. */
+	onEdit?: (entryId: string, text: string) => void;
 	/** Shown in place of the transcript until its first item or turn. */
 	empty?: ReactNode;
 }
@@ -297,12 +346,14 @@ const copyText = (item: Exclude<Item, ToolItem>): string =>
  * The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end.
  * It renders again only when its own items, fork state, or callbacks change, not with the page around it.
  */
-export const Transcript = memo(function Transcript({ view, items, working, fork, onFork, empty }: TranscriptProps) {
+export const Transcript = memo(function Transcript({ view, items, working, fork, onFork, onEdit, empty }: TranscriptProps) {
 	const last = items.at(-1);
 	const streaming = last?.kind === "assistant" && last.streaming;
 	const forks = useMemo(() => forkPoints(items), [items]);
 	const replies = useMemo(() => turnReplies(items, working), [items, working]);
 	const blocks = useMemo(() => toBlocks(items), [items]);
+	const editable = useMemo(() => (onEdit ? editablePrompt(items) : null), [items, onEdit]);
+	const [editing, setEditing] = useState<string | null>(null);
 	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
 	const here = fork && sameView(fork.op.view, view) ? fork : null;
 
@@ -332,6 +383,8 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 						const copyable = item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copied.trim() !== "";
 						const point = forks.get(item.id);
 						const failed = here?.phase === "failed" && here.op.itemId === item.id ? here.error : null;
+						const edit = editable?.itemId === item.id && onEdit ? { entryId: editable.entryId, run: onEdit } : null;
+						const inEdit = edit !== null && editing === item.id;
 						return (
 							<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
 								<ChatMessage
@@ -339,9 +392,12 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 									time={item.kind === "user" ? (item.from ?? undefined) : undefined}
 									images={item.kind === "user" ? item.images : undefined}
 									actions={
-										copyable || point ? (
+										inEdit ? (
+											<span>{working ? "Enter stops the turn and resends · Esc cancels" : "Enter resends from here · Esc cancels"}</span>
+										) : copyable || point || edit ? (
 											<>
 												{copyable && <CopyButton text={copied} />}
+												{edit && <EditButton onEdit={() => setEditing(item.id)} />}
 												{point && (
 													<ForkButton
 														point={point}
@@ -353,10 +409,21 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 											</>
 										) : undefined
 									}
+									onDoubleClick={edit && !inEdit ? () => setEditing(item.id) : undefined}
 									data-item={item.kind}
+									data-editing={inEdit || undefined}
 									data-streaming={item.kind === "assistant" ? item.streaming : undefined}
 								>
-									{item.kind === "user" && item.skill ? (
+									{inEdit ? (
+										<PromptEditor
+											initial={item.text}
+											onSave={text => {
+												setEditing(null);
+												edit.run(edit.entryId, text);
+											}}
+											onCancel={() => setEditing(null)}
+										/>
+									) : item.kind === "user" && item.skill ? (
 										<div className="flex flex-col items-start gap-1.5">
 											<SkillBadge name={item.skill} />
 											{item.text && <MessageMarkdown text={item.text} />}

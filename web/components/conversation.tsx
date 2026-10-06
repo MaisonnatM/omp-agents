@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { Delivery, Item, LiveView, PromptImage, RosterHost } from "../../src/shared";
 import { InputMessage } from "@/components/ui/input-message";
 import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
@@ -99,6 +99,8 @@ function LiveConversation({
 		if (!subject.live) setPendingModelRevision(null);
 	}, [subject.live]);
 	const switchingModel = !!switchable && (switchable.modelSwitch.pending || pendingModelRevision === switchable.modelSwitch.revision);
+	const instanceId = view.instanceId;
+	const editPrompt = useCallback((entryId: string, text: string) => send({ t: "edit-prompt", instanceId, entryId, text }), [instanceId, send]);
 
 	const textarea = () => completion.composerRef.current?.querySelector("textarea");
 	const { queued, take } = useQueue({
@@ -223,6 +225,7 @@ function LiveConversation({
 				working={working}
 				fork={fork}
 				onFork={onFork}
+				onEdit={switchable ? editPrompt : undefined}
 				empty={
 					loaded &&
 					session &&

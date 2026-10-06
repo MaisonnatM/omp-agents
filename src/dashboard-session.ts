@@ -30,7 +30,9 @@ export type DashboardUpdate =
 	/** `ended`: {@link DashboardSession.end} stopped it. Otherwise it went down with the dashboard or on its own. */
 	| { kind: "exited"; ended: boolean }
 	/** omp appended to `path` without the lock churn that the file watcher reports on macOS, as a `!` command's record. */
-	| { kind: "written"; path: string };
+	| { kind: "written"; path: string }
+	/** The session moved to a new file and session id, so its views read that file from now on. */
+	| { kind: "switched" };
 
 /** Same shape as a Collab instance id, so the page's hash routing treats both alike. */
 export const newInstanceId = (): string => randomBytes(8).toString("hex");
@@ -97,7 +99,7 @@ export class DashboardSession implements LiveSession {
 	#userCommand = false;
 	/** Whether **End session** stopped the process, rather than the dashboard shutting down or omp exiting on its own. */
 	#ended = false;
-	/** Prompt, dequeue, abort, and flush, so an abort cannot land before the steer it should deliver. */
+	/** Prompt, dequeue, abort, flush, and edit, so an abort cannot land before the steer it should deliver. */
 	readonly #turn = new TurnGate();
 
 	private constructor(
@@ -349,6 +351,31 @@ export class DashboardSession implements LiveSession {
 				if (queuedMessages.steering.length > 0) await this.#child.client.abort();
 			})
 			.catch((err: unknown) => this.#fail("Send now failed", err));
+	}
+
+	/**
+	 * Replace user prompt `entryId` with `text` in this same process, as omp's `/branch` then a prompt does. A running
+	 * turn stops first. omp moves the session to a new file holding the history before that prompt; the old file stays.
+	 */
+	async editPrompt(entryId: string, text: string): Promise<void> {
+		const { client } = this.#child;
+		await this.#turn
+			.run(async () => {
+				if (text.startsWith("!")) throw new Error("an edited prompt cannot be a ! command");
+				if (this.#activity === "working") await client.abort();
+				if ((await client.branch(entryId)).cancelled) throw new Error("an omp extension cancelled the branch");
+				const state = await client.getState();
+				this.sessionId = state.sessionId;
+				this.sessionFile = state.sessionFile ?? null;
+				this.queue = state.queuedMessages;
+				this.#applyState(state);
+				// omp forgets the subagents of the history it left.
+				this.#agents.clear();
+				this.#emit({ kind: "switched" });
+				this.#userCommand = text.startsWith("/");
+				await client.prompt(text);
+			})
+			.catch((err: unknown) => this.#fail("Edit failed", err));
 	}
 
 	cancelAgent(agentId: string): void {

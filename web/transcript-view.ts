@@ -89,3 +89,13 @@ export function forkPoints(items: Item[]): Map<string, ForkPoint> {
 	}
 	return points;
 }
+
+/**
+ * The prompt a double-click edits: the last one, once omp has saved it. omp resends an edit as text alone, so a skill
+ * prompt or one that carried images is not editable.
+ */
+export function editablePrompt(items: Item[]): { itemId: string; entryId: string } | null {
+	const last = items.findLast(item => item.kind === "user");
+	if (last?.kind !== "user" || !last.entryId || last.skill || last.images?.length) return null;
+	return { itemId: last.id, entryId: last.entryId };
+}

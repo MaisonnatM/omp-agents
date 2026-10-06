@@ -187,6 +187,11 @@ function onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 		case "written":
 			loops.fileChanged(update.path);
 			return;
+		case "switched":
+			// Before the edited prompt's events, so they land in the new file's transcript.
+			views.sync();
+			broadcasts.syncRoster();
+			return;
 		default: {
 			const unhandled: never = update;
 			return unhandled;

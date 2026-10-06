@@ -284,6 +284,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	},
 	abort: ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "abort", instanceId } } : null),
 	flush: ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "flush", instanceId } } : null),
+	"edit-prompt": ({ instanceId, entryId, text }) =>
+		typeof instanceId === "string" && isNonEmpty(entryId) && typeof text === "string" && text.trim()
+			? { ok: { t: "edit-prompt", instanceId, entryId, text } }
+			: null,
 	"cancel-agent"(value) {
 		const view = parseLiveView(value.view);
 		const agentId = view?.ok.agentId;

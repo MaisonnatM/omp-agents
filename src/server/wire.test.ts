@@ -259,6 +259,13 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "set-fast", instanceId: "i1", enabled: true })).toEqual({ t: "set-fast", instanceId: "i1", enabled: true });
 		expect(msg({ t: "set-fast", instanceId: "i1", enabled: "true" })).toBeNull();
 	});
+
+	test("edit-prompt needs the entry it rewinds to and non-blank text", () => {
+		const edit = { t: "edit-prompt" as const, instanceId: "i1", entryId: "e1", text: "again" };
+		expect(msg(edit)).toEqual(edit);
+		expect(msg({ ...edit, entryId: "" })).toBeNull();
+		expect(msg({ ...edit, text: "  \n" })).toBeNull();
+	});
 });
 
 describe("parsePullRequestQuery", () => {

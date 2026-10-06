@@ -1044,6 +1044,8 @@ export type ClientMsg =
 	| { t: "abort"; instanceId: string }
 	/** Stop the running turn while the session still holds a steer, so omp runs that steer now, as an empty Enter does in its terminal. */
 	| { t: "flush"; instanceId: string }
+	/** Replace user prompt `entryId` of a session this dashboard started with `text`, stopping a running turn first; the session moves to a new file. */
+	| { t: "edit-prompt"; instanceId: string; entryId: string; text: string }
 	/** Suggestions for the composer text with the caret at `cursor`, resolved against the scope's cwd and its skills and commands. */
 	| { t: "complete"; reqId: number; scope: CompletionScope; text: string; cursor: number }
 	/** End a live session: stop the omp process this dashboard started, or send SIGTERM to a terminal session's omp. */
