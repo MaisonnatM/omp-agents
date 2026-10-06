@@ -6,6 +6,6 @@ export const PAGE_ICON = {
 	tickets: SquareKanban,
 	sessions: MessagesSquare,
 	todo: ListTodo,
-	routines: CalendarClock,
+	calendar: CalendarClock,
 	analytics: BarChart3,
 } as const satisfies Record<string, LucideIcon>;

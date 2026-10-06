@@ -15,6 +15,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
 - [Pull requests and the inbox](#pull-requests-and-the-inbox)
 - [Todo list](#todo-list)
+- [Calendar](#calendar)
 - [Routines](#routines)
 - [Settings](#settings)
 - [Keyboard shortcuts](#keyboard-shortcuts)
@@ -391,12 +392,12 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.
-- Five tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, **Todo**, and **Routines**, switch what the sidebar lists.
+- Five tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, **Todo**, and **Calendar**, switch what the sidebar lists.
   Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
   The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the project that the sidebar's picker shows, pinned ones included, whatever the sidebar's search hides.
-  **Routines** opens the sessions that start on a schedule; see [Routines](#routines).
+  **Calendar** opens a month of routine runs and due todos and tickets, with your routines listed under it; see [Calendar](#calendar) and [Routines](#routines).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone across the sidebar's width; hover an icon for its name.
   The tabs never spill past the sidebar.
   **Inbox** lists your pull requests in the sidebar, like Graphite's inbox, and keeps the session panes beside it.
@@ -605,10 +606,27 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - The tool leaves each change as a file in `todo-inbox/` beside `todos.json`, and the server applies it and deletes the file, so a todo an agent adds while the dashboard is down shows once it starts.
   A file that is not a change an agent may make moves to `<name>.invalid`.
 
+## Calendar
+
+- The **Calendar** tab, or a `#calendar` address, shows a month in place of the panes, Monday first.
+  The sidebar then lists **Calendar**, then **All** and each routine by name.
+- Each day lists its routine runs, the todos due on it, and, once Linear is connected, the Linear tickets due on it.
+  A green dot is a run that went through, a red one a run that failed, and a hollow one a run still to come.
+  A violet dot is a todo, and an amber one a ticket; a checked todo, or a done or canceled ticket, is struck through.
+- Planned runs follow each routine's schedules from its last run.
+  A time that passed without a run shows as now, since the next minute's check runs it.
+  A paused routine shows its past runs and no planned ones.
+  A routine that runs more than once a day shows once on each day from today, with how often it runs, instead of each run.
+  Only the last 10 runs of a routine are kept, so older months show no past runs.
+- A day cell shows three entries and how many more there are.
+  Click a day's number, or its **+N more**, to list all of its entries beside the month; today is listed when the page opens.
+- Click an entry to open its routine, its todo list, or its ticket.
+- The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
+
 ## Routines
 
 - A routine starts sessions, or runs a shell command, on one or more schedules.
-  The **Routines** tab, or a `#routines` address, lists them in place of the panes, and the sidebar then lists **All** and each routine by name, a paused one muted.
+  **All** under the **Calendar** tab, or a `#routines` address, lists them in place of the panes, and the sidebar lists each routine by name, a paused one muted.
   `#routines/<id>` opens one routine.
 - Routines run only while the dashboard runs; a time missed while it was down, or while the Mac was off or asleep, starts one run once it is back.
   In the desktop app, **Open at Login** keeps it running from the moment you log in.
@@ -714,6 +732,7 @@ Alt is Option on macOS.
 | G then T | Outside text fields | Go to your Linear tickets |
 | G then S | Outside text fields | Go to the sessions |
 | G then D | Outside text fields | Go to your todo list |
+| G then C | Outside text fields | Go to your calendar |
 | G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Choose the sidebar's project |
 | J | Inbox, outside text fields | Move to the next pull request, or show its details while one shows |
@@ -750,8 +769,8 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool call.
   Cmd+, or Cmd+Shift+J opens Settings, where the model roles live, and closes it again.
 - G then I opens the Inbox tab.
-  G then S goes back from the inbox, the todo list, the routines, Settings, or the new-session draft to the panes.
-  G then D opens the **Todo** page, and G then R the **Routines** page.
+  G then S goes back from the inbox, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
+  G then D opens the **Todo** page, G then C the **Calendar** page, and G then R the **Routines** page.
   G then P opens the project picker with its search field focused.
 - Session shortcuts act on the focused pane.
   The dashboard does not read `~/.omp/agent/keybindings.yml`.
