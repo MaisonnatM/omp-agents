@@ -50,6 +50,7 @@ Bump them there together with the README.
 - Update [docs/usage.md](docs/usage.md) when you change what the interface does, and [docs/architecture.md](docs/architecture.md) when you change how the server works.
 - The dashboard builds on omp's own modules.
   Prefer importing omp's code over reimplementing a protocol or file format.
+- Follow [CODING_STANDARDS.md](CODING_STANDARDS.md) for omp imports and Markdown style.
 
 See [docs/architecture.md](docs/architecture.md#code-layout) for where each part of the code lives.
 
