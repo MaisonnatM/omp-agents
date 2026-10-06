@@ -11,8 +11,10 @@ import {
 	app,
 	BrowserWindow,
 	type ContextMenuParams,
+	dialog,
 	globalShortcut,
 	Menu,
+	type MenuItem,
 	type MenuItemConstructorOptions,
 	type Rectangle,
 	screen,
@@ -25,6 +27,7 @@ import { dashboardHosts, isListeningLine, originOf, portFromEnv } from "../src/s
 import { loadToken } from "../src/server/auth";
 import { parseUserTodoList } from "../src/user-todos-parse";
 import { QUICK_TODO_EVENT } from "../src/shared";
+import { opensAtLogin, removeLoginAgent, writeLoginAgent } from "./login-item";
 
 const PORT = portFromEnv();
 const ORIGIN = originOf(PORT);
@@ -247,10 +250,22 @@ function createWindow(): BrowserWindow {
 	return win;
 }
 
+/** Writes or removes the login agent for `item`'s new state, then shows what the disk holds, so a failure leaves no wrong check mark. */
+function toggleOpenAtLogin(item: MenuItem): void {
+	try {
+		if (item.checked) writeLoginAgent(PORT, [process.execPath, app.getAppPath()]);
+		else removeLoginAgent(PORT);
+	} catch (err) {
+		dialog.showErrorBox("Open at Login failed", errorText(err));
+	}
+	item.checked = opensAtLogin(PORT);
+}
+
 /** The menu holds no shortcut the dashboard binds (web/shortcuts.ts), so every one reaches the page. */
 function applicationMenu(): Menu {
+	const openAtLogin: MenuItemConstructorOptions = { label: "Open at Login", type: "checkbox", checked: IS_MAC && opensAtLogin(PORT), click: toggleOpenAtLogin };
 	const appMenu: MenuItemConstructorOptions[] = IS_MAC
-		? [{ label: app.name, submenu: [{ role: "about" }, SEPARATOR, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, SEPARATOR, { role: "quit" }] }]
+		? [{ label: app.name, submenu: [{ role: "about" }, SEPARATOR, openAtLogin, SEPARATOR, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, SEPARATOR, { role: "quit" }] }]
 		: [];
 	const front: MenuItemConstructorOptions[] = IS_MAC ? [SEPARATOR, { role: "front" }] : [];
 	return Menu.buildFromTemplate([

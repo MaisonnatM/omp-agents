@@ -569,6 +569,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - A routine starts sessions, or runs a shell command, on one or more schedules.
   The **Routines** tab, or a `#routines` address, lists them in place of the panes, and the sidebar then lists **All** and each routine by name, a paused one muted.
   `#routines/<id>` opens one routine.
+- Routines run only while the dashboard runs; a time missed while it was down, or while the Mac was off or asleep, starts one run once it is back.
+  In the desktop app, **Open at Login** keeps it running from the moment you log in.
 - **New routine** opens the editor: a name, the workspace it runs in, its task, its schedules, and its skill.
   The task is a prompt you write, or a shell command.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick. **Weekdays** and **Every day** pick those days at once. **Add schedule** adds another. The routine runs at the earliest of them, and a missed time still starts one run.
@@ -728,6 +730,8 @@ Alt is Option on macOS.
   Click the app in the Dock, or run `bun run desktop` again, to show it.
   Cmd+Q quits the app; when the app started the server, it waits for the server to end its sessions first, which then show under **interrupted** at the next start.
   Off macOS, closing the window quits.
+- On macOS, **omp agents › Open at Login** starts the app, and with it the server, when you log in.
+  It carries `PATH`, `PORT`, `XDG_CONFIG_HOME`, `OMP_PACKAGE_DIR`, and `PI_CODING_AGENT_DIR` from the environment you ticked it in, since an app started at login gets no shell environment; tick it off and on again after one of them changes.
 - Every link to another site opens in the default browser, and so does **Connect Linear**'s sign-in page.
   The window never leaves the dashboard.
 - Cmd+W closes the window, Cmd+R reloads it, Cmd+Q quits, Cmd+M minimizes, and Cmd+0, Cmd++, and Cmd+- set the zoom.
