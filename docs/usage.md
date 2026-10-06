@@ -559,6 +559,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - Every list shows its todos to do first and its checked ones after them, at both levels, each side in its own order.
   Click the circle before a todo to check it; checking a todo checks the todos under it too.
   A checked todo moves below the ones left to do, and unchecking one puts it last among them.
+  An unchecked top-level todo linked to a session shows a work-state pill instead of repeating the session's name: **Agent working**, **Needs you**, **In review**, **Shipped**, **Session ended**, or **Session unavailable**.
+  The pill opens the latest linked session; it does not check the todo or change its category.
   A todo that holds others shows how many of them are checked, as in `2/3`.
   The page's header counts the top-level todos left to do, and **Clear done** moves every checked todo it lists to **Done**, a checked todo under an unchecked one as a todo of its own.
 - **Done** lists the cleared todos, latest first, with the day each was checked.

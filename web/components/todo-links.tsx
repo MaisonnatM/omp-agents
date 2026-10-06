@@ -3,6 +3,7 @@ import { hashForSession, type PastSession, type RosterHost, type UserTodoLink } 
 import { hostLabel, pastLabel } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import { hashForInbox, hashForTickets } from "../routing";
+import type { TodoWorkState } from "../todo-work-state";
 import { Tooltip } from "@/components/ui/tooltip";
 import { StatusDot } from "./status-dot";
 
@@ -66,6 +67,29 @@ export function TodoLinkChip({ link, sessions, onRemove }: TodoLinkChipProps) {
 				</Tooltip>
 			)}
 		</span>
+	);
+}
+
+const WORK_LABELS: Record<TodoWorkState["kind"], { label: string; color: string }> = {
+	idea: { label: "Idea", color: "bg-muted-foreground" },
+	working: { label: "Agent working", color: "bg-sky-500" },
+	"needs-you": { label: "Needs you", color: "bg-amber-500" },
+	"in-review": { label: "In review", color: "bg-violet-500" },
+	shipped: { label: "Shipped", color: "bg-emerald-500" },
+	ended: { label: "Session ended", color: "bg-muted-foreground" },
+	unavailable: { label: "Session unavailable", color: "bg-muted-foreground" },
+};
+
+export function TodoWorkPill({ state }: { state: TodoWorkState }) {
+	if (state.kind === "idea") return null;
+	const { label, color } = WORK_LABELS[state.kind];
+	return (
+		<Tooltip content={`${label}. Open session`}>
+			<a href={hashForSession(state.sessionId)} className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground">
+				<span className={`size-1.5 rounded-full ${color}`} aria-hidden />
+				{label}
+			</a>
+		</Tooltip>
 	);
 }
 
