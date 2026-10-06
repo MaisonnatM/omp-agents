@@ -3,50 +3,62 @@
  * the server's tools, and the sign-in and sign-out the page starts. A sign-in adds the service's server to omp's
  * user-level MCP config when omp has none.
  */
-import { addMcpServer, checkMcpServer, findMcpServer, type McpServer, mcpSignedIn, signInMcp, signOutMcp } from "./omp/mcp";
-import { type IntegrationsAnswer, MCP_INTEGRATIONS, type McpConnection, type McpIntegration, type McpIntegrationId } from "./shared/accounts";
+import { errorText } from "./json";
+import { addMcpServer, checkMcpServer, findMcpServer, type McpServer, McpRefused, mcpSignedIn, signInMcp, signOutMcp } from "./omp/mcp";
+import { type IntegrationsAnswer, MCP_INTEGRATIONS, MCP_SERVICES, type McpConnection, type McpIntegration, type McpIntegrationId } from "./shared/accounts";
 import { createSignIn, type SignIn } from "./sign-in";
 
-interface Service {
-	label: string;
-	/** The host omp's server for the service is on, whatever omp named it. */
-	host: string;
-	/** The server a sign-in adds, by `name`, when omp has none. */
-	url: string;
-	name: string;
-	signIn: SignIn;
-}
+const signIns = Object.fromEntries(
+	MCP_INTEGRATIONS.map(id => [id, createSignIn(`${MCP_SERVICES[id].label}'s sign-in page was not completed within 5 minutes. Try again.`)]),
+) as Record<McpIntegrationId, SignIn>;
 
-const timeout = (label: string): string => `${label}'s sign-in page was not completed within 5 minutes. Try again.`;
-
-const SERVICES: Record<McpIntegrationId, Service> = {
-	linear: { label: "Linear", host: "mcp.linear.app", url: "https://mcp.linear.app/mcp", name: "linear", signIn: createSignIn(timeout("Linear")) },
-};
+/** Each service's connection as last answered, which a read repeats while its sign-in waits on the browser. */
+const lastConnections = new Map<McpIntegrationId, McpConnection>();
 
 /** omp's server for `id`, which reads and writes the service through its tools. */
 export async function integrationServer(id: McpIntegrationId): Promise<McpServer> {
-	const server = await findMcpServer(SERVICES[id].host);
-	if (!server) throw new Error(`${SERVICES[id].label} is not connected. Connect it on the Integrations page.`);
+	const server = await findMcpServer(MCP_SERVICES[id].host);
+	if (!server) throw new Error(`${MCP_SERVICES[id].label} is not connected. Connect it on the Integrations page.`);
 	return server;
 }
 
-async function connectionOf(id: McpIntegrationId, fresh: boolean): Promise<McpConnection> {
-	const found = await findMcpServer(SERVICES[id].host);
-	if (!found) return { kind: "absent" };
-	const server = { name: found.name, url: found.url };
-	if (!(await mcpSignedIn(found))) return { kind: "signed-out", server };
-	const check = await checkMcpServer(found, fresh);
-	if (check.ok) return { kind: "ready", server, tools: check.tools };
-	return { kind: check.refused ? "refused" : "failing", server, error: check.error };
+/** How {@link connectionOf} asks omp about a server: whether it holds a sign-in, and the server's tools with it. */
+export interface McpProbes {
+	signedIn: (server: McpServer) => Promise<boolean>;
+	tools: (server: McpServer) => Promise<string[]>;
 }
 
-async function loadIntegration(id: McpIntegrationId, fresh: boolean): Promise<McpIntegration> {
-	return { id, connection: await connectionOf(id, fresh), signIn: SERVICES[id].signIn.state() };
+/** Where omp stands with `found`, omp's server for a service or `null` when its config has none. */
+export async function connectionOf(found: McpServer | null, probes: McpProbes): Promise<McpConnection> {
+	if (!found) return { kind: "absent" };
+	const server = { name: found.name, url: found.url, host: new URL(found.url).host };
+	if (!(await probes.signedIn(found))) return { kind: "signed-out", server };
+	try {
+		return { kind: "ready", server, tools: await probes.tools(found) };
+	} catch (err) {
+		return { kind: err instanceof McpRefused ? "refused" : "failing", server, error: errorText(err) };
+	}
 }
+
+/**
+ * `id`'s integration with `found` as its server. While a sign-in waits on the browser, the connection is the last one
+ * answered, since the sign-in is about to change it and the page asks every few seconds meanwhile.
+ */
+async function loadIntegration(id: McpIntegrationId, found: McpServer | null, fresh: boolean): Promise<McpIntegration> {
+	const signIn = signIns[id].state();
+	const last = lastConnections.get(id);
+	const connection =
+		signIn?.phase === "waiting" && last ? last : await connectionOf(found, { signedIn: mcpSignedIn, tools: server => checkMcpServer(server, fresh) });
+	lastConnections.set(id, connection);
+	return { id, connection, signIn };
+}
+
+const findServer = (id: McpIntegrationId): Promise<McpServer | null> => findMcpServer(MCP_SERVICES[id].host);
 
 /** Every integration; `fresh` lists each signed-in server's tools again rather than the minute-old list. */
 export async function loadIntegrations(fresh: boolean): Promise<IntegrationsAnswer> {
-	return { integrations: await Promise.all(MCP_INTEGRATIONS.map(id => loadIntegration(id, fresh))) };
+	const loaded = await Promise.all(MCP_INTEGRATIONS.map(async id => loadIntegration(id, await findServer(id), fresh)));
+	return { integrations: Object.fromEntries(loaded.map(integration => [integration.id, integration])) as IntegrationsAnswer["integrations"] };
 }
 
 /**
@@ -54,19 +66,19 @@ export async function loadIntegrations(fresh: boolean): Promise<IntegrationsAnsw
  * has failed. It signs in to omp's server for the service, else adds one once the browser comes back.
  */
 export async function startIntegrationSignIn(id: McpIntegrationId): Promise<McpIntegration> {
-	const service = SERVICES[id];
-	await service.signIn.start(async (signal, waiting) => {
-		const found = await findMcpServer(service.host);
+	const service = MCP_SERVICES[id];
+	await signIns[id].start(async (signal, waiting) => {
+		const found = await findServer(id);
 		await signInMcp(found ?? { url: service.url }, { onAuth: waiting, signal });
-		if (!found) await addMcpServer(service.name, service.url);
+		if (!found) await addMcpServer(service.serverName, service.url);
 	});
-	return loadIntegration(id, false);
+	return loadIntegration(id, await findServer(id), false);
 }
 
 /** Abandons a sign-in to `id` under way and signs omp out of its server, which stays in omp's config. */
 export async function signOutIntegration(id: McpIntegrationId): Promise<McpIntegration> {
-	SERVICES[id].signIn.cancel();
-	const found = await findMcpServer(SERVICES[id].host);
+	signIns[id].cancel();
+	const found = await findServer(id);
 	if (found) await signOutMcp(found);
-	return loadIntegration(id, false);
+	return loadIntegration(id, found, false);
 }

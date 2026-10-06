@@ -407,14 +407,18 @@ The issue detail shows a change at once and sends its changes one at a time, and
 
 ### Integrations
 
-`src/integrations.ts` holds the services whose MCP server the **Integrations** page signs omp in to, one row each in `SERVICES`, keyed by the ids in `MCP_INTEGRATIONS` in `src/shared/accounts.ts`; Linear is the only one so far.
-A row names the host omp's server for the service is on, and the name and URL of the server a sign-in adds when omp has none.
+`MCP_SERVICES` in `src/shared/accounts.ts` holds the services whose MCP server the **Integrations** page signs omp in to, keyed by the ids in `MCP_INTEGRATIONS`; Linear is the only one so far.
+Each names its label, the host omp's server for the service is on, and the name and URL of the server a sign-in adds when omp has none.
+`src/integrations.ts` keeps a sign-in per service, and the page adds each service's brand mark and what it gives.
 
-`GET /api/integrations` answers `{ integrations }`, one `McpIntegration`, `{ id, connection, signIn }`, per service.
+`GET /api/integrations` answers `{ integrations }`, one `McpIntegration`, `{ id, connection, signIn }`, under each service's id.
 `connection` is `absent` while omp's user-level MCP config has no enabled server on the service's host, and `signed-out` while omp's credential store, read again on each call, holds no OAuth sign-in for it.
-Otherwise `checkMcpServer` in `src/omp/mcp.ts` lists the server's tools with `tools/list`, following `nextCursor`, through the same token as the tickets' calls: `ready` carries the tool names, `refused` the 401 that asks for a new sign-in, and `failing` any other error.
-The server keeps each list for a minute, `?fresh` lists again, and a sign-in, a sign-out, or a 401 drops it.
-The page shows the **Tickets** tab while Linear's connection is `ready`, `refused`, or `failing`, and keeps the last read in localStorage; the tickets page shows Linear's integration row instead of the issues while it is not `ready` or `failing`.
+Otherwise `checkMcpServer` in `src/omp/mcp.ts` lists the server's tools with `tools/list`, following `nextCursor`, through the same token as the tickets' calls.
+`connectionOf` in `src/integrations.ts` turns the outcome into `ready` with the tool names, `refused` when the server throws `McpRefused` on a 401 that asks for a new sign-in, or `failing` with any other error.
+The server keeps each list for a minute and never a failure; `?fresh` lists again, and a sign-in, a sign-out, or a 401 on a tickets call drops it.
+While a service's sign-in waits on the browser, its connection is the one last answered, without listing the tools again.
+The page shows the **Tickets** tab while Linear's connection is `ready`, `refused`, or `failing`, and keeps the last read in localStorage.
+The dashboard calls Linear only while its connection is `ready` or `failing`: the tickets page shows Linear's integration row instead of the issues otherwise, and the Todo page's **Create Linear ticket** and the Calendar's tickets wait on it too.
 
 `PUT /api/integrations/sign-in`, with `{ id }`, starts a sign-in the way omp's `/mcp reauth` does: it reads the service's OAuth endpoints from its metadata, registers a client, and starts omp's `MCPOAuthFlow`, whose callback server listens on `localhost:3000`.
 It answers the integration once the flow has the service's authorization address, as `signIn: { phase: "waiting", url }`, which the page opens in a new tab.
@@ -423,7 +427,8 @@ A new sign-in abandons the one under way.
 A failure, or no return within five minutes, shows as `signIn: { phase: "failed", error }` until the next sign-in.
 `createSignIn` in `src/sign-in.ts` holds that state for every MCP integration and for Google.
 
-`PUT /api/integrations/sign-out`, with `{ id }`, abandons a sign-in under way and signs out the way omp's `/mcp unauth` does: omp's `removeManagedMcpOAuthCredentials` removes the sign-ins omp manages under the server's credential id and the ids it files a sign-in for the URL under, and `mcp.json` keeps the server.
+`PUT /api/integrations/sign-out`, with `{ id }`, abandons a sign-in under way and removes the sign-ins omp manages for the server, as omp's `/mcp unauth` does: omp's `removeManagedMcpOAuthCredentials` removes them under the server's credential id and the ids it files a sign-in for the URL under.
+`mcp.json` keeps the server and, unlike `/mcp unauth`, its `auth` block.
 A sign-in that omp does not manage stays, and the route answers an error that says so.
 `parseIntegrationId` in `src/server/wire.ts` checks both bodies.
 
@@ -631,7 +636,8 @@ The page lives in `web/`.
 - `web/components/session-details.tsx`: the right sidebar's tabs for the focused pane: `outline-tab.tsx`, its turns from `outline` in `web/transcript-view.ts`, which scroll the focused pane's transcript to their prompt or reply and mark the turn its scroll is on; its changed files; and `media-tab.tsx`, its images and their viewer.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.
   `web/components/integrations/` holds the Integrations page, which sorts its rows into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which the tickets page also shows while Linear is not connected, and `google-calendar.tsx` is Google Calendar's, with the form that saves its OAuth client.
-  Both lay out through `integration-row.tsx`, draw their brand marks from `brand-logos.tsx`, and start their sign-ins with `web/use-sign-in.ts`.
+  Both lay out through `integration-row.tsx`, draw their brand marks from `brand-logos.tsx`, and start their sign-ins with `web/use-sign-in.ts`; `mcp-integration.tsx`'s `SignOutConfirm` asks before a sign-out and shows its failure.
+  `web/components/more-actions-menu.tsx` is the ⋯ menu of a row's rarer actions, which the integration rows and the Routines page share.
   `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue; both wrap their details in `DetailPage` from `web/components/list-page.tsx`.
   `pr-row.tsx` exports the DOM lookups of a row and its link that the inbox's keys use.
   `web/use-drag-order.ts` drags the inbox's repositories, sections, and pull requests, each within its own scope, and draws the drop line.

@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from "react";
-import { type GoogleStatus, type IntegrationsAnswer, signedIn } from "../../../src/shared/accounts";
+import { type GoogleStatus, type IntegrationsAnswer, MCP_INTEGRATIONS, signedIn } from "../../../src/shared/accounts";
 import type { PolledEntry } from "../../polled-store";
 import { googleStore, integrationsStore } from "../../reads";
 import { ListPage } from "../list-page";
@@ -33,7 +33,7 @@ function Section({ title, entries }: { title: string; entries: Entry[] }) {
 
 /** The integrations a sign-in holds, then the rest, then where their credentials live. */
 function Sections({ answer, google }: { answer: IntegrationsAnswer; google: PolledEntry<GoogleStatus> }) {
-	const entries: Entry[] = answer.integrations.map(integration => ({
+	const entries: Entry[] = MCP_INTEGRATIONS.map(id => answer.integrations[id]).map(integration => ({
 		key: integration.id,
 		connected: signedIn(integration.connection),
 		row: <McpIntegrationRow integration={integration} />,

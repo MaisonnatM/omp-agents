@@ -4,15 +4,16 @@ import type { GoogleStatus, SignInState } from "../../../src/shared/accounts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
-import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";
 import { googleStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
-import { FIELD } from "../settings/editor";
+import { MoreActionsMenu } from "../more-actions-menu";
 import { GOOGLE_CALENDAR_LOGO } from "./brand-logos";
-import { Callout, IntegrationRow, MetaDot, RowMenu } from "./integration-row";
+import { Callout, IntegrationRow, MetaDot } from "./integration-row";
 
 const NAME = "Google Calendar";
+
+const FIELD = "block h-8 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const startGoogleSignIn = async (): Promise<SignInState> => (await putJson<GoogleStatus>("/api/google/sign-in", {})).signIn;
 
@@ -74,15 +75,15 @@ function ClientForm({ id, replacing, connected, onDone }: ClientFormProps) {
 			<div className="grid gap-3 sm:grid-cols-2">
 				<label className="space-y-1">
 					<span className="text-xs font-medium">Client ID</span>
-					<input name="google-client-id" type="text" autoComplete="off" autoFocus value={clientId} onChange={event => setClientId(event.target.value)} required placeholder="…apps.googleusercontent.com" className={cn(FIELD, "block h-8 w-full")} />
+					<input name="google-client-id" type="text" autoComplete="off" autoFocus value={clientId} onChange={event => setClientId(event.target.value)} required placeholder="…apps.googleusercontent.com" className={FIELD} />
 				</label>
 				<label className="space-y-1">
 					<span className="text-xs font-medium">Client secret</span>
-					<input name="google-client-secret" type="password" autoComplete="off" value={clientSecret} onChange={event => setClientSecret(event.target.value)} required className={cn(FIELD, "block h-8 w-full")} />
+					<input name="google-client-secret" type="password" autoComplete="off" value={clientSecret} onChange={event => setClientSecret(event.target.value)} required className={FIELD} />
 				</label>
 			</div>
 			{saveError && (
-				<Callout tone="danger" icon={CircleAlert}>
+				<Callout tone="danger" icon={CircleAlert} role="alert">
 					Cannot save the OAuth client: {saveError}
 				</Callout>
 			)}
@@ -113,28 +114,21 @@ export function GoogleCalendarRow({ status, error }: GoogleCalendarRowProps) {
 	const clientId = status?.clientId ?? null;
 	const connected = status?.connected ?? false;
 
-	let badge;
+	let badge: ReactNode = null;
 	if (waitingUrl) badge = <Badge variant="dot" size="compact" color="blue">Waiting for you</Badge>;
 	else if (connected) badge = <Badge variant="dot" size="compact" color="green">Connected</Badge>;
 	else if (status) badge = <Badge variant="dot" size="compact" color="gray">{clientId ? "Not connected" : "Not set up"}</Badge>;
 
-	let actions;
-	if (formOpen) actions = null;
-	else if (!clientId) {
-		actions = (
-			<Button variant="secondary" size="compact" disabled={!status} onClick={() => setFormOpen(true)}>
-				Set up
-			</Button>
-		);
-	} else {
-		actions = (
+	let actions: ReactNode = null;
+	if (!formOpen && !waitingUrl) {
+		actions = clientId ? (
 			<>
-				{!connected && !waitingUrl && (
+				{!connected && (
 					<Button variant="secondary" size="compact" loading={starting} onClick={() => void connect()}>
 						Connect
 					</Button>
 				)}
-				<RowMenu name={NAME} disabled={starting}>
+				<MoreActionsMenu name={NAME} disabled={starting}>
 					{connected && (
 						<MenuItem onClick={() => void connect()}>
 							<RefreshCw />
@@ -145,8 +139,43 @@ export function GoogleCalendarRow({ status, error }: GoogleCalendarRowProps) {
 						<KeyRound />
 						Replace OAuth client
 					</MenuItem>
-				</RowMenu>
+				</MoreActionsMenu>
 			</>
+		) : (
+			<Button variant="secondary" size="compact" disabled={!status} onClick={() => setFormOpen(true)}>
+				Set up
+			</Button>
+		);
+	}
+
+	let callout: ReactNode = null;
+	if (!status && error) {
+		callout = (
+			<Callout tone="danger" icon={CircleAlert}>
+				Cannot check Google Calendar: {error}
+			</Callout>
+		);
+	} else if (waitingUrl) {
+		callout = (
+			<Callout
+				tone="info"
+				icon={LoaderCircle}
+				role="status"
+				spin
+				action={
+					<Button variant="ghost" size="compact" leadingIcon={ExternalLink} render={<a href={waitingUrl} target="_blank" rel="noreferrer" />}>
+						Open sign-in page
+					</Button>
+				}
+			>
+				Approve read-only calendar access on Google in the tab that opened. This updates on its own.
+			</Callout>
+		);
+	} else if (failure) {
+		callout = (
+			<Callout tone="danger" icon={CircleAlert} role="alert">
+				Sign-in failed: {failure}
+			</Callout>
 		);
 	}
 
@@ -173,30 +202,7 @@ export function GoogleCalendarRow({ status, error }: GoogleCalendarRowProps) {
 			}
 			actions={actions}
 		>
-			{!status && error && (
-				<Callout tone="danger" icon={CircleAlert}>
-					Cannot check Google Calendar: {error}
-				</Callout>
-			)}
-			{waitingUrl && (
-				<Callout
-					tone="info"
-					icon={LoaderCircle}
-					spin
-					action={
-						<Button variant="ghost" size="compact" leadingIcon={ExternalLink} render={<a href={waitingUrl} target="_blank" rel="noreferrer" />}>
-							Open sign-in page
-						</Button>
-					}
-				>
-					Approve read-only calendar access on Google in the tab that opened. This updates on its own.
-				</Callout>
-			)}
-			{failure && !waitingUrl && (
-				<Callout tone="danger" icon={CircleAlert}>
-					Sign-in failed: {failure}
-				</Callout>
-			)}
+			{callout}
 			{formOpen && <ClientForm id={formId} replacing={clientId !== null} connected={connected} onDone={() => setFormOpen(false)} />}
 		</IntegrationRow>
 	);

@@ -175,7 +175,7 @@ export function TicketsDisconnected({ linear }: { linear: McpIntegration }) {
 	return (
 		<PageFrame title={TITLE} meta={META}>
 			<div className="mx-auto w-full max-w-3xl px-6 py-6">
-				<IntegrationList label="Linear">
+				<IntegrationList label="Linear connection">
 					<McpIntegrationRow integration={linear} />
 				</IntegrationList>
 			</div>

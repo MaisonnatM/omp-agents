@@ -5,7 +5,7 @@
  */
 import { isObject, nonEmpty, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
-import { GOOGLE_CLIENT_ID, type GoogleClient, isMcpIntegration, type McpIntegrationId } from "../shared/accounts";
+import { GOOGLE_CLIENT_ID, type GoogleClient, MCP_INTEGRATIONS, type McpIntegrationId } from "../shared/accounts";
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import type { BranchChoice } from "../shared/git";
@@ -356,6 +356,8 @@ export function parseGoogleClient(body: unknown): GoogleClient | null {
 	const clientId = body.clientId.trim();
 	return GOOGLE_CLIENT_ID.test(clientId) ? { clientId, clientSecret: body.clientSecret.trim() } : null;
 }
+
+const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
 /** The body of `PUT /api/integrations/sign-in` and `/sign-out`: `{ id }` naming an MCP integration. */
 export const parseIntegrationId = (body: unknown): McpIntegrationId | null => (isObject(body) && isMcpIntegration(body.id) ? body.id : null);

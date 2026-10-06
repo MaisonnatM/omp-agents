@@ -7,12 +7,24 @@ export type SignInState = { phase: "waiting"; url: string } | { phase: "failed";
 export const MCP_INTEGRATIONS = ["linear"] as const;
 export type McpIntegrationId = (typeof MCP_INTEGRATIONS)[number];
 
-export const isMcpIntegration = (value: unknown): value is McpIntegrationId => MCP_INTEGRATIONS.some(id => id === value);
+export interface McpService {
+	label: string;
+	/** The host omp's server for the service is on, whatever omp named it. */
+	host: string;
+	/** The server a sign-in adds, under `serverName` in omp's MCP config, when omp has none. */
+	url: string;
+	serverName: string;
+}
 
-/** omp's MCP server for a service: its name in omp's MCP config, and its URL. */
+export const MCP_SERVICES: Record<McpIntegrationId, McpService> = {
+	linear: { label: "Linear", host: "mcp.linear.app", url: "https://mcp.linear.app/mcp", serverName: "linear" },
+};
+
+/** omp's MCP server for a service: its name in omp's MCP config, its URL, and that URL's host. */
 export interface McpServerRef {
 	name: string;
 	url: string;
+	host: string;
 }
 
 /**
@@ -26,8 +38,11 @@ export type McpConnection =
 	| { kind: "refused"; server: McpServerRef; error: string }
 	| { kind: "failing"; server: McpServerRef; error: string };
 
-/** Whether omp holds a sign-in for the service, working or not. */
+/** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and Linear's Tickets tab shows. */
 export const signedIn = (connection: McpConnection): boolean => connection.kind !== "absent" && connection.kind !== "signed-out";
+
+/** Whether the dashboard calls the service's tools: the server took omp's sign-in, or failed for a reason a retry may clear. */
+export const callable = (connection: McpConnection): boolean => connection.kind === "ready" || connection.kind === "failing";
 
 /** One service of `GET /api/integrations`, and what `PUT /api/integrations/sign-in` and `/sign-out` answer. */
 export interface McpIntegration {
@@ -37,9 +52,9 @@ export interface McpIntegration {
 	signIn: SignInState;
 }
 
-/** `GET /api/integrations[?fresh]`: every MCP integration, in the order of {@link MCP_INTEGRATIONS}. */
+/** `GET /api/integrations[?fresh]`: every MCP integration by its id. */
 export interface IntegrationsAnswer {
-	integrations: McpIntegration[];
+	integrations: Record<McpIntegrationId, McpIntegration>;
 }
 
 /** `GET /api/google`, and the writes under it: the OAuth client saved in the settings, and whether it holds a sign-in. The client secret never leaves the server. */

@@ -535,7 +535,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Until omp is signed in to that server, the sidebar has no **Tickets** tab, Cmd+2 keeps its browser behavior, and a `#tickets` address shows Linear's integration row instead of the issues.
 - To connect, open the **Integrations** page and choose **Connect** on Linear's row; see [Integrations](#integrations).
   A new browser tab opens Linear's sign-in page; approve omp there, and the **Tickets** tab appears within a few seconds.
-  When Linear later refuses the sign-in, the **Tickets** tab stays and its page shows Linear's row with **Reconnect**.
+  When Linear later refuses the sign-in, the **Tickets** tab stays and its page shows Linear's row with **Reconnect**; the Todo page's **Create Linear ticket** and the Calendar's tickets hide until it works again.
 
 ## Integrations
 
@@ -545,9 +545,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The page checks again every minute, and **Refresh** checks at once.
 - **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
   The service's page sends the browser back to `localhost:3000`, so that port must be free while you sign in.
-  While it waits, the row says so and links to the sign-in page again.
+  While it waits, the row says so, links to the sign-in page again, and hides its other buttons.
 - A connected row's ⋯ menu holds **Reconnect**, which signs in again over a sign-in that the server refused or that still works, and **Sign out**.
-  **Sign out** asks first, then removes omp's sign-in for the service, as omp's `/mcp unauth` does, so omp's sessions lose its tools too; the server stays in `mcp.json`.
+  **Sign out** asks first, then removes the sign-ins omp manages for the service, as omp's `/mcp unauth` does, so omp's sessions lose its tools too; the server stays in `mcp.json`.
+  When the sign-out fails, the question stays with the reason, to try again or cancel.
 - Google Calendar's **Set up** opens the steps to create its OAuth client and the fields for its ID and secret; once saved, **Connect** signs in, and the ⋯ menu holds **Reconnect** and **Replace OAuth client**.
 
 ## Todo list

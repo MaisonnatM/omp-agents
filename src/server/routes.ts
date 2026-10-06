@@ -140,7 +140,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	/** `PUT /api/integrations/sign-in`: starts a sign-in and answers with its authorization address to open. */
 	const integrationSignIn = integrationWrite(startIntegrationSignIn);
 
-	/** `PUT /api/integrations/sign-out`: signs omp out of the integration's server, as `/mcp unauth` does. */
+	/** `PUT /api/integrations/sign-out`: removes the sign-ins omp manages for the integration's server, as `/mcp unauth` does; its config stays. */
 	const integrationSignOut = integrationWrite(signOutIntegration);
 
 	/** `GET /api/google`: the OAuth client saved for Google Calendar, whether it holds a sign-in, and the sign-in the settings last started. */

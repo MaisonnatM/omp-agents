@@ -1,6 +1,6 @@
 import { ChevronRight, CircleAlert, ExternalLink, LoaderCircle, LogOut, RefreshCw, WifiOff } from "lucide-react";
-import { useId, useState } from "react";
-import { type McpConnection, type McpIntegration, type McpIntegrationId, type McpServerRef, type SignInState, signedIn } from "../../../src/shared/accounts";
+import { type ReactNode, useId, useState } from "react";
+import { MCP_SERVICES, type McpConnection, type McpIntegration, type McpIntegrationId, type McpServerRef, type SignInState, signedIn } from "../../../src/shared/accounts";
 import { Badge, type BadgeColor } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
@@ -8,11 +8,11 @@ import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
+import { MoreActionsMenu } from "../more-actions-menu";
 import { type BrandLogo, LINEAR_LOGO } from "./brand-logos";
-import { Callout, IntegrationRow, MetaDot, RowMenu } from "./integration-row";
+import { Callout, IntegrationRow, MetaDot } from "./integration-row";
 
 interface Service {
-	name: string;
 	logo: BrandLogo;
 	/** What the connection gives the dashboard and omp's sessions. */
 	gives: string;
@@ -20,7 +20,6 @@ interface Service {
 
 const SERVICES: Record<McpIntegrationId, Service> = {
 	linear: {
-		name: "Linear",
 		logo: LINEAR_LOGO,
 		gives: "Your assigned issues on the Tickets tab, and Linear's tools in every omp session.",
 	},
@@ -33,8 +32,6 @@ const STATUS: Record<McpConnection["kind"], { label: string; color: BadgeColor }
 	refused: { label: "Needs reconnecting", color: "red" },
 	failing: { label: "Unreachable", color: "amber" },
 };
-
-const refresh = (): Promise<void> => integrationsStore.refresh();
 
 /** The tools omp sessions can call, sorted for scanning, and the server they come from. */
 function ToolList({ id, tools, server }: { id: string; tools: string[]; server: McpServerRef }) {
@@ -54,55 +51,69 @@ function ToolList({ id, tools, server }: { id: string; tools: string[]; server: 
 	);
 }
 
-/** One service whose MCP server omp signs in to: where omp stands with it, and the buttons that sign in and out. */
-export function McpIntegrationRow({ integration }: { integration: McpIntegration }) {
-	const { id, connection } = integration;
-	const service = SERVICES[id];
-	const start = async (): Promise<SignInState> => (await putJson<McpIntegration>("/api/integrations/sign-in", { id })).signIn;
-	const { starting, waitingUrl, failure, connect } = useSignIn(integration.signIn, refresh, start);
-	const [confirming, setConfirming] = useState(false);
+/** Asks before signing omp out of `name`, then signs out; a failure stays in the question, to try again or cancel. */
+function SignOutConfirm({ id, name, onDone }: { id: McpIntegrationId; name: string; onDone: () => void }) {
 	const [signingOut, setSigningOut] = useState(false);
-	const [signOutError, setSignOutError] = useState<string | null>(null);
-	const [toolsOpen, setToolsOpen] = useState(false);
-	const [checking, setChecking] = useState(false);
-	const toolsId = useId();
+	const [error, setError] = useState<string | null>(null);
 
 	const signOut = async (): Promise<void> => {
 		setSigningOut(true);
-		setSignOutError(null);
+		setError(null);
 		try {
 			await putJson<McpIntegration>("/api/integrations/sign-out", { id });
-			await refresh();
+			await integrationsStore.refresh();
+			onDone();
 		} catch (err) {
-			setSignOutError(errorText(err));
-		} finally {
+			setError(errorText(err));
 			setSigningOut(false);
-			setConfirming(false);
 		}
 	};
 
-	const checkAgain = async (): Promise<void> => {
-		setChecking(true);
-		try {
-			await integrationsStore.refresh(null, { fresh: true });
-		} finally {
-			setChecking(false);
-		}
-	};
+	return (
+		<Callout
+			tone="danger"
+			icon={LogOut}
+			role="group"
+			label={`Sign omp out of ${name}?`}
+			action={
+				<div className="flex items-center gap-2">
+					<Button variant="ghost" size="compact" autoFocus disabled={signingOut} onClick={onDone}>
+						Cancel
+					</Button>
+					<Button size="compact" loading={signingOut} onClick={() => void signOut()}>
+						Sign out
+					</Button>
+				</div>
+			}
+		>
+			Sign omp out of {name}? Its tools leave every omp session until you reconnect.
+			{error && (
+				<p role="alert" className="mt-1">
+					Sign-out failed: {error}
+				</p>
+			)}
+		</Callout>
+	);
+}
+
+/** One service whose MCP server omp signs in to: where omp stands with it, and the buttons that sign in and out. */
+export function McpIntegrationRow({ integration }: { integration: McpIntegration }) {
+	const { id, connection } = integration;
+	const { label } = MCP_SERVICES[id];
+	const service = SERVICES[id];
+	const start = async (): Promise<SignInState> => (await putJson<McpIntegration>("/api/integrations/sign-in", { id })).signIn;
+	const { starting, waitingUrl, failure, connect } = useSignIn(integration.signIn, integrationsStore.refresh, start);
+	const { refreshing } = integrationsStore.use();
+	const [confirming, setConfirming] = useState(false);
+	const [toolsOpen, setToolsOpen] = useState(false);
+	const toolsId = useId();
 
 	const status = waitingUrl ? { label: "Waiting for you", color: "blue" as const } : STATUS[connection.kind];
-	const busy = starting || signingOut;
-	const reconnect = (
-		<Button variant="secondary" size="compact" leadingIcon={RefreshCw} loading={starting} disabled={busy} onClick={() => void connect()}>
-			Reconnect
-		</Button>
-	);
 
-	let actions;
-	if (confirming) actions = null;
-	else if (signedIn(connection)) {
-		actions = (
-			<RowMenu name={service.name} disabled={busy}>
+	let actions: ReactNode = null;
+	if (!waitingUrl && !confirming) {
+		actions = signedIn(connection) ? (
+			<MoreActionsMenu name={label} disabled={starting}>
 				<MenuItem onClick={() => void connect()}>
 					<RefreshCw />
 					Reconnect
@@ -112,21 +123,72 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 					<LogOut />
 					Sign out
 				</MenuItem>
-			</RowMenu>
-		);
-	} else if (!waitingUrl) {
-		actions = (
+			</MoreActionsMenu>
+		) : (
 			<Button variant="secondary" size="compact" loading={starting} onClick={() => void connect()}>
 				Connect
 			</Button>
 		);
 	}
 
-	const host = connection.kind === "absent" ? null : new URL(connection.server.url).host;
+	let callout: ReactNode = null;
+	if (waitingUrl) {
+		callout = (
+			<Callout
+				tone="info"
+				icon={LoaderCircle}
+				role="status"
+				spin
+				action={
+					<Button variant="ghost" size="compact" leadingIcon={ExternalLink} render={<a href={waitingUrl} target="_blank" rel="noreferrer" />}>
+						Open sign-in page
+					</Button>
+				}
+			>
+				Approve omp on {label} in the tab that opened. This updates on its own.
+			</Callout>
+		);
+	} else if (confirming) {
+		callout = <SignOutConfirm id={id} name={label} onDone={() => setConfirming(false)} />;
+	} else if (connection.kind === "refused") {
+		callout = (
+			<Callout
+				tone="danger"
+				icon={CircleAlert}
+				action={
+					<Button variant="secondary" size="compact" leadingIcon={RefreshCw} loading={starting} onClick={() => void connect()}>
+						Reconnect
+					</Button>
+				}
+			>
+				{label} refused omp's sign-in. Reconnect to sign in again.
+			</Callout>
+		);
+	} else if (connection.kind === "failing") {
+		callout = (
+			<Callout
+				tone="warning"
+				icon={WifiOff}
+				action={
+					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={refreshing} onClick={() => void integrationsStore.refresh(null, { fresh: true })}>
+						Check again
+					</Button>
+				}
+			>
+				{connection.error}
+			</Callout>
+		);
+	} else if (failure) {
+		callout = (
+			<Callout tone="danger" icon={CircleAlert} role="alert">
+				Sign-in failed: {failure}
+			</Callout>
+		);
+	}
 
 	return (
 		<IntegrationRow
-			name={service.name}
+			name={label}
 			logo={service.logo}
 			summary={service.gives}
 			status={<Badge variant="dot" size="compact" color={status.color}>{status.label}</Badge>}
@@ -134,7 +196,13 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 				<>
 					<span>MCP</span>
 					<MetaDot />
-					{host ? <span className="font-mono">{host}</span> : <span>Connecting adds it to omp's <code className="font-mono">mcp.json</code></span>}
+					{connection.kind === "absent" ? (
+						<span>
+							Connecting adds it to omp's <code className="font-mono">mcp.json</code>
+						</span>
+					) : (
+						<span className="font-mono">{connection.server.host}</span>
+					)}
 					{connection.kind === "ready" && (
 						<>
 							<MetaDot />
@@ -154,66 +222,7 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 			}
 			actions={actions}
 		>
-			{confirming && (
-				<Callout
-					tone="danger"
-					icon={LogOut}
-					action={
-						<div className="flex items-center gap-2">
-							<Button variant="ghost" size="compact" autoFocus disabled={signingOut} onClick={() => setConfirming(false)}>
-								Cancel
-							</Button>
-							<Button size="compact" loading={signingOut} onClick={() => void signOut()}>
-								Sign out
-							</Button>
-						</div>
-					}
-				>
-					Sign omp out of {service.name}? Its tools leave every omp session until you reconnect.
-				</Callout>
-			)}
-			{waitingUrl && (
-				<Callout
-					tone="info"
-					icon={LoaderCircle}
-					spin
-					action={
-						<Button variant="ghost" size="compact" leadingIcon={ExternalLink} render={<a href={waitingUrl} target="_blank" rel="noreferrer" />}>
-							Open sign-in page
-						</Button>
-					}
-				>
-					Approve omp on {service.name} in the tab that opened. This updates on its own.
-				</Callout>
-			)}
-			{!waitingUrl && connection.kind === "refused" && (
-				<Callout tone="danger" icon={CircleAlert} action={reconnect}>
-					{service.name} refused omp's sign-in. Reconnect to sign in again.
-				</Callout>
-			)}
-			{!waitingUrl && connection.kind === "failing" && (
-				<Callout
-					tone="warning"
-					icon={WifiOff}
-					action={
-						<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={checking} onClick={() => void checkAgain()}>
-							Check again
-						</Button>
-					}
-				>
-					{connection.error}
-				</Callout>
-			)}
-			{failure && !waitingUrl && (
-				<Callout tone="danger" icon={CircleAlert}>
-					Sign-in failed: {failure}
-				</Callout>
-			)}
-			{signOutError && (
-				<Callout tone="danger" icon={CircleAlert}>
-					Sign-out failed: {signOutError}
-				</Callout>
-			)}
+			{callout}
 			{connection.kind === "ready" && toolsOpen && <ToolList id={toolsId} tools={connection.tools} server={connection.server} />}
 		</IntegrationRow>
 	);

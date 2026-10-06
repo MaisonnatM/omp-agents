@@ -1,9 +1,9 @@
 /**
- * omp's MCP servers: finding one by its URL's host, signing in to one as `/mcp reauth` does and out as `/mcp unauth`
- * does, adding one to omp's user-level config, and listing and calling its tools with the OAuth sign-in omp keeps for it.
+ * omp's MCP servers: finding one by its URL's host, signing in to one as `/mcp reauth` does, removing the sign-ins omp
+ * manages for one, adding one to omp's user-level config, and listing and calling its tools with omp's OAuth sign-in.
  */
 import { createCache } from "../cache";
-import { errorText, isObject, str } from "../json";
+import { isObject, str } from "../json";
 import { runChecked } from "../proc";
 import { ompCommand } from "./install";
 import {
@@ -120,8 +120,9 @@ export async function signInMcp(server: Pick<McpServer, "url"> & Partial<Pick<Mc
 }
 
 /**
- * Signs omp out of `server` as `/mcp unauth` does: removes the sign-ins omp manages for it, under its credential id
- * and under the ids omp files a sign-in for its URL under. omp's config keeps the server.
+ * Removes the sign-ins omp manages for `server`, as `/mcp unauth` does, under its credential id and under the ids omp
+ * files a sign-in for its URL under; omp's config keeps the server and its `auth` block. Throws while omp still holds a
+ * sign-in under the credential id, the one {@link mcpSignedIn} reads.
  */
 export async function signOutMcp(server: McpServer): Promise<void> {
 	const storage = await auth.discoverAuthStorage();
@@ -130,9 +131,9 @@ export async function signOutMcp(server: McpServer): Promise<void> {
 		if (storage.credentials.hasOAuth(server.credentialId)) throw new Error(`omp does not manage the sign-in under ${server.credentialId}, so it stays. Remove it from omp's credentials yourself.`);
 	} finally {
 		storage.close();
+		tokens.drop(server.credentialId);
+		checks.drop(server.credentialId);
 	}
-	tokens.drop(server.credentialId);
-	checks.drop(server.credentialId);
 }
 
 /** Adds an HTTP server to omp's user-level MCP config, which new omp sessions load. */
@@ -150,7 +151,7 @@ function toolError(text: string): string {
 }
 
 /** The server refused omp's sign-in, so only a new sign-in helps. */
-class McpRefused extends Error {}
+export class McpRefused extends Error {}
 
 /** `method`'s result on `server`, called with omp's sign-in for it; the server's own message thrown when it answers an error. */
 async function request(server: McpServer, method: string, params: Record<string, unknown>): Promise<unknown> {
@@ -178,32 +179,28 @@ export async function callMcpTool(server: McpServer, tool: string, args: Record<
 	return text;
 }
 
-/** What listing a server's tools found: their names, or why it failed and whether the server refused omp's sign-in. */
-export type McpCheck = { ok: true; tools: string[] } | { ok: false; refused: boolean; error: string };
+const checks = createCache<string[]>(CHECK_MS);
 
-const checks = createCache<McpCheck>(CHECK_MS);
-
-/** Every tool `server` offers, following its cursor; a failure, which a session starting now would also meet, is an answer. */
-export const checkMcpServer = (server: McpServer, fresh: boolean): Promise<McpCheck> =>
+/**
+ * Every tool `server` offers, following its cursor. Throws {@link McpRefused} when the server refuses omp's sign-in, and
+ * the server's error on any other failure, which the cache does not keep.
+ */
+export const checkMcpServer = (server: McpServer, fresh: boolean): Promise<string[]> =>
 	checks.get(
 		server.credentialId,
 		async () => {
-			try {
-				const tools: string[] = [];
-				let cursor: string | undefined;
-				do {
-					const page = await request(server, "tools/list", cursor ? { cursor } : {});
-					if (!isObject(page)) break;
-					for (const tool of Array.isArray(page.tools) ? page.tools : []) {
-						const name = isObject(tool) ? str(tool.name) : undefined;
-						if (name) tools.push(name);
-					}
-					cursor = str(page.nextCursor);
-				} while (cursor);
-				return { ok: true, tools };
-			} catch (err) {
-				return { ok: false, refused: err instanceof McpRefused, error: errorText(err) };
-			}
+			const tools: string[] = [];
+			let cursor: string | undefined;
+			do {
+				const page = await request(server, "tools/list", cursor ? { cursor } : {});
+				if (!isObject(page)) break;
+				for (const tool of Array.isArray(page.tools) ? page.tools : []) {
+					const name = isObject(tool) ? str(tool.name) : undefined;
+					if (name) tools.push(name);
+				}
+				cursor = str(page.nextCursor);
+			} while (cursor);
+			return tools;
 		},
 		fresh,
 	);
