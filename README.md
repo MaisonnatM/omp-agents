@@ -100,6 +100,7 @@ It signs itself in, so it needs no token from you.
   Otherwise the app starts the server and stops it, with every session that the dashboard started, when you quit.
 - On macOS, closing the window (Cmd+W) hides it and keeps the server and its sessions running; click the app in the Dock to show it again.
   Cmd+Q quits.
+- On macOS, **Open at Login** in the app menu starts the app, and with it your routines, when you log in.
 - Links to GitHub, Graphite, Linear, and every other site open in your default browser.
 - `PORT` works as for `bun start`.
   A browser tab on the same address keeps working alongside the window.

@@ -7,11 +7,11 @@ import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { $ } from "bun";
+import { BUNDLE_ID } from "./login-item";
 
 const DESKTOP_DIR = import.meta.dir;
 const ELECTRON_DIST = join(DESKTOP_DIR, "node_modules", "electron", "dist");
 const ICON = join(DESKTOP_DIR, "icon.png");
-const BUNDLE_ID = "dev.omp-agents.desktop";
 const BRANDED_APP = join(DESKTOP_DIR, "dist", "omp agents.app");
 /** The sizes an `.icns` holds, each at 1x and 2x. */
 const ICONSET_SIZES = [16, 32, 128, 256, 512];

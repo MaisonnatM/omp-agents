@@ -207,6 +207,10 @@ It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching t
 - The page runs with context isolation and the sandbox on, and no preload: it gets no Node or Electron API.
 - The app keeps its data, its cookie, localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
 - A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
+- **Open at Login** (`desktop/login-item.ts`) writes a LaunchAgent, `~/Library/LaunchAgents/dev.omp-agents.desktop.port-<port>.plist`, through `plutil`, and removes it when cleared.
+  Electron's `setLoginItemSettings` registers the bundle alone, and a bundle launched without arguments runs Electron's default app, not `desktop/`; the agent runs the bundle's binary with `desktop/` as its argument, as `desktop/launch.ts` does.
+  launchd reads the file at the next login, so ticking the box starts nothing now; `RunAtLoad` without `KeepAlive` lets Cmd+Q quit for good.
+  The agent carries only the environment variables that the server and omp read to find `bun`, `omp`, and their files, so no secret a shell exports lands in the plist.
 
 ## Plan quota
 
@@ -558,7 +562,7 @@ The profile's `docs/git-workflow.md` detects Graphite with `git rev-parse --path
 The repository's agent guide links to [agent smoke checks](agent-smoke.md) for server authentication and lifecycle, browser verification, and desktop verification.
 
 `desktop/` holds the desktop shell; see [Desktop shell](#desktop-shell).
-`desktop/main.ts` is its whole main process, and `bun run desktop` at the root installs the package and starts it through `desktop/launch.ts`.
+`desktop/main.ts` is its whole main process but for Open at Login, in `desktop/login-item.ts`, and `bun run desktop` at the root installs the package and starts it through `desktop/launch.ts`.
 On macOS the launcher clones `node_modules/electron/dist/Electron.app` to `desktop/dist/omp agents.app`, sets its `CFBundleName`, `CFBundleDisplayName`, and `CFBundleIdentifier`, gives it an `.icns` that it renders from `icon.png` with `sips` and `iconutil`, signs it ad hoc, and runs that copy, because the Dock, the menu bar, and Cmd+Tab read an app's name and icon from its bundle.
 It rebuilds the copy when Electron's version or `icon.png` changes.
 `desktop/icon.svg` is the app icon, the logo mark on a macOS-style tile, and `desktop/icon.png` is that SVG rendered at 1024 px, because Electron reads no SVG; render it again after you change the SVG.
