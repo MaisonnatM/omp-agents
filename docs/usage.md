@@ -366,7 +366,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
   The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the project that the sidebar's picker shows, pinned ones included, whatever the sidebar's search hides.
   **Routines** opens the sessions that start on a schedule; see [Routines](#routines).
-  When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
+  The tabs show their names, and when the sidebar is too narrow for every name, their icons alone across the sidebar's width; hover an icon for its name.
+  The tabs never spill past the sidebar.
   **Inbox** opens a pull request inbox like Graphite's, and the sidebar then lists the inbox's sections with their pull request counts, under each repository's name when there are several.
   The counts of the sections that wait on your move stand out: **Needs your review** in bold, and **Returned to you** in red.
   The **Inbox** tab counts your pull requests that are ready to merge, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.

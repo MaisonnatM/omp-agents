@@ -33,6 +33,7 @@ import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { SizeProvider } from "@/lib/size-context";
+import { cn } from "@/lib/utils";
 import { inboxSection, inboxSections, mergeableCount, type Waiting } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { inboxStore, ticketsStore } from "../reads";
@@ -408,6 +409,24 @@ const SIDEBAR_TABS = [
 	{ value: "routines", label: "Routines", icon: CalendarClock },
 ] as const;
 
+/**
+ * How the sidebar tabs fit its width, by container query: labels while they fit, then icons alone sharing the row.
+ * Icons alone keep each name in the tooltip and for screen readers.
+ * Each switch sits where the labels fit with counts on Inbox and Sessions and the list's margins; labels never fit beside their icons once both carry counts.
+ */
+const SIDEBAR_TAB_FIT = {
+	four: {
+		list: "@max-[19rem]/sidebar:self-stretch",
+		tab: "@min-[19rem]/sidebar:[&>svg]:hidden @max-[19rem]/sidebar:flex-1 @max-[19rem]/sidebar:justify-center @max-[19rem]/sidebar:px-0.5",
+		label: "@max-[19rem]/sidebar:sr-only",
+	},
+	five: {
+		list: "@max-[22rem]/sidebar:self-stretch",
+		tab: "@min-[22rem]/sidebar:[&>svg]:hidden @max-[22rem]/sidebar:flex-1 @max-[22rem]/sidebar:justify-center @max-[22rem]/sidebar:px-0.5",
+		label: "@max-[22rem]/sidebar:sr-only",
+	},
+};
+
 /** The sidebar's tab; the inbox, tickets, todo, and routines tabs go with their pages, sessions with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
@@ -586,6 +605,7 @@ export function Roster({
 			</RowMenu>
 		);
 	};
+	const fit = ticketsShown ? SIDEBAR_TAB_FIT.five : SIDEBAR_TAB_FIT.four;
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
@@ -611,8 +631,7 @@ export function Roster({
 				{toggle}
 			</SidebarHeader>
 			<SizeProvider size="compact">
-				<TabsList aria-label="Sidebar" className="mx-2 self-start">
-					{/* The tabs fit the sidebar's default width only with tighter padding than Fluid's, and five of them only without their icons. */}
+				<TabsList aria-label="Sidebar" className={cn("mx-2 max-w-[calc(100%-1rem)] self-start", fit.list)}>
 					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => {
 						const counted = tabCounts[value];
 						const badge = counted && counted.count > 0 ? counted : undefined;
@@ -624,7 +643,8 @@ export function Roster({
 								icon={icon}
 								badge={badge?.count}
 								aria-label={badge && `${label}, ${badge.count} ${badge.meaning}`}
-								className={ticketsShown ? "px-2 @max-[25rem]/sidebar:[&>svg]:hidden" : "px-2 @max-[20rem]/sidebar:[&>svg]:hidden"}
+								className={cn("px-2", fit.tab)}
+								labelClassName={fit.label}
 								shortcut={shortcutLabels(value)}
 							/>
 						);
