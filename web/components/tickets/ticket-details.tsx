@@ -4,7 +4,7 @@ import type { Ticket, TicketDetail } from "../../../src/shared";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { age } from "../../labels";
-import { useReplaceableRead } from "../../reads";
+import type { ReadState } from "../../reads";
 import { PRIORITY_LABEL } from "../../tickets-model";
 import { BranchName } from "../git";
 import { IconTip } from "../inbox/avatars";
@@ -18,12 +18,13 @@ interface TicketDetailContentProps {
 	id: string;
 	/** The issue as the page lists it, which names it while Linear answers; `null` when the page does not list it. */
 	listed: Ticket | null;
+	/** Linear's answer for the issue, which the page also heads with its title. */
+	read: ReadState<TicketDetail> & { replace: (detail: TicketDetail) => void };
 	actions?: (ticket: Ticket) => ReactNode;
 }
 
 /** A Linear issue's editable fields, actions, description, links, and comments in the tickets page's main content. */
-export function TicketDetailContent({ id, listed, actions }: TicketDetailContentProps) {
-	const { data: detail, error, replace } = useReplaceableRead<TicketDetail>(`/api/ticket?${new URLSearchParams({ id })}`);
+export function TicketDetailContent({ id, listed, read: { data: detail, error, replace }, actions }: TicketDetailContentProps) {
 	const ticket = detail ?? listed;
 	const [PriorityIcon, priorityColor] = PRIORITY_ICON[ticket?.priority ?? 0];
 	const headingRef = useRef<HTMLHeadingElement>(null);
@@ -75,9 +76,9 @@ export function TicketDetailContent({ id, listed, actions }: TicketDetailContent
 				{detail && <TicketFields detail={detail} replace={replace} />}
 				{!detail && ticket && ticket.labels.length > 0 && (
 					<p className="flex flex-wrap gap-1">
-						{ticket.labels.map(label => (
-							<Badge key={label} variant="dot" size="compact">
-								{label}
+						{ticket.labels.map(({ name, color }) => (
+							<Badge key={name} variant="dot" size="compact" color={color || undefined}>
+								{name}
 							</Badge>
 						))}
 					</p>

@@ -353,6 +353,7 @@ The server reads Linear through Linear's MCP server, with the OAuth sign-in that
 The token stays in memory for five minutes and is dropped when Linear answers 401, which the page reports as a `/mcp reauth <name>` hint; it is never logged.
 Linear's GraphQL API refuses that token, so the server calls the MCP endpoint's `list_issues` tool through omp's `callMCP`, a stateless JSON-RPC `tools/call` POST.
 It asks for each open state type in full, following the cursor, and for completed, canceled, and duplicate issues updated in the last seven days, in parallel, then drops repeats by identifier.
+`list_issues` and `get_issue` name an issue's labels without their colors, so the server reads each team's labels with `list_issue_labels`, by the team key that prefixes the identifier, and keeps them for five minutes; `?fresh` reads them again too.
 
 `GET /api/ticket?id=<identifier>`, such as `?id=ENG-2368`, answers the tickets page's main content with that issue in full: the row's fields, the assignee, the team's id, the description, who opened it and when, the links Linear attaches to it, and its comment threads.
 The server calls `get_issue` and `list_comments` in parallel, through the same MCP sign-in, with no cache, so each opening reads the issue again.

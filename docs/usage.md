@@ -464,9 +464,11 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Completed and canceled issues show only when they changed in the last seven days, like the inbox's recent merges.
   Within a state, issues sort by priority, urgent first and no priority last, then by the latest update.
 - A row shows the priority, the identifier, the state, the title, the labels, the project, the due date when there is one, and how long ago the issue changed.
+  Each label's dot has the color Linear gives that label.
   Hover an icon to read what it means.
   Click a state's heading to fold it; the browser's localStorage keeps folded ones folded across reloads.
 - Click a row to replace the tickets list with the issue's details in the main content.
+  The page header then names the issue: its identifier, with its title under it.
   **Back to tickets** returns to the list with its folded states preserved.
   The detail view shows the title, the state, the priority, the assignee, the project, the due date, the labels, who opened the issue and when, the description, Linear's branch name for it, the links Linear keeps for it (such as its pull requests), and the comment threads, with a link to the issue on Linear.
   Each opening reads the issue again through Linear's `get_issue` and `list_comments` tools.

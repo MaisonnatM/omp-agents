@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { uploadAddress } from "./linear-uploads";
-import { linearMarkdown, parseIssueDetail, parseIssues, parseTicketOptions } from "./tickets";
+import { linearMarkdown, parseIssueDetail, parseIssues, parsePage, parseTicketOptions } from "./tickets";
 
 const signed = (path: string): string => `https://uploads.linear.app${path}?signature=x`;
 const proxied = (path: string): string => `/api/ticket/media?issue=ENG-1&path=${encodeURIComponent(path)}`;
@@ -24,58 +24,62 @@ const issue = (id: string, fields: Record<string, unknown> = {}) => ({
 
 const listed = (data: unknown): string => JSON.stringify(data);
 
+const colors = new Map([["ENG", new Map([["Front", "#f2c94c"]])]]);
+
 describe("parseIssues", () => {
-	test("maps Linear's fields, folds duplicates into canceled, and reads a missing project as none", () => {
-		const { project: _, ...noProject } = issue("ENG-2", { statusType: "duplicate", status: "Duplicate", priority: { value: 0, name: "No priority" } });
-		const answer = listed({ issues: [issue("ENG-1", { dueDate: "2026-10-05" }), noProject], hasNextPage: false });
-		expect(parseIssues(answer)).toEqual({
-			items: [
-				{
-					id: "ENG-1",
-					title: "Issue ENG-1",
-					url: "https://linear.app/acme/issue/ENG-1/issue",
-					status: "In Review",
-					statusType: "started",
-					priority: 3,
-					labels: ["Front"],
-					project: "Collect feedbacks",
-					team: "Engineering",
-					dueDate: "2026-10-05",
-					updatedAt: "2026-10-01T14:46:18.399Z",
-					branch: "eng-1-issue",
-				},
-				{
-					id: "ENG-2",
-					title: "Issue ENG-2",
-					url: "https://linear.app/acme/issue/ENG-2/issue",
-					status: "Duplicate",
-					statusType: "canceled",
-					priority: 0,
-					labels: ["Front"],
-					project: null,
-					team: "Engineering",
-					dueDate: null,
-					updatedAt: "2026-10-01T14:46:18.399Z",
-					branch: "eng-2-issue",
-				},
-			],
-			next: null,
-		});
+	test("maps Linear's fields, colors labels as their team does, folds duplicates into canceled, and reads a missing project as none", () => {
+		const { project: _, ...noProject } = issue("ENG-2", { statusType: "duplicate", status: "Duplicate", priority: { value: 0, name: "No priority" }, labels: ["Front", "Retired"] });
+		expect(parseIssues([issue("ENG-1", { dueDate: "2026-10-05" }), noProject, issue("OPS-1")], colors)).toEqual([
+			{
+				id: "ENG-1",
+				title: "Issue ENG-1",
+				url: "https://linear.app/acme/issue/ENG-1/issue",
+				status: "In Review",
+				statusType: "started",
+				priority: 3,
+				labels: [{ name: "Front", color: "#f2c94c" }],
+				project: "Collect feedbacks",
+				team: "Engineering",
+				dueDate: "2026-10-05",
+				updatedAt: "2026-10-01T14:46:18.399Z",
+				branch: "eng-1-issue",
+			},
+			{
+				id: "ENG-2",
+				title: "Issue ENG-2",
+				url: "https://linear.app/acme/issue/ENG-2/issue",
+				status: "Duplicate",
+				statusType: "canceled",
+				priority: 0,
+				labels: [
+					{ name: "Front", color: "#f2c94c" },
+					{ name: "Retired", color: "" },
+				],
+				project: null,
+				team: "Engineering",
+				dueDate: null,
+				updatedAt: "2026-10-01T14:46:18.399Z",
+				branch: "eng-2-issue",
+			},
+			expect.objectContaining({ id: "OPS-1", labels: [{ name: "Front", color: "" }] }),
+		]);
 	});
 
-	test("drops an issue without an id, a status, or a known state type, and keeps the rest", () => {
-		const answer = listed({ issues: [issue("ENG-1"), issue("", {}), issue("ENG-3", { status: undefined }), issue("ENG-4", { statusType: "archived" }), "ENG-5"] });
-		expect(parseIssues(answer).items.map(({ id }) => id)).toEqual(["ENG-1"]);
+	test("drops an issue without an id, a status, or a known state type, and keeps the rest once", () => {
+		const issues = [issue("ENG-1"), issue("", {}), issue("ENG-3", { status: undefined }), issue("ENG-4", { statusType: "archived" }), issue("ENG-1")];
+		expect(parseIssues(issues, colors).map(({ id }) => id)).toEqual(["ENG-1"]);
 	});
+});
 
+describe("parsePage", () => {
 	test("names the next page's cursor only while Linear has one", () => {
-		expect(parseIssues(listed({ issues: [], hasNextPage: true, cursor: "abc" })).next).toBe("abc");
-		expect(parseIssues(listed({ issues: [], hasNextPage: false, cursor: "abc" })).next).toBeNull();
+		expect(parsePage("list_issues", "issues", listed({ issues: [], hasNextPage: true, cursor: "abc" })).next).toBe("abc");
+		expect(parsePage("list_issues", "issues", listed({ issues: [], hasNextPage: false, cursor: "abc" })).next).toBeNull();
 	});
 
 	test("throws when the tool answers text that is not an issue list", () => {
-		expect(() => parseIssues("Team not found")).toThrow("something other than JSON: Team not found");
-		expect(() => parseIssues(JSON.stringify({ items: [] }))).toThrow("without issues");
+		expect(() => parsePage("list_issues", "issues", "Team not found")).toThrow("something other than JSON: Team not found");
+		expect(() => parsePage("list_issues", "issues", JSON.stringify({ items: [] }))).toThrow("without issues");
 	});
 });
 
@@ -131,7 +135,8 @@ describe("parseIssueDetail", () => {
 				comment("root", "2026-09-02T00:00:00.000Z", null),
 			],
 		});
-		const detail = parseIssueDetail(issueText, commentsText, media);
+		const detail = parseIssueDetail(issueText, commentsText, colors, media);
+		expect(detail.labels).toEqual([{ name: "Front", color: "#f2c94c" }]);
 		expect(detail.description).toBe("Do it");
 		expect(detail.createdBy).toBe("Grace");
 		expect(detail.assignee).toEqual({ id: "u-1", name: "Ada Lovelace" });
@@ -145,13 +150,13 @@ describe("parseIssueDetail", () => {
 	});
 
 	test("reads an issue without an assignee as unassigned", () => {
-		const detail = parseIssueDetail(JSON.stringify(issue("ENG-1", { assignee: null, assigneeId: null })), JSON.stringify({ comments: [] }), media);
+		const detail = parseIssueDetail(JSON.stringify(issue("ENG-1", { assignee: null, assigneeId: null })), JSON.stringify({ comments: [] }), colors, media);
 		expect(detail.assignee).toBeNull();
 	});
 
 	test("throws when get_issue answers no issue", () => {
-		expect(() => parseIssueDetail("Issue not found", JSON.stringify({ comments: [] }), media)).toThrow("get_issue answered something other than JSON");
-		expect(() => parseIssueDetail(JSON.stringify({ title: "No id" }), JSON.stringify({ comments: [] }), media)).toThrow("without an issue");
+		expect(() => parseIssueDetail("Issue not found", JSON.stringify({ comments: [] }), colors, media)).toThrow("get_issue answered something other than JSON");
+		expect(() => parseIssueDetail(JSON.stringify({ title: "No id" }), JSON.stringify({ comments: [] }), colors, media)).toThrow("without an issue");
 	});
 });
 

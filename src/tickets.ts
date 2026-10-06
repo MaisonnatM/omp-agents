@@ -18,6 +18,7 @@ import {
 	type TicketDetail,
 	type TicketDraft,
 	type TicketEdit,
+	type TicketLabel,
 	type TicketOptions,
 	type TicketsAnswer,
 	type TicketStatusType,
@@ -47,13 +48,19 @@ const WORKFLOW_ORDER: TicketStatusType[] = ["triage", "backlog", "unstarted", "s
 const isPriority = oneOf(TICKET_PRIORITIES);
 const isStatusType = oneOf(TICKET_STATUS_TYPES);
 
+/** Each label's color by name, under the key of the team it belongs to (`ENG`); a team's labels include the workspace's. */
+export type LabelColors = ReadonlyMap<string, ReadonlyMap<string, string>>;
+
+/** The key of the team an issue belongs to, which prefixes its identifier: `ENG` for `ENG-2368`. */
+const teamKey = (id: string): string => id.slice(0, id.lastIndexOf("-"));
+
 /** A state type as the page reads it: Linear's `duplicate` is a kind of canceled. */
 const statusTypeOf = (type: string | undefined): TicketStatusType | undefined => {
 	if (type === "duplicate") return "canceled";
 	return isStatusType(type) ? type : undefined;
 };
 
-function parseIssue(raw: unknown): Ticket | null {
+function parseIssue(raw: unknown, colors: LabelColors): Ticket | null {
 	if (!isObject(raw)) return null;
 	const id = str(raw.id);
 	const title = str(raw.title);
@@ -63,6 +70,7 @@ function parseIssue(raw: unknown): Ticket | null {
 	const updatedAt = str(raw.updatedAt);
 	if (!id || title === undefined || !url || !status || !statusType || !updatedAt) return null;
 	const priority = num(isObject(raw.priority) ? raw.priority.value : raw.priority);
+	const teamColors = colors.get(teamKey(id));
 	return {
 		id,
 		title,
@@ -70,7 +78,7 @@ function parseIssue(raw: unknown): Ticket | null {
 		status,
 		statusType,
 		priority: isPriority(priority) ? priority : 0,
-		labels: Array.isArray(raw.labels) ? raw.labels.filter(label => typeof label === "string") : [],
+		labels: Array.isArray(raw.labels) ? raw.labels.filter(label => typeof label === "string").map(name => ({ name, color: teamColors?.get(name) ?? "" })) : [],
 		project: str(raw.project) ?? null,
 		team: str(raw.team) ?? "",
 		dueDate: str(raw.dueDate) ?? null,
@@ -80,17 +88,19 @@ function parseIssue(raw: unknown): Ticket | null {
 }
 
 /** The objects under `key` in one page of `tool`'s answer, and the cursor of the next page, `null` on the last. */
-function parsePage(tool: string, key: string, toolText: string): { items: Record<string, unknown>[]; next: string | null } {
+export function parsePage(tool: string, key: string, toolText: string): { items: Record<string, unknown>[]; next: string | null } {
 	const data = toolJson("Linear", tool, toolText);
 	const items = isObject(data) ? data[key] : undefined;
 	if (!isObject(data) || !Array.isArray(items)) throw new Error(`Linear's ${tool} answered without ${key}`);
 	return { items: items.filter(isObject), next: data.hasNextPage === true ? (str(data.cursor) ?? null) : null };
 }
 
-/** The tickets in one `list_issues` answer's text and the cursor of the next page, `null` on the last. */
-export function parseIssues(toolText: string): { items: Ticket[]; next: string | null } {
-	const { items, next } = parsePage("list_issues", "issues", toolText);
-	return { items: items.map(parseIssue).filter(issue => issue !== null), next };
+const pageOf = (tool: string, key: string) => (toolText: string) => parsePage(tool, key, toolText);
+
+/** The tickets among `list_issues` answers' issues, each once, their labels colored from `colors`. */
+export function parseIssues(issues: Record<string, unknown>[], colors: LabelColors): Ticket[] {
+	const tickets = issues.map(raw => parseIssue(raw, colors)).filter(ticket => ticket !== null);
+	return [...new Map(tickets.map(ticket => [ticket.id, ticket])).values()];
 }
 
 /** The `src` in the JSON of a `<linear-image>` (under `attrs`) or a `<linear-embed>` tag. */
@@ -149,9 +159,9 @@ function parseThreads(toolText: string, media: (url: string) => string): TicketC
 }
 
 /** One issue in full from the texts of its `get_issue` and `list_comments` answers; `media` as for `linearMarkdown`. */
-export function parseIssueDetail(issueText: string, commentsText: string, media: (url: string) => string): TicketDetail {
+export function parseIssueDetail(issueText: string, commentsText: string, colors: LabelColors, media: (url: string) => string): TicketDetail {
 	const raw = toolJson("Linear", "get_issue", issueText);
-	const ticket = parseIssue(raw);
+	const ticket = parseIssue(raw, colors);
 	if (!ticket || !isObject(raw)) throw new Error("Linear's get_issue answered without an issue");
 	const attachments = Array.isArray(raw.attachments) ? raw.attachments.filter(isObject) : [];
 	const assigneeId = str(raw.assigneeId);
@@ -184,24 +194,59 @@ async function allPages<T>(server: McpServer, tool: string, args: Record<string,
 	return found;
 }
 
-async function queryTickets(): Promise<Ticket[]> {
+/** Live labels with their colors from `list_issue_labels` answers. */
+function parseLabels(labels: Record<string, unknown>[]): (TicketChoice & TicketLabel)[] {
+	return labels
+		.filter(label => !label.archivedAt)
+		.flatMap(raw => {
+			const choice = choiceOf(raw);
+			return choice ? [{ ...choice, color: str(raw.color) ?? "" }] : [];
+		});
+}
+
+const teamColors = createCache<ReadonlyMap<string, string>>(5 * 60_000);
+
+/** The label colors of the teams of issues `ids`, which Linear's issue tools leave out. `fresh` skips the cache. */
+async function loadLabelColors(server: McpServer, ids: string[], fresh = false): Promise<LabelColors> {
+	const teams = [...new Set(ids.map(teamKey))];
+	const colors = await Promise.all(
+		teams.map(team =>
+			teamColors.get(
+				team,
+				async () => {
+					const labels = await allPages(server, "list_issue_labels", { team, limit: PAGE }, pageOf("list_issue_labels", "labels"));
+					return new Map(parseLabels(labels).map(({ name, color }) => [name, color]));
+				},
+				fresh,
+			),
+		),
+	);
+	return new Map(teams.map((team, index) => [team, colors[index]!]));
+}
+
+async function queryTickets(fresh: boolean): Promise<Ticket[]> {
 	const server = await linearServer();
-	const lists = await Promise.all(QUERIES.map(query => allPages(server, "list_issues", { assignee: "me", limit: PAGE, fields: FIELDS, ...query }, parseIssues)));
-	return [...new Map(lists.flat().map(ticket => [ticket.id, ticket])).values()];
+	const lists = await Promise.all(QUERIES.map(query => allPages(server, "list_issues", { assignee: "me", limit: PAGE, fields: FIELDS, ...query }, pageOf("list_issues", "issues"))));
+	const issues = lists.flat();
+	return parseIssues(issues, await loadLabelColors(server, issues.map(issue => str(issue.id) ?? ""), fresh));
 }
 
 const loaded = createCache<Ticket[]>();
 
 /** The viewer's assigned Linear issues; a failed read throws Linear's or omp's message. `fresh` skips the cache. */
 export async function loadTickets(fresh: boolean): Promise<TicketsAnswer> {
-	return { tickets: await loaded.get("", queryTickets, fresh) };
+	return { tickets: await loaded.get("", () => queryTickets(fresh), fresh) };
 }
 
 /** Issue `id` (`ENG-2368`) in full, with its description and comments; a failed read throws Linear's or omp's message. */
 export async function loadTicketDetail(id: string): Promise<TicketDetail> {
 	const server = await linearServer();
-	const [issue, comments] = await Promise.all([callMcpTool(server, "get_issue", { id }), callMcpTool(server, "list_comments", { issueId: id, limit: PAGE })]);
-	return parseIssueDetail(issue, comments, url => uploadAddress(id, url));
+	const [issue, comments, colors] = await Promise.all([
+		callMcpTool(server, "get_issue", { id }),
+		callMcpTool(server, "list_comments", { issueId: id, limit: PAGE }),
+		loadLabelColors(server, [id]),
+	]);
+	return parseIssueDetail(issue, comments, colors, url => uploadAddress(id, url));
 }
 
 /** The files of one issue whose addresses expired share one read of the issue, which signs them all anew. */
@@ -237,13 +282,7 @@ export function parseTicketOptions(statusesText: string, users: Record<string, u
 			.map(choiceOf)
 			.filter(user => user !== null)
 			.sort(byName),
-		labels: labels
-			.filter(label => !label.archivedAt)
-			.flatMap(raw => {
-				const choice = choiceOf(raw);
-				return choice ? [{ ...choice, color: str(raw.color) ?? "" }] : [];
-			})
-			.sort(byName),
+		labels: parseLabels(labels).sort(byName),
 		projects: projects
 			.map(choiceOf)
 			.filter(project => project !== null)
@@ -253,12 +292,11 @@ export function parseTicketOptions(statusesText: string, users: Record<string, u
 
 async function queryOptions(team: string): Promise<TicketOptions> {
 	const server = await linearServer();
-	const page = (tool: string, key: string) => (toolText: string) => parsePage(tool, key, toolText);
 	const [statuses, users, labels, projects] = await Promise.all([
 		callMcpTool(server, "list_issue_statuses", { team }),
-		allPages(server, "list_users", { limit: PAGE }, page("list_users", "users")),
-		allPages(server, "list_issue_labels", { team, limit: PAGE }, page("list_issue_labels", "labels")),
-		allPages(server, "list_projects", { team, limit: PROJECT_PAGE }, page("list_projects", "projects")),
+		allPages(server, "list_users", { limit: PAGE }, pageOf("list_users", "users")),
+		allPages(server, "list_issue_labels", { team, limit: PAGE }, pageOf("list_issue_labels", "labels")),
+		allPages(server, "list_projects", { team, limit: PROJECT_PAGE }, pageOf("list_projects", "projects")),
 	]);
 	return parseTicketOptions(statuses, users, labels, projects);
 }
@@ -282,7 +320,7 @@ export const loadTeams = (): Promise<TicketChoice[]> => teams.get("", queryTeams
 
 async function queryTeams(): Promise<TicketChoice[]> {
 	const server = await linearServer();
-	const raw = await allPages(server, "list_teams", { limit: PAGE }, text => parsePage("list_teams", "teams", text));
+	const raw = await allPages(server, "list_teams", { limit: PAGE }, pageOf("list_teams", "teams"));
 	return raw
 		.map(choiceOf)
 		.filter(team => team !== null)

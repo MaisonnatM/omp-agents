@@ -197,6 +197,7 @@ export function TicketFields({ detail, replace }: { detail: TicketDetail; replac
 	const [PriorityIcon, priorityColor] = PRIORITY_ICON[detail.priority];
 	const statusId = options?.statuses.find(status => status.name === detail.status)?.id;
 	const projectId = options?.projects.find(project => project.name === detail.project)?.id;
+	const labelNames = detail.labels.map(label => label.name);
 
 	return (
 		<>
@@ -284,11 +285,19 @@ export function TicketFields({ detail, replace }: { detail: TicketDetail; replac
 				<DuePicker dueDate={detail.dueDate} onChange={dueDate => save({ dueDate }, { dueDate })} />
 				<FieldPicker
 					field="Labels"
-					current={detail.labels.join(", ") || "none"}
+					current={labelNames.join(", ") || "none"}
 					trigger={
 						<>
-							<Tag aria-hidden className="size-3.5" />
-							<span className="truncate">{detail.labels.join(", ") || "Labels"}</span>
+							{detail.labels.length > 0 ? (
+								<span aria-hidden className="flex shrink-0 -space-x-0.5">
+									{detail.labels.map(({ name, color }) => (
+										<span key={name} className="size-2 rounded-full ring-1 ring-background" style={{ backgroundColor: color || "currentColor" }} />
+									))}
+								</span>
+							) : (
+								<Tag aria-hidden className="size-3.5" />
+							)}
+							<span className="truncate">{labelNames.join(", ") || "Labels"}</span>
 						</>
 					}
 					choices={
@@ -299,12 +308,14 @@ export function TicketFields({ detail, replace }: { detail: TicketDetail; replac
 						})) ?? null
 					}
 					error={optionsError}
-					selected={detail.labels}
+					selected={labelNames}
 					multi
 					onOpen={loadOptions}
 					onPick={name => {
-						const labels = detail.labels.includes(name) ? detail.labels.filter(label => label !== name) : [...detail.labels, name];
-						save({ labels }, { labels });
+						const labels = labelNames.includes(name)
+							? detail.labels.filter(label => label.name !== name)
+							: [...detail.labels, { name, color: options?.labels.find(label => label.name === name)?.color ?? "" }];
+						save({ labels: labels.map(label => label.name) }, { labels });
 					}}
 				/>
 			</div>

@@ -79,9 +79,9 @@ export function TicketRow({ ticket, sessions, onOpen, pending, onQuickAction }: 
 					<span className="min-w-0 flex-1 truncate">{ticket.title}</span>
 					{ticket.labels.length > 0 && (
 						<span className="hidden max-w-64 shrink items-center gap-1 overflow-hidden md:flex">
-							{ticket.labels.map(label => (
-								<Badge key={label} variant="dot" size="compact">
-									{label}
+							{ticket.labels.map(({ name, color }) => (
+								<Badge key={name} variant="dot" size="compact" color={color || undefined}>
+									{name}
 								</Badge>
 							))}
 						</span>

@@ -129,6 +129,13 @@ export type TicketStatusType = (typeof TICKET_STATUS_TYPES)[number];
 export const TICKET_PRIORITIES = [0, 1, 2, 3, 4] as const;
 export type TicketPriority = (typeof TICKET_PRIORITIES)[number];
 
+/** A Linear label as an issue wears it: its name, and Linear's color for it, `""` when Linear names none. */
+export interface TicketLabel {
+	name: string;
+	/** A CSS color: `#f2c94c`. */
+	color: string;
+}
+
 /** A Linear issue assigned to the viewer, on the tickets page. */
 export interface Ticket {
 	/** The identifier Linear shows: `ENG-2368`. */
@@ -139,7 +146,7 @@ export interface Ticket {
 	status: string;
 	statusType: TicketStatusType;
 	priority: TicketPriority;
-	labels: string[];
+	labels: TicketLabel[];
 	project: string | null;
 	team: string;
 	/** `YYYY-MM-DD`. */
@@ -216,7 +223,7 @@ export interface TicketOptions {
 	/** Active members, by name. */
 	users: TicketChoice[];
 	/** The team's labels and the workspace's, by name. */
-	labels: (TicketChoice & { color: string })[];
+	labels: (TicketChoice & TicketLabel)[];
 	projects: TicketChoice[];
 }
 

@@ -2,10 +2,10 @@ import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import type { RosterHost, Ticket, View } from "../../../src/shared";
+import type { RosterHost, Ticket, TicketDetail, View } from "../../../src/shared";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
-import { ticketsStore } from "../../reads";
+import { ticketsStore, useReplaceableRead } from "../../reads";
 import { hashForTickets, type OpenMode } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import type { SectionTarget } from "../../section";
@@ -85,6 +85,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	const { open, start: startSession, dismissStart, starts: { quick } } = useDashboardContext();
 	const poll = ticketsStore.usePolling();
 	const tickets = poll.read?.data.tickets ?? [];
+	const detailRead = useReplaceableRead<TicketDetail>(target && `/api/ticket?${new URLSearchParams({ id: target })}`);
 	const folds = useFolds(COLLAPSED_KEY);
 	const start = (ticket: Ticket, action: TicketActionId) => startSession(ticketStart(ticket, action, cwd, readPinnedSkill()));
 	const listRef = useRef<HTMLDivElement>(null);
@@ -114,7 +115,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	if (target !== null) {
 		const listed = tickets.find(ticket => ticket.id === target) ?? null;
 		return (
-			<PageFrame title={TITLE} meta={META}>
+			<PageFrame title={target} meta={(detailRead.data ?? listed)?.title ?? "Linear issue"}>
 				<TooltipProvider>
 					<div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-6">
 						<Button variant="ghost" leadingIcon={ArrowLeft} render={<a href={hashForTickets(null)} />}>
@@ -125,6 +126,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 							key={target}
 							id={target}
 							listed={listed}
+							read={detailRead}
 							actions={ticket => (
 								<DetailQuickActions
 									actions={ticketActions(ticket)}
