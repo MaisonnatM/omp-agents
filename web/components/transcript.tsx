@@ -323,7 +323,7 @@ interface TranscriptProps {
 }
 
 /** The skill a prompt invoked, as a pill ahead of the user's words. */
-function SkillBadge({ name }: { name: string }) {
+export function SkillBadge({ name }: { name: string }) {
 	return (
 		<Tooltip content={`/skill:${name}`}>
 			<span

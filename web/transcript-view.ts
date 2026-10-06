@@ -43,6 +43,11 @@ export interface OutlineTurn {
 	prompt: string;
 	/** The skill the prompt invoked; `null` for any other prompt. */
 	skill: string | null;
+	/**
+	 * A prompt of a few words that only lets the agent carry on: `approve`, such as `go`, accepts the reply before it as a
+	 * plan; `resume`, such as `continue`, picks up work the turn before stopped. `null` for any other prompt.
+	 */
+	nudge: "approve" | "resume" | null;
 	/** The turn's final reply; `null` while the turn runs or when it ended without one. */
 	reply: { id: string; text: string } | null;
 	tools: number;
@@ -50,15 +55,25 @@ export interface OutlineTurn {
 	running: boolean;
 }
 
+/**
+ * A nudge: a prompt led by `go`, which in this workflow always approves, even with a choice after it (`go with the
+ * defaults`); or approval words alone, such as `yes`, `lgtm`, `fix all then push`, or `continue`, which resumes.
+ * `ok` with more words, or `push` or `ship it` alone, asks for something else, so it nudges nothing.
+ */
+const NUDGE = /^(?:go\b|(?:(continue)|yes|yep|yeah|y|ok|okay|sure|proceed|lgtm|do|fix)\b(?:[\s,.!]+(?:yes|ok|go|continue|all|on|ahead|it|please|then|push|don['’]?t|commit)\b)*[\s,.!]*$)/i;
+
 /** Each turn in transcript order. A turn still running has no reply until it ends. */
 export function outline(items: Item[], working: boolean): OutlineTurn[] {
 	const replies = turnReplies(items, working);
 	const turns: OutlineTurn[] = [];
 	for (const item of items) {
 		if (item.kind === "user") {
+			const text = item.text.trim();
 			const images = item.images?.length ?? 0;
-			const prompt = item.text.trim() || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
-			turns.push({ id: item.id, prompt, skill: item.skill, reply: null, tools: 0, failed: 0, running: false });
+			const prompt = text || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
+			const match = turns.length > 0 && !item.skill && images === 0 ? NUDGE.exec(text) : null;
+			const nudge = match ? (match[1] ? "resume" : "approve") : null;
+			turns.push({ id: item.id, prompt, skill: item.skill, nudge, reply: null, tools: 0, failed: 0, running: false });
 			continue;
 		}
 		const turn = turns.at(-1);

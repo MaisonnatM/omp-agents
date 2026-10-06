@@ -99,8 +99,8 @@ describe("outline", () => {
 
 	test("groups each prompt with its turn's final reply and counts the turn's tools and failures", () => {
 		expect(outline(items, false)).toEqual([
-			{ id: "p1", prompt: "Fix it", skill: null, reply: { id: "r1b", text: "Fixed." }, tools: 2, failed: 1, running: false },
-			{ id: "p2", prompt: "Ship it", skill: null, reply: { id: "r2", text: "Shipping" }, tools: 0, failed: 0, running: false },
+			{ id: "p1", prompt: "Fix it", skill: null, nudge: null, reply: { id: "r1b", text: "Fixed." }, tools: 2, failed: 1, running: false },
+			{ id: "p2", prompt: "Ship it", skill: null, nudge: null, reply: { id: "r2", text: "Shipping" }, tools: 0, failed: 0, running: false },
 		]);
 	});
 
@@ -127,6 +127,17 @@ describe("outline", () => {
 			expect.objectContaining({ id: "two", prompt: "2 images", skill: null }),
 			expect.objectContaining({ id: "skill", prompt: "1 image", skill: "review" }),
 		]);
+	});
+
+	test("a later prompt led by go, or of approval words alone, approves or resumes; ok with more words, or a bare publish, is a prompt", () => {
+		const nudge = (text: string, extra: Partial<Extract<Item, { kind: "user" }>> = {}) =>
+			outline([prompt("first", "Plan it"), reply("plan", "The plan"), prompt("next", text, extra)], false)[1].nudge;
+		expect(["go", "Yes go!", "go all don't commit", "fix all then push", "LGTM", "ok, continue", "go with the defaults", "go on https://linear.app/x/issue/ENG-1"].map(text => nudge(text))).toEqual(Array(8).fill("approve"));
+		expect(["continue", "Continue please"].map(text => nudge(text))).toEqual(["resume", "resume"]);
+		expect(["ok but rename it", "push", "Ship it", "gone", "continue with the tests", ""].map(text => nudge(text))).toEqual(Array(6).fill(null));
+		expect(nudge("go", { skill: "review" })).toBeNull();
+		expect(nudge("go", { images: ["/api/image?hash=a"] })).toBeNull();
+		expect(outline([prompt("first", "go")], false)[0].nudge).toBeNull();
 	});
 });
 

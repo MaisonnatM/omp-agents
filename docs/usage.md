@@ -93,14 +93,20 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
   The sidebar remembers the tab you chose, for every view.
-- **Outline** lists the conversation's turns, numbered, in order.
-  Each turn shows your prompt in bold on up to two lines, then the reply the turn ended on, muted, on up to two lines; hover either to read the whole message.
+- **Outline** shows the conversation's turns in order, each weighted by how much it matters.
+  Your first prompt opens the list whole, under **Request**, rendered as the transcript renders it, with its skill's chip first.
+  The turns after it hang from a rail of icons: a person for your prompt, a bot for the reply a turn ended on.
+  A prompt shows in bold on up to three lines, and a reply muted on up to three lines; hover either to read the whole message.
   A bold label that opens a reply, such as **Résumé**, is left out, so the line starts with what the reply says.
-  A line under them counts the turn's tool calls and, in red, those that failed, such as `14 tools · 2 failed`.
-  A prompt that invoked a skill shows the skill's name in an outlined chip first, and a prompt of images alone reads as how many it holds, such as `2 images`.
+  A prompt led by `go`, or of approval words alone such as `yes`, `lgtm`, or `fix all then push`, reads as one line, **Approved**, with its words after it, such as `Approved · go all don't commit`.
+  The reply such an approval follows is the agent's plan: it shows under **Plan**, rendered whole up to about twelve lines, and **Show more** opens the rest.
+  A prompt of `continue` alone reads as **Continued**, and the reply before it stays a reply, since it reports work in progress rather than a plan.
+  `ok` with more words, and `push` or `ship it` alone, read as prompts.
+  A line under a reply counts the turn's tool calls and, in red, those that failed, such as `14 tools · 2 failed`.
+  A later prompt that invoked a skill shows the skill's name in an outlined chip first, and a prompt of images alone reads as how many it holds, such as `2 images`.
   The turn still running shows **Working…** where its reply will go.
-  Click a prompt or a reply to scroll the pane's transcript to that message; the page stays where it is.
-  The turn you are reading carries a bar and a shaded background, and moves as you scroll the transcript; the outline scrolls to keep it in view.
+  Click a prompt, a reply, **Request**, or **Plan** to scroll the pane's transcript to that message; the page stays where it is.
+  The turn you are reading carries a shaded background, and moves as you scroll the transcript; the outline scrolls to keep it in view.
   After you click a turn it stays marked until you scroll the transcript yourself, since the last turns may never reach the top of the transcript.
   The list follows the conversation as it goes.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
