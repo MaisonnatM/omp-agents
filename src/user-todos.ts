@@ -166,19 +166,27 @@ function applyToTodos(todos: UserTodo[], change: TodoChange, isCategory: (id: st
 	}
 }
 
-/** The list once every checked todo of category `categoryId` (any for `null`) moved to the archive, latest first; `list` itself when none is checked. */
-function clearDone(list: UserTodoList, categoryId: string | null): UserTodoList {
+/** How long a checked todo stays in the list before the server moves it to the archive. */
+export const DONE_KEPT_HOURS = 24;
+
+/**
+ * The list once every checked todo of category `categoryId` (any for `null`), checked before `before` when given, moved
+ * to the archive, latest first; `list` itself when none is.
+ */
+function clearDone(list: UserTodoList, categoryId: string | null, before: string | undefined): UserTodoList {
+	const cutoff = before === undefined ? Infinity : Date.parse(before);
+	const cleared = (leaf: UserTodoLeaf): boolean => leaf.doneAt !== null && Date.parse(leaf.doneAt) < cutoff;
 	const archived: UserTodo[] = [];
 	const todos = list.todos.flatMap(todo => {
 		if (categoryId !== null && todo.categoryId !== categoryId) return [todo];
-		if (todo.doneAt !== null) {
+		if (cleared(todo)) {
 			archived.push(todo);
 			return [];
 		}
-		const done = todo.children.filter(child => child.doneAt !== null);
+		const done = todo.children.filter(cleared);
 		if (done.length === 0) return [todo];
 		archived.push(...done.map(child => topOf(child, todo.categoryId)));
-		return [{ ...todo, children: todo.children.filter(child => child.doneAt === null) }];
+		return [{ ...todo, children: todo.children.filter(child => !cleared(child)) }];
 	});
 	return archived.length === 0 ? list : { ...list, todos, archive: [...archived.reverse(), ...list.archive] };
 }
@@ -232,7 +240,7 @@ function applyChange(list: UserTodoList, change: UserTodoChange): UserTodoList {
 			return archived < 0 ? list : { ...list, archive: archive.toSpliced(archived, 1) };
 		}
 		case "clear-done":
-			return clearDone(list, change.categoryId);
+			return clearDone(list, change.categoryId, change.before);
 		case "unarchive": {
 			const at = archive.findIndex(todo => todo.id === change.id);
 			if (at < 0) return list;

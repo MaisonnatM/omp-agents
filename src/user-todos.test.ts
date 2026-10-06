@@ -171,6 +171,15 @@ describe("applyUserTodo", () => {
 		expect(archived(all)).toBe("c✓ a✓(a1✓) b1✓@work");
 	});
 
+	test("clear-done with before archives only the todos checked earlier, at either level", () => {
+		const toggle = (id: string, doneAt: string): UserTodoChange => ({ op: "toggle", id, doneAt });
+		const list = after(listOf([], todo("a", ["a1", "a2"]), todo("b"), todo("c")), toggle("a1", "2026-10-04T08:00:00.000Z"), toggle("a2", "2026-10-05T09:30:00.000Z"), toggle("b", "2026-10-04T09:00:00.000Z"), toggle("c", "2026-10-05T10:00:00.000Z"));
+		const cleared = after(list, { op: "clear-done", categoryId: null, before: "2026-10-05T09:00:00.000Z" });
+		expect(shape(cleared)).toBe("a(a2✓) c✓");
+		expect(archived(cleared)).toBe("b✓ a1✓");
+		expect(after(cleared, { op: "clear-done", categoryId: null, before: "2026-10-05T09:00:00.000Z" })).toBe(cleared);
+	});
+
 	test("an archived todo comes back last, removes on its own, and empty-archive drops them all", () => {
 		const list = after(listOf(["work"], todo("a", [], { done: true, categoryId: "work" }), todo("b", [], { done: true }), todo("c")), { op: "clear-done", categoryId: null });
 		expect(shape(after(list, { op: "unarchive", id: "a" }))).toBe("c a✓@work");

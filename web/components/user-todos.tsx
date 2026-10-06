@@ -1,7 +1,7 @@
 import { CalendarClock, Circle, CircleCheck, GripVertical, ListX, NotebookText, Plus, X } from "lucide-react";
 import { Fragment, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { PastSession, RosterHost, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../src/shared";
-import { applyUserTodo } from "../../src/user-todos";
+import { applyUserTodo, DONE_KEPT_HOURS } from "../../src/user-todos";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -11,11 +11,15 @@ import { DAY_FORMAT, LIST_KINDS, lastToDo, leftIn, matches, restoreOf, type Todo
 import { workStateOf } from "../todo-work-state";
 import { useTodoDrag } from "../use-todo-drag";
 import { useTodoKeys } from "../use-todo-keys";
+import { FoldButton, useFolds } from "./fold";
 import { PageFrame } from "./list-page";
 import { TodoDetail } from "./todo-detail";
 import { type KnownSessions, TodoLinkChip, TodoWorkPill } from "./todo-links";
 import { TodoSearch } from "./todo-search";
 import { useUndo } from "./todo-undo";
+
+/** Sections whose Logbook you unfolded, by category id, `""` for none; a Logbook starts folded. */
+const LOGBOOK_KEY = "omp-agents.todo-logbook-open";
 
 /** What the Todo page types into: a todo's title, or a todo not added yet, at its place in the list, with what it holds so far. */
 type Editing =
@@ -155,6 +159,7 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 	const sections = list === null ? [] : sectionsOf(list, view, day, sessions).map(section => ({ ...section, todos: section.todos.filter(todo => matches(todo, query)) }));
 	const undo = useUndo(onChange);
 	const drag = useTodoDrag(kind.canMove && !disabled, onChange);
+	const logbook = useFolds(LOGBOOK_KEY, () => true);
 	const toggle = (todo: UserTodoLeaf): void => onChange({ op: "toggle", id: todo.id, doneAt: todo.doneAt === null ? new Date().toISOString() : null });
 	useTodoKeys({
 		listRef,
@@ -453,10 +458,20 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 
 	const sectionView = (section: Section) => {
 		const label = section.title ?? title;
-		const sectionLeft = section.todos.filter(todo => todo.doneAt === null).length;
+		const toDo = section.todos.filter(todo => todo.doneAt === null);
+		const done = section.todos.filter(todo => todo.doneAt !== null);
 		const empty = section.todos.length === 0 ? (query ? `No todo matches “${query}”.` : kind.empty) : null;
+		const foldKey = section.categoryId ?? "";
+		// A search shows every match, done ones too.
+		const logbookOpen = query !== "" || !logbook.isFolded(foldKey);
+		const logbookId = `todo-logbook-${foldKey}`;
+		const rowsOf = (todo: UserTodo): ReactNode[] => [
+			row(section, { todo, parent: null }, section.todos),
+			...rowsAround(todo.children, child => [row(section, { todo: child, parent: todo }, todo.children), draftAt(section, todo.id, child.id)], draftAt(section, todo.id, null)),
+			draftAt(section, null, todo.id),
+		];
 		return (
-			<section key={section.categoryId ?? ""} aria-label={label} className="space-y-1">
+			<section key={foldKey} aria-label={label} className="space-y-1">
 				{section.title !== null && (
 					<h3 className="flex items-baseline gap-2 px-2 text-sm font-medium">
 						{section.categoryId === null ? (
@@ -466,19 +481,12 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 								{section.title}
 							</a>
 						)}
-						<span className="text-xs tabular-nums text-muted-foreground">{sectionLeft}</span>
+						<span className="text-xs tabular-nums text-muted-foreground">{toDo.length}</span>
 					</h3>
 				)}
 				<ul aria-label={`Todos of ${label}`} className="flex flex-col gap-0.5">
-					{rowsAround(
-						section.todos,
-						todo => [
-							row(section, { todo, parent: null }, section.todos),
-							...rowsAround(todo.children, child => [row(section, { todo: child, parent: todo }, todo.children), draftAt(section, todo.id, child.id)], draftAt(section, todo.id, null)),
-							draftAt(section, null, todo.id),
-						],
-						draftAt(section, null, null),
-					)}
+					{toDo.flatMap(rowsOf)}
+					{draftAt(section, null, null)}
 				</ul>
 				{empty && <p className="px-2 text-sm text-muted-foreground">{empty}</p>}
 				{!disabled && kind.canAdd && (
@@ -492,6 +500,22 @@ export function TodoPage({ list, view, disabled, onChange, hosts, past, newSessi
 							{kind.addLabel}
 						</button>
 					</Tooltip>
+				)}
+				{done.length > 0 && (
+					<div className="space-y-1 pt-2">
+						<h4 className="flex items-baseline gap-2 px-2 text-sm text-muted-foreground">
+							<FoldButton open={logbookOpen} onToggle={() => logbook.toggle(foldKey)} controls={logbookId}>
+								<span className="font-medium text-foreground/80">Logbook</span>
+								<span className="text-xs tabular-nums">{done.length} done</span>
+							</FoldButton>
+							<span className="ml-auto text-xs text-muted-foreground/70">Moves to Done after {DONE_KEPT_HOURS} hours</span>
+						</h4>
+						{logbookOpen && (
+							<ul id={logbookId} aria-label={`Done todos of ${label}`} className="flex flex-col gap-0.5">
+								{done.flatMap(rowsOf)}
+							</ul>
+						)}
+					</div>
 				)}
 			</section>
 		);
