@@ -163,7 +163,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A maximized pane adds `;max`, for example `#7c51f77b,past/01a0f6a5@1;max`, so back, forward, and reload return to it.
   With one pane the hash is the single-view form above, so older links still open.
   **Settings** takes over the page and leaves the panes behind it.
-  Select a row to return to them.
+  Select **Sessions** to return to them.
 
 ## Conversations
 
@@ -393,7 +393,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.
-- Five tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, **Todo**, and **Calendar**, switch what the sidebar lists.
+- Six tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, **Todo**, **Calendar**, and **Settings**, switch pages and what the sidebar lists.
   Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
@@ -665,7 +665,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Settings
 
-- The gear button in the sidebar header opens **Settings**, split into eight tabs that look like the sidebar's **Inbox** and **Sessions** tabs: **Analytics**, **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **Integrations**, **New sessions**, and **Appearance**.
+- **Settings** is the last sidebar tab, after **Calendar**.
+  It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
+  Select **Sessions** to return to the existing panes.
+  Settings has eight tabs: **Analytics**, **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **Integrations**, **New sessions**, and **Appearance**.
   It opens on **Analytics**.
   Switching tabs keeps an unsaved edit, and the selected tab stays when you change workspace.
 - **Analytics** shows request usage for the last seven days.
@@ -718,6 +721,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - **Settings** opens on the workspace of the session that you had open, so it includes that project's files and its `.omp/config.yml` overrides.
   With no session open, it shows user files only.
   Use the workspace picker in the header to choose another directory that a session ran in, or **User files only**.
+  Selecting the active **Settings** sidebar tab keeps the workspace you chose.
   The page is in the URL hash, `#settings` or `#settings/<encoded directory>`.
   After each save the page shows the settings as omp loads them from disk.
 

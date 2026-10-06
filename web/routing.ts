@@ -11,9 +11,10 @@ export const SIDEBAR_TABS = [
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
+	{ value: "settings", label: "Settings", icon: PAGE_ICON.settings },
 ] as const;
 
-/** The sidebar's tab; the tickets, todo, and calendar tabs go with their pages, the sessions and inbox tabs with the panes. */
+/** The sidebar's tab; the tickets, todo, calendar, and settings tabs go with their pages, the sessions and inbox tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 const PAST_PREFIX = "past/";
