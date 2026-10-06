@@ -1,6 +1,6 @@
 /**
  * omp's request stats, from the database omp-stats keeps in `~/.omp/stats.db`. The first read starts omp-stats' live
- * ingest, which syncs every session file and then watches them, so a server whose Analytics page never opens never
+ * ingest, which syncs every session file and then watches them, so a server whose Analytics tab never opens never
  * touches the database.
  */
 import type { AnalyticsRange } from "../shared/analytics";

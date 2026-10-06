@@ -1,4 +1,4 @@
-/** The Analytics page's numbers: omp-stats' reads, with each session's subagents folded into it. */
+/** The Analytics tab's numbers: omp-stats' reads, with each session's subagents folded into it. */
 import { basename, isAbsolute, relative, sep } from "node:path";
 import type { StatsDashboard, StatsUsage } from "./omp/modules";
 import type { SessionModelRow, StatsRead, StatsWindow } from "./omp/stats";

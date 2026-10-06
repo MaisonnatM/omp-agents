@@ -85,22 +85,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Hover or focus a window to see omp's full limit name and when it resets.
   The server runs `omp usage --json` at startup and every minute after that.
 
-## Analytics
-
-- **Analytics** at the bottom of the left sidebar, or `#analytics`, opens request usage for the last seven days.
-  Choose **24h**, **7d**, **30d**, **90d**, or **All** to change the range; the URL keeps the choice.
-- The page shows tokens, estimated cost, requests, cache hit rate, and a chart of token usage over time.
-  The cost is omp's API-equivalent list price, not what your subscription bills.
-- Models and projects are ordered by tokens, followed by the token split among main agents, subagents, and advisors, and by tool calls.
-  The top 20 sessions include their subagents' usage; select a session to open it.
-  omp keeps the usage of a session whose transcript you deleted, so it stays listed as **Deleted session**, without a link.
-- omp indexes session files when you first open Analytics and updates the page while indexing continues.
-  New requests appear as omp syncs them, including requests from sessions started outside the dashboard.
-
 ## Session details sidebar
 
 - The right sidebar shows the focused pane's conversation at a glance, and what its agent changed and captured: a live session, one of its subagents, or a past session, each from its own transcript file.
-  It hides for a pull request's details, the tickets, **Analytics**, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
+  It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
 - Tabs split it: **Outline**, **Files**, and **Media**.
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
@@ -671,9 +659,20 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Settings
 
-- The gear button in the sidebar header opens **Settings**, split into seven tabs that look like the sidebar's **Inbox** and **Sessions** tabs: **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **Integrations**, **New sessions**, and **Appearance**.
+- The gear button in the sidebar header opens **Settings**, split into eight tabs that look like the sidebar's **Inbox** and **Sessions** tabs: **Analytics**, **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **Integrations**, **New sessions**, and **Appearance**.
+  It opens on **Analytics**.
   Switching tabs keeps an unsaved edit, and the selected tab stays when you change workspace.
-  **Integrations** connects Linear; see [Linear tickets](#linear-tickets).
+- **Analytics** shows request usage for the last seven days.
+  Choose **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
+  It shows tokens, estimated cost, requests, cache hit rate, and a chart of token usage over time.
+  The cost is omp's API-equivalent list price, not what your subscription bills.
+  Models and projects are ordered by tokens, followed by the token split among main agents, subagents, and advisors, and by tool calls.
+  The top 20 sessions include their subagents' usage; select a session to open it.
+  omp keeps the usage of a session whose transcript you deleted, so it stays listed as **Deleted session**, without a link.
+  It covers every session whatever workspace the header picks.
+  omp indexes session files when you first open **Settings** and updates the tab while indexing continues.
+  New requests appear as omp syncs them, including requests from sessions started outside the dashboard.
+- **Integrations** connects Linear; see [Linear tickets](#linear-tickets).
   **Worktrees** lists every Git worktree in repositories where a session ran, and a path you enter lists that repository too.
   Each row shows the branch and path, the last time an omp session file in that checkout changed, the last commit, approximate disk use, and tracked or untracked changes.
   No omp session reads as no omp session, not as unused.
@@ -684,7 +683,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A detached commit that no branch contains is named before its registration can be removed.
   The page cannot see every shell or editor, so close other tools using a checkout before you delete it.
   Disk use is approximate, and removing a checkout may free less than the number shown.
-  The first tab shows which model omp uses for each role (`default`, `slow`, `plan`, `advisor`, `vision`, `smol`, `commit`, `tiny`, `task`) and the fallbacks that omp tries after that model, in order.
+  **Model roles & provider order** shows which model omp uses for each role (`default`, `slow`, `plan`, `advisor`, `vision`, `smol`, `commit`, `tiny`, `task`) and the fallbacks that omp tries after that model, in order.
   A role without its own chain says that it uses the `default` role's chain.
   Chains keyed by a model or a `provider/*` wildcard appear in their own table, and the `modelProviderOrder` follows.
   **Retry and fallback** lists the `retry.*` settings with omp's defaults filled in, for example `usageAwareFallback`, `usageReservePct`, and `usageReservePolicy`.

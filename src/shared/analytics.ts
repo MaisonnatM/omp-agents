@@ -1,6 +1,6 @@
-/** The Analytics page's ranges and token usage. */
+/** The Analytics tab's ranges and token usage. */
 
-/** The time ranges the Analytics page reads, shortest first; `all` has no start. */
+/** The time ranges the Analytics tab reads, shortest first; `all` has no start. */
 export const ANALYTICS_RANGES = ["24h", "7d", "30d", "90d", "all"] as const;
 
 export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number];

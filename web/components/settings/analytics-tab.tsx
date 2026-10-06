@@ -1,12 +1,10 @@
-/** The Analytics page: omp's request usage by time, model, project, agent, tool, and session. */
+/** The settings tab for omp's request usage by time, model, project, agent, tool, and session. */
 import { type ReactNode, useEffect, useState } from "react";
 import { ANALYTICS_RANGES, type Analytics, type AnalyticsRange, type AnalyticsSession } from "../../../src/shared/analytics";
 import { hashForSession } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { modelLabel, modelOrg, projectName, providerLabel, readTime } from "../../labels";
 import { useRead } from "../../reads";
-import { hashForAnalytics } from "../../routing";
-import { PageFrame } from "../list-page";
 import { OrgIcon } from "../org-icon";
 import { LoadNote } from "../sheet-details";
 
@@ -202,29 +200,31 @@ function UsageBody({ data }: { data: Analytics }) {
 	);
 }
 
-/** Analytics over a URL-selected range, refreshed while omp-stats indexes and on a slower cadence after it finishes. */
-export function AnalyticsPage({ range }: { range: AnalyticsRange }) {
+/** Analytics over the chosen range, refreshed while the tab shows: often while omp-stats indexes, slower after it finishes. */
+export function AnalyticsTab({ active }: { active: boolean }) {
+	const [range, setRange] = useState<AnalyticsRange>("7d");
 	const [version, setVersion] = useState(0);
 	const { data, error } = useRead<Analytics>(`/api/analytics?range=${range}`, version);
 	useEffect(() => {
+		if (!active) return;
 		const timer = setInterval(() => setVersion(value => value + 1), data?.sync.phase === "syncing" ? 2_000 : 30_000);
 		return () => clearInterval(timer);
-	}, [data?.sync.phase]);
+	}, [active, data?.sync.phase]);
 	return (
-		<PageFrame title="Analytics" meta="Token and request usage recorded by omp">
-			<div className="mx-auto w-full max-w-6xl space-y-7 px-6 py-6">
-				<nav aria-label="Analytics time range" className="flex flex-wrap gap-1">
-					{ANALYTICS_RANGES.map(option => <Button key={option} asChild variant="ghost" size="compact" active={option === range}>
-						<a href={hashForAnalytics(option)} aria-current={option === range ? "page" : undefined}>{rangeLabel[option]}</a>
-					</Button>)}
-				</nav>
-				{data?.sync.phase === "syncing" && <p role="status" className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Indexing sessions… {data.sync.total > 0 && `${full.format(data.sync.current)} of ${full.format(data.sync.total)}`}</p>}
-				{data?.sync.phase === "error" && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Indexing failed. omp will retry: {data.sync.error ?? "Unknown error"}</p>}
-				{error && data && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot refresh analytics: {error}</p>}
-				{!data ? <LoadNote loading="Reading omp's usage…" error={error} /> : data.totals.requests === 0 ? (
-					<div className="py-12 text-center text-sm text-muted-foreground">{data.sync.phase === "syncing" ? "Your session history is still being indexed." : "No requests in this time range."}</div>
-				) : <UsageBody data={data} />}
+		<div className="space-y-7">
+			<div role="group" aria-label="Time range" className="flex flex-wrap gap-1">
+				{ANALYTICS_RANGES.map(option => (
+					<Button key={option} variant="ghost" size="compact" active={option === range} aria-pressed={option === range} onClick={() => setRange(option)}>
+						{rangeLabel[option]}
+					</Button>
+				))}
 			</div>
-		</PageFrame>
+			{data?.sync.phase === "syncing" && <p role="status" className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Indexing sessions… {data.sync.total > 0 && `${full.format(data.sync.current)} of ${full.format(data.sync.total)}`}</p>}
+			{data?.sync.phase === "error" && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Indexing failed. omp will retry: {data.sync.error ?? "Unknown error"}</p>}
+			{error && data && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot refresh analytics: {error}</p>}
+			{!data ? <LoadNote loading="Reading omp's usage…" error={error} /> : data.totals.requests === 0 ? (
+				<div className="py-12 text-center text-sm text-muted-foreground">{data.sync.phase === "syncing" ? "Your session history is still being indexed." : "No requests in this time range."}</div>
+			) : <UsageBody data={data} />}
+		</div>
 	);
 }

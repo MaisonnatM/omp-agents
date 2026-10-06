@@ -19,8 +19,6 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return "Todo";
 		case "routines":
 			return "Routines";
-		case "analytics":
-			return "Analytics";
 		case "calendar":
 			return "Calendar";
 		case undefined: {
