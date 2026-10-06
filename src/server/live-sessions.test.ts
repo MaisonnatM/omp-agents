@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { SessionFacts } from "../live-session";
 import { withSubject } from "./live-sessions";
 
-const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], tickets: ["ENG-1"], ship: null };
+const facts: SessionFacts = { pullRequests: [{ owner: "acme", repo: "webapp", number: 7, link: "submitted" }], tickets: ["ENG-1"], ship: null, worktree: null };
 
 describe("withSubject", () => {
 	test("puts a quick action's pull request or issue first among the session's links", () => {

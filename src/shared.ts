@@ -393,6 +393,11 @@ interface RosterHostBase {
 	/** The Linear issues the session and its subagents read, changed, opened, or commented on, by identifier; the session's own first. */
 	tickets: string[];
 	ship: ShipProgress | null;
+	/**
+	 * The linked git worktree the session works in, when its own bash calls last ran in one of `cwd`'s repository other
+	 * than the checkout `cwd` is in; `null` when it works in `cwd`'s checkout.
+	 */
+	worktree: string | null;
 	/** Questions the session waits on, oldest first. */
 	requests: UserRequest[];
 	/** What waits on the main agent's turn. */
@@ -432,6 +437,8 @@ export interface PastSession {
 	/** The Linear issues the session and its subagents read, changed, opened, or commented on, by identifier; the session's own first. */
 	tickets: string[];
 	ship: ShipProgress | null;
+	/** As on {@link RosterHost}. */
+	worktree: string | null;
 	/** The dashboard started it, and it stopped without **End session**: with the dashboard server, or on its own. */
 	interrupted: boolean;
 }

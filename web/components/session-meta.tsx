@@ -8,9 +8,9 @@ import { PAGE_ICON } from "../page-icons";
 import { hashForInbox, hashForTickets } from "../routing";
 import { OrgIcon } from "./org-icon";
 
-/** The project a session runs in, with its full directory on hover. */
-export const Project = ({ cwdDisplay }: { cwdDisplay: string }) => (
-	<Tooltip content={cwdDisplay}>
+/** The project a session runs in, with its full directory, and the worktree it works in when another, on hover. */
+export const Project = ({ cwdDisplay, worktree }: { cwdDisplay: string; worktree: string | null }) => (
+	<Tooltip content={worktree ? `${cwdDisplay}, working in ${worktree}` : cwdDisplay}>
 		<span>{projectName(cwdDisplay) ?? cwdDisplay}</span>
 	</Tooltip>
 );

@@ -33,6 +33,21 @@ const branchesOf = async (cwd: string): Promise<string[]> =>
 		.filter(ref => ref.startsWith(HEADS))
 		.map(ref => ref.slice(HEADS.length));
 
+/** The worktree a directory is in, and the repository that worktree belongs to, as absolute paths. */
+export interface WorktreeAt {
+	/** The worktree's root directory. */
+	top: string;
+	/** The git directory every worktree of the repository shares. */
+	common: string;
+}
+
+/** The worktree `dir` is in, `null` when it is in none. */
+export async function worktreeAt(dir: string): Promise<WorktreeAt | null> {
+	const { code, stdout } = await run(["git", "-C", dir, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"]);
+	const [top, common] = stdout.trim().split("\n");
+	return code === 0 && top && common ? { top, common } : null;
+}
+
 /** The checkout `cwd` is in, `null` when it is in none. */
 export async function gitCheckout(cwd: string): Promise<GitCheckout | null> {
 	const inside = await run(["git", "-C", cwd, "rev-parse", "--is-inside-work-tree"]);

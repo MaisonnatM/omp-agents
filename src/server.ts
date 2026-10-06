@@ -112,9 +112,12 @@ const worktrees = new Worktrees({
 });
 const startSession = (request: StartRequest): Promise<StartResult> => worktrees.lifecycle(() => starter(request));
 const endInbox = new EndInbox(sessionEndInboxDir, {
-	session: sessionId => sessions.bySessionId(sessionId) ?? null,
-	async removeWorktree(cwd) {
-		const result = await worktrees.removeCheckout(cwd);
+	session(sessionId) {
+		const session = sessions.bySessionId(sessionId);
+		return session ? { workDir: files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() } : null;
+	},
+	async removeWorktree(dir) {
+		const result = await worktrees.removeCheckout(dir);
 		return result.removed ? null : (result.error ?? result.blockers.map(blocker => blocker.message).join(" "));
 	},
 	report(sessionId, text, body) {

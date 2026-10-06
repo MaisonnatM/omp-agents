@@ -35,8 +35,8 @@ interface ConversationHeaderProps {
 export function ConversationHeader({ view, subject, onEnd, actions }: ConversationHeaderProps) {
 	const { host, shown, agent, phase, live, working } = subject;
 	const { open } = useDashboardContext();
-	// Read again when a turn starts or ends, since a turn can switch the branch.
-	const checkout = useGitCheckout(subject.kind === "session" ? (shown?.cwd ?? null) : null, working);
+	// The worktree the session works in, else its own directory; read again when a turn starts or ends, since a turn can switch the branch.
+	const checkout = useGitCheckout(subject.kind === "session" && shown ? (shown.worktree ?? shown.cwd) : null, working);
 	const status =
 		phase.phase === "live" ? undefined : phase.phase === "connecting" ? CONTROL_LABEL.connecting : `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
 	const title = agent ? agent.id : shown ? hostLabel(shown) : view.instanceId;
@@ -45,7 +45,7 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 		: shown && (
 				<>
 					<ShipStep ship={shown.ship} />{" "}
-					<Project cwdDisplay={shown.cwdDisplay} />
+					<Project cwdDisplay={shown.cwdDisplay} worktree={shown.worktree} />
 					{checkout && (checkout.github || checkout.branch) && (
 						<>
 							{" · "}

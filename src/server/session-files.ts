@@ -1,5 +1,6 @@
 /** Every session file on disk, newest first, with the pull requests each session worked on. */
 import { basename, dirname, join } from "node:path";
+import { worktreeAt } from "../git";
 import { repoOf } from "../github";
 import { listSessionFiles, readSessionFile, type SavedSession, sessionsDir } from "../omp/sessions";
 import { displayPath } from "../paths";
@@ -33,7 +34,7 @@ export class SessionFiles {
 	#touched = new Set<string>();
 	/** Scans and refreshes run one after another, so a slow full scan never overwrites a newer single-file read. */
 	#chain: Promise<unknown> = Promise.resolve();
-	readonly facts = new SessionFactsIndex(repoOf);
+	readonly facts = new SessionFactsIndex(repoOf, worktreeAt);
 	readonly #root: string;
 
 	/** `root`: omp's sessions directory, one directory per working directory. */
@@ -47,10 +48,10 @@ export class SessionFiles {
 	/** Session `sessionId`'s listed file, or `null` while it is not listed. */
 	readonly savedOf = (sessionId: string): SavedSession | null => this.#byId.get(sessionId) ?? null;
 
-	/** What the index knows of session `sessionId`: its pull requests, Linear issues, and /ship stage. */
+	/** What the index knows of session `sessionId`: its pull requests, Linear issues, /ship stage, and worktree. */
 	readonly factsOf = (sessionId: string): SessionFacts => {
 		const path = this.pathOf(sessionId);
-		return path ? this.facts.factsOf(path) : { pullRequests: [], tickets: [], ship: null };
+		return path ? this.facts.factsOf(path) : { pullRequests: [], tickets: [], ship: null, worktree: null };
 	};
 
 	/** Directories sessions ran in, newest first. Sessions from old omp versions recorded none. */

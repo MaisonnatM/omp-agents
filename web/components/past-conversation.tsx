@@ -31,7 +31,7 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 	const meta = session ? (
 		<>
 			<ShipStep ship={session.ship} />{" "}
-			<Project cwdDisplay={session.cwdDisplay} /> · last active {new Date(session.modifiedAt).toLocaleString()}
+			<Project cwdDisplay={session.cwdDisplay} worktree={session.worktree} /> · last active {new Date(session.modifiedAt).toLocaleString()}
 			<PullRequests pullRequests={session.pullRequests} />
 			<Tickets tickets={session.tickets} />
 		</>

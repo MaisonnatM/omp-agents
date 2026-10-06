@@ -470,11 +470,13 @@ The server lives in `src/`:
 - `src/transcript.ts`: folds session-file lines and live events into display items.
 - `src/work.ts`: folds session-file lines into the files changed.
 - `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, for the `media` message.
-- `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, and its latest /ship step (`parseShipProgress`); `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
+- `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
+  The worktree comes from the `cwd` arguments of the session's own bash calls, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.
+  `git.ts`'s `worktreeAt` answers each directory once per refresh.
 - `src/session-links.ts`: writes the session block into a pull request's description.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
-- `src/git.ts`: the git checkout of a directory, and the worktree a new session's branch runs in.
+- `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), and the worktree a new session's branch runs in.
 - `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `removeCheckout` removes the checkout a directory is in, waiting up to 15 seconds for a session that just ended to leave it.
 - `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows.
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
@@ -502,7 +504,7 @@ The server lives in `src/`:
   The tool writes its request at `agent_end`, after the turn that called it, and deletes it at the next `agent_start` or `session_shutdown`, so a request names a session that idles.
   The inbox drains when the directory changes and after each registry poll, finds the live session through `LiveSessions.bySessionId`, deletes the request, and calls `end()`, the path **End session** takes, so the session is not marked interrupted.
   A request whose session the server does not follow yet stays for a later drain, and a file that is not a request, or whose name is not its session id, moves to `<name>.invalid`.
-  With `removeWorktree`, it then calls `Worktrees.removeCheckout` on the session's cwd, and a checkout that stays adds a todo naming the blockers.
+  With `removeWorktree`, it then calls `Worktrees.removeCheckout` on the session's worktree from `SessionFacts`, else its cwd, and a checkout that stays adds a todo naming the blockers.
 - `src/tickets.ts` also lists the workspace's Linear teams (`loadTeams`, `GET /api/linear/teams`) and opens an issue from a todo (`createTicket`, `PUT /api/ticket/new`), assigned to the viewer.
 - `src/routines.ts`: the rules of routines: `nextRunAt`, `nextDueAt`, `isDue`, `applyRoutine`, which applies an edit, and a command's length, time, and output limits; see [Routines](#routines).
   `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.

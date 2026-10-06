@@ -1,6 +1,6 @@
 /**
  * The requests omp's `end_session` tool leaves for the server, one `<session id>.json` each in a directory: end that
- * session as **End session** does, then, when it asked, remove the git worktree it ran in. The tool writes its request
+ * session as **End session** does, then, when it asked, remove the git worktree it works in. The tool writes its request
  * once the turn that asked is over, and deletes it when the session starts another turn or stops, so a request always
  * names a session that idles after asking. One whose session the server does not follow yet waits for the next drain.
  */
@@ -15,10 +15,13 @@ export interface EndRequest {
 }
 
 export interface EndInboxEnv {
-	/** Live session `sessionId`, or `null` while the server does not follow it. */
-	session(sessionId: string): { cwd: string; end(): Promise<void> } | null;
-	/** Removes the worktree `cwd` is in: why it stayed, or `null` once it is gone. */
-	removeWorktree(cwd: string): Promise<string | null>;
+	/**
+	 * Live session `sessionId`, or `null` while the server does not follow it. `workDir` is where it works: the linked
+	 * worktree its bash calls last ran in, else its own directory.
+	 */
+	session(sessionId: string): { workDir: string; end(): Promise<void> } | null;
+	/** Removes the worktree `dir` is in: why it stayed, or `null` once it is gone. */
+	removeWorktree(dir: string): Promise<string | null>;
 	/** Leaves the user a todo for what an ended session could not finish. */
 	report(sessionId: string, text: string, body: string): void;
 }
@@ -70,7 +73,7 @@ export class EndInbox {
 		await Promise.all(ending);
 	}
 
-	async #end(request: EndRequest, session: { cwd: string; end(): Promise<void> }): Promise<void> {
+	async #end(request: EndRequest, session: { workDir: string; end(): Promise<void> }): Promise<void> {
 		try {
 			await session.end();
 		} catch (err) {
@@ -80,11 +83,11 @@ export class EndInbox {
 		if (!request.removeWorktree) return;
 		let why: string | null;
 		try {
-			why = await this.#env.removeWorktree(session.cwd);
+			why = await this.#env.removeWorktree(session.workDir);
 		} catch (err) {
 			why = errorText(err);
 		}
-		if (why) this.#env.report(request.sessionId, `Remove the worktree ${displayPath(session.cwd)}`, `The session asked to end and to remove its worktree, which stayed: ${why}`);
+		if (why) this.#env.report(request.sessionId, `Remove the worktree ${displayPath(session.workDir)}`, `The session asked to end and to remove its worktree, which stayed: ${why}`);
 	}
 
 	/** Drains now and on every change to the directory, which it creates. */

@@ -7,11 +7,18 @@
  * The same scan collects the Linear issues a session worked on: the ones omp's Linear MCP tools read
  * (`get_issue`, `list_comments`), changed or opened (`save_issue`), or commented on (`save_comment`), and the
  * issue a /ship run records. An issue a search only listed is not linked.
+ *
+ * The session's own bash calls tell which linked worktree it works in: a session started in a repository's main
+ * checkout often adds a worktree and runs its commands there with bash's `cwd`.
  */
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import type { WorktreeAt } from "./git";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
 import { LineReader } from "./line-reader";
 import type { SessionFacts } from "./live-session";
+import { HOME } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
 import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo, SHIP_STAGES, SHIP_WORK, type ShipProgress, TICKET_ID } from "./shared";
@@ -33,7 +40,7 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "mcp__linear_"];
+const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "mcp__linear_", '"cwd"'];
 /** A Linear MCP tool called directly (`mcp__linear_get_issue`, or `xd_mcp__linear_get_issue`), or written to as an omp device. */
 const LINEAR_TOOL = /^(?:xd_)?mcp__linear_(\w+)$/;
 const LINEAR_DEVICE = /^xd:\/\/mcp__linear_(\w+)$/;
@@ -130,6 +137,8 @@ export class SessionFactsScan {
 	/** Linear issue identifiers, `ENG-123`, in the order the transcript first named them. */
 	readonly tickets = new Set<string>();
 	ship: ShipProgress | null = null;
+	/** The `cwd` arguments of bash calls as written, each once, the most recently used last. */
+	readonly workDirs = new Set<string>();
 
 	applyLine(line: string): void {
 		const backgrounding = this.#pending.size > 0 && line.includes('"jobId"');
@@ -161,6 +170,10 @@ export class SessionFactsScan {
 		if (entry.type !== "message" || !isObject(entry.message)) return;
 		for (const call of toolCallsOf(entry.message)) {
 			if (call.name === "bash" && typeof call.args.command === "string") this.#command(call.id, call.args.command);
+			if (call.name === "bash" && typeof call.args.cwd === "string" && call.args.cwd) {
+				this.workDirs.delete(call.args.cwd);
+				this.workDirs.add(call.args.cwd);
+			}
 			if (call.name === "read" && typeof call.args.path === "string") this.#read(call.args.path);
 			const linear = linearCall(call.name, call.args);
 			if (linear) this.#linear(call.id, linear.tool, linear.args);
@@ -301,6 +314,27 @@ interface SessionScan {
 	pullRequests: LinkedPullRequest[];
 	/** Every transcript's Linear issues, each once, the session's own first. */
 	tickets: string[];
+	/** The `cwd` arguments of the session's own bash calls, absolute, the most recently used first. */
+	workDirs: string[];
+	/** The linked worktree it works in, when that is not the checkout `cwd` is in. */
+	worktree: string | null;
+}
+
+/**
+ * The linked worktree of `cwd`'s repository, other than the one `cwd` is in, that the most recent of `workDirs` in
+ * one is in. Directories in `cwd`'s own checkout, outside git, or in another repository are passed over; a directory
+ * that is gone ends the search with `null`, since it may be a worktree removed since, and an older one is stale.
+ */
+async function workingWorktree(cwd: string, workDirs: readonly string[], worktreeAt: (dir: string) => Promise<WorktreeAt | null>): Promise<string | null> {
+	if (workDirs.length === 0) return null;
+	const own = await worktreeAt(cwd);
+	if (!own) return null;
+	for (const dir of workDirs) {
+		if (!existsSync(dir)) return null;
+		const at = await worktreeAt(dir);
+		if (at && at.top !== own.top && at.common === own.common) return at.top;
+	}
+	return null;
 }
 
 export interface ListedSession {
@@ -314,16 +348,18 @@ export class SessionFactsIndex {
 	/** The PRs the inbox listed, by `owner/repo:branch` of their head. */
 	readonly #heads = new Map<string, PullRequest>();
 	readonly #repoOf: (cwd: string) => Promise<Repo | null>;
+	readonly #worktreeAt: (dir: string) => Promise<WorktreeAt | null>;
 	#chain: Promise<unknown> = Promise.resolve();
 
-	/** `repoOf`: the GitHub repository `origin` names in a working directory. */
-	constructor(repoOf: (cwd: string) => Promise<Repo | null>) {
+	/** `repoOf`: the GitHub repository `origin` names in a working directory. `worktreeAt`: the git worktree a directory is in. */
+	constructor(repoOf: (cwd: string) => Promise<Repo | null>, worktreeAt: (dir: string) => Promise<WorktreeAt | null>) {
 		this.#repoOf = repoOf;
+		this.#worktreeAt = worktreeAt;
 	}
 
 	/**
 	 * What the session in `sessionPath` and its subagents submitted, worked on, and linked, or none before its first scan.
-	 * The /ship stage is the session's own transcript's, not its subagents'.
+	 * The /ship stage and the worktree are the session's own transcript's, not its subagents', which run in worktrees of their own.
 	 */
 	factsOf(sessionPath: string): SessionFacts {
 		const session = this.#sessions.get(sessionPath);
@@ -331,12 +367,13 @@ export class SessionFactsIndex {
 			pullRequests: session?.pullRequests ?? [],
 			tickets: session?.tickets ?? [],
 			ship: session?.transcripts.get(sessionPath)?.scan.ship ?? null,
+			worktree: session?.worktree ?? null,
 		};
 	}
 
 	/**
 	 * Read what the listed session files gained since the last refresh and forget unlisted ones.
-	 * Resolves whether any session's pull requests, Linear issues, or /ship stage changed. Refreshes run one at a time.
+	 * Resolves whether any session's pull requests, Linear issues, /ship stage, or worktree changed. Refreshes run one at a time.
 	 */
 	refresh(sessions: readonly ListedSession[]): Promise<boolean> {
 		const run = this.#chain.then(() => this.#refresh(sessions));
@@ -386,12 +423,14 @@ export class SessionFactsIndex {
 		for (const path of this.#sessions.keys()) if (!listed.has(path)) this.#sessions.delete(path);
 		let changed = false;
 		const touched: SessionScan[] = [];
+		/** Sessions whose bash calls named a new `cwd`, or whose worktree is gone: the others keep theirs without asking git. */
+		const moved: SessionScan[] = [];
 		for (const { path, cwd, modifiedAt } of sessions) {
 			let session = this.#sessions.get(path);
 			// A subagent's writes do not touch the session file, but its result does once it finishes.
 			if (session?.modifiedAt === modifiedAt) continue;
 			const previousShip = session?.transcripts.get(path)?.scan.ship;
-			session ??= { modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path)]]), refs: [], repo: null, pullRequests: [], tickets: [] };
+			session ??= { modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path)]]), refs: [], repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null };
 			this.#sessions.set(path, session);
 			for (const file of await subagentFiles(path)) {
 				if (!session.transcripts.has(file)) session.transcripts.set(file, new TranscriptScan(file));
@@ -399,7 +438,14 @@ export class SessionFactsIndex {
 			let complete = true;
 			for (const transcript of session.transcripts.values()) if (!(await transcript.read())) complete = false;
 			if (complete) session.modifiedAt = modifiedAt;
-			if (JSON.stringify(previousShip ?? null) !== JSON.stringify(session.transcripts.get(path)?.scan.ship ?? null)) changed = true;
+			const own = session.transcripts.get(path)!.scan;
+			if (JSON.stringify(previousShip ?? null) !== JSON.stringify(own.ship ?? null)) changed = true;
+			// omp resolves a bash `cwd` from the home directory after `~`, else from the session's directory.
+			const workDirs = [...own.workDirs].reverse().map(dir => (dir === "~" || dir.startsWith("~/") ? HOME + dir.slice(1) : resolve(cwd, dir)));
+			const before = session.workDirs;
+			const same = workDirs.length === before.length && workDirs.every((dir, i) => dir === before[i]);
+			if (!same || (session.worktree !== null && !existsSync(session.worktree))) moved.push(session);
+			session.workDirs = workDirs;
 			if (this.#gather(session)) changed = true;
 			touched.push(session);
 		}
@@ -412,6 +458,19 @@ export class SessionFactsIndex {
 				}),
 		);
 		for (const session of touched) if (this.#resolve(session)) changed = true;
+		// Sessions share directories, so each is asked about once per refresh.
+		const asked = new Map<string, Promise<WorktreeAt | null>>();
+		const worktreeAt = (dir: string): Promise<WorktreeAt | null> => {
+			let at = asked.get(dir);
+			if (!at) asked.set(dir, (at = this.#worktreeAt(dir)));
+			return at;
+		};
+		const worktrees = await Promise.all(moved.map(session => workingWorktree(session.cwd, session.workDirs, worktreeAt)));
+		moved.forEach((session, i) => {
+			if (worktrees[i] === session.worktree) return;
+			session.worktree = worktrees[i]!;
+			changed = true;
+		});
 		return changed;
 	}
 }

@@ -211,7 +211,9 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
   Hover either to see the full directory or model selector.
   The settings page labels models the same way.
-  When a running session's directory is in a git checkout, the header also names the GitHub repository that `origin` points to, as a link to it, and the branch that the directory has checked out.
+  When a running session's directory is in a git checkout, the header also names the GitHub repository that `origin` points to, as a link to it, and the branch of the checkout the session works in.
+  That is the linked worktree of the same repository that the session's own bash calls last named as their `cwd`, as when a session started in the main checkout adds a worktree and works there, else the session's directory; hover the project name to see that worktree.
+  A bash `cwd` in the session's own checkout, outside git, or in another repository leaves the worktree as it was, and one in a directory that is gone falls back to the session's directory.
   The page reads the branch again whenever a turn starts or ends, so a session that switches branches shows the new one.
   Click the branch to copy its name; its icon turns into a check mark for a moment.
   The same works on the branch of a pull request's details and of a Linear issue's detail view.
@@ -350,7 +352,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - An agent ends its own session through the `end_session` tool, when you ask it to, for example "Merge on main, delete the worktree, then end the session".
   It comes from `~/.omp/agent/extensions/end-session.ts`, which `bun run omp-template` installs.
   The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **End session**, not as interrupted.
-  With `removeWorktree`, the dashboard then removes the git worktree the session ran in, with the checks of **Settings → Worktrees**, and keeps its branch.
+  With `removeWorktree`, the dashboard then removes the git worktree the session works in, the one its header names the branch of, with the checks of **Settings → Worktrees**, and keeps its branch.
   A worktree that those checks keep, such as one with uncommitted changes, one another session uses, or the main checkout, stays, and a todo names why.
   The tool leaves its request as `<session id>.json` in `end-inbox/` beside `todos.json`; a message sent before the dashboard acts withdraws it, and a request waits while the dashboard is down.
 - **Resume** in a past session's header starts omp on that session's file from the dashboard, as `omp --resume <session id>` does in a terminal.

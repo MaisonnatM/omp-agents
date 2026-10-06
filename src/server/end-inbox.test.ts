@@ -16,21 +16,21 @@ function inboxDir(): string {
 }
 
 /** An inbox whose live sessions are `live`, recording what it ends, removes, and reports, in order. */
-function inboxOf(dir: string, live: string[], removal: (cwd: string) => Promise<string | null> = async () => null) {
+function inboxOf(dir: string, live: string[], removal: (dir: string) => Promise<string | null> = async () => null) {
 	const log: string[] = [];
 	const env: EndInboxEnv = {
 		session: sessionId =>
 			live.includes(sessionId)
 				? {
-						cwd: `/work/${sessionId}`,
+						workDir: `/work/${sessionId}`,
 						end: async () => {
 							log.push(`end ${sessionId}`);
 						},
 					}
 				: null,
-		removeWorktree: async cwd => {
-			log.push(`remove ${cwd}`);
-			return removal(cwd);
+		removeWorktree: async workDir => {
+			log.push(`remove ${workDir}`);
+			return removal(workDir);
 		},
 		report: (sessionId, text, body) => log.push(`report ${sessionId}: ${text}: ${body}`),
 	};

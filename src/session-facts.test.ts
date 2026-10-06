@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { worktreeAt } from "./git";
+import { runChecked } from "./proc";
 import { parseShipProgress, resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
 
 const toolCall = (id: string, name: string, args: object) =>
@@ -205,7 +207,7 @@ describe("SessionFactsIndex", () => {
 		mkdirSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child"), { recursive: true });
 		writeFileSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child", "Grandchild.jsonl"), `${line(2)}\n`);
 
-		const index = new SessionFactsIndex(async () => null);
+		const index = new SessionFactsIndex(async () => null, async () => null);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 		expect(await index.refresh(listed(1))).toBe(true);
 		expect(index.factsOf(session).pullRequests.map(pr => pr.number)).toEqual([1, 2]);
@@ -230,7 +232,7 @@ describe("SessionFactsIndex", () => {
 		const child = join(dir, "2026-10-01T00-00-00-000Z_ship", "Child");
 		mkdirSync(child, { recursive: true });
 		writeFileSync(join(child, "sub.jsonl"), `${state("merged")}\n`);
-		const index = new SessionFactsIndex(async () => null);
+		const index = new SessionFactsIndex(async () => null, async () => null);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
@@ -251,7 +253,7 @@ describe("SessionFactsIndex", () => {
 		const child = join(dir, "2026-10-01T00-00-00-000Z_tickets");
 		mkdirSync(child, { recursive: true });
 		writeFileSync(join(child, "Sub.jsonl"), `${read("ENG-2")}\n${read("ENG-1")}\n`);
-		const index = new SessionFactsIndex(async () => null);
+		const index = new SessionFactsIndex(async () => null, async () => null);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
@@ -270,10 +272,13 @@ describe("SessionFactsIndex", () => {
 		writeFileSync(reader, `${toolCall("r", "read", { path: "pr://6611" })}\n`);
 		writeFileSync(pusher, `${bashCall("p", "git push")}\n${result("p", pushed("me/feature"))}\n`);
 		const asked: string[] = [];
-		const index = new SessionFactsIndex(async cwd => {
-			asked.push(cwd);
-			return { owner: "acme", repo: "webapp" };
-		});
+		const index = new SessionFactsIndex(
+			async cwd => {
+				asked.push(cwd);
+				return { owner: "acme", repo: "webapp" };
+			},
+			async () => null,
+		);
 
 		expect(
 			await index.refresh([
@@ -291,6 +296,43 @@ describe("SessionFactsIndex", () => {
 		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, inbox)).toBe(false);
 		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, [])).toBe(true);
 		expect(index.factsOf(pusher).pullRequests).toEqual([]);
+	});
+
+	test("names the linked worktree the session's own bash calls last ran in, passing over others, and none once it is gone", async () => {
+		const parent = realpathSync(sessionDir());
+		const git = (cwd: string, ...args: string[]) => runChecked(["git", "-C", cwd, ...args], { env: { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
+		const main = join(parent, "app");
+		mkdirSync(join(main, "src"), { recursive: true });
+		await git(main, "init", "-q", "-b", "main");
+		await git(main, "commit", "-q", "--allow-empty", "-m", "one");
+		await git(main, "worktree", "add", "-q", "-b", "wip", join(parent, "app-wip"));
+		await git(main, "worktree", "add", "-q", "-b", "done", join(parent, "app-done"));
+		const other = join(parent, "other");
+		mkdirSync(other);
+		await git(other, "init", "-q");
+		mkdirSync(join(parent, "plain"));
+
+		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		const ran = (cwd: string) => toolCall(`b-${cwd}`, "bash", { command: "bun test", cwd });
+		const child = join(parent, "2026-10-01T00-00-00-000Z_s1", "Sub");
+		mkdirSync(child, { recursive: true });
+		writeFileSync(join(child, "sub.jsonl"), `${ran(join(parent, "app-done"))}\n`);
+		writeFileSync(session, `${ran("../../app-done")}\n${ran("../../app-wip")}\n`);
+		const index = new SessionFactsIndex(async () => null, worktreeAt);
+		const listed = (modifiedAt: number) => [{ path: session, cwd: join(main, "src"), modifiedAt }];
+
+		expect(await index.refresh(listed(1))).toBe(true);
+		expect(index.factsOf(session).worktree).toBe(join(parent, "app-wip"));
+		appendFileSync(session, `${ran(main)}\n${ran(other)}\n${ran("../../plain")}\n`);
+		expect(await index.refresh(listed(2))).toBe(false);
+		expect(index.factsOf(session).worktree).toBe(join(parent, "app-wip"));
+		appendFileSync(session, `${ran("../../app-done")}\n`);
+		expect(await index.refresh(listed(3))).toBe(true);
+		expect(index.factsOf(session).worktree).toBe(join(parent, "app-done"));
+		await git(main, "worktree", "remove", join(parent, "app-done"));
+		appendFileSync(session, `${ran("../../app-wip")}\n${ran("../../app-done")}\n`);
+		expect(await index.refresh(listed(4))).toBe(true);
+		expect(index.factsOf(session).worktree).toBeNull();
 	});
 });
 
