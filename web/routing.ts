@@ -1,5 +1,4 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { type AnalyticsRange, isAnalyticsRange } from "../src/shared/analytics";
 import type { PullRequest } from "../src/shared/github";
 import { type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
 import { TICKET_ID } from "../src/shared/tickets";
@@ -48,11 +47,6 @@ export interface RoutinesRoute {
 	target: string | null;
 }
 
-/** The Analytics page's selected time range. */
-export interface AnalyticsRoute {
-	range: AnalyticsRange;
-}
-
 /** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. `todoId` names the todo it works on. */
 export interface NewSessionRoute {
 	cwd: string | null;
@@ -66,7 +60,6 @@ export type Page =
 	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "routines" } & RoutinesRoute)
-	| ({ kind: "analytics" } & AnalyticsRoute)
 	| { kind: "calendar" }
 	| ({ kind: "new" } & NewSessionRoute);
 
@@ -96,7 +89,6 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/done` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone.
  * - `#routines` opens the Routines page with every routine, and `#routines/<id>` with that routine's settings and runs.
- * - `#analytics` opens the last seven days, and `#analytics/<range>` chooses another time range.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
@@ -113,7 +105,6 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "todo", list: named ?? { kind: "category", id: decodeURIComponent(rest) } };
 	},
 	routines: rest => ({ kind: "routines", target: rest ? decodeURIComponent(rest) : null }),
-	analytics: rest => ({ kind: "analytics", range: rest && isAnalyticsRange(rest) ? rest : "7d" }),
 	calendar: () => ({ kind: "calendar" }),
 };
 
@@ -133,8 +124,6 @@ function restOfPage(page: Page): string | null {
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
 		case "routines":
 			return page.target === null ? null : encodeURIComponent(page.target);
-		case "analytics":
-			return page.range === "7d" ? null : page.range;
 		case "calendar":
 			return null;
 		default: {
@@ -154,7 +143,6 @@ export const hashForInbox = (target: PullRequest | null): string => hashForPage(
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
 export const hashForTodo = (list: TodoListView): string => hashForPage({ kind: "todo", list });
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
-export const hashForAnalytics = (range: AnalyticsRange = "7d"): string => hashForPage({ kind: "analytics", range });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (cwd: string | null): string => hashForPage({ kind: "settings", cwd });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
@@ -207,7 +195,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `todo`, `routines`, `analytics`, `session`, or `new`. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `todo`, `routines`, `session`, or `new`. */
 function viewFromPane(pane: string): View {
 	if (pane.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(pane.slice(PAST_PREFIX.length)) };
 	const slash = pane.indexOf("/");

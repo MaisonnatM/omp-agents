@@ -1,4 +1,4 @@
-import { FileText, FolderOpen, GitBranch, Palette, Plug, RotateCcw, Route, Sparkles } from "lucide-react";
+import { BarChart3, FileText, FolderOpen, GitBranch, Palette, Plug, RotateCcw, Route, Sparkles } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
@@ -8,6 +8,7 @@ import { type ReadState, useRead, useReplaceableRead } from "../../reads";
 import { hashForSettings } from "../../routing";
 import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
+import { AnalyticsTab } from "./analytics-tab";
 import { AppearanceTab } from "./appearance-tab";
 import type { Catalog, Editing } from "./editor";
 import { Files } from "./files-tab";
@@ -53,6 +54,7 @@ function WorkspacePicker({ cwd, workspaces }: { cwd: string | null; workspaces: 
 }
 
 const SETTINGS_TABS = [
+	{ value: "analytics", label: "Analytics", icon: BarChart3 },
 	{ value: "roles", label: "Model roles & provider order", icon: Route },
 	{ value: "retry", label: "Retry and fallback", icon: RotateCcw },
 	{ value: "files", label: "Files", icon: FileText },
@@ -97,9 +99,9 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 	};
 }
 
-/** omp's model routing and the files it reads, for one workspace or for the user only, each editable in place. */
+/** omp's request usage, then its model routing and the files it reads, for one workspace or for the user only, each editable in place. */
 export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspaces: Workspace[] }) {
-	const [tab, setTab] = useState<SettingsTab>("roles");
+	const [tab, setTab] = useState<SettingsTab>("analytics");
 	const models = useRead<{ models: CatalogModel[] }>("/api/models");
 	const catalog = useMemo(
 		(): Catalog => ({
@@ -117,6 +119,7 @@ export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspac
 
 	const panels: Record<SettingsTab, ReactNode> = {
 		...ompPanels(settings, cwd, editing),
+		analytics: <AnalyticsTab active={tab === "analytics"} />,
 		worktrees: <WorktreesTab cwd={cwd} active={tab === "worktrees"} />,
 		integrations: <div className="space-y-6"><LinearConnection /><GoogleConnection /></div>,
 		"new-sessions": <NewSessionsTab cwd={cwd} />,
@@ -144,7 +147,7 @@ export function SettingsPage({ cwd, workspaces }: { cwd: string | null; workspac
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header
 				title="Settings"
-				meta={cwd === null ? "omp's model routing and your files" : "omp's model routing and files, as a session in this workspace loads them"}
+				meta={cwd === null ? "omp's usage, model routing, and your files" : "omp's usage, and its model routing and files as a session in this workspace loads them"}
 			>
 				<WorkspacePicker cwd={cwd} workspaces={workspaces} />
 			</Header>

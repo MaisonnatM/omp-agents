@@ -2,7 +2,6 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { QUICK_TODO_EVENT } from "../src/server/address";
 import type { UserTodoList } from "../src/user-todos-shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
-import { AnalyticsPage } from "./components/analytics/analytics-page";
 import { DashboardContext } from "./components/dashboard-context";
 import { FileDialog } from "./components/file-dialog";
 import { InboxNav } from "./components/inbox/inbox-nav";
@@ -325,9 +324,6 @@ export function App() {
 		case "settings":
 			main = <SettingsPage cwd={page.cwd} workspaces={projects} />;
 			break;
-		case "analytics":
-			main = <AnalyticsPage range={page.range} />;
-			break;
 		case "inbox":
 			main = page.target ? <PullRequestPage project={project} hosts={visible.hosts} target={page.target} /> : panes();
 			break;
@@ -418,7 +414,7 @@ export function App() {
 						onShowShortcuts={() => setShortcutsOpen(true)}
 						toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
 					/>
-					<PlanUsageFooter usage={state.usage} analyticsOpen={page?.kind === "analytics"} />
+					<PlanUsageFooter usage={state.usage} />
 				</DashboardSidebar>
 				<SidebarInset>
 					<Plans value={state.usage?.plans ?? NO_PLANS}>
