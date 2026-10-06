@@ -14,6 +14,7 @@ import { endsMidTurn } from "./omp/sessions";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type ModelEntry, type ModelOption, type PromptImage, selectorOf, type UserAnswer, type UserRequest } from "./shared";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { SKILL_PROMPT } from "./transcript";
+import { TurnGate } from "./turn-gate";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
 interface RpcAgent {
@@ -96,6 +97,8 @@ export class DashboardSession implements LiveSession {
 	#userCommand = false;
 	/** Whether **End session** stopped the process, rather than the dashboard shutting down or omp exiting on its own. */
 	#ended = false;
+	/** Prompt, dequeue, abort, and flush, so an abort cannot land before the steer it should deliver. */
+	readonly #turn = new TurnGate();
 
 	private constructor(
 		instanceId: string,
@@ -300,7 +303,9 @@ export class DashboardSession implements LiveSession {
 		}
 		this.#userCommand = text.startsWith("/");
 		const content = images.map(image => ({ type: "image" as const, ...image }));
-		await this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
+		await this.#turn
+			.run(() => this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery))
+			.catch((err: unknown) => this.#fail("Prompt failed", err));
 	}
 
 	/** A `!` command, which omp runs in the session's directory and records in its file for the agent to see. */
@@ -321,17 +326,29 @@ export class DashboardSession implements LiveSession {
 
 	/** Whether omp still held the message; it may have delivered it since the page saw the queue. */
 	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean> {
-		if (agentId !== null) return false;
-		try {
-			return (await this.#child.client.removeQueuedMessage(text, queue)).removed;
-		} catch (err) {
-			this.#fail("Dequeue failed", err);
-			return false;
-		}
+		return this.#turn.run(async () => {
+			if (agentId !== null) return false;
+			try {
+				return (await this.#child.client.removeQueuedMessage(text, queue)).removed;
+			} catch (err) {
+				this.#fail("Dequeue failed", err);
+				return false;
+			}
+		});
 	}
 
 	abort(): void {
-		this.#child.client.abort().catch((err: unknown) => this.#fail("Stop failed", err));
+		void this.#turn.run(() => this.#child.client.abort().catch((err: unknown) => this.#fail("Stop failed", err)));
+	}
+
+	/** omp's queue as it stands now, not as the page last saw it: the turn may already have taken the steer. */
+	flush(): void {
+		void this.#turn
+			.run(async () => {
+				const { queuedMessages } = await this.#child.client.getState();
+				if (queuedMessages.steering.length > 0) await this.#child.client.abort();
+			})
+			.catch((err: unknown) => this.#fail("Send now failed", err));
 	}
 
 	cancelAgent(agentId: string): void {

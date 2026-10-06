@@ -283,6 +283,7 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 			: null;
 	},
 	abort: ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "abort", instanceId } } : null),
+	flush: ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "flush", instanceId } } : null),
 	"cancel-agent"(value) {
 		const view = parseLiveView(value.view);
 		const agentId = view?.ok.agentId;

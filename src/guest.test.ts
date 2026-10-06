@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as commands from "./commands";
 import { SessionGuest } from "./guest";
 import type { LiveUpdate } from "./live-session";
 import * as collab from "./omp/collab";
@@ -66,6 +67,11 @@ function start(snapshot: HostSnapshot = host()) {
 	});
 	guests.push(guest);
 	return { guest, ended: ended.promise };
+}
+
+/** Lets every promise reaction that is already queued, and the ones it queues in turn, run. */
+async function settle(): Promise<void> {
+	for (let turn = 0; turn < 20; turn++) await Promise.resolve();
 }
 
 const guests: SessionGuest[] = [];
@@ -156,11 +162,52 @@ describe("SessionGuest follow-ups", () => {
 		]);
 	});
 
+	test("an abort waits until a steer that is still being prepared is sent", async () => {
+		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
+		const prepared = Promise.withResolvers<string>();
+		spyOn(commands, "expandPrompt").mockImplementation(() => prepared.promise);
+		const sending = guest.prompt(null, "now", [], "steer");
+		guest.abort();
+		await settle();
+		expect(socket.messages).toEqual([]);
+
+		prepared.resolve("now");
+		await sending;
+		await settle();
+		expect(socket.messages).toEqual([
+			{ t: "prompt", text: "now" },
+			{ t: "abort" },
+		]);
+	});
+
+	test("an empty Enter stops the turn while a steer waits, whether the host reported it or this guest just sent it", async () => {
+		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
+		guest.flush();
+		await settle();
+		expect(socket.messages).toEqual([]);
+
+		guest.send(null, { text: "now", payload: "now" }, "steer");
+		guest.flush();
+		await settle();
+		expect(socket.messages).toEqual([{ t: "prompt", text: "now" }, { t: "abort" }]);
+	});
+
+	test("once the host's state shows the steer taken, an empty Enter leaves the turn that answers it alone", async () => {
+		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
+		guest.send(null, { text: "now", payload: "now" }, "steer");
+		socket.frame({ t: "state", state: { isStreaming: true, queuedMessageCount: 1 } });
+		socket.frame({ t: "state", state: { isStreaming: true, queuedMessageCount: 0 } });
+		guest.flush();
+		await settle();
+		expect(socket.messages).toEqual([{ t: "prompt", text: "now" }]);
+	});
+
 	test("a follow-up held after the guest's own abort waits for the next turn to end", async () => {
 		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
 		guest.send(null, { text: "after", payload: "after" }, "followUp");
 
 		guest.abort();
+		await settle();
 		expect(socket.messages).toEqual([{ t: "abort" }]);
 		socket.frame(state(false));
 		expect(socket.messages).toEqual([{ t: "abort" }]);
@@ -250,6 +297,7 @@ describe("SessionGuest subagents", () => {
 		const { guest, socket } = await joinRoom({ welcome: { agents: [MAIN, agent("s1", "running")] } });
 		guest.send("s1", { text: "later", payload: "later" }, "followUp");
 		guest.abort();
+		await settle();
 		socket.frame({ t: "agents", agents: [MAIN, agent("s1", "idle")] });
 		expect(socket.messages).toEqual([{ t: "abort" }, { t: "agent-cmd", cmd: "chat", agentId: "s1", text: "later" }]);
 	});

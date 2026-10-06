@@ -1035,6 +1035,8 @@ export type ClientMsg =
 	/** Take `messages` out of the view's queue before the agent gets them. `reqId` counts per view. */
 	| { t: "dequeue"; reqId: number; view: LiveView; messages: { queue: keyof MessageQueue; text: string }[] }
 	| { t: "abort"; instanceId: string }
+	/** Stop the running turn while the session still holds a steer, so omp runs that steer now, as an empty Enter does in its terminal. */
+	| { t: "flush"; instanceId: string }
 	/** Suggestions for the composer text with the caret at `cursor`, resolved against the scope's cwd and its skills and commands. */
 	| { t: "complete"; reqId: number; scope: CompletionScope; text: string; cursor: number }
 	/** End a live session: stop the omp process this dashboard started, or send SIGTERM to a terminal session's omp. */

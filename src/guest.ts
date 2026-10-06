@@ -11,6 +11,7 @@ import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp/collab";
 import { type AgentRow, type ContextUsage, type ControlPhase, type Delivery, type HostStatus, type MessageQueue, type PromptImage, selectorOf, type UserAnswer, type UserRequest } from "./shared";
 import { contextOf, type HostAgent, parseAgents, parseSubagentFrame, SubagentFiles } from "./subagents";
+import { TurnGate } from "./turn-gate";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
 
 const DISPLAY_NAME = "omp-agents";
@@ -18,12 +19,13 @@ const LINK_ATTEMPTS = 3;
 /** Wait this long before rejoining a host whose room dropped us while it stays listed. */
 const REJOIN_MS = 5000;
 
-/** Model, thinking level, context, and whether a turn runs, from the host's status-line snapshot. */
+/** Model, thinking level, context, whether a turn runs, and how many messages wait on it, from the host's status-line snapshot. */
 interface HostState {
 	model: string | null;
 	thinkingLevel: string | null;
 	context: ContextUsage | null;
 	streaming: boolean;
+	queued: number;
 }
 
 function parseState(value: unknown): HostState | null {
@@ -34,6 +36,7 @@ function parseState(value: unknown): HostState | null {
 		thinkingLevel: nonEmptyStr(thinkingLevel) ?? null,
 		context: contextOf(value.contextUsage),
 		streaming: value.isStreaming === true,
+		queued: typeof value.queuedMessageCount === "number" ? value.queuedMessageCount : 0,
 	};
 }
 
@@ -104,6 +107,10 @@ export class SessionGuest implements LiveSession {
 	 * its queue back in the editor rather than run it after an interrupt, so held follow-ups wait for the next turn.
 	 */
 	#interrupted = false;
+	/** Prompt, abort, and flush, so their frames follow a steer that is still being prepared. */
+	readonly #turn = new TurnGate();
+	/** Whether this guest steered the running turn since the host last reported its queue; the host's state lags the steer. */
+	#steered = false;
 
 	constructor(host: HostSnapshot, emit: (update: LiveUpdate) => void) {
 		this.instanceId = host.instanceId;
@@ -193,9 +200,11 @@ export class SessionGuest implements LiveSession {
 
 	/** Prepare `text` as the terminal would, expanding a skill or file command, then {@link send} it with `images`. */
 	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
-		if (agentId && images.length > 0) throw new Error("omp sends a subagent text only.");
-		const payload = await expandPrompt(this.instanceId, this.#host.cwd, text, agentId ? "subagent" : "session");
-		this.send(agentId, { text, payload, images }, delivery);
+		await this.#turn.run(async () => {
+			if (agentId && images.length > 0) throw new Error("omp sends a subagent text only.");
+			const payload = await expandPrompt(this.instanceId, this.#host.cwd, text, agentId ? "subagent" : "session");
+			this.send(agentId, { text, payload, images }, delivery);
+		});
 	}
 
 	/**
@@ -211,6 +220,7 @@ export class SessionGuest implements LiveSession {
 			return;
 		}
 		if (!key) {
+			if (this.#running("")) this.#steered = true;
 			const images = message.images?.map(image => ({ type: "image", ...image }));
 			this.#socket?.send({ t: "prompt", text: message.payload, images: images?.length ? images : undefined });
 		} else if (this.#agents.some(a => a.id === key && !a.isMain && a.status !== "aborted")) {
@@ -236,7 +246,19 @@ export class SessionGuest implements LiveSession {
 	abort(): void {
 		if (!this.canWrite) return;
 		this.#interrupted = true;
-		this.#socket?.send({ t: "abort" });
+		void this.#turn.run(() => {
+			this.#socket?.send({ t: "abort" });
+		});
+	}
+
+	/** The host's last state counts a waiting steer, or this guest steered since that state left the host. */
+	flush(): void {
+		if (!this.canWrite) return;
+		void this.#turn.run(() => {
+			if (!this.#steered && !this.state?.queued) return;
+			this.#interrupted = true;
+			this.#socket?.send({ t: "abort" });
+		});
 	}
 
 	/** omp's Agent Hub kill over Collab: the host aborts a running subagent and tombstones it. */
@@ -365,9 +387,11 @@ export class SessionGuest implements LiveSession {
 				return;
 			}
 			case "state": {
-				const state = parseState(frame.state);
-				if (sameState(state, this.state)) return;
-				this.state = state;
+				const previous = this.state;
+				this.state = parseState(frame.state);
+				// The host now counts the steer this guest sent, or the turn it steered has ended.
+				if (!this.state?.streaming || this.state.queued > 0) this.#steered = false;
+				if (sameState(this.state, previous)) return;
 				this.#emit({ kind: "roster" });
 				return;
 			}

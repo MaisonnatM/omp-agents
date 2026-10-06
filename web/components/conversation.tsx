@@ -164,6 +164,11 @@ function LiveConversation({
 			if (!writable || !subject.followUps || (!text && (!attachable || attachments.files.length === 0)) || directCommand) return false;
 			submit(text, "followUp");
 		},
+		// Enter with a draft still steers. On the empty composer, the server stops the turn if omp still holds a steer, so omp runs it now.
+		deliverSteer: () => {
+			if (!session || !writable || !working || draft.trim() !== "" || (attachable && attachments.files.length > 0)) return false;
+			send({ t: "flush", instanceId: view.instanceId });
+		},
 		...(focused
 			? {
 					interrupt: () => {

@@ -211,6 +211,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 - While a turn runs, the composer sends the way omp's terminal does.
   Enter, or the send button (labeled **Steer**), steers the turn, and omp hands the message to the agent after the current tool call.
+  Enter again on the empty composer stops that turn and delivers the steer now, instead of leaving it behind a long reply or tool call.
+  It does nothing once the agent has already taken the steer, and a follow-up still waits.
   Ctrl+Enter (Cmd+Enter on macOS) sends a follow-up, which waits until the agent finishes its turn; the placeholder names the shortcut while a turn runs.
   An idle session takes either as a new prompt.
 - Messages that wait on the turn show above the text field, each tagged **Steer** or **Follow-up**.
