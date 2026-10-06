@@ -392,6 +392,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A workspace's repository is the one its `origin` remote names.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
   They sort into Graphite's sections: **Needs your review**, **Returned to you** (changes requested), **Approved**, **Waiting for review**, **Drafts**, and **Recently merged**.
+  Once you ask every reviewer who requested changes for a new review, the pull request moves back to **Waiting for review**, though GitHub still reports the change request until they review again.
   A row shows the pull request's state, title, and age, then its number, the check rollup, merge conflicts, the number of unresolved review comments, the review decision when its section does not already say it, its place in a stack, and the sessions on it.
   A review asked of you also names its author.
   The review decision shows on drafts and on reviews asked of you, since the other sections name it.

@@ -182,6 +182,32 @@ describe("parseInboxAnswer", () => {
 		]);
 	});
 
+	test("a change request waits on review again once every reviewer who asked for changes is asked for a new review", () => {
+		const lencshu = { login: "lencshu", avatarUrl: null };
+		const bsaintot = { login: "bsaintot", avatarUrl: null };
+		const changes = (...authors: (typeof lencshu)[]) => ({ nodes: authors.map(author => ({ state: "CHANGES_REQUESTED", author })) });
+		const requested = (...reviewers: (typeof lencshu)[]) => ({ nodes: reviewers.map(requestedReviewer => ({ requestedReviewer })) });
+		const prs = parseInboxAnswer(
+			{
+				data: {
+					authored: {
+						nodes: [
+							node(1, { reviewDecision: "CHANGES_REQUESTED", latestReviews: changes(lencshu) }),
+							node(2, { reviewDecision: "CHANGES_REQUESTED", latestReviews: changes(lencshu), reviewRequests: requested(lencshu) }),
+							node(3, { reviewDecision: "CHANGES_REQUESTED", latestReviews: changes(lencshu, bsaintot), reviewRequests: requested(lencshu) }),
+						],
+					},
+				},
+			},
+			repo,
+		);
+		expect(prs.map(pr => [pr.number, pr.review])).toEqual([
+			[1, "changes-requested"],
+			[2, "review-required"],
+			[3, "changes-requested"],
+		]);
+	});
+
 	test("counts unresolved review threads, as a floor when GitHub lists only the first page", () => {
 		const threads = (resolved: boolean[], totalCount = resolved.length) => ({ totalCount, nodes: resolved.map(isResolved => ({ isResolved })) });
 		const prs = parseInboxAnswer(

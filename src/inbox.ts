@@ -22,6 +22,7 @@ import {
 	type Repo,
 	type RepoInbox,
 	type Reviewer,
+	type ReviewDecision,
 	repoKey,
 } from "./shared";
 
@@ -78,6 +79,17 @@ function parseReviewers(node: Record<string, unknown>, author: string): Reviewer
 	return [...reviewers.values()];
 }
 
+/**
+ * GitHub's review decision, except that a change request waits on the reviewers again once the author asked each of
+ * them for a new review: GitHub keeps reporting `CHANGES_REQUESTED` until they review, and Graphite's inbox moves the
+ * pull request to its waiting-for-review section.
+ */
+function reviewOf(decision: string | undefined, reviewers: Reviewer[]): ReviewDecision {
+	const review = REVIEW[decision ?? ""] ?? "none";
+	const reRequested = reviewers.some(({ state }) => state === "requested") && !reviewers.some(({ state }) => state === "changes-requested");
+	return review === "changes-requested" && reRequested ? "review-required" : review;
+}
+
 function parseUnresolved(threads: unknown): InboxPullRequest["unresolved"] {
 	const nodes = nodesOf(threads);
 	const total = isObject(threads) && typeof threads.totalCount === "number" ? threads.totalCount : nodes.length;
@@ -97,14 +109,15 @@ function parsePullRequestHead(node: Record<string, unknown>) {
 	const base = str(node.baseRefName);
 	if (title === undefined || head === undefined || base === undefined) return null;
 	const author = authorOf(node.author);
+	const reviewers = parseReviewers(node, author.login);
 	return {
 		title,
 		head,
 		base,
 		author,
-		reviewers: parseReviewers(node, author.login),
+		reviewers,
 		state: node.state === "MERGED" ? ("merged" as const) : node.isDraft === true ? ("draft" as const) : ("open" as const),
-		review: REVIEW[str(node.reviewDecision) ?? ""] ?? "none",
+		review: reviewOf(str(node.reviewDecision), reviewers),
 	};
 }
 
