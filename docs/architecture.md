@@ -223,7 +223,7 @@ The prompt ends with `UNATTENDED`, which tells the session not to ask questions.
 
 `src/server/routines-file.ts` keeps the routines in `routines.json` beside the access token, and saves every change at once.
 A file from before `schedules` reads its `schedule` as a one-element list, and drops a routine whose task was pull requests. The rest of the file stays. The next save writes `schedules`. A file that is not a list of routines still moves aside.
-A run from before `queued` reads its `queue` list as queued while the list holds an entry.
+A run from before `queued` reads its `queue` list as queued while the list holds an entry; a run that has `queued` reads only that.
 Each routine holds its last 10 runs, newest first.
 A run holds its slot time, whether it is still queued, the sessions it started, its errors, and for a command task, its `command` result once the command ended.
 A run stays queued from its claim until the drain starts its session or command.
@@ -249,7 +249,7 @@ Each tick does three things, in order:
    A session that waits on a question holds its slot.
 
 Running a tick twice starts nothing new, since the slot is claimed, and a tick that comes while one runs is skipped.
-A crash after a claim loses no queue, since it is on disk. A start that had not finished waits for the routine's next slot.
+A crash after a claim loses no queued run, since it is on disk. A start that had not finished waits for the routine's next slot.
 After a restart the runner tracks no session, which is right, because the dashboard's sessions die with the server.
 Stopping the server stops every running command, right before it exits, so the result of a command it stopped is never saved as a time-limit stop.
 A run saves its command as `running` before the command starts, then as `exited`, `stopped`, or `failed` when it ends.

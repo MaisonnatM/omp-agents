@@ -54,14 +54,16 @@ function parseCommandRun(value: unknown): CommandRun | null {
 
 /**
  * A run; a command result that is missing, as in a file written before commands, or malformed reads as none, and the run stays.
- * A file from before `queued` holds a `queue` list, which is queued while it holds an entry.
+ * A file from before `queued` holds a `queue` list, which is queued while it holds an entry; a present `queued` does not fall back.
  */
 function parseRun(value: unknown): RoutineRun | null {
 	if (!isObject(value)) return null;
 	const { at, errors } = value;
-	const queued = value.queued === true || (isStrings(value.queue) && value.queue.length > 0);
+	const queued = "queued" in value ? value.queued : isStrings(value.queue) && value.queue.length > 0;
 	const started = parseAll(value.started, parseStarted);
-	return typeof at === "number" && isStrings(errors) && started ? { at, queued, started, errors, command: parseCommandRun(value.command) } : null;
+	return typeof at === "number" && typeof queued === "boolean" && isStrings(errors) && started
+		? { at, queued, started, errors, command: parseCommandRun(value.command) }
+		: null;
 }
 
 const isPullRequestRoutine = (value: unknown): boolean => isObject(value) && isObject(value.task) && value.task.kind === "pull-requests";

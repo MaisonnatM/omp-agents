@@ -37,7 +37,7 @@ const takesSession = (task: RoutineTask): boolean => task.kind !== "command";
 
 export class RoutineRunner {
 	readonly #deps: RoutineRunnerDeps;
-	/** By instance id. Kept in memory only: the sessions die with the server, and the queues resume from the file. */
+	/** By instance id. Kept in memory only: the sessions die with the server, and the queued runs resume from the file. */
 	readonly #tracked = new Map<string, Tracked>();
 	/** Routine ids whose command runs. In memory only: a command dies with the server, and the next one does not resume it. */
 	readonly #commands = new Set<string>();
@@ -54,7 +54,7 @@ export class RoutineRunner {
 				}
 	}
 
-	/** Claims due slots, drains the queues, then retires finished sessions. A tick while one runs is skipped. */
+	/** Claims due slots, starts the queued runs, then retires finished sessions. A tick while one runs is skipped. */
 	tick(): Promise<void> {
 		return (
 			this.#inFlight ??
@@ -114,20 +114,19 @@ export class RoutineRunner {
 			const { routine, run } = next;
 			const { task } = routine;
 			file.dequeue(routine.id, run.at);
-			if (task.kind === "command") {
-				this.#launch(routine, run.at, task.command);
-			} else if ([...this.#tracked.values()].some(tracked => tracked.routineId === routine.id)) {
-				file.failed(routine.id, run.at, "The last run's session is still running.");
-				this.#deps.onChange();
-			} else {
-				await this.#start(routine, run.at, task.prompt);
-			}
+			if (task.kind === "command") this.#launch(routine, run.at, task.command);
+			else await this.#start(routine, run.at, task.prompt);
 		}
 	}
 
-	/** Starts a session on `prompt` for routine `routine`'s run at `at`. */
+	/** Starts a session on `prompt` for routine `routine`'s run at `at`, unless the routine's last session still runs. */
 	async #start(routine: Routine, at: number, prompt: string): Promise<void> {
 		const { file } = this.#deps;
+		if ([...this.#tracked.values()].some(tracked => tracked.routineId === routine.id)) {
+			file.failed(routine.id, at, "The last run's session is still running.");
+			this.#deps.onChange();
+			return;
+		}
 		const result = await this.#deps.start({
 			kind: "new",
 			cwd: routine.cwd,
