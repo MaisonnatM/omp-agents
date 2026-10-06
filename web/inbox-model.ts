@@ -1,28 +1,126 @@
-/** Pull request links, the inbox page's sections and stacks, and what stands between a pull request and its merge. */
-import { type CheckState, type Inbox, type InboxPullRequest, type PullRequest, type PullRequestDetail, type Repo, type ReviewDecision, prKey, repoKey } from "../src/shared";
+/** Pull request links, what each pull request waits on next, the inbox's sections and stacks, and what stands between a pull request and its merge. */
+import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
+import { type CheckState, type HostStatus, type Inbox, type InboxPullRequest, type PullRequest, type PullRequestDetail, type Repo, type ReviewDecision, type RosterHost, prKey, repoKey, samePullRequest } from "../src/shared";
+import { sessionsOn } from "./sessions";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
 
-/** Whose move a section's pull requests wait on: someone asks you to review, or a reviewer sent it back to you. */
-export type Waiting = "your-review" | "your-fix";
+/** What a pull request waits on next. */
+export type MoveId = "review" | "merge" | "fix-ci" | "rebase" | "reply" | "answer" | "agent" | "in-review" | "checks-running" | "draft" | "merged";
 
-interface SectionRule {
-	title: string;
-	takes: (pr: InboxPullRequest) => boolean;
-	waiting: Waiting | null;
-	/** Folded until you unfold it, since it lists history rather than work. */
-	folded: boolean;
+/** Whose move it is; the inbox's sections, in page order. */
+export type MoveGroup = "Your move" | "Agent on it" | "Waiting on others" | "Recently merged";
+
+interface Move {
+	/** The verb on the row's badge. */
+	label: string;
+	group: MoveGroup;
+	/** The quick action that hands this move to an agent, if one does. */
+	action: PullRequestActionId | null;
 }
 
-/** Graphite's inbox sections, in page order. A pull request goes in the first section that takes it. */
-const SECTION_RULES: SectionRule[] = [
-	{ title: "Needs your review", takes: pr => pr.role === "reviewer" && pr.state !== "merged", waiting: "your-review", folded: false },
-	{ title: "Returned to you", takes: pr => pr.state === "open" && pr.review === "changes-requested", waiting: "your-fix", folded: false },
-	{ title: "Approved", takes: pr => pr.state === "open" && pr.review === "approved", waiting: null, folded: false },
-	{ title: "Waiting for review", takes: pr => pr.state === "open", waiting: null, folded: false },
-	{ title: "Drafts", takes: pr => pr.state === "draft", waiting: null, folded: false },
-	{ title: "Recently merged", takes: pr => pr.state === "merged", waiting: null, folded: true },
-];
+/** In rank order: within a group, a row's move ranks it before the sort applies. */
+export const MOVES: Record<MoveId, Move> = {
+	review: { label: "Review", group: "Your move", action: "review" },
+	merge: { label: "Merge", group: "Your move", action: null },
+	"fix-ci": { label: "Fix CI", group: "Your move", action: "fix-ci" },
+	rebase: { label: "Rebase", group: "Your move", action: "resolve-conflicts" },
+	reply: { label: "Reply", group: "Your move", action: "address-comments" },
+	answer: { label: "Answer", group: "Agent on it", action: null },
+	agent: { label: "Working", group: "Agent on it", action: null },
+	"in-review": { label: "In review", group: "Waiting on others", action: null },
+	"checks-running": { label: "CI running", group: "Waiting on others", action: null },
+	draft: { label: "Draft", group: "Waiting on others", action: null },
+	merged: { label: "Merged", group: "Recently merged", action: null },
+};
+
+const MOVE_IDS = Object.keys(MOVES) as MoveId[];
+
+/** The inbox's sections in page order, and whether each starts folded: those that hold nothing for you or an agent to do now. */
+const GROUPS: Record<MoveGroup, { folded: boolean }> = {
+	"Your move": { folded: false },
+	"Agent on it": { folded: false },
+	"Waiting on others": { folded: true },
+	"Recently merged": { folded: true },
+};
+
+const GROUP_TITLES = Object.keys(GROUPS) as MoveGroup[];
+
+/** A running session's turn on a pull request: it works, or it asks you something. */
+export type AgentState = Extract<HostStatus, "working" | "needs-input">;
+
+/** Where the running sessions linked to a pull request stand, `needs-input` before `working`; `null` when none works on it or asks. */
+export type AgentOn = (pr: PullRequest) => AgentState | null;
+
+/** Where the running sessions on each pull request stand. An idle session's turn ended, so the move is back with you; an unknown one counts as idle. */
+export const agentOn = (hosts: RosterHost[]): AgentOn => pr => {
+	const statuses = new Set(sessionsOn({ kind: "pull-request", pr }, hosts).map(host => host.status));
+	return statuses.has("needs-input") ? "needs-input" : statuses.has("working") ? "working" : null;
+};
+
+interface MergeFacts {
+	state: PullRequestDetail["state"];
+	review: ReviewDecision;
+	conflicts: boolean;
+	checks: CheckState;
+	/** Some review thread waits for a resolution, or GitHub listed too few threads to tell. */
+	threadsOpen: boolean;
+}
+
+/** Open, approved or needing no review, its checks passed or absent, no conflicts, and no review thread left open. */
+const readyToMerge = ({ state, review, conflicts, checks, threadsOpen }: MergeFacts): boolean =>
+	state === "open" && (review === "approved" || review === "none") && !conflicts && (checks === "passing" || checks === "none") && !threadsOpen;
+
+const hasOpenThreads = ({ unresolved }: InboxPullRequest): boolean => unresolved.count > 0 || !unresolved.exact;
+
+/** What `pr` waits on next, given where the sessions on it stand. */
+export function moveOf(pr: InboxPullRequest, agent: AgentState | null): MoveId {
+	if (pr.state === "merged") return "merged";
+	if (agent === "needs-input") return "answer";
+	if (agent === "working") return "agent";
+	if (pr.role === "reviewer") return "review";
+	// What follows is your own open or draft pull request: a blocker you can fix comes before whether it is a draft.
+	if (pr.conflicts) return "rebase";
+	if (pr.checks === "failing") return "fix-ci";
+	if (pr.review === "changes-requested" || hasOpenThreads(pr)) return "reply";
+	if (pr.state === "draft") return "draft";
+	if (readyToMerge({ state: pr.state, review: pr.review, conflicts: pr.conflicts, checks: pr.checks, threadsOpen: hasOpenThreads(pr) })) return "merge";
+	if (pr.checks === "pending") return "checks-running";
+	return "in-review";
+}
+
+const AND = new Intl.ListFormat("en", { type: "conjunction" });
+
+const REASON: Record<MoveId, (pr: InboxPullRequest) => string> = {
+	review: pr => `@${pr.author.login}`,
+	merge: pr => `${pr.review === "none" ? "no review needed" : "approved"} · ${pr.checks === "none" ? "no checks" : "checks green"}`,
+	"fix-ci": () => "checks failing",
+	rebase: pr => `conflicts with ${pr.stackedOn ?? "base"}`,
+	reply: pr => {
+		const { count, exact } = pr.unresolved;
+		const threads = hasOpenThreads(pr) ? `${count}${exact ? "" : "+"} open ${count === 1 && exact ? "thread" : "threads"}` : null;
+		const requested = pr.review === "changes-requested" ? "changes requested" : null;
+		return [threads, requested].filter(part => part !== null).join(" · ");
+	},
+	answer: () => "a session asks you",
+	agent: () => "an agent is working on it",
+	"in-review": pr => {
+		const waitingOn = pr.reviewers.filter(reviewer => reviewer.state === "requested").map(({ login }) => `@${login}`);
+		return waitingOn.length > 0 ? `waiting on ${AND.format(waitingOn)}` : "waiting for review";
+	},
+	"checks-running": () => "checks running",
+	draft: () => "draft",
+	merged: () => "merged",
+};
+
+/** Why `pr` waits on `move`, as its row's second line says after its number. */
+export const reason = (pr: InboxPullRequest, move: MoveId): string => REASON[move](pr);
+
+/** The quick action that hands `move` on `pr` to an agent, when one does and it applies to `pr`. */
+export function moveAction(pr: InboxPullRequest, move: MoveId): PullRequestActionId | null {
+	const { action } = MOVES[move];
+	return action && pullRequestActions(pr).includes(action) ? action : null;
+}
 
 /** Where a pull request sits in a stack of two or more that the inbox lists: `position` 1 is the bottom, which merges first. */
 export interface StackPlace {
@@ -37,15 +135,15 @@ export interface StackPlace {
 
 export interface InboxRow {
 	pr: InboxPullRequest;
+	move: MoveId;
 	stack: StackPlace | null;
 	/** The rows that move together: a stack's members share it, and a pull request in no stack has its own. */
 	unit: string;
 }
 
 export interface InboxSection {
-	title: string;
-	waiting: Waiting | null;
-	/** In the inbox's sort, except that a stack's members in the section sit together, top first, where its first member in the sort would. */
+	title: MoveGroup;
+	/** By move in rank order, then in the inbox's sort; the manual sort keeps your order alone. Either way, except that a stack's members in the section sit together, top first, where its first member in the sort would. */
 	rows: InboxRow[];
 }
 
@@ -79,8 +177,6 @@ function stackMembers(pullRequests: InboxPullRequest[]): Map<InboxPullRequest, S
 	return members;
 }
 
-const sectionOf = (pr: InboxPullRequest): SectionRule | undefined => SECTION_RULES.find(({ takes }) => takes(pr));
-
 /** How the inbox orders a section's pull requests; a stack's members sit together, top first, in every sort. */
 export type InboxSort = "updated" | "newest" | "oldest" | "manual";
 
@@ -90,7 +186,7 @@ export const INBOX_SORTS: Record<InboxSort, string> = { updated: "Recently updat
 export interface InboxOrder {
 	/** `repoKey`s; a repository you never moved follows them, in the order GitHub was asked. */
 	repos: string[];
-	/** Section titles; one you never moved follows them, in Graphite's order. */
+	/** Section titles; one you never moved follows them, in {@link MoveGroup}'s order. */
 	sections: string[];
 	sort: InboxSort;
 	/** `prKey`s, for the manual sort; a pull request you never placed goes first, most recently updated first, since it is new to you. */
@@ -126,43 +222,59 @@ const BY_SORT: Record<Exclude<InboxSort, "manual">, (a: InboxPullRequest, b: Inb
 	oldest: (a, b) => a.number - b.number,
 };
 
-function sorted(pullRequests: InboxPullRequest[], { sort, manual }: InboxOrder): InboxPullRequest[] {
-	if (sort !== "manual") return pullRequests.toSorted(BY_SORT[sort]);
+type Moved = Pick<InboxRow, "pr" | "move">;
+
+const rank = (move: MoveId): number => MOVE_IDS.indexOf(move);
+
+function sorted(moved: Moved[], { sort, manual }: InboxOrder): Moved[] {
+	if (sort !== "manual") return moved.toSorted((a, b) => rank(a.move) - rank(b.move) || BY_SORT[sort](a.pr, b.pr));
 	const at = new Map(manual.map((key, index) => [key, index]));
-	return pullRequests.toSorted((a, b) => (at.get(prKey(a)) ?? -1) - (at.get(prKey(b)) ?? -1) || BY_SORT.updated(a, b));
+	return moved.toSorted((a, b) => (at.get(prKey(a.pr)) ?? -1) - (at.get(prKey(b.pr)) ?? -1) || BY_SORT.updated(a.pr, b.pr));
 }
 
 /** The section titles in page order. */
-export const sectionTitles = (order: InboxOrder): string[] => inOrder(SECTION_RULES, rule => rule.title, order.sections).map(rule => rule.title);
+export const sectionTitles = (order: InboxOrder): MoveGroup[] => inOrder(GROUP_TITLES, title => title, order.sections);
 
 /** The inbox's repositories in page order. */
 export const orderedRepos = <R extends Repo>(repos: readonly R[], order: InboxOrder): R[] => inOrder(repos, repoKey, order.repos);
 
-/** A repository's pull requests in Graphite's inbox sections, leaving out the empty ones, each row with its place in a stack. */
-export function inboxSections(pullRequests: InboxPullRequest[], order: InboxOrder = DEFAULT_ORDER): InboxSection[] {
+/** A repository's pull requests by whose move it is, leaving out the empty sections, each row with its move and its place in a stack. */
+export function inboxSections(pullRequests: InboxPullRequest[], order: InboxOrder, agentOn: AgentOn): InboxSection[] {
 	const members = stackMembers(pullRequests);
-	const taken = Map.groupBy(sorted(pullRequests, order), sectionOf);
-	return inOrder(SECTION_RULES, rule => rule.title, order.sections).flatMap((rule): InboxSection[] => {
-		const prs = taken.get(rule);
+	const moved = pullRequests.map((pr): Moved => ({ pr, move: moveOf(pr, agentOn(pr)) }));
+	const taken = Map.groupBy(sorted(moved, order), ({ move }) => MOVES[move].group);
+	return sectionTitles(order).flatMap((title): InboxSection[] => {
+		const prs = taken.get(title);
 		if (!prs) return [];
-		const unitOf = (pr: InboxPullRequest): string => {
+		const unitOf = ({ pr }: Moved): string => {
 			const member = members.get(pr);
 			return member ? `stack:${member.root}` : prKey(pr);
 		};
 		// A group keeps its first member's place, so a stack sits where its first member in the sort would.
 		const groups = Map.groupBy(prs, unitOf);
-		const ordered = [...groups.values()].flatMap(group => group.toSorted((a, b) => (members.get(b)?.position ?? 0) - (members.get(a)?.position ?? 0)));
-		const rows = ordered.map((pr, at): InboxRow => {
-			const member = members.get(pr);
-			if (!member) return { pr, stack: null, unit: unitOf(pr) };
-			const joins = (row: InboxPullRequest | undefined, step: number): boolean => {
-				const other = row && members.get(row);
-				return !!other && other.root === member.root && other.position === member.position + step;
+		const ordered = [...groups.values()].flatMap(group => group.toSorted((a, b) => (members.get(b.pr)?.position ?? 0) - (members.get(a.pr)?.position ?? 0)));
+		const rows = ordered.map((row, at): InboxRow => {
+			const member = members.get(row.pr);
+			if (!member) return { ...row, stack: null, unit: unitOf(row) };
+			const joins = (other: Moved | undefined, step: number): boolean => {
+				const place = other && members.get(other.pr);
+				return !!place && place.root === member.root && place.position === member.position + step;
 			};
-			return { pr, stack: { position: member.position, size: member.size, joinsAbove: joins(ordered[at - 1], 1), joinsBelow: joins(ordered[at + 1], -1) }, unit: unitOf(pr) };
+			return { ...row, stack: { position: member.position, size: member.size, joinsAbove: joins(ordered[at - 1], 1), joinsBelow: joins(ordered[at + 1], -1) }, unit: unitOf(row) };
 		});
-		return [{ title: rule.title, waiting: rule.waiting, rows }];
+		return [{ title, rows }];
 	});
+}
+
+/** What a section holds by move, in rank order, such as `2 in review · 1 CI running`; `null` for a section only one move goes in, whose count says it all. */
+export function movesSummary({ title, rows }: InboxSection): string | null {
+	if (MOVE_IDS.filter(move => MOVES[move].group === title).length < 2) return null;
+	const counts = Map.groupBy(rows, row => row.move);
+	return MOVE_IDS.flatMap(move => {
+		const count = counts.get(move)?.length;
+		// Sentence case, which keeps an acronym such as CI.
+		return count ? [`${count} ${MOVES[move].label.replace(/^[A-Z](?=[a-z])/, letter => letter.toLowerCase())}`] : [];
+	}).join(" · ");
 }
 
 export type Where = "before" | "after";
@@ -186,7 +298,7 @@ export function stepTarget(keys: readonly string[], key: string, by: 1 | -1): { 
  * page shows it now, so switching to the manual sort keeps the order you see. Keys of the repository's pull requests
  * that left the inbox drop out; other repositories' keys stay.
  */
-export function placedManual(manual: readonly string[], repo: Repo, sections: InboxSection[], section: string, unit: string, target: string, where: Where): string[] {
+export function placedManual(manual: readonly string[], repo: Repo, sections: InboxSection[], section: MoveGroup, unit: string, target: string, where: Where): string[] {
 	const placed = sections.flatMap(({ title, rows }) => {
 		if (title !== section) return rows.map(row => prKey(row.pr));
 		const byUnit = Map.groupBy(rows, row => row.unit);
@@ -200,49 +312,30 @@ export function placedManual(manual: readonly string[], repo: Repo, sections: In
 export const sectionFoldKey = (repo: string, title: string): string => `${repo}:${title}`;
 
 /** Whether the inbox folds the repository or section that `key` names until you unfold it. */
-export const foldedByDefault = (key: string): boolean => SECTION_RULES.some(rule => rule.folded && key.endsWith(`:${rule.title}`));
+export const foldedByDefault = (key: string): boolean => GROUP_TITLES.some(title => GROUPS[title].folded && key.endsWith(`:${title}`));
 
 /** The pull requests the inbox shows, in its order: those of readable repositories and sections that `isFolded` leaves open. */
-export function shownPullRequests({ repos }: Inbox, isFolded: (key: string) => boolean, order: InboxOrder = DEFAULT_ORDER): InboxPullRequest[] {
+export function shownPullRequests({ repos }: Inbox, isFolded: (key: string) => boolean, order: InboxOrder, agentOn: AgentOn): InboxPullRequest[] {
 	return orderedRepos(repos, order).flatMap(repo => {
 		const key = repoKey(repo);
 		if ("error" in repo || isFolded(key)) return [];
-		return inboxSections(repo.pullRequests, order).flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
+		return inboxSections(repo.pullRequests, order, agentOn).flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
 	});
 }
 
-interface MergeFacts {
-	state: PullRequestDetail["state"];
-	review: ReviewDecision;
-	conflicts: boolean;
-	checks: CheckState;
-	/** Some review thread waits for a resolution, or GitHub listed too few threads to tell. */
-	threadsOpen: boolean;
-}
-
-/** Open, approved or needing no review, its checks passed or absent, no conflicts, and no review thread left open. */
-const readyToMerge = ({ state, review, conflicts, checks, threadsOpen }: MergeFacts): boolean =>
-	state === "open" && (review === "approved" || review === "none") && !conflicts && (checks === "passing" || checks === "none") && !threadsOpen;
-
-/** What a row says after its reviewers: ready to merge, or a review decision its section does not already state. */
-export type RowVerdict = "ready" | "approved" | "changes-requested" | null;
-
-/**
- * A review decision shows only where the section leaves it unsaid: on a draft, or on a review asked of you. Your own open
- * pull request sits in the section that names its decision, so it says only whether it is ready to merge.
- */
-export function rowVerdict(pr: InboxPullRequest): RowVerdict {
-	if (pr.state === "merged") return null;
-	if (pr.role === "author" && pr.state === "open") {
-		const threadsOpen = pr.unresolved.count > 0 || !pr.unresolved.exact;
-		return readyToMerge({ state: pr.state, review: pr.review, conflicts: pr.conflicts, checks: pr.checks, threadsOpen }) ? "ready" : null;
+/** The pull request as the inbox lists it, with the workspace a session on it starts in; `null` when the inbox does not list it. */
+export function listedPullRequest(inbox: Inbox, pr: PullRequest): { pr: InboxPullRequest; cwd: string } | null {
+	for (const repo of inbox.repos) {
+		if ("error" in repo) continue;
+		const listed = repo.pullRequests.find(other => samePullRequest(other, pr));
+		if (listed && repo.cwds[0] !== undefined) return { pr: listed, cwd: repo.cwds[0] };
 	}
-	return pr.review === "approved" || pr.review === "changes-requested" ? pr.review : null;
+	return null;
 }
 
-/** How many of your pull requests in `inbox` are ready to merge. */
-export const mergeableCount = ({ repos }: Inbox): number =>
-	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => rowVerdict(pr) === "ready").length;
+/** How many pull requests in `inbox` wait on your move. */
+export const yourMoveCount = ({ repos }: Inbox, agentOn: AgentOn): number =>
+	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => MOVES[moveOf(pr, agentOn(pr))].group === "Your move").length;
 
 /** One fact about where a pull request stands, as its details' Status lists it. */
 export type StatusItem =

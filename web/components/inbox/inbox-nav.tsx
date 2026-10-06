@@ -7,6 +7,8 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import {
+	type AgentOn,
+	agentOn,
 	DEFAULT_ORDER,
 	decodeOrder,
 	foldedByDefault,
@@ -14,14 +16,17 @@ import {
 	type InboxOrder,
 	type InboxSort,
 	inboxSections,
+	listedPullRequest,
+	moveAction,
 	moveKey,
+	moveOf,
+	movesSummary,
 	orderedRepos,
 	placedManual,
 	sectionFoldKey,
 	sectionTitles,
 	shownPullRequests,
 	stepTarget,
-	type Waiting,
 	type Where,
 } from "../../inbox-model";
 import { projectName, readTime } from "../../labels";
@@ -30,7 +35,7 @@ import { pendingOf, pullRequestStart } from "../../quick-actions";
 import { inboxStore } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { sectionId } from "../../section";
-import { useShortcuts } from "../../shortcuts";
+import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { DROP_LINE, useDragOrder } from "../../use-drag-order";
 import { useDashboardContext } from "../dashboard-context";
@@ -42,12 +47,6 @@ import { PullRequestRow, rowId, sessionsFor } from "./pr-row";
 const FOLDS_KEY = "omp-agents.inbox-collapsed";
 const ORDER_KEY = "omp-agents.inbox-order";
 
-/** The count of a section that waits on your move: a review asked of you, or a pull request a reviewer sent back. */
-const WAITING_COUNT: Record<Waiting, string> = {
-	"your-review": "text-foreground",
-	"your-fix": "text-red-600 dark:text-red-400",
-};
-
 const SORTS = Object.keys(INBOX_SORTS) as InboxSort[];
 
 /** Moves a focused heading or row one place; `false` at the edge. */
@@ -55,11 +54,33 @@ type Move = (by: 1 | -1) => boolean;
 
 const note = (text: string) => <p className="px-3 py-1 text-xs text-muted-foreground">{text}</p>;
 
+const Key = ({ children }: { children: ReactNode }) => (
+	<kbd className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[5px] border border-border bg-background px-1 font-sans text-[11px]">{children}</kbd>
+);
+
+/** The inbox's main keys, pinned under the list while it scrolls. */
+function KeysFooter() {
+	const [next] = shortcutLabels("nextPullRequest");
+	const [previous] = shortcutLabels("previousPullRequest");
+	const [give] = shortcutLabels("giveToAgent");
+	return (
+		<p className="sticky bottom-0 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-border bg-sidebar px-3 py-2 text-xs text-muted-foreground">
+			<Key>{next}</Key>
+			<Key>{previous}</Key>
+			<span className="mr-1.5">move</span>
+			<Key>↵</Key>
+			<span className="mr-1.5">details</span>
+			<Key>{give}</Key>
+			<span>give to agent</span>
+		</p>
+	);
+}
+
 /** The fold keys of the repository and the section that list `pr`, or `null` when the inbox does not list it. */
-function placeOf(inbox: Inbox, pr: PullRequest): { repo: string; section: string } | null {
+function placeOf(inbox: Inbox, pr: PullRequest, agent: AgentOn): { repo: string; section: string } | null {
 	for (const repo of inbox.repos) {
 		if ("error" in repo) continue;
-		const section = inboxSections(repo.pullRequests).find(({ rows }) => rows.some(row => samePullRequest(row.pr, pr)));
+		const section = inboxSections(repo.pullRequests, DEFAULT_ORDER, agent).find(({ rows }) => rows.some(row => samePullRequest(row.pr, pr)));
 		const key = repoKey(repo);
 		if (section) return { repo: key, section: sectionFoldKey(key, section.title) };
 	}
@@ -68,10 +89,10 @@ function placeOf(inbox: Inbox, pr: PullRequest): { repo: string; section: string
 
 /**
  * J and K move between the rows `shown` lists, or, while the main area shows a pull request, show the next or previous
- * one. O opens the pull request on GitHub, and `.` opens a row's quick actions. A key that has nothing to act on keeps
- * its usual meaning.
+ * one. O opens the pull request on GitHub, `.` opens a row's quick actions, and E runs `giveToAgent` on the focused row's
+ * pull request, or the one whose details show. A key that has nothing to act on keeps its usual meaning.
  */
-function useTriageKeys(shown: InboxPullRequest[], target: PullRequest | null): void {
+function useTriageKeys(shown: InboxPullRequest[], target: PullRequest | null, giveToAgent: (pr: PullRequest) => boolean): void {
 	const rowOf = (pr: PullRequest): HTMLElement | null => document.getElementById(rowId(pr));
 	const current = (): number =>
 		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowOf(pr)?.contains(document.activeElement) ?? false);
@@ -103,6 +124,10 @@ function useTriageKeys(shown: InboxPullRequest[], target: PullRequest | null): v
 			const trigger = pr && rowOf(pr)?.querySelector<HTMLButtonElement>("[data-row-actions] button");
 			if (!trigger) return false;
 			trigger.click();
+		},
+		giveToAgent: () => {
+			const pr = target ?? shown[current()];
+			return pr ? giveToAgent(pr) : false;
 		},
 	});
 }
@@ -166,9 +191,9 @@ interface InboxNavProps {
 }
 
 /**
- * The sidebar's inbox: the pull requests of its project, or of every project, by repository in Graphite's inbox
- * sections, read from GitHub. Dragging or Alt+Shift+↑ and ↓ reorder the repositories, the sections, and the pull
- * requests in a section; the browser keeps the order.
+ * The sidebar's inbox: the pull requests of its project, or of every project, by repository in sections named after
+ * whose move it is, read from GitHub. Dragging or Alt+Shift+↑ and ↓ reorder the repositories, the sections, and the
+ * pull requests in a section; the browser keeps the order.
  */
 export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 	const { open, start, dismissStart, starts: { quick } } = useDashboardContext();
@@ -177,10 +202,19 @@ export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 	const [order, setOrder] = useStoredState(ORDER_KEY, decodeOrder, JSON.stringify);
 	const drag = useDragOrder();
 	const moves = new Map<string, Move>();
-	const place = read && target ? placeOf(read.data, target) : null;
+	const agent = agentOn(hosts);
+	const place = read && target ? placeOf(read.data, target, agent) : null;
 	const reveal = target && place ? { id: rowId(target), folds: [place.repo, place.section] } : null;
 	useReveal(reveal, folds, { token: reveal?.id, block: "nearest", focus: false });
-	useTriageKeys(read ? shownPullRequests(read.data, folds.isFolded, order) : [], target);
+	/** Starts the quick action that makes `pr`'s move, the one its row's menu would; `false` when no action makes it. */
+	const giveToAgent = (pr: PullRequest): boolean => {
+		const listed = read && listedPullRequest(read.data, pr);
+		const action = listed && moveAction(listed.pr, moveOf(listed.pr, agent(listed.pr)));
+		if (!listed || !action) return false;
+		start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()));
+		return true;
+	};
+	useTriageKeys(read ? shownPullRequests(read.data, folds.isFolded, order, agent) : [], target, giveToAgent);
 	useMoveKeys(moves);
 
 	const repos = read ? orderedRepos(read.data.repos, order) : [];
@@ -188,7 +222,7 @@ export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 	// The page shows its pull requests in this order now; placing one by hand starts the manual sort from it.
 	const shownOrder = order.sort === "manual" && order.manual.length > 0
 		? order.manual
-		: repos.flatMap(repo => ("error" in repo ? [] : inboxSections(repo.pullRequests, order).flatMap(({ rows }) => rows.map(row => prKey(row.pr)))));
+		: repos.flatMap(repo => ("error" in repo ? [] : inboxSections(repo.pullRequests, order, agent).flatMap(({ rows }) => rows.map(row => prKey(row.pr)))));
 	const moveRepo = (key: string, beside: string, where: Where): void =>
 		// Repositories of other projects keep their place behind the ones shown.
 		setOrder({ ...order, repos: moveKey([...repoKeys, ...order.repos.filter(other => !repoKeys.includes(other))], key, beside, where) });
@@ -207,7 +241,7 @@ export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 			if (step) moveRepo(key, step.target, step.where);
 			return step !== null;
 		});
-		const sections = "error" in repo ? [] : inboxSections(repo.pullRequests, order);
+		const sections = "error" in repo ? [] : inboxSections(repo.pullRequests, order, agent);
 		const titles = sections.map(({ title }) => title);
 		let body: ReactNode;
 		if ("error" in repo) {
@@ -234,6 +268,8 @@ export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 				const placeUnit = (unit: string, beside: string, where: Where): void =>
 					setOrder({ ...order, sort: "manual", manual: placedManual(shownOrder, repo, sections, section.title, unit, beside, where) });
 				const { length } = section.rows;
+				const yours = section.title === "Your move";
+				const summary = sectionOpen ? null : movesSummary(section);
 				return (
 					<div
 						key={section.title}
@@ -242,13 +278,14 @@ export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 						className={cn("relative", sectionItem.dragging && "opacity-50", sectionItem.dropAt && DROP_LINE[sectionItem.dropAt])}
 					>
 						<h4 {...sectionItem.handle} className="flex h-6 items-center gap-2 pr-2 pl-2 text-xs text-muted-foreground">
-							<FoldButton open={sectionOpen} onToggle={() => folds.toggle(foldKey)} controls={listId} className="flex-1">
-								<span className="truncate">{section.title}</span>
+							<FoldButton open={sectionOpen} onToggle={() => folds.toggle(foldKey)} controls={listId} className="min-w-0 flex-1">
+								<span className="shrink-0">{section.title}</span>
+								{summary && <span className="min-w-0 truncate text-muted-foreground/70">{summary}</span>}
 							</FoldButton>
 							<span
 								aria-label={`${length} pull request${length === 1 ? "" : "s"}`}
-								className={cn("tabular-nums", section.waiting && WAITING_COUNT[section.waiting])}
-								style={section.waiting ? { fontVariationSettings: fontWeights.semibold } : undefined}
+								className={cn("tabular-nums", yours && "text-foreground")}
+								style={yours ? { fontVariationSettings: fontWeights.semibold } : undefined}
 							>
 								{length}
 							</span>
@@ -305,7 +342,7 @@ export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 	};
 
 	return (
-		<div className="space-y-2 pb-2">
+		<div className="space-y-2">
 			<div className="flex items-center gap-1 pr-2 pl-3 text-xs text-muted-foreground">
 				<span className="min-w-0 flex-1 truncate">{read ? `Updated ${readTime(read.at)}` : "Asking GitHub for pull requests…"}</span>
 				<SortMenu order={order} onSort={onSort} onReset={() => setOrder(DEFAULT_ORDER)} />
@@ -332,6 +369,7 @@ export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 					{read.data.unmatched.length === 1 ? "1 workspace has no GitHub origin and is" : `${read.data.unmatched.length} workspaces have no GitHub origin and are`} left out.
 				</p>
 			)}
+			<KeysFooter />
 		</div>
 	);
 }

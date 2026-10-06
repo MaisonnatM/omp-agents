@@ -495,7 +495,8 @@ The page lives in `web/`.
   `web/delimited.ts` parses a TSV or CSV file into rows.
   `web/components/file-link.tsx` holds the link that opens such a path, and `web/components/file-dialog.tsx` the dialog that shows the file.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the inbox and the tickets page show.
-  `web/inbox-model.ts` holds the inbox's sections in one table, with whether each waits on you and whether it starts folded, sorts each stack's rows together by the chain of base branches, and says what a row's verdict and the details' Status show.
+  `web/inbox-model.ts` holds the inbox's moves in one table, `MOVES`, with each move's verb, its section, and the quick action that makes it; `moveOf` picks a pull request's move from its facts and from where the running sessions on it stand, through `agentOn`.
+  It also holds which sections start folded, sorts rows by move and keeps each stack's rows together by the chain of base branches, and says what the details' Status shows.
   `InboxOrder` there is the order you chose, the repositories, the sections, the sort, and the manual order of pull requests, which `placedManual` updates after a drop; a stack moves as one `unit`.
   `web/routines-model.ts` words a routine's schedule, task, next run, and last run, and turns the routine editor's form into the routine it saves.
 - `web/page-icons.ts`: the icon of each dashboard page, which its sidebar tab and every link into the page show.
@@ -549,7 +550,7 @@ The page lives in `web/`.
   Both details views use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
   `LoadNote` is the loading or error line that the pull request's details, the issue's, and the list page share, and `Clamped` folds a long description behind **Show more**.
   `web/components/fold.tsx` holds the fold button that the inbox and tickets share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
-  The sidebar's inbox binds J, K, O, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/inbox-model.ts` lists in sidebar order, so a folded section's rows drop out, and binds Alt+Shift+↑ and ↓ to move the focused heading or row by its `data-move` attribute.
+  The sidebar's inbox binds J, K, O, E, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/inbox-model.ts` lists in sidebar order, so a folded section's rows drop out, and binds Alt+Shift+↑ and ↓ to move the focused heading or row by its `data-move` attribute.
 - `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).

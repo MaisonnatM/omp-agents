@@ -29,6 +29,7 @@ export type ShortcutId =
 	| "previousPullRequest"
 	| "pullRequestOnGitHub"
 	| "pullRequestActions"
+	| "giveToAgent"
 	| "todoSearch"
 	| "todoNext"
 	| "todoPrevious"
@@ -111,6 +112,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "previousPullRequest", label: "Inbox: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
 	{ id: "pullRequestOnGitHub", label: "Inbox: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
 	{ id: "pullRequestActions", label: "Inbox: open the pull request's quick actions", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
+	{ id: "giveToAgent", label: "Inbox: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{ id: "todoSearch", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
 	{ id: "todoNext", label: "Focus the next todo", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
 	{ id: "todoPrevious", label: "Focus the previous todo", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },

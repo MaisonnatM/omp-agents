@@ -1,10 +1,11 @@
 import { CircleCheck, CircleDashed, CircleSlash, CircleX, Eye, GitMerge, GitPullRequestDraft, type LucideIcon, MessageSquare } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { type CheckRunState, type PullRequest, type PullRequestCheck, type PullRequestDetail, type PullRequestEvent, pullRequestUrl, type RosterHost, type View } from "../../../src/shared";
+import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { graphiteUrl, pullRequestStatus, type StatusItem } from "../../inbox-model";
-import { age } from "../../labels";
+import { graphiteUrl, type MoveId, pullRequestStatus, type StatusItem } from "../../inbox-model";
+import { age, modeOf } from "../../labels";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
 import type { QuickActionId } from "../../quick-actions";
 import type { OpenMode } from "../../routing";
@@ -13,6 +14,7 @@ import { BranchName } from "../git";
 import { DetailQuickActions, QuickActionButton, type QuickActionsProps } from "../quick-actions";
 import { Clamped, Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
 import { Avatar, IconTip, Reviewers, STATE_ICON } from "./avatars";
+import { MoveBadge } from "./pr-row";
 
 const CHECK_RUN_ICON: Record<CheckRunState, [LucideIcon, string]> = {
 	passing: [CircleCheck, "text-emerald-600 dark:text-emerald-400"],
@@ -166,6 +168,43 @@ function Checks({ checks }: { checks: PullRequestCheck[] }) {
 	);
 }
 
+/** What the pull request waits on next, as the inbox lists it. */
+export interface NextMove {
+	move: MoveId;
+	reason: string;
+	/** The quick action that makes the move, when one applies. */
+	action: PullRequestActionId | null;
+	/** The running session that works on it or asks you, for the moves an agent holds. */
+	session: RosterHost | null;
+}
+
+/** The one thing to do about the pull request now: its move, why, and the button that makes it. */
+function NextMoveBar({ pr, next, quick, onOpen }: { pr: PullRequest; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"] }) {
+	const { move, reason, action, session } = next;
+	let button: ReactNode = null;
+	if (action) button = <QuickActionButton action={action} pending={quick.pending} onRun={quick.onRun} primary />;
+	else if (move === "merge")
+		button = (
+			<Button variant="primary" size="compact" render={<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" />}>
+				Merge on GitHub
+			</Button>
+		);
+	else if (session)
+		button = (
+			<Button variant="primary" size="compact" onClick={event => onOpen({ kind: "live", instanceId: session.instanceId, agentId: null }, modeOf(event))}>
+				Open the session
+			</Button>
+		);
+	return (
+		<div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
+			<span className="shrink-0 text-xs text-muted-foreground">Next move</span>
+			<MoveBadge move={move} />
+			<span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{reason}</span>
+			{button}
+		</div>
+	);
+}
+
 interface DetailContentProps {
 	pr: PullRequest;
 	/** The quick actions on it; none apply when the inbox does not list it, since a start needs the workspace the inbox names. */
@@ -173,25 +212,30 @@ interface DetailContentProps {
 	/** The running sessions that work on it. */
 	sessions: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
+	/** Its move; `null` when the inbox does not list it. */
+	next: NextMove | null;
 }
 
 /**
- * A pull request read from GitHub, in the main area: a header that names it, then its Status, where each blocker offers
- * the quick action that works on it, then its details. The header offers the other quick actions once the read settles,
- * so the buttons do not move when the details arrive, and the sessions that work on it.
+ * A pull request read from GitHub, in the main area: its next move, a header that names it, then its Status, where each
+ * blocker offers the quick action that works on it, then its details. The next move's action shows only there. The
+ * header offers the other quick actions once the read settles, so the buttons do not move when the details arrive, and
+ * the sessions that work on it.
  */
-export function PullRequestDetailContent({ pr, quick, sessions, onOpen }: DetailContentProps) {
+export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next }: DetailContentProps) {
 	const { data: detail, error } = useRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	useEffect(() => {
 		headingRef.current?.focus({ preventScroll: true });
 	}, []);
 	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
-	const placed = detail ? placeFixes(pullRequestStatus(detail), quick.actions) : [];
-	const headerActions = detail || error ? quick.actions.filter(action => !placed.some(({ fix }) => fix === action)) : [];
+	const offered = quick.actions.filter(action => action !== next?.action);
+	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
+	const headerActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];
 	return (
 		<>
 			<header className="space-y-3">
+				{next && <NextMoveBar pr={pr} next={next} quick={quick} onOpen={onOpen} />}
 				<h1 ref={headingRef} tabIndex={-1} className="flex items-start gap-2.5 text-base leading-snug font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
 					{detail && <IconTip icon={STATE_ICON[detail.state]} className="mt-1" />}
 					<span className="min-w-0">{detail?.title ?? name}</span>

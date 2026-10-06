@@ -386,44 +386,57 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The tabs never spill past the sidebar.
   **Inbox** lists your pull requests in the sidebar, like Graphite's inbox, and keeps the session panes beside it.
   The tab stays on the inbox while you open sessions from it, until you choose **Sessions**.
-  The counts of the sections that wait on your move stand out: **Needs your review** in bold, and **Returned to you** in red.
-  The **Inbox** tab counts your pull requests that are ready to merge, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
+  The **Your move** count stands out in bold.
+  The **Inbox** tab counts the pull requests that wait on your move, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
   An `#inbox` address selects the Inbox tab.
   The inbox covers the GitHub repository of the project that the sidebar's picker shows, or under **All projects** every repository that a session ran in, one section per repository.
   A workspace's repository is the one its `origin` remote names.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
-  They sort into Graphite's sections: **Needs your review**, **Returned to you** (changes requested), **Approved**, **Waiting for review**, **Drafts**, and **Recently merged**.
-  Once you ask every reviewer who requested changes for a new review, the pull request moves back to **Waiting for review**, though GitHub still reports the change request until they review again.
-  A row shows the pull request's state, title, and age, then its number, the check rollup, merge conflicts, the number of unresolved review comments, the review decision when its section does not already say it, its place in a stack, and the sessions on it.
-  A review asked of you also names its author.
-  The review decision shows on drafts and on reviews asked of you, since the other sections name it.
-  Your own open pull request says **Ready to merge** instead when it is approved or needs no review, its checks passed or it has none, it has no conflicts, and no review thread waits for a resolution.
+  They sort by whose move it is: **Your move**, **Agent on it**, **Waiting on others**, and **Recently merged**.
+  A row starts with a badge that names its move, then shows the title and age, then its number, the reason for the move, its place in a stack, and the sessions on it.
+  Each pull request takes the first move that applies, in this order.
+  A merge from the last seven days is **Merged**.
+  A pull request that a running session asks you about is **Answer**, and one that a running session works on is **Working**.
+  An idle session's turn ended, so the move comes back to you.
+  A review asked of you is **Review**, with its author as the reason.
+  Your own pull request is **Rebase** with merge conflicts, **Fix CI** with failed checks, and **Reply** with requested changes or review threads that wait for a resolution.
+  A draft with none of those is **Draft**.
+  It is **Merge** when it is approved or needs no review, its checks passed or it has none, it has no conflicts, and no review thread waits for a resolution.
+  It is **CI running** while its checks run, and **In review** otherwise, with the reviewers it still waits on as the reason.
+  Once you ask every reviewer who requested changes for a new review, the pull request is **In review** again, though GitHub still reports the change request until they review again.
+  **Review**, **Merge**, **Fix CI**, **Rebase**, and **Reply** are your moves, in that order within **Your move**.
+  **Answer** and **Working** are the agent's, and **In review**, **CI running**, and **Draft** wait on others.
+  Within a section, the pull requests of each move are most recently updated first.
   When the inbox lists another pull request of its stack, the row shows its place from the bottom, such as `2/4`, and its tooltip names the branch it is stacked on; otherwise a row stacked on another branch names it, as in `on fix/base`.
-  Within a section, a stack's pull requests sit together, top first, where its most recently updated one would, and a line joins each to the one below it.
+  Within a section, a stack's pull requests sit together, top first, where its first one would, and a line joins each to the one below it.
   A row shows one session chip: a running session first, since one may be working on the pull request now, then one that submitted it, then one that worked on it.
   A submitter's chip is filled and a worker's chip is outlined, and a chip's tooltip says which it is.
   A running session's chip starts with the sidebar's status dot: green while it works, amber while it waits on a question, blue once its turn ended.
   `+N` after the chip lists every session on the pull request, each with whether it submitted or worked on it; choose one to open it.
-  The comment count shows only when a conversation waits for a resolution.
-  A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+`.
-  Hover an icon to read what it means.
+  A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+ open threads`.
   The todo, lightning, and link buttons show while you hover or focus the row, while a start on it runs, and after a link write on it, so its outcome stays readable.
   Click a repository or a section heading to fold it; the browser's localStorage keeps your choice across reloads.
-  **Recently merged** starts folded, since it lists history rather than work, and stays unfolded once you unfold it.
+  A folded section's heading sums up its moves, such as `2 in review · 1 CI running`.
+  **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
+  A line under the list shows the inbox's main keys.
   Click the title to show the pull request's details in the main area, in place of the panes; **Back to the sessions** brings the panes back.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Inbox** tab's count stays current.
   Reopening the inbox, even after a reload, shows the last inbox read for the chosen project at once; the top of the list says when that inbox was read, and the browser's localStorage keeps the last one of each project.
   The server keeps each repository's answer for 30 seconds, and the refresh button asks GitHub again at once.
 - The sort button at the top of the inbox orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
+  Any sort but **Manual** keeps your moves in their order and sorts within each move.
   Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.
   In **Manual**, a pull request you never placed comes first, most recently updated first.
   A stack moves as one, and its pull requests keep their order from the top of the stack.
   Drag a repository's name to reorder the repositories, and a section's heading to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
-  The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores Graphite's.
-- The details open on **Status**, what stands between the pull request and its merge: **Ready to merge**, a draft, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first.
-  A blocker that a quick action works on carries that action's button, such as **Resolve conflicts** next to the conflicts, and the header keeps the other actions.
+  The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
+- The details of a pull request that the inbox lists open on its **Next move**: the move's badge, its reason, and one button that makes it.
+  The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**.
+  **Merge** offers **Merge on GitHub**, and **Answer** and **Working** offer **Open the session**.
+  Then **Status** shows what stands between the pull request and its merge: **Ready to merge**, a draft, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first.
+  A blocker that another quick action works on carries that action's button, and the header keeps the other actions.
   Then it shows the branch and the one it merges into, the lines added and removed, the description, folded after about 16 lines behind **Show more**, the head commit's checks (failing and pending ones listed, passing and skipped ones folded behind their counts), the unresolved review comments by file and line, the conversation of comments and reviews, and the changed files, with links to the pull request on GitHub and on Graphite.
   The dot on a reviewer's picture shows where they stand: green approved, red requested changes, grey commented, and amber means a review from them is still requested.
   Each opening reads the pull request again; the server keeps its answer for 30 seconds.
@@ -431,6 +444,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   J and K move to the next and previous row, and Enter shows the focused row's details.
   While the details show, J and K show the next and previous pull request.
   O opens the focused row's pull request, or the one whose details show, on GitHub, and `.` opens the focused row's quick actions.
+  E gives the focused row's move, or the move of the pull request whose details show, to an agent, when a quick action makes that move.
 - `#inbox/<owner>/<repo>/<number>` shows one pull request's details.
   The sidebar unfolds its row's repository and section, scrolls the row into view, and highlights it.
   When the inbox does not list that pull request, a note says why, and the details still show.
@@ -441,8 +455,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Each link is `http://127.0.0.1:<port>/#session/<session id>`, and the block says that the links open only on the machine that runs the dashboard.
   They carry no token, so they open the session in a browser that has signed in to the dashboard, and show the sign-in page elsewhere.
   The button's tooltip reports whether the description changed or why the write failed.
-- An inbox row has a conflicts icon (a red merge symbol) when GitHub reports merge conflicts with the pull request's base branch.
-  A lightning button on the row, and buttons in the pull request's details, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
+- A lightning button on an inbox row, and buttons in the pull request's details, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
   The inbox stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   The chip stays while the session runs, after a reload too, so the row says whether an agent still works on the pull request.
   The session also shows in the sessions sidebar.
@@ -682,6 +695,7 @@ Alt is Option on macOS.
 | K | Inbox, outside text fields | Move to the previous pull request, or show its details while one shows |
 | O | Inbox, outside text fields | Open the pull request on GitHub |
 | . | Inbox, outside text fields | Open the pull request's quick actions |
+| E | Inbox, outside text fields | Give the pull request's next move to an agent |
 | / | Todo page, outside text fields | Search the todos |
 | J / K | Todo page, outside text fields | Focus the next or previous todo |
 | X | Todo page, outside text fields | Check or uncheck the focused todo |

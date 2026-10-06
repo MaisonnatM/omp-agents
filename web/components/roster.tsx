@@ -33,7 +33,7 @@ import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { mergeableCount } from "../inbox-model";
+import { agentOn, yourMoveCount } from "../inbox-model";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import { inboxStore, ticketsStore } from "../reads";
@@ -409,6 +409,8 @@ interface RosterProps {
 	onSectionTarget: (target: SectionTarget) => void;
 	/** The Inbox tab's content. */
 	inbox: ReactNode;
+	/** The live sessions, which take a pull request's move while they work on it or ask about it. */
+	hosts: RosterHost[];
 	/** The selected project's `cwd`, or `null` for all projects. */
 	project: string | null;
 	onPickProject: (cwd: string | null) => void;
@@ -439,6 +441,7 @@ export function Roster({
 	sectionTarget,
 	onSectionTarget,
 	inbox,
+	hosts,
 	project,
 	onPickProject,
 	onShowSearch,
@@ -452,7 +455,7 @@ export function Roster({
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
-		inbox: { count: inboxRead ? mergeableCount(inboxRead.data) : 0, meaning: "ready to merge" },
+		inbox: { count: inboxRead ? yourMoveCount(inboxRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
 	/** Continue past session `sessionId`, in the pane that shows it. */
 	const onResume = (sessionId: string): void => {

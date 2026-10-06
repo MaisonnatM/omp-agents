@@ -1,7 +1,6 @@
-import { Check, CircleCheck, CircleDashed, CircleX, GitMerge, Layers, Link2, type LucideIcon, MessageSquare } from "lucide-react";
+import { Check, Layers, Link2 } from "lucide-react";
 import { useState } from "react";
 import {
-	type CheckState,
 	type HostStatus,
 	type InboxPullRequest,
 	type PastSession,
@@ -18,9 +17,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
+import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";
-import { type InboxRow, type RowVerdict, rowVerdict, type StackPlace } from "../../inbox-model";
+import { type InboxRow, MOVES, type MoveId, reason, type StackPlace } from "../../inbox-model";
 import { hashForInbox, type OpenMode } from "../../routing";
 import { age, hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
@@ -30,35 +30,34 @@ import { AddToTodo } from "../add-to-todo";
 import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";
-import { IconTip, STATE_ICON } from "./avatars";
 
-const CHECK_ICON: Record<Exclude<CheckState, "none">, [LucideIcon, string, string]> = {
-	passing: [CircleCheck, "text-emerald-600 dark:text-emerald-400", "Checks on the latest commit passed"],
-	failing: [CircleX, "text-red-600 dark:text-red-400", "Checks on the latest commit failed"],
-	pending: [CircleDashed, "text-amber-600 dark:text-amber-400", "Checks on the latest commit are still running"],
+const RED = "bg-red-500/10 text-red-700 dark:bg-red-400/15 dark:text-red-300";
+const MUTED = "bg-muted text-muted-foreground";
+
+const MOVE_TONE: Record<MoveId, string> = {
+	review: "bg-blue-500/10 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300",
+	merge: "bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300",
+	"fix-ci": RED,
+	rebase: RED,
+	reply: "bg-amber-500/10 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300",
+	answer: "bg-violet-500/10 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300",
+	agent: MUTED,
+	"in-review": MUTED,
+	"checks-running": MUTED,
+	draft: MUTED,
+	merged: "bg-violet-500/5 text-violet-600/70 dark:bg-violet-400/10 dark:text-violet-300/70",
 };
 
-const CONFLICTS_ICON: [LucideIcon, string, string] = [GitMerge, "text-red-600 dark:text-red-400", "Merge conflicts with its base branch"];
-
-const VERDICT_LABEL: Record<Exclude<RowVerdict, null>, [string, string]> = {
-	ready: ["Ready to merge", "text-emerald-600 dark:text-emerald-400"],
-	approved: ["Approved", "text-emerald-600 dark:text-emerald-400"],
-	"changes-requested": ["Changes requested", "text-red-600 dark:text-red-400"],
-};
-
-/** How many review threads wait for a resolution, shown only while some might. */
-function Unresolved({ unresolved: { count, exact } }: { unresolved: InboxPullRequest["unresolved"] }) {
-	if (count === 0 && exact) return null;
-	const label = exact
-		? `${count} unresolved ${count === 1 ? "comment" : "comments"}`
-		: `At least ${count} unresolved comments; GitHub listed only some threads`;
+/** The move a pull request waits on, as a fixed-width verb; an agent's work leads with the green dot of a working session. */
+export function MoveBadge({ move, className }: { move: MoveId; className?: string }) {
 	return (
-		<Tooltip content={label}>
-			<span role="img" aria-label={label} className="flex shrink-0 items-center gap-1 tabular-nums text-muted-foreground">
-				<MessageSquare aria-hidden className="size-4" />
-				{exact ? count : `${count}+`}
-			</span>
-		</Tooltip>
+		<span
+			className={cn("flex h-5 w-16 shrink-0 items-center justify-center gap-1 rounded-[5px] text-[11px] whitespace-nowrap", MOVE_TONE[move], className)}
+			style={{ fontVariationSettings: fontWeights.semibold }}
+		>
+			{move === "agent" && <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" />}
+			{MOVES[move].label}
+		</span>
 	);
 }
 
@@ -206,15 +205,14 @@ interface RowProps {
 	moveId: string;
 }
 
-/** A pull request in the sidebar's inbox: its title and age, then what stands out about it, with its actions on hover. */
-export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen, pending, onQuickAction, drag, moveId }: RowProps) {
-	const verdict = rowVerdict(pr);
+/** A pull request in the sidebar's inbox: its move, title, and age, then why it waits on that move, with its actions on hover. */
+export function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, pending, onQuickAction, drag, moveId }: RowProps) {
 	return (
 		<li id={rowId(pr)} {...drag.handle} {...drag.target} data-move={moveId} className={cn("group/row relative", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}>
-			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-[15.5px] h-1.5 w-px bg-border" />}
-			{stack?.joinsBelow && <span aria-hidden className="absolute top-6 bottom-0 left-[15.5px] w-px bg-border" />}
+			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-[39.5px] h-1.5 w-px bg-border" />}
+			{stack?.joinsBelow && <span aria-hidden className="absolute top-[26px] bottom-0 left-[39.5px] w-px bg-border" />}
 			<div className={cn("flex items-start gap-2 rounded-md px-2 py-1.5", targeted ? "bg-sidebar-accent" : "group-hover/row:bg-sidebar-accent/50")}>
-				<IconTip icon={STATE_ICON[pr.state]} className="mt-0.5" />
+				<MoveBadge move={move} />
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<div className="flex min-w-0 items-baseline gap-2">
 						<Tooltip content={`${pr.owner}/${pr.repo}#${pr.number} · ${pr.title}`}>
@@ -234,22 +232,20 @@ export function PullRequestRow({ row: { pr, stack }, sessions, targeted, onOpen,
 					</div>
 					<p className="flex min-w-0 items-center gap-x-1.5 overflow-hidden text-xs text-muted-foreground">
 						<span className="shrink-0 tabular-nums">#{pr.number}</span>
-						{pr.checks !== "none" && <IconTip icon={CHECK_ICON[pr.checks]} />}
-						{pr.conflicts && <IconTip icon={CONFLICTS_ICON} />}
-						<Unresolved unresolved={pr.unresolved} />
-						{verdict && <span className={cn("shrink-0", VERDICT_LABEL[verdict][1])}>{VERDICT_LABEL[verdict][0]}</span>}
+						<span aria-hidden>·</span>
+						{/* The reason is why the row is here, so the stack and session chips shrink before it does. */}
+						<span className="max-w-full shrink-0 truncate">{reason(pr, move)}</span>
 						{stack ? (
 							<StackChip stack={stack} base={pr.stackedOn} />
 						) : (
 							pr.stackedOn && (
 								<Tooltip content={`Stacked on ${pr.stackedOn}`}>
-									<span className="min-w-0 shrink-0 truncate">
+									<span className="min-w-0 truncate">
 										on <span className="font-mono">{pr.stackedOn}</span>
 									</span>
 								</Tooltip>
 							)
 						)}
-						{pr.role === "reviewer" && <span className="shrink-0">by {pr.author.login}</span>}
 						<SessionChips sessions={sessions} onOpen={onOpen} />
 					</p>
 				</div>

@@ -1,8 +1,9 @@
 import { ArrowLeft } from "lucide-react";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
-import { type Inbox, type InboxPullRequest, type PullRequest, type RosterHost, repoKey, samePullRequest, type WorkItem } from "../../../src/shared";
+import { type Inbox, type InboxPullRequest, type PullRequest, type RosterHost, repoKey, type WorkItem } from "../../../src/shared";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { agentOn, listedPullRequest, moveAction, moveOf, reason } from "../../inbox-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { actionOn, pendingOf, pullRequestStart } from "../../quick-actions";
 import { inboxStore } from "../../reads";
@@ -11,17 +12,14 @@ import { sessionsOn } from "../../sessions";
 import { useDashboardContext } from "../dashboard-context";
 import { PageFrame } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
-import { PullRequestDetailContent } from "./pr-details";
+import { type NextMove, PullRequestDetailContent } from "./pr-details";
 import { rowId } from "./pr-row";
 
-/** The pull request as the inbox lists it, with the workspace a session on it starts in; `null` when the inbox does not list it. */
-function listedPullRequest(inbox: Inbox, pr: PullRequest): { pr: InboxPullRequest; cwd: string } | null {
-	for (const repo of inbox.repos) {
-		if ("error" in repo) continue;
-		const listed = repo.pullRequests.find(other => samePullRequest(other, pr));
-		if (listed && repo.cwds[0] !== undefined) return { pr: listed, cwd: repo.cwds[0] };
-	}
-	return null;
+/** What `pr` waits on next, given the running sessions `sessions` on it. */
+function nextMove(pr: InboxPullRequest, hosts: RosterHost[], sessions: RosterHost[]): NextMove {
+	const move = moveOf(pr, agentOn(hosts)(pr));
+	const holder = move === "answer" ? "needs-input" : move === "agent" ? "working" : null;
+	return { move, reason: reason(pr, move), action: moveAction(pr, move), session: sessions.find(host => host.status === holder) ?? null };
 }
 
 /** Why the inbox does not list the PR a link named. `allProjects`: the sidebar shows every project. */
@@ -48,6 +46,7 @@ export function PullRequestPage({ project, hosts, target }: PullRequestPageProps
 	const { read } = inboxStore.use(project);
 	const listed = read && listedPullRequest(read.data, target);
 	const item: WorkItem = { kind: "pull-request", pr: target };
+	const sessions = sessionsOn(item, hosts);
 	return (
 		<PageFrame title="Inbox" meta="Your pull requests and review requests on GitHub">
 			<TooltipProvider>
@@ -69,8 +68,9 @@ export function PullRequestPage({ project, hosts, target }: PullRequestPageProps
 							pending: pendingOf(quick, item),
 							onRun: (action: PullRequestActionId) => listed && start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill())),
 						}}
-						sessions={sessionsOn(item, hosts)}
+						sessions={sessions}
 						onOpen={open}
+						next={listed ? nextMove(listed.pr, hosts, sessions) : null}
 					/>
 				</div>
 			</TooltipProvider>

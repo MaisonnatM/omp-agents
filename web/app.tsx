@@ -391,6 +391,7 @@ export function App() {
 								<p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>
 							)
 						}
+						hosts={visible.hosts}
 						project={project}
 						onPickProject={switchProject}
 						onShowSearch={() => setSwitcherOpen(true)}

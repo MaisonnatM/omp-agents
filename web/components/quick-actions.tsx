@@ -53,10 +53,10 @@ export function QuickActionsMenu({ actions, pending, onRun, label }: QuickAction
 }
 
 /** One quick action's button, which waits while any start on the same item is pending. */
-export function QuickActionButton({ action, pending, onRun }: { action: QuickActionId } & Omit<QuickActionsProps, "actions">) {
+export function QuickActionButton({ action, pending, onRun, primary = false }: { action: QuickActionId; primary?: boolean } & Omit<QuickActionsProps, "actions">) {
 	return (
 		<Tooltip content={QUICK_ACTIONS[action].description}>
-			<Button variant="secondary" size="compact" leadingIcon={ICON[action]} loading={pending === action} disabled={pending !== null} onClick={() => onRun(action)}>
+			<Button variant={primary ? "primary" : "secondary"} size="compact" leadingIcon={ICON[action]} loading={pending === action} disabled={pending !== null} onClick={() => onRun(action)}>
 				{QUICK_ACTIONS[action].label}
 			</Button>
 		</Tooltip>
