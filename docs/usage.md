@@ -138,7 +138,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Session changes
 
-- **Changes** in a session's header, or a `#changes/<session id>` address, shows the files the session changed as an editor does, in place of the panes; a past session's header has it too.
+- **Open the session's changes** in the sidebar's **Files** tab, the status bar's file count, or a `#changes/<session id>` address shows the files the session changed as an editor does, in place of the panes.
   The sidebar stays on **Sessions**, and the arrow before the title goes back to the session.
 - The page lists two sets of files at once.
   One is what the session's git checkout changed: its worktree, else its directory, against the commit its branch forked from the remote's default branch, else against `HEAD`, else against nothing before the first commit, with uncommitted and untracked files included.
@@ -645,7 +645,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - An open top-level todo's **Start session**, its main button, opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.
   The session links to the todo once omp starts, and its agent checks the todo off once it finishes the work; see [Todos from agents](#todos-from-agents).
 - With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, then opens an issue from the title and notes, assigned to you, and links it to the todo.
-- The list icon on an inbox pull request, a ticket, and a live session's header adds a todo of no category, last in the list, that links to it.
+- The list icon on an inbox pull request and a ticket adds a todo of no category, last in the list, that links to it.
 - The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
   A `todos.json` from before categories, notes, due days, links, or the archive still loads, with none of them; a todo checked then reads as checked when the server loads it.
   A `todos.json` that the server cannot read as a todo list is moved to `todos.json.invalid` rather than written over.
