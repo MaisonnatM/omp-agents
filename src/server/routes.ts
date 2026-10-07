@@ -17,7 +17,7 @@ import { sessionsDir } from "../omp/sessions";
 import { readStats } from "../omp/stats";
 import { directoryOf } from "../paths";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
-import { createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
+import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { SlackConfigError } from "../omp/mcp";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
@@ -28,7 +28,8 @@ import { TICKET_ID } from "../shared/tickets";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseBranchSwitch, parseGoogleCalendarAddress, parseGoogleCalendarId, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseBranchSwitch, parseGoogleCalendarAddress, parseGoogleCalendarId, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
@@ -201,10 +202,23 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		const write = await guards.writeBody(req);
 		if (write instanceof Response) return write;
 		const draft = parseTicketDraft(write.body);
-		return draft ? answer(() => createTicket(draft)) : fail(400, "Expected { title, description, team } naming a Linear team by id");
+		return draft ? answer(() => createTicket(draft)) : fail(400, "Expected { title, description, team } naming a Linear team by id, and fields of their own types");
 	};
 
-	/** `GET /api/linear/teams`: the workspace's Linear teams, `{ id, name }`, for the team a new issue goes in. */
+	/** `PUT /api/ticket/attachment`: `TicketAttachmentUpload`, attached to the issue in Linear; answers `{}`. */
+	const ticketAttach: Handler = async req => {
+		const write = await guards.writeBody(req);
+		if (write instanceof Response) return write;
+		const upload = parseTicketAttachment(write.body);
+		return upload
+			? answer(async () => {
+					await attachToTicket(upload);
+					return {};
+				})
+			: fail(400, `Expected { issue, name, type, data } naming a Linear issue, with a file of at most ${MAX_TICKET_ATTACHMENT_BYTES / 1024 / 1024} MB in base64`);
+	};
+
+	/** `GET /api/linear/teams`: the workspace's Linear teams, `{ id, name, key }`, for the team a new issue goes in. */
 	const teams = get(() => answer(loadTeams));
 
 	/** `GET /api/ticket/options?team=<id>`: what the field pickers offer for an issue of that Linear team. */
@@ -375,6 +389,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/linear/teams": { GET: teams },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },
 		"/api/ticket/new": { PUT: ticketCreate },
+		"/api/ticket/attachment": { PUT: ticketAttach },
 		"/api/ticket/options": { GET: ticketOptions },
 		"/api/ticket/media": { GET: ticketMedia },
 		"/api/pull-request": { GET: pullRequest },

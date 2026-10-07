@@ -571,6 +571,17 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The lists come from the issue's team in Linear, read when you first open one, and the server keeps them for five minutes.
 - `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens that issue's details directly, even when the tickets list does not include it or cannot load.
   The header's back arrow opens the list from a direct link too.
+- **New ticket**, before **Refresh** in the page header, C outside text fields on any page, or **Create ticket** in the command menu opens the new-issue dialog over the page you are on, laid out like Linear's.
+  Its header names the team by its key, such as ENG, in a pill that picks another team; the team starts as the last one an issue was created in, from here or from a todo, else Linear's first.
+  Below come the title, a markdown description, and a pill for each field: the status, which starts as the team's first backlog state, the priority, the assignee, which starts as you, the project, and the labels, each a searchable list as in an issue's side column, and **…** for a due date.
+  The lists come from the team in Linear, and another team clears the status, labels, and project picked for the last one.
+  The paperclip adds files of up to 25 MB each, which Linear attaches once the issue exists; the expand button makes the dialog taller and wider.
+  Enter in the title moves to the description, and **Create issue** or Cmd+Enter (Ctrl+Enter off macOS) creates the issue in Linear.
+  The dialog then closes and the issue's details open, and the tickets list reads Linear again.
+  With **Create more** on, the dialog instead clears the title, description, and files, keeps the fields, and names the issue it opened, for the next one.
+  When Linear refuses the issue, the dialog says why and keeps what you wrote; when it refuses a file, the issue stays created, and the dialog clears and names the issue and each file it did not attach.
+  Esc or the close button discards the draft, except while the issue is being created.
+  C and **Create ticket** show only while Linear is connected.
 - A lightning button, which shows on a row in place of the day it last changed while you hover or focus the row, and buttons in the issue's details, start a new dashboard session in the background, with a prompt that names the issue.
   The page stays on screen, and the session shows at once as a chip with its status dot on the issue's row and after the buttons in its details; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   A row and the details show a chip for every running session that works on the issue, whether a quick action started it or it read or changed the issue with omp's Linear tools, so they say whether an agent still works on it, after a reload too.
@@ -696,7 +707,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A running session shows its status dot; an open todo's **×** on a chip unlinks it.
 - An open top-level todo's **Start session**, its main button, opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.
   The session links to the todo once omp starts, and its agent checks the todo off once it finishes the work; see [Todos from agents](#todos-from-agents).
-- With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, then opens an issue from the title and notes, assigned to you, and links it to the todo.
+- With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, starting with the last one an issue was created in, then opens an issue from the title and notes, assigned to you, and links it to the todo.
 - The list icon on a ticket adds a todo of no category, last in the list, that links to it.
 - The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
   A `todos.json` from before categories, notes, due days, links, or the archive still loads, with none of them; a todo checked then reads as checked when the server loads it.
@@ -871,6 +882,7 @@ Alt is Option on macOS.
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
 | Cmd+1 | Anywhere | Go to the pull request inbox |
 | Cmd+2 | Anywhere | Go to your Linear tickets, when connected |
+| C | Outside text fields | Create a Linear ticket, when connected |
 | Cmd+3 | Anywhere | Go to the sessions |
 | Cmd+4 | Anywhere | Go to your todo list |
 | Cmd+5 | Anywhere | Go to your calendar |
@@ -913,6 +925,7 @@ Alt is Option on macOS.
   Whatever you type also offers **Create todo**, last, which adds it at the end of **All**, with no category.
   You stay on the page you were on.
   The title can end with a due day or a `#category`, as in [Todo list](#todo-list).
+  With Linear connected, it also offers **Create ticket**, which opens the new-ticket dialog with what you typed as the title; see [Linear tickets](#linear-tickets).
   Cmd+[ and Cmd+] walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   From a subagent they step from its session's row.
 - Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does.
@@ -923,7 +936,7 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in this browser.
-- Cmd+1 opens the Inbox tab, and Cmd+2 opens Tickets when connected to Linear.
+- Cmd+1 opens the Inbox tab, and Cmd+2 opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page.
   Cmd+3 goes back from the inbox, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
   Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, and G then R the **Routines** page.
   Cmd+6 opens Settings, where the model roles and the integrations live, and closes it again.

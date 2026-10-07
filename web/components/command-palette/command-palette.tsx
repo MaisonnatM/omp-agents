@@ -61,6 +61,7 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	help: Keyboard,
 	inbox: PAGE_ICON.inbox,
 	tickets: PAGE_ICON.tickets,
+	newTicket: PAGE_ICON.tickets,
 	sessions: PAGE_ICON.sessions,
 	todo: PAGE_ICON.todo,
 	calendar: PAGE_ICON.calendar,
@@ -89,14 +90,16 @@ interface CommandPaletteProps {
 	unavailable: ReadonlySet<ShortcutId>;
 	/** Add a top-level todo from a title, which may end in a due day or #category. Omitted while the list cannot be edited. */
 	onCreateTodo?: (text: string) => void;
+	/** Open the new-ticket dialog with a title. Omitted while Linear cannot be called. */
+	onCreateTicket?: (title: string) => void;
 }
 
 /**
  * Searches running and past sessions in every project, the page's commands, and projects; Enter runs the highlighted
- * entry's first action, ⌘K lists the rest, and what you type can become a todo.
+ * entry's first action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title.
  */
 export function CommandPalette(props: CommandPaletteProps) {
-	const { state, dispatch, onCreateTodo } = props;
+	const { state, dispatch, onCreateTodo, onCreateTicket } = props;
 	const { send, start, starts, end } = useDashboardContext();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -163,6 +166,22 @@ export function CommandPalette(props: CommandPaletteProps) {
 					},
 				]
 			: [];
+	/** What you typed, as the title of a new Linear issue in the dialog that opens it. */
+	const ticketItem = (): PaletteItem[] =>
+		onCreateTicket && search
+			? [
+					{
+						id: "fallback:create-ticket",
+						section: "fallback",
+						title: `Create ticket “${search}”`,
+						keywords: [],
+						icon: PAGE_ICON.tickets,
+						accessories: [],
+						kind: "Ticket",
+						actions: [[{ id: "create", title: "Create ticket", icon: PAGE_ICON.tickets, run: { kind: "do", fn: () => onCreateTicket(search) } }]],
+					},
+				]
+			: [];
 	const pushItem = (id: string, title: string, icon: LucideIcon, target: PaletteViewId, keywords: string[], keys: readonly string[]): PaletteItem => ({
 		id,
 		section: "commands",
@@ -206,6 +225,7 @@ export function CommandPalette(props: CommandPaletteProps) {
 			pushItem("command:project", "Choose project…", Folder, "projects", ["switch project", "workspace"], shortcutLabels("project")),
 			pushItem("command:create-todo", "Create todo", ListTodo, "createTodo", ["add todo", "task"], []),
 			...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`),
+			...ticketItem(),
 		],
 		projects: () => [
 			projectItem("project:all", "All projects", undefined, Layers, null),

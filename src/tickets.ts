@@ -8,7 +8,7 @@ import { isObject, num, oneOf, str } from "./json";
 import { integrationServer } from "./integrations";
 import { proxyUploads, rememberUploads, serveUpload } from "./linear-uploads";
 import { callMcpTool, type McpServer, toolJson } from "./omp/mcp";
-import { TICKET_ID, TICKET_PRIORITIES, TICKET_STATUS_TYPES, type Ticket, type TicketChoice, type TicketComment, type TicketDetail, type TicketDraft, type TicketEdit, type TicketLabel, type TicketOptions, type TicketsAnswer, type TicketStatusType } from "./shared/tickets";
+import { TICKET_ID, TICKET_PRIORITIES, TICKET_STATUS_TYPES, type Ticket, type TicketAttachmentUpload, type TicketChoice, type TicketComment, type TicketDetail, type TicketDraft, type TicketEdit, type TicketLabel, type TicketOptions, type TicketsAnswer, type TicketStatusType, type TicketTeam } from "./shared/tickets";
 
 const linearServer = (): Promise<McpServer> => integrationServer("linear");
 
@@ -305,26 +305,50 @@ export async function saveTicket(edit: TicketEdit): Promise<TicketDetail> {
 	return loadTicketDetail(edit.id);
 }
 
-const teams = createCache<TicketChoice[]>(60 * 60_000);
+const teams = createCache<TicketTeam[]>(60 * 60_000);
 
 /** The workspace's Linear teams, by name, for the team a new issue goes in. */
-export const loadTeams = (): Promise<TicketChoice[]> => teams.get("", queryTeams);
+export const loadTeams = (): Promise<TicketTeam[]> => teams.get("", queryTeams);
 
-async function queryTeams(): Promise<TicketChoice[]> {
+async function queryTeams(): Promise<TicketTeam[]> {
 	const server = await linearServer();
 	const raw = await allPages(server, "list_teams", { limit: PAGE }, pageOf("list_teams", "teams"));
 	return raw
-		.map(choiceOf)
-		.filter(team => team !== null)
+		.flatMap(team => {
+			const choice = choiceOf(team);
+			const key = str(team.key);
+			return choice && key ? [{ ...choice, key }] : [];
+		})
 		.sort(byName);
 }
 
-/** Opens `draft` in Linear, assigned to the viewer, and answers its identifier; the tickets list is read anew on its next request. */
-export async function createTicket({ title, description, team }: TicketDraft): Promise<{ identifier: string }> {
-	const text = await callMcpTool(await linearServer(), "save_issue", { title, description, team, assignee: "me" });
+/** Opens `draft` in Linear and answers its identifier; the tickets list is read anew on its next request. */
+export async function createTicket({ title, description, team, assignee, ...fields }: TicketDraft): Promise<{ identifier: string }> {
+	// A new issue has nothing to clear, so a `null` field is one left out.
+	const set = Object.fromEntries(Object.entries({ ...fields, assignee: assignee === undefined ? "me" : assignee }).filter(([, value]) => value !== null && value !== undefined));
+	const text = await callMcpTool(await linearServer(), "save_issue", { title, description, team, ...set });
 	loaded.drop("");
 	const issue = toolJson("Linear", "save_issue", text);
 	const identifier = isObject(issue) ? [issue.identifier, issue.id].find(value => typeof value === "string" && TICKET_ID.test(value)) : undefined;
 	if (typeof identifier !== "string") throw new Error("Linear's save_issue answered without the new issue's identifier");
 	return { identifier };
+}
+
+/**
+ * Attaches `upload` to its issue as Linear's own upload does: Linear signs a storage URL, the bytes go there with
+ * exactly the headers it signed, then Linear links the stored file to the issue.
+ */
+export async function attachToTicket({ issue, name, type, data }: TicketAttachmentUpload): Promise<void> {
+	const server = await linearServer();
+	const bytes = Buffer.from(data, "base64");
+	const prepared = toolJson("Linear", "prepare_attachment_upload", await callMcpTool(server, "prepare_attachment_upload", { issue, filename: name, contentType: type, size: bytes.byteLength }));
+	const request = isObject(prepared) && isObject(prepared.uploadRequest) ? prepared.uploadRequest : null;
+	const assetUrl = isObject(prepared) ? str(prepared.assetUrl) : undefined;
+	const url = request && str(request.url);
+	if (!request || !url || !assetUrl || !isObject(request.headers)) throw new Error("Linear's prepare_attachment_upload answered without an upload to make");
+	const headers = Object.fromEntries(Object.entries(request.headers).flatMap(([key, value]) => (typeof value === "string" ? [[key, value]] : [])));
+	const stored = await fetch(url, { method: str(request.method) ?? "PUT", headers, body: bytes });
+	if (!stored.ok) throw new Error(`Linear's storage refused ${name}: HTTP ${stored.status}`);
+	await callMcpTool(server, "create_attachment_from_upload", { issue, assetUrl, title: name });
+	loaded.drop("");
 }

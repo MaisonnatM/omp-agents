@@ -17,6 +17,7 @@ import { SettingsPage } from "./components/settings/settings-page";
 import type { SettingsTab } from "./components/settings/settings-nav";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
+import { NewTicketDialog } from "./components/tickets/new-ticket";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
 import { StatusBar } from "./components/status-bar";
 import { SplitResizeHandle, splitAt, useSplitRatio } from "./components/split-resize-handle";
@@ -149,8 +150,10 @@ export function App() {
 		show(endSession(latest.current.layout, instanceId, latest.current.listedHosts));
 	}, [send, show]);
 	const [filePath, setFilePath] = useState<string | null>(null);
+	/** The title the new-ticket dialog starts from while it is open. */
+	const [newTicket, setNewTicket] = useState<string | null>(null);
 	const dashboard = useMemo(
-		() => ({ send, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, connected: state.connected, starts: { fork, resume, quick, resumeAll } }),
+		() => ({ send, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, connected: state.connected, starts: { fork, resume, quick, resumeAll } }),
 		[send, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, state.connected, fork, resume, quick, resumeAll],
 	);
 	const onPaneLayout = useCallback((index: number, kind: "max" | "close") => {
@@ -256,6 +259,10 @@ export function App() {
 			if (page?.kind === "tickets") return;
 			showTab("tickets");
 		},
+		newTicket: () => {
+			if (!linearCallable) return false;
+			setNewTicket(current => current ?? "");
+		},
 		sessions: () => {
 			if (tab === "sessions" && !page) return;
 			showTab("sessions");
@@ -279,7 +286,11 @@ export function App() {
 	};
 	useShortcuts(handlers);
 	/** Commands that would do nothing now. */
-	const unavailable = new Set<ShortcutId>([...(ticketsShown ? [] : ["tickets" as const]), ...(detailsView ? [] : ["detailsSidebar" as const])]);
+	const unavailable = new Set<ShortcutId>([
+		...(ticketsShown ? [] : ["tickets" as const]),
+		...(linearCallable ? [] : ["newTicket" as const]),
+		...(detailsView ? [] : ["detailsSidebar" as const]),
+	]);
 
 	const panes = (): ReactNode => {
 		if (layout.panes.length > 0) {
@@ -482,6 +493,7 @@ export function App() {
 						)}
 						<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 						{filePath !== null && <FileDialog key={filePath} path={filePath} onClose={() => setFilePath(null)} />}
+						{newTicket !== null && <NewTicketDialog title={newTicket} onClose={() => setNewTicket(null)} />}
 						<CommandPalette
 							state={palette}
 							dispatch={dispatchPalette}
@@ -507,6 +519,7 @@ export function App() {
 										}
 									: undefined
 							}
+							onCreateTicket={linearCallable ? setNewTicket : undefined}
 						/>
 					</SidebarProvider>
 					<StatusBar usage={state.usage} checkout={checkout} onSwitched={() => setSwitches(count => count + 1)} />

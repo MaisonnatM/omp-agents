@@ -58,11 +58,35 @@ export interface TicketChoice {
 	name: string;
 }
 
-/** `PUT /api/ticket/new`: a Linear issue to open in team `team`, Linear's id of it, assigned to the viewer. It answers the new issue's identifier. */
-export interface TicketDraft {
+/** `GET /api/linear/teams`: a team a new issue can go in, with the key that starts its issues' identifiers (`ENG`). */
+export interface TicketTeam extends TicketChoice {
+	key: string;
+}
+
+/** An issue's fields that a picker sets, as {@link TicketEdit} names them. */
+export type TicketFieldValues = Omit<TicketEdit, "id">;
+
+/**
+ * `PUT /api/ticket/new`: a Linear issue to open in team `team`, Linear's id of it, with any of the fields the pickers
+ * set. `assignee` left out assigns the viewer, and `null` leaves the issue unassigned. It answers the new issue's
+ * identifier.
+ */
+export interface TicketDraft extends TicketFieldValues {
 	title: string;
 	description: string;
 	team: string;
+}
+
+/** The largest file `PUT /api/ticket/attachment` takes. */
+export const MAX_TICKET_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+
+/** `PUT /api/ticket/attachment`: a file to attach to issue `issue`, its bytes in base64. It answers `{}`. */
+export interface TicketAttachmentUpload {
+	issue: string;
+	name: string;
+	/** The file's MIME type: `image/png`. */
+	type: string;
+	data: string;
 }
 
 export interface TicketComment {

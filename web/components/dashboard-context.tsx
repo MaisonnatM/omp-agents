@@ -18,6 +18,8 @@ export interface DashboardContextValue {
 	end: (instanceId: string) => void;
 	/** Open the text file at an absolute or `~/` path in the file dialog. */
 	openFile: (path: string) => void;
+	/** Open the new-ticket dialog with `title` as the issue's title. */
+	openNewTicket: (title: string) => void;
 	connected: boolean;
 	/** The last start of each kind, under way or failed. */
 	starts: {

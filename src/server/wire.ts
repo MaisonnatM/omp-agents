@@ -8,13 +8,13 @@ import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
 import { MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
-import { TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
+import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import type { BranchChoice } from "../shared/git";
 import type { PullRequest } from "../shared/github";
 import type { ModelOption } from "../shared/models";
 import type { ClientMsg } from "../shared/protocol";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
-import type { TicketDraft, TicketEdit } from "../shared/tickets";
+import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues } from "../shared/tickets";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
 import { isDay, isTodoId, parseTodoChange } from "../user-todos-parse";
 import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } from "../worktrees-shared";
@@ -382,44 +382,60 @@ export function parseSlackClient(body: unknown): { ok: SlackClientInput } | { er
 
 const isTicketPriority = oneOf(TICKET_PRIORITIES);
 
-/** The body of `PUT /api/ticket/new`: a title and a description, each within its limit, and a team by id. */
+/** The fields a picker sets, each left out unchanged and `null` clearing it, each of its own type; `null` for any other value. */
+function parseTicketFields(body: Record<string, unknown>): TicketFieldValues | null {
+	const { state, assignee, priority, labels, project, dueDate } = body;
+	const fields: TicketFieldValues = {};
+	if (state !== undefined) {
+		if (!isNonEmpty(state)) return null;
+		fields.state = state;
+	}
+	if (assignee !== undefined) {
+		if (assignee !== null && !isNonEmpty(assignee)) return null;
+		fields.assignee = assignee;
+	}
+	if (priority !== undefined) {
+		if (!isTicketPriority(priority)) return null;
+		fields.priority = priority;
+	}
+	if (labels !== undefined) {
+		if (!Array.isArray(labels) || !labels.every(isNonEmpty)) return null;
+		fields.labels = [...new Set(labels)];
+	}
+	if (project !== undefined) {
+		if (project !== null && !isNonEmpty(project)) return null;
+		fields.project = project;
+	}
+	if (dueDate !== undefined) {
+		if (dueDate !== null && !isDay(dueDate)) return null;
+		fields.dueDate = dueDate;
+	}
+	return fields;
+}
+
+/** The body of `PUT /api/ticket/new`: a title and a description, each within its limit, a team by id, and any picker's fields. */
 export function parseTicketDraft(body: unknown): TicketDraft | null {
 	if (!isObject(body)) return null;
 	const { title, description, team } = body;
 	if (!isNonEmpty(title) || title.length > MAX_TICKET_TITLE || typeof description !== "string" || description.length > MAX_TICKET_DESCRIPTION || !isNonEmpty(team)) return null;
-	return { title: title.trim(), description, team };
+	const fields = parseTicketFields(body);
+	return fields && { ...fields, title: title.trim(), description, team };
 }
 
 /** The body of `PUT /api/ticket`: an issue identifier and at least one field to change, each of its own type. */
 export function parseTicketEdit(body: unknown): TicketEdit | null {
 	if (!isObject(body) || typeof body.id !== "string" || !TICKET_ID.test(body.id)) return null;
-	const { state, assignee, priority, labels, project, dueDate } = body;
-	const edit: TicketEdit = { id: body.id };
-	if (state !== undefined) {
-		if (!isNonEmpty(state)) return null;
-		edit.state = state;
-	}
-	if (assignee !== undefined) {
-		if (assignee !== null && !isNonEmpty(assignee)) return null;
-		edit.assignee = assignee;
-	}
-	if (priority !== undefined) {
-		if (!isTicketPriority(priority)) return null;
-		edit.priority = priority;
-	}
-	if (labels !== undefined) {
-		if (!Array.isArray(labels) || !labels.every(isNonEmpty)) return null;
-		edit.labels = [...new Set(labels)];
-	}
-	if (project !== undefined) {
-		if (project !== null && !isNonEmpty(project)) return null;
-		edit.project = project;
-	}
-	if (dueDate !== undefined) {
-		if (dueDate !== null && !isDay(dueDate)) return null;
-		edit.dueDate = dueDate;
-	}
-	return Object.keys(edit).length > 1 ? edit : null;
+	const fields = parseTicketFields(body);
+	return fields && Object.keys(fields).length > 0 ? { id: body.id, ...fields } : null;
+}
+
+/** The body of `PUT /api/ticket/attachment`: an issue identifier, a file name and MIME type, and its bytes in base64 within the size limit. */
+export function parseTicketAttachment(body: unknown): TicketAttachmentUpload | null {
+	if (!isObject(body)) return null;
+	const { issue, name, type, data } = body;
+	if (typeof issue !== "string" || !TICKET_ID.test(issue) || !isNonEmpty(name) || !isNonEmpty(type) || typeof data !== "string") return null;
+	if (data.length > Math.ceil(MAX_TICKET_ATTACHMENT_BYTES / 3) * 4 || (data !== "" && !BASE64.test(data))) return null;
+	return { issue, name, type, data };
 }
 
 export const SHA256 = /^[0-9a-f]{64}$/;

@@ -23,6 +23,7 @@ export type ShortcutId =
 	| "focusComposer"
 	| "inbox"
 	| "tickets"
+	| "newTicket"
 	| "sessions"
 	| "todo"
 	| "calendar"
@@ -135,6 +136,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	{ id: "inbox", label: "Go to the pull request inbox", command: "Go to inbox", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
 	{ id: "tickets", label: "Go to your Linear tickets", command: "Go to tickets", keys: [{ chord: { key: "2", mod: true }, scope: "anywhere" }] },
+	{ id: "newTicket", label: "Create a Linear ticket", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "sessions", label: "Go to the sessions", command: "Go to sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },
 	{ id: "todo", label: "Go to your todo list", command: "Go to todo list", keys: [{ chord: { key: "4", mod: true }, scope: "anywhere" }] },
 	{ id: "calendar", label: "Go to your calendar", command: "Go to calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },

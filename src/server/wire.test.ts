@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import type { ClientMsg } from "../shared/protocol";
 import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
-import { parseBranchSwitch, parseClientMsg, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketEdit } from "./wire";
+import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
+import { parseBranchSwitch, parseClientMsg, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -352,5 +353,46 @@ describe("parseTicketEdit", () => {
 		expect(parseTicketEdit({ id: "ENG-1", labels: ["Bug", 2] })).toBeNull();
 		expect(parseTicketEdit({ id: "ENG-1", dueDate: "next week" })).toBeNull();
 		expect(parseTicketEdit({ id: "ENG-1", assignee: 3 })).toBeNull();
+	});
+});
+
+describe("parseTicketDraft", () => {
+	test("keeps the trimmed title, the description as written, and the fields the pills set", () => {
+		expect(parseTicketDraft({ title: "  Fix login ", description: "", team: "t1", state: "Todo", priority: 2, assignee: null, labels: ["Bug", "Bug"], project: "Web", dueDate: "2026-10-09" })).toEqual({
+			title: "Fix login",
+			description: "",
+			team: "t1",
+			state: "Todo",
+			priority: 2,
+			assignee: null,
+			labels: ["Bug"],
+			project: "Web",
+			dueDate: "2026-10-09",
+		});
+	});
+
+	test("rejects a draft without a title or team, or with a field of the wrong kind", () => {
+		expect(parseTicketDraft({ title: " ", description: "", team: "t1" })).toBeNull();
+		expect(parseTicketDraft({ title: "Fix", description: "", team: "" })).toBeNull();
+		expect(parseTicketDraft({ title: "Fix", team: "t1" })).toBeNull();
+		expect(parseTicketDraft({ title: "Fix", description: "", team: "t1", priority: 7 })).toBeNull();
+		expect(parseTicketDraft({ title: "Fix", description: "", team: "t1", dueDate: "soon" })).toBeNull();
+	});
+});
+
+describe("parseTicketAttachment", () => {
+	const file = { issue: "ENG-1", name: "shot.png", type: "image/png", data: "aGVsbG8=" };
+
+	test("takes a named file in base64 for an issue, an empty file included", () => {
+		expect(parseTicketAttachment(file)).toEqual(file);
+		expect(parseTicketAttachment({ ...file, data: "" })).toEqual({ ...file, data: "" });
+	});
+
+	test("rejects a file for no issue, without a name or type, not in base64, or over the size limit", () => {
+		expect(parseTicketAttachment({ ...file, issue: "eng-1" })).toBeNull();
+		expect(parseTicketAttachment({ ...file, name: "" })).toBeNull();
+		expect(parseTicketAttachment({ ...file, type: "" })).toBeNull();
+		expect(parseTicketAttachment({ ...file, data: "not base64!" })).toBeNull();
+		expect(parseTicketAttachment({ ...file, data: "A".repeat((MAX_TICKET_ATTACHMENT_BYTES / 3) * 4 + 4) })).toBeNull();
 	});
 });

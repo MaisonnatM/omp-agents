@@ -1,6 +1,6 @@
-import { Box, Calendar, Check, CircleUser, Tag } from "lucide-react";
+import { Box, Calendar, Check, CircleUser, Ellipsis, Tag } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
-import type { Ticket, TicketDetail, TicketEdit, TicketOptions, TicketPriority } from "../../../src/shared/tickets";
+import type { Ticket, TicketDetail, TicketFieldValues, TicketOptions, TicketPriority } from "../../../src/shared/tickets";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,12 +13,17 @@ import { DetailSection } from "../sheet-details";
 import { dateLabel } from "../../labels";
 import { LabelDot, PRIORITY_ICON, statusIcon, TicketChip } from "./ticket-row";
 
-type Change = Omit<TicketEdit, "id">;
-
-const PRIORITIES: TicketPriority[] = [0, 1, 2, 3, 4];
+export const PRIORITIES: TicketPriority[] = [0, 1, 2, 3, 4];
 
 /** A field's button in the side column: the row's width, its value in the text's color, and room for wrapped labels. */
 const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
+/** A field's pill in the new-issue dialog, as Linear's own dialog draws them. */
+const CHIP_BUTTON = "max-w-56 rounded-full px-2.5 font-normal text-foreground";
+
+/** Where a picker sits: a row of the side column, or a pill in the new-issue dialog. */
+export type PickerLook = "field" | "chip";
+
+const pickerButton = (look: PickerLook): { variant: "ghost" | "tertiary"; className: string } => (look === "chip" ? { variant: "tertiary", className: CHIP_BUTTON } : { variant: "ghost", className: FIELD_BUTTON });
 
 /** A titled group of fields in the side column, whose buttons line their icons up with the title. */
 function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
@@ -51,10 +56,11 @@ interface FieldPickerProps {
 	disabled?: boolean;
 	onOpen?: () => void;
 	onPick: (value: string) => void;
+	look?: PickerLook;
 }
 
 /** A field as a button that opens a searchable list of its choices, as Linear's issue fields do. */
-function FieldPicker({ field, current, trigger, choices, error = null, selected, multi = false, disabled = false, onOpen, onPick }: FieldPickerProps) {
+export function FieldPicker({ field, current, trigger, choices, error = null, selected, multi = false, disabled = false, onOpen, onPick, look = "field" }: FieldPickerProps) {
 	const [open, setOpen] = useState(false);
 	return (
 		<Popover
@@ -66,7 +72,7 @@ function FieldPicker({ field, current, trigger, choices, error = null, selected,
 		>
 			<Tooltip content={`Change ${field.toLowerCase()}: ${current}`} side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
-					<Button variant="ghost" size="compact" className={FIELD_BUTTON} aria-label={`${field}: ${current}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
+					<Button size="compact" {...pickerButton(look)} aria-label={`${field}: ${current}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
 						<span className="flex min-w-0 items-center gap-2">{trigger}</span>
 					</Button>
 				</PopoverTrigger>
@@ -108,25 +114,33 @@ function FieldPicker({ field, current, trigger, choices, error = null, selected,
 	);
 }
 
-/** The due date: a date field to set it, and a button to clear it. */
-function DuePicker({ dueDate, disabled, onChange }: { dueDate: string | null; disabled: boolean; onChange: (dueDate: string | null) => void }) {
+/** The due date: a date field to set it, and a button to clear it. As a pill without a date, it waits behind a more button, as in Linear. */
+export function DuePicker({ dueDate, disabled, onChange, look = "field" }: { dueDate: string | null; disabled: boolean; onChange: (dueDate: string | null) => void; look?: PickerLook }) {
 	const [open, setOpen] = useState(false);
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<Tooltip content={dueDate ? `Change the due date: ${dateLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
-					<Button variant="ghost" size="compact" className={FIELD_BUTTON} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-						<span className="flex min-w-0 items-center gap-2">
-							<Calendar aria-hidden className="size-4 text-muted-foreground" />
-							{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
-						</span>
-					</Button>
+					{look === "chip" && !dueDate ? (
+						<Button variant="tertiary" size="icon-compact" className="rounded-full" aria-label="More fields: set a due date" data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
+							<Ellipsis />
+						</Button>
+					) : (
+						<Button size="compact" {...pickerButton(look)} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
+							<span className="flex min-w-0 items-center gap-2">
+								<Calendar aria-hidden className="size-4 text-muted-foreground" />
+								{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
+							</span>
+						</Button>
+					)}
 				</PopoverTrigger>
 			</Tooltip>
 			<PopoverContent align="start" className="w-auto p-2">
 				<form
 					onSubmit={event => {
 						event.preventDefault();
+						// React bubbles events through the popover's portal, so a form around the picker would submit too.
+						event.stopPropagation();
 						const value = new FormData(event.currentTarget).get("due");
 						setOpen(false);
 						if (typeof value === "string" && value !== "" && value !== dueDate) onChange(value);
@@ -192,7 +206,7 @@ export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsPr
 		if (options.error) setRetry(count => count + 1);
 	};
 
-	const save = (change: Change, shown: Partial<TicketDetail>): void => {
+	const save = (change: TicketFieldValues, shown: Partial<TicketDetail>): void => {
 		if (!detail) return;
 		replace({ ...detail, ...shown });
 		setSaveError(null);

@@ -14,9 +14,8 @@ import { shortcutLabels } from "../../shortcuts";
 import { categoryColor, type TodoEntry } from "../../todo-views";
 import { workStateOf } from "../../todo-work-state";
 import { MarkdownEditor } from "../markdown-editor";
+import { preferredTeam, rememberTeam, TeamSelect } from "../tickets/team-select";
 import { AddedByChip, type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
-
-const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60";
 
 /** Opening a Linear issue from a todo: pick its team, then create it, which links it to the todo. */
 type TicketStep =
@@ -33,7 +32,7 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 		try {
 			const teams = await getJson<TicketChoice[]>("/api/linear/teams");
 			if (teams.length === 0) return setStep({ kind: "failed", error: "Linear lists no team to open the issue in." });
-			setStep({ kind: "picking", teams, team: teams[0]!.id });
+			setStep({ kind: "picking", teams, team: preferredTeam(teams) });
 		} catch (err) {
 			setStep({ kind: "failed", error: errorText(err) });
 		}
@@ -42,6 +41,7 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 		setStep({ kind: "creating", teams, team });
 		try {
 			const { identifier } = await putJson<{ identifier: string }>("/api/ticket/new", { title: todo.text, description: todo.body, team } satisfies TicketDraft);
+			rememberTeam(team);
 			onChange({ op: "link", id: todo.id, link: { kind: "ticket", identifier } });
 			setStep({ kind: "idle" });
 		} catch (err) {
@@ -82,16 +82,7 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 	);
 	return (
 		<div className="flex flex-wrap items-center gap-2">
-			<label className="flex items-center gap-2 text-xs text-muted-foreground">
-				Team
-				<select value={team} disabled={creating} onChange={event => setStep({ kind: "picking", teams, team: event.target.value })} className={FIELD}>
-					{teams.map(({ id, name }) => (
-						<option key={id} value={id}>
-							{name}
-						</option>
-					))}
-				</select>
-			</label>
+			<TeamSelect teams={teams} value={team} disabled={creating} onChange={next => setStep({ kind: "picking", teams, team: next })} />
 			<Tooltip content="Create the issue in this team, assigned to you" disabled={creating}>
 				{createButton}
 			</Tooltip>

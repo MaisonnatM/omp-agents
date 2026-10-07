@@ -23,23 +23,21 @@ export interface ImageAttachments {
 	read: (deliver: (images: PromptImage[]) => void) => void;
 }
 
-/** The files as a prompt sends them: base64 and their type. */
-function promptImages(files: File[]): Promise<PromptImage[]> {
-	return Promise.all(
-		files.map(
-			file =>
-				new Promise<PromptImage>((resolve, reject) => {
-					const reader = new FileReader();
-					reader.onload = () => {
-						const url = String(reader.result);
-						resolve({ data: url.slice(url.indexOf(",") + 1), mimeType: file.type });
-					};
-					reader.onerror = () => reject(reader.error);
-					reader.readAsDataURL(file);
-				}),
-		),
-	);
+/** `file`'s bytes in base64, as the server's JSON bodies carry a file. */
+export function fileBase64(file: File): Promise<string> {
+	const { promise, resolve, reject } = Promise.withResolvers<string>();
+	const reader = new FileReader();
+	reader.onload = () => {
+		const url = String(reader.result);
+		resolve(url.slice(url.indexOf(",") + 1));
+	};
+	reader.onerror = () => reject(reader.error);
+	reader.readAsDataURL(file);
+	return promise;
 }
+
+/** The files as a prompt sends them: base64 and their type. */
+const promptImages = (files: File[]): Promise<PromptImage[]> => Promise.all(files.map(async file => ({ data: await fileBase64(file), mimeType: file.type })));
 
 /** The images a composer attaches to its next prompt, as many as fit in the bytes one prompt carries. */
 export function useImageAttachments(): ImageAttachments {

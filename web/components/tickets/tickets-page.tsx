@@ -1,7 +1,10 @@
+import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { McpIntegration } from "../../../src/shared/accounts";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
 import { ticketsStore, useReplaceableRead } from "../../reads";
@@ -9,6 +12,7 @@ import { hashForTickets, type OpenMode } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import type { SectionTarget } from "../../section";
 import type { StartOf } from "../../starts";
+import { shortcutLabels } from "../../shortcuts";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { useDashboardContext } from "../dashboard-context";
 import { FoldButton, useFolds, useReveal } from "../fold";
@@ -83,7 +87,7 @@ interface TicketsPageProps {
 
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
 export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
-	const { open, start: startSession, dismissStart, starts: { quick } } = useDashboardContext();
+	const { open, start: startSession, dismissStart, openNewTicket, starts: { quick } } = useDashboardContext();
 	const poll = ticketsStore.usePolling();
 	const tickets = poll.read?.data.tickets ?? [];
 	const [version, setVersion] = useState(0);
@@ -145,6 +149,13 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 			loading="Asking Linear for your issues…"
 			poll={poll}
 			onRefresh={() => void ticketsStore.refresh(null, { fresh: true })}
+			actions={
+				<Tooltip content="Create a Linear issue, assigned to you" shortcut={shortcutLabels("newTicket")} side="bottom">
+					<Button variant="ghost" size="compact" leadingIcon={Plus} onClick={() => openNewTicket("")}>
+						New ticket
+					</Button>
+				</Tooltip>
+			}
 			notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 			className="max-w-none space-y-1 px-4 pt-3"
 		>
