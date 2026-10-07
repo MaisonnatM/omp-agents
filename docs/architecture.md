@@ -86,7 +86,7 @@ Every transcript comes from the session files on this machine, not from a networ
   The `/ship` state's `issue` counts too.
   Session rows carry them as `tickets`, the session's own first.
 - Each inbox answer tells the server which branch heads which pull request in that repository.
-  The server then links each session whose `git push` updated one of those branches to that PR, and sends the sidebar the new links.
+  The server then links each session whose `git push` updated one of those branches, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
 
 ## Terminal sessions
 
