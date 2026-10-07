@@ -1,8 +1,9 @@
 /**
  * The requests omp's `end_session` tool leaves for the server, one `<session id>.json` each in a directory: end that
- * session as **End session** does, then, when it asked, remove the git worktree it works in. The tool writes its request
- * once the turn that asked is over, and deletes it when the session starts another turn or stops, so a request always
- * names a session that idles after asking. One whose session the server does not follow yet waits for the next drain.
+ * session as **End session** does, then, when it asked, remove the git worktree it works in. A worktree that the removal
+ * checks keep stays, and Settings → Worktrees still lists it. The tool writes its request once the turn that
+ * asked is over, and deletes it when the session starts another turn or stops, so a request always names a session that
+ * idles after asking. One whose session the server does not follow yet waits for the next drain.
  */
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, watch } from "node:fs";
 import { join } from "node:path";
@@ -22,8 +23,6 @@ export interface EndInboxEnv {
 	session(sessionId: string): { workDir: string; end(): Promise<void> } | null;
 	/** Removes the worktree `dir` is in: why it stayed, or `null` once it is gone. */
 	removeWorktree(dir: string): Promise<string | null>;
-	/** Leaves the user a todo for what an ended session could not finish. */
-	report(sessionId: string, text: string, body: string): void;
 }
 
 export function parseEndRequest(value: unknown): EndRequest | null {
@@ -87,7 +86,7 @@ export class EndInbox {
 		} catch (err) {
 			why = errorText(err);
 		}
-		if (why) this.#env.report(request.sessionId, `Remove the worktree ${displayPath(session.workDir)}`, `The session asked to end and to remove its worktree, which stayed: ${why}`);
+		if (why) console.error(`omp-agents: kept the worktree ${displayPath(session.workDir)} that session ${request.sessionId} asked to remove: ${why}`);
 	}
 
 	/** Drains now and on every change to the directory, which it creates. */

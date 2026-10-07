@@ -29,7 +29,7 @@ import { UserTodosFile } from "./server/user-todos-file";
 import { type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
 import type { StartRequest, StartResult, View } from "./shared/sessions";
-import { addTodo, DONE_KEPT_HOURS } from "./user-todos";
+import { DONE_KEPT_HOURS } from "./user-todos";
 import type { UserTodoChange } from "./user-todos-shared";
 import { Worktrees } from "./worktrees";
 
@@ -119,9 +119,6 @@ const endInbox = new EndInbox(sessionEndInboxDir, {
 	async removeWorktree(dir) {
 		const result = await worktrees.removeCheckout(dir);
 		return result.removed ? null : (result.error ?? result.blockers.map(blocker => blocker.message).join(" "));
-	},
-	report(sessionId, text, body) {
-		applyTodo(addTodo({ text, body, addedBy: sessionId }));
 	},
 });
 const runner = new RoutineRunner({

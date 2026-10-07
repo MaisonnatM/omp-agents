@@ -389,7 +389,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   It comes from `~/.omp/agent/extensions/end-session.ts`, which `bun run omp-template` installs.
   The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **End session**, not as interrupted.
   With `removeWorktree`, the dashboard then removes the git worktree the session works in, the one its header names the branch of, with the checks of **Settings → Worktrees**, and keeps its branch.
-  A worktree that those checks keep, such as one with uncommitted changes, one another session uses, or the main checkout, stays, and a todo names why.
+  A worktree that those checks keep, such as one with uncommitted changes, one another session uses, or the main checkout, stays in **Settings → Worktrees**, whose **Delete** applies the same checks.
   The tool leaves its request as `<session id>.json` in `end-inbox/` beside `todos.json`; a message sent before the dashboard acts withdraws it, and a request waits while the dashboard is down.
 - **Resume** in a past session's header starts omp on that session's file from the dashboard, as `omp --resume <session id>` does in a terminal.
   The pane then shows the live session, which carries on in the same file and moves to the running sessions.
@@ -701,11 +701,14 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 - The `user_todo` tool lets an omp session list your todos, add one, or check one off; it cannot edit or delete one.
   It comes from `~/.omp/agent/extensions/todos.ts`, which `bun run omp-template` installs.
-- An agent adds a todo when it stops on a step only you can take, such as approving a migration or reviewing a pull request.
+- An agent adds a todo when it stops on a step outside the session that only you can take, such as setting up an account or a credential, running something on your machine, or reviewing a pull request.
+  It asks for an approval or an answer in its reply, not in a todo.
   The todo lands last in no category, and its chip names the session that added it and opens it.
-- A session that an open top-level todo links to, such as the one its **Start session** started, is told which todo it works on at each prompt.
-  Its agent checks the todo off once it finishes the work, and leaves it open while the work still waits on you.
+- At each prompt, a session is told which open top-level todo links to it, such as the one its **Start session** started, and which open todos it added.
+  Its agent checks a linked todo off once it finishes the work, and leaves it open while the work still waits on you.
+  It checks off a todo it added once you have done the step or it no longer applies, and adding a todo it already added, with the same title, returns the open one.
   Any agent also checks off a todo whose work you ask it to do.
+- The tool takes an empty `due`, `text`, or `id` as absent.
 - The tool leaves each change as a file in `todo-inbox/` beside `todos.json`, and the server applies it and deletes the file, so a todo an agent adds while the dashboard is down shows once it starts.
   A file that is not a change an agent may make moves to `<name>.invalid`.
 
