@@ -10,7 +10,8 @@ import { errorText, putJson } from "../../api";
 import { ticketsStore, useRead } from "../../reads";
 import { PRIORITY_LABEL, statusOrder } from "../../tickets-model";
 import { DetailSection } from "../sheet-details";
-import { dueLabel, PRIORITY_ICON, statusIcon, TICKET_CHIP } from "./ticket-row";
+import { dateLabel } from "../../labels";
+import { LabelDot, PRIORITY_ICON, statusIcon, TicketChip } from "./ticket-row";
 
 type Change = Omit<TicketEdit, "id">;
 
@@ -112,12 +113,12 @@ function DuePicker({ dueDate, disabled, onChange }: { dueDate: string | null; di
 	const [open, setOpen] = useState(false);
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
-			<Tooltip content={dueDate ? `Change the due date: ${dueLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
+			<Tooltip content={dueDate ? `Change the due date: ${dateLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
 					<Button variant="ghost" size="compact" className={FIELD_BUTTON} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
 						<span className="flex min-w-0 items-center gap-2">
 							<Calendar aria-hidden className="size-4 text-muted-foreground" />
-							{dueDate ? dueLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
+							{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
 						</span>
 					</Button>
 				</PopoverTrigger>
@@ -302,10 +303,9 @@ export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsPr
 						ticket.labels.length > 0 ? (
 							<span className="flex min-w-0 flex-wrap gap-1.5">
 								{ticket.labels.map(({ name, color }) => (
-									<span key={name} className={cn(TICKET_CHIP, "text-foreground")}>
-										<span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color || "var(--muted-foreground)" }} />
-										<span className="truncate">{name}</span>
-									</span>
+									<TicketChip key={name} icon={<LabelDot color={color} />} className="text-foreground">
+										{name}
+									</TicketChip>
 								))}
 							</span>
 						) : (
@@ -319,7 +319,7 @@ export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsPr
 						options.data?.labels.map(label => ({
 							value: label.name,
 							label: label.name,
-							icon: <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: label.color || "currentColor" }} />,
+							icon: <LabelDot color={label.color} />,
 						})) ?? null
 					}
 					error={options.error}

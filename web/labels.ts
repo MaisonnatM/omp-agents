@@ -125,6 +125,19 @@ export const pullRequestsLabel = ([first, ...rest]: PullRequest[]): string => (r
 export const readTime = (at: number): string =>
 	new Date(at).toDateString() === new Date().toDateString() ? new Date(at).toLocaleTimeString() : new Date(at).toLocaleString();
 
+/** A day as the lists show it: `Oct 5`. */
+export const DAY_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const MONTH_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric" });
+
+/** A `2026-10-05` date as `Oct 5`, read as a local date so it does not shift a day west of UTC. */
+export const dateLabel = (date: string): string => DAY_FORMAT.format(new Date(`${date}T00:00`));
+
+/** A time as Linear's lists date it: `Oct 6` in `now`'s year, `Mar 2025` in an earlier one. */
+export function dayLabel(at: string, now = new Date()): string {
+	const date = new Date(at);
+	return (date.getFullYear() === now.getFullYear() ? DAY_FORMAT : MONTH_FORMAT).format(date);
+}
+
 /** A size in bytes, in the largest unit under 1024: `1536` reads `1.5 KB`. */
 export function formatBytes(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;

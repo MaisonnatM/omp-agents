@@ -49,7 +49,8 @@ function GroupSection({ group, open, onToggle, hosts, onOpen, quick, onQuickActi
 				</FoldButton>
 			</h3>
 			{open && (
-				<ul id={`${id}-list`} className="py-1">
+				// A row scrolled into view clears the sticky h-10 heading above it.
+				<ul id={`${id}-list`} className="py-1 *:scroll-mt-12 *:scroll-mb-2">
 					{group.tickets.map(ticket => (
 						<TicketRow
 							key={ticket.id}

@@ -79,7 +79,7 @@ interface ListPageProps<Data> {
 	/** What became of the last quick action, above the lists. */
 	notice: ReactNode;
 	/** Classes for the column that holds the lists: the spacing between them, and a width other than the reading width. */
-	className: string;
+	className?: string;
 	/** The page's lists, from its read. */
 	children: (data: Data) => ReactNode;
 }

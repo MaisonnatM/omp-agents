@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
+import { dayLabel, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
 
 describe("model labels", () => {
 	test("a direct provider's model reads as its family and dotted version", () => {
@@ -43,5 +43,13 @@ describe("model labels", () => {
 		expect(providerLabel("openrouter")).toBe("OpenRouter");
 		expect(skillLabel("poteto-mode")).toBe("Poteto Mode");
 		expect(skillLabel("Poteto Mode")).toBe("Poteto Mode");
+	});
+});
+
+describe("day labels", () => {
+	test("a time in the current year reads as its day, and one a day earlier across new year as its month and year", () => {
+		const now = new Date(2026, 0, 2, 9);
+		expect(dayLabel(new Date(2026, 0, 1, 23).toISOString(), now)).not.toContain("2026");
+		expect(dayLabel(new Date(2025, 11, 31, 23).toISOString(), now)).toContain("2025");
 	});
 });

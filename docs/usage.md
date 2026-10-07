@@ -541,7 +541,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The page header then names the issue: its identifier, with its title under it, after a back arrow.
   The back arrow, **Back to tickets**, stays in the header while the details scroll, and returns to the list with its folded states preserved.
   The detail view lays the issue out as Linear does: the title, the description, and the comment threads in a wide column, and beside it the quick actions, the state, the priority, the assignee, the due date, the labels as chips, the project, Linear's branch name for it, the links Linear keeps for it (a pull request with its own icon), who opened the issue and when, and a link to the issue on Linear.
-  On a page narrower than the side column needs, its groups sit two by two between the title and the description.
+  On a page narrower than the side column needs, the side column stacks between the title and the description.
   Each opening reads the issue again through Linear's `get_issue` and `list_comments` tools.
   Linear's issue mentions in the text become links.
   Its images show in place, its screen recordings play in a video player, and another embedded file becomes a link to download it.
@@ -554,7 +554,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The lists come from the issue's team in Linear, read when you first open one, and the server keeps them for five minutes.
 - `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens that issue's details directly, even when the tickets list does not include it or cannot load.
   The header's back arrow opens the list from a direct link too.
-- A lightning button, which shows on a row while you hover or focus it, and buttons in the issue's details, start a new dashboard session in the background, with a prompt that names the issue.
+- A lightning button, which shows on a row in place of the day it last changed while you hover or focus the row, and buttons in the issue's details, start a new dashboard session in the background, with a prompt that names the issue.
   The page stays on screen, and the session shows at once as a chip with its status dot on the issue's row and after the buttons in its details; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   A row and the details show a chip for every running session that works on the issue, whether a quick action started it or it read or changed the issue with omp's Linear tools, so they say whether an agent still works on it, after a reload too.
   A row shows two chips at most.

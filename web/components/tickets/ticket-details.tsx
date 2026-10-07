@@ -1,15 +1,12 @@
 import { GitPullRequest, Link2 } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
+import { pullRequestOfUrl } from "../../../src/shared/github";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { age } from "../../labels";
 import type { ReadState } from "../../reads";
 import { BranchName } from "../git";
 import { Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
 import { TicketFields } from "./ticket-fields";
-
-const ago = (at: string): string => `${age(Date.parse(at))} ago`;
-
-const PULL_REQUEST = /^https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/;
 
 interface TicketDetailContentProps {
 	id: string;
@@ -22,8 +19,7 @@ interface TicketDetailContentProps {
 
 /**
  * A Linear issue laid out as Linear lays it out: the title, description, and comments in a wide column, and beside it
- * the actions, the editable fields, the branch, the links, and who opened the issue. On a narrow page the side column
- * follows the title.
+ * {@link TicketSide}. On a narrow page the side column follows the title.
  */
 export function TicketDetailContent({ id, listed, read: { data: detail, error, replace, reload }, actions }: TicketDetailContentProps) {
 	const ticket = detail ?? listed;
@@ -33,31 +29,45 @@ export function TicketDetailContent({ id, listed, read: { data: detail, error, r
 	}, []);
 	return (
 		<div className="grid gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:grid-rows-[auto_1fr]">
-			<h1 ref={headingRef} tabIndex={-1} className="text-2xl leading-tight font-semibold tracking-tight outline-none lg:col-start-1 lg:row-start-1">
+			<h1
+				ref={headingRef}
+				tabIndex={-1}
+				className="rounded-md text-2xl leading-tight font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring lg:col-start-1 lg:row-start-1"
+			>
 				{ticket?.title ?? id}
 			</h1>
-			<aside aria-label="Issue properties" className="grid content-start gap-6 sm:grid-cols-2 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:grid-cols-1">
-				{ticket && actions && <div className="sm:col-span-2 lg:col-span-1">{actions(ticket)}</div>}
-				{ticket && <TicketFields ticket={ticket} detail={detail} replace={replace} reload={reload} />}
-				{detail && <TicketLinks detail={detail} />}
-				{ticket && (
-					<p className="space-y-1 text-xs text-muted-foreground">
-						<span className="block tabular-nums">{id}</span>
-						{detail && (
-							<span className="block" title={new Date(detail.createdAt).toLocaleString()}>
-								Opened{detail.createdBy && ` by ${detail.createdBy}`} {ago(detail.createdAt)}
-							</span>
-						)}
-						<span className="block">
-							<OutLink href={ticket.url}>Open in Linear</OutLink>
-						</span>
-					</p>
-				)}
-			</aside>
+			{ticket && <TicketSide ticket={ticket} detail={detail} replace={replace} reload={reload} actions={actions} />}
 			<div className="min-w-0 space-y-10 lg:col-start-1 lg:row-start-2">
 				{detail ? <TicketBody detail={detail} /> : <LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />}
 			</div>
 		</div>
+	);
+}
+
+interface TicketSideProps extends Pick<TicketDetailContentProps, "actions">, Pick<TicketDetailContentProps["read"], "replace" | "reload"> {
+	ticket: Ticket;
+	detail: TicketDetail | null;
+}
+
+/** The side column: the quick actions, the editable fields, the branch, the links, and who opened the issue. */
+function TicketSide({ ticket, detail, replace, reload, actions }: TicketSideProps) {
+	return (
+		<aside aria-label="Issue properties" className="space-y-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+			{actions?.(ticket)}
+			<TicketFields ticket={ticket} detail={detail} replace={replace} reload={reload} />
+			{detail && <TicketLinks detail={detail} />}
+			<div className="space-y-1 text-xs text-muted-foreground">
+				<p className="tabular-nums">{ticket.id}</p>
+				{detail && (
+					<p title={new Date(detail.createdAt).toLocaleString()}>
+						Opened{detail.createdBy && ` by ${detail.createdBy}`} {age(Date.parse(detail.createdAt))} ago
+					</p>
+				)}
+				<p>
+					<OutLink href={ticket.url}>Open in Linear</OutLink>
+				</p>
+			</div>
+		</aside>
 	);
 }
 
@@ -112,7 +122,7 @@ function TicketLinks({ detail: { branch, attachments } }: { detail: TicketDetail
 				>
 					<ul className="space-y-1.5 text-sm">
 						{attachments.map(({ title, url }, index) => {
-							const Icon = PULL_REQUEST.test(url) ? GitPullRequest : Link2;
+							const Icon = pullRequestOfUrl(url) ? GitPullRequest : Link2;
 							return (
 								// Linear can attach one address twice.
 								<li key={index} className="flex min-w-0 items-center gap-2">

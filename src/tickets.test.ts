@@ -27,7 +27,7 @@ const listed = (data: unknown): string => JSON.stringify(data);
 const colors = new Map([["ENG", new Map([["Front", "#f2c94c"]])]]);
 
 describe("parseIssues", () => {
-	test("maps Linear's fields, colors labels as their team does, folds duplicates into canceled, and reads a missing project as none and a missing creation as the update", () => {
+	test("maps Linear's fields, colors labels as their team does, folds duplicates into canceled, and reads a missing project as none", () => {
 		const { project: _, createdAt: __, ...noProject } = issue("ENG-2", { statusType: "duplicate", status: "Duplicate", priority: { value: 0, name: "No priority" }, labels: ["Front", "Retired"] });
 		expect(parseIssues([issue("ENG-1", { dueDate: "2026-10-05" }), noProject, issue("OPS-1")], colors)).toEqual([
 			{
