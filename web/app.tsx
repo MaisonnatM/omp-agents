@@ -101,10 +101,14 @@ export function App() {
 	const quick = startOf(state.starts, "quick");
 	const resumeAll = startOf(state.starts, "resume-all");
 	const sidebars = useSidebarPanels();
-	// Temporary workspaces remain in raw sessions; only discoverable sessions enter the project/sidebar view.
+	// Temporary and hidden workspaces remain in raw sessions; only discoverable sessions enter the project/sidebar view.
 	const all = { hosts: state.hosts, past: state.past };
-	const visible = useMemo(() => discoverableSessions(all.hosts, all.past), [all.hosts, all.past]);
-	const projects = useMemo(() => workspaces(visible.hosts, visible.past), [visible]);
+	const hiddenCwds = useMemo(() => new Set(state.projectList.hidden.map(hidden => hidden.cwd)), [state.projectList.hidden]);
+	const visible = useMemo(() => discoverableSessions(all.hosts, all.past, hiddenCwds), [all.hosts, all.past, hiddenCwds]);
+	const projects = useMemo(
+		() => workspaces(visible.hosts, visible.past, state.projectList.added.filter(added => !hiddenCwds.has(added.cwd))),
+		[visible, state.projectList.added, hiddenCwds],
+	);
 	const [project, pickProject] = useProject(projects);
 	// Keeps the Inbox tab's count current on every page. Until the sessions are listed, the saved project reads as all projects.
 	inboxStore.usePolling(project, state.listed);
@@ -112,7 +116,7 @@ export function App() {
 	const { started } = state;
 	useEffect(() => {
 		if (!started) return;
-		const next = projectSwitch(project, started.cwd);
+		const next = projectSwitch(project, started.cwd, hiddenCwds);
 		if (next !== null) pickProject(next);
 	}, [started]);
 	const { layout } = state;
@@ -129,6 +133,16 @@ export function App() {
 	useEffect(() => {
 		document.title = title;
 	}, [title]);
+	const shownCwd = useRef<{ instanceId: string; cwd: string; project: string | null } | null>(null);
+	// A `/move` takes the focused session to another project, and the sidebar follows it there.
+	// The project is the one shown before the move: the old directory may have no session left, which already shows all projects.
+	useEffect(() => {
+		const last = shownCwd.current;
+		shownCwd.current = viewHost ? { instanceId: viewHost.instanceId, cwd: viewHost.cwd, project } : null;
+		if (!viewHost || last?.instanceId !== viewHost.instanceId || last.cwd === viewHost.cwd) return;
+		const next = projectSwitch(last.project, viewHost.cwd, hiddenCwds);
+		if (next !== null) pickProject(next);
+	}, [viewHost?.instanceId, viewHost?.cwd, project]);
 	const viewSession = viewHost ?? viewPast;
 	/** The view's roster row, an ended session's last one, or its past entry: what the PRs tab lists. */
 	const viewRow = viewHost ?? viewLastHost ?? viewPast;
@@ -325,6 +339,7 @@ export function App() {
 							session={pane.kind === "past" ? all.past.find(s => s.sessionId === pane.sessionId) ?? null : null}
 							initialDraft={state.draft && sameView(state.draft.view, pane) ? state.draft.text : ""}
 							models={(pane.kind === "live" && state.models.get(pane.instanceId)) || UNREAD}
+							workspaces={projects}
 							onLayout={onPaneLayout}
 							toggleRight={toggleRight}
 							rightOpen={sidebars.panels.right.open}
@@ -369,7 +384,7 @@ export function App() {
 			break;
 		}
 		case "settings":
-			main = <SettingsPage route={page} workspaces={projects} />;
+			main = <SettingsPage route={page} workspaces={projects} projectList={state.projectList} />;
 			break;
 		case "inbox":
 			main =
@@ -515,7 +530,7 @@ export function App() {
 						projects={projects}
 						project={project}
 						onOpenSession={(picked, cwd, mode) => {
-							const next = projectSwitch(project, cwd);
+							const next = projectSwitch(project, cwd, hiddenCwds);
 							if (next !== null) pickProject(next);
 							open(picked, mode);
 						}}

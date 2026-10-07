@@ -9,7 +9,7 @@ import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { sessionsDir } from "./omp/sessions";
 import { stopStats } from "./omp/stats";
-import { directoryOf, displayPath, interruptedFile, oldGoogleFile, routinesFile, sessionEndInboxDir, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
+import { directoryOf, displayPath, interruptedFile, oldGoogleFile, projectsFile, routinesFile, sessionEndInboxDir, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
 import { runShell } from "./proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "./routines";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
@@ -23,6 +23,7 @@ import { Loops } from "./server/loops";
 import { buildPage, servePage } from "./server/page";
 import { createRoutes } from "./server/routes";
 import { RoutineRunner } from "./server/routine-runner";
+import { ProjectsFile } from "./server/projects-file";
 import { RoutinesFile } from "./server/routines-file";
 import { SessionFiles } from "./server/session-files";
 import { createClientHandler } from "./server/socket";
@@ -57,6 +58,7 @@ function clearOldDone(): void {
 }
 const inbox = new TodoInbox(userTodoInboxDir, applyTodo);
 const routines = new RoutinesFile(routinesFile);
+const projects = new ProjectsFile(projectsFile);
 // The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
 rmSync(oldGoogleFile, { force: true });
 const google = new GoogleCalendarReader(async url => readWithMcpSignIn(await integrationServer("google-calendar"), url));
@@ -71,6 +73,10 @@ const broadcasts = new Broadcasts({
 	past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
 	userTodosMsg: () => ({ t: "user-todos", list: todos.list }),
 	routinesMsg: () => ({ t: "routines", routines: routines.routines }),
+	projectsMsg: () => {
+		const [added, hidden] = [projects.list.added, projects.list.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
+		return { t: "projects", list: { added, hidden } };
+	},
 	publish: (topic, json) => void server.publish(topic, json),
 	subscriberCount: topic => server.subscriberCount(topic),
 	beforeRosterPush: () => views.sync(),
@@ -259,6 +265,10 @@ try {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},
 				google,
+				addedCwds: () => projects.list.added,
+				changeProjects(change) {
+					if (projects.apply(change)) broadcasts.pushProjects();
+				},
 				placeOf(sessionId) {
 					const file = files.pathOf(sessionId);
 					const saved = files.savedOf(sessionId);

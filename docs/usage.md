@@ -32,7 +32,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   With one project picked, the rows show no badge.
   A row without a title shows the project's name as its label, with no badge.
 - The project picker in the sidebar header shows only the running, idle, interrupted, and past sessions from one working directory.
-  It lists the directories that a live or saved session ran in, live sessions' directories first, except temporary directories.
+  It lists the directories that a live or saved session ran in, live sessions' directories first, then the ones added in **Settings › Projects**, except temporary directories and hidden projects.
   The session counts then count that directory's sessions only, such as `2 running` and `9 past`.
   Picking a project also opens its most recently started running session in the focused pane, unless that pane already shows a session from the project or a page such as a pull request, Settings, or the new-session draft covers the panes.
   Choose **All projects** to list every session again.
@@ -45,6 +45,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - Sessions in `/tmp` or `/private/tmp`, including their subdirectories, are hidden from project and workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved project.
   Their saved transcripts remain available through a direct session link.
+- A project hidden in **Settings › Projects** is left out the same way, but only its own directory: sessions in a directory inside it stay listed.
 - **Pin** in a row's menu moves the session to the **Pinned** group at the top of the list, and **Unpin** moves it back.
   The group lists pinned running sessions first, then pinned past ones, interrupted ones first, and shows only while it has a row.
   A pinned session stays pinned when it ends, is resumed, or is interrupted, and an interrupted one says `interrupted` after its title.
@@ -369,14 +370,19 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The page shows a new-session draft with the same header and composer as a running session: its trail reads `webapp / New session`, and hovering the project shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
   The directory is the selected project's, else the open session's, else the newest live session's, else the newest past session's.
-  To start in another directory, under **All projects** or not, pick it in the directory picker after the model picker.
-  It lists the directories that sessions ran in, and **Use** takes any directory typed into its search field.
+  To start in another directory, under **All projects** or not, pick it in the directory picker after the model picker, or press Cmd+Alt+P.
+  It lists the projects the sidebar lists, and **Use** takes any directory typed into its search field.
   The message you typed stays in the composer.
   Sending the first message starts omp there and sends it the message.
   The message stays in the composer while omp starts, and also if the start fails, with the error above it.
   When omp is ready, the dashboard opens the session in the focused pane.
   The draft is in the URL hash, `#new` or `#new/<encoded directory>`, and leaves the panes behind it, as **Settings** does.
   A session that you start or fork in another directory than the selected project switches the project picker to that directory, so the sidebar lists it.
+- A session that the dashboard started has the directory picker after its model picker too.
+  Picking a directory moves the session there, as omp's `/move` does: the transcript stays, and the header and the session's tools follow the new directory.
+  The sidebar's project picker switches to the new directory, as for a session you start there, unless it shows all projects.
+  The picker is disabled while a turn runs or waits on a question, since omp moves only an idle session.
+  A typed `/move <path>` works the same way; in a session with no reply yet, the dashboard follows the move once omp writes the first reply.
 - The draft's composer has the model menu at its bottom left, as a running session's does, without its Fast row.
   Until you pick one, it names the `default` role's model, such as **Opus 5.5**, which is the model omp starts on without `--model`.
   It reads **Default model** only when no `default` role names a model you are connected to.
@@ -829,8 +835,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - **Settings** is the last sidebar tab, after **Calendar**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
-  The sidebar lists six sections in two groups.
-  **General** holds **Analytics**, **Preferences**, and **Integrations**, which are the same whatever the workspace.
+  The sidebar lists seven sections in two groups.
+  **General** holds **Analytics**, **Preferences**, **Integrations**, and **Projects**, which are the same whatever the workspace.
   **Workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the chosen workspace loads them; only these sections show the workspace picker.
   It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit, and the selected section stays when you change workspace.
@@ -886,6 +892,11 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The picker lists the skills of the workspace that Settings opened on, and says which, or your own skills with **User files only**.
   Choose **None** to unpin.
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar; see [Integrations](#integrations).
+- **Projects** lists the directories that the sidebar's project picker and the directory pickers offer.
+  Type a path in **Directory** and choose **Add project** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
+  **Hide** drops a project and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
+  Hidden projects list under **Hidden**, and **Show** offers one again.
+  The server keeps the list in `projects.json` beside its access token, so every browser tab and the desktop app show the same projects.
 - **Settings** opens on the workspace of the session that you had open, so it includes that project's files and its `.omp/config.yml` overrides.
   With no session open, it shows user files only.
   Use the workspace picker in the header of a Workspace section to choose another directory that a session ran in, or **User files only**.
@@ -912,6 +923,7 @@ Alt is Option on macOS.
 | Cmd+[ | Anywhere | Open the previous session in the sidebar |
 | Cmd+] | Anywhere | Open the next session in the sidebar |
 | Cmd+Alt+/ | Anywhere | Choose the session's model |
+| Cmd+Alt+P | Anywhere | Choose the session's working directory |
 | Cmd+E | Anywhere | Expand or collapse tool calls |
 | Cmd+Shift+E | Anywhere | Show or hide tool calls |
 | Alt+T | Anywhere | Show or hide thinking |
@@ -946,7 +958,7 @@ Alt is Option on macOS.
 | J / K | Changes page or a pull request's changes page, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, **End session**, the composer's Stop button, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop button, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.
 - Cmd+1 through Cmd+5 select the dashboard's tabs, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers stay fixed when Tickets is hidden without a Linear connection; Cmd+2 then keeps its browser behavior.
   Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or another digit keeps its browser behavior.
@@ -977,6 +989,7 @@ Alt is Option on macOS.
   It does nothing in a subagent, a read-only room, or a past session.
   `/` or Cmd+I puts the cursor in the focused pane's composer.
 - Cmd+Alt+/ opens the model picker, and Shift+Tab in a composer moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.
+  Cmd+Alt+P (Option+Cmd+P on macOS) opens the directory picker in the new-session draft and, between turns, in sessions that the dashboard started.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in this browser.

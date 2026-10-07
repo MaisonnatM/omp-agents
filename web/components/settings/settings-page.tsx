@@ -1,6 +1,7 @@
 import { FolderOpen } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
+import type { Project, ProjectList } from "../../../src/shared/projects";
 import { settingsUrl } from "../../api";
 import { type ReadState, useRead, useReplaceableRead } from "../../reads";
 import { hashForSettings, SETTINGS_SECTIONS, type SettingsRoute, type SettingsSection } from "../../routing";
@@ -11,14 +12,13 @@ import type { Catalog, Editing } from "./editor";
 import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { PreferencesTab } from "./preferences-tab";
+import { ProjectsTab } from "./projects-tab";
 import { ModelsTab } from "./routing-tab";
 import { WorktreesTab } from "./worktrees-tab";
 
-type Workspace = { cwd: string; cwdDisplay: string };
+const workspaceLabel = (cwd: string, workspaces: Project[]): string => workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
 
-const workspaceLabel = (cwd: string, workspaces: Workspace[]): string => workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
-
-function WorkspacePicker({ route: { section, cwd }, workspaces }: { route: SettingsRoute; workspaces: Workspace[] }) {
+function WorkspacePicker({ route: { section, cwd }, workspaces }: { route: SettingsRoute; workspaces: Project[] }) {
 	const label = cwd === null ? "User files only" : workspaceLabel(cwd, workspaces);
 	const pick = (next: string | null) => (): void => {
 		location.hash = hashForSettings(section, next);
@@ -84,7 +84,7 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 }
 
 /** One section of the settings: omp's usage, the dashboard's own choices, or omp's routing and files for one workspace or for the user only, each editable in place. */
-export function SettingsPage({ route, workspaces }: { route: SettingsRoute; workspaces: Workspace[] }) {
+export function SettingsPage({ route, workspaces, projectList }: { route: SettingsRoute; workspaces: Project[]; projectList: ProjectList<Project> }) {
 	const { section, cwd } = route;
 	const models = useRead<{ models: CatalogModel[] }>("/api/models");
 	const catalog = useMemo(
@@ -106,6 +106,7 @@ export function SettingsPage({ route, workspaces }: { route: SettingsRoute; work
 		analytics: <AnalyticsTab active={section === "analytics"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
 		integrations: <IntegrationsTab active={section === "integrations"} />,
+		projects: <ProjectsTab projects={workspaces} list={projectList} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.

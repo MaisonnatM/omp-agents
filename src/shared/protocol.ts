@@ -2,6 +2,7 @@
 import type { Routine, RoutineChange } from "../routines";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
+import type { Project, ProjectList } from "./projects";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View } from "./sessions";
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
 
@@ -30,7 +31,9 @@ export type ServerMsg =
 	/** The Todo page's list, whole, sent when a socket opens and after every change. */
 	| { t: "user-todos"; list: UserTodoList }
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
-	| { t: "routines"; routines: Routine[] };
+	| { t: "routines"; routines: Routine[] }
+	/** The directories Settings → Projects added and hid, whole, sent when a socket opens and after every change. */
+	| { t: "projects"; list: ProjectList<Project> };
 
 export type ClientMsg =
 	/** The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming. */

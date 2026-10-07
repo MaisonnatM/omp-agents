@@ -44,7 +44,7 @@ Besides a live session's own hash, the routes are:
 - `#todo`, `#todo/today`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`;
 - `#calendar`, `#routines`, `#routines/<id>`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`;
-- `#settings`, `#settings/<section>`, `#settings/<section>/<encoded cwd>`, where `<section>` is `analytics`, `preferences`, `integrations`, `models`, `files`, or `worktrees`.
+- `#settings`, `#settings/<section>`, `#settings/<section>/<encoded cwd>`, where `<section>` is `analytics`, `preferences`, `integrations`, `projects`, `models`, `files`, or `worktrees`.
 
 ## Desktop smoke
 

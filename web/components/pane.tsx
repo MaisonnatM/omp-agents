@@ -1,5 +1,6 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
+import type { Project } from "../../src/shared/projects";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -27,6 +28,8 @@ interface PaneProps {
 	session: PastSession | null;
 	initialDraft: string;
 	models: ModelList;
+	/** The projects, which the composer's directory picker offers. */
+	workspaces: Project[];
 	onLayout: (index: number, kind: "max" | "close") => void;
 	toggleRight: () => void;
 	rightOpen: boolean;
@@ -38,7 +41,7 @@ const paneArea = (index: number, count: number): string =>
 
 /** Its own external-store subscription means another pane's token never asks this pane to render. */
 export const Pane = memo(function Pane({
-	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models, onLayout, toggleRight, rightOpen,
+	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models, workspaces, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
 	const { send, start, focus, open, end, starts: { fork, resume } } = useDashboardContext();
 	const { items, loaded, completions, dequeued, files } = usePane(view);
@@ -97,6 +100,7 @@ export const Pane = memo(function Pane({
 			onEnd={end}
 			actions={actions}
 			focused={focused}
+			workspaces={workspaces}
 		/>
 	);
 

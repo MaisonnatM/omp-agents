@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import type { Project } from "../../src/shared/projects";
 import type { Delivery, LiveView, PromptImage, RosterHost } from "../../src/shared/sessions";
 import type { ChangedFile, Item } from "../../src/shared/transcript";
 import { InputMessage } from "@/components/ui/input-message";
@@ -22,6 +23,7 @@ import { ModelSlot } from "./model-slot";
 import { type Subject, subjectOf } from "./subject";
 import { Transcript } from "./transcript";
 import { UserRequestCard } from "./user-request";
+import { DirectoryPicker } from "./workspace-picker";
 
 const STEER_KEYS = shortcutKeys("steer");
 
@@ -52,6 +54,8 @@ interface ConversationProps {
 	actions?: ReactNode;
 	/** Whether this is the focused pane, the one session shortcuts act on. */
 	focused: boolean;
+	/** The projects, as {@link workspaces} lists them, which the directory picker offers. */
+	workspaces: Project[];
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts, queues, and scroll reset per view. */
@@ -90,10 +94,12 @@ function LiveConversation({
 	onEnd,
 	actions,
 	focused,
+	workspaces,
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const [draft, setDraft] = useState(initialDraft);
 	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
+	const [directoriesOpen, setDirectoriesOpen] = useState(false);
 	const attachments = useImageAttachments();
 
 	const subject = subjectOf(view, host, lastHost);
@@ -161,6 +167,8 @@ function LiveConversation({
 		setModelsOpen(open);
 	};
 	const setThinking = (level: string): void => send({ t: "set-thinking", instanceId: view.instanceId, level });
+	// omp's `/move` refuses while a turn runs, a turn waiting on a question included.
+	const movable = switchable?.status === "idle";
 
 	const onComposerKey = useShortcuts({
 		// The textarea's own keys, so they need no focused pane.
@@ -194,6 +202,10 @@ function LiveConversation({
 					model: () => {
 						if (!switchable) return false;
 						openModels("models");
+					},
+					directory: () => {
+						if (!movable) return false;
+						setDirectoriesOpen(open => !open);
 					},
 					thinking: () => {
 						const levels = switchingModel ? [] : switchable?.thinkingLevels ?? [];
@@ -266,16 +278,30 @@ function LiveConversation({
 					}}
 					onSend={sendText}
 					leftSlot={
-						<ModelSlot
-							subject={subject}
-							models={models}
-							open={modelsOpen}
-							onOpenChange={openModels}
-							switching={switchingModel}
-							onSetModel={(model, level) => send({ t: "set-model", instanceId: view.instanceId, model, thinking: level })}
-							onSetThinking={setThinking}
-							onSetFast={enabled => send({ t: "set-fast", instanceId: view.instanceId, enabled })}
-						/>
+						<>
+							<ModelSlot
+								subject={subject}
+								models={models}
+								open={modelsOpen}
+								onOpenChange={openModels}
+								switching={switchingModel}
+								onSetModel={(model, level) => send({ t: "set-model", instanceId: view.instanceId, model, thinking: level })}
+								onSetThinking={setThinking}
+								onSetFast={enabled => send({ t: "set-fast", instanceId: view.instanceId, enabled })}
+							/>
+							{switchable && shown && (
+								<DirectoryPicker
+									cwd={shown.cwdDisplay}
+									workspaces={workspaces}
+									disabled={!movable}
+									tooltip={movable ? shown.cwdDisplay : `${shown.cwdDisplay} · Move the session once the turn ends`}
+									shortcut="directory"
+									open={directoriesOpen}
+									onOpenChange={setDirectoriesOpen}
+									onPick={dir => send({ t: "prompt", view, text: `/move ${dir}`, images: [], delivery: "steer" })}
+								/>
+							)}
+						</>
 					}
 					files={attachable ? attachments.files : undefined}
 					onFilesChange={attachable ? attachments.onFilesChange : undefined}

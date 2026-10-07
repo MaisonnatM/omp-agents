@@ -5,6 +5,7 @@ import { defaultCwd, discoverableSessions, listedViews, projectSession, projectS
 const host = (sessionId: string, cwd: string) => ({ instanceId: `i-${sessionId}`, sessionId, cwd }) as RosterHost;
 const past = (sessionId: string, cwd: string, interrupted: boolean) => ({ sessionId, cwd, interrupted }) as PastSession;
 const ids = (rows: { sessionId: string }[]) => rows.map(row => row.sessionId);
+const none = new Set<string>();
 
 describe("discoverableSessions", () => {
 	test("hides temporary roots and descendants but keeps lookalikes and directories named tmp elsewhere", () => {
@@ -25,9 +26,15 @@ describe("discoverableSessions", () => {
 		];
 		const hosts = paths.map((cwd, index) => host(`h${index}`, cwd));
 		const sessions = paths.map((cwd, index) => past(`p${index}`, cwd, index % 2 === 0));
-		const visible = discoverableSessions(hosts, sessions);
+		const visible = discoverableSessions(hosts, sessions, none);
 		expect(visible.hosts.map(row => row.cwd)).toEqual(["/tmp-project", "/private/tmp-project", "/home/user/tmp", "/home/user/tmp/project/", ""]);
 		expect(visible.past.map(row => row.cwd)).toEqual(["/tmp-project", "/private/tmp-project", "/home/user/tmp", "/home/user/tmp/project/", ""]);
+	});
+
+	test("a hidden project hides its own sessions, not those of the directories inside it", () => {
+		const hosts = [host("a", "/home/user/app"), host("b", "/home/user/app/web"), host("c", "/home/user/other")];
+		expect(discoverableSessions(hosts, [], new Set(["/home/user/app"])).hosts.map(row => row.cwd)).toEqual(["/home/user/app/web", "/home/user/other"]);
+		expect(projectSwitch("/home/user/other", "/home/user/app", new Set(["/home/user/app"]))).toBeNull();
 	});
 
 	test("hidden sessions stay out of pinned and interrupted lists without losing saved rows", () => {
@@ -40,7 +47,7 @@ describe("discoverableSessions", () => {
 			past("interrupted", "~/project", true),
 			past("ended", "~/project", false),
 		];
-		const visible = discoverableSessions(hosts, sessions);
+		const visible = discoverableSessions(hosts, sessions, none);
 		const lists = sidebarSessions(
 			visible.hosts,
 			visible.past,
@@ -60,12 +67,12 @@ describe("discoverableSessions", () => {
 
 	test("a temp cwd is not a project switch", () => {
 		for (const cwd of ["/tmp", "/tmp/", "/tmp/job", "/private/tmp", "/private/tmp/", "/private/tmp/job"]) {
-			expect(projectSwitch("~/app", cwd)).toBeNull();
+			expect(projectSwitch("~/app", cwd, none)).toBeNull();
 		}
-		expect(projectSwitch("~/app", "/tmp-project")).toBe("/tmp-project");
-		expect(projectSwitch("~/app", "~/other")).toBe("~/other");
-		expect(projectSwitch(null, "~/other")).toBeNull();
-		expect(projectSwitch("~/app", "~/app")).toBeNull();
+		expect(projectSwitch("~/app", "/tmp-project", none)).toBe("/tmp-project");
+		expect(projectSwitch("~/app", "~/other", none)).toBe("~/other");
+		expect(projectSwitch(null, "~/other", none)).toBeNull();
+		expect(projectSwitch("~/app", "~/app", none)).toBeNull();
 	});
 });
 

@@ -3,7 +3,7 @@ import type { ClientMsg } from "../shared/protocol";
 import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseClientMsg, parseGoogleClient, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
+import { parseClientMsg, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -270,6 +270,20 @@ describe("parseClientMsg", () => {
 	});
 });
 
+describe("parseProjectChange", () => {
+	test("adds a directory by any path the server then resolves, and hides or shows one by its absolute path", () => {
+		expect(parseProjectChange({ op: "add", cwd: "~/code/app" })).toEqual({ op: "add", cwd: "~/code/app" });
+		expect(parseProjectChange({ op: "hide", cwd: "/home/user/app" })).toEqual({ op: "hide", cwd: "/home/user/app" });
+		expect(parseProjectChange({ op: "show", cwd: "/home/user/app" })).toEqual({ op: "show", cwd: "/home/user/app" });
+	});
+
+	test("rejects hiding or showing a relative path, an unknown op, and an empty directory", () => {
+		expect(parseProjectChange({ op: "hide", cwd: "~/code/app" })).toBeNull();
+		expect(parseProjectChange({ op: "show", cwd: "app" })).toBeNull();
+		expect(parseProjectChange({ op: "remove", cwd: "/home/user/app" })).toBeNull();
+		expect(parseProjectChange({ op: "add", cwd: "" })).toBeNull();
+	});
+});
 describe("parsePullRequestQuery", () => {
 	const query = (qs: string) => parsePullRequestQuery(new URLSearchParams(qs));
 

@@ -279,7 +279,7 @@ interface RoutinesPageProps {
 	/** The routine whose settings and runs show, `null` for the list. */
 	target: string | null;
 	hosts: RosterHost[];
-	/** Directories sessions ran in, which the editor's workspace picker offers. */
+	/** The projects, which the editor's workspace picker offers. */
 	workspaces: { cwd: string; cwdDisplay: string }[];
 	/** Where a new routine's sessions start until you pick another directory. */
 	defaultCwd: string;

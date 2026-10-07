@@ -69,7 +69,8 @@ const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_chang
 export class DashboardSession implements LiveSession {
 	readonly instanceId: string;
 	readonly startedAt = Date.now();
-	readonly cwd: string;
+	/** Where omp works; a `/move` changes it. */
+	cwd: string;
 	readonly pid: number;
 	sessionId: string;
 	sessionFile: string | null;
@@ -485,12 +486,29 @@ export class DashboardSession implements LiveSession {
 	async #readModelState(failure: string | null): Promise<void> {
 		try {
 			const [state, levels] = await Promise.all([this.#child.client.getState(), this.#child.client.getAvailableThinkingLevels()]);
+			const moved = await this.#follow(state);
 			this.#applyState(state);
 			this.thinkingLevels = levels;
-			this.#emit({ kind: "roster" });
+			this.#emit({ kind: moved ? "switched" : "roster" });
 		} catch (err) {
 			if (failure) this.#fail(failure, err);
 		}
+	}
+
+	/** Whether omp now holds another file, as after `/move`; the session then works where that file's header says. */
+	async #follow(state: RpcState): Promise<boolean> {
+		const file = state.sessionFile ?? null;
+		if (file === this.sessionFile) return false;
+		// omp writes a moved session with no reply yet only with that reply, so the session follows on a later read.
+		if (file && !statSync(file, { throwIfNoEntry: false })) return false;
+		const cwd = file ? await recordedCwd(file) : this.cwd;
+		this.sessionFile = file;
+		this.cwd = cwd;
+		if (state.sessionId !== this.sessionId) {
+			this.sessionId = state.sessionId;
+			this.#agents.clear();
+		}
+		return true;
 	}
 
 	#setActivity(activity: "working" | "idle"): void {

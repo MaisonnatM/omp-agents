@@ -1,15 +1,12 @@
 import { Folder } from "lucide-react";
 import { useState } from "react";
+import type { Project } from "../../src/shared/projects";
 import { projectName } from "../labels";
+import type { ShortcutId } from "../shortcuts";
 import { CommandPicker, type PickerItem } from "./command-picker";
 
-export interface Workspace {
-	cwd: string;
-	cwdDisplay: string;
-}
-
 /** The same visible directory row and search words for the roster and the new-session picker. */
-export function workspaceItems(workspaces: Workspace[], current: string | null, onPick: (workspace: Workspace) => void): PickerItem[] {
+export function workspaceItems(workspaces: Project[], current: string | null, onPick: (workspace: Project) => void): PickerItem[] {
 	return workspaces.map(workspace => ({
 		value: workspace.cwd,
 		keywords: [workspace.cwdDisplay],
@@ -26,15 +23,22 @@ export function workspaceItems(workspaces: Workspace[], current: string | null, 
 
 interface DirectoryPickerProps {
 	cwd: string;
-	workspaces: Workspace[];
+	workspaces: Project[];
 	disabled: boolean;
+	/** What hovering the trigger says; `cwd` when omitted. */
+	tooltip?: string;
+	/** The shortcut that opens the list, which the tooltip shows; the caller binds it through `open`. */
+	shortcut?: ShortcutId;
 	/** Which side of the trigger the list opens on; the composer's opens upward. */
 	side?: "top" | "bottom";
+	/** Controlled when given, as a shortcut opens the list. */
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
 	onPick: (cwd: string) => void;
 }
 
-/** The directory the session starts in: one a session ran in, or any directory typed into the search field. */
-export function DirectoryPicker({ cwd, workspaces, disabled, side = "top", onPick }: DirectoryPickerProps) {
+/** A working directory: a project the dashboard lists, or any directory typed into the search field. */
+export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shortcut, side = "top", open, onOpenChange, onPick }: DirectoryPickerProps) {
 	const [query, setQuery] = useState("");
 	const typed = query.trim();
 	const pick = (next: string): void => {
@@ -45,21 +49,24 @@ export function DirectoryPicker({ cwd, workspaces, disabled, side = "top", onPic
 			trigger={<span className="truncate">{projectName(cwd) ?? cwd}</span>}
 			icon={Folder}
 			ariaLabel={`Working directory: ${cwd}`}
-			tooltip={cwd}
+			tooltip={tooltip}
+			shortcut={shortcut}
 			disabled={disabled}
 			className="min-w-0"
 			search={{ label: "Search or type a directory", query: { value: query, onChange: setQuery } }}
 			width="lg"
 			side={side}
+			open={open}
 			onOpenChange={next => {
 				if (!next) setQuery("");
+				onOpenChange?.(next);
 			}}
 			list={{
 				kind: "ready",
 				groups: [
 					{
 						key: "workspaces",
-						heading: "Directories sessions ran in",
+						heading: "Projects",
 						items: workspaceItems(workspaces, cwd, workspace => pick(workspace.cwdDisplay)),
 					},
 					...(typed && !workspaces.some(w => w.cwd === typed || w.cwdDisplay === typed)

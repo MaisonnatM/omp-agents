@@ -11,6 +11,7 @@ import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../sh
 import type { BranchChoice } from "../shared/git";
 import type { PullRequest } from "../shared/github";
 import type { ModelOption } from "../shared/models";
+import type { ProjectChange } from "../shared/projects";
 import type { ClientMsg } from "../shared/protocol";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues } from "../shared/tickets";
@@ -469,4 +470,12 @@ export function parseWorktreeRemoval(body: unknown): WorktreeRemovalRequest | nu
 		plans.push({ ...target, confirmation });
 	}
 	return { action: "remove", plans };
+}
+
+const isProjectOp = oneOf(["add", "hide", "show"] as const);
+
+/** The body of `PUT /api/projects`: `{ op, cwd }`. Adding takes any path a new session takes; hiding and showing name an absolute directory. */
+export function parseProjectChange(body: unknown): ProjectChange | null {
+	if (!isObject(body) || !isProjectOp(body.op) || !isNonEmpty(body.cwd)) return null;
+	return body.op === "add" || body.cwd.startsWith("/") ? { op: body.op, cwd: body.cwd } : null;
 }

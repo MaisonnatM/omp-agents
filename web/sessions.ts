@@ -1,24 +1,25 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
+import type { Project } from "../src/shared/projects";
 import { type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 
 const HIDDEN_ROOTS = ["/tmp", "/private/tmp"];
 
-/** A working directory outside `/tmp` and `/private/tmp`, including their descendants. */
-export function discoverableCwd(cwd: string): boolean {
-	return !HIDDEN_ROOTS.some(root => cwd === root || cwd.startsWith(`${root}/`));
+/** A working directory outside `/tmp` and `/private/tmp`, including their descendants, and not one Settings → Projects hid. */
+export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boolean {
+	return !hidden.has(cwd) && !HIDDEN_ROOTS.some(root => cwd === root || cwd.startsWith(`${root}/`));
 }
 
 /** The running sessions that work on `item`: their tool calls named it, or a quick action on it started them. */
 export const sessionsOn = (item: WorkItem, hosts: RosterHost[]): RosterHost[] => hosts.filter(host => worksOn(host, item));
 
-export function discoverableSessions(hosts: RosterHost[], past: PastSession[]): { hosts: RosterHost[]; past: PastSession[] } {
-	const listed = <T extends { cwd: string }>(rows: T[]): T[] => rows.filter(row => discoverableCwd(row.cwd));
+export function discoverableSessions(hosts: RosterHost[], past: PastSession[], hidden: ReadonlySet<string>): { hosts: RosterHost[]; past: PastSession[] } {
+	const listed = <T extends { cwd: string }>(rows: T[]): T[] => rows.filter(row => discoverableCwd(row.cwd, hidden));
 	return { hosts: listed(hosts), past: listed(past) };
 }
 
-/** The project a started or picked session switches to, so it stays listed. `null` keeps the current project; a temporary directory is not a switch. */
-export function projectSwitch(project: string | null, cwd: string): string | null {
-	if (project === null || cwd === project || !discoverableCwd(cwd)) return null;
+/** The project a started or picked session switches to, so it stays listed. `null` keeps the current project; a temporary or hidden directory is not a switch. */
+export function projectSwitch(project: string | null, cwd: string, hidden: ReadonlySet<string>): string | null {
+	if (project === null || cwd === project || !discoverableCwd(cwd, hidden)) return null;
 	return cwd;
 }
 
@@ -49,10 +50,10 @@ export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSes
 	return chosen?.cwdDisplay ?? "~";
 }
 
-/** Directories sessions ran in, live ones first, then past ones newest first. The settings page reads a workspace from one. */
-export function workspaces(hosts: RosterHost[], past: PastSession[]): { cwd: string; cwdDisplay: string }[] {
+/** Directories sessions ran in, live ones first, then past ones newest first, then the ones Settings → Projects added. The settings page reads a workspace from one. */
+export function workspaces(hosts: RosterHost[], past: PastSession[], added: readonly Project[]): Project[] {
 	const byCwd = new Map<string, string>();
-	for (const row of [...hosts.toSorted(newestFirst), ...past]) {
+	for (const row of [...hosts.toSorted(newestFirst), ...past, ...added]) {
 		// Sessions from old omp versions recorded no directory.
 		if (row.cwd && !byCwd.has(row.cwd)) byCwd.set(row.cwd, row.cwdDisplay);
 	}

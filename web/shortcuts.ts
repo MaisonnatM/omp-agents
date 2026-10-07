@@ -11,6 +11,7 @@ export type ShortcutId =
 	| "previousSession"
 	| "nextSession"
 	| "model"
+	| "directory"
 	| "thinking"
 	| "tools"
 	| "hideTools"
@@ -101,6 +102,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	{ id: "nextSession", label: "Open the next session in the sidebar", command: "Open next session", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
 	{ id: "model", label: "Choose the session's model", keys: [{ chord: { key: "/", mod: true, alt: true }, scope: "anywhere" }] },
+	{ id: "directory", label: "Choose the session's working directory", keys: [{ chord: { key: "p", mod: true, alt: true }, scope: "anywhere" }] },
 	{ id: "thinking", label: "Cycle the thinking level", keys: [{ chord: { key: "Tab", shift: true }, scope: "composer" }] },
 	{ id: "tools", label: "Expand or collapse tool calls", command: "Toggle tool calls", keys: [{ chord: { key: "e", mod: true }, scope: "anywhere" }] },
 	{

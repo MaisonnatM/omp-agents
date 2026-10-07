@@ -19,6 +19,7 @@ import {
 	Wrench,
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useRef } from "react";
+import type { Project } from "../../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import {
 	type Accessory,
@@ -46,7 +47,6 @@ import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } 
 import { useStoredState } from "../../stored-state";
 import { useDashboardContext } from "../dashboard-context";
 import { StatusDot } from "../status-dot";
-import type { Workspace } from "../workspace-picker";
 import { ActionPanel } from "./action-panel";
 import { Kbd, PaletteFooter } from "./palette-footer";
 
@@ -74,8 +74,8 @@ interface CommandPaletteProps {
 	dispatch: (event: PaletteEvent) => void;
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** Directories sessions ran in, as the sidebar's project picker lists them. */
-	projects: Workspace[];
+	/** The projects, as the sidebar's project picker lists them. */
+	projects: Project[];
 	/** The sidebar's project, or `null` for all projects. */
 	project: string | null;
 	/** Open `view`, whose session ran in `cwd`, and keep it listed by switching the sidebar to its project. */

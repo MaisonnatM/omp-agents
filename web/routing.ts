@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { BarChart3, FileText, GitBranch, Plug, Route as RouteIcon, SlidersHorizontal } from "lucide-react";
+import { BarChart3, FileText, Folders, GitBranch, Plug, Route as RouteIcon, SlidersHorizontal } from "lucide-react";
 import type { PullRequest } from "../src/shared/github";
 import { type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
 import { TICKET_ID } from "../src/shared/tickets";
@@ -40,6 +40,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "analytics", label: "Analytics", icon: BarChart3, scope: "general" },
 	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, scope: "general" },
 	{ value: "integrations", label: "Integrations", icon: Plug, scope: "general" },
+	{ value: "projects", label: "Projects", icon: Folders, scope: "general" },
 	{ value: "models", label: "Models", icon: RouteIcon, scope: "workspace" },
 	{ value: "files", label: "Files", icon: FileText, scope: "workspace" },
 	{ value: "worktrees", label: "Worktrees", icon: GitBranch, scope: "workspace" },

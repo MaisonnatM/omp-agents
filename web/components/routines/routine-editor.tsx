@@ -128,7 +128,7 @@ function ScheduleEditor({
 interface RoutineEditorProps {
 	initial: RoutineDraft;
 	isNew: boolean;
-	/** Directories sessions ran in, which the workspace picker offers. */
+	/** The projects, which the workspace picker offers. */
 	workspaces: { cwd: string; cwdDisplay: string }[];
 	connected: boolean;
 	onSave: (routine: RoutineSpec) => void;

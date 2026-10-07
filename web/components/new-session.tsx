@@ -27,7 +27,7 @@ import { DirectoryPicker } from "./workspace-picker";
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
 	cwd: string;
-	/** Directories sessions ran in, as {@link workspaces} lists them, which the directory picker offers. */
+	/** The projects, as {@link workspaces} lists them, which the directory picker offers. */
 	workspaces: { cwd: string; cwdDisplay: string }[];
 	launch: StartOf<"new"> | null;
 	connected: boolean;
@@ -76,6 +76,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	// Reopening reads credentials and model capabilities again after a provider login.
 	const [modelOpens, setModelOpens] = useState(0);
 	const modelsRead = useRead<ConnectedModels>(`/api/models/connected?cwd=${encodeURIComponent(cwd)}`, modelOpens);
+	const [directoriesOpen, setDirectoriesOpen] = useState(false);
 	const shownSelector = shownModel ? selectorOf(shownModel) : null;
 	const levels = modelsRead.data?.models.find(model => selectorOf(model) === shownSelector)?.thinkingLevels ?? null;
 	const thinking = pickedThinking?.model === shownSelector && levels?.includes(pickedThinking.level) ? pickedThinking.level : null;
@@ -99,6 +100,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		model: () => {
 			if (starting || !connected) return false;
 			openModels("models");
+		},
+		directory: () => {
+			if (starting) return false;
+			setDirectoriesOpen(open => !open);
 		},
 		thinking: () => {
 			if (starting || !connected || modelsRead.error !== null || !levels?.length) return false;
@@ -172,7 +177,15 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 								effort={{ current: thinking, levels: modelsRead.error === null ? levels : [], onPick: pickThinking, allowDefault: true }}
 								disabled={starting || !connected}
 							/>
-							<DirectoryPicker cwd={cwd} workspaces={workspaces} disabled={starting} onPick={onPickCwd} />
+							<DirectoryPicker
+								cwd={cwd}
+								workspaces={workspaces}
+								disabled={starting}
+								shortcut="directory"
+								open={directoriesOpen}
+								onOpenChange={setDirectoriesOpen}
+								onPick={onPickCwd}
+							/>
 							{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 							{pinnedSkill !== null && <PinnedSkillToggle name={pinnedSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 						</>

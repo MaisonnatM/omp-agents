@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DashboardSession, type DashboardUpdate } from "./dashboard-session";
 import type { Frame } from "./omp/collab";
 import * as rpc from "./omp/rpc";
@@ -136,6 +139,34 @@ describe("DashboardSession state refresh", () => {
 		await settle();
 		expect(session.switching).toBe(false);
 		expect(session.sessionName).toBe("second");
+	});
+
+	test("after a /move the session keeps omp's other state, then follows the new file once omp writes it, into the directory its header records", async () => {
+		const dir = mkdtempSync(join(tmpdir(), "omp-agents-move-"));
+		try {
+			const client = new FakeClient();
+			fakeOmp(client);
+			const switched = Promise.withResolvers<void>();
+			const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => {
+				if (update.kind === "switched") switched.resolve();
+			});
+			const file = join(dir, "moved.jsonl");
+			client.getState = async () => ({ ...STATE, sessionFile: file, sessionName: "moved" });
+
+			client.fire({ type: "turn_end" });
+			await settle();
+			expect(session.sessionName).toBe("moved");
+			expect(session.sessionFile).toBeNull();
+			expect(session.cwd).toBe("/tmp/project");
+
+			writeFileSync(file, `${JSON.stringify({ type: "session", id: "session-1", cwd: dir })}\n`);
+			client.fire({ type: "turn_end" });
+			await switched.promise;
+			expect(session.sessionFile).toBe(file);
+			expect(session.cwd).toBe(dir);
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
 	});
 });
 

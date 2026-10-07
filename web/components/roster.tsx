@@ -39,7 +39,7 @@ export function useProject(projects: { cwd: string }[]): [string | null, (cwd: s
 	return [projects.some(({ cwd }) => cwd === stored) ? stored : null, pick];
 }
 interface ProjectPickerProps {
-	/** Directories sessions ran in, as {@link workspaces} lists them. */
+	/** The projects, as {@link workspaces} lists them. */
 	projects: { cwd: string; cwdDisplay: string }[];
 	/** The selected project's `cwd`, or `null` for all projects. */
 	current: string | null;
@@ -140,7 +140,7 @@ const SIDEBAR_TAB_FIT = {
 
 
 interface RosterProps {
-	/** Directories sessions ran in, as {@link workspaces} lists them. */
+	/** The projects, as {@link workspaces} lists them. */
 	projects: { cwd: string; cwdDisplay: string }[];
 	/** The sessions tab's lists, under the selected project and matching `query`. */
 	lists: SidebarSessions;

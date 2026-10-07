@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, the inbox, pull requests, git checkouts, worktrees,
- * the machine's load, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
+ * the projects Settings adds and hides, the machine's load, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
  */
 import { join } from "node:path";
 import { buildAnalytics, type SessionFacts as AnalyticsSessionFacts } from "../analytics";
@@ -24,13 +24,14 @@ import { ClientConfigError } from "../omp/mcp";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
+import type { ProjectChange } from "../shared/projects";
 import { PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseGoogleClient, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -41,6 +42,10 @@ export interface RouteEnv {
 	guards: Guards;
 	/** Directories sessions ran in: live ones first, then saved ones newest first. */
 	knownCwds(): string[];
+	/** The directories Settings → Projects added, which the page names as workspaces before any session runs there. */
+	addedCwds(): string[];
+	/** Apply `change` to the projects and send every socket the projects after it. */
+	changeProjects(change: ProjectChange): void;
 	worktrees: Worktrees;
 	/** The listed file of a session, for Analytics' title and working directory. */
 	savedOf(sessionId: string): AnalyticsSessionFacts | null;
@@ -64,11 +69,11 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 
 	/**
 	 * The `cwd` a request names, `null` when it names none, or the response refusing it. `cwd` must be a
-	 * directory some session ran in: the page names workspaces that way, as it names sessions by id.
+	 * directory some session ran in or Settings → Projects added: the page names workspaces that way, as it names sessions by id.
 	 */
 	function workspaceCwd(params: URLSearchParams): string | null | Response {
 		const cwd = params.get("cwd");
-		return cwd === null || knownCwds().includes(cwd) ? cwd : fail(404, `No session ran in ${cwd}`);
+		return cwd === null || knownCwds().includes(cwd) || env.addedCwds().includes(cwd) ? cwd : fail(404, `No session ran in ${cwd}`);
 	}
 
 	/** The directory `?cwd=` names, or the response refusing it. Like a new session, `cwd` may name any directory. */
@@ -353,6 +358,18 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return answer(async () => ({ results: await env.worktrees.remove(body.plans) }));
 	};
 
+	/** `PUT /api/projects` `{ op, cwd }`: add a directory as a project, or hide or show one. */
+	const projectChange: Handler = async req => {
+		const write = await guards.writeBody(req);
+		if (write instanceof Response) return write;
+		const change = parseProjectChange(write.body);
+		if (!change) return fail(400, "Expected { op, cwd } with op add, hide, or show");
+		const cwd = change.op === "add" ? directoryOf(change.cwd) : change.cwd;
+		if (!cwd) return fail(400, `${change.cwd.trim()} is not a directory.`);
+		env.changeProjects({ op: change.op, cwd });
+		return Response.json({});
+	};
+
 	return {
 		"/api/settings": { GET: settings },
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
@@ -383,6 +400,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/worktrees": { GET: worktreeInventory },
 		"/api/worktrees/metrics": { GET: worktreeMetrics },
 		"/api/worktrees/removal": { PUT: worktreeRemoval },
+		"/api/projects": { PUT: projectChange },
 		"/api/git": { GET: git },
 		"/api/system": { GET: system },
 		"/api/image": { GET: image },
