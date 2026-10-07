@@ -540,12 +540,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - Click a row to replace the tickets list with the issue's details in the main content.
   The page header then names the issue: its identifier, with its title under it, after a back arrow.
   The back arrow, **Back to tickets**, stays in the header while the details scroll, and returns to the list with its folded states preserved.
-  The detail view shows the title, the state, the priority, the assignee, the project, the due date, the labels, who opened the issue and when, the description, Linear's branch name for it, the links Linear keeps for it (such as its pull requests), and the comment threads, with a link to the issue on Linear.
+  The detail view lays the issue out as Linear does: the title, the description, and the comment threads in a wide column, and beside it the quick actions, the state, the priority, the assignee, the due date, the labels as chips, the project, Linear's branch name for it, the links Linear keeps for it (a pull request with its own icon), who opened the issue and when, and a link to the issue on Linear.
+  On a page narrower than the side column needs, its groups sit two by two between the title and the description.
   Each opening reads the issue again through Linear's `get_issue` and `list_comments` tools.
   Linear's issue mentions in the text become links.
   Its images show in place, its screen recordings play in a video player, and another embedded file becomes a link to download it.
   The dashboard's server fetches each of these files from Linear, so a video still plays and seeks after Linear's five-minute link to it expires.
-- Once Linear has answered, each field under the issue's title is a button that changes the issue in Linear: the state, the priority, the assignee, the project, and the labels open a list to search and pick from, and the due date opens a date field with **Set** and **Clear**.
+- Once Linear has answered, each field in the side column is a button that changes the issue in Linear: the state, the priority, the assignee, the project, and the labels open a list to search and pick from, and the due date opens a date field with **Set** and **Clear**.
   Labels toggle, and their list stays open for several.
   A change shows at once and saves in turn after the ones before it.
   The tickets list reads Linear again after each save, so an issue you assign to someone else leaves it.

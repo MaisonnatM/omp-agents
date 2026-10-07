@@ -113,6 +113,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 				backHref={hashForTickets(null)}
 				backLabel="Back to tickets"
 				notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
+				className="max-w-6xl pt-8"
 			>
 				<TicketDetailContent
 					key={target}

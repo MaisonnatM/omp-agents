@@ -60,7 +60,8 @@ function dayLabel(iso: string): string {
 /** The element id of an issue's row, used to restore focus after its details close. */
 export const ticketRowId = (id: string): string => `ticket-${id}`;
 
-const CHIP = "flex h-6 min-w-0 max-w-48 items-center gap-1.5 rounded-full border border-border px-2.5 text-xs text-muted-foreground";
+/** A pill for a value on an issue: a label, the project, or the due date. */
+export const TICKET_CHIP = "flex h-6 min-w-0 max-w-48 items-center gap-1.5 rounded-full border border-border px-2.5 text-xs text-muted-foreground";
 
 interface TicketRowProps {
 	ticket: Ticket;
@@ -87,19 +88,19 @@ export function TicketRow({ ticket, sessions, onOpen, pending, onQuickAction }: 
 				{/* Chips that do not fit wrap onto a second line that the fixed height hides, so the title keeps its room. */}
 				<span className="hidden h-6 min-w-0 shrink-[100] flex-wrap justify-end gap-1.5 overflow-hidden @2xl:flex">
 					{ticket.dueDate && (
-						<span className={CHIP} title={`Due ${ticket.dueDate}`}>
+						<span className={TICKET_CHIP} title={`Due ${ticket.dueDate}`}>
 							<Calendar aria-hidden className="size-3.5 shrink-0" />
 							<span className="truncate">{dueLabel(ticket.dueDate)}</span>
 						</span>
 					)}
 					{ticket.labels.map(({ name, color }) => (
-						<span key={name} className={CHIP}>
+						<span key={name} className={TICKET_CHIP}>
 							<span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color || "var(--muted-foreground)" }} />
 							<span className="truncate">{name}</span>
 						</span>
 					))}
 					{ticket.project && (
-						<span className={CHIP} title={ticket.project}>
+						<span className={TICKET_CHIP} title={ticket.project}>
 							<Box aria-hidden className="size-3.5 shrink-0" />
 							<span className="truncate">{ticket.project}</span>
 						</span>

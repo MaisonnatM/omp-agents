@@ -41,10 +41,12 @@ interface DetailPageProps {
 	/** What the page tells above its content: a quick action's notice, or why the item is not listed. */
 	notice?: ReactNode;
 	children: ReactNode;
+	/** Classes for the column that holds the content: a width other than the reading width. */
+	className?: string;
 }
 
 /** A page for one item of a list, a pull request or an issue: the frame with a back arrow to the list, `notice`, and the item's content. */
-export function DetailPage({ title, meta, backHref, backLabel, notice, children }: DetailPageProps) {
+export function DetailPage({ title, meta, backHref, backLabel, notice, children, className }: DetailPageProps) {
 	const back = (
 		<Tooltip content={backLabel} side="bottom">
 			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label={backLabel} render={<a href={backHref} />}>
@@ -55,7 +57,7 @@ export function DetailPage({ title, meta, backHref, backLabel, notice, children 
 	return (
 		<PageFrame title={title} meta={meta} leading={back}>
 			<TooltipProvider>
-				<div className="mx-auto w-full max-w-5xl space-y-6 px-6 py-6">
+				<div className={cn("mx-auto w-full max-w-5xl space-y-6 px-6 py-6", className)}>
 					{notice}
 					{children}
 				</div>
