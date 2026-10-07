@@ -455,7 +455,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The inbox covers the GitHub repository of the project that the sidebar's picker shows, or under **All projects** every repository that a session ran in, one section per repository.
   A workspace's repository is the one its `origin` remote names.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
-  They sort by whose move it is: **Your move**, **Agent on it**, **Waiting on others**, and **Recently merged**.
+  They sort by whose move it is: **Your move**, **Agent on it**, **Waiting on others**, **Drafts**, and **Recently merged**.
   A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, and its checks.
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
   The inbox page's table shows each section as a card, one row per pull request: the move's badge, the title with its author, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, and its age.
@@ -471,7 +471,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   It is **CI running** while its checks run, and **In review** otherwise, with the reviewers it still waits on as the reason.
   Once you ask every reviewer who requested changes for a new review, the pull request is **In review** again, though GitHub still reports the change request until they review again.
   **Review**, **Merge**, **Fix CI**, **Rebase**, and **Reply** are your moves, in that order within **Your move**.
-  **Answer** and **Working** are the agent's, and **In review**, **CI running**, and **Draft** wait on others.
+  **Answer** and **Working** are the agent's, **In review** and **CI running** wait on others, and **Draft** has its own section, **Drafts**.
   Within a section, the pull requests of each move are most recently updated first.
   When the inbox lists another pull request of its stack, the row shows its place from the bottom, such as `2/4`, and its tooltip names the branch it is stacked on; otherwise a row stacked on another branch names it, as in `on fix/base`.
   Within a section, a stack's pull requests sit together, top first, where its first one would, and a line joins each to the one below it.
@@ -487,7 +487,6 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
   A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository the inbox could not read.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
-  A line under the list shows the inbox's main keys.
   Click the title to show the pull request's details in the main area; the back arrow at the start of the page header, **Back to the inbox**, brings the inbox page back.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Inbox** tab's count stays current.
@@ -503,7 +502,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
 - The details of a pull request lay out like Graphite's: the repository and number above the title, then its author, the branch and the one it merges into, its files, the lines added and removed, and when it opened.
   Beside them, a column shows its state with links to it on GitHub and on Graphite, then its **Next move**: the move's badge, its reason, and one button that makes it.
-  The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**.
+  The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**; a **Rebase** whose checks also failed offers **Fix CI and conflicts**.
   **Merge** offers **Merge on GitHub**, and **Answer** and **Working** offer **Open the session**.
   Under it, **Status** shows what stands between the pull request and its merge: **Ready to merge**, a draft, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first.
   A blocker that another quick action works on carries that action's button, and **Actions** at the bottom of the column keeps the other actions with the sessions on the pull request.
@@ -532,7 +531,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The inbox stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   The chip stays while the session runs, after a reload too, so the row says whether an agent still works on the pull request.
   The session also shows in the sessions sidebar.
-  Which actions show depends on the pull request: **Fix CI** on your own open pull request whose checks failed, **Resolve conflicts** on your own open pull request with merge conflicts, **Address comments** on your own open pull request with unresolved review threads or requested changes, **Review** on an open pull request that waits for your review, and **Thermonuclear review** on every open or draft pull request.
+  Which actions show depends on the pull request: **Fix CI and conflicts** on your own open pull request with merge conflicts and failed checks, **Fix CI** on your own open pull request whose checks failed, **Resolve conflicts** on your own open pull request with merge conflicts, **Address comments** on your own open pull request with unresolved review threads or requested changes, **Review** on an open pull request that waits for your review, and **Thermonuclear review** on every open or draft pull request.
+  **Fix CI and conflicts** rebases the branch and resolves its conflicts first, then fixes the checks that still fail on the rebased branch, in one session.
   **Thermonuclear review** runs the `thermonuclear-reviewer` agent on the pull request's diff.
   On your own pull request, the session then applies the valid findings on its branch, pushes them, and only after the push adds `- [x] Thermo-nuclear code quality review` to its description; on a pull request you review, it reports the findings in the session and changes nothing on GitHub.
   A merged pull request has none.

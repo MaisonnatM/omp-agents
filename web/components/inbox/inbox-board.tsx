@@ -1,13 +1,12 @@
 /** What the inbox's two lists share, the sidebar's and the page's: their state, their keys, and the board they render. */
 import { ArrowDownUp, Unplug } from "lucide-react";
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { pullRequestActions } from "../../../src/pull-request-actions";
 import { type Inbox, type InboxPullRequest, type PullRequest, prKey, pullRequestUrl, type RepoInbox, repoKey, samePullRequest } from "../../../src/shared/github";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 import {
 	type AgentOn,
 	agentOn,
@@ -40,7 +39,7 @@ import type { PolledEntry } from "../../polled-store";
 import { inboxStore } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { type SectionTarget, sectionId } from "../../section";
-import { shortcutLabels, useShortcuts } from "../../shortcuts";
+import { useShortcuts } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { type DragItem, useDragOrder } from "../../use-drag-order";
 import { useDashboardContext } from "../dashboard-context";
@@ -61,28 +60,6 @@ export const useInboxFolds = (): Folds => useFolds(FOLDS_KEY, foldedByDefault);
 
 /** Moves a focused heading or row one place; `false` at the edge. */
 type Move = (by: 1 | -1) => boolean;
-
-const Key = ({ children }: { children: ReactNode }) => (
-	<kbd className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-[5px] border border-border bg-background px-1 font-sans text-[11px]">{children}</kbd>
-);
-
-/** The inbox's main keys, pinned under the list while it scrolls; `className` gives it the background it sits on. */
-export function KeysFooter({ className }: { className: string }) {
-	const [next] = shortcutLabels("nextPullRequest");
-	const [previous] = shortcutLabels("previousPullRequest");
-	const [give] = shortcutLabels("giveToAgent");
-	return (
-		<p className={cn("sticky bottom-0 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-border px-3 py-2 text-xs text-muted-foreground", className)}>
-			<Key>{next}</Key>
-			<Key>{previous}</Key>
-			<span className="mr-1.5">move</span>
-			<Key>↵</Key>
-			<span className="mr-1.5">details</span>
-			<Key>{give}</Key>
-			<span>give to agent</span>
-		</p>
-	);
-}
 
 /** The fold keys of the repository and the section that list `pr`, or `null` when the inbox does not list it. */
 function placeOf(inbox: Inbox, pr: PullRequest, agent: AgentOn): { repo: string; section: string } | null {

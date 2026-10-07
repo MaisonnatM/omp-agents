@@ -17,7 +17,7 @@ import { useDashboardContext } from "../dashboard-context";
 import { FoldButton } from "../fold";
 import { QuickStartNotice } from "../quick-actions";
 import { SectionLink } from "../section-link";
-import { inboxSection, KeysFooter, type RepoView, type SectionView, SortMenu, UnmatchedTip, useInboxBoard, useInboxOrder, workspacesLabel } from "./inbox-board";
+import { inboxSection, type RepoView, type SectionView, SortMenu, UnmatchedTip, useInboxBoard, useInboxOrder, workspacesLabel } from "./inbox-board";
 import { PullRequestRow } from "./pr-row";
 
 const note = (text: string) => <p className="px-3 py-1 text-xs text-muted-foreground">{text}</p>;
@@ -138,7 +138,6 @@ export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
 			{board.repos.map(view => (
 				<RepoBlock key={view.key} view={view} />
 			))}
-			<KeysFooter className="bg-sidebar" />
 		</div>
 	);
 }

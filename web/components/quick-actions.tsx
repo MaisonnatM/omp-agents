@@ -1,4 +1,4 @@
-import { CircleX, Eye, GitMerge, Hammer, ListChecks, type LucideIcon, MessageSquare, Radiation, Zap } from "lucide-react";
+import { CircleX, Eye, GitMerge, Hammer, ListChecks, type LucideIcon, MessageSquare, Radiation, Wrench, Zap } from "lucide-react";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
@@ -10,6 +10,7 @@ import type { StartOf } from "../starts";
 import { LiveSessionChips } from "./session-chip";
 
 const ICON: Record<QuickActionId, LucideIcon> = {
+	"fix-ci-and-conflicts": Wrench,
 	"fix-ci": CircleX,
 	"resolve-conflicts": GitMerge,
 	"address-comments": MessageSquare,

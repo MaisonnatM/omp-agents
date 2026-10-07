@@ -8,7 +8,7 @@ import { useDashboardContext } from "../dashboard-context";
 import { FoldButton, useReveal } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
-import { inboxSection, KeysFooter, type RepoView, type SectionView, SortMenu, UnmatchedTip, useInboxBoard, workspacesLabel } from "./inbox-board";
+import { inboxSection, type RepoView, type SectionView, SortMenu, UnmatchedTip, useInboxBoard, workspacesLabel } from "./inbox-board";
 import { SectionCount } from "./inbox-nav";
 import { PullRequestTableRow } from "./pr-row";
 
@@ -116,7 +116,6 @@ export function InboxPage({ project, hosts, past, section }: InboxPageProps) {
 			}
 			notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 			className="max-w-7xl space-y-8"
-			footer={<KeysFooter className="bg-background px-6" />}
 		>
 			{() => (board.repos.length === 0 ? note("No session ran in a GitHub repository.") : board.repos.map(view => <RepoTable key={view.key} view={view} />))}
 		</ListPage>

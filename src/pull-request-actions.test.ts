@@ -26,7 +26,9 @@ describe("pullRequestActions", () => {
 
 	test("an own open PR offers each action whose problem it has, then the thermonuclear review, in registry order", () => {
 		const broken = { checks: "failing", conflicts: true, unresolved: { count: 2, exact: true } } as const;
-		expect(pullRequestActions(pr(broken))).toEqual(["fix-ci", "resolve-conflicts", "address-comments", "thermonuclear-review"]);
+		expect(pullRequestActions(pr(broken))).toEqual(["fix-ci-and-conflicts", "fix-ci", "resolve-conflicts", "address-comments", "thermonuclear-review"]);
+		expect(pullRequestActions(pr({ checks: "failing" }))).toEqual(["fix-ci", "thermonuclear-review"]);
+		expect(pullRequestActions(pr({ conflicts: true }))).toEqual(["resolve-conflicts", "thermonuclear-review"]);
 		expect(pullRequestActions(pr({ ...broken, state: "merged" }))).toEqual([]);
 	});
 

@@ -10,38 +10,40 @@ export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.co
 export type MoveId = "review" | "merge" | "fix-ci" | "rebase" | "reply" | "answer" | "agent" | "in-review" | "checks-running" | "draft" | "merged";
 
 /** Whose move it is; the inbox's sections, in page order. */
-export type MoveGroup = "Your move" | "Agent on it" | "Waiting on others" | "Recently merged";
+export type MoveGroup = "Your move" | "Agent on it" | "Waiting on others" | "Drafts" | "Recently merged";
 
 interface Move {
 	/** The verb on the row's badge. */
 	label: string;
 	group: MoveGroup;
-	/** The quick action that hands this move to an agent, if one does. */
-	action: PullRequestActionId | null;
+	/** The quick actions that hand this move to an agent, in preference order: the first that applies makes it. */
+	actions: PullRequestActionId[];
 }
 
 /** In rank order: within a group, a row's move ranks it before the sort applies. */
 export const MOVES: Record<MoveId, Move> = {
-	review: { label: "Review", group: "Your move", action: "review" },
-	merge: { label: "Merge", group: "Your move", action: null },
-	"fix-ci": { label: "Fix CI", group: "Your move", action: "fix-ci" },
-	rebase: { label: "Rebase", group: "Your move", action: "resolve-conflicts" },
-	reply: { label: "Reply", group: "Your move", action: "address-comments" },
-	answer: { label: "Answer", group: "Agent on it", action: null },
-	agent: { label: "Working", group: "Agent on it", action: null },
-	"in-review": { label: "In review", group: "Waiting on others", action: null },
-	"checks-running": { label: "CI running", group: "Waiting on others", action: null },
-	draft: { label: "Draft", group: "Waiting on others", action: null },
-	merged: { label: "Merged", group: "Recently merged", action: null },
+	review: { label: "Review", group: "Your move", actions: ["review"] },
+	merge: { label: "Merge", group: "Your move", actions: [] },
+	"fix-ci": { label: "Fix CI", group: "Your move", actions: ["fix-ci"] },
+	// Conflicts rank before failing checks, so a pull request with both is a rebase; one session fixes both.
+	rebase: { label: "Rebase", group: "Your move", actions: ["fix-ci-and-conflicts", "resolve-conflicts"] },
+	reply: { label: "Reply", group: "Your move", actions: ["address-comments"] },
+	answer: { label: "Answer", group: "Agent on it", actions: [] },
+	agent: { label: "Working", group: "Agent on it", actions: [] },
+	"in-review": { label: "In review", group: "Waiting on others", actions: [] },
+	"checks-running": { label: "CI running", group: "Waiting on others", actions: [] },
+	draft: { label: "Draft", group: "Drafts", actions: [] },
+	merged: { label: "Merged", group: "Recently merged", actions: [] },
 };
 
 const MOVE_IDS = Object.keys(MOVES) as MoveId[];
 
-/** The inbox's sections in page order, and whether each starts folded: those that hold nothing for you or an agent to do now. */
+/** The inbox's sections in page order, and whether each starts folded: those that hold nothing for you or an agent to do now. Drafts stay open, since they are your work in progress. */
 const GROUPS: Record<MoveGroup, { folded: boolean }> = {
 	"Your move": { folded: false },
 	"Agent on it": { folded: false },
 	"Waiting on others": { folded: true },
+	Drafts: { folded: false },
 	"Recently merged": { folded: true },
 };
 
@@ -112,10 +114,10 @@ const REASON: Record<MoveId, (pr: InboxPullRequest) => string> = {
 /** Why `pr` waits on `move`, as its row's second line says after its number. */
 export const reason = (pr: InboxPullRequest, move: MoveId): string => REASON[move](pr);
 
-/** The quick action that hands `move` on `pr` to an agent, when one does and it applies to `pr`. */
+/** The first quick action that hands `move` on `pr` to an agent and applies to `pr`, if any. */
 export function moveAction(pr: InboxPullRequest, move: MoveId): PullRequestActionId | null {
-	const { action } = MOVES[move];
-	return action && pullRequestActions(pr).includes(action) ? action : null;
+	const applying = pullRequestActions(pr);
+	return MOVES[move].actions.find(action => applying.includes(action)) ?? null;
 }
 
 /** How long ago `at` was, in its largest whole unit: `<1m`, `19m`, `17h`, `2d`, so the inbox's ages line up in a narrow column. */
