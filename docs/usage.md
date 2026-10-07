@@ -77,7 +77,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the session details sidebar.
   Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
-- The left sidebar's session rows leave out the full working directory and the model; the pane header shows both.
+- The left sidebar's session rows leave out the full working directory and the model; hover the project in the pane header to see the directory, and the composer shows the model.
 - A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
   Hover the logo to see the plan's name and account.
   A provider without a logo shows the plan's name instead.
@@ -222,6 +222,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A subagent's own `task` calls link its subagents the same way.
   A past session's ids are not links, because the dashboard opens subagents only of a running session.
 - A subagent's header starts with a back arrow that opens the session's main agent in the pane, or focuses the pane that already shows it.
+  Its trail then names the project, the session's title, and the subagent's id, as in `webapp / Fix login / 0-Explore`.
 - In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one.
   A follow-up (Ctrl+Enter, or Cmd+Enter on macOS) waits in the dashboard until the subagent stops running.
   In a subagent of a session that the dashboard started, a message steers a running subagent at its next step, through omp's RPC `steer_subagent`.
@@ -248,18 +249,23 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   That covers skills sent from the dashboard, from omp's terminal, and to a subagent, in live and past sessions.
   Copy copies the prompt as typed.
   File commands show their expanded text, because omp records only that.
-- A session's header shows its project, the last segment of its working directory (`~/code/webapp` reads `webapp`), and its model's label next to the logo of the org that makes it (`anthropic/claude-opus-5-5` reads `Opus 5.5` with the Anthropic logo).
+- A session's header is its trail: its project, the last segment of its working directory (`~/code/webapp` reads `webapp`), then its title, as in `webapp / Fix login`.
+  A session without a title shows its project alone.
+  Hover the project to see the full directory, and the worktree the session works in when that differs.
+  That is the linked worktree of the same repository that the session's own bash calls last named as their `cwd`, as when a session started in the main checkout adds a worktree and works there.
+  A bash `cwd` in the session's own checkout, outside git, or in another repository leaves the worktree as it was, and one in a directory that is gone falls back to the session's directory.
+- On the right of a session's header, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
+  Its menu opens each one on GitHub, on Graphite, or in the inbox's details; the button shows only for a session with a pull request.
+  **Cursor** opens the directory the session works in, its worktree or else its own directory, as a Cursor window through Cursor's `cursor://file/<path>` link.
+  A browser asks before it hands the link to Cursor; the desktop app hands it to macOS directly.
+  Past sessions show both buttons before **Resume**.
+- The composer names a session's model by its label, next to the logo of the org that makes it (`anthropic/claude-opus-5-5` reads `Opus 5.5` with the Anthropic logo).
   The label leaves out the provider, the vendor prefix, and a release date, joins version parts with dots, and puts a `:` suffix such as a thinking level in parentheses (`Sonnet 5.5 (high)`).
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
-  Hover either to see the full directory or model selector.
+  Hover it to see the full model selector.
   The settings page labels models the same way.
-  When a running session's directory is in a git checkout, the header also names the GitHub repository that `origin` points to, as a link to it, and the branch of the checkout the session works in.
-  That is the linked worktree of the same repository that the session's own bash calls last named as their `cwd`, as when a session started in the main checkout adds a worktree and works there, else the session's directory; hover the project name to see that worktree.
-  A bash `cwd` in the session's own checkout, outside git, or in another repository leaves the worktree as it was, and one in a directory that is gone falls back to the session's directory.
-  The page reads the branch again whenever a turn starts or ends, so a session that switches branches shows the new one.
-  Click the branch to copy its name; its icon turns into a check mark for a moment.
-  The same works on the branch of a pull request's details and of a Linear issue's detail view.
-  A long branch name keeps its start and end with `…` in the middle, in a header, the status bar, a branch picker, a pull request's branches, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
+- Click the branch of a pull request's details, of a Linear issue's detail view, or of the new-session draft's header to copy its name; its icon turns into a check mark for a moment.
+  A long branch name keeps its start and end with `…` in the middle, in the new-session header, the status bar, a branch picker, a pull request's branches, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.
 
@@ -416,7 +422,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Pull requests and the inbox
 
-- A session lists the pull requests it submitted or worked on as `#<number>` after its title in the sidebar, and in its header.
+- A session lists the pull requests it submitted or worked on as `#<number>` after its title in the sidebar, and on the pull request button in its header.
   In the sidebar, a session with several shows the first number and `+N` for the rest, for example `#6535 +2`; hover it to read them all, or find each in the row's menu.
   Its subagents' pull requests count as its own.
   A submission is a `gt submit` line (`<branch>: https://app.graphite.com/github/pr/<owner>/<repo>/<number> (created)` or `(updated)`) or the URL a `gh pr create` call printed, both from bash output, including bash run as a background job.
@@ -426,14 +432,12 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A push links once the inbox has listed the PR that the branch heads, because only the inbox knows which branch heads which PR.
   A PR the session only quoted, listed with `gh pr list`, or looked up with `gh pr view` does not count.
   A PR that a session submitted counts as submitted, even when it also worked on it.
-- In a session's header, a pull request's number opens its details in the inbox, the arrow after the number opens it on GitHub, and the Graphite logo after the arrow opens it on Graphite.
-  The number shows the **Inbox** tab's icon, since it opens there.
-  Hover the number to see whether the session submitted it or worked on it.
-- A session's header also lists the Linear issues it worked on by identifier, such as `ENG-2368`, after its pull requests, and its row's menu has **Open ENG-2368** for each.
-  Both open the issue's details in the tickets page's main content (`#tickets/<identifier>`), and show the **Tickets** tab's icon.
+- In a session's header, the pull request button's menu opens each pull request on GitHub, on Graphite, or in the inbox's details.
+- A session's row menu has **Open ENG-2368** for each Linear issue the session worked on, by identifier.
+  It opens the issue's details in the tickets page's main content (`#tickets/<identifier>`), and shows the **Tickets** tab's icon.
   An issue counts when the session or one of its subagents read it with omp's Linear tools (`get_issue`, `list_comments`), changed or opened it (`save_issue`), commented on it (`save_comment`), or names it in its `/ship` step.
   An issue that a `list_issues` search only listed does not count.
-- Sessions that use `/ship` show their current workflow step in the sidebar and session header, for example `6/7 · Rebase`.
+- Sessions that use `/ship` show their current workflow step in the sidebar, for example `6/7 · Rebase`.
   Hover the badge to see the Linear issue.
   The steps are ticket, implementation, draft PR, thermonuclear review, ready gate, live review, and merged.
   During live review the badge names the active rebase, review-comment, or CI-fix work.

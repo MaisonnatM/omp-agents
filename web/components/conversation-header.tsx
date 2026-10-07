@@ -5,13 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
-import { useGitCheckout } from "../use-git-checkout";
 import { useDashboardContext } from "./dashboard-context";
-import { GitRef } from "./git";
-import { Model } from "./model-picker";
 import { Header } from "./page-header";
-import { Project, PullRequests, Tickets } from "./session-meta";
-import { ShipStep } from "./ship-step";
+import { OpenInCursor, PullRequestMenu, SessionTrail } from "./session-meta";
 import type { Subject } from "./subject";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
@@ -30,33 +26,17 @@ interface ConversationHeaderProps {
 	actions?: ReactNode;
 }
 
-/** A live session's or subagent's title, what it runs on, its connection status, and End session; a subagent's leads with the way back to its session. */
+/**
+ * A live session's or subagent's trail, `project / title`, or `project / title / subagent` with the way back to its session;
+ * the connection status; a session's pull requests, its directory in Cursor, and End session.
+ */
 export function ConversationHeader({ view, subject, onEnd, actions }: ConversationHeaderProps) {
-	const { host, shown, agent, phase, live, working } = subject;
+	const { host, shown, agent, phase, live } = subject;
 	const { open } = useDashboardContext();
-	// The worktree the session works in, else its own directory; read again when a turn starts or ends, since a turn can switch the branch.
-	const checkout = useGitCheckout(subject.kind === "session" && shown ? (shown.worktree ?? shown.cwd) : null, working);
 	const status =
 		phase.phase === "live" ? undefined : phase.phase === "connecting" ? CONTROL_LABEL.connecting : `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
-	const title = agent ? agent.id : shown ? hostLabel(shown) : view.instanceId;
-	const meta = agent
-		? [`${agent.kind} subagent of ${shown ? hostLabel(shown) : "a session"}`, agent.activity].filter(Boolean).join(" · ")
-		: shown && (
-				<>
-					<ShipStep ship={shown.ship} />{" "}
-					<Project cwdDisplay={shown.cwdDisplay} worktree={shown.worktree} />
-					{checkout && (checkout.github || checkout.branch) && (
-						<>
-							{" · "}
-							<GitRef github={checkout.github} branch={checkout.branch} />
-						</>
-					)}
-					{" · "}
-					{shown.model ? <Model selector={shown.model} /> : "no model"} · pid {shown.pid}
-					<PullRequests pullRequests={shown.pullRequests} />
-					<Tickets tickets={shown.tickets} />
-				</>
-			);
+	const path = [shown?.sessionName, agent?.id].filter((name): name is string => !!name);
+	const title = shown ? <SessionTrail cwdDisplay={shown.cwdDisplay} worktree={shown.worktree} path={path} /> : (agent?.id ?? view.instanceId);
 	const session = shown ? hostLabel(shown) : "the session";
 	const back = view.agentId !== null && (
 		<Tooltip content={`Back to ${session}`} side="bottom">
@@ -72,7 +52,13 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 		</Tooltip>
 	);
 	return (
-		<Header title={title} meta={meta} status={status} alert={phase.phase === "ended"} leading={back}>
+		<Header title={title} status={status} alert={phase.phase === "ended"} leading={back}>
+			{subject.kind === "session" && shown && (
+				<>
+					<PullRequestMenu pullRequests={shown.pullRequests} />
+					<OpenInCursor dir={shown.worktree ?? shown.cwd} />
+				</>
+			)}
 			{subject.kind === "session" && live && host && (
 				<Tooltip
 					content={
