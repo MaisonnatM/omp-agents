@@ -210,7 +210,7 @@ It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching t
 - The window loads `http://127.0.0.1:<port>/?token=<token>`, a navigation that sends `Sec-Fetch-Site: none`, so `guardsFor` admits it as it admits the printed address in a browser, and the socket's `Origin` matches its `Host`.
   A custom scheme for the page would fail that check.
 - `setWindowOpenHandler` denies every new window and hands `http:` and `https:` addresses to `shell.openExternal`; `will-navigate` does the same for any address outside the dashboard's origin.
-  An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the MCP and Google sign-ins in `web/use-sign-in.ts` then open the address themselves once the server names it.
+  An empty `window.open`, which a browser tab opens before it knows the address, returns `null`, so the MCP sign-ins in `web/use-sign-in.ts` then open the address themselves once the server names it.
 - The page runs with context isolation and the sandbox on, and no preload: it gets no Node or Electron API.
 - The app keeps its data, its cookie, localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
 - A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
@@ -431,7 +431,7 @@ It answers the integration once the flow has the service's authorization address
 When the browser comes back, the server stores the tokens, refresh material included, under the server's credential id, where `omp token` finds them, and adds the service's server, such as `"linear": { "type": "http", "url": "https://mcp.linear.app/mcp" }`, to omp's `mcp.json` when omp had none.
 A new sign-in abandons the one under way.
 A failure, or no return within five minutes, shows as `signIn: { phase: "failed", error }` until the next sign-in.
-`createSignIn` in `src/sign-in.ts` holds that state for every MCP integration and for Google.
+`createSignIn` in `src/sign-in.ts` holds that state for every MCP integration.
 
 `PUT /api/integrations/sign-out`, with `{ id }`, abandons a sign-in under way and removes the sign-ins omp manages for the server, as omp's `/mcp unauth` does: omp's `removeManagedMcpOAuthCredentials` removes them under the server's credential id and the ids it files a sign-in for the URL under.
 `mcp.json` keeps the server and, unlike `/mcp unauth`, its `auth` block.
@@ -440,17 +440,18 @@ A sign-in that omp does not manage stays, and the route answers an error that sa
 
 ### Google Calendar
 
-`src/google-calendar.ts` owns the dashboard's Google Calendar connection, separate from omp's MCP sign-ins.
-`PUT /api/google/client` saves a Desktop OAuth client ID and secret in `google.json` beside the access token, with owner-only file permissions, and signs out any prior account.
-`GET /api/google` answers the client ID, a `connected` flag, and the current sign-in state, never the client secret or refresh token.
-`PUT /api/google/sign-in` starts the desktop OAuth loopback flow on an ephemeral `127.0.0.1` port and answers the browser's Google authorization URL.
-The server verifies a random state and PKCE challenge, exchanges the authorization code for a refresh token, and stops the listener after success, failure, a replacing sign-in, or the five-minute timeout.
-A refresh that Google refuses with a 400 drops the refresh token, so the settings ask for a new sign-in.
-The requested scope is `https://www.googleapis.com/auth/calendar.readonly`, and access tokens remain in server memory.
-`GET /api/calendar/events?from=<ISO time>&to=<ISO time>` reads at most 62 days, caches a successful answer for 60 seconds, and expands recurring events through Google's `singleEvents=true` query.
-It reads the viewer's calendar list, then the events of each selected, visible calendar, including paginated results; canceled, declined, and working-location events are left out.
-Google's exclusive all-day end becomes the last included day before the event reaches the page.
-The Calendar page reads the open month's events through `calendarEventsStore` in `web/reads.ts` every minute while Google is connected, and puts a multi-day event on each day it covers.
+`src/google-calendar.ts` reads Google calendars through their secret addresses in iCal format, with no Google sign-in and separate from omp's MCP sign-ins.
+`PUT /api/google/calendars`, with `{ url }`, takes only an address under `https://calendar.google.com/calendar/ical/`, reads it once, and adds the calendar when the answer parses as a `VCALENDAR`; a failed read answers 400 with the reason and adds nothing.
+Each added calendar takes the feed's `X-WR-CALNAME` as its name, else the address's email, and the next unused color of Google's event palette.
+The addresses stay in `google.json` beside the access token, with owner-only file permissions, and never reach the page: `GET /api/google` answers each calendar's id, a hash of its address, with its name, color, and the error of its last read.
+A `google.json` that holds anything else, such as the OAuth client secret and refresh token an older version kept, is replaced with an empty list when the server starts.
+`PUT /api/google/calendars/remove`, with `{ id }`, forgets one.
+`GET /api/calendar/events?from=<ISO time>&to=<ISO time>` reads at most 62 days and reads each feed at most once a minute, unless `fresh` asks again.
+`ical.js` expands each repeating event into its repeats in the event's own time zone, from the feed's `VTIMEZONE`s, with Google's removed (`EXDATE`) and moved (`RECURRENCE-ID`) repeats applied; a repeat's id ends with its original start.
+Canceled events, events the address's owner declined, and events with no length are left out, and iCal's exclusive all-day end becomes the last included day.
+One calendar that cannot be read keeps its error for the Integrations row while the others still answer; only when none can is the answer an error.
+An event links to its day in Google Calendar, since the feed carries no link to the event.
+The Calendar page reads the open month's events through `calendarEventsStore` in `web/reads.ts` every minute while a calendar is added, and puts a multi-day event on each day it covers.
 
 ## Front-end components
 
@@ -492,7 +493,7 @@ The server lives in `src/`:
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle.
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
-  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations, the Google sign-in, and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; and `analytics.ts` the Analytics section.
+  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations, the Google calendars, and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; and `analytics.ts` the Analytics section.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
@@ -525,8 +526,8 @@ The server lives in `src/`:
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/integrations.ts` finds omp's server for each MCP integration, checks it, and runs the sign-ins and sign-outs that the Integrations page starts; see [Integrations](#integrations).
-- `src/google-calendar.ts`: the read-only Google Calendar OAuth sign-in, private client and refresh-token file, access-token refresh, and month-range event reads.
-- `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout that `src/integrations.ts` and `src/google-calendar.ts` share.
+- `src/google-calendar.ts`: the Google calendars added by their iCal addresses, their private file, and the month-range events their feeds expand to.
+- `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout behind `src/integrations.ts`.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
 - `src/user-todos-shared.ts`: the Todo page's types, which the server, the page, and the extension that reads `todos.json` all follow: `UserTodoList`, `UserTodo`, `UserTodoLink`, and `UserTodoChange`.
   `templates/omp/agent/extensions/todos.ts` cannot import them, so it declares the shape it reads by hand.
@@ -599,7 +600,7 @@ The page lives in `web/`.
 - `web/reads.ts`: the server reads that components hold.
   `useRead` reads one URL, such as the pull request or the Linear issue the main content shows, the settings page's model catalog, or the new-session draft's model list.
   `useReplaceableRead` shows the version a save answered until that URL is read again.
-  The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, one for the MCP integrations, one for whether Google Calendar is connected, and one for the Calendar page's Google events, with one entry per month.
+  The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, one for the MCP integrations, one for the Google calendars added, and one for the Calendar page's Google events, with one entry per month.
   `web/app.tsx` polls the inbox instead, on every page once the sessions are listed, for the Inbox tab's count, and the sidebar's inbox reads that entry.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft and a live session's header.
@@ -647,8 +648,8 @@ The page lives in `web/`.
 - `web/components/session-details.tsx`: the right sidebar's tabs for the focused pane: `outline-tab.tsx`, its turns from `outline` in `web/transcript-view.ts`, which scroll the focused pane's transcript to their prompt or reply and mark the turn its scroll is on; its changed files; and `media-tab.tsx`, its images and their viewer.
 - `web/components/changes/`: the changes page, `changes-page.tsx`, with its explorer, `file-tree.tsx`, and its Diff and File views, `code-view.tsx`; `changes-link.tsx` is the **Changes** button the live and past session headers share.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.
-  `web/components/integrations/` holds the Integrations page, which sorts its rows into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which the tickets page also shows while Linear is not connected, and `google-calendar.tsx` is Google Calendar's, with the form that saves its OAuth client.
-  Both lay out through `integration-row.tsx`, draw their brand marks from `brand-logos.tsx`, and start their sign-ins with `web/use-sign-in.ts`; `mcp-integration.tsx`'s `SignOutConfirm` asks before a sign-out and shows its failure.
+  `web/components/integrations/` holds the Integrations page, which sorts its rows into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which the tickets page also shows while Linear is not connected, and `google-calendar.tsx` is Google Calendar's, with the form that adds a calendar by its address.
+  Both lay out through `integration-row.tsx` and draw their brand marks from `brand-logos.tsx`; `mcp-integration.tsx` starts its sign-ins with `web/use-sign-in.ts`, and its `SignOutConfirm` asks before a sign-out and shows its failure.
   `web/components/more-actions-menu.tsx` is the ⋯ menu of a row's rarer actions, which the integration rows and the Routines page share.
   `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue; both wrap their details in `DetailPage` from `web/components/list-page.tsx`.
   `pr-row.tsx` exports the DOM lookups of a row and its link that the inbox's keys use.
