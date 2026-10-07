@@ -230,7 +230,7 @@ export function Roster({
 	const fit = ticketsShown ? SIDEBAR_TAB_FIT.six : SIDEBAR_TAB_FIT.five;
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
-			<SidebarHeader className="min-h-(--page-header-height) flex-row items-center justify-between gap-2 px-2 py-3">
+			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-3">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
 				<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
