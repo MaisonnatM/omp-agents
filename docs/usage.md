@@ -530,7 +530,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Duplicates count as canceled.
   Completed and canceled issues show only when they changed in the last seven days, like the inbox's recent merges.
   Within a state, issues sort by priority, urgent first and no priority last, then by the latest update.
-- A row shows the priority, the identifier, the state, the title, the labels, the project, the due date when there is one, and how long ago the issue changed.
+- The list spans the page's width, like Linear's, and each state's heading stays at the top of the page while its issues scroll under it.
+- A row shows the priority, the identifier, the state, and the title, then the due date when there is one, the labels, and the project as chips, then the day Linear opened the issue and the day it last changed.
+  A day this year reads `Oct 6`, an earlier one `Mar 2025`; hover a day for its full time.
+  On a narrow page the chips that do not fit drop out first, from the project back, then the opening day, so the title keeps its room.
   Each label's dot has the color Linear gives that label.
   Hover an icon to read what it means.
   Click a state's heading to fold it; the browser's localStorage keeps folded ones folded across reloads.
@@ -550,7 +553,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The lists come from the issue's team in Linear, read when you first open one, and the server keeps them for five minutes.
 - `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens that issue's details directly, even when the tickets list does not include it or cannot load.
   The header's back arrow opens the list from a direct link too.
-- A lightning button on the row, and buttons in the issue's details, start a new dashboard session in the background, with a prompt that names the issue.
+- A lightning button, which shows on a row while you hover or focus it, and buttons in the issue's details, start a new dashboard session in the background, with a prompt that names the issue.
   The page stays on screen, and the session shows at once as a chip with its status dot on the issue's row and after the buttons in its details; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   A row and the details show a chip for every running session that works on the issue, whether a quick action started it or it read or changed the issue with omp's Linear tools, so they say whether an agent still works on it, after a reload too.
   A row shows two chips at most.

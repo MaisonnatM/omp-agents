@@ -17,9 +17,7 @@ import {
 } from "lucide-react";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Ticket, TicketPriority, TicketStatus } from "../../../src/shared/tickets";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip } from "@/components/ui/tooltip";
-import { age } from "../../labels";
+import { cn } from "@/lib/utils";
 import { type QuickActionId, type TicketActionId, ticketActions } from "../../quick-actions";
 import { hashForTickets, type OpenMode } from "../../routing";
 import { PRIORITY_LABEL, type StatusKind, statusKind } from "../../tickets-model";
@@ -52,8 +50,17 @@ export const PRIORITY_ICON: Record<TicketPriority, [LucideIcon, string]> = {
 /** `2026-10-05` as `Oct 5`, read as a local date so it does not shift a day west of UTC. */
 export const dueLabel = (dueDate: string): string => new Date(`${dueDate}T00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
+/** A time as Linear's lists date it: `Oct 6` this year, `Mar 2025` before. */
+function dayLabel(iso: string): string {
+	const date = new Date(iso);
+	const thisYear = date.getFullYear() === new Date().getFullYear();
+	return date.toLocaleDateString(undefined, thisYear ? { month: "short", day: "numeric" } : { month: "short", year: "numeric" });
+}
+
 /** The element id of an issue's row, used to restore focus after its details close. */
 export const ticketRowId = (id: string): string => `ticket-${id}`;
+
+const CHIP = "flex h-6 min-w-0 max-w-48 items-center gap-1.5 rounded-full border border-border px-2.5 text-xs text-muted-foreground";
 
 interface TicketRowProps {
 	ticket: Ticket;
@@ -67,48 +74,57 @@ interface TicketRowProps {
 
 export function TicketRow({ ticket, sessions, onOpen, pending, onQuickAction }: TicketRowProps) {
 	return (
-		<li id={ticketRowId(ticket.id)} className="flex scroll-my-6 items-center hover:bg-muted/50">
-			<Tooltip content={`${ticket.id} · ${ticket.title}`}>
-				<a
-					href={hashForTickets(ticket.id)}
-					className="flex h-9 min-w-0 flex-1 items-center gap-3 pl-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-				>
-					<IconTip icon={[...PRIORITY_ICON[ticket.priority], PRIORITY_LABEL[ticket.priority]]} />
-					<span className="w-20 shrink-0 truncate font-mono text-xs tabular-nums text-muted-foreground">{ticket.id}</span>
-					<IconTip icon={[...statusIcon(ticket), ticket.status]} />
-					<span className="min-w-0 flex-1 truncate">{ticket.title}</span>
-					{ticket.labels.length > 0 && (
-						<span className="hidden max-w-64 shrink items-center gap-1 overflow-hidden md:flex">
-							{ticket.labels.map(({ name, color }) => (
-								<Badge key={name} variant="dot" size="compact" color={color || undefined}>
-									{name}
-								</Badge>
-							))}
-						</span>
-					)}
-					{ticket.project && (
-						<Tooltip content={ticket.project}>
-							<span className="hidden max-w-40 shrink-0 items-center gap-1 text-xs text-muted-foreground lg:flex">
-								<Box aria-hidden className="size-3.5 shrink-0" />
-								<span className="truncate">{ticket.project}</span>
-							</span>
-						</Tooltip>
-					)}
+		<li id={ticketRowId(ticket.id)} className="group/row relative flex scroll-mt-12 scroll-mb-2 items-center rounded-md hover:bg-muted has-[:focus-visible]:bg-muted">
+			<a
+				href={hashForTickets(ticket.id)}
+				className="@container flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+			>
+				<IconTip icon={[...PRIORITY_ICON[ticket.priority], PRIORITY_LABEL[ticket.priority]]} />
+				<span className="min-w-[4.75rem] shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">{ticket.id}</span>
+				<IconTip icon={[...statusIcon(ticket), ticket.status]} />
+				<span className="min-w-0 truncate">{ticket.title}</span>
+				<span className="min-w-4 flex-1" />
+				{/* Chips that do not fit wrap onto a second line that the fixed height hides, so the title keeps its room. */}
+				<span className="hidden h-6 min-w-0 shrink-[100] flex-wrap justify-end gap-1.5 overflow-hidden @2xl:flex">
 					{ticket.dueDate && (
-						<span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground" title={`Due ${ticket.dueDate}`}>
-							<Calendar aria-hidden className="size-3.5" />
-							{dueLabel(ticket.dueDate)}
+						<span className={CHIP} title={`Due ${ticket.dueDate}`}>
+							<Calendar aria-hidden className="size-3.5 shrink-0" />
+							<span className="truncate">{dueLabel(ticket.dueDate)}</span>
 						</span>
 					)}
-				</a>
-			</Tooltip>
-			<div className="flex shrink-0 items-center gap-3 px-3 text-xs">
-				<LiveSessionChips hosts={sessions.slice(0, 2)} onOpen={onOpen} />
+					{ticket.labels.map(({ name, color }) => (
+						<span key={name} className={CHIP}>
+							<span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color || "var(--muted-foreground)" }} />
+							<span className="truncate">{name}</span>
+						</span>
+					))}
+					{ticket.project && (
+						<span className={CHIP} title={ticket.project}>
+							<Box aria-hidden className="size-3.5 shrink-0" />
+							<span className="truncate">{ticket.project}</span>
+						</span>
+					)}
+				</span>
+				<span className="hidden w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground @4xl:block" title={`Created ${new Date(ticket.createdAt).toLocaleString()}`}>
+					{dayLabel(ticket.createdAt)}
+				</span>
+				<span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground" title={`Updated ${new Date(ticket.updatedAt).toLocaleString()}`}>
+					{dayLabel(ticket.updatedAt)}
+				</span>
+			</a>
+			{sessions.length > 0 && (
+				<div className="shrink-0 pr-3">
+					<LiveSessionChips hosts={sessions.slice(0, 2)} onOpen={onOpen} />
+				</div>
+			)}
+			<div
+				className={cn(
+					"absolute inset-y-0 right-1 flex items-center gap-1 rounded-md bg-muted px-2 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
+					pending === null && "opacity-0",
+				)}
+			>
 				<AddToTodo text={ticket.title} body={`Linear issue ${ticket.id}: ${ticket.url}`} link={{ kind: "ticket", identifier: ticket.id }} label={`Add ${ticket.id} to your todo list`} />
 				<QuickActionsMenu actions={ticketActions(ticket)} pending={pending} onRun={onQuickAction} label="Quick actions: start a session in the background that works on this issue" />
-				<span className="w-10 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={`Updated ${new Date(ticket.updatedAt).toLocaleString()}`}>
-					{age(Date.parse(ticket.updatedAt))}
-				</span>
 			</div>
 		</li>
 	);

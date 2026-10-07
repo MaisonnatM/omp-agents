@@ -76,14 +76,14 @@ interface ListPageProps<Data> {
 	onRefresh: () => void;
 	/** What became of the last quick action, above the lists. */
 	notice: ReactNode;
-	/** The spacing between the page's lists: a `space-y-*` class. */
-	spacing: string;
+	/** Classes for the column that holds the lists: the spacing between them, and a width other than the reading width. */
+	className: string;
 	/** The page's lists, from its read. */
 	children: (data: Data) => ReactNode;
 }
 
 /** A page of lists read from GitHub or Linear with a Refresh button, `notice`, and the lists once the first read loads. */
-export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, spacing, children }: ListPageProps<Data>) {
+export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, className, children }: ListPageProps<Data>) {
 	const { read, error, refreshing } = poll;
 	let body: ReactNode;
 	if (!read) body = <LoadNote loading={loading} error={error && `Cannot load ${noun}: ${error}`} />;
@@ -107,7 +107,7 @@ export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, no
 			}
 		>
 			<TooltipProvider>
-				<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", spacing)}>
+				<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", className)}>
 					{notice}
 					{body}
 				</div>

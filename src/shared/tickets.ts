@@ -31,6 +31,8 @@ export interface Ticket {
 	/** `YYYY-MM-DD`. */
 	dueDate: string | null;
 	/** ISO time. */
+	createdAt: string;
+	/** ISO time. */
 	updatedAt: string;
 	/** Linear's suggested git branch name. */
 	branch: string;
@@ -76,8 +78,6 @@ export interface TicketDetail extends Ticket {
 	/** Markdown, with Linear's issue mentions as links, and its images and videos loading through `TICKET_MEDIA_PATH`. */
 	description: string;
 	createdBy: string | null;
-	/** ISO time. */
-	createdAt: string;
 	assignee: TicketChoice | null;
 	/** Linear's id of the issue's team, whose states, labels, and projects the pickers offer. */
 	teamId: string;

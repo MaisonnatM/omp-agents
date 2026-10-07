@@ -40,16 +40,16 @@ function GroupSection({ group, open, onToggle, hosts, onOpen, quick, onQuickActi
 	const [Icon, color] = statusIcon(group);
 	return (
 		// Focused when its sidebar link is chosen.
-		<section id={id} tabIndex={-1} aria-labelledby={`${id}-heading`} className="scroll-mt-6 overflow-hidden rounded-md border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring">
-			<h3 id={`${id}-heading`} className="bg-muted/50 px-3 py-1.5 text-sm font-medium">
-				<FoldButton open={open} onToggle={onToggle} controls={`${id}-list`} className="items-center">
+		<section id={id} tabIndex={-1} aria-labelledby={`${id}-heading`} className="rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
+			<h3 id={`${id}-heading`} className="sticky top-0 z-10 flex h-10 items-center rounded-md bg-muted px-3 text-sm font-medium">
+				<FoldButton open={open} onToggle={onToggle} controls={`${id}-list`} className="items-center gap-2.5">
 					<Icon aria-hidden className={`size-4 shrink-0 ${color}`} />
 					{group.status}
-					<span className="text-xs tabular-nums text-muted-foreground">{group.tickets.length}</span>
+					<span className="tabular-nums text-muted-foreground">{group.tickets.length}</span>
 				</FoldButton>
 			</h3>
 			{open && (
-				<ul id={`${id}-list`} className="divide-y divide-border border-t border-border">
+				<ul id={`${id}-list`} className="py-1">
 					{group.tickets.map(ticket => (
 						<TicketRow
 							key={ticket.id}
@@ -144,12 +144,12 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 			poll={poll}
 			onRefresh={() => void ticketsStore.refresh(null, { fresh: true })}
 			notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
-			spacing="space-y-4"
+			className="max-w-none space-y-1 px-4 pt-3"
 		>
 			{() => {
 				const groups = ticketGroups(tickets);
 				return (
-					<div ref={listRef} tabIndex={-1} className="space-y-4 outline-none focus-visible:ring-2 focus-visible:ring-ring">
+					<div ref={listRef} tabIndex={-1} className="space-y-1 outline-none focus-visible:ring-2 focus-visible:ring-ring">
 						{groups.length === 0 && <p className="text-sm text-muted-foreground">No issues assigned to you.</p>}
 						{groups.map(group => (
 							<GroupSection

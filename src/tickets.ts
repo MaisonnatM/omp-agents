@@ -25,7 +25,7 @@ const MAX_PAGES = 20;
 /** How many days back the page lists closed issues. */
 const CLOSED_DAYS = 7;
 
-const FIELDS = ["id", "title", "url", "priority", "status", "statusType", "labels", "project", "team", "dueDate", "updatedAt", "gitBranchName"];
+const FIELDS = ["id", "title", "url", "priority", "status", "statusType", "labels", "project", "team", "dueDate", "createdAt", "updatedAt", "gitBranchName"];
 
 /** Linear's state types, and `duplicate`, which the query takes as a state of its own and the page reads as canceled. */
 const QUERY_STATES = [...TICKET_STATUS_TYPES, "duplicate"] as const;
@@ -71,6 +71,7 @@ function parseIssue(raw: unknown, colors: LabelColors): Ticket | null {
 		project: str(raw.project) ?? null,
 		team: str(raw.team) ?? "",
 		dueDate: str(raw.dueDate) ?? null,
+		createdAt: str(raw.createdAt) ?? updatedAt,
 		updatedAt,
 		branch: str(raw.gitBranchName) ?? "",
 	};
@@ -161,7 +162,6 @@ export function parseIssueDetail(issueText: string, commentsText: string, colors
 		...ticket,
 		description: linearMarkdown(str(raw.description) ?? "", ticket.id),
 		createdBy: str(raw.createdBy) ?? null,
-		createdAt: str(raw.createdAt) ?? ticket.updatedAt,
 		assignee: assigneeId && assignee ? { id: assigneeId, name: assignee } : null,
 		teamId,
 		attachments: attachments.flatMap(attachment => {
