@@ -1,4 +1,4 @@
-import { ChevronRight, CircleAlert, ExternalLink, LoaderCircle, LogOut, RefreshCw, WifiOff } from "lucide-react";
+import { ChevronRight, CircleAlert, ExternalLink, KeyRound, LoaderCircle, LogOut, RefreshCw, WifiOff } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { MCP_SERVICES, type McpConnection, type McpIntegration, type McpIntegrationId, type McpServerRef, type SignInState, signedIn } from "../../../src/shared/accounts";
 import { Badge, type BadgeColor } from "@/components/ui/badge";
@@ -9,8 +9,9 @@ import { errorText, putJson } from "../../api";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
-import { type BrandLogo, LINEAR_LOGO } from "./brand-logos";
+import { type BrandLogo, LINEAR_LOGO, SLACK_LOGO } from "./brand-logos";
 import { Callout, IntegrationRow, MetaDot } from "./integration-row";
+import { SlackAppForm } from "./slack-app-form";
 
 interface Service {
 	logo: BrandLogo;
@@ -22,6 +23,10 @@ const SERVICES: Record<McpIntegrationId, Service> = {
 	linear: {
 		logo: LINEAR_LOGO,
 		gives: "Your assigned issues on the Tickets tab, and Linear's tools in every omp session.",
+	},
+	slack: {
+		logo: SLACK_LOGO,
+		gives: "Search, read, and send in the conversations you grant, in every omp session.",
 	},
 };
 
@@ -101,34 +106,65 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 	const { id, connection } = integration;
 	const { label } = MCP_SERVICES[id];
 	const service = SERVICES[id];
+	const setup = id === "slack" ? integration.setup : null;
+	const needsSetup = id === "slack" && !setup?.configured;
 	const start = async (): Promise<SignInState> => (await putJson<McpIntegration>("/api/integrations/sign-in", { id })).signIn;
 	const { starting, waitingUrl, failure, connect } = useSignIn(integration.signIn, integrationsStore.refresh, start);
 	const { refreshing } = integrationsStore.use();
 	const [confirming, setConfirming] = useState(false);
+	const [formOpen, setFormOpen] = useState(false);
 	const [toolsOpen, setToolsOpen] = useState(false);
 	const toolsId = useId();
 
-	const status = waitingUrl ? { label: "Waiting for you", color: "blue" as const } : STATUS[connection.kind];
+	const status = waitingUrl ? { label: "Waiting for you", color: "blue" as const } : needsSetup && !signedIn(connection) ? { label: "Not set up", color: "gray" as const } : STATUS[connection.kind];
 
 	let actions: ReactNode = null;
-	if (!waitingUrl && !confirming) {
-		actions = signedIn(connection) ? (
-			<MoreActionsMenu name={label} disabled={starting}>
-				<MenuItem onClick={() => void connect()}>
-					<RefreshCw />
-					Reconnect
-				</MenuItem>
-				<MenuSeparator />
-				<MenuItem variant="destructive" onClick={() => setConfirming(true)}>
-					<LogOut />
-					Sign out
-				</MenuItem>
-			</MoreActionsMenu>
-		) : (
-			<Button variant="secondary" size="compact" loading={starting} onClick={() => void connect()}>
-				Connect
-			</Button>
-		);
+	if (!waitingUrl && !confirming && !formOpen) {
+		if (needsSetup && !signedIn(connection)) {
+			actions = (
+				<Button variant="secondary" size="compact" onClick={() => setFormOpen(true)}>
+					Set up
+				</Button>
+			);
+		} else if (signedIn(connection)) {
+			actions = (
+				<MoreActionsMenu name={label} disabled={starting}>
+					{!needsSetup && (
+						<MenuItem onClick={() => void connect()}>
+							<RefreshCw />
+							Reconnect
+						</MenuItem>
+					)}
+					{id === "slack" && (
+						<MenuItem onClick={() => setFormOpen(true)}>
+							<KeyRound />
+							{setup?.configured ? "Replace app settings" : "Set up"}
+						</MenuItem>
+					)}
+					<MenuSeparator />
+					<MenuItem variant="destructive" onClick={() => setConfirming(true)}>
+						<LogOut />
+						Sign out
+					</MenuItem>
+				</MoreActionsMenu>
+			);
+		} else {
+			actions = (
+				<>
+					<Button variant="secondary" size="compact" loading={starting} onClick={() => void connect()}>
+						Connect
+					</Button>
+					{id === "slack" && (
+						<MoreActionsMenu name={label} disabled={starting}>
+							<MenuItem onClick={() => setFormOpen(true)}>
+								<KeyRound />
+								Replace app settings
+							</MenuItem>
+						</MoreActionsMenu>
+					)}
+				</>
+			);
+		}
 	}
 
 	let callout: ReactNode = null;
@@ -150,18 +186,24 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 		);
 	} else if (confirming) {
 		callout = <SignOutConfirm id={id} name={label} onDone={() => setConfirming(false)} />;
+	} else if (failure) {
+		callout = (
+			<Callout tone="danger" icon={CircleAlert} role="alert">
+				Sign-in failed: {failure}
+			</Callout>
+		);
 	} else if (connection.kind === "refused") {
 		callout = (
 			<Callout
 				tone="danger"
 				icon={CircleAlert}
 				action={
-					<Button variant="secondary" size="compact" leadingIcon={RefreshCw} loading={starting} onClick={() => void connect()}>
-						Reconnect
+					<Button variant="secondary" size="compact" leadingIcon={needsSetup ? KeyRound : RefreshCw} loading={starting} onClick={() => needsSetup ? setFormOpen(true) : void connect()}>
+						{needsSetup ? "Set up" : "Reconnect"}
 					</Button>
 				}
 			>
-				{label} refused omp's sign-in. Reconnect to sign in again.
+				{needsSetup ? "Complete the Slack app settings before you reconnect." : `${label} refused omp's sign-in. Reconnect to sign in again.`}
 			</Callout>
 		);
 	} else if (connection.kind === "failing") {
@@ -178,12 +220,6 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 				{connection.error}
 			</Callout>
 		);
-	} else if (failure) {
-		callout = (
-			<Callout tone="danger" icon={CircleAlert} role="alert">
-				Sign-in failed: {failure}
-			</Callout>
-		);
 	}
 
 	return (
@@ -191,17 +227,39 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 			name={label}
 			logo={service.logo}
 			summary={service.gives}
-			status={<Badge variant="dot" size="compact" color={status.color}>{status.label}</Badge>}
+			status={
+				<Badge variant="dot" size="compact" color={status.color}>
+					{status.label}
+				</Badge>
+			}
 			meta={
 				<>
 					<span>MCP</span>
 					<MetaDot />
-					{connection.kind === "absent" ? (
+					{needsSetup ? (
+						<span>Dedicated internal app</span>
+					) : connection.kind === "absent" ? (
 						<span>
 							Connecting adds it to omp's <code className="font-mono">mcp.json</code>
 						</span>
 					) : (
 						<span className="font-mono">{connection.server.host}</span>
+					)}
+					{setup?.configured && setup.redirectUri && (
+						<>
+							<MetaDot />
+							<span className="max-w-56 truncate font-mono" title={setup.redirectUri}>
+								{setup.redirectUri}
+							</span>
+						</>
+					)}
+					{setup?.configured && (
+						<>
+							<MetaDot />
+							<span>
+								callback <span className="font-mono">localhost:{setup.callbackPort}</span>
+							</span>
+						</>
 					)}
 					{connection.kind === "ready" && (
 						<>
@@ -223,6 +281,7 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 			actions={actions}
 		>
 			{callout}
+			{formOpen && <SlackAppForm setup={setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />}
 			{connection.kind === "ready" && toolsOpen && <ToolList id={toolsId} tools={connection.tools} server={connection.server} />}
 		</IntegrationRow>
 	);

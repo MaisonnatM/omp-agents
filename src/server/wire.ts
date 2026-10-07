@@ -6,7 +6,7 @@
 import { GOOGLE_ICAL_ADDRESS } from "../google-calendar";
 import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
-import { MCP_INTEGRATIONS, type McpIntegrationId } from "../shared/accounts";
+import { MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import type { BranchChoice } from "../shared/git";
@@ -364,6 +364,30 @@ const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
 /** The body of `PUT /api/integrations/sign-in` and `/sign-out`: `{ id }` naming an MCP integration. */
 export const parseIntegrationId = (body: unknown): McpIntegrationId | null => (isObject(body) && isMcpIntegration(body.id) ? body.id : null);
+
+/** The body of `PUT /api/integrations/slack/client`. An empty secret is omitted so the saved secret can stay. */
+export function parseSlackClient(body: unknown): { ok: SlackClientInput } | { error: string } {
+	if (!isObject(body)) return { error: "Expected { clientId, redirectUri, callbackPort, scope } for the Slack app." };
+	if (typeof body.clientId !== "string" || body.clientId.trim() === "") return { error: "Slack needs the app's client ID." };
+	let clientSecret: string | undefined;
+	if ("clientSecret" in body && body.clientSecret !== undefined) {
+		if (typeof body.clientSecret !== "string") return { error: "Expected clientSecret to be a string." };
+		const trimmed = body.clientSecret.trim();
+		if (trimmed) clientSecret = trimmed;
+	}
+	if (typeof body.redirectUri !== "string" || body.redirectUri.trim() === "") return { error: "Enter the HTTPS redirect registered on the Slack app." };
+	if (typeof body.callbackPort !== "number" || !Number.isSafeInteger(body.callbackPort) || body.callbackPort < 1 || body.callbackPort > 65535) {
+		return { error: "Enter a local callback port from 1 to 65535." };
+	}
+	if (typeof body.scope !== "string") return { error: "Choose at least one Slack scope from the supported chat and search set." };
+	const scope = normalizeSlackScope(body.scope);
+	if (!scope) return { error: "Choose at least one Slack scope from the supported chat and search set." };
+	const redirectUri = body.redirectUri.trim();
+	const redirectError = slackRedirectError(redirectUri, body.callbackPort);
+	if (redirectError) return { error: redirectError };
+	const clientId = body.clientId.trim();
+	return { ok: clientSecret === undefined ? { clientId, redirectUri, callbackPort: body.callbackPort, scope } : { clientId, clientSecret, redirectUri, callbackPort: body.callbackPort, scope } };
+}
 
 const isTicketPriority = oneOf(TICKET_PRIORITIES);
 

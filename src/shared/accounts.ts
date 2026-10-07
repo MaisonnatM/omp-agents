@@ -4,8 +4,60 @@
 export type SignInState = { phase: "waiting"; url: string } | { phase: "failed"; error: string } | null;
 
 /** The services whose MCP server the integrations page signs omp in to. */
-export const MCP_INTEGRATIONS = ["linear"] as const;
+export const MCP_INTEGRATIONS = ["linear", "slack"] as const;
 export type McpIntegrationId = (typeof MCP_INTEGRATIONS)[number];
+
+/**
+ * User scopes a dedicated Slack app may grant for normal chat.
+ * Search, history, channel membership, users, and sending. Canvas, list, file, reaction, and channel-creation scopes stay out.
+ */
+export const SLACK_USER_SCOPES = [
+	"search:read.public",
+	"search:read.private",
+	"search:read.mpim",
+	"search:read.im",
+	"search:read.users",
+	"channels:history",
+	"groups:history",
+	"mpim:history",
+	"im:history",
+	"channels:read",
+	"groups:read",
+	"mpim:read",
+	"im:read",
+	"users:read",
+	"chat:write",
+] as const;
+
+const SLACK_SCOPE: Record<string, true> = Object.fromEntries(SLACK_USER_SCOPES.map(scope => [scope, true]));
+
+/**
+ * `input` as a unique space-separated subset of {@link SLACK_USER_SCOPES}, or `null` when it is empty or names anything else.
+ * Commas and extra whitespace are separators, not part of a scope.
+ */
+export function normalizeSlackScope(input: string): string | null {
+	const scopes = input.trim().split(/[\s,]+/).filter(Boolean);
+	if (scopes.length === 0 || scopes.some(scope => !Object.hasOwn(SLACK_SCOPE, scope))) return null;
+	return [...new Set(scopes)].join(" ");
+}
+
+const SLACK_LOOPBACK: Record<string, true> = { localhost: true, "127.0.0.1": true, "[::1]": true };
+
+/** Why `redirectUri` cannot be the Slack app's registered redirect for a listener on `callbackPort`, or `null` when it can. */
+export function slackRedirectError(redirectUri: string, callbackPort: number): string | null {
+	let url: URL;
+	try {
+		url = new URL(redirectUri);
+	} catch {
+		return "Enter the HTTPS redirect registered on the Slack app.";
+	}
+	if (url.protocol !== "https:") return "Slack needs an HTTPS redirect. Forward it to the local HTTP callback with a TLS terminator.";
+	const registeredPort = url.port ? Number(url.port) : 443;
+	if ((Object.hasOwn(SLACK_LOOPBACK, url.hostname) || url.hostname.endsWith(".localhost")) && registeredPort === callbackPort) {
+		return "The HTTPS redirect port and the local callback port must differ. Terminate TLS on the redirect port and forward to the callback port.";
+	}
+	return null;
+}
 
 export interface McpService {
 	label: string;
@@ -18,7 +70,28 @@ export interface McpService {
 
 export const MCP_SERVICES: Record<McpIntegrationId, McpService> = {
 	linear: { label: "Linear", host: "mcp.linear.app", url: "https://mcp.linear.app/mcp", serverName: "linear" },
+	slack: { label: "Slack", host: "mcp.slack.com", url: "https://mcp.slack.com/mcp", serverName: "slack" },
 };
+
+/** Slack app settings the integrations page can show. The client secret stays in omp's config. */
+export interface SlackSetup {
+	clientId: string | null;
+	hasClientSecret: boolean;
+	redirectUri: string | null;
+	callbackPort: number;
+	scope: string;
+	/** The saved client, secret, scope, redirect, and callback port are complete and valid. */
+	configured: boolean;
+}
+
+/** `PUT /api/integrations/slack/client`. An omitted or empty `clientSecret` keeps the saved secret for the same client ID. */
+export interface SlackClientInput {
+	clientId: string;
+	clientSecret?: string;
+	redirectUri: string;
+	callbackPort: number;
+	scope: string;
+}
 
 /** omp's MCP server for a service: its name in omp's MCP config, its URL, and that URL's host. */
 export interface McpServerRef {
@@ -44,12 +117,14 @@ export const signedIn = (connection: McpConnection): boolean => connection.kind 
 /** Whether the dashboard calls the service's tools: the server took omp's sign-in, or failed for a reason a retry may clear. */
 export const callable = (connection: McpConnection): boolean => connection.kind === "ready" || connection.kind === "failing";
 
-/** One service of `GET /api/integrations`, and what `PUT /api/integrations/sign-in` and `/sign-out` answer. */
+/** One service of `GET /api/integrations`, and what `PUT /api/integrations/sign-in`, `/sign-out`, and `/slack/client` answer. */
 export interface McpIntegration {
 	id: McpIntegrationId;
 	connection: McpConnection;
 	/** The latest sign-in, while it waits or after it failed; `null` when none ran or the last one succeeded. */
 	signIn: SignInState;
+	/** Slack's saved app, without the secret. `null` for Linear, which registers its own client. */
+	setup: SlackSetup | null;
 }
 
 /** `GET /api/integrations[?fresh]`: every MCP integration by its id. */

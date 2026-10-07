@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ClientMsg } from "../shared/protocol";
 import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
-import { parseBranchSwitch, parseClientMsg, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
+import { parseBranchSwitch, parseClientMsg, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseSlackClient, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -300,11 +300,32 @@ describe("parsePullRequestQuery", () => {
 describe("parseIntegrationId", () => {
 	test("takes the id of an MCP integration and nothing else", () => {
 		expect(parseIntegrationId({ id: "linear" })).toBe("linear");
+		expect(parseIntegrationId({ id: "slack" })).toBe("slack");
 		expect(parseIntegrationId({ id: "Linear" })).toBeNull();
 		expect(parseIntegrationId({ id: "google" })).toBeNull();
 		expect(parseIntegrationId({})).toBeNull();
 		expect(parseIntegrationId("linear")).toBeNull();
 		expect(parseIntegrationId(null)).toBeNull();
+	});
+});
+
+describe("parseSlackClient", () => {
+	test("normalizes a subset of the chat scopes and omits an empty secret", () => {
+		expect(parseSlackClient({
+			clientId: " 111.222 ",
+			clientSecret: "  ",
+			redirectUri: " https://omp.example/slack ",
+			callbackPort: 8787,
+			scope: "chat:write, channels:history chat:write",
+		})).toEqual({ ok: { clientId: "111.222", redirectUri: "https://omp.example/slack", callbackPort: 8787, scope: "chat:write channels:history" } });
+	});
+
+	test("rejects invalid redirects, unsupported scopes, and non-integer callback ports", () => {
+		const app = { clientId: "111", redirectUri: "https://omp.example/slack", callbackPort: 3000, scope: "chat:write" };
+		expect(parseSlackClient({ ...app, redirectUri: "http://127.0.0.1:3000/callback" })).toHaveProperty("error");
+		expect(parseSlackClient({ ...app, redirectUri: "https://[::1]:8443/callback", callbackPort: 8443 })).toHaveProperty("error");
+		expect(parseSlackClient({ ...app, scope: "constructor" })).toHaveProperty("error");
+		expect(parseSlackClient({ ...app, callbackPort: 3.5 })).toHaveProperty("error");
 	});
 });
 

@@ -28,8 +28,9 @@ The main ones:
   It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.
 - Model roles: `pi-coding-agent/src/config/model-resolver.ts` (`expandRoleAlias`, `resolveRoleChain`), whose `@role` aliases `resolveRoles` in `src/omp/models.ts` follows for `GET /api/models/roles`.
   `modelEntries` reads each role and fallback selector with `parseRetryFallbackSelector` and maps it to a listed model with `resolveProviderModelReference`, which follows retired variant ids such as `grok-4.7-high` and dotted spellings such as `claude-fable-5.1`.
-- MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `oauth-credentials.ts` (`removeManagedMcpOAuthCredentials`), `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`), which `src/omp/mcp.ts` wraps for the tickets page and the Integrations page.
+- MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `oauth-credentials.ts` (`removeManagedMcpOAuthCredentials`), `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`, `updateMCPServer`, `readMCPConfigFile`), which `src/omp/mcp.ts` wraps for the tickets page and the Integrations page.
   The MCP sign-ins and sign-outs read and write omp's credential store through the same `discoverAuthStorage`, opened and closed on each call.
+  `pi-coding-agent/src/commands/token.ts` uses `refreshStoredManagedMcpOAuthCredential` from `oauth-credentials.ts` to refresh a managed token and persist its rotated refresh token before printing the access token.
 - Completions: `pi-tui/src/autocomplete.ts`, and the skills and slash commands in `pi-coding-agent/src/extensibility/`.
 - Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
 - Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `rollup.ts` (`getProviderTimeSeries`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
@@ -417,12 +418,25 @@ The issue detail shows a change at once and sends its changes one at a time, and
 
 ### Integrations
 
-`MCP_SERVICES` in `src/shared/accounts.ts` holds the services whose MCP server the **Integrations** page signs omp in to, keyed by the ids in `MCP_INTEGRATIONS`; Linear is the only one so far.
+`MCP_SERVICES` in `src/shared/accounts.ts` holds the services whose MCP server the **Integrations** page signs omp in to, keyed by the ids in `MCP_INTEGRATIONS`.
+Linear and Slack are the two.
 Each names its label, the host omp's server for the service is on, and the name and URL of the server a sign-in adds when omp has none.
 `src/integrations.ts` keeps a sign-in per service, and the page adds each service's brand mark and what it gives.
+`SLACK_USER_SCOPES` is the chat, history, search, and user set a dedicated Slack app may grant.
+Canvas, list, file, reaction, and channel-creation scopes are not requested.
 
-`GET /api/integrations` answers `{ integrations }`, one `McpIntegration`, `{ id, connection, signIn }`, under each service's id.
+`GET /api/integrations` answers `{ integrations }`, one `McpIntegration`, `{ id, connection, signIn, setup }`, under each service's id.
+`setup` is `null` for Linear, which registers its own OAuth client.
+For Slack it is a `SlackSetup` with the client ID, whether a client secret is stored, the redirect URI, the callback port, the scope string, and `configured`.
+The client secret is absent from that body.
+`GET /api/settings` does not read `mcp.json` either.
+Its file list comes from omp's context, prompt, command, rule, skill, hook, and agent discovery.
+Before the app is saved, Slack's setup uses callback port 3000 and the full scope list, with `configured: false`.
+`configured` is true only when the user MCP file has a client ID, a client secret, a nonempty subset of `SLACK_USER_SCOPES`, an HTTPS redirect, and a callback port.
+An HTTPS loopback redirect must use a different port from the local HTTP callback.
+
 `connection` is `absent` while omp's user-level MCP config has no enabled server on the service's host, and `signed-out` while omp's credential store, read again on each call, holds no OAuth sign-in for it.
+A Slack server that already has a sign-in is still probed when the saved app settings are incomplete.
 Otherwise `checkMcpServer` in `src/omp/mcp.ts` lists the server's tools with `tools/list`, following `nextCursor`, through the same token as the tickets' calls.
 `connectionOf` in `src/integrations.ts` turns the outcome into `ready` with the tool names, `refused` when the server throws `McpRefused` on a 401 that asks for a new sign-in, or `failing` with any other error.
 The server keeps each list for a minute and never a failure; `?fresh` lists again, and a sign-in, a sign-out, or a 401 on a tickets call drops it.
@@ -430,9 +444,33 @@ While a service's sign-in waits on the browser, its connection is the one last a
 The page shows the **Tickets** tab while Linear's connection is `ready`, `refused`, or `failing`, and keeps the last read in localStorage.
 The dashboard calls Linear only while its connection is `ready` or `failing`: the tickets page shows Linear's integration row instead of the issues otherwise, and the Todo page's **Create Linear ticket** and the Calendar's tickets wait on it too.
 
-`PUT /api/integrations/sign-in`, with `{ id }`, starts a sign-in the way omp's `/mcp reauth` does: it reads the service's OAuth endpoints from its metadata, registers a client, and starts omp's `MCPOAuthFlow`, whose callback server listens on `localhost:3000`.
+`PUT /api/integrations/slack/client` takes `{ clientId, clientSecret?, redirectUri, callbackPort, scope }`.
+`parseSlackClient` accepts a nonempty subset of `SLACK_USER_SCOPES`, with commas or whitespace as separators, and an HTTPS redirect.
+It answers 400 for an HTTP redirect, an unknown scope, a bad port, or an HTTPS loopback redirect that reuses the callback port.
+The save writes the existing user server on `mcp.slack.com`, or a new `slack` server, through omp's locked config writer.
+The writer keeps owner-only file permissions and leaves every other server, top-level list, header, timeout, `callbackPath`, and `prompt` in place.
+An omitted or empty client secret stays only when the client ID is unchanged.
+A new client ID without a new secret is a 400 and does not write.
+Saving cancels a Slack sign-in that is waiting.
+Changing the client ID or the secret also removes the OAuth credentials omp manages for that server.
+Credentials are removed before changing the app identity, so a failed config write cannot leave the old app signed in under the new settings.
+If that write fails, the old settings remain, but Slack needs a new sign-in.
+Config and credentials have separate native owners, not a shared transaction.
+Saving scopes changes the next authorization request, not an existing grant.
+Sign-out and a later sign-in leave the saved app in the file.
+
+`PUT /api/integrations/sign-in`, with `{ id }`, starts a sign-in the way omp's `/mcp reauth` does.
+Linear still reads the OAuth endpoints from metadata, registers a client when the authorization server offers registration, and listens on `localhost:3000`.
+Slack refuses to start until `setup.configured` is true, so it does not open an authorization URL that has no client ID.
+The flow then receives the saved client ID, client secret, scope, redirect, callback port, callback path, and prompt.
 It answers the integration once the flow has the service's authorization address, as `signIn: { phase: "waiting", url }`, which the page opens in a new tab.
-When the browser comes back, the server stores the tokens, refresh material included, under the server's credential id, where `omp token` finds them, and adds the service's server, such as `"linear": { "type": "http", "url": "https://mcp.linear.app/mcp" }`, to omp's `mcp.json` when omp had none.
+When the browser comes back, the server stores the tokens under the server's credential id, where `omp token` finds them.
+The stored client secret is the one dynamic registration issued, or the configured secret when registration did not issue one.
+That is the secret a later refresh sends.
+A Slack grant with no refresh token is not stored.
+The Slack app has to enable token rotation, which Slack does not let an app turn back off.
+omp otherwise treats a missing token lifetime as one hour, so a refresh-less grant would stop working with no error at save time.
+The server adds the service's HTTP server to the user `mcp.json` only when discovery found no enabled server on the service's host.
 A new sign-in abandons the one under way.
 A failure, or no return within five minutes, shows as `signIn: { phase: "failed", error }` until the next sign-in.
 `createSignIn` in `src/sign-in.ts` holds that state for every MCP integration.
@@ -656,6 +694,7 @@ The page lives in `web/`.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.
   `web/components/integrations/` holds the Integrations page, which sorts its rows into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which the tickets page also shows while Linear is not connected, and `google-calendar.tsx` is Google Calendar's, with the form that adds a calendar by its address.
   Both lay out through `integration-row.tsx` and draw their brand marks from `brand-logos.tsx`; `mcp-integration.tsx` starts its sign-ins with `web/use-sign-in.ts`, and its `SignOutConfirm` asks before a sign-out and shows its failure.
+  `slack-app-form.tsx` holds Slack's confidential-app setup, field errors, and scope selection; the generic MCP row owns its connection and sign-in controls.
   `web/components/more-actions-menu.tsx` is the ⋯ menu of a row's rarer actions, which the integration rows and the Routines page share.
   `inbox-board.tsx` holds `useInboxBoard`, the inbox's logic that the sidebar list and the page share: its sections, folds, order, drag, keys, and rows, with the sort menu and the keys line.
   Only one board mounts at a time, since its rows carry document ids and its keys are global, so the inbox page (`inbox-page.tsx`) shows the table while the sidebar shows `InboxIndex`, its sections as links, and `inbox-nav.tsx` lists the pull requests in the sidebar otherwise.

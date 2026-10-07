@@ -10,7 +10,7 @@ import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import { gitCheckout, gitStatus, switchBranch, worktreeAt } from "../git";
 import type { GoogleCalendar } from "../google-calendar";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
-import { loadIntegrations, signOutIntegration, startIntegrationSignIn } from "../integrations";
+import { loadIntegrations, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { sessionsDir } from "../omp/sessions";
@@ -20,6 +20,7 @@ import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
+import { SlackConfigError } from "../omp/mcp";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type LinkedPullRequest, type PullRequest, type Repo, samePullRequest } from "../shared/github";
@@ -28,7 +29,7 @@ import { TICKET_ID } from "../shared/tickets";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseBranchSwitch, parseGoogleCalendarAddress, parseGoogleCalendarId, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseBranchSwitch, parseGoogleCalendarAddress, parseGoogleCalendarId, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseSlackClient, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
@@ -147,6 +148,14 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 
 	/** `PUT /api/integrations/sign-out`: removes the sign-ins omp manages for the integration's server, as `/mcp unauth` does; its config stays. */
 	const integrationSignOut = integrationWrite(signOutIntegration);
+
+	const slackClient: Handler = async req => {
+		const write = await guards.writeBody(req);
+		if (write instanceof Response) return write;
+		const parsed = parseSlackClient(write.body);
+		if ("error" in parsed) return fail(400, parsed.error);
+		return answer(() => saveSlackClient(parsed.ok), err => (err instanceof SlackConfigError ? fail(400, err.message) : null));
+	};
 
 	/** `GET /api/google`: the Google calendars added, with why each one's last read failed. */
 	const googleStatus = get(() => Response.json(google.status()));
@@ -383,6 +392,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/integrations": { GET: integrations },
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
 		"/api/integrations/sign-out": { PUT: integrationSignOut },
+		"/api/integrations/slack/client": { PUT: slackClient },
 		"/api/google": { GET: googleStatus },
 		"/api/google/calendars": { PUT: googleCalendarAdd },
 		"/api/google/calendars/remove": { PUT: googleCalendarRemove },
