@@ -3,10 +3,9 @@
  * Each socket message has one parser in {@link clientParsers}, so a {@link ClientMsg} variant without one does not compile.
  * Socket parsers return `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller casts what it received.
  */
-import { GOOGLE_ICAL_ADDRESS } from "../google-calendar";
 import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
-import { MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
+import { GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import type { BranchChoice } from "../shared/git";
@@ -342,34 +341,28 @@ export function parsePullRequestQuery(params: URLSearchParams): PullRequest | nu
 	return parsePullRequest(params.get("owner"), params.get("repo"), Number(params.get("number")));
 }
 
-/** The body of `PUT /api/google/calendars`: `{ url }`, a Google calendar's address in iCal format. */
-export function parseGoogleCalendarAddress(body: unknown): string | null {
-	const url = isObject(body) ? str(body.url)?.trim() : undefined;
-	return url && GOOGLE_ICAL_ADDRESS.test(url) ? url : null;
-}
-
-/** The body of `PUT /api/google/calendars/remove`: `{ id }` of an added calendar. */
-export const parseGoogleCalendarId = (body: unknown): string | null => (isObject(body) ? (nonEmptyStr(body.id) ?? null) : null);
-
 const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
 /** The body of `PUT /api/integrations/sign-in` and `/sign-out`: `{ id }` naming an MCP integration. */
 export const parseIntegrationId = (body: unknown): McpIntegrationId | null => (isObject(body) && isMcpIntegration(body.id) ? body.id : null);
 
+const validPort = (port: unknown): port is number => typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
+
+/** A body's `clientSecret`: trimmed, `undefined` when left out or empty so the saved secret can stay, `null` when it is not a string. */
+function secretOf(body: Record<string, unknown>): string | undefined | null {
+	if (body.clientSecret === undefined) return undefined;
+	if (typeof body.clientSecret !== "string") return null;
+	return body.clientSecret.trim() || undefined;
+}
+
 /** The body of `PUT /api/integrations/slack/client`. An empty secret is omitted so the saved secret can stay. */
 export function parseSlackClient(body: unknown): { ok: SlackClientInput } | { error: string } {
 	if (!isObject(body)) return { error: "Expected { clientId, redirectUri, callbackPort, scope } for the Slack app." };
 	if (typeof body.clientId !== "string" || body.clientId.trim() === "") return { error: "Slack needs the app's client ID." };
-	let clientSecret: string | undefined;
-	if ("clientSecret" in body && body.clientSecret !== undefined) {
-		if (typeof body.clientSecret !== "string") return { error: "Expected clientSecret to be a string." };
-		const trimmed = body.clientSecret.trim();
-		if (trimmed) clientSecret = trimmed;
-	}
+	const clientSecret = secretOf(body);
+	if (clientSecret === null) return { error: "Expected clientSecret to be a string." };
 	if (typeof body.redirectUri !== "string" || body.redirectUri.trim() === "") return { error: "Enter the HTTPS redirect registered on the Slack app." };
-	if (typeof body.callbackPort !== "number" || !Number.isSafeInteger(body.callbackPort) || body.callbackPort < 1 || body.callbackPort > 65535) {
-		return { error: "Enter a local callback port from 1 to 65535." };
-	}
+	if (!validPort(body.callbackPort)) return { error: "Enter a local callback port from 1 to 65535." };
 	if (typeof body.scope !== "string") return { error: "Choose at least one Slack scope from the supported chat and search set." };
 	const scope = normalizeSlackScope(body.scope);
 	if (!scope) return { error: "Choose at least one Slack scope from the supported chat and search set." };
@@ -378,6 +371,17 @@ export function parseSlackClient(body: unknown): { ok: SlackClientInput } | { er
 	if (redirectError) return { error: redirectError };
 	const clientId = body.clientId.trim();
 	return { ok: clientSecret === undefined ? { clientId, redirectUri, callbackPort: body.callbackPort, scope } : { clientId, clientSecret, redirectUri, callbackPort: body.callbackPort, scope } };
+}
+
+/** The body of `PUT /api/integrations/google-calendar/client`. An empty secret is omitted so the saved secret can stay. */
+export function parseGoogleClient(body: unknown): { ok: GoogleClientInput } | { error: string } {
+	if (!isObject(body)) return { error: "Expected { clientId, callbackPort } for the Google OAuth client." };
+	const clientId = typeof body.clientId === "string" ? body.clientId.trim() : "";
+	if (!GOOGLE_CLIENT_ID.test(clientId)) return { error: "Enter the OAuth client's ID, which ends in .apps.googleusercontent.com." };
+	const clientSecret = secretOf(body);
+	if (clientSecret === null) return { error: "Expected clientSecret to be a string." };
+	if (!validPort(body.callbackPort)) return { error: "Enter a local callback port from 1 to 65535." };
+	return { ok: clientSecret === undefined ? { clientId, callbackPort: body.callbackPort } : { clientId, clientSecret, callbackPort: body.callbackPort } };
 }
 
 const isTicketPriority = oneOf(TICKET_PRIORITIES);

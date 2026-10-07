@@ -5,7 +5,19 @@
 import { createCache } from "../cache";
 import { isObject, str } from "../json";
 import { runChecked } from "../proc";
-import { MCP_SERVICES, normalizeSlackScope, type SlackClientInput, type SlackSetup, slackRedirectError, SLACK_USER_SCOPES } from "../shared/accounts";
+import {
+	DEFAULT_GOOGLE_CALLBACK_PORT,
+	GOOGLE_CALENDAR_SCOPES,
+	type GoogleClientInput,
+	type GoogleSetup,
+	googleRedirectUri,
+	MCP_SERVICES,
+	normalizeSlackScope,
+	type SlackClientInput,
+	type SlackSetup,
+	slackRedirectError,
+	SLACK_USER_SCOPES,
+} from "../shared/accounts";
 import { ompCommand } from "./install";
 import {
 	auth,
@@ -155,9 +167,10 @@ export const userMcpConfigPath = (): string => dirs.getMCPConfigPath("user");
 
 const DEFAULT_SLACK_CALLBACK_PORT = 3000;
 
-export class SlackConfigError extends Error {}
+/** A service's OAuth client settings that cannot be saved as given. */
+export class ClientConfigError extends Error {}
 
-export interface SlackSave {
+export interface ClientSave {
 	name: string;
 	server: McpServerConfig;
 	dropCredentials: boolean;
@@ -176,11 +189,14 @@ function validPort(port: number | undefined): port is number {
 	return typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
 }
 
+const clientIdOf = (oauth: McpServerConfig["oauth"]): string | null => (typeof oauth?.clientId === "string" ? oauth.clientId.trim() || null : null);
+const hasSecret = (oauth: McpServerConfig["oauth"]): boolean => typeof oauth?.clientSecret === "string" && oauth.clientSecret.trim().length > 0;
+
 /** Public Slack setup for one stored server. `undefined` is the state before a save. */
 export function slackSetupFrom(server: McpServerConfig | undefined): SlackSetup {
 	const oauth = server?.oauth;
-	const clientId = typeof oauth?.clientId === "string" ? oauth.clientId.trim() || null : null;
-	const hasClientSecret = typeof oauth?.clientSecret === "string" && oauth.clientSecret.trim().length > 0;
+	const clientId = clientIdOf(oauth);
+	const hasClientSecret = hasSecret(oauth);
 	const redirectUri = typeof oauth?.redirectUri === "string" ? oauth.redirectUri.trim() || null : null;
 	const storedPort = oauth?.callbackPort;
 	const callbackPort = validPort(storedPort) ? storedPort : DEFAULT_SLACK_CALLBACK_PORT;
@@ -207,10 +223,23 @@ function serverOnHost(servers: Record<string, McpServerConfig>, host: string): {
 	return undefined;
 }
 
-/** Slack's setup from the user MCP file. Unconfigured Slack still gets the default port and scopes. */
-export async function slackSetup(): Promise<SlackSetup> {
+/** Public Google Calendar setup for one stored server. A callback port must be saved, since omp's own default differs. */
+export function googleSetupFrom(server: McpServerConfig | undefined): GoogleSetup {
+	const oauth = server?.oauth;
+	const clientId = clientIdOf(oauth);
+	const hasClientSecret = hasSecret(oauth);
+	const storedPort = oauth?.callbackPort;
+	const callbackPort = validPort(storedPort) ? storedPort : DEFAULT_GOOGLE_CALLBACK_PORT;
+	return { clientId, hasClientSecret, callbackPort, configured: clientId !== null && hasClientSecret && validPort(storedPort) };
+}
+
+/** Slack's and Google Calendar's setups from the user MCP file. An unconfigured service still gets its defaults. */
+export async function clientSetups(): Promise<{ slack: SlackSetup; "google-calendar": GoogleSetup }> {
 	const servers = await userServers();
-	return slackSetupFrom(serverOnHost(servers, MCP_SERVICES.slack.host)?.config);
+	return {
+		slack: slackSetupFrom(serverOnHost(servers, MCP_SERVICES.slack.host)?.config),
+		"google-calendar": googleSetupFrom(serverOnHost(servers, MCP_SERVICES["google-calendar"].host)?.config),
+	};
 }
 
 function credentialFor(name: string, config: McpServerConfig): McpServer | null {
@@ -222,41 +251,53 @@ function credentialFor(name: string, config: McpServerConfig): McpServer | null 
 	return { name, url, credentialId };
 }
 
+type ClientService = "slack" | "google-calendar";
+
 /**
- * The next Slack server entry for validated `input`, without writing it.
+ * The next server entry for `id` with the client `clientId` and the OAuth settings `oauth`, without writing it.
  * An omitted secret is copied from the same client ID. Changing the client ID without a new secret throws.
  */
-export async function planSlackSave(filePath: string, input: SlackClientInput): Promise<SlackSave> {
-	const clientId = input.clientId.trim();
+async function planClientSave(filePath: string, id: ClientService, clientId: string, submitted: string | undefined, oauth: NonNullable<McpServerConfig["oauth"]>): Promise<ClientSave> {
+	const { label, host, url, serverName } = MCP_SERVICES[id];
 	const file = await mcpConfigWriter.readMCPConfigFile(filePath);
 	const servers = file.mcpServers ?? {};
-	const current = serverOnHost(servers, MCP_SERVICES.slack.host);
-	if (!current && servers.slack) {
-		throw new SlackConfigError('omp already has an MCP server named "slack" for a different address. Rename that server, then save the Slack app.');
+	const current = serverOnHost(servers, host);
+	if (!current && servers[serverName]) {
+		throw new ClientConfigError(`omp already has an MCP server named "${serverName}" for a different address. Rename that server, then save the ${label} app.`);
 	}
 	const existing = current?.config.oauth;
-	const existingId = typeof existing?.clientId === "string" ? existing.clientId.trim() || null : null;
-	const existingSecret = typeof existing?.clientSecret === "string" && existing.clientSecret.trim() ? existing.clientSecret : undefined;
-	const submittedSecret = input.clientSecret?.trim() || undefined;
+	const existingId = clientIdOf(existing);
+	const existingSecret = hasSecret(existing) ? existing?.clientSecret : undefined;
+	const submittedSecret = submitted?.trim() || undefined;
 	if (submittedSecret === undefined && (existingId !== clientId || !existingSecret)) {
-		throw new SlackConfigError(existingId && existingId !== clientId ? "Changing the Slack client ID needs the new app's client secret." : "Slack needs the app's client secret.");
+		throw new ClientConfigError(existingId && existingId !== clientId ? `Changing the ${label} client ID needs the new app's client secret.` : `${label} needs the app's client secret.`);
 	}
 	const clientSecret = submittedSecret ?? existingSecret;
-	if (!clientSecret) throw new SlackConfigError("Slack needs the app's client secret.");
-	const name = current?.name ?? "slack";
-	const server: McpServerConfig = {
-		...current?.config,
-		type: "http",
-		url: current?.config.url ?? MCP_SERVICES.slack.url,
-		oauth: { ...existing, clientId, clientSecret, scope: input.scope, redirectUri: input.redirectUri, callbackPort: input.callbackPort },
-	};
+	if (!clientSecret) throw new ClientConfigError(`${label} needs the app's client secret.`);
+	const server: McpServerConfig = { ...current?.config, type: "http", url: current?.config.url ?? url, oauth: { ...existing, ...oauth, clientId, clientSecret } };
 	if (server.auth) server.auth = { ...server.auth, clientId, clientSecret };
 	const dropCredentials = current !== undefined && (existingId !== clientId || (submittedSecret !== undefined && submittedSecret !== existingSecret));
-	return { name, server, dropCredentials, credential: current ? credentialFor(current.name, current.config) : null };
+	return { name: current?.name ?? serverName, server, dropCredentials, credential: current ? credentialFor(current.name, current.config) : null };
 }
 
+/** The next Slack server entry for validated `input`, without writing it. */
+export const planSlackSave = (filePath: string, input: SlackClientInput): Promise<ClientSave> =>
+	planClientSave(filePath, "slack", input.clientId.trim(), input.clientSecret, { scope: input.scope, redirectUri: input.redirectUri, callbackPort: input.callbackPort });
+
+/**
+ * The next Google Calendar server entry for validated `input`, without writing it: the client, the scopes the dashboard
+ * and the MCP server's tools need, a consent prompt so Google grants a refresh token every time, and the loopback redirect.
+ */
+export const planGoogleSave = (filePath: string, input: GoogleClientInput): Promise<ClientSave> =>
+	planClientSave(filePath, "google-calendar", input.clientId.trim(), input.clientSecret, {
+		scope: GOOGLE_CALENDAR_SCOPES.join(" "),
+		prompt: "consent",
+		redirectUri: googleRedirectUri(input.callbackPort),
+		callbackPort: input.callbackPort,
+	});
+
 /** Writes `save` with omp's locked, owner-only MCP config writer. */
-export function commitSlackSave(filePath: string, save: SlackSave): Promise<void> {
+export function commitClientSave(filePath: string, save: ClientSave): Promise<void> {
 	return mcpConfigWriter.updateMCPServer(filePath, save.name, save.server);
 }
 
@@ -280,20 +321,39 @@ function toolError(text: string): string {
 /** The server refused omp's sign-in, so only a new sign-in helps. */
 export class McpRefused extends Error {}
 
+/** Forgets `server`'s token and tool list once a service refused the token, and the error that says so. */
+function refused(server: McpServer): McpRefused {
+	tokens.drop(server.credentialId);
+	checks.drop(server.credentialId);
+	return new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it in Settings › Integrations, or run /mcp reauth ${server.name} in omp.`);
+}
+
 /** `method`'s result on `server`, called with omp's sign-in for it; the server's own message thrown when it answers an error. */
 async function request(server: McpServer, method: string, params: Record<string, unknown>): Promise<unknown> {
 	const response = await mcpRpc.callMCP(server.url, method, params, {
 		headers: { Authorization: `Bearer ${await tokenOf(server.credentialId)}` },
 		signal: AbortSignal.timeout(TIMEOUT_MS),
-		onHttpError: ({ status }) => {
-			if (status !== 401) return new Error(`The "${server.name}" MCP server answered HTTP ${status}`);
-			tokens.drop(server.credentialId);
-			checks.drop(server.credentialId);
-			return new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it in Settings › Integrations, or run /mcp reauth ${server.name} in omp.`);
-		},
+		onHttpError: ({ status }) => (status === 401 ? refused(server) : new Error(`The "${server.name}" MCP server answered HTTP ${status}`)),
 	});
 	if (response.error) throw new Error(response.error.message || "The MCP server answered an error");
 	return response.result;
+}
+
+/**
+ * The JSON at `url`, an API of the service behind `server` that takes the same OAuth token, read with omp's sign-in.
+ * Throws {@link McpRefused} on 401, and the API's own `error.message` on another failure.
+ */
+export async function readWithMcpSignIn(server: McpServer, url: string): Promise<unknown> {
+	const response = await fetch(url, { headers: { Authorization: `Bearer ${await tokenOf(server.credentialId)}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+	if (response.status === 401) throw refused(server);
+	const text = await response.text();
+	if (response.ok) return toolJson(new URL(url).host, "API", text);
+	let message: string | undefined;
+	try {
+		const parsed: unknown = JSON.parse(text);
+		message = isObject(parsed) && isObject(parsed.error) ? str(parsed.error.message) : undefined;
+	} catch {}
+	throw new Error(message ?? `${new URL(url).host} answered HTTP ${response.status}`);
 }
 
 /** The text that `tool` answers for `args` on `server`; the server's own message thrown when the call fails. */

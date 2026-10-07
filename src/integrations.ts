@@ -7,18 +7,29 @@ import { errorText } from "./json";
 import {
 	addMcpServer,
 	checkMcpServer,
-	commitSlackSave,
+	type ClientSave,
+	clientSetups,
+	commitClientSave,
 	findMcpServer,
 	type McpServer,
 	McpRefused,
 	mcpSignedIn,
+	planGoogleSave,
 	planSlackSave,
 	signInMcp,
 	signOutMcp,
-	slackSetup,
 	userMcpConfigPath,
 } from "./omp/mcp";
-import { type IntegrationsAnswer, MCP_INTEGRATIONS, MCP_SERVICES, type McpConnection, type McpIntegration, type McpIntegrationId, type SlackClientInput } from "./shared/accounts";
+import {
+	type GoogleClientInput,
+	type IntegrationsAnswer,
+	MCP_INTEGRATIONS,
+	MCP_SERVICES,
+	type McpConnection,
+	type McpIntegration,
+	type McpIntegrationId,
+	type SlackClientInput,
+} from "./shared/accounts";
 import { createSignIn, type SignIn } from "./sign-in";
 
 const signIns = Object.fromEntries(
@@ -63,8 +74,8 @@ async function loadIntegration(id: McpIntegrationId, found: McpServer | null, fr
 	const connection =
 		signIn?.phase === "waiting" && last ? last : await connectionOf(found, { signedIn: mcpSignedIn, tools: server => checkMcpServer(server, fresh) });
 	lastConnections.set(id, connection);
-	const setup = id === "slack" ? await slackSetup() : null;
-	return { id, connection, signIn, setup };
+	const setup = id === "linear" ? null : (await clientSetups())[id];
+	return { id, connection, signIn, setup } as McpIntegration;
 }
 
 const findServer = (id: McpIntegrationId): Promise<McpServer | null> => findMcpServer(MCP_SERVICES[id].host);
@@ -75,7 +86,10 @@ export async function loadIntegrations(fresh: boolean): Promise<IntegrationsAnsw
 	return { integrations: Object.fromEntries(loaded.map(integration => [integration.id, integration])) as IntegrationsAnswer["integrations"] };
 }
 
-const SLACK_SETUP_ERROR = "Set up the Slack app before connecting. Save a client ID, client secret, HTTPS redirect, callback port, and at least one supported scope.";
+const SETUP_ERROR: Record<Exclude<McpIntegrationId, "linear">, string> = {
+	slack: "Set up the Slack app before connecting. Save a client ID, client secret, HTTPS redirect, callback port, and at least one supported scope.",
+	"google-calendar": "Set up the Google OAuth client before connecting. Save its client ID, client secret, and callback port.",
+};
 
 /**
  * Starts a sign-in to `id`, abandoning any under way, and answers once it has the service's authorization address or
@@ -85,7 +99,7 @@ export async function startIntegrationSignIn(id: McpIntegrationId): Promise<McpI
 	const service = MCP_SERVICES[id];
 	await signIns[id].start(async (signal, waiting) => {
 		const found = await findServer(id);
-		if (id === "slack" && !(await slackSetup()).configured) throw new Error(SLACK_SETUP_ERROR);
+		if (id !== "linear" && !(await clientSetups())[id].configured) throw new Error(SETUP_ERROR[id]);
 		await signInMcp(found ?? { url: service.url }, { onAuth: waiting, signal, requireRefresh: id === "slack" });
 		if (!found) await addMcpServer(service.serverName, service.url);
 	});
@@ -93,17 +107,21 @@ export async function startIntegrationSignIn(id: McpIntegrationId): Promise<McpI
 }
 
 /**
- * Saves Slack's app in the user MCP config and answers the integration.
+ * Saves `id`'s OAuth client, as `plan` makes it from the user MCP config, and answers the integration.
  * A waiting sign-in is cancelled. A new client ID or secret also drops the credentials omp manages for that server.
  */
-export async function saveSlackClient(input: SlackClientInput): Promise<McpIntegration> {
+async function saveClient(id: Exclude<McpIntegrationId, "linear">, plan: (path: string) => Promise<ClientSave>): Promise<McpIntegration> {
 	const path = userMcpConfigPath();
-	const planned = await planSlackSave(path, input);
-	signIns.slack.cancel();
+	const planned = await plan(path);
+	signIns[id].cancel();
 	if (planned.dropCredentials && planned.credential) await signOutMcp(planned.credential);
-	await commitSlackSave(path, planned);
-	return loadIntegration("slack", await findServer("slack"), false);
+	await commitClientSave(path, planned);
+	return loadIntegration(id, await findServer(id), false);
 }
+
+export const saveSlackClient = (input: SlackClientInput): Promise<McpIntegration> => saveClient("slack", path => planSlackSave(path, input));
+
+export const saveGoogleClient = (input: GoogleClientInput): Promise<McpIntegration> => saveClient("google-calendar", path => planGoogleSave(path, input));
 
 /** Abandons a sign-in to `id` under way and signs omp out of its server, which stays in omp's config. */
 export async function signOutIntegration(id: McpIntegrationId): Promise<McpIntegration> {

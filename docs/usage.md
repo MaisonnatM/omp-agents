@@ -623,14 +623,15 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Integrations
 
-- **Integrations** is a section of [Settings](#settings): a row for each service omp's sessions reach through an MCP server, Linear and Slack so far, and one for Google Calendar, which only the dashboard reads.
+- **Integrations** is a section of [Settings](#settings): a row for each service omp's sessions reach through an MCP server, Linear, Slack, and Google Calendar so far.
   **Connected** lists the services that hold a sign-in, working or not, and **Available** lists the rest.
 - Each MCP row shows whether omp is connected, by listing the server's tools with omp's sign-in: **Connected** with the server's host and the number of tools, which unfolds to their names, **Needs reconnecting** when the server refuses the sign-in, **Unreachable** with the server's error and **Check again**, or **Not connected** or **Signed out** when omp has no server or no sign-in for it.
-  An unconfigured Slack row says **Not set up** until its app settings are saved.
+  An unconfigured Slack or Google Calendar row says **Not set up** until its OAuth client is saved.
   The section checks again every minute while it is open, and **Refresh** checks at once.
-- **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp` or `https://mcp.slack.com/mcp`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
+- **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, `https://mcp.slack.com/mcp`, or `https://calendarmcp.googleapis.com/mcp/v1`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
   Linear sends the browser back to `localhost:3000`, so that port must be free while you sign in.
   Slack sends the browser to the HTTPS redirect saved for the app, and omp listens for HTTP on the saved callback port.
+  Google Calendar sends the browser back to `localhost` on the saved callback port, 3119 unless you change it.
   While it waits, the row says so, links to the sign-in page again, and hides its other buttons.
 - A connected row's ⋯ menu holds **Reconnect**, which signs in again over a sign-in that the server refused or that still works, and **Sign out**.
   **Sign out** asks first, then removes the sign-ins omp manages for the service, as omp's `/mcp unauth` does, so omp's sessions lose its tools too; the server stays in `mcp.json`.
@@ -663,7 +664,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   **Replace app settings** in the ⋯ menu opens the form again.
   Changing the client ID or the secret signs omp out of Slack and drops the old credentials.
   Saving a different scope selection changes the next **Connect** or **Reconnect**, not the existing sign-in.
-- Google Calendar's **Add calendar** opens the steps to find a calendar's **Secret address in iCal format** in Google Calendar's settings and the field to paste it; the row then lists each calendar added, in its color, with why its last read failed, and its ⋯ menu holds **Remove**.
+- Google Calendar shows **Not set up** and **Set up** until its OAuth client is saved.
+  In a [Google Cloud project](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com), turn on the Google Calendar API.
+  Under [Credentials](https://console.cloud.google.com/apis/credentials), create an OAuth client ID of type **Web application**, and add `http://localhost:3119/callback`, with your callback port, as an authorized redirect URI.
+  Paste the client ID and secret, then **Connect**; Google asks you to grant reading and editing your events, reading your calendar list, and free/busy.
+  omp stores the secret in that server's entry in `~/.omp/agent/mcp.json`, and the secret, client-change, and **Replace OAuth client** rules are Slack's.
+  Once connected, the row lists the calendars the Calendar page shows, in their colors, with why the last read of one failed.
+  Google Calendar's MCP tools answer omp's sessions only when the client's Google Cloud project is in Google's Workspace Developer Preview Program; the Calendar page reads Google's Calendar API and does not need it.
 
 ## Todo list
 
@@ -772,13 +779,11 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - A day cell shows three entries and how many more there are; today's number is circled.
   Hover a day, or focus its number, to see all of its entries in a card beside it, each a link like in the day's list.
   Click a day's number, or its **+N more**, to list all of its entries beside the month; today is listed when the page opens.
-- Click an entry to open its routine, its todo list, or its ticket; a Google event opens its day in Google Calendar in a new tab.
+- Click an entry to open its routine, its todo list, or its ticket; a Google event opens in Google Calendar in a new tab.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
-- To show Google events, open Google Calendar's settings, choose a calendar under **Settings for my calendars**, then **Integrate calendar**, and copy its **Secret address in iCal format**.
-  In **Settings › Integrations**, choose **Add calendar** on Google Calendar's row and paste it; add each calendar you want shown.
-  Anyone with the address can read the calendar, so the server keeps it in `google.json` beside its access token with owner-only file permissions and never sends it to the page; **Reset** in Google Calendar's settings makes a new one.
-  A Workspace administrator can turn the secret address off, and then Google Calendar's settings do not show it.
-  The page expands repeating events, leaves out canceled events and the ones you declined, repeats multi-day events on each day, and refreshes the open month every minute.
+- To show Google events, connect Google Calendar in **Settings › Integrations**; see [Integrations](#integrations).
+  The page shows the calendars checked in Google Calendar's own list, so check or uncheck one there to show or hide it here.
+  It leaves out canceled events, the ones you declined, and working locations, repeats multi-day events on each day, and refreshes the open month every minute.
 
 ## Routines
 

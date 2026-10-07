@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { commitSlackSave, planSlackSave, type SlackSave, slackSetupFrom } from "./mcp";
+import { type ClientSave, commitClientSave, googleSetupFrom, planGoogleSave, planSlackSave, slackSetupFrom } from "./mcp";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -23,9 +23,9 @@ const app = {
 	scope: "chat:write channels:history",
 };
 
-async function save(path: string, input: typeof app | Omit<typeof app, "clientSecret">): Promise<SlackSave> {
+async function save(path: string, input: typeof app | Omit<typeof app, "clientSecret">): Promise<ClientSave> {
 	const planned = await planSlackSave(path, input);
-	await commitSlackSave(path, planned);
+	await commitClientSave(path, planned);
 	return planned;
 }
 
@@ -96,3 +96,36 @@ test("changing the Slack client ID without a new secret does not write, and a di
 	expect(readFileSync(ready, "utf8")).toBe(before);
 });
 
+test("a Google client save asks for consent and the calendar scopes, redirects to its callback port, and keeps the secret only for the same client", async () => {
+	const path = configPath();
+	writeFileSync(path, JSON.stringify({ mcpServers: { calendar: { type: "http", url: "https://calendarmcp.googleapis.com/mcp/v1", auth: { type: "oauth", credentialId: "cal-id" } } } }));
+	const first = await planGoogleSave(path, { clientId: "1-a.apps.googleusercontent.com", clientSecret: "first-secret", callbackPort: 3119 });
+	await commitClientSave(path, first);
+	expect(first.name).toBe("calendar");
+	expect(JSON.parse(readFileSync(path, "utf8")).mcpServers.calendar.oauth).toEqual({
+		clientId: "1-a.apps.googleusercontent.com",
+		clientSecret: "first-secret",
+		scope: "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly https://www.googleapis.com/auth/calendar.events.freebusy",
+		prompt: "consent",
+		redirectUri: "http://localhost:3119/callback",
+		callbackPort: 3119,
+	});
+	expect(googleSetupFrom(first.server)).toEqual({ clientId: "1-a.apps.googleusercontent.com", hasClientSecret: true, callbackPort: 3119, configured: true });
+
+	const moved = await planGoogleSave(path, { clientId: "1-a.apps.googleusercontent.com", callbackPort: 3120 });
+	expect(moved.dropCredentials).toBe(false);
+	expect(moved.server.oauth).toMatchObject({ clientSecret: "first-secret", redirectUri: "http://localhost:3120/callback", callbackPort: 3120 });
+	await expect(planGoogleSave(path, { clientId: "2-b.apps.googleusercontent.com", callbackPort: 3119 })).rejects.toThrow("needs the new app's client secret");
+	const replaced = await planGoogleSave(path, { clientId: "2-b.apps.googleusercontent.com", clientSecret: "second-secret", callbackPort: 3119 });
+	expect(replaced.dropCredentials).toBe(true);
+	expect(replaced.credential).toEqual({ name: "calendar", url: "https://calendarmcp.googleapis.com/mcp/v1", credentialId: "cal-id" });
+});
+
+test("a Google client without a saved callback port is not set up, since omp would listen on another port", () => {
+	expect(googleSetupFrom({ oauth: { clientId: "1-a.apps.googleusercontent.com", clientSecret: "s" } })).toEqual({
+		clientId: "1-a.apps.googleusercontent.com",
+		hasClientSecret: true,
+		callbackPort: 3119,
+		configured: false,
+	});
+});

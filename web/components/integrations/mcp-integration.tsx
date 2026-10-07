@@ -9,7 +9,8 @@ import { errorText, putJson } from "../../api";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
-import { type BrandLogo, LINEAR_LOGO, SLACK_LOGO } from "./brand-logos";
+import { type BrandLogo, GOOGLE_CALENDAR_LOGO, LINEAR_LOGO, SLACK_LOGO } from "./brand-logos";
+import { GoogleClientForm } from "./google-calendar";
 import { Callout, IntegrationRow, MetaDot } from "./integration-row";
 import { SlackAppForm } from "./slack-app-form";
 
@@ -17,6 +18,8 @@ interface Service {
 	logo: BrandLogo;
 	/** What the connection gives the dashboard and omp's sessions. */
 	gives: string;
+	/** What the service's own OAuth client is called, for a service that needs one. */
+	client?: string;
 }
 
 const SERVICES: Record<McpIntegrationId, Service> = {
@@ -27,6 +30,12 @@ const SERVICES: Record<McpIntegrationId, Service> = {
 	slack: {
 		logo: SLACK_LOGO,
 		gives: "Search, read, and send in the conversations you grant, in every omp session.",
+		client: "Dedicated internal app",
+	},
+	"google-calendar": {
+		logo: GOOGLE_CALENDAR_LOGO,
+		gives: "Your calendars' events on the Calendar tab, and Google Calendar's tools in every omp session.",
+		client: "Your Google OAuth client",
 	},
 };
 
@@ -101,13 +110,13 @@ function SignOutConfirm({ id, name, onDone }: { id: McpIntegrationId; name: stri
 	);
 }
 
-/** One service whose MCP server omp signs in to: where omp stands with it, and the buttons that sign in and out. */
-export function McpIntegrationRow({ integration }: { integration: McpIntegration }) {
-	const { id, connection } = integration;
+/** One service whose MCP server omp signs in to: where omp stands with it, the buttons that sign in and out, and `children` below. */
+export function McpIntegrationRow({ integration, children }: { integration: McpIntegration; children?: ReactNode }) {
+	const { id, connection, setup } = integration;
 	const { label } = MCP_SERVICES[id];
 	const service = SERVICES[id];
-	const setup = id === "slack" ? integration.setup : null;
-	const needsSetup = id === "slack" && !setup?.configured;
+	const needsSetup = setup !== null && !setup.configured;
+	const settingsLabel = id === "slack" ? "app settings" : "OAuth client";
 	const start = async (): Promise<SignInState> => (await putJson<McpIntegration>("/api/integrations/sign-in", { id })).signIn;
 	const { starting, waitingUrl, failure, connect } = useSignIn(integration.signIn, integrationsStore.refresh, start);
 	const { refreshing } = integrationsStore.use();
@@ -135,10 +144,10 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 							Reconnect
 						</MenuItem>
 					)}
-					{id === "slack" && (
+					{setup !== null && (
 						<MenuItem onClick={() => setFormOpen(true)}>
 							<KeyRound />
-							{setup?.configured ? "Replace app settings" : "Set up"}
+							{setup.configured ? `Replace ${settingsLabel}` : "Set up"}
 						</MenuItem>
 					)}
 					<MenuSeparator />
@@ -154,11 +163,11 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 					<Button variant="secondary" size="compact" loading={starting} onClick={() => void connect()}>
 						Connect
 					</Button>
-					{id === "slack" && (
+					{setup !== null && (
 						<MoreActionsMenu name={label} disabled={starting}>
 							<MenuItem onClick={() => setFormOpen(true)}>
 								<KeyRound />
-								Replace app settings
+								Replace {settingsLabel}
 							</MenuItem>
 						</MoreActionsMenu>
 					)}
@@ -203,7 +212,7 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 					</Button>
 				}
 			>
-				{needsSetup ? "Complete the Slack app settings before you reconnect." : `${label} refused omp's sign-in. Reconnect to sign in again.`}
+				{needsSetup ? `Complete the ${label} ${settingsLabel} before you reconnect.` : `${label} refused omp's sign-in. Reconnect to sign in again.`}
 			</Callout>
 		);
 	} else if (connection.kind === "failing") {
@@ -237,7 +246,7 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 					<span>MCP</span>
 					<MetaDot />
 					{needsSetup ? (
-						<span>Dedicated internal app</span>
+						<span>{service.client}</span>
 					) : connection.kind === "absent" ? (
 						<span>
 							Connecting adds it to omp's <code className="font-mono">mcp.json</code>
@@ -245,11 +254,11 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 					) : (
 						<span className="font-mono">{connection.server.host}</span>
 					)}
-					{setup?.configured && setup.redirectUri && (
+					{integration.id === "slack" && integration.setup.configured && integration.setup.redirectUri && (
 						<>
 							<MetaDot />
-							<span className="max-w-56 truncate font-mono" title={setup.redirectUri}>
-								{setup.redirectUri}
+							<span className="max-w-56 truncate font-mono" title={integration.setup.redirectUri}>
+								{integration.setup.redirectUri}
 							</span>
 						</>
 					)}
@@ -281,7 +290,9 @@ export function McpIntegrationRow({ integration }: { integration: McpIntegration
 			actions={actions}
 		>
 			{callout}
-			{formOpen && <SlackAppForm setup={setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />}
+			{formOpen && integration.id === "slack" && <SlackAppForm setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />}
+			{formOpen && integration.id === "google-calendar" && <GoogleClientForm setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />}
+			{children}
 			{connection.kind === "ready" && toolsOpen && <ToolList id={toolsId} tools={connection.tools} server={connection.server} />}
 		</IntegrationRow>
 	);

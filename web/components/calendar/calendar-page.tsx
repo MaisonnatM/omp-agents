@@ -1,5 +1,6 @@
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import type { Routine } from "../../../src/routines";
+import { callable } from "../../../src/shared/accounts";
 import type { UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -18,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { type CalendarEntry, calendarEntries } from "../../calendar-model";
 import { localDay } from "../../days";
-import { calendarEventsStore, googleStore, ticketsStore } from "../../reads";
+import { calendarEventsStore, integrationsStore, ticketsStore } from "../../reads";
 import { hashForRoutines, hashForTickets, hashForTodo } from "../../routing";
 import { scheduleWords, timeWords } from "../../routines-model";
 import { useMinute } from "../../use-minute";
@@ -267,7 +268,8 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 	const [year, setYear] = useCalendarYear();
 	const [selected, setSelected] = useState<Date | null>(() => new Date(now));
 	const tickets = ticketsStore.usePolling(null, ticketsShown).read?.data.tickets ?? null;
-	const connected = (googleStore.usePolling().read?.data.calendars.length ?? 0) > 0;
+	const googleConnection = integrationsStore.usePolling().read?.data.integrations["google-calendar"].connection;
+	const connected = googleConnection !== undefined && callable(googleConnection);
 	const span = new URLSearchParams({ from: new Date(year, month, 1).toISOString(), to: new Date(year, month + 1, 1).toISOString() }).toString();
 	const eventsRead = calendarEventsStore.usePolling(span, connected);
 	const events = connected ? (eventsRead.read?.data.events ?? null) : null;

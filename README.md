@@ -46,6 +46,8 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - **Slack.**
   Search, history, and sending in Slack from every omp session, through Slack's MCP server at `https://mcp.slack.com/mcp`.
   Save a dedicated internal Slack app in **Settings › Integrations**, then connect it.
+- **Calendar.**
+  A month of routine runs, due todos and Linear tickets, and your Google Calendar's events, read with omp's sign-in to Google Calendar's MCP server.
 - **Your own todo list.**
   Categories, due days with a Today list, drag-to-reorder, search, and an archive with undo.
   A todo links to the sessions, pull requests, and Linear issues it is about, starts a session or opens a Linear issue from its notes, and agents add the steps only you can take through the starter kit's `user_todo` tool and check off a todo once they finish its work.
@@ -73,6 +75,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 - Optional, for the pull request inbox: the [GitHub CLI](https://cli.github.com) (`gh`), signed in with `gh auth login`.
 - Optional, for the Linear tickets: Linear's MCP server added to omp (`/mcp add` with `https://mcp.linear.app/mcp`) and signed in.
 - Optional, for Slack in omp sessions: a dedicated internal Slack app, with the MCP server and token rotation turned on, an HTTPS redirect, and the user scopes you choose, saved from **Settings › Integrations**.
+- Optional, for Google Calendar: a Google OAuth client of type Web application, with the Google Calendar API turned on, saved from **Settings › Integrations**.
 
 ## Quick start
 

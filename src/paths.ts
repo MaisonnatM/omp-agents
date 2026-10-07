@@ -24,8 +24,8 @@ export const userTodoInboxDir = join(configDir, "todo-inbox");
 export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
 export const routinesFile = join(configDir, "routines.json");
-/** The Google calendars' addresses you added, which read them, beside {@link tokenFile}. */
-export const googleFile = join(configDir, "google.json");
+/** The Google calendars' secret addresses an older version kept, beside {@link tokenFile}; the server deletes it at startup. */
+export const oldGoogleFile = join(configDir, "google.json");
 
 /** `path` with the home directory shortened to `~`. */
 export const displayPath = (path: string): string =>

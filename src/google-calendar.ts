@@ -1,217 +1,138 @@
 /**
- * Google Calendar, read-only: the secret addresses in iCal format you add in the settings, and the events of those
- * calendars, which the Calendar page lists. Each address is a calendar's whole feed, which the server expands by span.
+ * Google Calendar, read-only: the calendars checked in your Google Calendar's list and their events, which the Calendar
+ * page lists. It reads Google's Calendar API with the token omp holds for its Google Calendar MCP server, the same
+ * sign-in and scopes: the server's own tools answer only for OAuth clients in Google's Developer Preview Program.
  */
-import { createHash } from "node:crypto";
-import ICAL from "ical.js";
 import { createCache } from "./cache";
-import { JsonFile } from "./fs";
-import { errorText, isObject, nonEmptyStr } from "./json";
-import type { CalendarEvent, CalendarEventsAnswer, GoogleCalendarFeed, GoogleStatus } from "./shared/accounts";
+import { errorText, isObject, nonEmptyStr, str } from "./json";
+import type { CalendarEvent, CalendarEventsAnswer, GoogleCalendar, GoogleStatus } from "./shared/accounts";
 
-/** A Google calendar's secret or public address in iCal format, its calendar id first, as its **Integrate calendar** settings show it. */
-export const GOOGLE_ICAL_ADDRESS = /^https:\/\/calendar\.google\.com\/calendar\/ical\/([^/?#]+)\/(?:private-[0-9a-f]+|public)\/basic\.ics$/;
+const API = "https://www.googleapis.com/calendar/v3";
 
-/** Google Calendar's own event colors, which new calendars take in turn. */
-const PALETTE = ["#039be5", "#33b679", "#8e24aa", "#e67c73", "#f6bf26", "#f4511e", "#7986cb", "#0b8043", "#3f51b5", "#d50000", "#616161"];
+/** Google Calendar's default calendar color, for a list entry that names none. */
+const DEFAULT_COLOR = "#039be5";
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
-const DAY_VIEW = "https://calendar.google.com/calendar/r/day";
+/** Reads the JSON at a Google Calendar API address with your sign-in. */
+export type GoogleGet = (url: string) => Promise<unknown>;
 
-interface StoredCalendar {
-	url: string;
-	name: string;
-	color: string;
+/** A calendar list entry as the page shows it, or `null` for one unchecked in Google Calendar or without an id. */
+function calendarOf(item: unknown): Omit<GoogleCalendar, "error"> | null {
+	if (!isObject(item) || item.selected !== true) return null;
+	const id = nonEmptyStr(item.id);
+	if (!id) return null;
+	const color = str(item.backgroundColor);
+	return { id, name: nonEmptyStr(item.summaryOverride) ?? nonEmptyStr(item.summary) ?? id, color: color && HEX_COLOR.test(color) ? color : DEFAULT_COLOR };
 }
 
-interface Stored {
-	calendars: StoredCalendar[];
-}
+/** The day before `day`, both `YYYY-MM-DD`. */
+const dayBefore = (day: string): string => new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
 
-function parseStored(json: unknown): Stored | null {
-	if (!isObject(json) || !Array.isArray(json.calendars)) return null;
-	const calendars = json.calendars.flatMap(item => {
-		if (!isObject(item)) return [];
-		const url = nonEmptyStr(item.url);
-		const name = nonEmptyStr(item.name);
-		const color = nonEmptyStr(item.color);
-		return url && name && color && GOOGLE_ICAL_ADDRESS.test(url) ? [{ url, name, color }] : [];
-	});
-	return { calendars };
-}
-
-/** The email of the account whose calendar `url` is, or `null` for a shared or holiday calendar, whose id is Google's. */
-function ownerOf(url: string): string | null {
-	let id: string;
-	try {
-		id = decodeURIComponent(GOOGLE_ICAL_ADDRESS.exec(url)?.[1] ?? "").toLowerCase();
-	} catch {
-		return null;
-	}
-	return id.includes("@") && !id.endsWith("calendar.google.com") ? id : null;
-}
-
-/** An added calendar: its address, what the settings show of it, and `owner`, whose declined events it leaves out. */
-interface Calendar extends GoogleCalendarFeed {
-	url: string;
-	owner: string | null;
-}
-
-const calendarOf = ({ url, name, color }: StoredCalendar): Calendar => ({
-	url,
-	id: createHash("sha256").update(url).digest("hex").slice(0, 12),
-	name,
-	color,
-	owner: ownerOf(url),
-	error: null,
-});
-
-/** One occurrence of an event as the page shows it, or `null` for one Google Calendar hides: canceled, declined, or with no length. */
-function toCalendarEvent(item: ICAL.Event, start: ICAL.Time, end: ICAL.Time, id: string, calendar: Pick<Calendar, "name" | "color" | "owner">): CalendarEvent | null {
-	if (item.component.getFirstPropertyValue("status") === "CANCELLED") return null;
-	const { owner } = calendar;
-	if (owner && item.attendees.some(attendee => String(attendee.getFirstValue()).toLowerCase() === `mailto:${owner}` && attendee.getParameter("partstat") === "DECLINED")) return null;
-	const event = { id, title: item.summary || "(No title)", calendar: calendar.name, color: calendar.color };
-	if (start.isDate) {
-		const firstDay = start.toString();
-		// iCal ends an all-day event on the day after it.
-		const last = end.clone();
-		last.adjust(-1, 0, 0, 0);
-		const lastDay = end.isDate && last.compare(start) > 0 ? last.toString() : firstDay;
-		return { ...event, url: `${DAY_VIEW}/${start.year}/${start.month}/${start.day}`, when: { allDay: true, firstDay, lastDay } };
-	}
-	const [startAt, endAt] = [start.toJSDate(), end.toJSDate()];
-	if (endAt <= startAt) return null;
-	const url = `${DAY_VIEW}/${startAt.getFullYear()}/${startAt.getMonth() + 1}/${startAt.getDate()}`;
-	return { ...event, url, when: { allDay: false, start: startAt.getTime(), end: endAt.getTime() } };
-}
-
-/** The calendar `ics` describes, checked to be one, with the time zones its events name registered. */
-export function parseFeed(ics: string): ICAL.Component {
-	let root: ICAL.Component | null;
-	try {
-		root = new ICAL.Component(ICAL.parse(ics));
-	} catch {
-		root = null;
-	}
-	if (root?.name !== "vcalendar") throw new Error("The address answered something other than a calendar");
-	for (const zone of root.getAllSubcomponents("vtimezone")) ICAL.TimezoneService.register(zone);
-	return root;
-}
-
-/** The events of `root` that overlap `from` to `to`, each repeat apart, with Google's moved and removed repeats applied. */
-export function expandFeed(root: ICAL.Component, calendar: Pick<Calendar, "id" | "name" | "color" | "owner">, from: Date, to: Date): CalendarEvent[] {
-	const [start, end] = [ICAL.Time.fromJSDate(from, true), ICAL.Time.fromJSDate(to, true)];
-	const events: CalendarEvent[] = [];
-	/** Adds `item` from `first` to `last` when it overlaps the span; `due` is a repeat's original start, which its id ends with. */
-	const emit = (item: ICAL.Event, first: ICAL.Time, last: ICAL.Time, due?: ICAL.Time): void => {
-		if (last.compare(start) <= 0 || first.compare(end) >= 0) return;
-		const event = toCalendarEvent(item, first, last, due ? `${calendar.id}/${item.uid}/${due}` : `${calendar.id}/${item.uid}`, calendar);
-		if (event) events.push(event);
+/**
+ * One event as the page shows it, or `null` for one Google Calendar hides or draws apart: canceled, declined by you,
+ * a working location, or with no length.
+ */
+function eventOf(item: unknown, calendar: Omit<GoogleCalendar, "error">): CalendarEvent | null {
+	if (!isObject(item) || item.status === "cancelled" || item.eventType === "workingLocation") return null;
+	const id = nonEmptyStr(item.id);
+	if (!id || !isObject(item.start) || !isObject(item.end)) return null;
+	const attendees = Array.isArray(item.attendees) ? item.attendees : [];
+	if (attendees.some(attendee => isObject(attendee) && attendee.self === true && attendee.responseStatus === "declined")) return null;
+	const event = {
+		id: `${calendar.id}/${id}`,
+		title: nonEmptyStr(item.summary) ?? "(No title)",
+		calendar: calendar.name,
+		color: calendar.color,
+		url: nonEmptyStr(item.htmlLink) ?? "https://calendar.google.com/calendar/r",
 	};
-	const masters = new Map<string, ICAL.Event>();
-	const moved: ICAL.Event[] = [];
-	for (const component of root.getAllSubcomponents("vevent")) {
-		const event = new ICAL.Event(component);
-		if (event.isRecurrenceException()) moved.push(event);
-		else masters.set(event.uid, event);
+	const firstDay = str(item.start.date);
+	if (firstDay) {
+		// Google ends an all-day event on the day after it.
+		const end = str(item.end.date);
+		return { ...event, when: { allDay: true, firstDay, lastDay: end && end > firstDay ? dayBefore(end) : firstDay } };
 	}
-	for (const event of moved) {
-		const master = masters.get(event.uid);
-		if (master) master.relateException(event);
-		// A repeat that moved, in a feed without its series, stands alone.
-		else emit(event, event.startDate, event.endDate, event.recurrenceId);
-	}
-	for (const event of masters.values()) {
-		if (!event.isRecurring()) {
-			emit(event, event.startDate, event.endDate);
-			continue;
-		}
-		const repeats = event.iterator();
-		for (let due = repeats.next(); due && due.compare(end) < 0; due = repeats.next()) {
-			const occurrence = event.getOccurrenceDetails(due);
-			emit(occurrence.item, occurrence.startDate, occurrence.endDate, due);
-		}
-	}
-	return events;
+	const start = Date.parse(str(item.start.dateTime) ?? "");
+	const end = Date.parse(str(item.end.dateTime) ?? "");
+	return end > start ? { ...event, when: { allDay: false, start, end } } : null;
 }
 
-/** The Google calendars the settings added, kept in `path` with the owner's permissions only, since each address reads its calendar. */
-export class GoogleCalendar {
-	readonly #file: JsonFile<Stored>;
-	#calendars: Calendar[];
-	/** Each calendar's feed by address, read at most once a minute. */
-	readonly #feeds = createCache<ICAL.Component>(60_000);
+/** The calendars your Google Calendar shows, and their events, each read at most once a minute. */
+export class GoogleCalendarReader {
+	readonly #get: GoogleGet;
+	readonly #lists = createCache<Omit<GoogleCalendar, "error">[]>(60_000);
+	/** Each calendar's events by calendar and span. */
+	readonly #reads = createCache<CalendarEvent[]>(60_000);
+	/** Why each calendar's last read failed, by its id. */
+	readonly #errors = new Map<string, string>();
 
-	constructor(path: string) {
-		this.#file = new JsonFile(path, { parse: parseStored, holds: "a list of Google calendars", onInvalid: "ignore", indent: "\t", mode: 0o600 });
-		const stored = this.#file.load();
-		this.#calendars = (stored?.calendars ?? []).map(calendarOf);
-		// A file that holds something else, such as the OAuth secret an older version kept, is replaced at once.
-		if (!stored) this.#save();
+	constructor(get: GoogleGet) {
+		this.#get = get;
 	}
 
-	status(): GoogleStatus {
-		return { calendars: this.#calendars.map(({ id, name, color, error }) => ({ id, name, color, error })) };
+	/** Every item of the list at `url`, following Google's page tokens. */
+	async #items(url: URL): Promise<unknown[]> {
+		const items: unknown[] = [];
+		for (;;) {
+			const page = await this.#get(url.toString());
+			if (!isObject(page)) throw new Error("Google Calendar answered something other than a list");
+			if (Array.isArray(page.items)) items.push(...page.items);
+			const next = nonEmptyStr(page.nextPageToken);
+			if (!next) return items;
+			url.searchParams.set("pageToken", next);
+		}
 	}
 
-	#save(): void {
-		this.#file.save({ calendars: this.#calendars.map(({ url, name, color }) => ({ url, name, color })) });
-	}
-
-	/** `url`'s feed, read again when `fresh`. */
-	#feed(url: string, fresh: boolean): Promise<ICAL.Component> {
-		return this.#feeds.get(
-			url,
+	#calendars(fresh: boolean): Promise<Omit<GoogleCalendar, "error">[]> {
+		return this.#lists.get(
+			"",
 			async () => {
-				const response = await fetch(url);
-				if (!response.ok) throw new Error(`Google answered ${response.status} for this calendar's address`);
-				return parseFeed(await response.text());
+				const url = new URL(`${API}/users/me/calendarList`);
+				url.searchParams.set("maxResults", "250");
+				return (await this.#items(url)).flatMap(item => calendarOf(item) ?? []);
 			},
 			fresh,
 		);
 	}
 
-	/** Adds the calendar at `url`, a Google address in iCal format, once its feed reads as a calendar. Adding one twice keeps one. */
-	async add(url: string): Promise<GoogleStatus> {
-		if (this.#calendars.some(calendar => calendar.url === url)) return this.status();
-		const root = await this.#feed(url, true);
-		const used = new Set(this.#calendars.map(calendar => calendar.color));
-		const color = PALETTE.find(candidate => !used.has(candidate)) ?? PALETTE[this.#calendars.length % PALETTE.length];
-		const name = nonEmptyStr(root.getFirstPropertyValue("x-wr-calname")) ?? ownerOf(url) ?? "Google Calendar";
-		this.#calendars = [...this.#calendars, calendarOf({ url, name, color })];
-		this.#save();
-		return this.status();
+	/** The calendars checked in Google Calendar's list, each with why its last read failed. `fresh` lists them again. */
+	async status(fresh = false): Promise<GoogleStatus> {
+		return { calendars: (await this.#calendars(fresh)).map(calendar => ({ ...calendar, error: this.#errors.get(calendar.id) ?? null })) };
 	}
 
-	remove(id: string): GoogleStatus {
-		const removed = this.#calendars.find(calendar => calendar.id === id);
-		if (removed) {
-			this.#feeds.drop(removed.url);
-			this.#calendars = this.#calendars.filter(calendar => calendar !== removed);
-			this.#save();
-		}
-		return this.status();
+	#events(calendar: Omit<GoogleCalendar, "error">, from: Date, to: Date, fresh: boolean): Promise<CalendarEvent[]> {
+		const [timeMin, timeMax] = [from.toISOString(), to.toISOString()];
+		return this.#reads.get(
+			`${calendar.id} ${timeMin} ${timeMax}`,
+			async () => {
+				const url = new URL(`${API}/calendars/${encodeURIComponent(calendar.id)}/events`);
+				for (const [key, value] of Object.entries({ singleEvents: "true", orderBy: "startTime", timeMin, timeMax, maxResults: "2500" })) url.searchParams.set(key, value);
+				return (await this.#items(url)).flatMap(item => eventOf(item, calendar) ?? []);
+			},
+			fresh,
+		);
 	}
 
 	/**
-	 * The events from `from` to `to` of the added calendars, each repeat apart. `fresh` reads every feed again.
+	 * The events from `from` to `to` of the shown calendars, each repeat apart. `fresh` reads every calendar again.
 	 * A calendar that cannot be read keeps its error for the settings, and the others still answer; only when none can is it an error.
 	 */
 	async events(from: Date, to: Date, fresh = false): Promise<CalendarEventsAnswer> {
+		const calendars = await this.#calendars(fresh);
+		if (calendars.length === 0) throw new Error("No calendar is checked in your Google Calendar's list. Check one there to see its events here.");
 		const lists = await Promise.all(
-			this.#calendars.map(async calendar => {
+			calendars.map(async calendar => {
 				try {
-					const root = await this.#feed(calendar.url, fresh);
-					calendar.error = null;
-					return expandFeed(root, calendar, from, to);
+					const events = await this.#events(calendar, from, to, fresh);
+					this.#errors.delete(calendar.id);
+					return events;
 				} catch (err) {
-					calendar.error = errorText(err);
+					this.#errors.set(calendar.id, errorText(err));
 					return null;
 				}
 			}),
 		);
 		const read = lists.filter(list => list !== null);
-		if (read.length === 0) throw new Error(this.#calendars[0]?.error ?? "No Google calendar is added. Add one in Settings › Integrations.");
+		if (read.length === 0) throw new Error(this.#errors.get(calendars[0]!.id));
 		return { events: read.flat() };
 	}
 }

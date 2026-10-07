@@ -3,7 +3,7 @@ import type { ClientMsg } from "../shared/protocol";
 import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseBranchSwitch, parseClientMsg, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
+import { parseBranchSwitch, parseClientMsg, parseGoogleClient, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -306,6 +306,7 @@ describe("parseIntegrationId", () => {
 	test("takes the id of an MCP integration and nothing else", () => {
 		expect(parseIntegrationId({ id: "linear" })).toBe("linear");
 		expect(parseIntegrationId({ id: "slack" })).toBe("slack");
+		expect(parseIntegrationId({ id: "google-calendar" })).toBe("google-calendar");
 		expect(parseIntegrationId({ id: "Linear" })).toBeNull();
 		expect(parseIntegrationId({ id: "google" })).toBeNull();
 		expect(parseIntegrationId({})).toBeNull();
@@ -331,6 +332,21 @@ describe("parseSlackClient", () => {
 		expect(parseSlackClient({ ...app, redirectUri: "https://[::1]:8443/callback", callbackPort: 8443 })).toHaveProperty("error");
 		expect(parseSlackClient({ ...app, scope: "constructor" })).toHaveProperty("error");
 		expect(parseSlackClient({ ...app, callbackPort: 3.5 })).toHaveProperty("error");
+	});
+});
+
+describe("parseGoogleClient", () => {
+	test("trims a Google client ID, omits an empty secret, and keeps the port", () => {
+		expect(parseGoogleClient({ clientId: " 1-a.apps.googleusercontent.com ", clientSecret: " ", callbackPort: 3119 })).toEqual({ ok: { clientId: "1-a.apps.googleusercontent.com", callbackPort: 3119 } });
+		expect(parseGoogleClient({ clientId: "1-a.apps.googleusercontent.com", clientSecret: " s ", callbackPort: 3119 })).toEqual({ ok: { clientId: "1-a.apps.googleusercontent.com", clientSecret: "s", callbackPort: 3119 } });
+	});
+
+	test("rejects a client ID that is not Google's, a secret that is not a string, and a bad port", () => {
+		const client = { clientId: "1-a.apps.googleusercontent.com", callbackPort: 3119 };
+		expect(parseGoogleClient({ ...client, clientId: "111.222" })).toHaveProperty("error");
+		expect(parseGoogleClient({ ...client, clientSecret: 7 })).toHaveProperty("error");
+		expect(parseGoogleClient({ ...client, callbackPort: 0 })).toHaveProperty("error");
+		expect(parseGoogleClient({ ...client, callbackPort: "3119" })).toHaveProperty("error");
 	});
 });
 

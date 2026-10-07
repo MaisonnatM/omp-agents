@@ -8,9 +8,9 @@ import { errorText } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import { gitCheckout, gitStatus, switchBranch, worktreeAt } from "../git";
-import type { GoogleCalendar } from "../google-calendar";
+import type { GoogleCalendarReader } from "../google-calendar";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
-import { loadIntegrations, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
+import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { sessionsDir } from "../omp/sessions";
@@ -19,7 +19,7 @@ import { directoryOf } from "../paths";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
-import { SlackConfigError } from "../omp/mcp";
+import { ClientConfigError } from "../omp/mcp";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
 import type { PullRequest, Repo } from "../shared/github";
@@ -28,7 +28,7 @@ import { TICKET_ID } from "../shared/tickets";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseBranchSwitch, parseGoogleCalendarAddress, parseGoogleCalendarId, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseBranchSwitch, parseGoogleClient, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -44,7 +44,7 @@ export interface RouteEnv {
 	savedOf(sessionId: string): AnalyticsSessionFacts | null;
 	/** The inbox listed `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
-	google: GoogleCalendar;
+	google: GoogleCalendarReader;
 	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
 	placeOf(sessionId: string): SessionPlace | null;
 	/** The directories that live sessions whose turn runs, or waits on a question, work in: each one's worktree, else its cwd. */
@@ -151,30 +151,22 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		if (write instanceof Response) return write;
 		const parsed = parseSlackClient(write.body);
 		if ("error" in parsed) return fail(400, parsed.error);
-		return answer(() => saveSlackClient(parsed.ok), err => (err instanceof SlackConfigError ? fail(400, err.message) : null));
+		return answer(() => saveSlackClient(parsed.ok), err => (err instanceof ClientConfigError ? fail(400, err.message) : null));
 	};
 
-	/** `GET /api/google`: the Google calendars added, with why each one's last read failed. */
-	const googleStatus = get(() => Response.json(google.status()));
-
-	/** `PUT /api/google/calendars`: `{ url }`, a Google calendar's address in iCal format, added once it reads as a calendar. */
-	const googleCalendarAdd: Handler = async req => {
+	/** `PUT /api/integrations/google-calendar/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client. */
+	const googleClient: Handler = async req => {
 		const write = await guards.writeBody(req);
 		if (write instanceof Response) return write;
-		const url = parseGoogleCalendarAddress(write.body);
-		if (!url) return fail(400, "Expected { url }, a calendar's secret address in iCal format, from https://calendar.google.com/calendar/ical/");
-		return answer(() => google.add(url), err => fail(400, errorText(err)));
+		const parsed = parseGoogleClient(write.body);
+		if ("error" in parsed) return fail(400, parsed.error);
+		return answer(() => saveGoogleClient(parsed.ok), err => (err instanceof ClientConfigError ? fail(400, err.message) : null));
 	};
 
-	/** `PUT /api/google/calendars/remove`: `{ id }` of an added calendar, which the Calendar page stops reading. */
-	const googleCalendarRemove: Handler = async req => {
-		const write = await guards.writeBody(req);
-		if (write instanceof Response) return write;
-		const id = parseGoogleCalendarId(write.body);
-		return id ? Response.json(google.remove(id)) : fail(400, "Expected { id } of an added calendar");
-	};
+	/** `GET /api/google[?fresh]`: the calendars checked in your Google Calendar's list, with why each one's last read failed. */
+	const googleStatus = get(params => answer(() => google.status(params.has("fresh"))));
 
-	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your added Google calendars in that span. */
+	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your shown Google calendars in that span. */
 	const calendarEvents = get(params => {
 		const from = new Date(params.get("from") ?? "");
 		const to = new Date(params.get("to") ?? "");
@@ -382,9 +374,8 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
 		"/api/integrations/sign-out": { PUT: integrationSignOut },
 		"/api/integrations/slack/client": { PUT: slackClient },
+		"/api/integrations/google-calendar/client": { PUT: googleClient },
 		"/api/google": { GET: googleStatus },
-		"/api/google/calendars": { PUT: googleCalendarAdd },
-		"/api/google/calendars/remove": { PUT: googleCalendarRemove },
 		"/api/calendar/events": { GET: calendarEvents },
 		"/api/linear/teams": { GET: teams },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },

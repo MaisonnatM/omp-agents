@@ -88,10 +88,10 @@ export const integrationsStore = createPolledStore<IntegrationsAnswer>({
 	},
 });
 
-/** The Google calendars added, which the Calendar page reads. */
+/** The calendars checked in your Google Calendar's list, which the Calendar page reads. */
 export const googleStore = createPolledStore<GoogleStatus>({
 	cacheKey: "omp-agents.google-cache",
-	url: () => "/api/google",
+	url: (_, fresh) => `/api/google${fresh ? "?fresh" : ""}`,
 	isValid: (value): value is GoogleStatus => Array.isArray((value as Partial<GoogleStatus> | null)?.calendars),
 });
 

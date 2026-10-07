@@ -1,10 +1,10 @@
-/** The integrations: omp's MCP sign-ins and the dashboard's Google sign-in, and the Google calendar events they read. */
+/** The integrations: omp's MCP sign-ins, and the Google calendar events the Google Calendar sign-in reads. */
 
 /** A sign-in that the integrations page started: waiting for the browser at the provider's authorization `url`, or why it failed. */
 export type SignInState = { phase: "waiting"; url: string } | { phase: "failed"; error: string } | null;
 
 /** The services whose MCP server the integrations page signs omp in to. */
-export const MCP_INTEGRATIONS = ["linear", "slack"] as const;
+export const MCP_INTEGRATIONS = ["linear", "slack", "google-calendar"] as const;
 export type McpIntegrationId = (typeof MCP_INTEGRATIONS)[number];
 
 /**
@@ -71,7 +71,27 @@ export interface McpService {
 export const MCP_SERVICES: Record<McpIntegrationId, McpService> = {
 	linear: { label: "Linear", host: "mcp.linear.app", url: "https://mcp.linear.app/mcp", serverName: "linear" },
 	slack: { label: "Slack", host: "mcp.slack.com", url: "https://mcp.slack.com/mcp", serverName: "slack" },
+	"google-calendar": { label: "Google Calendar", host: "calendarmcp.googleapis.com", url: "https://calendarmcp.googleapis.com/mcp/v1", serverName: "google-calendar" },
 };
+
+/**
+ * What the Google Calendar sign-in asks for: events, to read them here and let omp sessions write them, the calendar
+ * list, to know which calendars you show, and free/busy, which the MCP server's scheduling tool reads.
+ */
+export const GOOGLE_CALENDAR_SCOPES = [
+	"https://www.googleapis.com/auth/calendar.events",
+	"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+	"https://www.googleapis.com/auth/calendar.events.freebusy",
+] as const;
+
+/** The port omp listens on for Google's redirect unless the setup names another. */
+export const DEFAULT_GOOGLE_CALLBACK_PORT = 3119;
+
+/** The redirect Google sends the browser back to, which the OAuth client must list, for a listener on `callbackPort`. */
+export const googleRedirectUri = (callbackPort: number): string => `http://localhost:${callbackPort}/callback`;
+
+/** A Google OAuth client ID, as the Google Cloud console shows it. */
+export const GOOGLE_CLIENT_ID = /^[\w-]+\.apps\.googleusercontent\.com$/;
 
 /** Slack app settings the integrations page can show. The client secret stays in omp's config. */
 export interface SlackSetup {
@@ -91,6 +111,22 @@ export interface SlackClientInput {
 	redirectUri: string;
 	callbackPort: number;
 	scope: string;
+}
+
+/** Google Calendar's OAuth client settings the integrations page can show. The client secret stays in omp's config. */
+export interface GoogleSetup {
+	clientId: string | null;
+	hasClientSecret: boolean;
+	callbackPort: number;
+	/** The saved client, secret, and callback port are complete and valid. */
+	configured: boolean;
+}
+
+/** `PUT /api/integrations/google-calendar/client`. An omitted or empty `clientSecret` keeps the saved secret for the same client ID. */
+export interface GoogleClientInput {
+	clientId: string;
+	clientSecret?: string;
+	callbackPort: number;
 }
 
 /** omp's MCP server for a service: its name in omp's MCP config, its URL, and that URL's host. */
@@ -117,54 +153,62 @@ export const signedIn = (connection: McpConnection): boolean => connection.kind 
 /** Whether the dashboard calls the service's tools: the server took omp's sign-in, or failed for a reason a retry may clear. */
 export const callable = (connection: McpConnection): boolean => connection.kind === "ready" || connection.kind === "failing";
 
-/** One service of `GET /api/integrations`, and what `PUT /api/integrations/sign-in`, `/sign-out`, and `/slack/client` answer. */
-export interface McpIntegration {
-	id: McpIntegrationId;
-	connection: McpConnection;
-	/** The latest sign-in, while it waits or after it failed; `null` when none ran or the last one succeeded. */
-	signIn: SignInState;
-	/** Slack's saved app, without the secret. `null` for Linear, which registers its own client. */
-	setup: SlackSetup | null;
+/** Each service's saved OAuth client, without the secret: `null` for Linear, which registers its own. */
+export interface McpSetups {
+	linear: null;
+	slack: SlackSetup;
+	"google-calendar": GoogleSetup;
 }
+
+/** One service of `GET /api/integrations`, and what `PUT /api/integrations/sign-in`, `/sign-out`, and `/<id>/client` answer. */
+export type McpIntegration<Id extends McpIntegrationId = McpIntegrationId> = {
+	[K in Id]: {
+		id: K;
+		connection: McpConnection;
+		/** The latest sign-in, while it waits or after it failed; `null` when none ran or the last one succeeded. */
+		signIn: SignInState;
+		setup: McpSetups[K];
+	};
+}[Id];
 
 /** `GET /api/integrations[?fresh]`: every MCP integration by its id. */
 export interface IntegrationsAnswer {
-	integrations: Record<McpIntegrationId, McpIntegration>;
+	integrations: { [K in McpIntegrationId]: McpIntegration<K> };
 }
 
-/** A Google calendar the dashboard reads from its secret address in iCal format. The address never leaves the server. */
-export interface GoogleCalendarFeed {
-	/** A hash of the address: stable, and safe to send to the page. */
+/** A calendar shown in your Google Calendar, which the Calendar page reads. */
+export interface GoogleCalendar {
+	/** Google's id for it: your email for your main calendar, else an address Google made. */
 	id: string;
-	/** The calendar's name in Google Calendar; your main calendar's is your email. */
+	/** Its name in your calendar list. */
 	name: string;
-	/** `#rrggbb`, from Google's palette, the first one no other calendar here uses. */
+	/** Its color in your calendar list, `#rrggbb`. */
 	color: string;
-	/** Why the last read failed; `null` once one works. */
+	/** Why the last read of its events failed; `null` once one works. */
 	error: string | null;
 }
 
-/** `GET /api/google`, and the writes under it: the calendars the Calendar page reads. */
+/** `GET /api/google`: the calendars the Calendar page reads, the ones checked in Google Calendar's own list. */
 export interface GoogleStatus {
-	calendars: GoogleCalendarFeed[];
+	calendars: GoogleCalendar[];
 }
 
 /** An event of one of your Google calendars, read-only. */
 export interface CalendarEvent {
-	/** The calendar's id, a slash, and the event's, then for a repeat a slash and when it was due, since one event can sit in two calendars and repeat. */
+	/** The calendar's id, a slash, and the event's; each repeat has its own event id. */
 	id: string;
 	title: string;
-	/** The calendar's name, as {@link GoogleCalendarFeed} has it. */
+	/** The calendar's name, as {@link GoogleCalendar} has it. */
 	calendar: string;
 	/** The calendar's color, `#rrggbb`. */
 	color: string;
-	/** The day of the event in Google Calendar, since the iCal format links to no event. */
+	/** The event in Google Calendar. */
 	url: string;
 	/** An all-day event's first and last days, `YYYY-MM-DD`, or a timed event's start and end, epoch milliseconds. */
 	when: { allDay: true; firstDay: string; lastDay: string } | { allDay: false; start: number; end: number };
 }
 
-/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your added calendars that overlap that span. */
+/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your shown calendars that overlap that span. */
 export interface CalendarEventsAnswer {
 	events: CalendarEvent[];
 }
