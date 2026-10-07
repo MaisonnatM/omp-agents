@@ -34,3 +34,4 @@ describe("connectionOf", () => {
 		expect(failing).toEqual({ kind: "failing", server, error: "HTTP 502" });
 	});
 });
+

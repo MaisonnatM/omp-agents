@@ -231,11 +231,24 @@ export interface McpRpcModule {
 		options: { headers?: Record<string, string>; signal?: AbortSignal; onHttpError?: (response: Response, body: string) => Error },
 	): Promise<McpResponse>;
 }
-/** Subset of omp's `MCPServerConfig` (src/mcp/types.ts) this app reads. */
+/** Subset of omp's `MCPServerConfig` (src/mcp/types.ts) this app reads and writes back. Extra fields on a parsed server are kept by spreading it. */
 export interface McpServerConfig {
 	type?: string;
 	url?: string;
-	auth?: { type: string; credentialId?: string };
+	command?: string;
+	enabled?: boolean;
+	timeout?: number;
+	headers?: Record<string, string>;
+	auth?: { type: string; credentialId?: string; tokenUrl?: string; clientId?: string; clientSecret?: string; resource?: string };
+	oauth?: {
+		clientId?: string;
+		clientSecret?: string;
+		scope?: string;
+		redirectUri?: string;
+		callbackPort?: number;
+		callbackPath?: string;
+		prompt?: string;
+	};
 }
 export interface McpConfigModule {
 	/** The MCP servers omp would start in `cwd`: disabled ones (`disabledServers`, `enabled: false`) left out, `url` env vars not yet expanded. */
@@ -269,7 +282,12 @@ export interface McpOAuthConfig {
 	issuerUrl?: string;
 	registrationUrl?: string;
 	clientId?: string;
+	clientSecret?: string;
 	scopes?: string;
+	prompt?: string;
+	redirectUri?: string;
+	callbackPort?: number;
+	callbackPath?: string;
 	resource?: string;
 	/** The `resource` is the server URL, not one the metadata advertised. */
 	stripSameOriginResource?: boolean;
@@ -286,9 +304,17 @@ export interface McpOAuthFlow {
 export interface McpOAuthFlowModule {
 	MCPOAuthFlow: new (config: McpOAuthConfig, ctrl: { onAuth(info: { url: string }): void; signal: AbortSignal }) => McpOAuthFlow;
 }
+export interface McpConfigFile {
+	mcpServers?: Record<string, McpServerConfig>;
+	disabledServers?: string[];
+}
 export interface McpConfigWriterModule {
 	/** Adds a server to an MCP config file; throws when the file already has one by that name. */
 	addMCPServer(filePath: string, name: string, config: { type: "http"; url: string }): Promise<void>;
+	/** Replaces one server, or adds it, under the config file lock. The file mode stays owner-only. */
+	updateMCPServer(filePath: string, name: string, config: McpServerConfig): Promise<void>;
+	/** The parsed MCP file, or `{ mcpServers: {} }` when it is not there yet. */
+	readMCPConfigFile(filePath: string): Promise<McpConfigFile>;
 }
 
 export interface DiscoveryHelpersModule {
@@ -477,7 +503,11 @@ export const mcpOAuthDiscovery = await load<McpOAuthDiscoveryModule>(join(srcDir
 	discoverOAuthEndpoints: "function",
 });
 export const mcpOAuthFlow = await load<McpOAuthFlowModule>(join(srcDir, "mcp", "oauth-flow.ts"), { MCPOAuthFlow: "function" });
-export const mcpConfigWriter = await load<McpConfigWriterModule>(join(srcDir, "mcp", "config-writer.ts"), { addMCPServer: "function" });
+export const mcpConfigWriter = await load<McpConfigWriterModule>(join(srcDir, "mcp", "config-writer.ts"), {
+	addMCPServer: "function",
+	updateMCPServer: "function",
+	readMCPConfigFile: "function",
+});
 
 const statsSrc = join(dirname(packageDir), "omp-stats", "src");
 export const statsAggregator = await load<StatsAggregatorModule>(join(statsSrc, "aggregator.ts"), {
