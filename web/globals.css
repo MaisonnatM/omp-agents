@@ -325,7 +325,8 @@
     animation-timeline: --sf-scroller;
     animation-range: 0 var(--scroll-divider-size);
   }
-  .scroll-divider:first-child::before {
+  /* A scroller at its container's top or bottom edge draws no hairline there: the edge has its own border, such as the status bar's. */
+  .scroll-divider:first-child::before, .scroll-divider:last-child::after {
     content: none;
   }
   .scroll-divider::after {

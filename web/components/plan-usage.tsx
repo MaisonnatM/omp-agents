@@ -38,7 +38,7 @@ function WindowLeft({ window }: { window: PlanWindow }) {
 function PlanRow({ plan }: { plan: PlanUsage }) {
 	const label = plan.account ? `${plan.name} · ${plan.account}` : plan.name;
 	return (
-		<li className="flex items-center gap-2">
+		<li className="flex items-center gap-2 border-border not-first:border-l not-first:pl-2.5">
 			<Tooltip content={label}>
 				<span role="img" aria-label={label} className="flex shrink-0 items-center">
 					<OrgIcon
@@ -65,7 +65,7 @@ export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
 			</p>
 		);
 	return (
-		<ul aria-label="Plan usage" className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-0.5">
+		<ul aria-label="Plan usage" className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
 			{usage.plans.map((plan, index) => (
 				<PlanRow key={`${plan.provider}:${plan.account ?? index}`} plan={plan} />
 			))}

@@ -53,7 +53,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showProj
 	const hidden = ended.length - pastShown;
 	return (
 		<>
-			<SidebarGroup className="gap-1 pb-0">
+			<SidebarGroup className="gap-1">
 				<SidebarMenu aria-label="Start a session">
 					<SidebarMenuItem>
 						<Tooltip content={newSessionLabel} shortcut={shortcutLabels("newSession")} side="right">
