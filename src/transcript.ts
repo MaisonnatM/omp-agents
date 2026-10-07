@@ -184,10 +184,12 @@ export class Transcript {
 			case "tool_execution_end":
 				return this.#upsertLiveTool(str(event.toolCallId), str(event.toolName), undefined, event.isError ? "error" : "ok", spawnedAgents(event.toolName, event.result));
 			case "agent_end":
-				// An interrupted turn ends without tool_execution_end for the call it cut off.
-				return [...this.#items.values()].flatMap(item =>
-					item.kind === "tool" && item.status === "running" ? this.#upsert({ ...item, status: "error" }) : [],
-				);
+				// An interrupted turn ends without tool_execution_end for the call it cut off, or message_end for thinking still streaming.
+				return [...this.#items.values()].flatMap(item => {
+					if (item.kind === "tool" && item.status === "running") return this.#upsert({ ...item, status: "error" });
+					if (item.kind === "thinking" && item.streaming) return this.#upsert({ ...item, streaming: false });
+					return [];
+				});
 			case "notice": {
 				// Join and leave notices (including this dashboard's own) are noise here.
 				if (event.source === "collab") return [];
@@ -266,6 +268,8 @@ export class Transcript {
 			if (block.type === "text" && typeof block.text === "string" && block.text) {
 				const { body, suggestions } = splitSuggestions(block.text);
 				changed.push(...this.#upsert({ id: `${key}:${index}`, kind: "assistant", text: body, streaming, suggestions }));
+			} else if (block.type === "thinking" && typeof block.thinking === "string" && block.thinking) {
+				changed.push(...this.#upsert({ id: `${key}:${index}`, kind: "thinking", text: block.thinking, streaming }));
 			} else if (block.type === "toolCall") {
 				changed.push(...this.#upsertTool(str(block.id), str(block.name), toolSummary(block.arguments, block.intent), undefined, []));
 			}

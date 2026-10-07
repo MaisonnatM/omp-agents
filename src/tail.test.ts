@@ -121,6 +121,20 @@ describe("FileTail", () => {
 			return { ...ctx, applied };
 		}
 
+		test("a burst of thinking updates publishes once the window ends, with the latest text", async () => {
+			const { tail, emits, applied } = await loaded();
+			const thinking = (text: string) => ({
+				type: "message_update",
+				assistantMessageEvent: { partial: { role: "assistant", timestamp: 7, content: [{ type: "thinking", thinking: text }] } },
+			});
+			for (let n = 1; n <= 30; n++) tail.live(t => t.applyEvent(thinking("x".repeat(n))));
+			await applied();
+			expect(emits).toHaveLength(1);
+
+			jest.advanceTimersByTime(50);
+			expect(emits.slice(1)).toEqual([{ reset: false, items: [{ id: "m7:0", kind: "thinking", text: "x".repeat(30), streaming: true }] }]);
+		});
+
 		test("a burst of updates of a streaming reply publishes once the window ends, with the latest text", async () => {
 			const { tail, emits, applied } = await loaded();
 			for (let n = 1; n <= 30; n++) tail.live(t => t.applyEvent(update("x".repeat(n))));

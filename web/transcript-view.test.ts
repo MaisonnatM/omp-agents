@@ -6,10 +6,12 @@ describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
 	const tool = (id: string, status: "running" | "ok"): Item => ({ id, kind: "tool", name: "bash", summary: "ls", status, agents: [] });
 
-	test("consecutive tools group into one block; a message splits groups", () => {
-		const blocks = toBlocks([tool("t1", "ok"), tool("t2", "ok"), user, tool("t3", "running")]);
-		expect(blocks.map(block => (block.kind === "tools" ? block.tools.map(t => t.id).join("+") : block.item.id))).toEqual([
-			"t1+t2",
+	const thinking = (id: string): Item => ({ id, kind: "thinking", text: "hmm", streaming: false });
+
+	test("consecutive tools and thinking group into one block; a message splits groups", () => {
+		const blocks = toBlocks([thinking("h1"), tool("t1", "ok"), tool("t2", "ok"), user, tool("t3", "running")]);
+		expect(blocks.map(block => (block.kind === "activity" ? block.entries.map(entry => entry.id).join("+") : block.item.id))).toEqual([
+			"h1+t1+t2",
 			"u",
 			"t3",
 		]);
@@ -95,7 +97,8 @@ describe("outline", () => {
 	const prompt = (id: string, text: string, extra: Partial<Extract<Item, { kind: "user" }>> = {}): Item => ({ id, kind: "user", text, skill: null, from: null, entryId: id, ...extra });
 	const reply = (id: string, text: string): Item => ({ id, kind: "assistant", text, streaming: false, suggestions: [] });
 	const tool = (status: "ok" | "error"): Item => ({ id: `t-${status}`, kind: "tool", name: "bash", summary: "ls", status, agents: [] });
-	const items = [prompt("p1", "Fix it"), reply("r1a", "Looking"), tool("ok"), tool("error"), reply("r1b", " Fixed. "), prompt("p2", "Ship it"), reply("r2", "Shipping")];
+	const thinking: Item = { id: "th", kind: "thinking", text: "hmm", streaming: false };
+	const items = [prompt("p1", "Fix it"), reply("r1a", "Looking"), thinking, tool("ok"), tool("error"), reply("r1b", " Fixed. "), prompt("p2", "Ship it"), reply("r2", "Shipping")];
 
 	test("groups each prompt with its turn's final reply and counts the turn's tools and failures", () => {
 		expect(outline(items, false)).toEqual([
