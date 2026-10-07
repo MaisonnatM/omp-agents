@@ -579,6 +579,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The inbox and the tickets page share that note: either page shows the last failed quick action, whether it ran on a pull request or an issue.
 - The list of tickets is not tied to the sidebar's project.
   The page reads Linear when it opens and every minute after, and shows the last read at once on a reopen, even after a reload.
+  A saved tickets list without each issue's opening date is discarded, and the page reads Linear again.
   The server keeps Linear's answer for 30 seconds, and **Refresh** asks again at once.
 - The dashboard reads Linear through omp's Linear MCP server and its sign-in, so there is no key to set.
   Until omp is signed in to that server, the sidebar has no **Tickets** tab, Cmd+2 keeps its browser behavior, and a `#tickets` address shows Linear's integration row instead of the issues.

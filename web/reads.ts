@@ -71,7 +71,11 @@ export const inboxStore = createPolledStore<Inbox>({
 export const ticketsStore = createPolledStore<TicketsAnswer>({
 	cacheKey: "omp-agents.tickets-cache",
 	url: (_, fresh) => `/api/tickets${fresh ? "?fresh" : ""}`,
-	isValid: (value): value is TicketsAnswer => Array.isArray((value as Partial<TicketsAnswer> | null)?.tickets),
+	isValid: (value): value is TicketsAnswer => {
+		const answer = value as Partial<TicketsAnswer> | null;
+		// A read saved before tickets carried their opening date reads Linear again.
+		return Array.isArray(answer?.tickets) && answer.tickets.every(ticket => typeof ticket.createdAt === "string");
+	},
 });
 
 /** Where omp stands with each MCP integration, which the sidebar's tabs, the tickets page, and the integrations page share. */
