@@ -3,8 +3,11 @@ import { RadioGroup } from "@base-ui/react/radio-group";
 import { Switch } from "@base-ui/react/switch";
 import { type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
 import { useContext } from "react";
+import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
 import { type Theme, THEMES, useTheme } from "../../theme";
+import { useSkills } from "../../use-skills";
+import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
 import { Section } from "./editor";
 
@@ -30,8 +33,29 @@ function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string;
 	);
 }
 
-/** The dashboard's own look, kept in this browser rather than in omp's files. */
-export function AppearanceTab() {
+/**
+ * The skill every session the dashboard starts goes through. It lists the skills of `cwd`, the workspace the settings
+ * were opened on, else the user's own.
+ */
+function PinnedSkill({ cwd, workspace }: { cwd: string | null; workspace: string | null }) {
+	const [pinned, pin] = usePinnedSkill();
+	const skills = useSkills(cwd ?? "~");
+	const listed = workspace === null ? "Lists your own skills." : `Lists the skills of ${workspace}.`;
+	return (
+		<Section
+			title="New sessions"
+			meta={`The first message of every session you start here, a quick action's included, goes through the pinned skill. Saved in this browser. ${listed}`}
+		>
+			<SkillPicker label="Pinned skill" skills={skills} value={pinned} onPick={pin} />
+			{pinned !== null && skills.error === null && skills.data && !skills.data.skills.some(skill => skill.name === pinned) && (
+				<p className="text-xs text-muted-foreground">No skill named {pinned} here. A session in a directory without it starts without it.</p>
+			)}
+		</Section>
+	);
+}
+
+/** The dashboard's own choices, kept in this browser rather than in omp's files. `workspace` names `cwd` for the skill list. */
+export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspace: string | null }) {
 	const [theme, setTheme] = useTheme();
 	const { hideTools, hideThinking, toggleTools, toggleThinking } = useContext(ActivityVisibility);
 	return (
@@ -64,6 +88,7 @@ export function AppearanceTab() {
 					<ActivitySwitch label="Show thinking" shortcut="hideThinking" checked={!hideThinking} onToggle={toggleThinking} />
 				</div>
 			</Section>
+			<PinnedSkill cwd={cwd} workspace={workspace} />
 		</>
 	);
 }

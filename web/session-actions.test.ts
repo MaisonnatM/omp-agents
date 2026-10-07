@@ -55,7 +55,7 @@ describe("sessionActions", () => {
 			["Open r#4", { kind: "link", href: "https://github.com/o/r/pull/4", external: true }],
 			["Open ENG-1", { kind: "link", href: "#tickets/ENG-1" }],
 			["Open ENG-2", { kind: "link", href: "#tickets/ENG-2" }],
-			["Workspace settings", { kind: "link", href: "#settings/%2Fw" }],
+			["Workspace settings", { kind: "link", href: "#settings/models/%2Fw" }],
 		]);
 	});
 });

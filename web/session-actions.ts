@@ -79,7 +79,7 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 			run: { kind: "link", href: pullRequestUrl(pr), external: true } as const,
 		})),
 		...row.tickets.map(id => ({ id: `ticket:${id}`, title: `Open ${id}`, icon: PAGE_ICON.tickets, run: { kind: "link", href: hashForTickets(id) } as const })),
-		{ id: "settings", title: "Workspace settings", icon: Settings, run: { kind: "link", href: hashForSettings(row.cwd) } },
+		{ id: "settings", title: "Workspace settings", icon: Settings, run: { kind: "link", href: hashForSettings("models", row.cwd) } },
 	];
 	const copies: ActionGroup<SessionRun> = [
 		{ id: "copy-path", title: "Copy path", icon: Folder, chord: { key: "c", mod: true, shift: true }, run: { kind: "do", fn: () => void navigator.clipboard.writeText(row.cwd) } },

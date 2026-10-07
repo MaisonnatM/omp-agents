@@ -223,7 +223,7 @@ function NumberField({ value, id, onChange }: { value: number; id: string; onCha
 	);
 }
 
-export function RetrySection({ routing, editing }: { routing: ModelRouting; editing: Editing }) {
+function RetrySection({ routing, editing }: { routing: ModelRouting; editing: Editing }) {
 	const editor = useEditor(
 		routing.retry,
 		draft =>
@@ -347,8 +347,8 @@ function ProviderOrderSection({ order, editing }: { order: string[]; editing: Ed
 	);
 }
 
-/** Roles, per-model chains, and provider order: which model a session gets and where its fallbacks are served from. */
-export function RolesTab({ routing, configPath, editing }: { routing: ModelRouting; configPath: string | undefined; editing: Editing }) {
+/** Roles, per-model chains, provider order, and retries: which model a session gets, where its fallbacks are served from, and when omp moves on to them. */
+export function ModelsTab({ routing, configPath, editing }: { routing: ModelRouting; configPath: string | undefined; editing: Editing }) {
 	return (
 		<>
 			<Section title="Model roles" meta={configPath && `Saved to ${configPath}`}>
@@ -394,6 +394,7 @@ export function RolesTab({ routing, configPath, editing }: { routing: ModelRouti
 				</Section>
 			)}
 			<ProviderOrderSection order={routing.modelProviderOrder} editing={editing} />
+			<RetrySection routing={routing} editing={editing} />
 		</>
 	);
 }

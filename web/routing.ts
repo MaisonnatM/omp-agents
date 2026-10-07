@@ -1,4 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
+import { BarChart3, FileText, GitBranch, Plug, Route as RouteIcon, SlidersHorizontal } from "lucide-react";
 import type { PullRequest } from "../src/shared/github";
 import { type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
 import { TICKET_ID } from "../src/shared/tickets";
@@ -30,8 +31,26 @@ export interface TicketsRoute {
 	target: string | null;
 }
 
-/** Where the settings page reads project files and config from; `null` for user-level only. */
+/**
+ * The settings page's sections, in the sidebar's order. A `workspace` section shows omp's files and config as a session in
+ * the chosen workspace loads them; a `general` section is the same whatever the workspace.
+ */
+export const SETTINGS_SECTIONS = [
+	{ value: "analytics", label: "Analytics", icon: BarChart3, scope: "general" },
+	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, scope: "general" },
+	{ value: "integrations", label: "Integrations", icon: Plug, scope: "general" },
+	{ value: "models", label: "Models", icon: RouteIcon, scope: "workspace" },
+	{ value: "files", label: "Files", icon: FileText, scope: "workspace" },
+	{ value: "worktrees", label: "Worktrees", icon: GitBranch, scope: "workspace" },
+] as const;
+
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
+
+const isSettingsSection = (segment: string): segment is SettingsSection => SETTINGS_SECTIONS.some(({ value }) => value === segment);
+
+/** The open section of the settings page, and where it reads project files and config from; `null` for user-level only. */
 export interface SettingsRoute {
+	section: SettingsSection;
 	cwd: string | null;
 }
 
@@ -86,7 +105,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
 /**
  * Each page by its kind, which is its hash's first segment, reading what follows the next `/` (`null` without one) and
  * what follows a `?` after it.
- * - `#settings` opens the settings page, `#settings/<cwd>` with that workspace's project files and config.
+ * - `#settings/<section>` opens that section of the settings page, `#settings/<section>/<cwd>` with that workspace's
+ *   project files and config. `#settings` and an unknown section open Analytics.
  * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, and `?todo=<id>` with that todo's
  *   title and notes as its first message. No omp runs until its first message.
  * - `#inbox` shows the sidebar's Inbox tab, which lists the pull requests of the sidebar's project, beside the panes,
@@ -100,7 +120,10 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
-	settings: rest => ({ kind: "settings", cwd: decodeCwd(rest) }),
+	settings: rest => {
+		const [section = "", cwd] = (rest ?? "").split("/");
+		return { kind: "settings", section: isSettingsSection(section) ? section : "analytics", cwd: decodeCwd(cwd ?? null) };
+	},
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
 	inbox: rest => {
 		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)$/.exec(rest);
@@ -126,6 +149,7 @@ const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, 
 function restOfPage(page: Page): string | null {
 	switch (page.kind) {
 		case "settings":
+			return `${page.section}${page.cwd === null ? "" : `/${encodeCwd(page.cwd)}`}`;
 		case "new":
 			return encodeCwd(page.cwd);
 		case "inbox":
@@ -158,7 +182,7 @@ export const hashForTickets = (target: string | null): string => hashForPage({ k
 export const hashForTodo = (list: TodoListView): string => hashForPage({ kind: "todo", list });
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
-export const hashForSettings = (cwd: string | null): string => hashForPage({ kind: "settings", cwd });
+export const hashForSettings = (section: SettingsSection, cwd: string | null): string => hashForPage({ kind: "settings", section, cwd });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForChanges = (sessionId: string, path: string | null = null): string => hashForPage({ kind: "changes", sessionId, path });
 

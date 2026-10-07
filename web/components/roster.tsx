@@ -13,7 +13,7 @@ import { agentOn, yourMoveCount } from "../inbox-model";
 import { projectName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import { inboxStore, ticketsStore } from "../reads";
-import { hashForTickets, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "../routing";
+import { hashForTickets, type SettingsRoute, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
@@ -24,7 +24,7 @@ import { SectionLink } from "./section-link";
 import { useDashboardContext } from "./dashboard-context";
 import { CalendarNav, type CalendarTabPage } from "./calendar/calendar-nav";
 import { SessionList } from "./session-list";
-import { SettingsNav, type SettingsTab } from "./settings/settings-nav";
+import { SettingsNav } from "./settings/settings-nav";
 import { workspaceItems } from "./workspace-picker";
 import { TodoCategories } from "./todo/categories";
 import type { KnownSessions } from "./todo/links";
@@ -169,8 +169,8 @@ interface RosterProps {
 	routines: Routine[];
 	/** The page under the Calendar tab that is open. */
 	calendarTab: CalendarTabPage;
-	settingsTab: SettingsTab;
-	onSettingsTab: (tab: SettingsTab) => void;
+	/** The settings section and workspace the Settings tab's links keep. */
+	settingsRoute: SettingsRoute;
 	/** The tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
@@ -204,8 +204,7 @@ export function Roster({
 	todoSessions,
 	routines,
 	calendarTab,
-	settingsTab,
-	onSettingsTab,
+	settingsRoute,
 	sectionTarget,
 	onSectionTarget,
 	inbox,
@@ -303,7 +302,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="settings" asChild>
 				<SidebarContent>
-					<SettingsNav tab={settingsTab} onTab={onSettingsTab} />
+					<SettingsNav route={settingsRoute} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>

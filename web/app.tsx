@@ -14,7 +14,6 @@ import { NO_PLANS, Plans } from "./components/plan-usage";
 import { Roster, useProject } from "./components/roster";
 import { SessionDetails } from "./components/session-details";
 import { SettingsPage } from "./components/settings/settings-page";
-import type { SettingsTab } from "./components/settings/settings-nav";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { NewTicketDialog } from "./components/tickets/new-ticket";
@@ -178,11 +177,11 @@ export function App() {
 		const next = page ? null : projectSession(cwd, visible.hosts, viewCwd);
 		if (next) open(next, "replace");
 	};
-	const settingsPage: Page = { kind: "settings", cwd: page?.kind === "settings" ? page.cwd : viewCwd || null };
-	const [settingsTab, setSettingsTab] = useState<SettingsTab>("analytics");
-	useEffect(() => {
-		if (page?.kind !== "settings") setSettingsTab("analytics");
-	}, [page?.kind]);
+	const settingsPage = {
+		kind: "settings",
+		section: page?.kind === "settings" ? page.section : "analytics",
+		cwd: page?.kind === "settings" ? page.cwd : viewCwd || null,
+	} as const satisfies Page;
 	const [toolsExpanded, setToolsExpanded] = useState(false);
 	const [hideTools, setHideTools] = useStoredState(HIDE_TOOL_CALLS_KEY, raw => raw === "true");
 	const [hideThinking, setHideThinking] = useStoredState(HIDE_THINKING_KEY, raw => raw === "true");
@@ -370,7 +369,7 @@ export function App() {
 			break;
 		}
 		case "settings":
-			main = <SettingsPage cwd={page.cwd} workspaces={projects} tab={settingsTab} />;
+			main = <SettingsPage route={page} workspaces={projects} />;
 			break;
 		case "inbox":
 			main = page.target ? (
@@ -460,8 +459,7 @@ export function App() {
 								todoSessions={{ hosts: state.hosts, past: state.past }}
 								routines={state.routines}
 								calendarTab={page?.kind === "calendar" ? page : page?.kind === "routines" ? { kind: "routines", target: routinesTarget } : null}
-								settingsTab={settingsTab}
-								onSettingsTab={setSettingsTab}
+								settingsRoute={settingsPage}
 								sectionTarget={sectionTarget}
 								onSectionTarget={setSectionTarget}
 								inbox={

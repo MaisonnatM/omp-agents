@@ -217,7 +217,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - The model's thinking is a row in that same group.
   It shows while the model is still writing it, then stays.
   A thinking block the provider redacts, which has no text, stays out.
-  **Settings → Appearance** has a switch for each, **Show tool calls** and **Show thinking**, which hides the tool rows or the thinking text in every pane; the heading stays.
+  **Settings → Preferences** has a switch for each, **Show tool calls** and **Show thinking**, which hides the tool rows or the thinking text in every pane; the heading stays.
   The choice is saved in this browser.
   Cmd+Shift+E shows or hides the tool rows, and Alt+T (Option+T on macOS) shows or hides the thinking.
   Cmd+E still opens or closes the group.
@@ -795,7 +795,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - **New routine** opens the editor: a name, the workspace it runs in, its task, its schedules, and its skill.
   The task is a prompt you write, or a shell command.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick. **Weekdays** and **Every day** pick those days at once. **Add schedule** adds another. The routine runs at the earliest of them, and a missed time still starts one run.
-  The skill starts as the one pinned in **Settings › New sessions**, and **None** starts the sessions without one.
+  The skill starts as the one pinned in **Settings › Preferences**, and **None** starts the sessions without one.
 - A command routine runs its command with `sh` in its workspace, without an omp session, so it takes no skill and the editor hides that field.
   The command runs with your user's full permissions, and nothing asks before it acts: a file it deletes is gone.
   It stops after 10 minutes, and its run keeps the last 64 KB of what it printed, stdout and stderr together.
@@ -823,10 +823,11 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - **Settings** is the last sidebar tab, after **Calendar**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
-  The sidebar lists eight sections: **Analytics**, **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **New sessions**, **Integrations**, and **Appearance**.
-  It opens on **Analytics**.
+  The sidebar lists six sections in two groups.
+  **General** holds **Analytics**, **Preferences**, and **Integrations**, which are the same whatever the workspace.
+  **Workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the chosen workspace loads them; only these sections show the workspace picker.
+  It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit, and the selected section stays when you change workspace.
-  The arrow keys move between section buttons; Enter or Space opens the focused section.
 - **Analytics** shows request usage for the last seven days.
   Choose **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
   It shows tokens, estimated cost, requests, cache hit rate, and a chart of token usage over time.
@@ -852,10 +853,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A detached commit that no branch contains is named before its registration can be removed.
   The page cannot see every shell or editor, so close other tools using a checkout before you delete it.
   Disk use is approximate, and removing a checkout may free less than the number shown.
-  **Model roles & provider order** shows which model omp uses for each role (`default`, `slow`, `plan`, `advisor`, `vision`, `smol`, `commit`, `tiny`, `task`) and the fallbacks that omp tries after that model, in order.
+- **Models** shows which model omp uses for each role (`default`, `slow`, `plan`, `advisor`, `vision`, `smol`, `commit`, `tiny`, `task`) and the fallbacks that omp tries after that model, in order.
   A role without its own chain says that it uses the `default` role's chain.
   Chains keyed by a model or a `provider/*` wildcard appear in their own table, and the `modelProviderOrder` follows.
-  **Retry and fallback** lists the `retry.*` settings with omp's defaults filled in, for example `usageAwareFallback`, `usageReservePct`, and `usageReservePolicy`.
+  **Retry and fallback**, last on the page, lists the `retry.*` settings with omp's defaults filled in, for example `usageAwareFallback`, `usageReservePct`, and `usageReservePolicy`.
   Hover a retry setting to see its config key.
 - Every part of the routing has an **Edit** button.
   On a role, pick its model and thinking level from the models that `omp models` lists, then add, remove, or reorder its fallbacks.
@@ -869,22 +870,22 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Save with the button or with Cmd+S. If the file changed on disk after the page read it, the save is refused and your edits stay in the editor, so you can copy them before you load the file from disk.
   A `.yml`, `.yaml`, or `.json` file must parse before it saves, and a settings file must hold a mapping.
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.
-  If omp cannot load `config.yml`, the two routing sections show omp's error and **Files** still lists the files, so you can fix the broken file there.
+  If omp cannot load `config.yml`, **Models** shows omp's error and **Files** still lists the files, so you can fix the broken file there.
   Files from installed plugins and omp's bundled rules are left out.
-- **New sessions** pins a skill.
+- **Preferences** holds the dashboard's own choices, saved in the browser's localStorage, not in omp's files.
+  **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
+  **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
+  **New sessions** pins a skill.
   Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request or a Linear issue, then sends its first message through that skill.
-  The picker lists the skills of the workspace that the settings show, or your own skills with **User files only**.
+  The picker lists the skills of the workspace that Settings opened on, and says which, or your own skills with **User files only**.
   Choose **None** to unpin.
-  The pin is saved in the browser's localStorage, not in omp's files.
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar; see [Integrations](#integrations).
-- **Appearance** sets the dashboard's theme: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one.
-  The choice applies at once and is saved in the browser's localStorage, not in omp's files, so it does not change omp's terminal theme.
-  Its **Transcript** switches, **Show tool calls** and **Show thinking**, are the same choices as their shortcuts.
 - **Settings** opens on the workspace of the session that you had open, so it includes that project's files and its `.omp/config.yml` overrides.
   With no session open, it shows user files only.
-  Use the workspace picker in the header to choose another directory that a session ran in, or **User files only**.
-  Selecting the active **Settings** sidebar tab keeps the workspace you chose.
-  The page is in the URL hash, `#settings` or `#settings/<encoded directory>`.
+  Use the workspace picker in the header of a Workspace section to choose another directory that a session ran in, or **User files only**.
+  Selecting the active **Settings** sidebar tab keeps the section and the workspace you chose.
+  A session's **Workspace settings** opens **Models** on that session's workspace.
+  The page is in the URL hash, `#settings/<section>` or `#settings/<section>/<encoded directory>`, such as `#settings/integrations`; `#settings` opens **Analytics**.
   After each save the page shows the settings as omp loads them from disk.
 
 ## Keyboard shortcuts

@@ -636,9 +636,10 @@ The page lives in `web/`.
   `web/calendar-model.ts` lays a month's routine runs, past and planned, its due todos and tickets, and Google events out by day.
   `web/days.ts` names a local day as todos, tickets, and the calendar do, `YYYY-MM-DD`, and walks the days between two of them.
 - `web/page-icons.ts`: the icon of each dashboard page, which its sidebar tab and every link into the page show.
-  `web/routing.ts` owns the sidebar tab vocabulary and the page/hash routes; `web/components/workspace-picker.tsx` owns the directory picker and the workspace rows it shares with the sidebar's project picker.
-- `web/components/settings/settings-nav.tsx`: the Settings sidebar's section buttons and the registry shared with `settings-page.tsx`.
-  `web/app.tsx` holds the selected section for both; the page keeps inactive panels mounted to preserve unsaved drafts.
+  `web/routing.ts` owns the sidebar tab vocabulary, the settings sections, and the page/hash routes; `web/components/workspace-picker.tsx` owns the directory picker and the workspace rows it shares with the sidebar's project picker.
+- `web/components/settings/settings-nav.tsx`: the Settings sidebar's links, one per section of `SETTINGS_SECTIONS` in `web/routing.ts`, grouped by scope into **General** and **Workspace**.
+  The open section is in the hash, `#settings/<section>/<encoded cwd>`; `settings-page.tsx` keeps inactive panels mounted to preserve unsaved drafts, and shows the workspace picker on the Workspace sections only.
+  `preferences-tab.tsx` holds the dashboard's browser-local choices, and `routing-tab.tsx` the Models section: roles, model chains, provider order, and retries.
 - `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
   `provider-trend.tsx` renders the stacked provider chart and bucket-data table; `analytics-format.ts` shares number and cost formatting across the section.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.

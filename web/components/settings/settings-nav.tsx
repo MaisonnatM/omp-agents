@@ -1,37 +1,27 @@
-import { BarChart3, FileText, GitBranch, Palette, Plug, RotateCcw, Route, Sparkles } from "lucide-react";
-import { SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { hashForSettings, SETTINGS_SECTIONS, type SettingsRoute } from "../../routing";
 
-export const SETTINGS_TABS = [
-	{ value: "analytics", label: "Analytics", icon: BarChart3 },
-	{ value: "roles", label: "Model roles & provider order", icon: Route },
-	{ value: "retry", label: "Retry and fallback", icon: RotateCcw },
-	{ value: "files", label: "Files", icon: FileText },
-	{ value: "worktrees", label: "Worktrees", icon: GitBranch },
-	{ value: "new-sessions", label: "New sessions", icon: Sparkles },
-	{ value: "integrations", label: "Integrations", icon: Plug },
-	{ value: "appearance", label: "Appearance", icon: Palette },
+const GROUPS = [
+	{ scope: "general", label: "General" },
+	{ scope: "workspace", label: "Workspace" },
 ] as const;
 
-export type SettingsTab = (typeof SETTINGS_TABS)[number]["value"];
-
-export function SettingsNav({ tab, onTab }: { tab: SettingsTab; onTab: (tab: SettingsTab) => void }) {
-	return (
-		<SidebarGroup>
-			<SidebarMenu aria-label="Settings sections">
-				{SETTINGS_TABS.map(({ value, label, icon }) => (
+/** The Settings tab of the sidebar: the sections that are the same in every workspace, then those the workspace picker changes. */
+export function SettingsNav({ route: { section, cwd } }: { route: SettingsRoute }) {
+	return GROUPS.map(group => (
+		<SidebarGroup key={group.scope}>
+			<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+			<SidebarMenu aria-label={`${group.label} settings`}>
+				{SETTINGS_SECTIONS.filter(({ scope }) => scope === group.scope).map(({ value, label, icon }) => (
 					<SidebarMenuItem key={value}>
-						<SidebarMenuButton
-							icon={icon}
-							isActive={tab === value}
-							aria-current={tab === value ? "true" : undefined}
-							aria-controls={`settings-panel-${value}`}
-							onClick={() => onTab(value)}
-						>
-							{label}
+						<SidebarMenuButton asChild icon={icon} isActive={section === value}>
+							<a href={hashForSettings(value, cwd)} aria-current={section === value ? "page" : undefined}>
+								{label}
+							</a>
 						</SidebarMenuButton>
 					</SidebarMenuItem>
 				))}
 			</SidebarMenu>
 		</SidebarGroup>
-	);
+	));
 }
