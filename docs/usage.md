@@ -331,7 +331,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Tickets, Pull requests, and Sessions.
   Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@ticket:`, `@pr:`, or `@session:`.
   Type `@` and a word to search everything at once: up to five files from the selected session's working directory, then up to three matches from each category.
-  Every word must appear in a row's name, ID, or detail, in any order; quote several words, as in `@"login page` or `@ticket:"login page`.
+  Every word must appear in a row's name or the detail beside it, such as a ticket's ID, in any order; quote several words, as in `@"login page` or `@ticket:"login page`.
   A file inserts its path, as in omp's terminal.
   A todo inserts its text and ID, a ticket or pull request a Markdown link, and a session its title and ID.
   Done todos and the session you are typing in stay out of the list.

@@ -4,6 +4,7 @@ import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sess
 import type { Ticket } from "../src/shared/tickets";
 import type { ChangedFile, FileChange } from "../src/shared/transcript";
 import type { UserTodo, UserTodoLeaf } from "../src/user-todos-shared";
+import { completionTrigger, type MentionToken } from "./completion-trigger";
 import { fileSearch, type MentionData, mentionMenu, mentionQuery, type MenuSection } from "./mentions";
 
 const leaf = (id: string, text: string, doneAt: string | null = null): UserTodoLeaf => ({ id, text, body: "", doneAt, due: null });
@@ -31,48 +32,52 @@ const data: MentionData = {
 	],
 	hosts: [host("s-self", "Login work"), host("s-live", null)],
 	past: [{ sessionId: "s-old", title: "Login bug hunt", cwdDisplay: "~/code/api" } as PastSession],
-	sessionId: "s-self",
+};
+
+const tokenAt = (text: string, cursor = text.length): MentionToken => {
+	const trigger = completionTrigger(text, cursor);
+	if (trigger?.kind !== "mention") throw new Error(`no mention at ${cursor} in ${text}`);
+	return trigger.token;
 };
 
 const fileItem = (path: string): CompletionItem => ({ kind: "file", label: path, description: null, text: `@${path} `, cursor: path.length + 2 });
 const labels = (sections: MenuSection[]) => sections.map(({ title, options }) => [title, options.map(option => option.label)]);
 const menu = (text: string, { files = null, changed = [], cursor = text.length }: { files?: CompletionItem[] | null; changed?: ChangedFile[]; cursor?: number } = {}) =>
-	mentionMenu({ text, cursor, data, changed, files });
+	mentionMenu({ text, token: tokenAt(text, cursor), data, composer: { sessionId: "s-self", changed }, files });
 const pick = (text: string, label: string, cursor = text.length) =>
 	menu(text, { cursor }).flatMap(section => section.options).find(option => option.label === label)?.edit;
 
 describe("mentionQuery", () => {
-	test("@ alone is home, a word searches, and a known prefix narrows to its source", () => {
-		const at = (text: string) => mentionQuery(text, text.length);
+	test("@ alone is home, a word searches, and a known prefix narrows to its category", () => {
+		const at = (text: string) => mentionQuery(tokenAt(text));
 		expect(at("Read @")).toEqual({ kind: "home" });
 		expect(at("Read @login")).toEqual({ kind: "search", words: "login" });
-		expect(at("@file:src/")).toEqual({ kind: "source", source: "file", words: "src/" });
-		expect(at("@todo:")).toEqual({ kind: "source", source: "todo", words: "" });
-		expect(at("@ticket:login")).toEqual({ kind: "source", source: "ticket", words: "login" });
-		expect(at("@pr:7")).toEqual({ kind: "source", source: "pull-request", words: "7" });
-		expect(at("@session:bug")).toEqual({ kind: "source", source: "session", words: "bug" });
-		expect(at('@ticket:"login page')).toEqual({ kind: "source", source: "ticket", words: "login page" });
+		expect(at("@file:src/")).toEqual({ kind: "source", category: "file", words: "src/" });
+		expect(at("@todo:")).toEqual({ kind: "source", category: "todo", words: "" });
+		expect(at("@ticket:login")).toEqual({ kind: "source", category: "ticket", words: "login" });
+		expect(at("@pr:7")).toEqual({ kind: "source", category: "pull-request", words: "7" });
+		expect(at("@session:bug")).toEqual({ kind: "source", category: "session", words: "bug" });
+		expect(at('@ticket:"login page')).toEqual({ kind: "source", category: "ticket", words: "login page" });
 		expect(at('@"login page')).toEqual({ kind: "search", words: "login page" });
 	});
 
-	test("an unknown prefix is a search, and an @ inside a word is no mention", () => {
-		expect(mentionQuery("@wiki:login", 11)).toEqual({ kind: "search", words: "wiki:login" });
-		expect(mentionQuery("Write me@example.com", 20)).toBeNull();
-		expect(mentionQuery("Write @me now", 13)).toBeNull();
+	test("an unknown prefix is a search for the whole token", () => {
+		expect(mentionQuery(tokenAt("@wiki:login"))).toEqual({ kind: "search", words: "wiki:login" });
 	});
 });
 
 describe("fileSearch", () => {
 	test("asks omp for @words in place of @file:words, and as typed for a search", () => {
-		expect(fileSearch("See @file:src now", 13)).toEqual({ text: "See @src now", cursor: 8 });
-		expect(fileSearch('@file:"my notes', 15)).toEqual({ text: '@"my notes', cursor: 10 });
-		expect(fileSearch("See @login", 10)).toEqual({ text: "See @login", cursor: 10 });
+		expect(fileSearch("See @file:src now", tokenAt("See @file:src now", 13))).toEqual({ text: "See @src now", cursor: 8 });
+		expect(fileSearch('@file:"my notes', tokenAt('@file:"my notes'))).toEqual({ text: '@"my notes', cursor: 10 });
+		expect(fileSearch("See @login", tokenAt("See @login"))).toEqual({ text: "See @login", cursor: 10 });
+		expect(fileSearch("See @wiki:x", tokenAt("See @wiki:x"))).toEqual({ text: "See @wiki:x", cursor: 11 });
 	});
 
-	test("asks nothing on home or another source", () => {
-		expect(fileSearch("See @", 5)).toBeNull();
-		expect(fileSearch("See @ticket:login", 17)).toBeNull();
-		expect(fileSearch("See @file:", 10)).toEqual({ text: "See @", cursor: 5 });
+	test("asks nothing on home or another category", () => {
+		expect(fileSearch("See @", tokenAt("See @"))).toBeNull();
+		expect(fileSearch("See @ticket:login", tokenAt("See @ticket:login"))).toBeNull();
+		expect(fileSearch("See @file:", tokenAt("See @file:"))).toEqual({ text: "See @", cursor: 5 });
 	});
 });
 
@@ -131,7 +136,7 @@ describe("mentionMenu", () => {
 		]);
 	});
 
-	test("every word must match the label, key, or detail, in any order and any case", () => {
+	test("every word must match the label or detail, in any order and any case", () => {
 		expect(labels(menu('@"LOGIN fix'))).toEqual([
 			// A subtodo's detail is its parent's title, so it matches words from either.
 			["Todos", ["Fix login redirect", "Write the login test"]],
@@ -147,9 +152,9 @@ describe("mentionMenu", () => {
 		expect(labels(menu("@file:src", { files: [fileItem("src/")] }))).toEqual([["Files & Folders", ["src/"]]]);
 		const many = mentionMenu({
 			text: "@todo:",
-			cursor: 6,
+			token: tokenAt("@todo:"),
 			data: { ...data, todos: Array.from({ length: 60 }, (_, index) => todo(`t${index}`, `Todo ${index}`)) },
-			changed: [],
+			composer: { sessionId: null, changed: [] },
 			files: null,
 		});
 		expect(many[0].options).toHaveLength(50);

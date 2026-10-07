@@ -1,157 +1,49 @@
-/** The composer's `@` menu: the sources it offers beside omp's files, the query a token asks, and the rows it shows. */
+/** The composer's `@` menu: the categories it offers, the query a token asks, and the rows it shows. */
 import { File, Folder, GitPullRequest, ListTodo, type LucideIcon, MessageSquare, Slash, Sparkles, Ticket } from "lucide-react";
-import { prKey, pullRequestUrl, type RepoInbox } from "../src/shared/github";
+import { pullRequestUrl, type RepoInbox } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import type { Ticket as LinearTicket } from "../src/shared/tickets";
 import { type ChangedFile, fileStatus } from "../src/shared/transcript";
 import type { UserTodo } from "../src/user-todos-shared";
-import { mentionToken } from "./completion-trigger";
+import type { MentionToken } from "./completion-trigger";
+import { isAbsolutePath } from "./file-paths";
 import { hostLabel, pastLabel } from "./labels";
 
-export type SourceId = "todo" | "ticket" | "pull-request" | "session";
+export type CategoryId = "file" | "todo" | "ticket" | "pull-request" | "session";
 
-/** Something the menu offers besides a file; picking it puts `reference` in the draft, the text the agent reads. */
-export interface Mention {
-	source: SourceId;
-	key: string;
-	label: string;
-	detail: string | null;
-	reference: string;
-}
-
-/** What the page holds that the sources list. */
-export interface MentionData {
+/** The page's lists that every composer shares. */
+export interface MentionLists {
 	todos: UserTodo[];
-	tickets: LinearTicket[];
-	inbox: RepoInbox[];
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The composer's own session, which the menu leaves out; `null` for the new-session draft. */
+}
+
+/** What the sources list: the page's lists, then the tickets and inbox the menu polls while it needs them. */
+export interface MentionData extends MentionLists {
+	tickets: LinearTicket[];
+	inbox: RepoInbox[];
+}
+
+/** The composer the menu opens in. */
+export interface Composer {
+	/** Its session, which the menu leaves out; `null` for the new-session draft. */
 	sessionId: string | null;
+	/** The files its agent changed, in first-touch order. */
+	changed: ChangedFile[];
 }
 
-/** A category of the home menu, which `@<prefix>:` narrows the menu to. */
-interface Category {
-	id: SourceId | "file";
-	prefix: string;
-	title: string;
-	icon: LucideIcon;
+/** The draft and caret a row leaves. */
+export interface Edit {
+	text: string;
+	cursor: number;
 }
 
-export interface MentionSource extends Category {
-	id: SourceId;
-	list(data: MentionData): Mention[];
-}
-
-/** omp's own file search, which the server answers. */
-const FILES: Category = { id: "file", prefix: "file", title: "Files & Folders", icon: Folder };
-
-/** Brackets in a Markdown link's text would end it early. */
-const linkText = (text: string): string => text.replace(/[[\]]/g, "\\$&");
-
-export const MENTION_SOURCES: readonly MentionSource[] = [
-	{
-		id: "todo",
-		prefix: "todo",
-		title: "Todos",
-		icon: ListTodo,
-		list: ({ todos }) =>
-			todos.flatMap(todo =>
-				[todo, ...todo.children]
-					.filter(leaf => leaf.doneAt === null)
-					.map(leaf => ({
-						source: "todo",
-						key: leaf.id,
-						label: leaf.text,
-						detail: leaf === todo ? null : todo.text,
-						reference: `todo ${JSON.stringify(leaf.text)} (id ${leaf.id})`,
-					})),
-			),
-	},
-	{
-		id: "ticket",
-		prefix: "ticket",
-		title: "Tickets",
-		icon: Ticket,
-		list: ({ tickets }) =>
-			tickets.map(ticket => ({
-				source: "ticket",
-				key: ticket.id,
-				label: ticket.title,
-				detail: ticket.id,
-				reference: `[${linkText(`${ticket.id} ${ticket.title}`)}](${ticket.url})`,
-			})),
-	},
-	{
-		id: "pull-request",
-		prefix: "pr",
-		title: "Pull requests",
-		icon: GitPullRequest,
-		list: ({ inbox }) =>
-			inbox.flatMap(repo => ("pullRequests" in repo ? repo.pullRequests : [])).map(pr => {
-				const name = `${pr.owner}/${pr.repo}#${pr.number}`;
-				return { source: "pull-request", key: prKey(pr), label: pr.title, detail: name, reference: `[${linkText(`${name} ${pr.title}`)}](${pullRequestUrl(pr)})` };
-			}),
-	},
-	{
-		id: "session",
-		prefix: "session",
-		title: "Sessions",
-		icon: MessageSquare,
-		list: ({ hosts, past, sessionId }) =>
-			[
-				...hosts.map(host => ({ id: host.sessionId, title: hostLabel(host), cwdDisplay: host.cwdDisplay })),
-				...past.map(session => ({ id: session.sessionId, title: pastLabel(session), cwdDisplay: session.cwdDisplay })),
-			]
-				.filter(({ id }) => id !== sessionId)
-				.map(({ id, title, cwdDisplay }) => ({ source: "session", key: id, label: title, detail: cwdDisplay, reference: `omp session ${JSON.stringify(title)} (id ${id})` })),
-	},
-];
-
-const CATEGORIES: readonly (Category | MentionSource)[] = [FILES, ...MENTION_SOURCES];
-
-export type MentionQuery =
-	/** The token is `@` alone. */
-	| { kind: "home" }
-	| { kind: "search"; words: string }
-	| { kind: "source"; source: SourceId | "file"; words: string };
-
-/** The `@` token under the caret: where it starts, what it asks, and `typed`, what follows its prefix as typed, quotes kept. */
-function tokenAt(text: string, cursor: number): { start: number; query: MentionQuery; typed: string } | null {
-	const token = mentionToken(text, cursor);
-	if (!token) return null;
-	const { start, body } = token;
-	if (body === "") return { start, query: { kind: "home" }, typed: "" };
-	const prefix = /^([a-z]+):/.exec(body);
-	const category = prefix && CATEGORIES.find(({ prefix: name }) => name === prefix[1]);
-	const typed = category ? body.slice(prefix[0].length) : body;
-	const words = typed.replace(/^"|"$/g, "");
-	return { start, query: category ? { kind: "source", source: category.id, words } : { kind: "search", words }, typed };
-}
-
-/** What the `@` token under the caret asks for; `null` when the caret is in no such token. */
-export function mentionQuery(text: string, cursor: number): MentionQuery | null {
-	return tokenAt(text, cursor)?.query ?? null;
-}
-
-/**
- * The `complete` request whose files the menu shows: the draft with the token as the `@` mention omp completes, so
- * omp's answer replaces `@file:src` whole. `null` when the menu shows no files: home, or another source.
- */
-export function fileSearch(text: string, cursor: number): { text: string; cursor: number } | null {
-	const token = tokenAt(text, cursor);
-	if (!token || token.query.kind === "home" || (token.query.kind === "source" && token.query.source !== "file")) return null;
-	const mention = `@${token.typed}`;
-	return { text: text.slice(0, token.start) + mention + text.slice(cursor), cursor: token.start + mention.length };
-}
-
-/** A row that picking applies: `edit` is the draft and caret after it, and a row that `opens` a category keeps the menu open. */
+/** A row that picking applies; a row that `opens` a category keeps the menu open. */
 export interface MenuOption {
-	key: string;
 	icon: LucideIcon;
 	label: string;
 	detail: string | null;
-	edit: { text: string; cursor: number };
+	edit: Edit;
 	opens: boolean;
 }
 
@@ -161,83 +53,189 @@ export interface MenuSection {
 	options: MenuOption[];
 }
 
-const ICON: Record<CompletionItem["kind"], LucideIcon> = { command: Slash, skill: Sparkles, file: File, directory: Folder };
-
-/** omp's own suggestion, which carries the draft and caret it leaves. */
-export function completionOption(item: CompletionItem): MenuOption {
-	return { key: `${item.kind}:${item.label}`, icon: ICON[item.kind], label: item.label, detail: item.description, edit: { text: item.text, cursor: item.cursor }, opens: false };
+interface CategoryInput {
+	words: string;
+	data: MentionData;
+	composer: Composer;
+	/** omp's answer to {@link fileSearch}, empty until it arrives. */
+	files: CompletionItem[];
+	/** The draft with the `@` token replaced by `insert`. */
+	replace: (insert: string) => Edit;
 }
 
-/** Every word of `words` is in the mention's label, key, or detail, in any order and any case. */
+/** A row of the home menu, which `@<prefix>:` narrows the menu to. */
+interface Category {
+	id: CategoryId;
+	prefix: string;
+	title: string;
+	icon: LucideIcon;
+	/** How many rows a search across every category shows. */
+	searchLimit: number;
+	/** The rows matching `words`. */
+	options(input: CategoryInput): MenuOption[];
+}
+
+/** Something a source offers; picking it puts `reference` in the draft, the text the agent reads. */
+interface Mention {
+	label: string;
+	detail: string | null;
+	reference: string;
+}
+
+/** Every word of `words` is in the mention's label or detail, in any order and any case. */
 function matches(mention: Mention, words: string): boolean {
-	const text = [mention.label, mention.key, mention.detail ?? ""].join("\n").toLowerCase();
+	const text = `${mention.label}\n${mention.detail ?? ""}`.toLowerCase();
 	return words.toLowerCase().split(/\s+/).every(word => text.includes(word));
 }
 
-const SEARCH_FILES = 5;
-const SEARCH_MENTIONS = 3;
-const SOURCE_LIMIT = 50;
-const CHANGED_FILES = 3;
+/** A category the page answers, filtering what `list` gives. */
+function source({ list, ...category }: Omit<Category, "searchLimit" | "options"> & { list(data: MentionData, composer: Composer): Mention[] }): Category {
+	return {
+		...category,
+		searchLimit: 3,
+		options: ({ words, data, composer, replace }) =>
+			list(data, composer)
+				.filter(mention => matches(mention, words))
+				.map(({ label, detail, reference }) => ({ icon: category.icon, label, detail, edit: replace(`${reference} `), opens: false })),
+	};
+}
+
+const COMPLETION_ICON: Record<CompletionItem["kind"], LucideIcon> = { command: Slash, skill: Sparkles, file: File, directory: Folder };
+
+/** omp's own suggestion, which carries the draft and caret it leaves. */
+export function completionOption(item: CompletionItem): MenuOption {
+	return { icon: COMPLETION_ICON[item.kind], label: item.label, detail: item.description, edit: { text: item.text, cursor: item.cursor }, opens: false };
+}
+
+/** Brackets in a Markdown link's text would end it early. */
+const linkText = (text: string): string => text.replace(/[[\]]/g, "\\$&");
+
+const CATEGORIES: readonly Category[] = [
+	{ id: "file", prefix: "file", title: "Files & Folders", icon: Folder, searchLimit: 5, options: ({ files }) => files.map(completionOption) },
+	source({
+		id: "todo",
+		prefix: "todo",
+		title: "Todos",
+		icon: ListTodo,
+		list: ({ todos }) =>
+			todos.flatMap(todo =>
+				[todo, ...todo.children]
+					.filter(leaf => leaf.doneAt === null)
+					.map(leaf => ({ label: leaf.text, detail: leaf === todo ? null : todo.text, reference: `todo ${JSON.stringify(leaf.text)} (id ${leaf.id})` })),
+			),
+	}),
+	source({
+		id: "ticket",
+		prefix: "ticket",
+		title: "Tickets",
+		icon: Ticket,
+		list: ({ tickets }) => tickets.map(ticket => ({ label: ticket.title, detail: ticket.id, reference: `[${linkText(`${ticket.id} ${ticket.title}`)}](${ticket.url})` })),
+	}),
+	source({
+		id: "pull-request",
+		prefix: "pr",
+		title: "Pull requests",
+		icon: GitPullRequest,
+		list: ({ inbox }) =>
+			inbox
+				.flatMap(repo => ("pullRequests" in repo ? repo.pullRequests : []))
+				.map(pr => {
+					const name = `${pr.owner}/${pr.repo}#${pr.number}`;
+					return { label: pr.title, detail: name, reference: `[${linkText(`${name} ${pr.title}`)}](${pullRequestUrl(pr)})` };
+				}),
+	}),
+	source({
+		id: "session",
+		prefix: "session",
+		title: "Sessions",
+		icon: MessageSquare,
+		list: ({ hosts, past }, { sessionId }) =>
+			[
+				...hosts.map(host => ({ id: host.sessionId, title: hostLabel(host), cwdDisplay: host.cwdDisplay })),
+				...past.map(session => ({ id: session.sessionId, title: pastLabel(session), cwdDisplay: session.cwdDisplay })),
+			]
+				.filter(({ id }) => id !== sessionId)
+				.map(({ id, title, cwdDisplay }) => ({ label: title, detail: cwdDisplay, reference: `omp session ${JSON.stringify(title)} (id ${id})` })),
+	}),
+];
+
+export type MentionQuery =
+	/** The token is `@` alone. */
+	| { kind: "home" }
+	| { kind: "search"; words: string }
+	| { kind: "source"; category: CategoryId; words: string };
+
+/** The token's category, and what follows its prefix as typed; an unknown prefix stays part of what was typed. */
+function categoryOf({ prefix, body }: MentionToken): { category: Category | undefined; typed: string } {
+	const category = CATEGORIES.find(candidate => candidate.prefix === prefix);
+	return { category, typed: category || prefix === null ? body : `${prefix}:${body}` };
+}
+
+/** What the `@` token asks for. */
+export function mentionQuery(token: MentionToken): MentionQuery {
+	const { category, typed } = categoryOf(token);
+	const words = typed.replace(/^"|"$/g, "");
+	if (category) return { kind: "source", category: category.id, words };
+	return typed === "" ? { kind: "home" } : { kind: "search", words };
+}
+
+/** Whether the query shows category `id`'s rows. */
+export function wants(query: MentionQuery, id: CategoryId): boolean {
+	return query.kind === "search" || (query.kind === "source" && query.category === id);
+}
+
+/**
+ * The `complete` request whose files the menu shows: the draft with the token as the `@` mention omp completes, so
+ * omp's answer replaces `@file:src` whole. `null` when the menu shows no files: home, or another category.
+ */
+export function fileSearch(text: string, token: MentionToken): Edit | null {
+	const { category, typed } = categoryOf(token);
+	if (category ? category.id !== "file" : typed === "") return null;
+	const mention = `@${typed}`;
+	return { text: text.slice(0, token.start) + mention + text.slice(token.end), cursor: token.start + mention.length };
+}
+
+/** The last `count` files the agent changed inside its directory and did not delete, latest first. */
+function recentlyChanged(changed: ChangedFile[], count: number): string[] {
+	const lastAt = (file: ChangedFile): number => file.changes[file.changes.length - 1].at ?? 0;
+	return changed
+		.map((file, index) => ({ file, index }))
+		.filter(({ file }) => !isAbsolutePath(file.path) && fileStatus(file.changes) !== "deleted")
+		.sort((a, b) => lastAt(b.file) - lastAt(a.file) || b.index - a.index)
+		.slice(0, count)
+		.map(({ file }) => file.path);
+}
 
 export interface MenuInput {
+	/** The draft `token` was read from. */
 	text: string;
-	cursor: number;
+	token: MentionToken;
 	data: MentionData;
-	/** The files the view's agent changed, in first-touch order, relative to its directory when inside it. */
-	changed: ChangedFile[];
+	composer: Composer;
 	/** omp's answer to {@link fileSearch}; `null` until it arrives or when none was asked. */
 	files: CompletionItem[] | null;
 }
 
-/** The menu for the `@` token under the caret; empty when the caret is in none. */
-export function mentionMenu({ text, cursor, data, changed, files }: MenuInput): MenuSection[] {
-	const token = tokenAt(text, cursor);
-	if (!token) return [];
-	const replace = (insert: string): MenuOption["edit"] => ({ text: text.slice(0, token.start) + insert + text.slice(cursor), cursor: token.start + insert.length });
-	const { query } = token;
+/** The menu for the `@` token. */
+export function mentionMenu({ text, token, data, composer, files }: MenuInput): MenuSection[] {
+	const replace = (insert: string): Edit => ({ text: text.slice(0, token.start) + insert + text.slice(token.end), cursor: token.start + insert.length });
+	const query = mentionQuery(token);
 	if (query.kind === "home") {
-		const recent = changed
-			.filter(file => !/^[/~]/.test(file.path) && fileStatus(file.changes) !== "deleted")
-			// Reversed first, so among files with no change time the later-touched one leads.
-			.toReversed()
-			.sort((a, b) => (b.changes.at(-1)?.at ?? 0) - (a.changes.at(-1)?.at ?? 0))
-			.slice(0, CHANGED_FILES)
-			.map(({ path }) => ({
-				key: `changed:${path}`,
-				icon: File,
-				label: path,
-				detail: null,
-				// omp's own completion quotes a path with a space the same way.
-				edit: replace(`${path.includes(" ") ? `@"${path}"` : `@${path}`} `),
-				opens: false,
-			}));
-		const categories = CATEGORIES.map(category => ({
-			key: `category:${category.id}`,
-			icon: category.icon,
-			label: category.title,
+		const recent = recentlyChanged(composer.changed, 3).map(path => ({
+			icon: File,
+			label: path,
 			detail: null,
-			edit: replace(`@${category.prefix}:`),
-			opens: true,
+			// omp's own completion quotes a path with a space the same way.
+			edit: replace(`${path.includes(" ") ? `@"${path}"` : `@${path}`} `),
+			opens: false,
 		}));
+		const categories = CATEGORIES.map(category => ({ icon: category.icon, label: category.title, detail: null, edit: replace(`@${category.prefix}:`), opens: true }));
 		return [...(recent.length > 0 ? [{ title: null, options: recent }] : []), { title: null, options: categories }];
 	}
-	const search = query.kind === "search";
-	return CATEGORIES.filter(category => query.kind === "search" || category.id === query.source).flatMap(category => {
-		const options =
-			"list" in category
-				? category
-						.list(data)
-						.filter(mention => matches(mention, query.words))
-						.slice(0, search ? SEARCH_MENTIONS : SOURCE_LIMIT)
-						.map(mention => ({
-							key: `${mention.source}:${mention.key}`,
-							icon: category.icon,
-							label: mention.label,
-							detail: mention.detail,
-							edit: replace(`${mention.reference} `),
-							opens: false,
-						}))
-				: (files ?? []).slice(0, search ? SEARCH_FILES : SOURCE_LIMIT).map(completionOption);
+	return CATEGORIES.filter(category => wants(query, category.id)).flatMap(category => {
+		const options = category
+			.options({ words: query.words, data, composer, files: files ?? [], replace })
+			.slice(0, query.kind === "search" ? category.searchLimit : 50);
 		return options.length > 0 ? [{ title: category.title, options }] : [];
 	});
 }

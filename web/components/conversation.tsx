@@ -213,8 +213,7 @@ function LiveConversation({
 		setDraft,
 		completions,
 		onComplete: (reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "live", view }, text, cursor }),
-		sessionId: shown?.sessionId ?? null,
-		changed,
+		composer: { sessionId: shown?.sessionId ?? null, changed },
 		onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => {
 			onComposerKey(event);
 			if (!event.defaultPrevented) suggestions.onKeyDown(event);
