@@ -78,12 +78,18 @@ interface ListPageProps<Data> {
 	notice: ReactNode;
 	/** The spacing between the page's lists: a `space-y-*` class. */
 	spacing: string;
+	/** Lets the lists take the width of a wide window, for a table. */
+	wide?: boolean;
+	/** Buttons before Refresh. */
+	actions?: ReactNode;
+	/** What stays pinned under the lists while they scroll. */
+	footer?: ReactNode;
 	/** The page's lists, from its read. */
 	children: (data: Data) => ReactNode;
 }
 
 /** A page of lists read from GitHub or Linear with a Refresh button, `notice`, and the lists once the first read loads. */
-export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, spacing, children }: ListPageProps<Data>) {
+export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, spacing, wide = false, actions, footer, children }: ListPageProps<Data>) {
 	const { read, error, refreshing } = poll;
 	let body: ReactNode;
 	if (!read) body = <LoadNote loading={loading} error={error && `Cannot load ${noun}: ${error}`} />;
@@ -101,16 +107,20 @@ export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, no
 			title={title}
 			meta={read ? `${meta} · updated ${readTime(read.at)}` : meta}
 			actions={
-				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={onRefresh}>
-					{refreshing ? "Refreshing…" : "Refresh"}
-				</Button>
+				<>
+					{actions}
+					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={onRefresh}>
+						{refreshing ? "Refreshing…" : "Refresh"}
+					</Button>
+				</>
 			}
 		>
 			<TooltipProvider>
-				<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", spacing)}>
+				<div className={cn("mx-auto w-full px-6 py-6", wide ? "max-w-7xl" : "max-w-5xl", spacing)}>
 					{notice}
 					{body}
 				</div>
+				{footer}
 			</TooltipProvider>
 		</PageFrame>
 	);

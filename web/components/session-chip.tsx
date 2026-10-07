@@ -14,23 +14,27 @@ interface SessionChipProps {
 	title: string;
 	/** Filled for the session that submitted the pull request, outlined for one that worked on it. */
 	filled: boolean;
+	/** Shows the session's status alone, naming it in the tooltip, where its name would not fit whole. */
+	compact?: boolean;
 	onClick: (event: MouseEvent) => void;
 }
 
 /** A session named on a pull request or an issue, which opens it on click. */
-export function SessionChip({ label, status, title, filled, onClick }: SessionChipProps) {
+export function SessionChip({ label, status, title, filled, compact = false, onClick }: SessionChipProps) {
 	return (
 		<Tooltip content={`${label}. ${title}`}>
 			<button
 				type="button"
 				onClick={onClick}
 				className={cn(
-					"flex max-w-48 items-center gap-1.5 rounded px-1.5 py-px text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
+					"flex max-w-48 min-w-0 items-center gap-1.5 rounded px-1.5 py-px text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
 					filled ? "bg-muted" : "ring-1 ring-inset ring-border",
+					compact && "gap-1 px-1",
 				)}
 			>
+				{compact && <Bot aria-hidden className="size-3 shrink-0 text-muted-foreground" />}
 				{status && <StatusDot status={status} />}
-				<span className="truncate">{label}</span>
+				<span className={compact ? "sr-only" : "truncate"}>{label}</span>
 			</button>
 		</Tooltip>
 	);

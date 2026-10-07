@@ -438,16 +438,20 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   **Calendar** opens a month of Google events, routine runs, and due todos and tickets, with your routines listed under it; see [Calendar](#calendar) and [Routines](#routines).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone across the sidebar's width; hover an icon for its name.
   The tabs never spill past the sidebar.
-  **Inbox** lists your pull requests in the sidebar, like Graphite's inbox, and keeps the session panes beside it.
+  **Inbox** opens the inbox page, a table of your pull requests like Graphite's inbox, and lists its sections in the sidebar, each with its count; click one to unfold its card on the page and scroll to it.
+  Once you open a pull request or a session from the inbox, the sidebar lists the pull requests instead, beside the details or the session panes.
   The tab stays on the inbox while you open sessions from it, until you choose **Sessions**.
   The **Your move** count stands out in bold.
   The **Inbox** tab counts the pull requests that wait on your move, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
-  An `#inbox` address selects the Inbox tab.
+  An `#inbox` address opens the inbox page.
   The inbox covers the GitHub repository of the project that the sidebar's picker shows, or under **All projects** every repository that a session ran in, one section per repository.
   A workspace's repository is the one its `origin` remote names.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
   They sort by whose move it is: **Your move**, **Agent on it**, **Waiting on others**, and **Recently merged**.
-  A row starts with a badge that names its move, then shows the title and age, then its number, the reason for the move, its place in a stack, and the sessions on it.
+  A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, and its checks.
+  A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
+  The inbox page's table shows each section as a card, one row per pull request: the move's badge, the title with its author, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, and its age.
+  A narrow page drops the sessions, stack, and line columns.
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.
   A pull request that a running session asks you about is **Answer**, and one that a running session works on is **Working**.
@@ -466,14 +470,17 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A row shows one session chip: a running session first, since one may be working on the pull request now, then one that submitted it, then one that worked on it.
   A submitter's chip is filled and a worker's chip is outlined, and a chip's tooltip says which it is.
   A running session's chip starts with the sidebar's status dot: green while it works, amber while it waits on a question, blue once its turn ended.
+  In the sidebar the chip shows only an agent icon and that dot, with the session's name in its tooltip; the table shows the name.
   `+N` after the chip lists every session on the pull request, each with whether it submitted or worked on it; choose one to open it.
+  The table shows up to two reviewers' pictures and lists the rest under `+N`; with no reviewer, an icon shows the review state.
   A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+ open threads`.
   The todo, lightning, and link buttons show while you hover or focus the row, while a start on it runs, and after a link write on it, so its outcome stays readable.
   Click a repository or a section heading to fold it; the browser's localStorage keeps your choice across reloads.
-  A folded section's heading sums up its moves, such as `2 in review · 1 CI running`.
+  A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
+  A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository the inbox could not read.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
   A line under the list shows the inbox's main keys.
-  Click the title to show the pull request's details in the main area, in place of the panes; the back arrow at the start of the page header, **Back to the sessions**, brings the panes back.
+  Click the title to show the pull request's details in the main area; the back arrow at the start of the page header, **Back to the inbox**, brings the inbox page back.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Inbox** tab's count stays current.
   Reopening the inbox, even after a reload, shows the last inbox read for the chosen project at once; the top of the list says when that inbox was read, and the browser's localStorage keeps the last one of each project.

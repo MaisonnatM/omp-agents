@@ -15,6 +15,8 @@ describe("pullRequestActions", () => {
 		review: "review-required",
 		checks: "passing",
 		conflicts: false,
+		additions: 0,
+		deletions: 0,
 		head: "me/widgets",
 		stackedOn: null,
 		unresolved: { count: 0, exact: true },

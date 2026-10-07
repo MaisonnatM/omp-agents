@@ -23,7 +23,7 @@ const REVIEW_FIELDS = `author { login ${AVATAR} }
 	latestReviews(first: 10) { nodes { state author { login ${AVATAR} } } }`;
 
 const PR_FIELDS = `... on PullRequest {
-	number title isDraft state reviewDecision mergeable headRefName baseRefName updatedAt mergedAt
+	number title isDraft state reviewDecision mergeable headRefName baseRefName updatedAt mergedAt additions deletions
 	${REVIEW_FIELDS}
 	repository { defaultBranchRef { name } }
 	commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
@@ -104,6 +104,8 @@ function parsePullRequestHead(node: Record<string, unknown>) {
 		review: reviewOf(str(node.reviewDecision), reviewers),
 		checks: STATUS[rollup ?? ""] ?? "none",
 		conflicts: conflictsOf(node),
+		additions: num(node.additions) ?? 0,
+		deletions: num(node.deletions) ?? 0,
 		unresolved: parseUnresolved(node.reviewThreads),
 	};
 }
@@ -235,8 +237,6 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		...head,
 		body: str(node.body) ?? "",
 		state: node.state === "CLOSED" ? "closed" : head.state,
-		additions: num(node.additions) ?? 0,
-		deletions: num(node.deletions) ?? 0,
 		changedFiles: num(node.changedFiles) ?? 0,
 		files,
 		checkRuns,

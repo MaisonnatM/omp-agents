@@ -7,6 +7,7 @@ import {
 	DEFAULT_ORDER,
 	decodeOrder,
 	foldedByDefault,
+	inboxAge,
 	type InboxOrder,
 	inboxSections,
 	moveKey,
@@ -34,6 +35,8 @@ const pr = (number: number, fields: Partial<InboxPullRequest> = {}): InboxPullRe
 	review: "review-required",
 	checks: "passing",
 	conflicts: false,
+	additions: 0,
+	deletions: 0,
 	head: `me/branch-${number}`,
 	stackedOn: null,
 	unresolved: { count: 0, exact: true },
@@ -111,6 +114,12 @@ describe("next move", () => {
 			"no review needed · no checks",
 			"@teammate",
 		]);
+	});
+
+	test("an age shows its largest whole unit, rounding down at each boundary", () => {
+		const now = Date.parse("2026-10-02T12:00:00Z");
+		const ago = (minutes: number): string => inboxAge(now - minutes * 60_000, now);
+		expect([ago(0), ago(0.9), ago(1), ago(59), ago(60), ago(23 * 60 + 59), ago(24 * 60), ago(-5)]).toEqual(["<1m", "<1m", "1m", "59m", "1h", "23h", "1d", "<1m"]);
 	});
 });
 

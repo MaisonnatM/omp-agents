@@ -54,14 +54,21 @@ const REVIEWER_STATE: Record<ReviewerState, [string, (login: string) => string]>
 	requested: ["bg-amber-500", login => `Waiting on a review from ${login}`],
 };
 
-export function Reviewers({ reviewers }: { reviewers: Reviewer[] }) {
+/** The reviewers' pictures, each marked with where they stand; past `max`, a `+N` names the rest in its tooltip. */
+export function Reviewers({ reviewers, max = Infinity }: { reviewers: Reviewer[]; max?: number }) {
 	if (reviewers.length === 0) return null;
+	const rest = reviewers.slice(max);
 	return (
 		<span className="flex items-center -space-x-1">
-			{reviewers.map(reviewer => {
+			{reviewers.slice(0, max).map(reviewer => {
 				const [dot, says] = REVIEWER_STATE[reviewer.state];
 				return <Avatar key={reviewer.login} person={reviewer} label={says(reviewer.login)} dot={dot} />;
 			})}
+			{rest.length > 0 && (
+				<Tooltip content={rest.map(reviewer => REVIEWER_STATE[reviewer.state][1](reviewer.login)).join("\n")}>
+					<span className="pl-2 text-xs tabular-nums text-muted-foreground">+{rest.length}</span>
+				</Tooltip>
+			)}
 		</span>
 	);
 }

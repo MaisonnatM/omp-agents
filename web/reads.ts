@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { isObject } from "../src/json";
 import { type CalendarEventsAnswer, type GoogleStatus, type IntegrationsAnswer, MCP_INTEGRATIONS } from "../src/shared/accounts";
-import type { Inbox } from "../src/shared/github";
+import type { Inbox, RepoInbox } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
 import type { TicketsAnswer } from "../src/shared/tickets";
 import { errorText, getJson } from "./api";
@@ -61,7 +61,9 @@ export const inboxStore = createPolledStore<Inbox>({
 	},
 	isValid: (value): value is Inbox => {
 		const inbox = value as Partial<Inbox> | null;
-		return Array.isArray(inbox?.repos) && Array.isArray(inbox.unmatched);
+		// A read saved before the inbox carried each PR's diff size reads GitHub again.
+		const current = (repo: RepoInbox): boolean => "error" in repo || repo.pullRequests.every(pr => typeof pr.additions === "number");
+		return Array.isArray(inbox?.repos) && Array.isArray(inbox.unmatched) && inbox.repos.every(current);
 	},
 });
 
