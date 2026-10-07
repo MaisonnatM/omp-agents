@@ -82,11 +82,11 @@ export const integrationsStore = createPolledStore<IntegrationsAnswer>({
 	},
 });
 
-/** The Google OAuth client and whether its sign-in can read your calendars. */
+/** The Google calendars added, which the Calendar page reads. */
 export const googleStore = createPolledStore<GoogleStatus>({
 	cacheKey: "omp-agents.google-cache",
 	url: () => "/api/google",
-	isValid: (value): value is GoogleStatus => typeof (value as Partial<GoogleStatus> | null)?.connected === "boolean",
+	isValid: (value): value is GoogleStatus => Array.isArray((value as Partial<GoogleStatus> | null)?.calendars),
 });
 
 /** Your Google events over a span, by its `from` and `to` query, which the Calendar page reads a month at a time. */

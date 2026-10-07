@@ -1,4 +1,4 @@
-/** The sign-ins the integrations page starts, to omp's MCP servers and to Google: one at a time each, waiting for the browser at most five minutes. */
+/** The sign-ins the integrations page starts to omp's MCP servers: one at a time each, waiting for the browser at most five minutes. */
 import { errorText } from "./json";
 import type { SignInState } from "./shared/accounts";
 

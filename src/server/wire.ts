@@ -3,9 +3,10 @@
  * Each socket message has one parser in {@link clientParsers}, so a {@link ClientMsg} variant without one does not compile.
  * Socket parsers return `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller casts what it received.
  */
-import { isObject, nonEmpty, oneOf, str } from "../json";
+import { GOOGLE_ICAL_ADDRESS } from "../google-calendar";
+import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
-import { GOOGLE_CLIENT_ID, type GoogleClient, MCP_INTEGRATIONS, type McpIntegrationId } from "../shared/accounts";
+import { MCP_INTEGRATIONS, type McpIntegrationId } from "../shared/accounts";
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import type { BranchChoice } from "../shared/git";
@@ -350,12 +351,14 @@ export function parseSessionLinks(body: unknown): SessionLinksEdit | null {
 	return sessionIds.every((id): id is string => typeof id === "string") ? { ...pr, sessionIds } : null;
 }
 
-/** The body of `PUT /api/google/client`: a desktop OAuth client's ID and secret, as Google Cloud's console shows them. */
-export function parseGoogleClient(body: unknown): GoogleClient | null {
-	if (!isObject(body) || !isNonEmpty(body.clientId) || !isNonEmpty(body.clientSecret)) return null;
-	const clientId = body.clientId.trim();
-	return GOOGLE_CLIENT_ID.test(clientId) ? { clientId, clientSecret: body.clientSecret.trim() } : null;
+/** The body of `PUT /api/google/calendars`: `{ url }`, a Google calendar's address in iCal format. */
+export function parseGoogleCalendarAddress(body: unknown): string | null {
+	const url = isObject(body) ? str(body.url)?.trim() : undefined;
+	return url && GOOGLE_ICAL_ADDRESS.test(url) ? url : null;
 }
+
+/** The body of `PUT /api/google/calendars/remove`: `{ id }` of an added calendar. */
+export const parseGoogleCalendarId = (body: unknown): string | null => (isObject(body) ? (nonEmptyStr(body.id) ?? null) : null);
 
 const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
