@@ -40,14 +40,14 @@ function Sections({ answer, google }: { answer: IntegrationsAnswer; google: Poll
 	}));
 	const googleStatus = google.read?.data ?? null;
 	if (googleStatus || google.error) {
-		entries.push({ key: "google", connected: googleStatus?.connected ?? false, row: <GoogleCalendarRow status={googleStatus} error={google.error} /> });
+		entries.push({ key: "google", connected: (googleStatus?.calendars.length ?? 0) > 0, row: <GoogleCalendarRow status={googleStatus} error={google.error} /> });
 	}
 	return (
 		<div className="mx-auto w-full max-w-3xl space-y-8">
 			<Section title="Connected" entries={entries.filter(entry => entry.connected)} />
 			<Section title="Available" entries={entries.filter(entry => !entry.connected)} />
 			<p className="px-1 text-xs text-pretty text-muted-foreground">
-				omp keeps its MCP sign-ins in its own credential store, so every omp session can use them. Google Calendar's token stays with this dashboard, on this machine.
+				omp keeps its MCP sign-ins in its own credential store, so every omp session can use them. Google Calendar's addresses stay with this dashboard, on this machine.
 			</p>
 		</div>
 	);

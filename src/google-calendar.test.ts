@@ -1,8 +1,17 @@
-import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { GoogleCalendar, toCalendarEvent } from "./google-calendar";
+import { expandFeed, GoogleCalendar, parseFeed } from "./google-calendar";
+
+// The feed's times are Paris wall-clock times; Paris leaves summer time on 2026-10-25, inside the month below.
+const savedTz = process.env.TZ;
+beforeAll(() => {
+	process.env.TZ = "Europe/Paris";
+});
+afterAll(() => {
+	process.env.TZ = savedTz;
+});
 
 const dirs: string[] = [];
 const originalFetch = globalThis.fetch;
@@ -11,78 +20,134 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-const client = { clientId: "123.apps.googleusercontent.com", clientSecret: "secret-from-google" };
-const calendar = { id: "personal", name: "Personal", color: "#4285f4" };
+const ADDRESS = "https://calendar.google.com/calendar/ical/max%40example.com/private-0123abcd/basic.ics";
+const OTHER = "https://calendar.google.com/calendar/ical/team%40group.calendar.google.com/private-4567ef/basic.ics";
 
-const pathFor = (): string => {
+const FEED = `BEGIN:VCALENDAR
+PRODID:-//Google Inc//Google Calendar 70.9054//EN
+VERSION:2.0
+X-WR-CALNAME:Work
+BEGIN:VTIMEZONE
+TZID:Europe/Paris
+BEGIN:DAYLIGHT
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+DTSTART:19700329T020000
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU
+END:DAYLIGHT
+BEGIN:STANDARD
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+DTSTART:19701025T030000
+RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20200106T093000
+DTEND;TZID=Europe/Paris:20200106T100000
+RRULE:FREQ=WEEKLY;BYDAY=MO
+EXDATE;TZID=Europe/Paris:20261012T093000
+UID:standup@google.com
+SUMMARY:Standup
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Paris:20261020T110000
+DTEND;TZID=Europe/Paris:20261020T113000
+RECURRENCE-ID;TZID=Europe/Paris:20261019T093000
+UID:standup@google.com
+SUMMARY:Standup (moved)
+END:VEVENT
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261024
+DTEND;VALUE=DATE:20261027
+UID:vacation@google.com
+SUMMARY:Vacation
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261008T120000Z
+DTEND:20261008T130000Z
+UID:lunch@google.com
+SUMMARY:Lunch
+ATTENDEE;PARTSTAT=DECLINED;CN=max@example.com:mailto:max@example.com
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261008T223000Z
+DTEND:20261008T233000Z
+UID:late@google.com
+SUMMARY:Late call
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20261009T120000Z
+DTEND:20261009T130000Z
+UID:canceled@google.com
+STATUS:CANCELLED
+SUMMARY:Canceled
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20250101T120000Z
+DTEND:20250101T130000Z
+UID:old@google.com
+SUMMARY:Last year
+END:VEVENT
+END:VCALENDAR
+`;
+
+const OCTOBER = [new Date("2026-10-01T00:00:00+02:00"), new Date("2026-11-01T00:00:00+01:00")] as const;
+const work = { id: "work", name: "Work", color: "#039be5", owner: "max@example.com" };
+
+test("a feed's month holds each repeat in its own time zone, with Google's moved and removed repeats, all-day ends, local day links, and no declined or canceled events", () => {
+	expect(expandFeed(parseFeed(FEED), work, ...OCTOBER)).toEqual([
+		{ id: "work/standup@google.com/2026-10-05T09:30:00", title: "Standup", calendar: "Work", color: "#039be5", url: "https://calendar.google.com/calendar/r/day/2026/10/5", when: { allDay: false, start: Date.parse("2026-10-05T07:30:00Z"), end: Date.parse("2026-10-05T08:00:00Z") } },
+		{ id: "work/standup@google.com/2026-10-19T09:30:00", title: "Standup (moved)", calendar: "Work", color: "#039be5", url: "https://calendar.google.com/calendar/r/day/2026/10/20", when: { allDay: false, start: Date.parse("2026-10-20T09:00:00Z"), end: Date.parse("2026-10-20T09:30:00Z") } },
+		{ id: "work/standup@google.com/2026-10-26T09:30:00", title: "Standup", calendar: "Work", color: "#039be5", url: "https://calendar.google.com/calendar/r/day/2026/10/26", when: { allDay: false, start: Date.parse("2026-10-26T08:30:00Z"), end: Date.parse("2026-10-26T09:00:00Z") } },
+		{ id: "work/vacation@google.com", title: "Vacation", calendar: "Work", color: "#039be5", url: "https://calendar.google.com/calendar/r/day/2026/10/24", when: { allDay: true, firstDay: "2026-10-24", lastDay: "2026-10-26" } },
+		{ id: "work/late@google.com", title: "Late call", calendar: "Work", color: "#039be5", url: "https://calendar.google.com/calendar/r/day/2026/10/9", when: { allDay: false, start: Date.parse("2026-10-08T22:30:00Z"), end: Date.parse("2026-10-08T23:30:00Z") } },
+	]);
+});
+
+test("someone else's calendar keeps the events its owner declined", () => {
+	const titles = expandFeed(parseFeed(FEED), { ...work, owner: null }, ...OCTOBER).map(event => event.title);
+	expect(titles).toContain("Lunch");
+});
+
+test("an answer that is not a calendar is refused", () => {
+	expect(() => parseFeed("<html>Sign in</html>")).toThrow("something other than a calendar");
+	expect(() => parseFeed("BEGIN:VEVENT\nUID:a\nEND:VEVENT\n")).toThrow("something other than a calendar");
+});
+
+test("calendars are added once they read, keep their address on the server, replace an older file at once, and a failing one leaves the others' events", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-calendar-"));
 	dirs.push(dir);
-	return join(dir, "config", "google.json");
-};
+	const path = join(dir, "config", "google.json");
+	mkdirSync(dirname(path));
+	writeFileSync(path, JSON.stringify({ clientId: "123.apps.googleusercontent.com", clientSecret: "old-secret", refreshToken: "old-token" }));
+	const answers: Record<string, () => Response> = {
+		[ADDRESS]: () => new Response(FEED),
+		[OTHER]: () => new Response("Not Found", { status: 404 }),
+	};
+	globalThis.fetch = Object.assign(async (input: Parameters<typeof fetch>[0]) => answers[String(input)]!(), { preconnect: originalFetch.preconnect });
 
-test("Google's exclusive all-day end is the preceding day and a timed event keeps its instants", () => {
-	expect(toCalendarEvent({ id: "a", summary: "Vacation", start: { date: "2026-10-24" }, end: { date: "2026-10-27" } }, calendar)).toEqual({
-		id: "personal/a", title: "Vacation", calendar: "Personal", color: "#4285f4", url: "https://calendar.google.com/",
-		when: { allDay: true, firstDay: "2026-10-24", lastDay: "2026-10-26" },
-	});
-	expect(toCalendarEvent({ id: "b", summary: "Night shift", start: { dateTime: "2026-10-24T23:00:00+02:00" }, end: { dateTime: "2026-10-25T01:00:00+02:00" } }, calendar)?.when).toEqual({
-		allDay: false, start: Date.parse("2026-10-24T23:00:00+02:00"), end: Date.parse("2026-10-25T01:00:00+02:00"),
-	});
-});
-
-test("canceled, declined, and working-location entries do not appear", () => {
-	const item = { id: "a", start: { date: "2026-10-24" }, end: { date: "2026-10-25" } };
-	expect(toCalendarEvent({ ...item, status: "cancelled" }, calendar)).toBeNull();
-	expect(toCalendarEvent({ ...item, attendees: [{ self: true, responseStatus: "declined" }] }, calendar)).toBeNull();
-	expect(toCalendarEvent({ ...item, eventType: "workingLocation" }, calendar)).toBeNull();
-	expect(toCalendarEvent({ ...item, htmlLink: "javascript:alert(1)" }, calendar)?.url).toBe("https://calendar.google.com/");
-});
-
-test("loopback sign-in verifies state, stores a private refresh token, and reads only selected calendars", async () => {
-	const path = pathFor();
 	const google = new GoogleCalendar(path);
-	expect(google.saveClient(client)).toEqual({ clientId: client.clientId, connected: false, signIn: null });
+	expect(google.status()).toEqual({ calendars: [] });
+	expect(readFileSync(path, "utf8")).not.toContain("old-secret");
+	await expect(google.add(OTHER)).rejects.toThrow("Google answered 404");
+	const added = await google.add(ADDRESS);
+	expect(added.calendars.map(({ name, color, error }) => ({ name, color, error }))).toEqual([{ name: "Work", color: "#039be5", error: null }]);
+	expect((await google.add(ADDRESS)).calendars).toHaveLength(1);
+	expect(JSON.stringify(added)).not.toContain("private-0123abcd");
 	expect(statSync(path).mode & 0o777).toBe(0o600);
-	expect(statSync(dirname(path)).mode & 0o777).toBe(0o700);
-	const calls: URL[] = [];
-	globalThis.fetch = Object.assign(async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]): Promise<Response> => {
-		const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
-		if (url.hostname === "127.0.0.1") return originalFetch(input, init);
-		calls.push(url);
-		if (url.pathname === "/token") {
-			const grant = new URLSearchParams(init?.body as string);
-			if (grant.get("grant_type") === "authorization_code") return Response.json({ access_token: "temporary", refresh_token: "private-refresh-token", expires_in: 3600 });
-			return Response.json({ access_token: "access-token", expires_in: 3600 });
-		}
-		if (url.pathname === "/calendar/v3/users/me/calendarList") return Response.json({ items: [
-			{ id: "personal", summary: "Personal", selected: true, backgroundColor: "#4285f4" },
-			{ id: "hidden", summary: "Hidden", selected: false },
-		] });
-		if (url.pathname === "/calendar/v3/calendars/personal/events") {
-			expect(init?.headers).toEqual({ authorization: "Bearer access-token" });
-			expect(url.searchParams.get("singleEvents")).toBe("true");
-			return Response.json({ items: [{ id: "meeting", summary: "Planning", htmlLink: "https://calendar.google.com/calendar/event?eid=m", start: { date: "2026-10-06" }, end: { date: "2026-10-07" } }] });
-		}
-		throw new Error(`Unexpected Google API call ${url}`);
-	}, { preconnect: originalFetch.preconnect });
-	const waiting = await google.startSignIn();
-	if (waiting.signIn?.phase !== "waiting") throw new Error("Expected a waiting sign-in");
-	const auth = new URL(waiting.signIn.url);
-	expect(auth.searchParams.get("scope")).toBe("https://www.googleapis.com/auth/calendar.readonly");
-	expect(auth.searchParams.get("code_challenge_method")).toBe("S256");
-	const redirect = auth.searchParams.get("redirect_uri")!;
-	expect((await fetch(`${redirect}?code=wrong&state=wrong`)).status).toBe(400);
-	expect(google.status().signIn?.phase).toBe("waiting");
-	expect((await fetch(`${redirect}?code=one-time-code&state=${auth.searchParams.get("state")}`)).status).toBe(200);
-	for (let i = 0; i < 50 && !google.status().connected; i++) await Promise.resolve();
-	expect(google.status()).toEqual({ clientId: client.clientId, connected: true, signIn: null });
-	expect(readFileSync(path, "utf8")).toContain("private-refresh-token");
-	expect(new GoogleCalendar(path).status().connected).toBe(true);
-	const events = await google.events(new Date("2026-10-01T00:00:00Z"), new Date("2026-11-01T00:00:00Z"));
-	expect(events.events.map(event => [event.id, event.title, event.when])).toEqual([
-		["personal/meeting", "Planning", { allDay: true, firstDay: "2026-10-06", lastDay: "2026-10-06" }],
-	]);
-	expect(calls.some(url => url.pathname.includes("/hidden/events"))).toBe(false);
-	expect(google.saveClient({ ...client, clientSecret: "replacement" }).connected).toBe(false);
-	expect(readFileSync(path, "utf8")).not.toContain("private-refresh-token");
+
+	answers[OTHER] = () => new Response(FEED.replace("X-WR-CALNAME:Work", "X-WR-CALNAME:Team"));
+	await google.add(OTHER);
+	answers[OTHER] = () => new Response("Gone", { status: 410 });
+	const events = await google.events(...OCTOBER, true);
+	expect(new Set(events.events.map(event => event.calendar))).toEqual(new Set(["Work"]));
+	const [work, team] = google.status().calendars;
+	expect([work!.color, team!.color]).toEqual(["#039be5", "#33b679"]);
+	expect(team!.error).toBe("Google answered 410 for this calendar's address");
+
+	const reloaded = new GoogleCalendar(path);
+	expect(reloaded.status().calendars.map(calendar => calendar.name)).toEqual(["Work", "Team"]);
+	expect(reloaded.remove(work!.id).calendars.map(calendar => calendar.name)).toEqual(["Team"]);
+	expect(new GoogleCalendar(path).status().calendars.map(calendar => calendar.name)).toEqual(["Team"]);
 });

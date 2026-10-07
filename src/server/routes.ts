@@ -28,7 +28,7 @@ import { TICKET_ID } from "../shared/tickets";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseGoogleClient, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseGoogleCalendarAddress, parseGoogleCalendarId, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
@@ -146,24 +146,27 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	/** `PUT /api/integrations/sign-out`: removes the sign-ins omp manages for the integration's server, as `/mcp unauth` does; its config stays. */
 	const integrationSignOut = integrationWrite(signOutIntegration);
 
-	/** `GET /api/google`: the OAuth client saved for Google Calendar, whether it holds a sign-in, and the sign-in the settings last started. */
+	/** `GET /api/google`: the Google calendars added, with why each one's last read failed. */
 	const googleStatus = get(() => Response.json(google.status()));
 
-	/** `PUT /api/google/client`: `{ clientId, clientSecret }` of a desktop OAuth client, which replaces the saved one and signs out. */
-	const googleClient: Handler = async req => {
+	/** `PUT /api/google/calendars`: `{ url }`, a Google calendar's address in iCal format, added once it reads as a calendar. */
+	const googleCalendarAdd: Handler = async req => {
 		const write = await guards.writeBody(req);
 		if (write instanceof Response) return write;
-		const client = parseGoogleClient(write.body);
-		return client ? Response.json(google.saveClient(client)) : fail(400, "Expected { clientId, clientSecret } of a desktop OAuth client, its ID ending in .apps.googleusercontent.com");
+		const url = parseGoogleCalendarAddress(write.body);
+		if (!url) return fail(400, "Expected { url }, a calendar's secret address in iCal format, from https://calendar.google.com/calendar/ical/");
+		return answer(() => google.add(url), err => fail(400, errorText(err)));
 	};
 
-	/** `PUT /api/google/sign-in`: starts a sign-in to Google and answers with its authorization address to open. */
-	const googleSignIn: Handler = async req => {
+	/** `PUT /api/google/calendars/remove`: `{ id }` of an added calendar, which the Calendar page stops reading. */
+	const googleCalendarRemove: Handler = async req => {
 		const write = await guards.writeBody(req);
-		return write instanceof Response ? write : answer(() => google.startSignIn());
+		if (write instanceof Response) return write;
+		const id = parseGoogleCalendarId(write.body);
+		return id ? Response.json(google.remove(id)) : fail(400, "Expected { id } of an added calendar");
 	};
 
-	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your shown Google calendars in that span. */
+	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your added Google calendars in that span. */
 	const calendarEvents = get(params => {
 		const from = new Date(params.get("from") ?? "");
 		const to = new Date(params.get("to") ?? "");
@@ -353,8 +356,8 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
 		"/api/integrations/sign-out": { PUT: integrationSignOut },
 		"/api/google": { GET: googleStatus },
-		"/api/google/client": { PUT: googleClient },
-		"/api/google/sign-in": { PUT: googleSignIn },
+		"/api/google/calendars": { PUT: googleCalendarAdd },
+		"/api/google/calendars/remove": { PUT: googleCalendarRemove },
 		"/api/calendar/events": { GET: calendarEvents },
 		"/api/linear/teams": { GET: teams },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },

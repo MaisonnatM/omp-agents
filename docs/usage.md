@@ -575,7 +575,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - A connected row's ⋯ menu holds **Reconnect**, which signs in again over a sign-in that the server refused or that still works, and **Sign out**.
   **Sign out** asks first, then removes the sign-ins omp manages for the service, as omp's `/mcp unauth` does, so omp's sessions lose its tools too; the server stays in `mcp.json`.
   When the sign-out fails, the question stays with the reason, to try again or cancel.
-- Google Calendar's **Set up** opens the steps to create its OAuth client and the fields for its ID and secret; once saved, **Connect** signs in, and the ⋯ menu holds **Reconnect** and **Replace OAuth client**.
+- Google Calendar's **Add calendar** opens the steps to find a calendar's **Secret address in iCal format** in Google Calendar's settings and the field to paste it; the row then lists each calendar added, in its color, with why its last read failed, and its ⋯ menu holds **Remove**.
 
 ## Todo list
 
@@ -659,7 +659,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 - The **Calendar** tab, or a `#calendar` address, shows a month in place of the panes, Monday first.
   The sidebar then lists **Calendar**, then **All** and each routine by name.
-- Each day lists its routine runs, the todos due on it, and, once connected, the Linear tickets due on it and events of your selected Google calendars.
+- Each day lists its routine runs, the todos due on it, and, once connected, the Linear tickets due on it and events of the Google calendars you added.
   A green dot is a run that went through, a red one a run that failed, and a hollow one a run still to come.
   A violet dot is a todo, an amber one a ticket, and a timed Google event uses its calendar's color; an all-day event is a band in that color; a checked todo, or a done or canceled ticket, is struck through.
 - Planned runs follow each routine's schedules from its last run.
@@ -670,14 +670,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - A day cell shows three entries and how many more there are; today's number is circled.
   Hover a day, or focus its number, to see all of its entries in a card beside it, each a link like in the day's list.
   Click a day's number, or its **+N more**, to list all of its entries beside the month; today is listed when the page opens.
-- Click an entry to open its routine, its todo list, or its ticket; Google events open in Google Calendar in a new tab.
+- Click an entry to open its routine, its todo list, or its ticket; a Google event opens its day in Google Calendar in a new tab.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
-- To show Google events, enable the Google Calendar API in your Google Cloud project and create a Desktop OAuth client.
-  For a Workspace account, set the OAuth consent screen to **Internal** if available, then open the **Integrations** page, choose **Set up** on Google Calendar's row to save the client ID and secret, and choose **Connect**.
-  Approve the dashboard's read-only `calendar.readonly` scope in the browser; a local callback at `127.0.0.1` completes sign-in.
-  The server keeps the client secret and refresh token in `google.json` beside its access token with owner-only file permissions, and never sends them to the page.
-  Replacing the OAuth client signs out of Google Calendar until you connect again.
-  The page reads events from the calendars selected in Google Calendar, expands recurring events into instances, repeats multi-day events on each day, and refreshes the open month every minute.
+- To show Google events, open Google Calendar's settings, choose a calendar under **Settings for my calendars**, then **Integrate calendar**, and copy its **Secret address in iCal format**.
+  On the **Integrations** page, choose **Add calendar** on Google Calendar's row and paste it; add each calendar you want shown.
+  Anyone with the address can read the calendar, so the server keeps it in `google.json` beside its access token with owner-only file permissions and never sends it to the page; **Reset** in Google Calendar's settings makes a new one.
+  A Workspace administrator can turn the secret address off, and then Google Calendar's settings do not show it.
+  The page expands repeating events, leaves out canceled events and the ones you declined, repeats multi-day events on each day, and refreshes the open month every minute.
 
 ## Routines
 

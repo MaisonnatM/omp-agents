@@ -267,7 +267,7 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 	const [year, setYear] = useCalendarYear();
 	const [selected, setSelected] = useState<Date | null>(() => new Date(now));
 	const tickets = ticketsStore.usePolling(null, ticketsShown).read?.data.tickets ?? null;
-	const connected = googleStore.usePolling().read?.data.connected ?? false;
+	const connected = (googleStore.usePolling().read?.data.calendars.length ?? 0) > 0;
 	const span = new URLSearchParams({ from: new Date(year, month, 1).toISOString(), to: new Date(year, month + 1, 1).toISOString() }).toString();
 	const eventsRead = calendarEventsStore.usePolling(span, connected);
 	const events = connected ? (eventsRead.read?.data.events ?? null) : null;

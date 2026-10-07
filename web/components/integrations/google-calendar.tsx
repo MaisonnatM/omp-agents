@@ -1,12 +1,11 @@
-import { CircleAlert, ExternalLink, KeyRound, LoaderCircle, RefreshCw } from "lucide-react";
+import { CircleAlert, ExternalLink, Trash2 } from "lucide-react";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
-import type { GoogleStatus, SignInState } from "../../../src/shared/accounts";
+import type { GoogleCalendarFeed, GoogleStatus } from "../../../src/shared/accounts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
 import { errorText, putJson } from "../../api";
 import { googleStore } from "../../reads";
-import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { GOOGLE_CALENDAR_LOGO } from "./brand-logos";
 import { Callout, IntegrationRow, MetaDot } from "./integration-row";
@@ -15,9 +14,7 @@ const NAME = "Google Calendar";
 
 const FIELD = "block h-8 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-const startGoogleSignIn = async (): Promise<SignInState> => (await putJson<GoogleStatus>("/api/google/sign-in", {})).signIn;
-
-/** One numbered step of the OAuth client's setup. */
+/** One numbered step of finding a calendar's address. */
 function Step({ n, children }: { n: number; children: ReactNode }) {
 	return (
 		<li className="flex gap-2.5">
@@ -29,17 +26,9 @@ function Step({ n, children }: { n: number; children: ReactNode }) {
 	);
 }
 
-interface ClientFormProps {
-	id: string;
-	replacing: boolean;
-	connected: boolean;
-	onDone: () => void;
-}
-
-/** The steps to create a desktop OAuth client in Google Cloud, then its ID and secret. */
-function ClientForm({ id, replacing, connected, onDone }: ClientFormProps) {
-	const [clientId, setClientId] = useState("");
-	const [clientSecret, setClientSecret] = useState("");
+/** The steps to a calendar's secret address in Google Calendar's settings, then the address. */
+function AddressForm({ id, onDone }: { id: string; onDone: () => void }) {
+	const [url, setUrl] = useState("");
 	const [saving, setSaving] = useState(false);
 	const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -48,7 +37,7 @@ function ClientForm({ id, replacing, connected, onDone }: ClientFormProps) {
 		setSaving(true);
 		setSaveError(null);
 		try {
-			await putJson<GoogleStatus>("/api/google/client", { clientId: clientId.trim(), clientSecret: clientSecret.trim() });
+			await putJson<GoogleStatus>("/api/google/calendars", { url: url.trim() });
 			await googleStore.refresh();
 			onDone();
 		} catch (err) {
@@ -59,44 +48,80 @@ function ClientForm({ id, replacing, connected, onDone }: ClientFormProps) {
 	};
 
 	return (
-		<form id={id} aria-label="OAuth client" onSubmit={event => void save(event)} className="space-y-4 rounded-lg bg-muted/60 p-4 text-[13px]">
+		<form id={id} aria-label="Calendar address" onSubmit={event => void save(event)} className="space-y-4 rounded-lg bg-muted/60 p-4 text-[13px]">
 			<ol className="space-y-2.5">
 				<Step n={1}>
 					Open{" "}
-					<a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium underline decoration-border underline-offset-2 hover:decoration-foreground">
-						Google Cloud credentials
+					<a href="https://calendar.google.com/calendar/r/settings" target="_blank" rel="noreferrer" className="inline-flex items-center gap-0.5 font-medium underline decoration-border underline-offset-2 hover:decoration-foreground">
+						Google Calendar's settings
 						<ExternalLink aria-hidden className="size-3" />
-					</a>{" "}
-					and enable the Google Calendar API.
+					</a>
+					.
 				</Step>
-				<Step n={2}>Create an OAuth client of type Desktop. An internal consent screen keeps it to your Workspace.</Step>
-				<Step n={3}>Paste its ID and secret here. Both stay on this machine.</Step>
+				<Step n={2}>Under Settings for my calendars, choose a calendar, then Integrate calendar.</Step>
+				<Step n={3}>Copy its Secret address in iCal format and paste it here. Anyone with it can read the calendar, so it stays on this machine.</Step>
 			</ol>
-			<div className="grid gap-3 sm:grid-cols-2">
-				<label className="space-y-1">
-					<span className="text-xs font-medium">Client ID</span>
-					<input name="google-client-id" type="text" autoComplete="off" autoFocus value={clientId} onChange={event => setClientId(event.target.value)} required placeholder="…apps.googleusercontent.com" className={FIELD} />
-				</label>
-				<label className="space-y-1">
-					<span className="text-xs font-medium">Client secret</span>
-					<input name="google-client-secret" type="password" autoComplete="off" value={clientSecret} onChange={event => setClientSecret(event.target.value)} required className={FIELD} />
-				</label>
-			</div>
+			<label className="block space-y-1">
+				<span className="text-xs font-medium">Secret address in iCal format</span>
+				<input
+					name="google-calendar-address"
+					type="url"
+					autoComplete="off"
+					spellCheck={false}
+					autoFocus
+					value={url}
+					onChange={event => setUrl(event.target.value)}
+					required
+					placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
+					className={FIELD}
+				/>
+			</label>
 			{saveError && (
 				<Callout tone="danger" icon={CircleAlert} role="alert">
-					Cannot save the OAuth client: {saveError}
+					Cannot add the calendar: {saveError}
 				</Callout>
 			)}
 			<div className="flex flex-wrap items-center justify-end gap-2">
-				{replacing && connected && <p className="me-auto text-xs text-muted-foreground">Replacing it signs out of Google Calendar until you connect again.</p>}
 				<Button type="button" variant="ghost" size="compact" disabled={saving} onClick={onDone}>
 					Cancel
 				</Button>
 				<Button type="submit" size="compact" loading={saving}>
-					{replacing ? "Replace client" : "Save client"}
+					Add calendar
 				</Button>
 			</div>
 		</form>
+	);
+}
+
+/** An added calendar: its color and name, why its last read failed, and its removal. */
+function CalendarItem({ calendar }: { calendar: GoogleCalendarFeed }) {
+	const [removeError, setRemoveError] = useState<string | null>(null);
+	const remove = async (): Promise<void> => {
+		setRemoveError(null);
+		try {
+			await putJson<GoogleStatus>("/api/google/calendars/remove", { id: calendar.id });
+			await googleStore.refresh();
+		} catch (err) {
+			setRemoveError(errorText(err));
+		}
+	};
+	const error = removeError ? `Cannot remove it: ${removeError}` : calendar.error;
+	return (
+		<li className="flex items-start gap-2.5 py-1.5 text-[13px]">
+			<span aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full" style={{ backgroundColor: calendar.color }} />
+			<div className="min-w-0 flex-1">
+				<p className="truncate" title={calendar.name}>
+					{calendar.name}
+				</p>
+				{error && <p className="text-xs text-pretty text-red-600 dark:text-red-400">{error}</p>}
+			</div>
+			<MoreActionsMenu name={calendar.name}>
+				<MenuItem variant="destructive" onClick={() => void remove()}>
+					<Trash2 />
+					Remove
+				</MenuItem>
+			</MoreActionsMenu>
+		</li>
 	);
 }
 
@@ -106,104 +131,51 @@ interface GoogleCalendarRowProps {
 	error: string | null;
 }
 
-/** Google Calendar: its OAuth client and its read-only sign-in, both owned by this dashboard rather than by omp. */
+/** Google Calendar: the calendars this dashboard reads from their addresses in iCal format, owned by it rather than by omp. */
 export function GoogleCalendarRow({ status, error }: GoogleCalendarRowProps) {
-	const { starting, waitingUrl, failure, connect } = useSignIn(status?.signIn ?? null, googleStore.refresh, startGoogleSignIn);
 	const [formOpen, setFormOpen] = useState(false);
 	const formId = useId();
-	const clientId = status?.clientId ?? null;
-	const connected = status?.connected ?? false;
+	const calendars = status?.calendars ?? [];
 
 	let badge: ReactNode = null;
-	if (waitingUrl) badge = <Badge variant="dot" size="compact" color="blue">Waiting for you</Badge>;
-	else if (connected) badge = <Badge variant="dot" size="compact" color="green">Connected</Badge>;
-	else if (status) badge = <Badge variant="dot" size="compact" color="gray">{clientId ? "Not connected" : "Not set up"}</Badge>;
+	if (calendars.some(calendar => calendar.error)) badge = <Badge variant="dot" size="compact" color="amber">Cannot read a calendar</Badge>;
+	else if (calendars.length > 0) badge = <Badge variant="dot" size="compact" color="green">Connected</Badge>;
+	else if (status) badge = <Badge variant="dot" size="compact" color="gray">Not set up</Badge>;
 
-	let actions: ReactNode = null;
-	if (!formOpen && !waitingUrl) {
-		actions = clientId ? (
-			<>
-				{!connected && (
-					<Button variant="secondary" size="compact" loading={starting} onClick={() => void connect()}>
-						Connect
-					</Button>
-				)}
-				<MoreActionsMenu name={NAME} disabled={starting}>
-					{connected && (
-						<MenuItem onClick={() => void connect()}>
-							<RefreshCw />
-							Reconnect
-						</MenuItem>
-					)}
-					<MenuItem onClick={() => setFormOpen(true)}>
-						<KeyRound />
-						Replace OAuth client
-					</MenuItem>
-				</MoreActionsMenu>
-			</>
-		) : (
-			<Button variant="secondary" size="compact" disabled={!status} onClick={() => setFormOpen(true)}>
-				Set up
-			</Button>
-		);
-	}
-
-	let callout: ReactNode = null;
-	if (!status && error) {
-		callout = (
-			<Callout tone="danger" icon={CircleAlert}>
-				Cannot check Google Calendar: {error}
-			</Callout>
-		);
-	} else if (waitingUrl) {
-		callout = (
-			<Callout
-				tone="info"
-				icon={LoaderCircle}
-				role="status"
-				spin
-				action={
-					<Button variant="ghost" size="compact" leadingIcon={ExternalLink} render={<a href={waitingUrl} target="_blank" rel="noreferrer" />}>
-						Open sign-in page
-					</Button>
-				}
-			>
-				Approve read-only calendar access on Google in the tab that opened. This updates on its own.
-			</Callout>
-		);
-	} else if (failure) {
-		callout = (
-			<Callout tone="danger" icon={CircleAlert} role="alert">
-				Sign-in failed: {failure}
-			</Callout>
-		);
-	}
+	const actions = formOpen ? null : (
+		<Button variant="secondary" size="compact" disabled={!status} onClick={() => setFormOpen(true)}>
+			Add calendar
+		</Button>
+	);
 
 	return (
 		<IntegrationRow
 			name={NAME}
 			logo={GOOGLE_CALENDAR_LOGO}
-			summary="Events from the calendars you pick, on the Calendar tab. Read-only."
+			summary="Events from the calendars you add, on the Calendar tab. Read-only."
 			status={badge}
 			meta={
 				<>
-					<span>OAuth</span>
+					<span>iCal</span>
 					<MetaDot />
 					<span>This dashboard only</span>
-					{clientId && (
-						<>
-							<MetaDot />
-							<span className="max-w-56 truncate font-mono" title={clientId}>
-								{clientId}
-							</span>
-						</>
-					)}
 				</>
 			}
 			actions={actions}
 		>
-			{callout}
-			{formOpen && <ClientForm id={formId} replacing={clientId !== null} connected={connected} onDone={() => setFormOpen(false)} />}
+			{!status && error && (
+				<Callout tone="danger" icon={CircleAlert}>
+					Cannot check Google Calendar: {error}
+				</Callout>
+			)}
+			{calendars.length > 0 && (
+				<ul aria-label="Calendars" className="divide-y divide-border">
+					{calendars.map(calendar => (
+						<CalendarItem key={calendar.id} calendar={calendar} />
+					))}
+				</ul>
+			)}
+			{formOpen && <AddressForm id={formId} onDone={() => setFormOpen(false)} />}
 		</IntegrationRow>
 	);
 }
