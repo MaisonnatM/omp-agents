@@ -59,7 +59,6 @@ import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { modeOf, skillLabel, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
-import { type ShortcutId, shortcutLabels } from "../shortcuts";
 import type { StartOf } from "../starts";
 import { type ActivityItem, editablePrompt, type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies } from "../transcript-view";
 import { useCopy } from "../use-copy";
@@ -204,29 +203,10 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 	);
 }
 
-function HideButton({ hidden, label, shortcut, onToggle, icon: Icon }: { hidden: boolean; label: string; shortcut: ShortcutId; onToggle: () => void; icon: LucideIcon }) {
-	const action = hidden ? "Show" : "Hide";
-	return (
-		<Tooltip content={`${action} ${label}`} shortcut={shortcutLabels(shortcut)}>
-			<Button
-				variant="ghost"
-				size="icon-compact"
-				aria-pressed={hidden}
-				aria-label={`${action} ${label}`}
-				className={cn("shrink-0", hidden && "text-muted-foreground")}
-				onClick={onToggle}
-			>
-				<Icon />
-			</Button>
-		</Tooltip>
-	);
-}
-
 function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
 	const expanded = useContext(ToolsExpanded);
-	const { hideTools, hideThinking, toggleTools, toggleThinking } = useContext(ActivityVisibility);
+	const { hideTools, hideThinking } = useContext(ActivityVisibility);
 	const tools = entries.filter((entry): entry is ToolItem => entry.kind === "tool");
-	const thinking = entries.some(entry => entry.kind === "thinking");
 	const running =
 		tools.some(tool => tool.status === "running") || entries.some(entry => entry.kind === "thinking" && entry.streaming);
 	const failed = tools.filter(tool => tool.status === "error").length;
@@ -243,11 +223,7 @@ function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
 	const visible = entries.filter(entry => (entry.kind === "thinking" ? !hideThinking : !hideTools));
 	return (
 		<ThinkingSteps open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="w-full max-w-2xl self-start">
-			<div className="flex items-center">
-				<ThinkingStepsHeader>{header}</ThinkingStepsHeader>
-				{tools.length > 0 && <HideButton hidden={hideTools} label="tool calls" shortcut="hideTools" onToggle={toggleTools} icon={Wrench} />}
-				{thinking && <HideButton hidden={hideThinking} label="thinking" shortcut="hideThinking" onToggle={toggleThinking} icon={Brain} />}
-			</div>
+			<ThinkingStepsHeader>{header}</ThinkingStepsHeader>
 			<ThinkingStepsContent>
 				{visible.map((entry, index) =>
 					entry.kind === "thinking" ? (
