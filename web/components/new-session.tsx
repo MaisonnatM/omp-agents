@@ -114,6 +114,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		setDraft,
 		completions,
 		onComplete,
+		sessionId: null,
+		changed: [],
 		onKeyDown: event => {
 			onComposerKey(event);
 			if (!event.defaultPrevented && event.key === "Escape") {

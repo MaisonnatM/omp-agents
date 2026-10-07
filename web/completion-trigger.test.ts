@@ -8,8 +8,10 @@ test("slash suggestions require a token under the caret", () => {
 	expect(completionTrigger("https://example.com", 19)).toBeNull();
 });
 
-test("file mentions work after prose but not inside ordinary words", () => {
+test("mentions work after prose but not inside ordinary words", () => {
 	expect(completionTrigger("Read @src/", 10)).toBe("mention");
 	expect(completionTrigger("Write email@example.com", 23)).toBeNull();
 	expect(completionTrigger("Read @\"file with space", 22)).toBe("mention");
+	expect(completionTrigger("Fix @ticket:foo", 15)).toBe("mention");
+	expect(completionTrigger("Fix @ticket:\"login page", 23)).toBe("mention");
 });

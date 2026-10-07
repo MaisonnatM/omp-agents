@@ -635,6 +635,8 @@ The page lives in `web/`.
   `provider-trend.tsx` renders the stacked provider chart and bucket-data table; `analytics-format.ts` shares number and cost formatting across the section.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.
+- `web/mentions.ts`: the composer's `@` menu as a pure function of the draft, the caret, the page's lists, and omp's file completions: its sources and their references, the query a token asks, and the rows and sections it shows.
+  `web/completion-trigger.ts` finds the token, and `web/components/completion-popup.tsx` renders the menu, asks the server only for files, and polls tickets and the inbox only while the menu needs them.
 - `web/components/status-bar.tsx`: the window's bottom strip, with `PlanUsageList` from `web/components/plan-usage.tsx` on the left and the focused session's checkout on the right: its branch switcher, upstream counts, and uncommitted files.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
   `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's or an issue's details, and the note that says why a start failed.

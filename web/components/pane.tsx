@@ -41,7 +41,7 @@ export const Pane = memo(function Pane({
 	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
 	const { send, start, focus, open, end, starts: { fork, resume } } = useDashboardContext();
-	const { items, loaded, completions, dequeued } = usePane(view);
+	const { items, loaded, completions, dequeued, files } = usePane(view);
 	const instanceId = view.kind === "live" ? view.instanceId : null;
 	const agents = host?.agents;
 	const writable = host?.control.phase === "live" && !host.control.readOnly;
@@ -90,6 +90,7 @@ export const Pane = memo(function Pane({
 			fork={fork}
 			onFork={onFork}
 			completions={completions}
+			changed={files ?? []}
 			models={models}
 			dequeued={dequeued}
 			send={send}

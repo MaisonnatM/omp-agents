@@ -1,6 +1,6 @@
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import type { Delivery, LiveView, PromptImage, RosterHost } from "../../src/shared/sessions";
-import type { Item } from "../../src/shared/transcript";
+import type { ChangedFile, Item } from "../../src/shared/transcript";
 import { InputMessage } from "@/components/ui/input-message";
 import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
 import { projectName } from "../labels";
@@ -39,6 +39,8 @@ interface ConversationProps {
 	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
 	completions: Completions | null;
+	/** The files the view's agent changed, which the composer's `@` offers first. */
+	changed: ChangedFile[];
 	/** The last model list the server sent for this session; nothing while none has arrived. */
 	models: ModelList;
 	/** The server's last answer to this view's `dequeue`. */
@@ -81,6 +83,7 @@ function LiveConversation({
 	fork,
 	onFork,
 	completions,
+	changed,
 	models,
 	dequeued,
 	send,
@@ -210,6 +213,8 @@ function LiveConversation({
 		setDraft,
 		completions,
 		onComplete: (reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "live", view }, text, cursor }),
+		sessionId: shown?.sessionId ?? null,
+		changed,
 		onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => {
 			onComposerKey(event);
 			if (!event.defaultPrevented) suggestions.onKeyDown(event);

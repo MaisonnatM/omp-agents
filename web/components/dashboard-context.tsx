@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { MentionData } from "../mentions";
 import type { StartOf } from "../starts";
 import type { Dashboard } from "../use-dashboard";
 
@@ -37,3 +38,9 @@ export function useDashboardContext(): DashboardContextValue {
 	if (!value) throw new Error("useDashboardContext must be used within the App's DashboardContext.Provider");
 	return value;
 }
+
+/**
+ * The page's lists that the composer's `@` menu offers, provided once by `App` apart from {@link DashboardContext}, so a
+ * roster or todo change renders only the composers again and not every reader of the dashboard's actions.
+ */
+export const MentionListsContext = createContext<Pick<MentionData, "todos" | "hosts" | "past">>({ todos: [], hosts: [], past: [] });

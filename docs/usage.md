@@ -328,7 +328,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Dashboard sessions report them after each turn and after each model or thinking change.
   Terminal sessions report them through Collab `state` frames.
 - Type `/` to complete discovered file commands and `/skill:<name>` skills.
-  Type `@` to find files in the selected session's working directory.
+  Type `@` to mention something: the list shows the last three files the session changed, then Files & Folders, Todos, Tickets, Pull requests, and Sessions.
+  Picking a category narrows the list to it, which you can also type as a prefix: `@file:`, `@todo:`, `@ticket:`, `@pr:`, or `@session:`.
+  Type `@` and a word to search everything at once: up to five files from the selected session's working directory, then up to three matches from each category.
+  Every word must appear in a row's name, ID, or detail, in any order; quote several words, as in `@"login page` or `@ticket:"login page`.
+  A file inserts its path, as in omp's terminal.
+  A todo inserts its text and ID, a ticket or pull request a Markdown link, and a session its title and ID.
+  Done todos and the session you are typing in stay out of the list.
   Use arrow keys, Tab or Enter to insert a suggestion, and Esc to close the list.
   File suggestions follow Git ignore rules in Git repositories.
 - Attach images to a session's prompt with the paperclip between the context ring and the send button, by dropping them on the composer, or by pasting them, such as a screenshot.
