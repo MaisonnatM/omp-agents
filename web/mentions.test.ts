@@ -7,7 +7,16 @@ import type { UserTodo, UserTodoLeaf } from "../src/user-todos-shared";
 import { completionTrigger, type MentionToken } from "./completion-trigger";
 import { fileSearch, type MentionData, mentionMenu, mentionQuery, type MenuSection } from "./mentions";
 
-const leaf = (id: string, text: string, doneAt: string | null = null): UserTodoLeaf => ({ id, text, body: "", doneAt, due: null });
+const leaf = (id: string, text: string, doneAt: string | null = null): UserTodoLeaf => ({
+	id,
+	text,
+	body: "",
+	status: doneAt === null ? "todo" : "done",
+	priority: 0,
+	doneAt,
+	due: null,
+	createdAt: null,
+});
 const todo = (id: string, text: string, fields: Partial<UserTodo> = {}): UserTodo => ({
 	...leaf(id, text),
 	categoryId: null,
