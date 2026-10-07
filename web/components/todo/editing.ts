@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { applyUserTodo } from "../../../src/user-todos";
-import type { UserTodoChange, UserTodoLeaf, UserTodoList } from "../../../src/user-todos-shared";
+import type { TodoStatus, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../../src/user-todos-shared";
 import { hashForNewSession } from "../../routing";
 import { quickAddTodo } from "../../todo-quick-add";
-import { type ListKind, lastToDo, restoreOf, type Section } from "../../todo-views";
+import { type ListKind, lastOf, restoreOf, type Section } from "../../todo-views";
 import type { TodoKey } from "./input";
 import type { Undo } from "./undo";
 
@@ -16,6 +16,8 @@ type Editing =
 			parentId: string | null;
 			afterId: string | null;
 			categoryId: string | null;
+			/** The status the new todo gets: the group it is typed in. */
+			status: TodoStatus;
 			text: string;
 			/** The todo this draft last added. A todo its title moved elsewhere leaves the draft in place, and this still gives it a fresh input. */
 			addedId?: string;
@@ -41,8 +43,8 @@ interface TodoEditingOptions {
 	newSessionCwd: string;
 }
 
-/** Where a todo added right below `todo` among `siblings` goes: after it, or after the last one to do when it is done. */
-const below = (todo: UserTodoLeaf, siblings: readonly UserTodoLeaf[]): string | null => (todo.doneAt === null ? todo.id : lastToDo(siblings));
+/** Where a todo added right below `todo` goes, and its status: after it, in its status, as Linear adds one within a group. */
+const below = (todo: UserTodoLeaf): Pick<Draft, "afterId" | "status"> => ({ afterId: todo.id, status: todo.status });
 
 /** What the page's rows and drafts ask of its typing. */
 export interface TodoEditing {
@@ -54,12 +56,12 @@ export interface TodoEditing {
 	/** Starts typing todo `id`'s title. */
 	edit(id: string): void;
 	/** Starts a new todo with an empty title. */
-	startDraft(place: Pick<Draft, "parentId" | "afterId" | "categoryId">): void;
+	startDraft(place: Pick<Draft, "parentId" | "afterId" | "categoryId" | "status">): void;
 	/** Focus left the input of todo `todo` with `text` in it. */
 	leaveEdit(todo: UserTodoLeaf, text: string): void;
 	leaveDraft(draft: Draft, text: string): void;
-	/** What `key` does in the input of todo `todo`, beside `siblings` under `parentId`; whether the input goes away. */
-	editKey(todo: UserTodoLeaf, siblings: readonly UserTodoLeaf[], parentId: string | null, categoryId: string | null, key: TodoKey, text: string): boolean;
+	/** What `key` does in the input of todo `todo` under `parentId`; whether the input goes away. */
+	editKey(todo: UserTodoLeaf, parentId: string | null, categoryId: string | null, key: TodoKey, text: string): boolean;
 	/** What `key` does in the input of the new todo `draft` of `section`; whether the input goes away. */
 	draftKey(draft: Draft, section: Section, key: TodoKey, text: string): boolean;
 }
@@ -86,9 +88,9 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, undo, onRemo
 	 * where the next draft goes: after the new todo, or in its place when the parsed fields move the todo out of this list.
 	 */
 	const add = (draft: Draft, text: string): { id: string; afterId: string | null } | null => {
-		const { parentId, afterId, categoryId } = draft;
+		const { parentId, afterId, categoryId, status } = draft;
 		const dueToday = parentId === null && kind.add?.dueToday === true;
-		const change = quickAddTodo(text, list.categories, day, { parentId, afterId, categoryId, due: dueToday ? day : null });
+		const change = quickAddTodo(text, list.categories, day, { parentId, afterId, categoryId, status, due: dueToday ? day : null });
 		if (!change) return null;
 		onChange(change);
 		const leaves = change.categoryId !== categoryId || (dueToday && change.due !== null && change.due > day);
@@ -110,11 +112,11 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, undo, onRemo
 			add(draft, text);
 			setEditing(NOT_EDITING);
 		},
-		editKey: (todo, siblings, parentId, categoryId, key, text) => {
+		editKey: (todo, parentId, categoryId, key, text) => {
 			switch (key) {
 				case "enter":
 					commit(todo, text);
-					setEditing(text.trim() && kind.add ? { kind: "draft", parentId, afterId: below(todo, siblings), categoryId, text: "" } : NOT_EDITING);
+					setEditing(text.trim() && kind.add ? { kind: "draft", parentId, ...below(todo), categoryId, text: "" } : NOT_EDITING);
 					return true;
 				case "start":
 					if (parentId !== null || !text.trim()) return false;
@@ -159,8 +161,8 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, undo, onRemo
 					setEditing(NOT_EDITING);
 					return true;
 				case "indent": {
-					// Under the top-level todo it follows, or the last one to do when it ends them.
-					const parentId = draft.parentId === null ? (draft.afterId ?? lastToDo(section.todos)) : null;
+					// Under the top-level todo it follows, or the last one of its status when it ends them.
+					const parentId = draft.parentId === null ? (draft.afterId ?? lastOf(section.todos, draft.status)) : null;
 					if (parentId === null) return false;
 					setEditing({ ...draft, parentId, afterId: null, text });
 					return true;
@@ -168,7 +170,7 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, undo, onRemo
 				case "outdent": {
 					const parent = draft.parentId === null ? undefined : section.todos.find(todo => todo.id === draft.parentId);
 					if (!parent) return false;
-					setEditing({ ...draft, parentId: null, afterId: below(parent, section.todos), text });
+					setEditing({ ...draft, parentId: null, ...below(parent), text });
 					return true;
 				}
 			}

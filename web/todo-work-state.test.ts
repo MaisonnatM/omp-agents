@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { UserTodo } from "../src/user-todos-shared";
 import { workStateOf } from "./todo-work-state";
 
-const base: UserTodo = { id: "todo", text: "Review the change", body: "", doneAt: null, due: null, categoryId: null, children: [], links: [], addedBy: null };
+const base: UserTodo = { id: "todo", text: "Review the change", body: "", status: "todo", priority: 0, doneAt: null, due: null, createdAt: null, categoryId: null, children: [], links: [], addedBy: null };
 const linked: UserTodo = { ...base, links: [{ kind: "session", sessionId: "session" }] };
 const submitted = [{ owner: "example", repo: "app", number: 42, link: "submitted" as const }];
 const sessions = { hosts: [], past: [] };

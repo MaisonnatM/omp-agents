@@ -3,6 +3,16 @@ import type { UserTodo, UserTodoChange, UserTodoLeaf } from "../src/user-todos-s
 import { useShortcuts } from "./shortcuts";
 import { moveTo, placeIn } from "./todo-views";
 
+/** A todo's property that a key opens the picker of. */
+export type TodoField = "status" | "priority" | "due";
+
+/** The picker a key opened: todo `id`'s `field`, on its row in the list, or in the open todo's details. */
+export interface OpenPicker {
+	id: string;
+	field: TodoField;
+	inRow: boolean;
+}
+
 interface TodoKeysOptions {
 	/** The element that holds the list's rows. */
 	listRef: RefObject<HTMLElement | null>;
@@ -11,10 +21,14 @@ interface TodoKeysOptions {
 	/** The todo whose title is being typed, which the keys act on before the focused row. */
 	editingId: string | null;
 	canMove: boolean;
-	/** Changes would not reach the server, so X and the moves do nothing. */
+	/** Changes would not reach the server, so X, the pickers, C, and the moves do nothing. */
 	disabled: boolean;
 	onChange: (change: UserTodoChange) => void;
 	onToggle: (todo: UserTodoLeaf) => void;
+	/** S, P, or Shift+D opened a picker. */
+	onPicker: (picker: OpenPicker) => void;
+	/** C starts a new todo in the Todo group; `null` in a list that takes none. */
+	onNew: (() => void) | null;
 	/** The todo the page shows beside the list, `null` for none. */
 	openId: string | null;
 	/** Every todo whose row shows, in the list's order: what J and K open while a todo is open. */
@@ -24,10 +38,12 @@ interface TodoKeysOptions {
 
 /**
  * J and K focus the next and previous todo, or, while one is open, open the next or previous one and focus its row.
- * Esc closes the open todo, X checks the focused one, and Alt+Shift+↑ and ↓ move it a place. Returns that opening step
- * for the open todo's own buttons; `false` at either end of the list.
+ * Esc closes the open todo, X marks the focused todo, or else the open one, Done or a closed one Todo, S, P, and
+ * Shift+D open the status, priority, and due day pickers of the focused todo or else the open one, C starts a new
+ * todo, and Alt+Shift+↑ and ↓ move the focused todo a place. Returns that opening step for the open todo's own
+ * buttons; `false` at either end of the list.
  */
-export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onChange, onToggle, openId, openOrder, onOpen }: TodoKeysOptions): (step: 1 | -1) => boolean {
+export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onChange, onToggle, onPicker, onNew, openId, openOrder, onOpen }: TodoKeysOptions): (step: 1 | -1) => boolean {
 	const focused = () => {
 		const id = editingId ?? (document.activeElement as HTMLElement | null)?.closest("[data-todo-id]")?.getAttribute("data-todo-id") ?? null;
 		return id === null ? null : placeIn(groups, id);
@@ -57,13 +73,28 @@ export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onC
 		onChange(change);
 		return true;
 	};
+	const pickerFor = (field: TodoField): boolean => {
+		if (disabled) return false;
+		const place = focused();
+		const id = place?.entry.todo.id ?? openId;
+		if (id === null) return false;
+		onPicker({ id, field, inRow: place !== null });
+		return true;
+	};
 	useShortcuts({
 		todoNext: () => (openId === null ? focusStep(1) : openStep(1)),
 		todoPrevious: () => (openId === null ? focusStep(-1) : openStep(-1)),
 		todoCheck: () => {
-			const place = disabled ? null : focused();
+			const place = disabled ? null : (focused() ?? (openId === null ? null : placeIn(groups, openId)));
 			if (!place) return false;
 			onToggle(place.entry.todo);
+		},
+		todoStatus: () => pickerFor("status"),
+		todoPriority: () => pickerFor("priority"),
+		todoDue: () => pickerFor("due"),
+		todoNew: () => {
+			if (disabled || onNew === null) return false;
+			onNew();
 		},
 		todoClose: () => {
 			if (openId === null) return false;

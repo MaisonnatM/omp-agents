@@ -9,6 +9,18 @@ export type UserTodoLink =
 	| { kind: "pull-request"; owner: string; repo: string; number: number }
 	| { kind: "ticket"; identifier: string };
 
+/** Where a todo stands, as Linear's workflow states go: not planned yet, planned, being worked on, then closed as done or canceled. */
+export const TODO_STATUSES = ["backlog", "todo", "in-progress", "done", "canceled"] as const;
+export type TodoStatus = (typeof TODO_STATUSES)[number];
+
+/** Whether a todo with `status` is closed, which gives it a `doneAt`. */
+export const isClosed = (status: TodoStatus): boolean => status === "done" || status === "canceled";
+
+/** 0 none, 1 urgent, 2 high, 3 medium, 4 low: Linear's scale, the same as `TicketPriority`. */
+export type TodoPriority = 0 | 1 | 2 | 3 | 4;
+
+export const TODO_PRIORITIES: readonly TodoPriority[] = [0, 1, 2, 3, 4];
+
 /** A todo of your own, on the Todo page, under a top-level one. It holds none, so the list is two deep at most. */
 export interface UserTodoLeaf {
 	id: string;
@@ -16,10 +28,14 @@ export interface UserTodoLeaf {
 	text: string;
 	/** Its markdown content, `""` for none. */
 	body: string;
-	/** When it was checked, as an ISO 8601 time; `null` while it is to do. */
+	status: TodoStatus;
+	priority: TodoPriority;
+	/** When it was closed (Done or Canceled), as an ISO 8601 time; `null` while open. Set exactly when `status` is done or canceled. */
 	doneAt: string | null;
 	/** The day it is due, `YYYY-MM-DD`; `null` for none. */
 	due: string | null;
+	/** When it was added, as an ISO 8601 time; `null` for a todo from before this field. */
+	createdAt: string | null;
 }
 
 /** A top-level todo of the Todo page, in category `categoryId` (`null` for none), with its own todos in order, which share its category. */
@@ -53,7 +69,7 @@ export type UserTodoChange =
 	/**
 	 * After todo `afterId` among `parentId`'s todos (the top level for `null`), or last for `null`. A top-level todo goes
 	 * in category `categoryId`, or in none when that category is gone; one under another goes in its parent's. A top-level
-	 * todo takes `links` and `addedBy`; any todo takes `body` and `due`.
+	 * todo takes `links` and `addedBy`; any todo takes `body`, `due`, `status`, and `priority`. A closed `status` closes it at `createdAt`.
 	 */
 	| {
 			op: "add";
@@ -66,11 +82,18 @@ export type UserTodoChange =
 			due: string | null;
 			links: UserTodoLink[];
 			addedBy: string | null;
+			status: TodoStatus;
+			priority: TodoPriority;
+			createdAt: string | null;
 	  }
 	| { op: "edit"; id: string; text: string }
 	| { op: "edit-body"; id: string; body: string }
-	/** Checks a todo at `doneAt`, or unchecks it for `null`. Checking a top-level todo checks its todos too. */
-	| { op: "toggle"; id: string; doneAt: string | null }
+	/**
+	 * Sets a todo's status; closing it (Done or Canceled) sets its `doneAt` to `at`, and reopening it clears that.
+	 * Closing a top-level todo closes its open todos too, with the same status and time; reopening it leaves them.
+	 */
+	| { op: "set-status"; id: string; status: TodoStatus; at: string }
+	| { op: "set-priority"; id: string; priority: TodoPriority }
 	/** A todo of the list or of the archive, with its todos. */
 	| { op: "remove"; id: string }
 	/** Puts back a todo `remove` took at `index` among the top-level todos, or among top-level todo `parentId`'s, which holds leaves only. */
@@ -92,9 +115,9 @@ export type UserTodoChange =
 	/** A top-level todo, with its todos, moves to category `categoryId`, or to none for `null`. */
 	| { op: "categorize"; id: string; categoryId: string | null }
 	/**
-	 * Moves every checked todo of category `categoryId`, or of the whole list for `null`, to the archive. A checked todo
-	 * under an unchecked one goes there as a top-level todo of its parent's category. With `before`, an ISO 8601 time,
-	 * only todos checked earlier go: the server's auto-clear sends it, and the socket and the todo inbox drop it.
+	 * Moves every closed todo (Done or Canceled) of category `categoryId`, or of the whole list for `null`, to the archive.
+	 * A closed todo under an open one goes there as a top-level todo of its parent's category. With `before`, an ISO 8601
+	 * time, only todos closed earlier go: the server's auto-clear sends it, and the socket and the todo inbox drop it.
 	 */
 	| { op: "clear-done"; categoryId: string | null; before?: string }
 	/** An archived todo goes back last in the list, in its category when that still exists. */

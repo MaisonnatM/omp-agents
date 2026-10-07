@@ -10,6 +10,8 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
+const CREATED = "2026-10-01T08:00:00.000Z";
+
 function todosPath(): string {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-todos-"));
 	dirs.push(dir);
@@ -26,8 +28,8 @@ describe("UserTodosFile", () => {
 		const path = todosPath();
 		const first = new UserTodosFile(path);
 		expect(first.apply({ op: "add-category", id: "w", name: "Work" })).toBe(true);
-		expect(first.apply(addTodo({ id: "a", categoryId: "w", text: "Ship it" }))).toBe(true);
-		expect(first.apply(addTodo({ id: "b", parentId: "a", text: "Write the docs" }))).toBe(true);
+		expect(first.apply(addTodo({ id: "a", categoryId: "w", text: "Ship it", createdAt: CREATED }))).toBe(true);
+		expect(first.apply(addTodo({ id: "b", parentId: "a", text: "Write the docs", priority: 3, createdAt: CREATED }))).toBe(true);
 		expect(first.apply({ op: "edit-body", id: "a", body: "**Friday**" })).toBe(true);
 		expect(first.apply({ op: "indent", id: "a" })).toBe(false);
 		expect(new UserTodosFile(path).list).toEqual({
@@ -37,10 +39,13 @@ describe("UserTodosFile", () => {
 					id: "a",
 					text: "Ship it",
 					body: "**Friday**",
+					status: "todo",
+					priority: 0,
 					doneAt: null,
 					due: null,
+					createdAt: CREATED,
 					categoryId: "w",
-					children: [{ id: "b", text: "Write the docs", body: "", doneAt: null, due: null }],
+					children: [{ id: "b", text: "Write the docs", body: "", status: "todo", priority: 3, doneAt: null, due: null, createdAt: CREATED }],
 					links: [],
 					addedBy: null,
 				},
@@ -49,17 +54,47 @@ describe("UserTodosFile", () => {
 		});
 	});
 
-	test("a list saved before bodies, categories, dates, links, and the archive reads with none", () => {
+	test("a list saved before bodies, categories, dates, links, statuses, priorities, and the archive reads with none, a checked todo as Done", () => {
 		const path = todosPath();
-		writeTodos(path, '{"todos": [{"id": "a", "text": "Old", "children": [{"id": "a1", "text": "Older"}]}, {"id": "b", "text": "Lost", "categoryId": "gone", "children": []}]}');
+		writeTodos(
+			path,
+			'{"todos": [{"id": "a", "text": "Old", "children": [{"id": "a1", "text": "Older", "doneAt": "2026-10-05T09:00:00.000Z"}]}, {"id": "b", "text": "Lost", "categoryId": "gone", "children": []}]}',
+		);
+		const old = { body: "", priority: 0 as const, due: null, createdAt: null };
 		expect(new UserTodosFile(path).list).toEqual({
 			categories: [],
 			todos: [
-				{ id: "a", text: "Old", body: "", doneAt: null, due: null, categoryId: null, children: [{ id: "a1", text: "Older", body: "", doneAt: null, due: null }], links: [], addedBy: null },
-				{ id: "b", text: "Lost", body: "", doneAt: null, due: null, categoryId: null, children: [], links: [], addedBy: null },
+				{
+					id: "a",
+					text: "Old",
+					...old,
+					status: "todo",
+					doneAt: null,
+					categoryId: null,
+					children: [{ id: "a1", text: "Older", ...old, status: "done", doneAt: "2026-10-05T09:00:00.000Z" }],
+					links: [],
+					addedBy: null,
+				},
+				{ id: "b", text: "Lost", ...old, status: "todo", doneAt: null, categoryId: null, children: [], links: [], addedBy: null },
 			],
 			archive: [],
 		});
+	});
+
+	test("a status that disagrees with doneAt reads the way doneAt says: an open one drops it, a closed one without it is Todo", () => {
+		const path = todosPath();
+		const at = "2026-10-05T09:00:00.000Z";
+		const stored = [
+			{ id: "a", text: "a", status: "in-progress", doneAt: at, children: [] },
+			{ id: "b", text: "b", status: "canceled", doneAt: null, children: [] },
+			{ id: "c", text: "c", status: "canceled", doneAt: at, priority: 2, createdAt: at, children: [] },
+		];
+		writeTodos(path, JSON.stringify({ todos: stored }));
+		expect(new UserTodosFile(path).list.todos.map(({ id, status, doneAt, priority, createdAt }) => ({ id, status, doneAt, priority, createdAt }))).toEqual([
+			{ id: "a", status: "in-progress", doneAt: null, priority: 0, createdAt: null },
+			{ id: "b", status: "todo", doneAt: null, priority: 0, createdAt: null },
+			{ id: "c", status: "canceled", doneAt: at, priority: 2, createdAt: at },
+		]);
 		expect(existsSync(`${path}.invalid`)).toBe(false);
 	});
 

@@ -29,7 +29,7 @@ import { UserTodosFile } from "./server/user-todos-file";
 import { type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
 import type { StartRequest, StartResult, View } from "./shared/sessions";
-import { DONE_KEPT_HOURS } from "./user-todos";
+import { DONE_KEPT_HOURS, startChanges } from "./user-todos";
 import type { UserTodoChange } from "./user-todos-shared";
 import { Worktrees } from "./worktrees";
 
@@ -97,7 +97,9 @@ const starter = createStarter({
 	pathFor,
 	savedFile: files.pathOf,
 	onStarted: () => broadcasts.syncRoster(),
-	linkTodo: (todoId, sessionId) => applyTodo({ op: "link", id: todoId, link: { kind: "session", sessionId } }),
+	linkTodo(todoId, sessionId) {
+		for (const change of startChanges(todos.list, todoId, sessionId, new Date().toISOString())) applyTodo(change);
+	},
 });
 const worktrees = new Worktrees({
 	knownCwds,

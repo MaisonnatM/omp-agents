@@ -1,5 +1,5 @@
 import { addTodo } from "../src/user-todos";
-import type { UserTodoCategory, UserTodoChange } from "../src/user-todos-shared";
+import type { TodoStatus, UserTodoCategory, UserTodoChange } from "../src/user-todos-shared";
 import { localDay } from "./days";
 
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
@@ -49,7 +49,7 @@ export function quickAddTodo(
 	text: string,
 	categories: readonly UserTodoCategory[],
 	day: string,
-	place: { parentId?: string | null; afterId?: string | null; categoryId?: string | null; due?: string | null } = {},
+	place: { parentId?: string | null; afterId?: string | null; categoryId?: string | null; due?: string | null; status?: TodoStatus } = {},
 ): Extract<UserTodoChange, { op: "add" }> | null {
 	const parsed = parseQuickTodo(text, place.parentId ? [] : categories, day);
 	if (!parsed) return null;

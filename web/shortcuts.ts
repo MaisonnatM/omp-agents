@@ -38,6 +38,10 @@ export type ShortcutId =
 	| "todoNext"
 	| "todoPrevious"
 	| "todoCheck"
+	| "todoStatus"
+	| "todoPriority"
+	| "todoDue"
+	| "todoNew"
 	| "todoClose"
 	| "nextChangedFile"
 	| "previousChangedFile"
@@ -136,7 +140,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	{ id: "inbox", label: "Go to the pull request inbox", command: "Go to inbox", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
 	{ id: "tickets", label: "Go to your Linear tickets", command: "Go to tickets", keys: [{ chord: { key: "2", mod: true }, scope: "anywhere" }] },
-	{ id: "newTicket", label: "Create a Linear ticket", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "newTicket", label: "Create a Linear ticket, except on the Todo page", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "sessions", label: "Go to the sessions", command: "Go to sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },
 	{ id: "todo", label: "Go to your todo list", command: "Go to todo list", keys: [{ chord: { key: "4", mod: true }, scope: "anywhere" }] },
 	{ id: "calendar", label: "Go to your calendar", command: "Go to calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },
@@ -150,7 +154,11 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoSearch", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
 	{ id: "todoNext", label: "Focus the next todo, or open it while a todo is open", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
 	{ id: "todoPrevious", label: "Focus the previous todo, or open it while a todo is open", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
-	{ id: "todoCheck", label: "Check or uncheck the focused todo", keys: [{ chord: { key: "x" }, scope: "outside-fields" }] },
+	{ id: "todoCheck", label: "Mark the focused or open todo Done, or a closed one Todo again", keys: [{ chord: { key: "x" }, scope: "outside-fields" }] },
+	{ id: "todoStatus", label: "Change the focused or open todo's status", keys: [{ chord: { key: "s" }, scope: "outside-fields" }] },
+	{ id: "todoPriority", label: "Change the focused or open todo's priority", keys: [{ chord: { key: "p" }, scope: "outside-fields" }] },
+	{ id: "todoDue", label: "Change the focused or open todo's due day", keys: [{ chord: { key: "d", shift: true }, scope: "outside-fields" }] },
+	{ id: "todoNew", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "nextChangedFile", label: "Changes: open the next changed file", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", label: "Changes: open the previous changed file", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },

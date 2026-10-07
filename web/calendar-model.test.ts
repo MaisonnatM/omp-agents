@@ -32,7 +32,7 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	runs: [],
 	...fields,
 });
-const todo = (fields: Partial<UserTodo>): UserTodo => ({ id: "t1", text: "Todo", body: "", doneAt: null, due: null, categoryId: null, children: [], links: [], addedBy: null, ...fields });
+const todo = (fields: Partial<UserTodo>): UserTodo => ({ id: "t1", text: "Todo", body: "", status: "todo", priority: 0, doneAt: null, due: null, createdAt: null, categoryId: null, children: [], links: [], addedBy: null, ...fields });
 const list = (todos: UserTodo[], archive: UserTodo[] = []): UserTodoList => ({ categories: [], todos, archive });
 const ticket = (fields: Partial<Ticket>): Ticket => ({
 	id: "ENG-1",
@@ -121,8 +121,8 @@ describe("todos and tickets", () => {
 			due: "2026-10-01",
 			categoryId: "work",
 			children: [
-				{ id: "c", text: "Child", body: "", doneAt: "2026-10-02T10:00:00Z", due: "2026-10-31" },
-				{ id: "late", text: "Late", body: "", doneAt: null, due: "2026-11-01" },
+				{ id: "c", text: "Child", body: "", status: "done", priority: 0, doneAt: "2026-10-02T10:00:00Z", due: "2026-10-31", createdAt: null },
+				{ id: "late", text: "Late", body: "", status: "todo", priority: 0, doneAt: null, due: "2026-11-01", createdAt: null },
 			],
 		});
 		const entries = october({ todos: list([parent, todo({ id: "none" })], [todo({ id: "archived", due: "2026-10-05" })]) });

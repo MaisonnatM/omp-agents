@@ -1,10 +1,11 @@
 /** Which todos each of the Todo page's lists holds and what it lets you do, shared by the page and the sidebar. */
 import { Archive, Bot, CalendarClock, ListTodo, type LucideIcon, MessageCircleQuestionMark } from "lucide-react";
-import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
+import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
 import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "./days";
 import { DAY_FORMAT } from "./labels";
 import type { TodoListView } from "./routing";
+import type { StatusKind } from "./tickets-model";
 import { workStateOf, type TodoSessions } from "./todo-work-state";
 
 /** What a list shows and lets you do. A category's title is its own name. */
@@ -13,9 +14,9 @@ export interface ListKind {
 	title: string;
 	/** What adding a todo here offers; `null` for a list that takes none. */
 	add: { label: string; dueToday: boolean } | null;
-	/** Today sorts by due day and Done by when it was cleared, so neither moves todos. */
+	/** Today sorts by due day and Archive by when it was cleared, so neither moves todos. */
 	canMove: boolean;
-	/** Done lists the archive: its todos can be opened, put back, or deleted, not changed. */
+	/** Archive lists the archive: its todos can be opened, put back, or deleted, not changed. */
 	readOnly: boolean;
 	/** What the list says while it holds nothing to show and no search is typed. */
 	empty: string | null;
@@ -26,7 +27,7 @@ export const LIST_KINDS: Record<TodoListView["kind"], ListKind> = {
 	today: { title: "Today", add: { label: "Add a todo due today", dueToday: true }, canMove: false, readOnly: false, empty: "Nothing is due today." },
 	needs: { title: "Needs you", add: null, canMove: false, readOnly: false, empty: "No todo is waiting on you." },
 	agents: { title: "From agents", add: null, canMove: true, readOnly: false, empty: "No agent has added a todo. An omp session adds one with its `user_todo` tool." },
-	done: { title: "Done", add: null, canMove: false, readOnly: true, empty: "Clear done puts checked todos here." },
+	archive: { title: "Archive", add: null, canMove: false, readOnly: true, empty: "Clear done puts closed todos here." },
 	category: { title: "Todo", add: { label: "Add a todo", dueToday: false }, canMove: true, readOnly: false, empty: null },
 };
 
@@ -36,8 +37,24 @@ export const SIDEBAR_LISTS: { view: Exclude<TodoListView, { kind: "category" }>;
 	{ view: { kind: "today" }, name: "Today", icon: CalendarClock },
 	{ view: { kind: "needs" }, name: "Needs you", icon: MessageCircleQuestionMark },
 	{ view: { kind: "agents" }, name: "From agents", icon: Bot },
-	{ view: { kind: "done" }, name: "Done", icon: Archive },
+	{ view: { kind: "archive" }, name: "Archive", icon: Archive },
 ];
+
+/** Each status as the page names it and draws it, with the Linear state type whose glyph it takes. */
+export const TODO_STATUS: Record<TodoStatus, { label: string; kind: StatusKind }> = {
+	backlog: { label: "Backlog", kind: "backlog" },
+	todo: { label: "Todo", kind: "unstarted" },
+	"in-progress": { label: "In Progress", kind: "started" },
+	done: { label: "Done", kind: "completed" },
+	canceled: { label: "Canceled", kind: "canceled" },
+};
+
+/** The statuses in the order a list groups its todos, as Linear's lists do: started work first, closed work last. */
+export const STATUS_GROUPS: readonly TodoStatus[] = ["in-progress", "todo", "backlog", "done", "canceled"];
+
+/** `todos` in a group per status, in `STATUS_GROUPS`' order, each in the order `todos` has them. */
+export const byStatus = <T extends UserTodoLeaf>(todos: readonly T[]): { status: TodoStatus; todos: T[] }[] =>
+	STATUS_GROUPS.map(status => ({ status, todos: todos.filter(todo => todo.status === status) }));
 
 export const titleOf = (list: UserTodoList, view: TodoListView): string =>
 	view.kind === "category" ? (list.categories.find(({ id }) => id === view.id)?.name ?? LIST_KINDS.category.title) : LIST_KINDS[view.kind].title;
@@ -79,7 +96,7 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 			return list.todos.filter(todo => todo.doneAt === null && workStateOf(todo, sessions).kind === "needs-you");
 		case "agents":
 			return list.todos.filter(todo => todo.addedBy !== null);
-		case "done":
+		case "archive":
 			return list.archive;
 		default: {
 			const never: never = view;
@@ -88,10 +105,10 @@ export function todosOf(list: UserTodoList, view: TodoListView, day: string, ses
 	}
 }
 
-/** How many top-level todos `view` lists still to do; for Done, how many it holds. */
+/** How many top-level todos `view` lists still open; for Archive, how many it holds. */
 export function leftIn(list: UserTodoList, view: TodoListView, day: string, sessions: TodoSessions): number {
 	const todos = todosOf(list, view, day, sessions);
-	return view.kind === "done" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
+	return view.kind === "archive" ? todos.length : todos.filter(todo => todo.doneAt === null).length;
 }
 
 /** What a list shows: its top-level todos, and the category a todo added there joins. */
@@ -120,18 +137,19 @@ export function matches(todo: UserTodo, query: string): boolean {
 	return words.every(word => text.includes(word));
 }
 
-/** Whether two todos sit on the same side of a list, which keeps the ones to do before the done ones. */
-export const sameStatus = (a: UserTodoLeaf, b: UserTodoLeaf): boolean => (a.doneAt === null) === (b.doneAt === null);
+/** Whether two todos share a status, which a move keeps them within. */
+export const sameStatus = (a: UserTodoLeaf, b: UserTodoLeaf): boolean => a.status === b.status;
 
-/** The last of `todos` still to do, after which a new todo ends them; `null` for none, which adds it last, still before the done ones. */
-export const lastToDo = (todos: readonly UserTodoLeaf[]): string | null => todos.findLast(todo => todo.doneAt === null)?.id ?? null;
+/** The last of `todos` with `status`, after which a new todo of it ends them; `null` for none, which adds it last. */
+export const lastOf = (todos: readonly UserTodoLeaf[], status: TodoStatus): string | null => todos.findLast(todo => todo.status === status)?.id ?? null;
 
 /** A todo as a list shows it: a top-level one, or one under top-level todo `parent`. */
 export type TodoEntry = { todo: UserTodo; parent: null } | { todo: UserTodoLeaf; parent: UserTodo };
 
 /**
  * The `move` that puts `entry` at `position` among `siblings`, the todos a list shows beside it, counted once `entry`
- * is out of them; a top-level todo joins `categoryId`. `null` when that is where it is, or among the todos of the other status.
+ * is out of them; a top-level todo joins `categoryId`. `null` when that is where it is, or when no todo of its status
+ * is right beside that place, so a todo moves only among the todos of its own status.
  */
 export function moveTo(entry: TodoEntry, siblings: readonly UserTodoLeaf[], position: number, categoryId: string | null): Extract<UserTodoChange, { op: "move" }> | null {
 	const { id } = entry.todo;
@@ -139,8 +157,7 @@ export function moveTo(entry: TodoEntry, siblings: readonly UserTodoLeaf[], posi
 	if (position < 0 || position > rest.length || siblings[position]?.id === id) return null;
 	const before = rest[position - 1];
 	const after = rest[position];
-	const crosses = entry.todo.doneAt === null ? before !== undefined && before.doneAt !== null : after !== undefined && after.doneAt === null;
-	if (crosses) return null;
+	if (![before, after].some(todo => todo !== undefined && sameStatus(todo, entry.todo))) return null;
 	return { op: "move", id, afterId: before?.id ?? null, categoryId: entry.parent === null ? categoryId : null };
 }
 

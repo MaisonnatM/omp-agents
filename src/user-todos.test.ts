@@ -1,17 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { addTodo, applyUserTodo } from "./user-todos";
-import type { UserTodo, UserTodoChange, UserTodoList } from "./user-todos-shared";
+import { addTodo, applyUserTodo, startChanges } from "./user-todos";
+import { isClosed, type TodoStatus, type UserTodo, type UserTodoChange, type UserTodoLeaf, type UserTodoList } from "./user-todos-shared";
 
 const AT = "2026-10-05T09:00:00.000Z";
+const CREATED = "2026-10-01T08:00:00.000Z";
+
+const leaf = (id: string): UserTodoLeaf => ({ id, text: id, body: "", status: "todo", priority: 0, doneAt: null, due: null, createdAt: CREATED });
 
 const todo = (id: string, children: string[] = [], { done = false, categoryId = null }: { done?: boolean; categoryId?: string | null } = {}): UserTodo => ({
-	id,
-	text: id,
-	body: "",
+	...leaf(id),
+	status: done ? "done" : "todo",
 	doneAt: done ? AT : null,
-	due: null,
 	categoryId,
-	children: children.map(child => ({ id: child, text: child, body: "", doneAt: null, due: null })),
+	children: children.map(leaf),
 	links: [],
 	addedBy: null,
 });
@@ -19,12 +20,15 @@ const todo = (id: string, children: string[] = [], { done = false, categoryId = 
 /** A list with categories named after their ids. */
 const listOf = (categories: string[], ...todos: UserTodo[]): UserTodoList => ({ categories: categories.map(id => ({ id, name: id })), todos, archive: [] });
 
-/** The todos as `id@category(child child)` words, which reads their order, nesting, and categories at a glance. */
+/** How a status reads in `words`: Done ✓, Canceled ✗, In Progress ~, Backlog ?, and Todo bare. */
+const MARK: Record<TodoStatus, string> = { backlog: "?", todo: "", "in-progress": "~", done: "✓", canceled: "✗" };
+
+/** The todos as `id@category(child child)` words, which reads their order, nesting, statuses, and categories at a glance. */
 const words = (todos: UserTodo[]): string =>
 	todos
-		.map(({ id, doneAt, categoryId, children }) => {
-			const kids = children.map(child => child.id + (child.doneAt ? "✓" : "")).join(" ");
-			return `${id}${doneAt ? "✓" : ""}${categoryId ? `@${categoryId}` : ""}${kids ? `(${kids})` : ""}`;
+		.map(({ id, status, categoryId, children }) => {
+			const kids = children.map(child => child.id + MARK[child.status]).join(" ");
+			return `${id}${MARK[status]}${categoryId ? `@${categoryId}` : ""}${kids ? `(${kids})` : ""}`;
 		})
 		.join(" ");
 const shape = ({ todos }: UserTodoList): string => words(todos);
@@ -34,7 +38,12 @@ const after = (list: UserTodoList, ...changes: UserTodoChange[]): UserTodoList =
 
 const add = (id: string, parentId: string | null, afterId: string | null, categoryId: string | null = null): UserTodoChange => addTodo({ id, parentId, afterId, categoryId, text: id });
 
-const check = (id: string): UserTodoChange => ({ op: "toggle", id, doneAt: AT });
+const setStatus = (id: string, status: TodoStatus, at = AT): UserTodoChange => ({ op: "set-status", id, status, at });
+const check = (id: string): UserTodoChange => setStatus(id, "done");
+
+/** Every todo, at both levels and in the archive, whose `doneAt` is set while it is open or missing while it is closed. */
+const unsettled = ({ todos, archive }: UserTodoList): string[] =>
+	[...todos, ...archive].flatMap(todo => [todo, ...todo.children]).filter(todo => isClosed(todo.status) !== (todo.doneAt !== null)).map(todo => todo.id);
 
 describe("applyUserTodo", () => {
 	test("add places a todo after the one it names, last otherwise, and once per id", () => {
@@ -53,12 +62,13 @@ describe("applyUserTodo", () => {
 		expect(shape(after(list, add("n", "a", null, null)))).toBe("a@work(n)");
 	});
 
-	test("add keeps the notes, due day, links, and agent it is given, each link once, and none on a todo under another", () => {
+	test("add keeps the notes, due day, status, priority, links, and agent it is given, each link once, and none on a todo under another", () => {
 		const pr = { kind: "pull-request", owner: "o", repo: "r", number: 7 } as const;
-		const list = after(listOf([]), addTodo({ id: "a", text: "Review", body: "See PR", due: "2026-10-06", links: [pr, { ...pr }], addedBy: "s1" }));
-		expect(list.todos[0]).toEqual({ ...todo("a"), text: "Review", body: "See PR", due: "2026-10-06", links: [pr], addedBy: "s1" });
-		const child = after(list, addTodo({ id: "c", parentId: "a", text: "c", links: [pr], addedBy: "s1" }));
-		expect(child.todos[0]!.children).toEqual([{ id: "c", text: "c", body: "", doneAt: null, due: null }]);
+		const fields = { body: "See PR", due: "2026-10-06", status: "backlog" as const, priority: 2 as const, links: [pr, { ...pr }], addedBy: "s1", createdAt: CREATED };
+		const list = after(listOf([]), addTodo({ id: "a", text: "Review", ...fields }));
+		expect(list.todos[0]).toEqual({ ...todo("a"), text: "Review", body: "See PR", due: "2026-10-06", status: "backlog", priority: 2, links: [pr], addedBy: "s1" });
+		const child = after(list, addTodo({ id: "c", parentId: "a", text: "c", links: [pr], addedBy: "s1", createdAt: CREATED }));
+		expect(child.todos[0]!.children).toEqual([leaf("c")]);
 	});
 
 	test("the list never nests three deep: indent refuses a todo with todos, the first one, and one already under another", () => {
@@ -95,24 +105,68 @@ describe("applyUserTodo", () => {
 			{ op: "set-due", id: "b", due: "2026-10-09" },
 			{ op: "indent", id: "b" },
 		);
-		const leaf = { id: "b", text: "Bee", body: "# Notes\n\n- one", doneAt: null, due: "2026-10-09" };
-		expect(edited.todos[0]!.children).toEqual([leaf]);
-		expect(after(edited, { op: "outdent", id: "b" }).todos[1]).toEqual({ ...leaf, categoryId: null, children: [], links: [], addedBy: null });
+		const moved = { ...leaf("b"), text: "Bee", body: "# Notes\n\n- one", due: "2026-10-09" };
+		expect(edited.todos[0]!.children).toEqual([moved]);
+		expect(after(edited, { op: "outdent", id: "b" }).todos[1]).toEqual({ ...moved, categoryId: null, children: [], links: [], addedBy: null });
 	});
 
-	test("checking a top-level todo checks its todos at that time, keeps an earlier check, and unchecking it leaves them", () => {
-		const list = after(listOf([], todo("a", ["a1", "a2"])), { op: "toggle", id: "a2", doneAt: "2026-10-01T00:00:00.000Z" });
-		const checked = after(list, check("a"));
-		expect(shape(checked)).toBe("a✓(a1✓ a2✓)");
-		expect(checked.todos[0]!.children.map(child => child.doneAt)).toEqual([AT, "2026-10-01T00:00:00.000Z"]);
-		expect(shape(after(checked, { op: "toggle", id: "a", doneAt: null }))).toBe("a(a1✓ a2✓)");
+	test("closing a top-level todo closes its open todos with the same status and time, keeps an earlier close, and reopening it leaves them", () => {
+		const list = after(listOf([], todo("a", ["a1", "a2", "a3"])), setStatus("a2", "done", "2026-10-01T00:00:00.000Z"), setStatus("a3", "in-progress"));
+		const canceled = after(list, setStatus("a", "canceled"));
+		expect(shape(canceled)).toBe("a✗(a1✗ a3✗ a2✓)");
+		expect(canceled.todos[0]!.children.map(child => child.doneAt)).toEqual([AT, AT, "2026-10-01T00:00:00.000Z"]);
+		const reopened = after(canceled, setStatus("a", "backlog"));
+		expect(shape(reopened)).toBe("a?(a1✗ a3✗ a2✓)");
+		expect(reopened.todos[0]!.doneAt).toBeNull();
+		expect(shape(after(list, setStatus("a1", "canceled")))).toBe("a(a3~ a1✗ a2✓)");
+	});
+
+	test("doneAt is set exactly while a todo is Done or Canceled, through every status change", () => {
+		const list = listOf([], todo("a", ["a1", "a2"]), todo("b"));
+		const steps = [
+			setStatus("a1", "in-progress"),
+			setStatus("a", "done"),
+			setStatus("a", "canceled", "2026-10-06T00:00:00.000Z"),
+			setStatus("a1", "todo"),
+			setStatus("b", "backlog"),
+			setStatus("b", "canceled"),
+			addTodo({ id: "c", text: "c", status: "done", createdAt: AT }),
+			addTodo({ id: "d", text: "d", status: "canceled", createdAt: null }),
+			{ op: "clear-done", categoryId: null },
+			{ op: "unarchive", id: "a" },
+			setStatus("a", "in-progress"),
+		] satisfies UserTodoChange[];
+		let state = list;
+		for (const change of steps) {
+			state = applyUserTodo(state, change);
+			expect(unsettled(state)).toEqual([]);
+		}
+		expect(shape(state)).toBe("d a~(a1 a2✓)");
+		expect(archived(state)).toBe("c✓ b✗");
+	});
+
+	test("set-priority sets a todo's priority at either level and leaves its status", () => {
+		const list = listOf([], todo("a", ["a1"], { done: true }));
+		const urgent = after(list, { op: "set-priority", id: "a", priority: 1 }, { op: "set-priority", id: "a1", priority: 4 });
+		expect(urgent.todos[0]!.priority).toBe(1);
+		expect(urgent.todos[0]!.children[0]!.priority).toBe(4);
+		expect(shape(urgent)).toBe("a✓(a1)");
+		expect(after(urgent, { op: "set-priority", id: "a", priority: 1 })).toBe(urgent);
+	});
+
+	test("starting a session links the todo and moves one in Backlog or Todo to In Progress, but leaves a started or closed one", () => {
+		const list = after(listOf([], todo("a"), todo("b"), todo("c"), todo("d", [], { done: true })), setStatus("b", "backlog"), setStatus("c", "in-progress"));
+		const started = ["a", "b", "c", "d"].reduce((state, id) => after(state, ...startChanges(state, id, `s-${id}`, AT)), list);
+		expect(shape(started)).toBe("a~ b~ c~ d✓");
+		expect(started.todos.map(todo => todo.links)).toEqual(["a", "b", "c", "d"].map(id => [{ kind: "session", sessionId: `s-${id}` }]));
+		expect(started.todos[3]!.doneAt).toBe(AT);
 	});
 
 	test("every list keeps its todos to do before the done ones, each side in its order", () => {
 		const list = after(listOf([], todo("a", ["a1", "a2"]), todo("b"), todo("c")), check("a1"), check("b"));
 		expect(shape(list)).toBe("a(a2 a1✓) c b✓");
 		expect(shape(after(list, check("a")))).toBe("c a✓(a2✓ a1✓) b✓");
-		expect(shape(after(list, { op: "toggle", id: "b", doneAt: null }))).toBe("a(a2 a1✓) c b");
+		expect(shape(after(list, setStatus("b", "todo")))).toBe("a(a2 a1✓) c b");
 		expect(shape(after(list, add("n", null, "b"), add("n1", "a", null)))).toBe("a(a2 n1 a1✓) c n b✓");
 	});
 
@@ -137,9 +191,9 @@ describe("applyUserTodo", () => {
 		const removed = after(list, { op: "remove", id: "a" });
 		expect(after(removed, { op: "restore", todo: taken, parentId: null, index: 0 }).todos).toEqual(list.todos);
 		expect(after(removed, { op: "restore", todo: taken, parentId: null, index: 1 }).todos).toEqual([list.todos[1]!, taken]);
-		const leaf = { id: "a1", text: "a1", body: "x", doneAt: null, due: null };
-		const childBack = after(list, { op: "remove", id: "a1" }, { op: "restore", todo: leaf, parentId: "a", index: 0 });
-		expect(childBack.todos[0]!.children).toEqual([leaf]);
+		const child = { ...leaf("a1"), body: "x" };
+		const childBack = after(list, { op: "remove", id: "a1" }, { op: "restore", todo: child, parentId: "a", index: 0 });
+		expect(childBack.todos[0]!.children).toEqual([child]);
 		expect(after(list, { op: "restore", todo: taken, parentId: null, index: 0 })).toBe(list);
 	});
 
@@ -154,11 +208,16 @@ describe("applyUserTodo", () => {
 	});
 
 	test("clear-done with before archives only the todos checked earlier, at either level", () => {
-		const toggle = (id: string, doneAt: string): UserTodoChange => ({ op: "toggle", id, doneAt });
-		const list = after(listOf([], todo("a", ["a1", "a2"]), todo("b"), todo("c")), toggle("a1", "2026-10-04T08:00:00.000Z"), toggle("a2", "2026-10-05T09:30:00.000Z"), toggle("b", "2026-10-04T09:00:00.000Z"), toggle("c", "2026-10-05T10:00:00.000Z"));
+		const list = after(
+			listOf([], todo("a", ["a1", "a2"]), todo("b"), todo("c")),
+			setStatus("a1", "done", "2026-10-04T08:00:00.000Z"),
+			setStatus("a2", "done", "2026-10-05T09:30:00.000Z"),
+			setStatus("b", "canceled", "2026-10-04T09:00:00.000Z"),
+			setStatus("c", "done", "2026-10-05T10:00:00.000Z"),
+		);
 		const cleared = after(list, { op: "clear-done", categoryId: null, before: "2026-10-05T09:00:00.000Z" });
 		expect(shape(cleared)).toBe("a(a2✓) c✓");
-		expect(archived(cleared)).toBe("b✓ a1✓");
+		expect(archived(cleared)).toBe("b✗ a1✓");
 		expect(after(cleared, { op: "clear-done", categoryId: null, before: "2026-10-05T09:00:00.000Z" })).toBe(cleared);
 	});
 
@@ -208,6 +267,8 @@ describe("applyUserTodo", () => {
 			{ op: "edit", id: "a", text: "a" },
 			{ op: "edit-body", id: "gone", body: "x" },
 			{ op: "set-due", id: "a", due: null },
+			setStatus("a", "todo"),
+			{ op: "set-priority", id: "a", priority: 0 },
 			{ op: "indent", id: "a" },
 			{ op: "outdent", id: "a" },
 			{ op: "clear-done", categoryId: null },

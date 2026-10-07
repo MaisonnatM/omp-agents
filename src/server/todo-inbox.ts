@@ -1,12 +1,13 @@
 /**
  * The changes omp's `user_todo` tool leaves for the Todo page's list, one JSON file each in a directory, so the server
  * stays the only writer of `todos.json` and a session can file a todo while the dashboard is down. An agent may add a
- * todo or check one; the inbox sets aside any other change, unchecking included, so it cannot undo what you did.
+ * todo or check one, which marks it Done; the inbox sets aside any other change, unchecking included, so it cannot undo
+ * what you did.
  */
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, watch } from "node:fs";
 import { join } from "node:path";
 import { errorText } from "../json";
-import { parseTodoChange } from "../user-todos-parse";
+import { parseAgentChange } from "../user-todos-parse";
 import type { UserTodoChange } from "../user-todos-shared";
 
 export class TodoInbox {
@@ -31,16 +32,16 @@ export class TodoInbox {
 			let change: UserTodoChange | null = null;
 			let why = "it is not a change to the todo list";
 			try {
-				change = parseTodoChange(JSON.parse(readFileSync(path, "utf8")));
+				change = parseAgentChange(JSON.parse(readFileSync(path, "utf8")), new Date().toISOString());
 			} catch (err) {
 				why = errorText(err);
 			}
-			if (change && (change.op === "add" || (change.op === "toggle" && change.doneAt !== null))) {
+			if (change && (change.op === "add" || (change.op === "set-status" && change.status === "done"))) {
 				this.#apply(change);
 				rmSync(path, { force: true });
 				continue;
 			}
-			if (change) why = `an agent may only add or check a todo, not ${change.op === "toggle" ? "uncheck one" : change.op}`;
+			if (change) why = `an agent may only add or check a todo, not ${change.op === "set-status" ? `mark one ${change.status}` : change.op}`;
 			console.error(`omp-agents: set aside ${path}: ${why}`);
 			renameSync(path, `${path}.invalid`);
 		}

@@ -1,19 +1,20 @@
 import { ListX, Plus, Trash2 } from "lucide-react";
 import { Fragment, type ReactNode, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
-import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../../src/user-todos-shared";
+import { isClosed, type TodoStatus, type UserTodo, type UserTodoChange, type UserTodoLeaf, type UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DONE_KEPT_HOURS } from "../../../src/user-todos";
 import { localDay } from "../../days";
 import type { TodoListView } from "../../routing";
-import { LIST_KINDS, lastToDo, leftIn, matches, placeIn, type Section, type TodoEntry, titleOf, todosOf } from "../../todo-views";
+import { byStatus, LIST_KINDS, lastOf, leftIn, matches, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todosOf } from "../../todo-views";
 import { useTodoDrag } from "../../use-todo-drag";
-import { useTodoKeys } from "../../use-todo-keys";
+import { type OpenPicker, type TodoField, useTodoKeys } from "../../use-todo-keys";
 import { FoldButton, useFolds } from "../fold";
 import { PageFrame } from "../list-page";
 import { TodoDetail } from "./detail";
 import { useTodoEditing } from "./editing";
+import { StatusIcon } from "./fields";
 import type { KnownSessions } from "./links";
 import { ArchivedRow, DraftRow, TodoRow } from "./row";
 import { TodoSearch } from "./search";
@@ -34,8 +35,9 @@ interface TodoPageProps {
 	linearConnected: boolean;
 }
 
-/** Sections whose Logbook you unfolded, by category id, `""` for none; a Logbook starts folded. */
-const LOGBOOK_KEY = "omp-agents.todo-logbook-open";
+/** The status groups you folded or unfolded, by status; Done and Canceled start folded. */
+const FOLDS_KEY = "omp-agents.todo-status-folds";
+const foldedByDefault = (status: string): boolean => status === "done" || status === "canceled";
 
 /** Your own todos, each with todos of its own, two deep at most, beside the open one's notes. */
 export function TodoPage({ list, ...props }: TodoPageProps) {
@@ -49,20 +51,15 @@ export function TodoPage({ list, ...props }: TodoPageProps) {
 	return <LoadedTodoPage list={list} {...props} />;
 }
 
-/** The rows of `todos`, done ones last, with `end`, the draft that ends the ones to do, between the two. */
-function rowsAround<T extends UserTodoLeaf>(todos: readonly T[], rowsOf: (todo: T) => ReactNode, end: ReactNode): ReactNode[] {
-	const done = todos.findIndex(todo => todo.doneAt !== null);
-	const at = done < 0 ? todos.length : done;
-	return [...todos.slice(0, at).map(rowsOf), end, ...todos.slice(at).map(rowsOf)];
-}
-
 function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessionCwd, linearConnected }: TodoPageProps & { list: UserTodoList }) {
 	const [openId, setOpenId] = useState<string | null>(null);
 	const [query, setQuery] = useState("");
+	const [picker, setPicker] = useState<OpenPicker | null>(null);
 	const listRef = useRef<HTMLElement>(null);
 	const day = localDay();
 	const kind = LIST_KINDS[view.kind];
 	const frozen = disabled || kind.readOnly;
+	const canAdd = !disabled && kind.add !== null;
 	const sessions: KnownSessions = { hosts, past };
 	const listed = todosOf(list, view, day, sessions);
 	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todo => matches(todo, query)) };
@@ -71,38 +68,43 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 	const undo = useUndo(onChange);
 	const editing = useTodoEditing({ list, kind, day, frozen, onChange, undo, onRemoved: id => openId === id && setOpenId(null), newSessionCwd });
 	const drag = useTodoDrag(kind.canMove && !frozen, onChange);
-	const logbook = useFolds(LOGBOOK_KEY, () => true);
+	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 
 	const title = titleOf(list, view);
 	const left = leftIn(list, view, day, sessions);
-	const toDo = section.todos.filter(todo => todo.doneAt === null);
-	const done = section.todos.filter(todo => todo.doneAt !== null);
-	const anyDone = done.length > 0 || toDo.some(todo => todo.children.some(child => child.doneAt !== null));
+	const anyClosed = section.todos.some(todo => todo.doneAt !== null || todo.children.some(child => child.doneAt !== null));
 	const empty = section.todos.length === 0 ? (query ? `No todo matches “${query}”.` : kind.empty) : null;
-	const foldKey = section.categoryId ?? "";
-	// A search shows every match, done ones too.
-	const logbookOpen = query !== "" || !logbook.isFolded(foldKey);
-	const logbookId = `todo-logbook-${foldKey}`;
-	const shown = kind.readOnly ? section.todos : logbookOpen ? [...toDo, ...done] : toDo;
+	const groups = (kind.readOnly ? [] : byStatus(section.todos))
+		.filter(group => group.todos.length > 0 || (group.status === "todo" && canAdd))
+		// A search shows every match, closed ones too.
+		.map(group => ({ ...group, open: query !== "" || !folds.isFolded(group.status) }));
+	const shown = kind.readOnly ? section.todos : groups.flatMap(group => (group.open ? group.todos : []));
 	const order = shown.flatMap(todo => [todo.id, ...(kind.readOnly ? [] : todo.children.map(child => child.id))]);
 	const at = open ? order.indexOf(open.todo.id) : -1;
+	const startDraft = (status: TodoStatus): void => {
+		folds.unfold([status]);
+		editing.startDraft({ parentId: null, afterId: lastOf(section.todos, status), categoryId: section.categoryId, status });
+	};
 	const openStep = useTodoKeys({
 		listRef,
-		groups: [section.todos],
+		groups: kind.readOnly ? [section.todos] : groups.map(group => group.todos),
 		editingId: editing.editingId,
 		canMove: kind.canMove,
 		disabled: frozen,
 		onChange,
-		onToggle: todo => onChange({ op: "toggle", id: todo.id, doneAt: todo.doneAt === null ? new Date().toISOString() : null }),
+		onToggle: todo => onChange({ op: "set-status", id: todo.id, status: isClosed(todo.status) ? "todo" : "done", at: new Date().toISOString() }),
+		onPicker: setPicker,
+		onNew: canAdd ? () => startDraft("todo") : null,
 		openId: open && open.todo.id,
 		openOrder: order,
 		onOpen: setOpenId,
 	});
 
-	const draftAt = (parentId: string | null, afterId: string | null): ReactNode => {
+	/** The new todo typed at this place; a top-level one only in the group of its status. */
+	const draftAt = (parentId: string | null, afterId: string | null, status?: TodoStatus): ReactNode => {
 		const draft = editing.draftAt(section, parentId, afterId);
 		// A new key per place and per added todo, so the input starts with the draft's text wherever it moves.
-		return draft && <DraftRow key={`draft:${parentId}:${afterId}:${draft.addedId}`} draft={draft} section={section} editing={editing} />;
+		return draft && (status === undefined || draft.status === status) && <DraftRow key={`draft:${parentId}:${afterId}:${draft.addedId}`} draft={draft} section={section} editing={editing} />;
 	};
 	const row = (entry: TodoEntry, siblings: readonly UserTodoLeaf[]) => (
 		<TodoRow
@@ -114,33 +116,38 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 			sessions={sessions}
 			disabled={disabled}
 			open={entry.todo.id === openId}
+			picker={picker?.inRow && picker.id === entry.todo.id ? picker.field : null}
+			onPicker={field => setPicker(field && { id: entry.todo.id, field, inRow: true })}
 			drag={drag}
 			editing={editing}
 			onOpen={setOpenId}
 			onChange={onChange}
 		/>
 	);
-	const rowsOf = (todo: UserTodo): ReactNode => (
-		<Fragment key={todo.id}>
-			{row({ todo, parent: null }, section.todos)}
-			{rowsAround(
-				todo.children,
-				child => (
-					<Fragment key={child.id}>
-						{row({ todo: child, parent: todo }, todo.children)}
-						{draftAt(todo.id, child.id)}
-					</Fragment>
-				),
-				draftAt(todo.id, null),
-			)}
-			{draftAt(null, todo.id)}
-		</Fragment>
-	);
+	const rowsOf = (todo: UserTodo, siblings: readonly UserTodo[]): ReactNode => {
+		const closedAt = todo.children.findIndex(child => child.doneAt !== null);
+		const split = closedAt < 0 ? todo.children.length : closedAt;
+		const childRow = (child: UserTodoLeaf): ReactNode => (
+			<Fragment key={child.id}>
+				{row({ todo: child, parent: todo }, todo.children)}
+				{draftAt(todo.id, child.id)}
+			</Fragment>
+		);
+		return (
+			<Fragment key={todo.id}>
+				{row({ todo, parent: null }, siblings)}
+				{todo.children.slice(0, split).map(childRow)}
+				{draftAt(todo.id, null)}
+				{todo.children.slice(split).map(childRow)}
+				{draftAt(null, todo.id, todo.status)}
+			</Fragment>
+		);
+	};
 
 	return (
 		<PageFrame
 			title={title}
-			meta={kind.readOnly ? `${left} done` : left === 0 ? "Nothing to do" : `${left} to do`}
+			meta={kind.readOnly ? `${left} archived` : left === 0 ? "Nothing to do" : `${left} open`}
 			actions={
 				<>
 					<TodoSearch query={query} onQuery={setQuery} />
@@ -158,8 +165,8 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 							</Button>
 						</Tooltip>
 					)}
-					{!kind.readOnly && anyDone && !disabled && (
-						<Tooltip content="Move checked todos to Done">
+					{!kind.readOnly && anyClosed && !disabled && (
+						<Tooltip content="Move Done and Canceled todos to Archive">
 							<Button variant="ghost" size="compact" leadingIcon={ListX} onClick={() => onChange({ op: "clear-done", categoryId: view.kind === "category" ? view.id : null })}>
 								Clear done
 							</Button>
@@ -170,46 +177,60 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 		>
 			<TodoSplit
 				list={
-					<section ref={listRef} aria-label={title} className="mx-auto w-full max-w-3xl space-y-1 px-3 py-2">
-						<ul aria-label={kind.readOnly ? "Archived todos" : `Todos of ${title}`} className="flex flex-col gap-0.5">
-							{kind.readOnly ? (
-								section.todos.map(todo => <ArchivedRow key={todo.id} todo={todo} disabled={disabled} open={todo.id === openId} onOpen={setOpenId} onChange={onChange} />)
-							) : (
-								<>
-									{toDo.map(rowsOf)}
-									{draftAt(null, null)}
-								</>
-							)}
-						</ul>
+					<section ref={listRef} aria-label={title} className="mx-auto w-full max-w-3xl space-y-2 px-3 py-2">
+						{kind.readOnly ? (
+							<ul aria-label="Archived todos" className="flex flex-col gap-0.5">
+								{section.todos.map(todo => (
+									<ArchivedRow key={todo.id} todo={todo} disabled={disabled} open={todo.id === openId} onOpen={setOpenId} onChange={onChange} />
+								))}
+							</ul>
+						) : (
+							groups.map(({ status, todos, open: groupOpen }) => {
+								const { label } = TODO_STATUS[status];
+								const id = `todo-group-${status}`;
+								return (
+									<section key={status} aria-labelledby={`${id}-heading`}>
+										<h3 id={`${id}-heading`} className="sticky top-0 z-10 flex h-10 items-center gap-2 rounded-md bg-muted px-3 text-sm font-medium">
+											<FoldButton open={groupOpen} onToggle={() => folds.toggle(status)} controls={`${id}-list`} className="items-center gap-2.5">
+												<StatusIcon status={status} />
+												{label}
+												<span className="tabular-nums text-muted-foreground">{todos.length}</span>
+											</FoldButton>
+											{isClosed(status) && <span className="ml-auto text-xs font-normal text-muted-foreground">Archived after {DONE_KEPT_HOURS} hours</span>}
+											{canAdd && (
+												<Tooltip content={`Add a todo to ${label}`}>
+													<Button variant="ghost" size="icon-compact" aria-label={`Add a todo to ${label}`} className={isClosed(status) ? undefined : "ml-auto"} onClick={() => startDraft(status)}>
+														<Plus />
+													</Button>
+												</Tooltip>
+											)}
+										</h3>
+										{groupOpen && (
+											// A row scrolled into view clears the sticky h-10 heading above it.
+											<ul id={`${id}-list`} aria-label={`${label} todos of ${title}`} className="flex flex-col gap-0.5 py-1 *:scroll-mt-12">
+												{todos.map(todo => rowsOf(todo, todos))}
+												{draftAt(null, null, status)}
+												{status === "todo" && canAdd && kind.add && (
+													<li>
+														<Tooltip content={kind.add.dueToday ? "Add a todo due today" : "Add a todo at the end of Todo"}>
+															<button
+																type="button"
+																onClick={() => startDraft("todo")}
+																className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground [&>svg]:size-4"
+															>
+																<Plus />
+																{kind.add.label}
+															</button>
+														</Tooltip>
+													</li>
+												)}
+											</ul>
+										)}
+									</section>
+								);
+							})
+						)}
 						{empty && <p className="px-2 text-sm text-muted-foreground">{empty}</p>}
-						{!disabled && kind.add && (
-							<Tooltip content={kind.add.dueToday ? "Add a todo due today" : "Add a todo at the end of this list"}>
-								<button
-									type="button"
-									onClick={() => editing.startDraft({ parentId: null, afterId: lastToDo(section.todos), categoryId: section.categoryId })}
-									className="flex items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent/50 hover:text-foreground [&>svg]:size-4"
-								>
-									<Plus />
-									{kind.add.label}
-								</button>
-							</Tooltip>
-						)}
-						{!kind.readOnly && done.length > 0 && (
-							<div className="space-y-1 pt-2">
-								<h4 className="flex items-baseline gap-2 px-2 text-sm text-muted-foreground">
-									<FoldButton open={logbookOpen} onToggle={() => logbook.toggle(foldKey)} controls={logbookId}>
-										<span className="font-medium text-foreground/80">Logbook</span>
-										<span className="text-xs tabular-nums">{done.length} done</span>
-									</FoldButton>
-									<span className="ml-auto text-xs text-muted-foreground/70">Moves to Done after {DONE_KEPT_HOURS} hours</span>
-								</h4>
-								{logbookOpen && (
-									<ul id={logbookId} aria-label={`Done todos of ${title}`} className="flex flex-col gap-0.5">
-										{done.map(rowsOf)}
-									</ul>
-								)}
-							</div>
-						)}
 					</section>
 				}
 				detail={
@@ -219,7 +240,11 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 							list={list}
 							open={open}
 							readOnly={frozen}
+							day={day}
+							picker={picker && !picker.inRow && picker.id === open.todo.id ? picker.field : null}
+							onPicker={field => setPicker(field && { id: open.todo.id, field, inRow: false })}
 							onChange={onChange}
+							onOpen={setOpenId}
 							onClose={() => setOpenId(null)}
 							onPrevious={at > 0 ? () => openStep(-1) : undefined}
 							onNext={at >= 0 && at < order.length - 1 ? () => openStep(1) : undefined}

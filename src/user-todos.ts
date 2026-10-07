@@ -1,12 +1,38 @@
 /** The rules of the Todo page's list, which the server applies to its file and the page to what it shows until the server answers. */
-import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoLink, UserTodoList } from "./user-todos-shared";
+import { isClosed, type UserTodo, type UserTodoChange, type UserTodoLeaf, type UserTodoLink, type UserTodoList } from "./user-todos-shared";
 
 type AddChange = Extract<UserTodoChange, { op: "add" }>;
 
-/** The `add` of a new todo, with a new id unless `id` names it; whatever `fields` leaves out is none, last in the top level. */
+/**
+ * The `add` of a new todo, with a new id unless `id` names it, a Todo with no priority added now; whatever else
+ * `fields` leaves out is none, last in the top level.
+ */
 export function addTodo(fields: Pick<AddChange, "text"> & Partial<Omit<AddChange, "op">>): AddChange {
-	const { id = crypto.randomUUID(), parentId = null, afterId = null, categoryId = null, text, body = "", due = null, links = [], addedBy = null } = fields;
-	return { op: "add", id, parentId, afterId, categoryId, text, body, due, links, addedBy };
+	const {
+		id = crypto.randomUUID(),
+		parentId = null,
+		afterId = null,
+		categoryId = null,
+		text,
+		body = "",
+		due = null,
+		links = [],
+		addedBy = null,
+		status = "todo",
+		priority = 0,
+		createdAt = new Date().toISOString(),
+	} = fields;
+	return { op: "add", id, parentId, afterId, categoryId, text, body, due, links, addedBy, status, priority, createdAt };
+}
+
+/**
+ * The changes that start session `sessionId` for top-level todo `id`: the link to it, then In Progress at `at` when
+ * the todo was not started yet (Backlog or Todo), so a started todo reads as being worked on.
+ */
+export function startChanges(list: UserTodoList, id: string, sessionId: string, at: string): UserTodoChange[] {
+	const link: UserTodoChange = { op: "link", id, link: { kind: "session", sessionId } };
+	const status = list.todos.find(todo => todo.id === id)?.status;
+	return status === "backlog" || status === "todo" ? [link, { op: "set-status", id, status: "in-progress", at }] : [link];
 }
 
 /** The changes that touch the list's todos alone, not its categories or its archive. */
@@ -43,7 +69,7 @@ function updateAt(todos: UserTodo[], { top, child }: Place, next: (todo: UserTod
 	return todos.with(top, { ...parent, children: parent.children.with(child, next(parent.children[child]!)) });
 }
 
-const leafOf = ({ id, text, body, doneAt, due }: UserTodoLeaf): UserTodoLeaf => ({ id, text, body, doneAt, due });
+const leafOf = ({ id, text, body, status, priority, doneAt, due, createdAt }: UserTodoLeaf): UserTodoLeaf => ({ id, text, body, status, priority, doneAt, due, createdAt });
 
 const topOf = (leaf: UserTodoLeaf, categoryId: string | null): UserTodo => ({ ...leafOf(leaf), categoryId, children: [], links: [], addedBy: null });
 
@@ -118,15 +144,16 @@ function applyToTodos(todos: UserTodo[], change: TodoChange, isCategory: (id: st
 			return target.body === change.body ? todos : updateAt(todos, place, todo => ({ ...todo, body: change.body }));
 		case "set-due":
 			return target.due === change.due ? todos : updateAt(todos, place, todo => ({ ...todo, due: change.due }));
-		case "toggle": {
-			const { doneAt } = change;
-			if (place.child !== null) return updateAt(todos, place, todo => ({ ...todo, doneAt }));
-			return todos.with(place.top, {
-				...parent,
-				doneAt,
-				children: doneAt === null ? parent.children : parent.children.map(child => (child.doneAt === null ? { ...child, doneAt } : child)),
-			});
+		case "set-status": {
+			const { status, at } = change;
+			if (target.status === status) return todos;
+			const doneAt = isClosed(status) ? at : null;
+			const set = <T extends UserTodoLeaf>(leaf: T): T => ({ ...leaf, status, doneAt });
+			if (place.child !== null || doneAt === null) return updateAt(todos, place, set);
+			return todos.with(place.top, { ...set(parent), children: parent.children.map(child => (child.doneAt === null ? set(child) : child)) });
 		}
+		case "set-priority":
+			return target.priority === change.priority ? todos : updateAt(todos, place, todo => ({ ...todo, priority: change.priority }));
 		case "move": {
 			if (place.child === null) {
 				const { categoryId } = change;
@@ -174,11 +201,11 @@ function applyToTodos(todos: UserTodo[], change: TodoChange, isCategory: (id: st
 	}
 }
 
-/** How long a checked todo stays in the list before the server moves it to the archive. */
+/** How long a closed todo stays in the list before the server moves it to the archive. */
 export const DONE_KEPT_HOURS = 24;
 
 /**
- * The list once every checked todo of category `categoryId` (any for `null`), checked before `before` when given, moved
+ * The list once every closed todo of category `categoryId` (any for `null`), closed before `before` when given, moved
  * to the archive, latest first; `list` itself when none is.
  */
 function clearDone(list: UserTodoList, categoryId: string | null, before: string | undefined): UserTodoList {
@@ -215,12 +242,18 @@ function applyChange(list: UserTodoList, change: UserTodoChange): UserTodoList {
 	switch (change.op) {
 		case "add": {
 			if (known(change.id)) return list;
+			// A closed todo closes when it is added; one with no time to close at reads as Todo, as the file does.
+			const closedAt = isClosed(change.status) ? change.createdAt : null;
+			const status = isClosed(change.status) && closedAt === null ? "todo" : change.status;
 			const added: UserTodo = {
 				id: change.id,
 				text: change.text,
 				body: change.body,
-				doneAt: null,
+				status,
+				priority: change.priority,
+				doneAt: closedAt,
 				due: change.due,
+				createdAt: change.createdAt,
 				categoryId: change.categoryId,
 				children: [],
 				links: uniqueLinks(change.links),

@@ -36,7 +36,7 @@ export interface SettingsRoute {
 }
 
 /** Which todos the Todo page lists: every one, one category's, due ones, those waiting on you, those agents added, or the archive. */
-export type TodoListView = { kind: "all" } | { kind: "category"; id: string } | { kind: "today" } | { kind: "needs" } | { kind: "agents" } | { kind: "done" };
+export type TodoListView = { kind: "all" } | { kind: "category"; id: string } | { kind: "today" } | { kind: "needs" } | { kind: "agents" } | { kind: "archive" };
 
 /** The Todo page, listing `list`. */
 export interface TodoRoute {
@@ -81,7 +81,7 @@ const decodeCwd = (rest: string | null): string | null => (rest === null ? null 
 const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : encodeURIComponent(cwd));
 
 /** The Todo page's lists that are not a category, by the hash segment that names them. Category ids are random, so none reads as one. */
-const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents: { kind: "agents" }, done: { kind: "done" } } as const satisfies Record<string, TodoListView>;
+const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents: { kind: "agents" }, archive: { kind: "archive" } } as const satisfies Record<string, TodoListView>;
 
 /**
  * Each page by its kind, which is its hash's first segment, reading what follows the next `/` (`null` without one) and
@@ -94,7 +94,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   shows the tab alone.
  * - `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
  *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
- * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/done` with the todos due by
+ * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone.
  * - `#routines` opens the Routines page with every routine, and `#routines/<id>` with that routine's settings and runs.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.

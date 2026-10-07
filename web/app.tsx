@@ -233,6 +233,10 @@ export function App() {
 		if (next) open(next, "replace");
 		else if (!listed.length) return false;
 	};
+	const createTicket = (): false | void => {
+		if (!linearCallable) return false;
+		setNewTicket(current => current ?? "");
+	};
 	/** What the page's shortcuts run, and the command palette's commands. */
 	const handlers: ShortcutHandlers = {
 		help: () => setShortcutsOpen(open => !open),
@@ -262,8 +266,9 @@ export function App() {
 			showTab("tickets");
 		},
 		newTicket: () => {
-			if (!linearCallable) return false;
-			setNewTicket(current => current ?? "");
+			// The Todo page's C adds a todo; its listener may come after this one, so this one steps aside there.
+			if (page?.kind === "todo") return false;
+			return createTicket();
 		},
 		sessions: () => {
 			if (tab === "sessions" && !page) return;
@@ -514,7 +519,7 @@ export function App() {
 							onPickProject={switchProject}
 							pinned={pinned}
 							onTogglePin={togglePin}
-							handlers={handlers}
+							handlers={{ ...handlers, newTicket: createTicket }}
 							unavailable={unavailable}
 							onCreateTodo={
 								state.connected && state.userTodos

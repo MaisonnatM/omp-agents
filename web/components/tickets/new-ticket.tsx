@@ -12,7 +12,8 @@ import { hashForTickets } from "../../routing";
 import { chordLabel } from "../../shortcuts";
 import { PRIORITY_LABEL, statusOrder } from "../../tickets-model";
 import { fileBase64 } from "../image-attachments";
-import { DuePicker, FieldPicker, PRIORITIES } from "./ticket-fields";
+import { DuePicker, FieldPicker } from "../field-picker";
+import { PRIORITIES } from "./ticket-fields";
 import { LabelDot, PRIORITY_ICON, statusIcon } from "./ticket-row";
 import { preferredTeam, rememberTeam } from "./team-select";
 

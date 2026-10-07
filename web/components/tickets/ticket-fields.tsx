@@ -1,29 +1,16 @@
-import { Box, Calendar, Check, CircleUser, Ellipsis, Tag } from "lucide-react";
+import { Box, CircleUser, Tag } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import type { Ticket, TicketDetail, TicketFieldValues, TicketOptions, TicketPriority } from "../../../src/shared/tickets";
-import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";
 import { ticketsStore, useRead } from "../../reads";
 import { PRIORITY_LABEL, statusOrder } from "../../tickets-model";
+import { DuePicker, FieldPicker } from "../field-picker";
 import { DetailSection } from "../sheet-details";
-import { dateLabel } from "../../labels";
 import { LabelDot, PRIORITY_ICON, statusIcon, TicketChip } from "./ticket-row";
 
 export const PRIORITIES: TicketPriority[] = [0, 1, 2, 3, 4];
 
-/** A field's button in the side column: the row's width, its value in the text's color, and room for wrapped labels. */
-const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
-/** A field's pill in the new-issue dialog, as Linear's own dialog draws them. */
-const CHIP_BUTTON = "max-w-56 rounded-full px-2.5 font-normal text-foreground";
-
-/** Where a picker sits: a row of the side column, or a pill in the new-issue dialog. */
-export type PickerLook = "field" | "chip";
-
-const pickerButton = (look: PickerLook): { variant: "ghost" | "tertiary"; className: string } => (look === "chip" ? { variant: "tertiary", className: CHIP_BUTTON } : { variant: "ghost", className: FIELD_BUTTON });
 
 /** A titled group of fields in the side column, whose buttons line their icons up with the title. */
 function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
@@ -34,148 +21,6 @@ function FieldGroup({ title, children }: { title: string; children: ReactNode })
 	);
 }
 
-interface Choice {
-	value: string;
-	label: string;
-	icon?: ReactNode;
-}
-
-interface FieldPickerProps {
-	/** What the field is, for the search box and screen readers: `Status`. */
-	field: string;
-	/** What the field holds now, in words, for screen readers. */
-	current: string;
-	trigger: ReactNode;
-	/** `null` while Linear's options load, or when they failed to, with `error`. */
-	choices: Choice[] | null;
-	error?: string | null;
-	selected: string[];
-	/** Several choices at once: the list stays open while the choices toggle. */
-	multi?: boolean;
-	/** The field cannot change yet: Linear has not answered for the issue. */
-	disabled?: boolean;
-	onOpen?: () => void;
-	onPick: (value: string) => void;
-	look?: PickerLook;
-}
-
-/** A field as a button that opens a searchable list of its choices, as Linear's issue fields do. */
-export function FieldPicker({ field, current, trigger, choices, error = null, selected, multi = false, disabled = false, onOpen, onPick, look = "field" }: FieldPickerProps) {
-	const [open, setOpen] = useState(false);
-	return (
-		<Popover
-			open={open}
-			onOpenChange={next => {
-				setOpen(next);
-				if (next) onOpen?.();
-			}}
-		>
-			<Tooltip content={`Change ${field.toLowerCase()}: ${current}`} side="bottom" forceOpen={open ? false : undefined}>
-				<PopoverTrigger asChild>
-					<Button size="compact" {...pickerButton(look)} aria-label={`${field}: ${current}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-						<span className="flex min-w-0 items-center gap-2">{trigger}</span>
-					</Button>
-				</PopoverTrigger>
-			</Tooltip>
-			<PopoverContent align="start" className="w-64 p-0">
-				<Command>
-					<CommandInput aria-label={`Search ${field.toLowerCase()}`} placeholder={`${field}…`} />
-					<CommandList>
-						{choices === null ? (
-							<p role={error ? "alert" : undefined} className={cn("px-3 py-2 text-xs", error ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
-								{error ?? "Asking Linear…"}
-							</p>
-						) : (
-							<>
-								<CommandEmpty>No match.</CommandEmpty>
-								<CommandGroup>
-									{choices.map(choice => (
-										<CommandItem
-											key={choice.value}
-											value={choice.value}
-											keywords={[choice.label]}
-											onSelect={() => {
-												if (!multi) setOpen(false);
-												onPick(choice.value);
-											}}
-										>
-											{choice.icon}
-											<span className="truncate">{choice.label}</span>
-											<Check aria-hidden className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />
-										</CommandItem>
-									))}
-								</CommandGroup>
-							</>
-						)}
-					</CommandList>
-				</Command>
-			</PopoverContent>
-		</Popover>
-	);
-}
-
-/** The due date: a date field to set it, and a button to clear it. As a pill without a date, it waits behind a more button, as in Linear. */
-export function DuePicker({ dueDate, disabled, onChange, look = "field" }: { dueDate: string | null; disabled: boolean; onChange: (dueDate: string | null) => void; look?: PickerLook }) {
-	const [open, setOpen] = useState(false);
-	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<Tooltip content={dueDate ? `Change the due date: ${dateLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
-				<PopoverTrigger asChild>
-					{look === "chip" && !dueDate ? (
-						<Button variant="tertiary" size="icon-compact" className="rounded-full" aria-label="More fields: set a due date" data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-							<Ellipsis />
-						</Button>
-					) : (
-						<Button size="compact" {...pickerButton(look)} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-							<span className="flex min-w-0 items-center gap-2">
-								<Calendar aria-hidden className="size-4 text-muted-foreground" />
-								{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
-							</span>
-						</Button>
-					)}
-				</PopoverTrigger>
-			</Tooltip>
-			<PopoverContent align="start" className="w-auto p-2">
-				<form
-					onSubmit={event => {
-						event.preventDefault();
-						// React bubbles events through the popover's portal, so a form around the picker would submit too.
-						event.stopPropagation();
-						const value = new FormData(event.currentTarget).get("due");
-						setOpen(false);
-						if (typeof value === "string" && value !== "" && value !== dueDate) onChange(value);
-					}}
-					className="flex items-center gap-1.5"
-				>
-					<input
-						type="date"
-						name="due"
-						aria-label="Due date"
-						defaultValue={dueDate ?? ""}
-						required
-						className="h-7 rounded-md border border-border bg-background px-2 text-xs"
-					/>
-					<Button type="submit" variant="secondary" size="compact">
-						Set
-					</Button>
-					{dueDate && (
-						<Button
-							type="button"
-							variant="ghost"
-							size="compact"
-							onClick={() => {
-								setOpen(false);
-								onChange(null);
-							}}
-						>
-							Clear
-						</Button>
-					)}
-				</form>
-			</PopoverContent>
-		</Popover>
-	);
-}
 
 interface TicketFieldsProps {
 	/** What the fields show: the issue as the list has it, then in full once `detail` arrives. */

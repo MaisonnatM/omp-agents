@@ -100,7 +100,7 @@ export function TodoCategories({ list, view, disabled, onChange, sessions }: Tod
 		return (
 			<>
 				<SidebarMenuButton asChild isActive={active}>
-					<a href={hashForTodo(target)} aria-current={active ? "page" : undefined} aria-label={`${name}, ${count} ${target.kind === "done" ? "done" : "to do"}`}>
+					<a href={hashForTodo(target)} aria-current={active ? "page" : undefined} aria-label={`${name}, ${count} ${target.kind === "archive" ? "archived" : "to do"}`}>
 						{icon}
 						<span className="truncate">{name}</span>
 					</a>

@@ -124,7 +124,7 @@ describe("layout hash", () => {
 		expect(routeFromHash("#todo")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" } } });
 		expect(routeFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "category", id: "a b/c" } } });
 		expect(routeFromHash("#todo/")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" } } });
-		for (const kind of ["today", "agents", "done"] as const) {
+		for (const kind of ["today", "agents", "archive"] as const) {
 			expect(hashForTodo({ kind })).toBe(`#todo/${kind}`);
 			expect(routeFromHash(`#todo/${kind}`)).toEqual({ kind: "page", page: { kind: "todo", list: { kind } } });
 		}

@@ -29,7 +29,7 @@ import { QuickActionsMenu } from "../quick-actions";
 import { LiveSessionChips } from "../session-chip";
 
 /** Linear's glyph for each state type, and In Review's own green one. */
-const STATUS_ICON: Record<StatusKind, [LucideIcon, string]> = {
+export const STATUS_ICON: Record<StatusKind, [LucideIcon, string]> = {
 	review: [CircleDot, "text-green-600 dark:text-green-400"],
 	triage: [CircleArrowOutUpRight, "text-orange-500 dark:text-orange-400"],
 	started: [Contrast, "text-amber-500 dark:text-amber-400"],

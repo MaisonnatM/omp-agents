@@ -1,31 +1,22 @@
-import { Archive, CalendarClock, Circle, GripVertical, NotebookText, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Archive, GripVertical, NotebookText, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import type { UserTodo, UserTodoCategory, UserTodoChange, UserTodoLeaf } from "../../../src/user-todos-shared";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { DAY_FORMAT } from "../../labels";
-import { categoryColor, dueLabel, type Section, type TodoEntry } from "../../todo-views";
+import { DAY_FORMAT, dayLabel } from "../../labels";
+import { categoryColor, type Section, type TodoEntry } from "../../todo-views";
 import { workStateOf } from "../../todo-work-state";
 import type { TodoDrag } from "../../use-todo-drag";
-import { TodoCheck } from "./check";
+import type { TodoField } from "../../use-todo-keys";
 import type { Draft, TodoEditing } from "./editing";
+import { StatusIcon, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
 import { TodoInput } from "./input";
 import { type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
-
-function DueChip({ due, day }: { due: string; day: string }) {
-	const { text, overdue } = dueLabel(due, day);
-	return (
-		<span className={cn("inline-flex shrink-0 items-center gap-1 text-xs [&>svg]:size-3", overdue ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
-			<CalendarClock aria-hidden />
-			{text}
-		</span>
-	);
-}
 
 interface TodoRowProps {
 	section: Section;
 	entry: TodoEntry;
-	/** The todos beside it: a top-level todo's section, or its parent's todos. */
+	/** The todos beside it: a top-level todo's status group, or its parent's todos. */
 	siblings: readonly UserTodoLeaf[];
 	/** The category a top-level todo shows as a badge, in a list that mixes categories. */
 	category?: UserTodoCategory;
@@ -34,29 +25,33 @@ interface TodoRowProps {
 	/** Changes would not reach the server. */
 	disabled: boolean;
 	open: boolean;
+	/** The picker of this row a key opened, `null` for none. */
+	picker: TodoField | null;
+	onPicker: (field: TodoField | null) => void;
 	drag: TodoDrag;
 	editing: TodoEditing;
 	onOpen: (id: string) => void;
 	onChange: (change: UserTodoChange) => void;
 }
 
-/** A todo's row: its checkbox, title, what it carries, and the buttons that add under it and delete it. */
-export function TodoRow({ section, entry, siblings, category, day, sessions, disabled, open, drag, editing, onOpen, onChange }: TodoRowProps) {
+/** A todo's row: its priority and status, title, what it carries, when it was added, and the buttons that add under it and delete it. */
+export function TodoRow({ section, entry, siblings, category, day, sessions, disabled, open, picker, onPicker, drag, editing, onOpen, onChange }: TodoRowProps) {
 	const { todo } = entry;
 	const top = entry.parent === null ? entry.todo : null;
 	const children = top?.children ?? [];
 	const isEditing = editing.editingId === todo.id;
-	const done = todo.doneAt !== null;
+	const closed = todo.doneAt !== null;
 	const childrenDone = children.filter(child => child.doneAt !== null).length;
 	const over = drag.overOf(todo.id);
 	const rowProps = drag.rowProps(entry, siblings);
+	const pickerOf = (field: TodoField) => ({ open: picker === field, onOpenChange: (next: boolean) => onPicker(next ? field : null) });
 	return (
 		<li
 			data-todo-id={todo.id}
 			{...rowProps}
 			draggable={rowProps.draggable && !isEditing}
 			className={cn(
-				"group/todo relative flex h-8 items-center gap-2 rounded-md px-2 text-sm hover:bg-accent/50",
+				"group/todo relative flex h-8 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-accent/50",
 				!top && "ml-6",
 				open && "bg-accent",
 				drag.draggingId === todo.id && "opacity-50",
@@ -67,17 +62,13 @@ export function TodoRow({ section, entry, siblings, category, day, sessions, dis
 			{rowProps.draggable && !isEditing && (
 				<GripVertical aria-hidden className="absolute -left-3 top-1.5 size-3.5 cursor-grab text-muted-foreground/50 opacity-0 group-hover/todo:opacity-100" />
 			)}
-			<TodoCheck
-				done={done}
-				label={todo.text}
-				disabled={disabled}
-				onToggle={() => onChange({ op: "toggle", id: todo.id, doneAt: done ? null : new Date().toISOString() })}
-			/>
+			<TodoPriorityPicker todo={todo} look="icon" disabled={disabled} {...pickerOf("priority")} onChange={onChange} />
+			<TodoStatusPicker todo={todo} look="icon" disabled={disabled} {...pickerOf("status")} onChange={onChange} />
 			{isEditing ? (
 				<TodoInput
 					initial={todo.text}
 					label="Todo"
-					onKey={(key, text) => editing.editKey(todo, siblings, entry.parent?.id ?? null, section.categoryId, key, text)}
+					onKey={(key, text) => editing.editKey(todo, entry.parent?.id ?? null, section.categoryId, key, text)}
 					onLeave={text => editing.leaveEdit(todo, text)}
 				/>
 			) : (
@@ -92,20 +83,25 @@ export function TodoRow({ section, entry, siblings, category, day, sessions, dis
 						onKeyDown={event => {
 							if (event.key === "Escape") event.currentTarget.blur();
 						}}
-						className={cn("min-w-0 flex-1 truncate rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring", done ? "text-muted-foreground line-through" : "text-foreground")}
+						className="flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
 					>
-						{todo.text}
+						<span className={cn("truncate", closed ? "text-muted-foreground line-through" : "text-foreground")}>{todo.text}</span>
+						{children.length > 0 && (
+							<span className="shrink-0 text-xs tabular-nums text-muted-foreground" aria-label={`${childrenDone} of ${children.length} done`}>
+								{childrenDone}/{children.length}
+							</span>
+						)}
 					</button>
 				</Tooltip>
 			)}
+			{top && !closed && <TodoWorkPill state={workStateOf(top, sessions)} compact />}
 			{category && (
 				<Badge variant="dot" size="compact" color={categoryColor(category.id)} className="max-w-28 shrink-0 [&>span:last-child]:truncate">
 					{category.name}
 				</Badge>
 			)}
-			{todo.due && !done && <DueChip due={todo.due} day={day} />}
+			{((todo.due !== null && !closed) || picker === "due") && <TodoDuePicker todo={todo} look="icon" day={day} disabled={disabled} {...pickerOf("due")} onChange={onChange} />}
 			{top?.links.filter(link => link.kind !== "session").map(link => <TodoLinkChip key={JSON.stringify(link)} link={link} sessions={sessions} compact />)}
-			{top && !done && <TodoWorkPill state={workStateOf(top, sessions)} compact />}
 			{todo.body.trim() && (
 				<Tooltip content="Has notes">
 					<button
@@ -118,11 +114,7 @@ export function TodoRow({ section, entry, siblings, category, day, sessions, dis
 					</button>
 				</Tooltip>
 			)}
-			{children.length > 0 && (
-				<span className="shrink-0 text-xs tabular-nums text-muted-foreground" aria-label={`${childrenDone} of ${children.length} done`}>
-					{childrenDone}/{children.length}
-				</span>
-			)}
+			{todo.createdAt && <span className="w-14 shrink-0 text-right text-xs text-muted-foreground">{dayLabel(todo.createdAt)}</span>}
 			{!disabled && !isEditing && (
 				<span className="pointer-events-none absolute inset-y-0 right-1 flex items-center gap-1.5 rounded-md bg-accent pl-2 pr-1 opacity-0 group-hover/todo:pointer-events-auto group-hover/todo:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 [&_svg]:size-3.5">
 					{top && (
@@ -130,7 +122,7 @@ export function TodoRow({ section, entry, siblings, category, day, sessions, dis
 							<button
 								type="button"
 								aria-label={`Add a todo under ${todo.text}`}
-								onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId })}
+								onClick={() => editing.startDraft({ parentId: todo.id, afterId: null, categoryId: section.categoryId, status: "todo" })}
 								className="text-muted-foreground hover:text-foreground"
 							>
 								<Plus />
@@ -211,8 +203,10 @@ interface DraftRowProps {
 /** The row of a todo not added yet, which a new input types into. */
 export function DraftRow({ draft, section, editing }: DraftRowProps) {
 	return (
-		<li className={cn("flex items-start gap-2 rounded-md px-2 py-1 text-sm leading-snug", draft.parentId !== null && "ml-6")}>
-			<Circle aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground/60" />
+		<li className={cn("flex items-start gap-1.5 rounded-md px-2 py-1 text-sm leading-snug", draft.parentId !== null && "ml-6")}>
+			<span className="flex w-[54px] shrink-0 justify-end pr-1">
+				<StatusIcon status={draft.status} className="mt-0.5 opacity-60" />
+			</span>
 			<TodoInput
 				initial={draft.text}
 				label={draft.parentId === null ? "New todo" : "New todo under it"}

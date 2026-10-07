@@ -25,7 +25,7 @@ export interface StartEnv {
 	savedFile(sessionId: string): string | null;
 	/** Called once a started session is in the registry. */
 	onStarted(): void;
-	/** Links todo `todoId` to session `sessionId`, which a new session started for it. */
+	/** Links todo `todoId` to session `sessionId`, which a new session started for it, and moves a todo not started yet to In Progress. */
 	linkTodo(todoId: string, sessionId: string): void;
 }
 
