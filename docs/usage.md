@@ -138,7 +138,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A session with several lists them first, each with whether it submitted or worked on it; click one to show it.
   The first one shows until you pick another.
   **Open #N in the inbox** opens its details in the main area.
-  Under it, the pull request shows as its details in the inbox do, in one column: its state with links to GitHub and Graphite, its **Next move**, **Status**, **Checks**, **Reviewers**, its other quick actions and the sessions on it, its stack, then its description, unresolved review comments, conversation, and changed files.
+  Under it, the pull request shows as its details in the inbox do, in one column: its state with links to GitHub and Graphite, its **Next move**, **Status**, **Checks**, **Reviewers**, its other quick actions and the sessions on it, its stack, then its description, unresolved review comments, conversation, and changed files; a changed file opens the pull request's changes page in the inbox.
   The quick actions apply only when the inbox of the sidebar's project lists the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
@@ -531,17 +531,25 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   **Checks** shows a bar of the head commit's checks by state, the failing and pending ones, and the passing and skipped ones folded behind their counts.
   **Reviewers** lists each reviewer with an icon for where they stand: approved, requested changes, commented, or a review still requested.
   When the inbox lists another pull request of its stack, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, marks this one, and links to the others.
-  Then come the description, folded after about 16 lines behind **Show more**, the unresolved review comments by file and line, the conversation of comments and reviews, and the changed files.
+  Then come the description, folded after about 16 lines behind **Show more**, the unresolved review comments by file and line, the conversation of comments and reviews, and the changed files, each a link to the file's changes.
   A narrow page puts the column above the details.
   Each opening reads the pull request again; the server keeps its answer for 30 seconds.
 - The inbox works from the keyboard, outside text fields, while its tab shows.
   J and K move to the next and previous row, and Enter shows the focused row's details.
-  While the details show, J and K show the next and previous pull request.
+  While the details show, J and K show the next and previous pull request; while its changes page shows, they open the next and previous file.
   O opens the focused row's pull request, or the one whose details show, on GitHub, and `.` opens the focused row's quick actions.
   E gives the focused row's move, or the move of the pull request whose details show, to an agent, when a quick action makes that move.
 - `#inbox/<owner>/<repo>/<number>` shows one pull request's details.
   The sidebar unfolds its row's repository and section, scrolls the row into view, and highlights it.
   When the inbox does not list that pull request, a note says why, and the details still show.
+- Click a changed file in the details, or the file above an unresolved review comment, to open the pull request's changes page on that file, in place of the details.
+  It shows the pull request's files as the [session changes](#session-changes) page shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and the open file in **Diff** or **File**, with J and K to step through them.
+  A renamed file shows **R**, and a copied one **A**.
+  The header names the branch and the one it merges into, and totals the files and the lines added and removed; the arrow before the title goes back to the details, and the round arrow reads the files again.
+  The page reads the files from GitHub, so it needs no checkout of the repository; a file GitHub shows no diff for, such as a binary one or one with a very large diff, shows why instead.
+  Opening the page reads the list from GitHub again, and the files you open within 30 seconds read from that list.
+  `#inbox/<owner>/<repo>/<number>/files` opens it on the first file, and `#inbox/<owner>/<repo>/<number>/files/<path>` on the file at that path, encoded.
+  The sidebar keeps the pull request highlighted, as for its details.
 - A lightning button on an inbox row, and buttons in the pull request's details, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
   The inbox stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   The chip stays while the session runs, after a reload too, so the row says whether an agent still works on the pull request.
@@ -937,7 +945,7 @@ Alt is Option on macOS.
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or inbox | Move the focused todo, or the inbox's focused pull request, section, or repository, up or down |
-| J / K | Changes page, outside text fields | Open the next or previous changed file |
+| J / K | Changes page or a pull request's changes page, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, and thinking pickers, **New session**, **End session**, the composer's Stop button, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.

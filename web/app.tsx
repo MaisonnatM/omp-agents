@@ -7,6 +7,7 @@ import { DashboardContext, MentionListsContext } from "./components/dashboard-co
 import { FileDialog } from "./components/file-dialog";
 import { InboxIndex, InboxNav } from "./components/inbox/inbox-nav";
 import { InboxPage } from "./components/inbox/inbox-page";
+import { PullRequestChangesPage } from "./components/inbox/pr-changes-page";
 import { PullRequestPage } from "./components/inbox/pr-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
@@ -37,6 +38,7 @@ import {
 	focusedView,
 	hashForNewSession,
 	hashForView,
+	type InboxRoute,
 	type Page,
 	sameView,
 	type SidebarTab,
@@ -115,8 +117,9 @@ export function App() {
 		if (next !== null) pickProject(next);
 	}, [started]);
 	const { layout } = state;
-	/** The pull request whose details the main area shows; `#inbox` alone shows the inbox page, with its sections in the sidebar. */
-	const inboxTarget = page?.kind === "inbox" ? page.target : null;
+	/** The pull request whose details or changes the main area shows; `#inbox` alone shows the inbox page, with its sections in the sidebar. */
+	const inboxRoute: InboxRoute = page?.kind === "inbox" ? page : { target: null };
+	const inboxTarget = inboxRoute.target;
 	/** The inbox page lists the pull requests itself, so the sidebar's inbox tab shows its sections then. */
 	const onInboxPage = page?.kind === "inbox" && !inboxTarget;
 	const view = focusedView(layout);
@@ -372,11 +375,14 @@ export function App() {
 			main = <SettingsPage route={page} workspaces={projects} />;
 			break;
 		case "inbox":
-			main = page.target ? (
-				<PullRequestPage project={project} hosts={visible.hosts} target={page.target} />
-			) : (
-				<InboxPage project={project} hosts={visible.hosts} past={visible.past} section={sectionTarget} />
-			);
+			main =
+				page.target === null ? (
+					<InboxPage project={project} hosts={visible.hosts} past={visible.past} section={sectionTarget} />
+				) : page.files ? (
+					<PullRequestChangesPage pr={page.target} path={page.files.path} />
+				) : (
+					<PullRequestPage project={project} hosts={visible.hosts} target={page.target} />
+				);
 			break;
 		case "tickets":
 			if (linear && !linearCallable) main = <TicketsDisconnected linear={linear} />;
@@ -469,7 +475,7 @@ export function App() {
 									) : onInboxPage ? (
 										<InboxIndex project={project} hosts={visible.hosts} target={sectionTarget} onTarget={setSectionTarget} />
 									) : (
-										<InboxNav project={project} hosts={visible.hosts} past={visible.past} target={inboxTarget} />
+										<InboxNav project={project} hosts={visible.hosts} past={visible.past} route={inboxRoute} />
 									)
 								}
 								hosts={visible.hosts}

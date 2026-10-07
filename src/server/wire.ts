@@ -336,7 +336,7 @@ export function parsePullRequest(owner: unknown, repo: unknown, number: unknown)
 	return typeof number === "number" && Number.isSafeInteger(number) && number >= 1 ? { owner, repo, number } : null;
 }
 
-/** `?owner=<o>&repo=<r>&number=<n>` of `GET /api/pull-request`. */
+/** `?owner=<o>&repo=<r>&number=<n>` of `GET /api/pull-request` and its `/files` and `/file`. */
 export function parsePullRequestQuery(params: URLSearchParams): PullRequest | null {
 	return parsePullRequest(params.get("owner"), params.get("repo"), Number(params.get("number")));
 }

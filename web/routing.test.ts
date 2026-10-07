@@ -9,6 +9,7 @@ import {
 	hashForInbox,
 	hashForLayout,
 	hashForNewSession,
+	hashForPullRequestFiles,
 	hashForRoutines,
 	hashForSettings,
 	hashForTickets,
@@ -103,10 +104,21 @@ describe("layout hash", () => {
 		expect(hashForInbox(null)).toBe("#inbox");
 		expect(hashForInbox(target)).toBe("#inbox/acme/web.app/6596");
 		expect(routeFromHash("#inbox")).toEqual({ kind: "page", page: { kind: "inbox", target: null } });
-		expect(routeFromHash("#inbox/acme/web.app/6596")).toEqual({ kind: "page", page: { kind: "inbox", target } });
+		expect(routeFromHash("#inbox/acme/web.app/6596")).toEqual({ kind: "page", page: { kind: "inbox", target, files: null } });
 		expect(routeFromHash("#inbox/acme/web.app")).toEqual({ kind: "page", page: { kind: "inbox", target: null } });
 		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
 		for (const hash of ["#inbox", "#inbox/acme/web.app/6596", "#inbox/acme"]) expect(routeFromHash(hash).kind).toBe("page");
+	});
+
+	test("the inbox files hash opens a pull request's first changed file or one by path, slashes, spaces, and brackets kept", () => {
+		const target = { owner: "acme", repo: "web.app", number: 6596 };
+		expect(hashForPullRequestFiles(target)).toBe("#inbox/acme/web.app/6596/files");
+		expect(routeFromHash("#inbox/acme/web.app/6596/files")).toEqual({ kind: "page", page: { kind: "inbox", target, files: { path: null } } });
+		expect(hashForPullRequestFiles(target, "app/[id]/page view.tsx")).toBe("#inbox/acme/web.app/6596/files/app%2F%5Bid%5D%2Fpage%20view.tsx");
+		for (const path of ["app/[id]/page view.tsx", "README.md"]) {
+			expect(routeFromHash(hashForPullRequestFiles(target, path))).toEqual({ kind: "page", page: { kind: "inbox", target, files: { path } } });
+		}
+		expect(routeFromHash("#inbox/acme/web.app/6596/filesx")).toEqual({ kind: "page", page: { kind: "inbox", target: null } });
 	});
 
 	test("the tickets hash opens the list or one issue's details, and no tickets hash is read as a layout", () => {

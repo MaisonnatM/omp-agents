@@ -4,6 +4,7 @@
  */
 import { isObject, str } from "./json";
 import { run, runJson } from "./proc";
+import type { ChangeStatus } from "./shared/changes";
 import type { CheckRunState, Person, PullRequestEvent, PullRequestFile, Repo, ReviewDecision, ReviewerState } from "./shared/github";
 
 const GH_TIMEOUT_MS = 20_000;
@@ -68,6 +69,11 @@ export function repoOf(cwd: string): Promise<Repo | null> {
 export function ghGraphql(query: string, vars: Record<string, string | number>): Promise<unknown> {
 	const fields = Object.entries(vars).flatMap(([name, value]) => [typeof value === "number" ? "-F" : "-f", `${name}=${value}`]);
 	return runJson(["gh", "api", "graphql", "-f", `query=${query}`, ...fields], { timeoutMs: GH_TIMEOUT_MS });
+}
+
+/** `gh api`'s answer for REST `path`; `paginate` reads every page, answering an array of the pages. */
+export function ghRest(path: string, paginate = false): Promise<unknown> {
+	return runJson(["gh", "api", ...(paginate ? ["--paginate", "--slurp"] : []), path], { timeoutMs: GH_TIMEOUT_MS });
 }
 
 /** The data of a `gh api graphql` answer, or GitHub's errors thrown. */
@@ -137,4 +143,15 @@ export const CHANGE: Record<string, PullRequestFile["change"]> = {
 	RENAMED: "renamed",
 	COPIED: "copied",
 	CHANGED: "changed",
+};
+
+/** A changed file's status in the REST API; a copy is a new file at the head. */
+export const FILE_STATUS: Record<string, ChangeStatus> = {
+	added: "added",
+	copied: "added",
+	removed: "deleted",
+	modified: "modified",
+	changed: "modified",
+	unchanged: "modified",
+	renamed: "renamed",
 };

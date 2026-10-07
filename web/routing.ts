@@ -20,10 +20,11 @@ export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 const PAST_PREFIX = "past/";
 
-/** The sidebar's inbox, and the pull request whose details the main content shows; `null` keeps the panes. */
-export interface InboxRoute {
-	target: PullRequest | null;
-}
+/**
+ * The sidebar's inbox, and the pull request the main content shows: its details, or with `files` its changes page open
+ * on the file at `path`, `null` for the first. A `null` target keeps the panes.
+ */
+export type InboxRoute = { target: null } | { target: PullRequest; files: { path: string | null } | null };
 
 /** The tickets list, or the Linear issue whose details replace it when `target` is non-null. */
 export interface TicketsRoute {
@@ -110,8 +111,9 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, and `?todo=<id>` with that todo's
  *   title and notes as its first message. No omp runs until its first message.
  * - `#inbox` shows the sidebar's Inbox tab, which lists the pull requests of the sidebar's project, beside the panes,
- *   and `#inbox/<owner>/<repo>/<number>` shows that pull request's details in the main content. Any other `#inbox/…`
- *   shows the tab alone.
+ *   and `#inbox/<owner>/<repo>/<number>` shows that pull request's details in the main content.
+ *   `#inbox/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
+ *   at that encoded path. Any other `#inbox/…` shows the tab alone.
  * - `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
  *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
@@ -126,8 +128,10 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	},
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
 	inbox: rest => {
-		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)$/.exec(rest);
-		return { kind: "inbox", target: match ? { owner: match[1]!, repo: match[2]!, number: Number(match[3]) } : null };
+		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)(\/files(?:\/(.+))?)?$/.exec(rest);
+		if (!match) return { kind: "inbox", target: null };
+		const files = match[4] ? { path: match[5] ? decodeURIComponent(match[5]) : null } : null;
+		return { kind: "inbox", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
 	},
 	tickets: rest => ({ kind: "tickets", target: rest !== null && TICKET_ID.test(rest) ? rest : null }),
 	todo: rest => {
@@ -152,8 +156,12 @@ function restOfPage(page: Page): string | null {
 			return `${page.section}${page.cwd === null ? "" : `/${encodeCwd(page.cwd)}`}`;
 		case "new":
 			return encodeCwd(page.cwd);
-		case "inbox":
-			return page.target && `${page.target.owner}/${page.target.repo}/${page.target.number}`;
+		case "inbox": {
+			if (page.target === null) return null;
+			const pr = `${page.target.owner}/${page.target.repo}/${page.target.number}`;
+			if (page.files === null) return pr;
+			return page.files.path === null ? `${pr}/files` : `${pr}/files/${encodeURIComponent(page.files.path)}`;
+		}
 		case "tickets":
 			return page.target || null;
 		case "todo":
@@ -177,7 +185,8 @@ export function hashForPage(page: Page): string {
 	return `#${page.kind}${rest === null ? "" : `/${rest}`}${query}`;
 }
 
-export const hashForInbox = (target: PullRequest | null): string => hashForPage({ kind: "inbox", target });
+export const hashForInbox = (target: PullRequest | null): string => hashForPage(target ? { kind: "inbox", target, files: null } : { kind: "inbox", target: null });
+export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "inbox", target: pr, files: { path } });
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
 export const hashForTodo = (list: TodoListView): string => hashForPage({ kind: "todo", list });
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });

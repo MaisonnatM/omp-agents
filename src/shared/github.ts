@@ -1,4 +1,6 @@
-/** GitHub repositories and pull requests: keys, links, the inbox, and one pull request in full. */
+/** GitHub repositories and pull requests: keys, links, the inbox, one pull request in full, and its changed files. */
+
+import type { ChangedEntry } from "./changes";
 
 /** A GitHub repository. */
 export interface Repo {
@@ -112,6 +114,15 @@ export interface PullRequestFile {
 	additions: number;
 	deletions: number;
 	change: "added" | "deleted" | "modified" | "renamed" | "copied" | "changed";
+}
+
+/** Every file a pull request changes, as its changes page lists them, beyond the first 100 that its details list. */
+export interface PullRequestChanges {
+	title: string;
+	/** The branch it merges, and the one it merges into. */
+	head: string;
+	base: string;
+	files: ChangedEntry[];
 }
 
 export interface PullRequestComment {

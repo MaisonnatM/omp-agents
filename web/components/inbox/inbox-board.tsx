@@ -37,7 +37,7 @@ import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart } from "../../quick-actions";
 import type { PolledEntry } from "../../polled-store";
 import { inboxStore } from "../../reads";
-import { hashForInbox } from "../../routing";
+import { hashForInbox, type InboxRoute } from "../../routing";
 import { type SectionTarget, sectionId } from "../../section";
 import { useShortcuts } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
@@ -79,14 +79,17 @@ function placeOf(inbox: Inbox, pr: PullRequest, agent: AgentOn): { repo: string;
 }
 
 /**
- * J and K move between the rows `shown` lists, or, while the main area shows a pull request, show the next or previous
- * one. O opens the pull request on GitHub, `.` opens a row's quick actions, and E runs `giveToAgent` on the focused row's
- * pull request, or the one whose details show. A key that has nothing to act on keeps its usual meaning.
+ * J and K move between the rows `shown` lists, or, while the main area shows a pull request's details, show the next or
+ * previous one; on its changes page they step through its files instead. O opens the pull request on GitHub, `.` opens a
+ * row's quick actions, and E runs `giveToAgent` on the focused row's pull request, or the one the main area shows. A key
+ * that has nothing to act on keeps its usual meaning.
  */
-function useTriageKeys(shown: InboxPullRequest[], target: PullRequest | null, giveToAgent: (pr: PullRequest) => boolean, openActions: (pr: InboxPullRequest) => boolean): void {
+function useTriageKeys(shown: InboxPullRequest[], route: InboxRoute, giveToAgent: (pr: PullRequest) => boolean, openActions: (pr: InboxPullRequest) => boolean): void {
+	const { target } = route;
 	const current = (): number =>
 		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowElement(pr)?.contains(document.activeElement) ?? false);
 	const step = (by: 1 | -1): boolean => {
+		if (route.target !== null && route.files !== null) return false;
 		const at = current();
 		if (target) {
 			if (at < 0) return false;
@@ -238,8 +241,8 @@ interface BoardProps {
 	project: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The pull request whose details the main area shows: its row unfolds, scrolls into view, and stays highlighted. */
-	target: PullRequest | null;
+	/** What the main area shows: a pull request's row unfolds, scrolls into view, and stays highlighted while its details or changes show. */
+	route: InboxRoute;
 }
 
 /**
@@ -247,7 +250,8 @@ interface BoardProps {
  * or Alt+Shift+↑ and ↓ reorder the repositories, the sections, and the pull requests in a section; the browser keeps
  * the order. Mount it once per screen, since its keys act on the rows it lists.
  */
-export function useInboxBoard({ project, hosts, past, target }: BoardProps): InboxBoard {
+export function useInboxBoard({ project, hosts, past, route }: BoardProps): InboxBoard {
+	const { target } = route;
 	const { open, start, starts: { quick } } = useDashboardContext();
 	const poll = inboxStore.use(project);
 	const { read } = poll;
@@ -274,7 +278,7 @@ export function useInboxBoard({ project, hosts, past, target }: BoardProps): Inb
 		setActionsOpen(rowId(pr));
 		return true;
 	};
-	useTriageKeys(read ? shownPullRequests(read.data, folds.isFolded, order, agent) : [], target, giveToAgent, openActions);
+	useTriageKeys(read ? shownPullRequests(read.data, folds.isFolded, order, agent) : [], route, giveToAgent, openActions);
 	useMoveKeys(moves);
 
 	const repos = read ? orderedRepos(read.data.repos, order) : [];

@@ -1,10 +1,10 @@
-/** What a session changed, for the changes view: its checkout's diff against the branch base, and the files its own calls changed. */
+/** What changed, for the changes views: a session's checkout and its own calls, or a pull request on GitHub. */
 
-/** What git says happened to a file between the base and the working tree. */
-export type ChangeStatus = "added" | "modified" | "deleted" | "untracked";
+/** What happened to a file between the base and the working tree, or between a pull request's base and head. */
+export type ChangeStatus = "added" | "modified" | "deleted" | "renamed" | "untracked";
 
 export interface ChangedEntry {
-	/** Relative to the checkout's root inside it, else absolute with the home directory as `~`; the file read names it so. */
+	/** Relative to the checkout's or the repository's root inside it, else absolute with the home directory as `~`; the file read names it so. */
 	path: string;
 	/** Git's change against the base; `null` for a file outside the checkout, or one the session changed back to the base. */
 	status: ChangeStatus | null;
@@ -77,9 +77,38 @@ export function parseFullDiff(diff: string): DiffRow[] {
 	return rows;
 }
 
-/** A file's text as rows that changed nothing, for a file with no base to compare. */
-export function contextRows(text: string): DiffRow[] {
+const linesOf = (text: string): string[] => {
 	const lines = text.split("\n");
 	if (lines.at(-1) === "") lines.pop();
-	return lines.map((line, index) => ({ sign: " ", old: index + 1, new: index + 1, text: line }));
+	return lines;
+};
+
+/** A file's text as rows that changed nothing, for a file with no base to compare. */
+export function contextRows(text: string): DiffRow[] {
+	return linesOf(text).map((line, index) => ({ sign: " ", old: index + 1, new: index + 1, text: line }));
+}
+
+/**
+ * Every row of a file from GitHub's `patch` of it, whose hunks hold only a few unchanged lines around each change, and
+ * `head`, its text after the change; empty for a removed file, whose patch holds every line. Lines outside the hunks are
+ * the same on both sides, so each gap before, between, and after them comes from `head`, its old number moved by as
+ * many lines as the hunks before it added or removed.
+ */
+export function patchRows(patch: string, head: string): DiffRow[] {
+	const lines = linesOf(head);
+	const rows: DiffRow[] = [];
+	let oldNext = 1;
+	let newNext = 1;
+	const fillTo = (end: number): void => {
+		while (newNext < end && newNext <= lines.length) rows.push({ sign: " ", old: oldNext++, new: newNext, text: lines[newNext++ - 1]! });
+	};
+	for (const row of parseFullDiff(patch)) {
+		// A removed line names no new number; the gap before it is as long on both sides.
+		fillTo(row.new ?? newNext + (row.old ?? oldNext) - oldNext);
+		rows.push(row);
+		if (row.old !== null) oldNext = row.old + 1;
+		if (row.new !== null) newNext = row.new + 1;
+	}
+	fillTo(lines.length + 1);
+	return rows;
 }

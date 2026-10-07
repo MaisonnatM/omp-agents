@@ -16,13 +16,14 @@ import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { sessionsDir } from "../omp/sessions";
 import { readStats } from "../omp/stats";
 import { directoryOf } from "../paths";
+import { listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../omp/mcp";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
-import type { PullRequest, Repo } from "../shared/github";
+import { type PullRequest, prKey, type Repo } from "../shared/github";
 import { PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import { readTextFile } from "../text-file";
@@ -237,6 +238,22 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return pr ? answer(() => loadPullRequestDetail(pr)) : fail(400, "Expected ?owner=&repo=&number=");
 	});
 
+	/** `GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>`: every file that pull request changes, read from GitHub anew, for its changes page. */
+	const pullRequestFiles = get(params => {
+		const pr = parsePullRequestQuery(params);
+		return pr ? answer(() => listPullRequestChanges(pr)) : fail(400, "Expected ?owner=&repo=&number=");
+	});
+
+	/** `GET /api/pull-request/file?owner=<o>&repo=<r>&number=<n>&path=<path>`: one file of that list in full, with its diff; only a path the list holds. */
+	const pullRequestFile = get(async params => {
+		const pr = parsePullRequestQuery(params);
+		if (!pr) return fail(400, "Expected ?owner=&repo=&number=&path=");
+		const path = params.get("path") ?? "";
+		const file = await readPullRequestFile(pr, path).catch((err: unknown) => fail(500, errorText(err)));
+		if (file instanceof Response) return file;
+		return file ? Response.json(file) : fail(404, `${prKey(pr)} changes no file ${path}`);
+	});
+
 	/**
 	 * `GET /api/git?cwd=<dir>`: the git checkout of a directory, `null` outside one, for the new-session draft's branch
 	 * picker and a session's header.
@@ -384,6 +401,8 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/ticket/options": { GET: ticketOptions },
 		"/api/ticket/media": { GET: ticketMedia },
 		"/api/pull-request": { GET: pullRequest },
+		"/api/pull-request/files": { GET: pullRequestFiles },
+		"/api/pull-request/file": { GET: pullRequestFile },
 		"/api/worktrees": { GET: worktreeInventory },
 		"/api/worktrees/metrics": { GET: worktreeMetrics },
 		"/api/worktrees/removal": { PUT: worktreeRemoval },

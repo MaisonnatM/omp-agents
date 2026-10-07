@@ -20,7 +20,7 @@ import { graphiteUrl, inboxAge, type MoveId, pullRequestStatus, type StatusItem 
 import { age, modeOf } from "../../labels";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
 import type { QuickActionId } from "../../quick-actions";
-import { hashForInbox, type OpenMode } from "../../routing";
+import { hashForInbox, hashForPullRequestFiles, type OpenMode } from "../../routing";
 import { useRead } from "../../reads";
 import { BranchLabel, BranchName } from "../git";
 import { DetailQuickActions, QuickActionButton, type QuickActionsProps } from "../quick-actions";
@@ -473,10 +473,14 @@ function PullRequestSections({ detail }: { detail: PullRequestDetail }) {
 					<ul className="space-y-3">
 						{threads.map((thread, index) => (
 							<li key={index} className="space-y-3 rounded-lg border border-border p-3">
-								<p className="truncate font-mono text-xs text-muted-foreground" title={thread.path}>
+								<a
+									href={hashForPullRequestFiles(detail, thread.path)}
+									className="block truncate font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
+									title={`${thread.path}: open its changes`}
+								>
 									{thread.path}
 									{thread.line !== null && `:${thread.line}`}
-								</p>
+								</a>
 								<ul className="space-y-3">
 									{thread.comments.map((comment, position) => (
 										<Comment
@@ -518,14 +522,18 @@ function PullRequestSections({ detail }: { detail: PullRequestDetail }) {
 				>
 					<ul className="max-h-72 divide-y divide-border overflow-y-auto rounded-lg border border-border font-mono text-xs">
 						{files.map(file => (
-							<li key={file.path} className="flex min-w-0 items-center gap-3 px-2.5 py-1">
-								<span className="min-w-0 flex-1 truncate" title={`${file.path} (${file.change})`}>
-									{file.path}
-								</span>
-								<span className="shrink-0 tabular-nums">
-									<span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>{" "}
-									<span className="text-red-600 dark:text-red-400">−{file.deletions}</span>
-								</span>
+							<li key={file.path}>
+								<a
+									href={hashForPullRequestFiles(detail, file.path)}
+									title={`${file.path} (${file.change}): open its changes`}
+									className="flex min-w-0 items-center gap-3 px-2.5 py-1 outline-none hover:bg-muted focus-visible:bg-muted"
+								>
+									<span className="min-w-0 flex-1 truncate">{file.path}</span>
+									<span className="shrink-0 tabular-nums">
+										<span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>{" "}
+										<span className="text-red-600 dark:text-red-400">−{file.deletions}</span>
+									</span>
+								</a>
 							</li>
 						))}
 					</ul>

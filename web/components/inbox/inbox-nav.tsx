@@ -1,6 +1,6 @@
 import { RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
-import { type PullRequest, repoKey } from "../../../src/shared/github";
+import { repoKey } from "../../../src/shared/github";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu } from "@/components/ui/sidebar";
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { agentOn, inboxSections, orderedRepos } from "../../inbox-model";
 import { readTime } from "../../labels";
 import { inboxStore } from "../../reads";
-import { hashForInbox } from "../../routing";
+import { hashForInbox, type InboxRoute } from "../../routing";
 import type { SectionTarget } from "../../section";
 import { DROP_LINE, useDragOrder } from "../../use-drag-order";
 import { useDashboardContext } from "../dashboard-context";
@@ -100,17 +100,17 @@ interface InboxNavProps {
 	project: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The pull request whose details the main area shows: its row unfolds, scrolls into view, and stays highlighted. */
-	target: PullRequest | null;
+	/** What the main area shows: a pull request's row unfolds, scrolls into view, and stays highlighted while its details or changes show. */
+	route: InboxRoute;
 }
 
 /**
  * The sidebar's inbox beside the panes or a pull request's details: the pull requests of its project, or of every
  * project, by repository in sections named after whose move it is, read from GitHub.
  */
-export function InboxNav({ project, hosts, past, target }: InboxNavProps) {
+export function InboxNav({ project, hosts, past, route }: InboxNavProps) {
 	const { dismissStart, starts: { quick } } = useDashboardContext();
-	const board = useInboxBoard({ project, hosts, past, target });
+	const board = useInboxBoard({ project, hosts, past, route });
 	const { read, error, refreshing } = board.poll;
 	return (
 		<div className="space-y-2">

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listChanges, readChangedFile, type SessionPlace } from "./changes";
 import { runChecked } from "./proc";
-import { parseFullDiff } from "./shared/changes";
+import { type DiffRow, parseFullDiff, patchRows } from "./shared/changes";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -130,5 +130,44 @@ describe("parseFullDiff", () => {
 	test("a header line that looks like a change is not a row, and no hunk means no rows", () => {
 		expect(parseFullDiff("--- a/x\n+++ b/x\n")).toEqual([]);
 		expect(parseFullDiff("")).toEqual([]);
+	});
+});
+
+describe("patchRows", () => {
+	const context = (old: number, line: number, text: string): DiffRow => ({ sign: " ", old, new: line, text });
+
+	test("fills the lines before, between, and after the hunks from the head, numbering the old side past each change", () => {
+		const head = ["1", "2", "3", "4", "FIVE", "6", "7", "8", "10", "11", "12", ""].join("\n");
+		const patch = ["@@ -4,3 +4,3 @@", " 4", "-5", "+FIVE", " 6", "@@ -8,3 +8,2 @@", " 8", "-9", " 10"].join("\n");
+		expect(patchRows(patch, head)).toEqual([
+			context(1, 1, "1"),
+			context(2, 2, "2"),
+			context(3, 3, "3"),
+			context(4, 4, "4"),
+			{ sign: "-", old: 5, new: null, text: "5" },
+			{ sign: "+", old: null, new: 5, text: "FIVE" },
+			context(6, 6, "6"),
+			context(7, 7, "7"),
+			context(8, 8, "8"),
+			{ sign: "-", old: 9, new: null, text: "9" },
+			context(10, 9, "10"),
+			context(11, 10, "11"),
+			context(12, 11, "12"),
+		]);
+	});
+
+	test("an added file's patch holds every line, as does a removed one's with no head", () => {
+		expect(patchRows("@@ -0,0 +1,2 @@\n+a\n+b", "a\nb\n")).toEqual([
+			{ sign: "+", old: null, new: 1, text: "a" },
+			{ sign: "+", old: null, new: 2, text: "b" },
+		]);
+		expect(patchRows("@@ -1,2 +0,0 @@\n-a\n-b", "")).toEqual([
+			{ sign: "-", old: 1, new: null, text: "a" },
+			{ sign: "-", old: 2, new: null, text: "b" },
+		]);
+	});
+
+	test("a file renamed without a change is its head text, every line unchanged", () => {
+		expect(patchRows("", "x\ny\n")).toEqual([context(1, 1, "x"), context(2, 2, "y")]);
 	});
 });

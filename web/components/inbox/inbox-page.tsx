@@ -97,7 +97,7 @@ interface InboxPageProps {
  */
 export function InboxPage({ project, hosts, past, section }: InboxPageProps) {
 	const { dismissStart, starts: { quick } } = useDashboardContext();
-	const board = useInboxBoard({ project, hosts, past, target: null });
+	const board = useInboxBoard({ project, hosts, past, route: { target: null } });
 	useReveal(section, board.folds, { token: section, block: "start", focus: true });
 	const unmatched = board.poll.read?.data.unmatched ?? [];
 	return (
