@@ -1,13 +1,13 @@
 /**
- * The HTTP API the page reads and writes omp's settings, analytics, the inbox, pull requests, git checkouts,
- * worktrees, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
+ * The HTTP API the page reads and writes omp's settings, analytics, the inbox, pull requests, git checkouts, worktrees,
+ * the machine's load, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
  */
 import { join } from "node:path";
 import { buildAnalytics, type SessionFacts as AnalyticsSessionFacts } from "../analytics";
 import { errorText } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
-import { gitCheckout, gitStatus, switchBranch, worktreeAt } from "../git";
+import { gitCheckout } from "../git";
 import type { GoogleCalendarReader } from "../google-calendar";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
 import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
@@ -26,10 +26,11 @@ import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
 import { PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
+import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseBranchSwitch, parseGoogleClient, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseGoogleClient, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -48,8 +49,6 @@ export interface RouteEnv {
 	google: GoogleCalendarReader;
 	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
 	placeOf(sessionId: string): SessionPlace | null;
-	/** The directories that live sessions whose turn runs, or waits on a question, work in: each one's worktree, else its cwd. */
-	busyDirs(): string[];
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -263,31 +262,9 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return cwd instanceof Response ? cwd : answer(() => gitCheckout(cwd));
 	});
 
-	/** `GET /api/git/status?cwd=<dir>`: the branch, upstream, and uncommitted files of a directory's checkout, `null` outside one, for the status bar. */
-	const status = get(params => {
-		const cwd = dirParam(params);
-		return cwd instanceof Response ? cwd : answer(() => gitStatus(cwd));
-	});
-
-	/**
-	 * `PUT /api/git/switch`: `{ cwd, choice }` switches the checkout `cwd` is in to an existing branch or a new one, and
-	 * answers its status. Refused while a session's turn runs in that checkout, and with git's reason when git refuses.
-	 */
-	const branchSwitch: Handler = async req => {
-		const write = await guards.writeBody(req);
-		if (write instanceof Response) return write;
-		const body = parseBranchSwitch(write.body);
-		const cwd = body && directoryOf(body.cwd);
-		if (!body || !cwd) return fail(400, "Expected { cwd, choice } naming a directory and a branch");
-		const target = await worktreeAt(cwd);
-		if (!target) return fail(404, `${cwd} is not in a git checkout`);
-		const busy = await Promise.all(env.busyDirs().map(dir => worktreeAt(dir)));
-		if (busy.some(at => at?.top === target.top)) return fail(409, "A session's turn runs in this checkout; switch once it ends.");
-		return answer(async () => {
-			await switchBranch(target.top, body.choice);
-			return gitStatus(target.top);
-		}, err => fail(409, errorText(err)));
-	};
+	const systemLoad = new SystemLoadReader();
+	/** `GET /api/system`: the CPU percent since the previous read and the memory available, for the status bar. */
+	const system = get(() => answer(() => systemLoad.read()));
 
 	/**
 	 * `GET /api/image?hash=<sha256>&type=<image type>`: an image of a prompt that omp moved from its session file to its
@@ -407,8 +384,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/worktrees/metrics": { GET: worktreeMetrics },
 		"/api/worktrees/removal": { PUT: worktreeRemoval },
 		"/api/git": { GET: git },
-		"/api/git/status": { GET: status },
-		"/api/git/switch": { PUT: branchSwitch },
+		"/api/system": { GET: system },
 		"/api/image": { GET: image },
 		"/api/file": { GET: textFile },
 		"/api/changes": { GET: changes },

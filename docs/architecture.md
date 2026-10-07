@@ -320,9 +320,9 @@ Every endpoint needs the access token's cookie; see [SECURITY.md](../SECURITY.md
 
 `GET /api/git?cwd=<directory>` answers the git checkout that the directory is in, or `null` outside one: the checked-out branch, every local branch with the worktree that has it checked out, and the main worktree.
 
-`GET /api/git/status?cwd=<directory>` answers the status bar's view of the checkout the directory is in, or `null` outside one: its top directory, the checked-out branch (`null` while HEAD is detached), the upstream with the commits ahead and behind, and each uncommitted file with its kind, from `git status --porcelain=v2 --branch -z --untracked-files=all`.
-`PUT /api/git/switch` takes `{ cwd, choice }`, an existing branch or a new one with its base as a start's `branch` does, runs `git switch --no-guess` in the checkout `cwd` is in, and answers its new status.
-It answers 409 while a live session whose status is `working` or `needs-input` works in that checkout (`RouteEnv.busyDirs`), and with git's message when git refuses, as for a branch another worktree has checked out.
+`GET /api/system` answers the status bar's machine load: `{ cpuPercent, memoryAvailable, memoryTotal }`.
+`cpuPercent` is the busy share of every core's time since the previous read, from `os.cpus()`, and `null` when no time passed; the first read measures from the server's start.
+`memoryAvailable` is `kern.memorystatus_level`, the free percentage `memory_pressure` reports, of the physical memory on macOS, since `os.freemem()` counts only never-used pages there, and `os.freemem()` elsewhere.
 
 `GET /api/file?path=<absolute path>` answers a text file for the page's file dialog: `{ path, text, size, truncated }`.
 The path is absolute or starts with `~/`; the page resolves a relative one against the session's directory first.
@@ -567,7 +567,7 @@ The server lives in `src/`:
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
   A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `MergeFacts` in `web/inbox-model.ts` takes either.
-- `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), the worktree a new session's branch runs in, and the status bar's status (`gitStatus`) and in-place branch switch (`switchBranch`).
+- `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), and the worktree a new session's branch runs in.
   It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, and `worktreesOf`, which parses `git worktree list --porcelain -z`.
 - `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `Worktrees.start` and `Worktrees.remove` order starts against removals; `removeCheckout` removes the checkout a directory is in, waiting up to 15 seconds for a session that just ended to leave it.
 - `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows.
@@ -612,6 +612,7 @@ The server lives in `src/`:
   `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.
 - `src/pull-request-actions.ts`: the pull request actions, which pull requests each applies to and its prompt, which the inbox's quick actions use.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
+- `src/system-load.ts`: reads the machine's CPU percent and available memory for `GET /api/system`; `src/shared/system.ts` holds the shape the page shares.
 - `src/settings.ts`: builds the settings page's model routing and file list, and checks and saves its edits.
   An edit it refuses throws its `Rejected`, which `src/server/routes.ts` answers with the error's status.
 - `src/test-env.ts`: points `PI_CODING_AGENT_DIR` at a temporary directory.
@@ -652,7 +653,7 @@ The page lives in `web/`.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.
 - `web/mentions.ts`: the composer's `@` menu as a pure function of the draft, the `@` token, the page's lists, and omp's file completions: its categories and their references, the query a token asks, and the rows and sections it shows.
   `web/completion-trigger.ts` reads the token and its prefix from the draft, and `useCompletion` in `web/components/completion-popup.tsx` builds the menu, asks the server only for files, and polls tickets and the inbox only while the menu needs them.
-- `web/components/status-bar.tsx`: the window's bottom strip, with `PlanUsageList` from `web/components/plan-usage.tsx` on the left and the focused session's checkout on the right: its branch switcher, upstream counts, and uncommitted files.
+- `web/components/status-bar.tsx`: the window's bottom strip, with `PlanUsageList` from `web/components/plan-usage.tsx` on the left, and on the right the focused session's worktree and the machine's CPU and available memory from `GET /api/system`.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
   `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's or an issue's details, and the note that says why a start failed.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
@@ -664,7 +665,7 @@ The page lives in `web/`.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, one for the MCP integrations, one for the Google calendars shown, and one for the Calendar page's Google events, with one entry per month.
   `web/app.tsx` polls the inbox instead, on every page once the sessions are listed, for the Inbox tab's count, and the sidebar's inbox reads that entry.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes; the picker button and its searchable list, and the due date's, live in `web/components/field-picker.tsx`, which the Todo page shares, with an open state its owner can hold so a key opens it, and digits that pick a choice.
-- `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft, a live session's header, and the status bar's branch switcher; `CheckoutVersion` counts the switches made from the page so that each of them reads its checkout again.
+- `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft's branch picker.
   `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the inbox and tickets also show.
   `web/use-copy.ts` copies text to the clipboard and holds the copied state behind a button's check mark.
   `web/use-default-model.ts` reads the model that the `default` role names, which the draft's model picker shows until a pick.

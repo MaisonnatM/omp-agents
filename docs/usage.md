@@ -86,13 +86,9 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Amber means less than 20% is left, and red means none.
   Hover or focus a window to see omp's full limit name and when it resets.
   The server runs `omp usage --json` at startup and every minute after that.
-- The strip's right side shows the git checkout of the focused pane's session, its worktree else its directory, as an editor's status bar does; it hides while no session is focused or outside a git checkout.
-  The branch button lists the local branches that no other worktree has checked out; pick one to switch the checkout to it, or type a new name to create that branch from the current one.
-  The switch is `git switch` in place: uncommitted changes come along, and git's refusal, as when a change would be overwritten, shows next to the button.
-  The dashboard refuses a switch while a session's turn runs in that checkout.
-  `↑2 ↓1` counts the commits ahead of and behind the branch's upstream, as last fetched; it hides for a branch without one.
-  The file count is the checkout's uncommitted files, untracked ones included; hover it to see the first twelve with their kind, and click it to open the session's **Changes** page.
-  The strip reads the checkout again every five seconds while the page is visible, and when a turn starts or ends.
+- The strip's right side shows the worktree of the focused pane's session, else its directory, by name; hover it for the full path, and it hides while no session is focused.
+  After it come the machine's CPU, the percent of every core's time spent busy since the last read, and the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory; hover either for its full reading.
+  The strip reads the CPU and memory again every five seconds while the page is visible.
 
 ## Session details sidebar
 
@@ -145,7 +141,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Session changes
 
-- **Open the session's changes** in the sidebar's **Files** tab, the status bar's file count, or a `#changes/<session id>` address shows the files the session changed as an editor does, in place of the panes.
+- **Open the session's changes** in the sidebar's **Files** tab or a `#changes/<session id>` address shows the files the session changed as an editor does, in place of the panes.
   The sidebar stays on **Sessions**, and the arrow before the title goes back to the session.
 - The page lists two sets of files at once.
   One is what the session's git checkout changed: its worktree, else its directory, against the commit its branch forked from the remote's default branch, else against `HEAD`, else against nothing before the first commit, with uncommitted and untracked files included.
@@ -272,7 +268,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Hover it to see the full model selector.
   The settings page labels models the same way.
 - Click the branch of a pull request's details or of a Linear issue's detail view to copy its name; its icon turns into a check mark for a moment.
-  A long branch name keeps its start and end with `…` in the middle, in the status bar, a branch picker, a pull request's branches, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
+  A long branch name keeps its start and end with `…` in the middle, in a branch picker, a pull request's branches, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.
 

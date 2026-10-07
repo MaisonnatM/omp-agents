@@ -52,7 +52,6 @@ import { startOf } from "./starts";
 import { PINNED_SESSIONS_KEY, useStoredKeys, useStoredState } from "./stored-state";
 import { quickAddTodo } from "./todo-quick-add";
 import { localDay } from "./days";
-import { CheckoutVersion } from "./use-git-checkout";
 import { useDashboard } from "./use-dashboard";
 
 /** The sidebar tab that goes with each page; the panes keep the one you chose. A session's changes go with the sessions. */
@@ -134,8 +133,6 @@ export function App() {
 	/** The view's roster row, an ended session's last one, or its past entry: what the PRs tab lists. */
 	const viewRow = viewHost ?? viewLastHost ?? viewPast;
 	const viewCwd = viewSession?.cwd;
-	const [switches, setSwitches] = useState(0);
-	const checkout = viewSession ? { dir: viewSession.worktree ?? viewSession.cwd, sessionId: viewSession.sessionId, working: viewHost?.status === "working" } : null;
 	const split = layout.panes.length > 1;
 	const [columns, setColumns] = useSplitRatio("columns");
 	const [rows, setRows] = useSplitRatio("rows");
@@ -444,104 +441,102 @@ export function App() {
 
 	return (
 		<DashboardContext.Provider value={dashboard}>
-			<CheckoutVersion.Provider value={switches}>
-				<div className="flex h-svh flex-col">
-					<SidebarProvider persist={false} shortcut={null} className="min-h-0 flex-1">
-						<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
-							<Roster
-								projects={projects}
-								lists={lists}
-								waiting={waitingCount(projectLists)}
-								query={sessionQuery}
-								onQuery={setSessionQuery}
-								onTogglePin={togglePin}
-								open={page ? [] : layout.panes}
-								newSessionOpen={page?.kind === "new"}
-								ticketsShown={ticketsShown}
-								tab={tab}
-								onTab={showTab}
-								userTodos={state.userTodos}
-								todoView={todoView}
-								todoSessions={{ hosts: state.hosts, past: state.past }}
-								routines={state.routines}
-								calendarTab={page?.kind === "calendar" ? page : page?.kind === "routines" ? { kind: "routines", target: routinesTarget } : null}
-								settingsRoute={settingsPage}
-								sectionTarget={sectionTarget}
-								onSectionTarget={setSectionTarget}
-								inbox={
-									// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
-									!state.listed ? (
-										<p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>
-									) : onInboxPage ? (
-										<InboxIndex project={project} hosts={visible.hosts} target={sectionTarget} onTarget={setSectionTarget} />
-									) : (
-										<InboxNav project={project} hosts={visible.hosts} past={visible.past} route={inboxRoute} />
-									)
-								}
-								hosts={visible.hosts}
+			<div className="flex h-svh flex-col">
+				<SidebarProvider persist={false} shortcut={null} className="min-h-0 flex-1">
+					<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
+						<Roster
+							projects={projects}
+							lists={lists}
+							waiting={waitingCount(projectLists)}
+							query={sessionQuery}
+							onQuery={setSessionQuery}
+							onTogglePin={togglePin}
+							open={page ? [] : layout.panes}
+							newSessionOpen={page?.kind === "new"}
+							ticketsShown={ticketsShown}
+							tab={tab}
+							onTab={showTab}
+							userTodos={state.userTodos}
+							todoView={todoView}
+							todoSessions={{ hosts: state.hosts, past: state.past }}
+							routines={state.routines}
+							calendarTab={page?.kind === "calendar" ? page : page?.kind === "routines" ? { kind: "routines", target: routinesTarget } : null}
+							settingsRoute={settingsPage}
+							sectionTarget={sectionTarget}
+							onSectionTarget={setSectionTarget}
+							inbox={
+								// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
+								!state.listed ? (
+									<p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>
+								) : onInboxPage ? (
+									<InboxIndex project={project} hosts={visible.hosts} target={sectionTarget} onTarget={setSectionTarget} />
+								) : (
+									<InboxNav project={project} hosts={visible.hosts} past={visible.past} route={inboxRoute} />
+								)
+							}
+							hosts={visible.hosts}
+							project={project}
+							onPickProject={switchProject}
+							onShowSearch={() => dispatchPalette({ type: "open" })}
+							onShowShortcuts={() => setShortcutsOpen(true)}
+							toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
+						/>
+					</DashboardSidebar>
+					<SidebarInset>
+						<Plans value={state.usage?.plans ?? NO_PLANS}>
+							<ActivityVisibility.Provider value={activityVisibility}>
+								<ToolsExpanded value={toolsExpanded}>
+									<MentionListsContext.Provider value={mentionLists}>{main}</MentionListsContext.Provider>
+								</ToolsExpanded>
+							</ActivityVisibility.Provider>
+						</Plans>
+					</SidebarInset>
+					{detailsView && (
+						<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
+							<SessionDetails
+								key={hashForView(detailsView)}
+								view={detailsView}
+								working={detailsView.kind === "live" && subjectOf(detailsView, viewHost ?? null, viewLastHost).working}
+								sessionId={detailsView.kind === "past" ? detailsView.sessionId : detailsView.agentId === null ? ((viewHost ?? viewLastHost)?.sessionId ?? null) : null}
+								pullRequests={viewRow?.pullRequests ?? []}
 								project={project}
-								onPickProject={switchProject}
-								onShowSearch={() => dispatchPalette({ type: "open" })}
-								onShowShortcuts={() => setShortcutsOpen(true)}
-								toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
+								hosts={visible.hosts}
 							/>
 						</DashboardSidebar>
-						<SidebarInset>
-							<Plans value={state.usage?.plans ?? NO_PLANS}>
-								<ActivityVisibility.Provider value={activityVisibility}>
-									<ToolsExpanded value={toolsExpanded}>
-										<MentionListsContext.Provider value={mentionLists}>{main}</MentionListsContext.Provider>
-									</ToolsExpanded>
-								</ActivityVisibility.Provider>
-							</Plans>
-						</SidebarInset>
-						{detailsView && (
-							<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-								<SessionDetails
-									key={hashForView(detailsView)}
-									view={detailsView}
-									working={detailsView.kind === "live" && subjectOf(detailsView, viewHost ?? null, viewLastHost).working}
-									sessionId={detailsView.kind === "past" ? detailsView.sessionId : detailsView.agentId === null ? ((viewHost ?? viewLastHost)?.sessionId ?? null) : null}
-									pullRequests={viewRow?.pullRequests ?? []}
-									project={project}
-									hosts={visible.hosts}
-								/>
-							</DashboardSidebar>
-						)}
-						<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-						{filePath !== null && <FileDialog key={filePath} path={filePath} onClose={() => setFilePath(null)} />}
-						{newTicket !== null && <NewTicketDialog title={newTicket} onClose={() => setNewTicket(null)} />}
-						<CommandPalette
-							state={palette}
-							dispatch={dispatchPalette}
-							hosts={visible.hosts}
-							past={visible.past}
-							projects={projects}
-							project={project}
-							onOpenSession={(picked, cwd, mode) => {
-								const next = projectSwitch(project, cwd);
-								if (next !== null) pickProject(next);
-								open(picked, mode);
-							}}
-							onPickProject={switchProject}
-							pinned={pinned}
-							onTogglePin={togglePin}
-							handlers={{ ...handlers, newTicket: createTicket }}
-							unavailable={unavailable}
-							onCreateTodo={
-								state.connected && state.userTodos
-									? text => {
-											const change = quickAddTodo(text, state.userTodos?.categories ?? [], localDay());
-											if (change) changeTodo(change);
-										}
-									: undefined
-							}
-							onCreateTicket={linearCallable ? setNewTicket : undefined}
-						/>
-					</SidebarProvider>
-					<StatusBar usage={state.usage} checkout={checkout} onSwitched={() => setSwitches(count => count + 1)} />
-				</div>
-			</CheckoutVersion.Provider>
+					)}
+					<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+					{filePath !== null && <FileDialog key={filePath} path={filePath} onClose={() => setFilePath(null)} />}
+					{newTicket !== null && <NewTicketDialog title={newTicket} onClose={() => setNewTicket(null)} />}
+					<CommandPalette
+						state={palette}
+						dispatch={dispatchPalette}
+						hosts={visible.hosts}
+						past={visible.past}
+						projects={projects}
+						project={project}
+						onOpenSession={(picked, cwd, mode) => {
+							const next = projectSwitch(project, cwd);
+							if (next !== null) pickProject(next);
+							open(picked, mode);
+						}}
+						onPickProject={switchProject}
+						pinned={pinned}
+						onTogglePin={togglePin}
+						handlers={{ ...handlers, newTicket: createTicket }}
+						unavailable={unavailable}
+						onCreateTodo={
+							state.connected && state.userTodos
+								? text => {
+										const change = quickAddTodo(text, state.userTodos?.categories ?? [], localDay());
+										if (change) changeTodo(change);
+									}
+								: undefined
+						}
+						onCreateTicket={linearCallable ? setNewTicket : undefined}
+					/>
+				</SidebarProvider>
+				<StatusBar usage={state.usage} workspace={viewSession ? (viewSession.worktree ?? viewSession.cwd) : null} />
+			</div>
 		</DashboardContext.Provider>
 	);
 }
