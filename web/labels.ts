@@ -1,6 +1,6 @@
 /** Names the page gives things: sessions, models, providers, file kinds, and the click gestures that open rows. */
 import type { MouseEvent } from "react";
-import type { PullRequest } from "../src/shared/github";
+import type { PullRequest, PullRequestLink } from "../src/shared/github";
 import type { OmpFile, OmpFileKind } from "../src/shared/models";
 import type { PastSession, RosterHost } from "../src/shared/sessions";
 import { IS_MAC } from "./shortcuts";
@@ -120,6 +120,9 @@ export function age(startedAt: number): string {
 
 /** A sidebar row's pull requests: the first one's number, then `+N` for the rest, which the row's tooltip and menu list. */
 export const pullRequestsLabel = ([first, ...rest]: PullRequest[]): string => (rest.length ? `#${first.number} +${rest.length}` : `#${first.number}`);
+
+/** How a session relates to a pull request it names. */
+export const LINK_VERB: Record<PullRequestLink, string> = { submitted: "submitted", worked: "worked on" };
 
 /** When a page last read its data: the time alone today, else the date and time. */
 export const readTime = (at: number): string =>

@@ -8,7 +8,7 @@ import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { inboxAge, type InboxRow, MOVES, type MoveId, moveAction, reason, type StackPlace } from "../../inbox-model";
 import { hashForInbox, type OpenMode } from "../../routing";
-import { hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
+import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { DROP_LINE, type DragItem } from "../../use-drag-order";
@@ -149,8 +149,6 @@ export function sessionsFor(pr: InboxPullRequest, hosts: RosterHost[], past: Pas
 	];
 	return linked.toSorted((a, b) => Number(a.view.kind === "past") - Number(b.view.kind === "past") || Number(a.link === "worked") - Number(b.link === "worked"));
 }
-
-const LINK_VERB: Record<PullRequestLink, string> = { submitted: "submitted", worked: "worked on" };
 
 /**
  * The first session on the pull request as a chip, then the others behind a `+N` menu that lists every one. A `compact`

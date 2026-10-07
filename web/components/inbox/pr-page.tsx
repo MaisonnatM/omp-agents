@@ -10,7 +10,7 @@ import { sessionsOn } from "../../sessions";
 import { useDashboardContext } from "../dashboard-context";
 import { DetailPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
-import { type NextMove, PullRequestDetailContent } from "./pr-details";
+import { type NextMove, type Placement, PullRequestDetailContent } from "./pr-details";
 import { rowId } from "./pr-row";
 
 /** What `pr` waits on next, given the running sessions `sessions` on it. */
@@ -31,38 +31,35 @@ function whyMissing(target: PullRequest, inbox: Inbox, allProjects: boolean): st
 	return `${repo}#${target.number} is not in this inbox, which covers only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}.`;
 }
 
-interface PullRequestPageProps {
+interface PullRequestDetailsProps {
 	/** The sidebar's project `cwd`, or `null` for every project. */
 	project: string | null;
 	hosts: RosterHost[];
 	target: PullRequest;
+	placement: Placement;
+	/** A change reads `target` from GitHub again. */
+	version?: unknown;
 }
 
-/** A pull request from the inbox in the main area, with the quick actions that start a session on it. */
-export function PullRequestPage({ project, hosts, target }: PullRequestPageProps) {
+/**
+ * `target`'s details with the quick actions that start a session on it, as the inbox of `project` lists it, after what
+ * became of a quick start on it. The page also says why the inbox does not list it; the sidebar does not, since most
+ * past sessions' merged pull requests would carry that note.
+ */
+export function PullRequestDetails({ project, hosts, target, placement, version }: PullRequestDetailsProps) {
 	const { open, start, dismissStart, starts: { quick } } = useDashboardContext();
 	const { read } = inboxStore.use(project);
 	const listed = read && listedPullRequest(read.data, target);
 	const item: WorkItem = { kind: "pull-request", pr: target };
 	const sessions = sessionsOn(item, hosts);
 	return (
-		<DetailPage
-			title="Inbox"
-			meta="Your pull requests and review requests on GitHub"
-			backHref={hashForInbox(null)}
-			backLabel="Back to the inbox"
-			className="max-w-7xl"
-			notice={
-				<>
-					{read && !listed && (
-						<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-							{whyMissing(target, read.data, project === null)}
-						</p>
-					)}
-					{quick && actionOn(quick.op.subject, item) !== null && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
-				</>
-			}
-		>
+		<>
+			{placement === "page" && read && !listed && (
+				<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+					{whyMissing(target, read.data, project === null)}
+				</p>
+			)}
+			{quick && actionOn(quick.op.subject, item) !== null && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 			<PullRequestDetailContent
 				key={rowId(target)}
 				pr={target}
@@ -75,7 +72,18 @@ export function PullRequestPage({ project, hosts, target }: PullRequestPageProps
 				onOpen={open}
 				next={listed ? nextMove(listed.pr, hosts, sessions) : null}
 				stack={read ? pullRequestStack(read.data, target) : []}
+				placement={placement}
+				version={version}
 			/>
+		</>
+	);
+}
+
+/** A pull request from the inbox in the main area, with the quick actions that start a session on it. */
+export function PullRequestPage(props: Omit<PullRequestDetailsProps, "placement" | "version">) {
+	return (
+		<DetailPage title="Inbox" meta="Your pull requests and review requests on GitHub" backHref={hashForInbox(null)} backLabel="Back to the inbox" className="max-w-7xl">
+			<PullRequestDetails {...props} placement="page" />
 		</DetailPage>
 	);
 }

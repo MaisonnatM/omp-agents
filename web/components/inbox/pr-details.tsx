@@ -324,23 +324,37 @@ interface DetailContentProps {
 	next: NextMove | null;
 	/** The pull requests stacked with it that the inbox lists, top first; empty when it is in no stack. */
 	stack: InboxPullRequest[];
+	/** Where the details show: the main area's page, whose heading takes focus, or the session details sidebar, under its own heading. */
+	placement: Placement;
+	/** A change reads the pull request from GitHub again. */
+	version?: unknown;
 }
 
+export type Placement = "page" | "sidebar";
+
+const HEADING: Record<Placement, { tag: "h1" | "h3"; className: string }> = {
+	page: { tag: "h1", className: "text-xl" },
+	sidebar: { tag: "h3", className: "text-base" },
+};
+
 /**
- * A pull request read from GitHub, in the main area, laid out like Graphite's: a header that names it, then its stack
- * and details, beside a column of its state, next move, Status, where each blocker offers the quick action that works on
- * it, checks, reviewers, and the other quick actions with the sessions that work on it. The next move's action shows only
- * in its card. The other quick actions show once the read settles, so the buttons do not move when the details arrive.
+ * A pull request read from GitHub, laid out like Graphite's: a header that names it, then its stack and details, beside
+ * a column of its state, next move, Status, where each blocker offers the quick action that works on it, checks,
+ * reviewers, and the other quick actions with the sessions that work on it. The column stacks above the details when the
+ * container is narrow, as in the sidebar. The next move's action shows only in its card. The other quick actions show
+ * once the read settles, so the buttons do not move when the details arrive.
  */
-export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next, stack }: DetailContentProps) {
-	const { data: detail, error } = useRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`);
+export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next, stack, placement, version }: DetailContentProps) {
+	const { data: detail, error } = useRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`, version);
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	useEffect(() => {
-		headingRef.current?.focus({ preventScroll: true });
-	}, []);
+		// The sidebar's details must leave the cursor in the pane's composer.
+		if (placement === "page") headingRef.current?.focus({ preventScroll: true });
+	}, [placement]);
 	const offered = quick.actions.filter(action => action !== next?.action);
 	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
 	const otherActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];
+	const { tag: Heading, className: headingSize } = HEADING[placement];
 	return (
 		<div className="@container/pr">
 			<div className="grid gap-x-10 gap-y-6 @4xl/pr:grid-cols-[minmax(0,1fr)_18rem]">
@@ -348,9 +362,9 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next, st
 					<p className="text-sm tabular-nums text-muted-foreground">
 						{pr.repo} #{pr.number}
 					</p>
-					<h1 ref={headingRef} tabIndex={-1} className="text-xl leading-snug font-semibold outline-none">
+					<Heading ref={headingRef} tabIndex={-1} className={cn(headingSize, "leading-snug font-semibold outline-none")}>
 						{detail?.title ?? `${pr.owner}/${pr.repo}#${pr.number}`}
-					</h1>
+					</Heading>
 					{detail && (
 						<div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-xs text-muted-foreground">
 							<span className="flex items-center gap-1.5">
