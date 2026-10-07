@@ -211,7 +211,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   It shows while the model is still writing it, then stays.
   A thinking block the provider redacts, which has no text, stays out.
   Buttons on the heading hide the tool rows and the thinking text, each on its own, and the heading stays so you can show them again.
-  The choice is saved in this browser.
+  The choice is saved in this browser, and **Settings → Appearance** has a switch for each.
   Cmd+Shift+E shows or hides the tool rows, and Alt+T (Option+T on macOS) shows or hides the thinking.
   Cmd+E still opens or closes the group.
   Hiding either leaves the outline's tool count as it was.
@@ -835,6 +835,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar; see [Integrations](#integrations).
 - **Appearance** sets the dashboard's theme: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one.
   The choice applies at once and is saved in the browser's localStorage, not in omp's files, so it does not change omp's terminal theme.
+  Its **Transcript** switches, **Show tool calls** and **Show thinking**, are the same choices as the activity group heading's buttons and their shortcuts.
 - **Settings** opens on the workspace of the session that you had open, so it includes that project's files and its `.omp/config.yml` overrides.
   With no session open, it shows user files only.
   Use the workspace picker in the header to choose another directory that a session ran in, or **User files only**.

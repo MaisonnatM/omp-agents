@@ -141,6 +141,9 @@ function tabLabel(name: string, count: number): { label: string; badge: number |
 /** The labeled tabs fit the sidebar's default width only with tighter padding than Fluid's, and only without their icons. */
 const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
 
+/** Keeps each tab's content off the header's hairline at rest, and scrolls away with it. */
+const PANEL_VIEWPORT = "pt-2";
+
 /**
  * The right sidebar's content for the focused view: an outline of its conversation's turns, the files its agent changed,
  * and the images its agents' tools returned, each tab apart. `working` marks the last turn as still running, and
@@ -164,12 +167,12 @@ export function SessionDetails({ view, working, sessionId }: { view: View; worki
 				</SizeProvider>
 			</SidebarHeader>
 			<TabPanel value="outline" asChild>
-				<SidebarContent>
+				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
 					<OutlineTab turns={turns} loaded={loaded} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="files" asChild>
-				<SidebarContent>
+				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
 					{changedFiles && files.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p>}
 					{files.length > 0 && (
 						<SidebarGroup>
@@ -203,7 +206,7 @@ export function SessionDetails({ view, working, sessionId }: { view: View; worki
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="media" asChild>
-				<SidebarContent>
+				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
 					<MediaTab media={media} view={view} />
 				</SidebarContent>
 			</TabPanel>

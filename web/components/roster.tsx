@@ -244,7 +244,7 @@ export function Roster({
 				{toggle}
 			</SidebarHeader>
 			<SizeProvider size="compact">
-				<TabsList aria-label="Sidebar" className={cn("mx-2 max-w-[calc(100%-1rem)] self-start", fit.list)}>
+				<TabsList aria-label="Sidebar" className={cn("mx-2 mt-2 max-w-[calc(100%-1rem)] self-start", fit.list)}>
 					{SIDEBAR_TABS.filter(({ value }) => ticketsShown || value !== "tickets").map(({ value, label, icon }) => {
 						const counted = tabCounts[value];
 						const badge = counted && counted.count > 0 ? counted : undefined;
