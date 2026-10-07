@@ -3,7 +3,8 @@ import type { UserTodo, UserTodoCategory, UserTodoChange, UserTodoLeaf } from ".
 import { Badge } from "@/components/ui/badge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { categoryColor, DAY_FORMAT, dueLabel, type Section, type TodoEntry } from "../../todo-views";
+import { DAY_FORMAT } from "../../labels";
+import { categoryColor, dueLabel, type Section, type TodoEntry } from "../../todo-views";
 import { workStateOf } from "../../todo-work-state";
 import type { TodoDrag } from "../../use-todo-drag";
 import { TodoCheck } from "./check";

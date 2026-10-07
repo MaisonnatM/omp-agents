@@ -51,7 +51,7 @@ export function PullRequestPage({ project, hosts, target }: PullRequestPageProps
 			meta="Your pull requests and review requests on GitHub"
 			backHref={hashForInbox(null)}
 			backLabel="Back to the inbox"
-			wide
+			className="max-w-7xl"
 			notice={
 				<>
 					{read && !listed && (

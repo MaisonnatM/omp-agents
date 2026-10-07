@@ -45,6 +45,7 @@ const ticket = (fields: Partial<Ticket>): Ticket => ({
 	project: null,
 	team: "ENG",
 	dueDate: null,
+	createdAt: "2026-09-01T00:00:00Z",
 	updatedAt: "2026-10-01T00:00:00Z",
 	branch: "eng-1",
 	...fields,

@@ -15,11 +15,11 @@ import {
 	SignalLow,
 	SignalMedium,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Ticket, TicketPriority, TicketStatus } from "../../../src/shared/tickets";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip } from "@/components/ui/tooltip";
-import { age } from "../../labels";
+import { cn } from "@/lib/utils";
+import { dateLabel, dayLabel } from "../../labels";
 import { type QuickActionId, type TicketActionId, ticketActions } from "../../quick-actions";
 import { hashForTickets, type OpenMode } from "../../routing";
 import { PRIORITY_LABEL, type StatusKind, statusKind } from "../../tickets-model";
@@ -49,11 +49,23 @@ export const PRIORITY_ICON: Record<TicketPriority, [LucideIcon, string]> = {
 	4: [SignalLow, "text-foreground"],
 };
 
-/** `2026-10-05` as `Oct 5`, read as a local date so it does not shift a day west of UTC. */
-export const dueLabel = (dueDate: string): string => new Date(`${dueDate}T00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-
 /** The element id of an issue's row, used to restore focus after its details close. */
 export const ticketRowId = (id: string): string => `ticket-${id}`;
+
+/** A pill for a value on an issue, its glyph then its truncating text: a label, the project, or the due date. */
+export function TicketChip({ icon, title, className, children }: { icon: ReactNode; title?: string; className?: string; children: ReactNode }) {
+	return (
+		<span title={title} className={cn("flex h-6 min-w-0 max-w-48 items-center gap-1.5 rounded-full border border-border px-2.5 text-xs text-muted-foreground", className)}>
+			{icon}
+			<span className="truncate">{children}</span>
+		</span>
+	);
+}
+
+/** A label's dot in the color Linear gives the label. */
+export const LabelDot = ({ color }: { color: string }) => (
+	<span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: color || "var(--muted-foreground)" }} />
+);
 
 interface TicketRowProps {
 	ticket: Ticket;
@@ -67,48 +79,63 @@ interface TicketRowProps {
 
 export function TicketRow({ ticket, sessions, onOpen, pending, onQuickAction }: TicketRowProps) {
 	return (
-		<li id={ticketRowId(ticket.id)} className="flex scroll-my-6 items-center hover:bg-muted/50">
-			<Tooltip content={`${ticket.id} · ${ticket.title}`}>
-				<a
-					href={hashForTickets(ticket.id)}
-					className="flex h-9 min-w-0 flex-1 items-center gap-3 pl-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-				>
-					<IconTip icon={[...PRIORITY_ICON[ticket.priority], PRIORITY_LABEL[ticket.priority]]} />
-					<span className="w-20 shrink-0 truncate font-mono text-xs tabular-nums text-muted-foreground">{ticket.id}</span>
-					<IconTip icon={[...statusIcon(ticket), ticket.status]} />
-					<span className="min-w-0 flex-1 truncate">{ticket.title}</span>
-					{ticket.labels.length > 0 && (
-						<span className="hidden max-w-64 shrink items-center gap-1 overflow-hidden md:flex">
-							{ticket.labels.map(({ name, color }) => (
-								<Badge key={name} variant="dot" size="compact" color={color || undefined}>
-									{name}
-								</Badge>
-							))}
-						</span>
-					)}
-					{ticket.project && (
-						<Tooltip content={ticket.project}>
-							<span className="hidden max-w-40 shrink-0 items-center gap-1 text-xs text-muted-foreground lg:flex">
-								<Box aria-hidden className="size-3.5 shrink-0" />
-								<span className="truncate">{ticket.project}</span>
-							</span>
-						</Tooltip>
-					)}
+		<li id={ticketRowId(ticket.id)} className="group/row flex items-center rounded-md hover:bg-muted has-[:focus-visible]:bg-muted">
+			<a
+				href={hashForTickets(ticket.id)}
+				className="@container flex h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+			>
+				<IconTip icon={[...PRIORITY_ICON[ticket.priority], PRIORITY_LABEL[ticket.priority]]} />
+				<span className="min-w-[4.75rem] shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">{ticket.id}</span>
+				<IconTip icon={[...statusIcon(ticket), ticket.status]} />
+				<span className="min-w-0 truncate">{ticket.title}</span>
+				<span className="min-w-4 flex-1" />
+				{/* Chips that do not fit wrap onto a second line that the fixed height hides, so the title keeps its room. */}
+				<span className="hidden h-6 min-w-0 shrink-[100] flex-wrap justify-end gap-1.5 overflow-hidden @2xl:flex">
 					{ticket.dueDate && (
-						<span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground" title={`Due ${ticket.dueDate}`}>
-							<Calendar aria-hidden className="size-3.5" />
-							{dueLabel(ticket.dueDate)}
-						</span>
+						<TicketChip icon={<Calendar aria-hidden className="size-3.5 shrink-0" />} title={`Due ${ticket.dueDate}`}>
+							{dateLabel(ticket.dueDate)}
+						</TicketChip>
 					)}
-				</a>
-			</Tooltip>
-			<div className="flex shrink-0 items-center gap-3 px-3 text-xs">
-				<LiveSessionChips hosts={sessions.slice(0, 2)} onOpen={onOpen} />
-				<AddToTodo text={ticket.title} body={`Linear issue ${ticket.id}: ${ticket.url}`} link={{ kind: "ticket", identifier: ticket.id }} label={`Add ${ticket.id} to your todo list`} />
-				<QuickActionsMenu actions={ticketActions(ticket)} pending={pending} onRun={onQuickAction} label="Quick actions: start a session in the background that works on this issue" />
-				<span className="w-10 whitespace-nowrap text-right tabular-nums text-muted-foreground" title={`Updated ${new Date(ticket.updatedAt).toLocaleString()}`}>
-					{age(Date.parse(ticket.updatedAt))}
+					{ticket.labels.map(({ name, color }) => (
+						<TicketChip key={name} icon={<LabelDot color={color} />}>
+							{name}
+						</TicketChip>
+					))}
+					{ticket.project && (
+						<TicketChip icon={<Box aria-hidden className="size-3.5 shrink-0" />} title={ticket.project}>
+							{ticket.project}
+						</TicketChip>
+					)}
 				</span>
+				<span className="hidden w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground @4xl:block" title={`Created ${new Date(ticket.createdAt).toLocaleString()}`}>
+					{dayLabel(ticket.createdAt)}
+				</span>
+			</a>
+			{sessions.length > 0 && (
+				<div className="shrink-0 pl-1">
+					<LiveSessionChips hosts={sessions.slice(0, 2)} onOpen={onOpen} />
+				</div>
+			)}
+			{/* The updated day and the row's buttons share one cell: the buttons show in the day's place on hover or focus. */}
+			<div className="grid shrink-0 items-center justify-items-end pr-2 pl-1 *:col-start-1 *:row-start-1">
+				<span
+					className={cn(
+						"w-14 pr-1 text-right text-xs tabular-nums text-muted-foreground transition-opacity group-focus-within/row:opacity-0 group-hover/row:opacity-0 group-has-[[data-popup-open]]/row:opacity-0 [@media(hover:none)]:hidden",
+						pending !== null && "opacity-0",
+					)}
+					title={`Updated ${new Date(ticket.updatedAt).toLocaleString()}`}
+				>
+					{dayLabel(ticket.updatedAt)}
+				</span>
+				<div
+					className={cn(
+						"flex items-center gap-1 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
+						pending === null && "opacity-0",
+					)}
+				>
+					<AddToTodo text={ticket.title} body={`Linear issue ${ticket.id}: ${ticket.url}`} link={{ kind: "ticket", identifier: ticket.id }} label={`Add ${ticket.id} to your todo list`} />
+					<QuickActionsMenu actions={ticketActions(ticket)} pending={pending} onRun={onQuickAction} label="Quick actions: start a session in the background that works on this issue" />
+				</div>
 			</div>
 		</li>
 	);

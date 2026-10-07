@@ -114,9 +114,8 @@ export function InboxPage({ project, hosts, past, section }: InboxPageProps) {
 					<SortMenu order={board.order} onSort={board.onSort} onReset={board.onReset} />
 				</>
 			}
-			wide
 			notice={quick && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
-			spacing="space-y-8"
+			className="max-w-7xl space-y-8"
 			footer={<KeysFooter className="bg-background px-6" />}
 		>
 			{() => (board.repos.length === 0 ? note("No session ran in a GitHub repository.") : board.repos.map(view => <RepoTable key={view.key} view={view} />))}

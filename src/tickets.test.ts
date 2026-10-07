@@ -15,6 +15,7 @@ const issue = (id: string, fields: Record<string, unknown> = {}) => ({
 	project: "Collect feedbacks",
 	team: "Engineering",
 	dueDate: null,
+	createdAt: "2026-09-20T09:00:00.000Z",
 	updatedAt: "2026-10-01T14:46:18.399Z",
 	gitBranchName: `${id.toLowerCase()}-issue`,
 	teamId: "t-1",
@@ -27,7 +28,7 @@ const colors = new Map([["ENG", new Map([["Front", "#f2c94c"]])]]);
 
 describe("parseIssues", () => {
 	test("maps Linear's fields, colors labels as their team does, folds duplicates into canceled, and reads a missing project as none", () => {
-		const { project: _, ...noProject } = issue("ENG-2", { statusType: "duplicate", status: "Duplicate", priority: { value: 0, name: "No priority" }, labels: ["Front", "Retired"] });
+		const { project: _, createdAt: __, ...noProject } = issue("ENG-2", { statusType: "duplicate", status: "Duplicate", priority: { value: 0, name: "No priority" }, labels: ["Front", "Retired"] });
 		expect(parseIssues([issue("ENG-1", { dueDate: "2026-10-05" }), noProject, issue("OPS-1")], colors)).toEqual([
 			{
 				id: "ENG-1",
@@ -40,6 +41,7 @@ describe("parseIssues", () => {
 				project: "Collect feedbacks",
 				team: "Engineering",
 				dueDate: "2026-10-05",
+				createdAt: "2026-09-20T09:00:00.000Z",
 				updatedAt: "2026-10-01T14:46:18.399Z",
 				branch: "eng-1-issue",
 			},
@@ -57,6 +59,7 @@ describe("parseIssues", () => {
 				project: null,
 				team: "Engineering",
 				dueDate: null,
+				createdAt: "2026-10-01T14:46:18.399Z",
 				updatedAt: "2026-10-01T14:46:18.399Z",
 				branch: "eng-2-issue",
 			},

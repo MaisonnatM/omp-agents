@@ -20,7 +20,7 @@ import { LineReader } from "./line-reader";
 import { HOME } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
-import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, type Repo } from "./shared/github";
+import { headKey, type LinkedPullRequest, type PullRequest, type PullRequestLink, prKey, pullRequestOfUrl, type Repo } from "./shared/github";
 import { SHIP_STAGES, SHIP_WORK, type SessionFacts, type ShipProgress } from "./shared/sessions";
 import { TICKET_ID } from "./shared/tickets";
 
@@ -32,7 +32,6 @@ const GH_PR_CREATE = /\bgh\s+pr\s+create\b/;
 /** A `gh pr` call that acts on one PR, with its arguments up to the end of that shell command; not one quoted in another command. */
 const GH_PR_ACTION = /(?:^|[;&|(\n])\s*gh\s+pr\s+(?:checkout|co|edit|comment|review|merge|ready)\b([^\n;&|)]*)/g;
 const GIT_PUSH = /\bgit\s+(?:-C\s+\S+\s+)?push\b/;
-const PR_URL = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#]|$)/;
 const OWNER_REPO = /^([\w.-]+)\/([\w.-]+)$/;
 /** omp's `pr://<n>` or `pr://<owner>/<repo>/<n>`, with or without `/diff/…` or `?comments=1` after it. */
 const PR_URI = /^pr:\/\/(?:([\w.-]+)\/([\w.-]+)\/)?(\d+)(?:[/?#]|$)/;
@@ -86,8 +85,8 @@ function actedOn(args: string): PullRequestRef | null {
 		else if (token.startsWith("--repo=")) repoText = token.slice("--repo=".length);
 		else if (target === "" && !token.startsWith("-")) target = token;
 	}
-	const url = PR_URL.exec(target);
-	if (url) return { kind: "pr", link: "worked", owner: url[1]!, repo: url[2]!, number: Number(url[3]) };
+	const url = pullRequestOfUrl(target);
+	if (url) return { kind: "pr", link: "worked", ...url };
 	// A branch name is left out: it does not say which PR it heads.
 	const number = /^#?(\d+)$/.exec(target)?.[1];
 	if (!number) return null;

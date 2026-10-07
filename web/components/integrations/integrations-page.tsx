@@ -69,7 +69,7 @@ export function IntegrationsPage() {
 				void googleStore.refresh();
 			}}
 			notice={null}
-			spacing="space-y-4"
+			className="space-y-4"
 		>
 			{answer => <Sections answer={answer} google={google} />}
 		</ListPage>

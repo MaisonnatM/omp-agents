@@ -9,11 +9,25 @@ import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";
 import { ticketsStore, useRead } from "../../reads";
 import { PRIORITY_LABEL, statusOrder } from "../../tickets-model";
-import { dueLabel, PRIORITY_ICON, statusIcon } from "./ticket-row";
+import { DetailSection } from "../sheet-details";
+import { dateLabel } from "../../labels";
+import { LabelDot, PRIORITY_ICON, statusIcon, TicketChip } from "./ticket-row";
 
 type Change = Omit<TicketEdit, "id">;
 
 const PRIORITIES: TicketPriority[] = [0, 1, 2, 3, 4];
+
+/** A field's button in the side column: the row's width, its value in the text's color, and room for wrapped labels. */
+const FIELD_BUTTON = "h-auto min-h-8 w-full justify-start px-2 py-1 text-[13px] font-normal text-foreground";
+
+/** A titled group of fields in the side column, whose buttons line their icons up with the title. */
+function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
+	return (
+		<DetailSection title={title}>
+			<div className="-mx-2 flex flex-col">{children}</div>
+		</DetailSection>
+	);
+}
 
 interface Choice {
 	value: string;
@@ -39,7 +53,7 @@ interface FieldPickerProps {
 	onPick: (value: string) => void;
 }
 
-/** A header field as a button that opens a searchable list of its choices, as Linear's issue fields do. */
+/** A field as a button that opens a searchable list of its choices, as Linear's issue fields do. */
 function FieldPicker({ field, current, trigger, choices, error = null, selected, multi = false, disabled = false, onOpen, onPick }: FieldPickerProps) {
 	const [open, setOpen] = useState(false);
 	return (
@@ -52,8 +66,8 @@ function FieldPicker({ field, current, trigger, choices, error = null, selected,
 		>
 			<Tooltip content={`Change ${field.toLowerCase()}: ${current}`} side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
-					<Button variant="ghost" size="compact" className="max-w-56 px-1.5 text-muted-foreground" aria-label={`${field}: ${current}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-						<span className="flex min-w-0 items-center gap-1">{trigger}</span>
+					<Button variant="ghost" size="compact" className={FIELD_BUTTON} aria-label={`${field}: ${current}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
+						<span className="flex min-w-0 items-center gap-2">{trigger}</span>
 					</Button>
 				</PopoverTrigger>
 			</Tooltip>
@@ -99,10 +113,13 @@ function DuePicker({ dueDate, disabled, onChange }: { dueDate: string | null; di
 	const [open, setOpen] = useState(false);
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
-			<Tooltip content={dueDate ? `Change the due date: ${dueLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
+			<Tooltip content={dueDate ? `Change the due date: ${dateLabel(dueDate)}` : "Set a due date"} side="bottom" forceOpen={open ? false : undefined}>
 				<PopoverTrigger asChild>
-					<Button variant="ghost" size="compact" className="px-1.5 text-muted-foreground" leadingIcon={Calendar} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
-						{dueDate ? dueLabel(dueDate) : "Due date"}
+					<Button variant="ghost" size="compact" className={FIELD_BUTTON} aria-label={`Due date: ${dueDate ?? "none"}`} data-state={open ? "open" : "closed"} active={open} disabled={disabled}>
+						<span className="flex min-w-0 items-center gap-2">
+							<Calendar aria-hidden className="size-4 text-muted-foreground" />
+							{dueDate ? dateLabel(dueDate) : <span className="text-muted-foreground">Set due date</span>}
+						</span>
 					</Button>
 				</PopoverTrigger>
 			</Tooltip>
@@ -157,9 +174,9 @@ interface TicketFieldsProps {
 }
 
 /**
- * The issue's status, priority, assignee, project, due date, and labels, each a picker that changes it in Linear. A
- * change shows at once and is sent in turn after the ones before it; when Linear refuses one, the issue is read again
- * once every change sent has answered, and the page names why.
+ * The issue's status, priority, assignee, due date, labels, and project in the side column, each a picker that
+ * changes it in Linear. A change shows at once and is sent in turn after the ones before it; when Linear refuses one,
+ * the issue is read again once every change sent has answered, and the page names why.
  */
 export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsProps) {
 	const [opened, setOpened] = useState(false);
@@ -206,13 +223,18 @@ export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsPr
 
 	return (
 		<>
-			<div className="-ml-1.5 flex flex-wrap items-center gap-0.5 text-xs">
+			{saveError && (
+				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
+					Linear did not take the change: {saveError}
+				</p>
+			)}
+			<FieldGroup title="Properties">
 				<FieldPicker
 					field="Status"
 					current={ticket.status}
 					trigger={
 						<>
-							<StatusIcon aria-hidden className={cn("size-3.5", statusColor)} />
+							<StatusIcon aria-hidden className={cn("size-4", statusColor)} />
 							<span className="truncate">{ticket.status}</span>
 						</>
 					}
@@ -236,7 +258,7 @@ export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsPr
 					current={PRIORITY_LABEL[ticket.priority]}
 					trigger={
 						<>
-							<PriorityIcon aria-hidden className={cn("size-3.5", priorityColor)} />
+							<PriorityIcon aria-hidden className={cn("size-4", priorityColor)} />
 							<span className="truncate">{PRIORITY_LABEL[ticket.priority]}</span>
 						</>
 					}
@@ -256,7 +278,7 @@ export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsPr
 					current={detail ? (detail.assignee?.name ?? "unassigned") : "loading"}
 					trigger={
 						<>
-							<CircleUser aria-hidden className="size-3.5" />
+							<CircleUser aria-hidden className="size-4 text-muted-foreground" />
 							<span className="truncate">{detail ? (detail.assignee?.name ?? "Unassigned") : "Assignee"}</span>
 						</>
 					}
@@ -271,47 +293,33 @@ export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsPr
 						save({ assignee: user?.id ?? null }, { assignee: user });
 					}}
 				/>
-				<FieldPicker
-					field="Project"
-					current={ticket.project ?? "none"}
-					trigger={
-						<>
-							<Box aria-hidden className="size-3.5" />
-							<span className="truncate">{ticket.project ?? "No project"}</span>
-						</>
-					}
-					choices={options.data ? [{ value: "", label: "No project" }, ...options.data.projects.map(name => ({ value: name, label: name }))] : null}
-					error={options.error}
-					selected={[ticket.project ?? ""]}
-					disabled={!detail}
-					onOpen={open}
-					onPick={name => {
-						if (name !== (ticket.project ?? "")) save({ project: name || null }, { project: name || null });
-					}}
-				/>
 				<DuePicker dueDate={ticket.dueDate} disabled={!detail} onChange={dueDate => save({ dueDate }, { dueDate })} />
+			</FieldGroup>
+			<FieldGroup title="Labels">
 				<FieldPicker
 					field="Labels"
 					current={labelNames.join(", ") || "none"}
 					trigger={
-						<>
-							{ticket.labels.length > 0 ? (
-								<span aria-hidden className="flex shrink-0 -space-x-0.5">
-									{ticket.labels.map(({ name, color }) => (
-										<span key={name} className="size-2 rounded-full ring-1 ring-background" style={{ backgroundColor: color || "currentColor" }} />
-									))}
-								</span>
-							) : (
-								<Tag aria-hidden className="size-3.5" />
-							)}
-							<span className="truncate">{labelNames.join(", ") || "Labels"}</span>
-						</>
+						ticket.labels.length > 0 ? (
+							<span className="flex min-w-0 flex-wrap gap-1.5">
+								{ticket.labels.map(({ name, color }) => (
+									<TicketChip key={name} icon={<LabelDot color={color} />} className="text-foreground">
+										{name}
+									</TicketChip>
+								))}
+							</span>
+						) : (
+							<>
+								<Tag aria-hidden className="size-4 text-muted-foreground" />
+								<span className="text-muted-foreground">Add label</span>
+							</>
+						)
 					}
 					choices={
 						options.data?.labels.map(label => ({
 							value: label.name,
 							label: label.name,
-							icon: <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: label.color || "currentColor" }} />,
+							icon: <LabelDot color={label.color} />,
 						})) ?? null
 					}
 					error={options.error}
@@ -326,12 +334,27 @@ export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsPr
 						save({ labels: labels.map(label => label.name) }, { labels });
 					}}
 				/>
-			</div>
-			{saveError && (
-				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
-					Linear did not take the change: {saveError}
-				</p>
-			)}
+			</FieldGroup>
+			<FieldGroup title="Project">
+				<FieldPicker
+					field="Project"
+					current={ticket.project ?? "none"}
+					trigger={
+						<>
+							<Box aria-hidden className="size-4 text-muted-foreground" />
+							<span className={cn("truncate", !ticket.project && "text-muted-foreground")}>{ticket.project ?? "Add to project"}</span>
+						</>
+					}
+					choices={options.data ? [{ value: "", label: "No project" }, ...options.data.projects.map(name => ({ value: name, label: name }))] : null}
+					error={options.error}
+					selected={[ticket.project ?? ""]}
+					disabled={!detail}
+					onOpen={open}
+					onPick={name => {
+						if (name !== (ticket.project ?? "")) save({ project: name || null }, { project: name || null });
+					}}
+				/>
+			</FieldGroup>
 		</>
 	);
 }

@@ -1,14 +1,12 @@
+import { GitPullRequest, Link2 } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
+import { pullRequestOfUrl } from "../../../src/shared/github";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { age } from "../../labels";
 import type { ReadState } from "../../reads";
 import { BranchName } from "../git";
-import { IconTip } from "../inbox/avatars";
 import { Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
 import { TicketFields } from "./ticket-fields";
-import { statusIcon } from "./ticket-row";
-
-const ago = (at: string): string => `${age(Date.parse(at))} ago`;
 
 interface TicketDetailContentProps {
 	id: string;
@@ -19,49 +17,96 @@ interface TicketDetailContentProps {
 	actions?: (ticket: Ticket) => ReactNode;
 }
 
-/** A Linear issue's editable fields, actions, description, links, and comments in the tickets page's main content. */
+/**
+ * A Linear issue laid out as Linear lays it out: the title, description, and comments in a wide column, and beside it
+ * {@link TicketSide}. On a narrow page the side column follows the title.
+ */
 export function TicketDetailContent({ id, listed, read: { data: detail, error, replace, reload }, actions }: TicketDetailContentProps) {
 	const ticket = detail ?? listed;
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	useEffect(() => {
 		headingRef.current?.focus({ preventScroll: true });
 	}, []);
-	const body = detail ? <TicketSections detail={detail} /> : <LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />;
+	return (
+		<div className="grid gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:grid-rows-[auto_1fr]">
+			<h1
+				ref={headingRef}
+				tabIndex={-1}
+				className="rounded-md text-2xl leading-tight font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring lg:col-start-1 lg:row-start-1"
+			>
+				{ticket?.title ?? id}
+			</h1>
+			{ticket && <TicketSide ticket={ticket} detail={detail} replace={replace} reload={reload} actions={actions} />}
+			<div className="min-w-0 space-y-10 lg:col-start-1 lg:row-start-2">
+				{detail ? <TicketBody detail={detail} /> : <LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />}
+			</div>
+		</div>
+	);
+}
+
+interface TicketSideProps extends Pick<TicketDetailContentProps, "actions">, Pick<TicketDetailContentProps["read"], "replace" | "reload"> {
+	ticket: Ticket;
+	detail: TicketDetail | null;
+}
+
+/** The side column: the quick actions, the editable fields, the branch, the links, and who opened the issue. */
+function TicketSide({ ticket, detail, replace, reload, actions }: TicketSideProps) {
+	return (
+		<aside aria-label="Issue properties" className="space-y-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+			{actions?.(ticket)}
+			<TicketFields ticket={ticket} detail={detail} replace={replace} reload={reload} />
+			{detail && <TicketLinks detail={detail} />}
+			<div className="space-y-1 text-xs text-muted-foreground">
+				<p className="tabular-nums">{ticket.id}</p>
+				{detail && (
+					<p title={new Date(detail.createdAt).toLocaleString()}>
+						Opened{detail.createdBy && ` by ${detail.createdBy}`} {age(Date.parse(detail.createdAt))} ago
+					</p>
+				)}
+				<p>
+					<OutLink href={ticket.url}>Open in Linear</OutLink>
+				</p>
+			</div>
+		</aside>
+	);
+}
+
+/** An issue's description, then its comment threads. */
+function TicketBody({ detail: { description, threads } }: { detail: TicketDetail }) {
 	return (
 		<>
-			<header className="space-y-3">
-				<h1 ref={headingRef} tabIndex={-1} className="flex items-start gap-2.5 text-base leading-snug font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring">
-					{ticket && <IconTip icon={[...statusIcon(ticket), ticket.status]} className="mt-1" />}
-					<span className="min-w-0">{ticket?.title ?? id}</span>
-				</h1>
-				<p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-					<span className="font-mono tabular-nums">{id}</span>
-					{detail && (
-						<span title={new Date(detail.createdAt).toLocaleString()}>
-							opened{detail.createdBy && ` by ${detail.createdBy}`} {ago(detail.createdAt)}
-						</span>
-					)}
-					{ticket && (
-						<span className="ml-auto">
-							<OutLink href={ticket.url}>Linear</OutLink>
-						</span>
-					)}
-				</p>
-				{ticket && <TicketFields ticket={ticket} detail={detail} replace={replace} reload={reload} />}
-				{ticket && actions?.(ticket)}
-			</header>
-			<div className="space-y-5">{body}</div>
+			{description.trim() ? <Markdown text={description} className="text-[15px] leading-relaxed" /> : <p className="text-sm text-muted-foreground">No description.</p>}
+			{threads.length > 0 && (
+				<section className="space-y-4 border-t border-border pt-6">
+					<h2 className="flex items-baseline gap-2 text-sm font-medium">
+						Comments <span className="text-muted-foreground tabular-nums">{threads.reduce((count, thread) => count + thread.length, 0)}</span>
+					</h2>
+					<ul className="space-y-3">
+						{threads.map((thread, index) => (
+							<li key={index} className="rounded-lg border border-border p-3">
+								<ul className="space-y-3">
+									{thread.map(({ author, body, createdAt }, position) => (
+										<Comment
+											key={position}
+											comment={{ body, at: Date.parse(createdAt), url: null }}
+											author={author}
+											action={position === 0 ? "commented" : "replied"}
+										/>
+									))}
+								</ul>
+							</li>
+						))}
+					</ul>
+				</section>
+			)}
 		</>
 	);
 }
 
-/** An issue's description, the links Linear keeps for it, and its comment threads. */
-function TicketSections({ detail: { description, attachments, threads, branch } }: { detail: TicketDetail }) {
+/** The issue's branch and the pull requests, documents, and pages Linear links it to. */
+function TicketLinks({ detail: { branch, attachments } }: { detail: TicketDetail }) {
 	return (
 		<>
-			<DetailSection title="Description">
-				{description.trim() ? <Markdown text={description} /> : <p className="text-sm text-muted-foreground">No description.</p>}
-			</DetailSection>
 			{branch && (
 				<DetailSection title="Branch">
 					<BranchName name={branch} className="max-w-full truncate font-mono text-xs" />
@@ -75,39 +120,19 @@ function TicketSections({ detail: { description, attachments, threads, branch } 
 						</>
 					}
 				>
-					<ul className="space-y-1 text-sm">
-						{attachments.map(({ title, url }, index) => (
-							// Linear can attach one address twice.
-							<li key={index} className="min-w-0 truncate">
-								<OutLink href={url}>{title}</OutLink>
-							</li>
-						))}
-					</ul>
-				</DetailSection>
-			)}
-			{threads.length > 0 && (
-				<DetailSection
-					title={
-						<>
-							Comments <span className="tabular-nums">{threads.reduce((count, thread) => count + thread.length, 0)}</span>
-						</>
-					}
-				>
-					<ul className="space-y-3">
-						{threads.map((thread, index) => (
-							<li key={index} className="rounded-md border border-border p-3">
-								<ul className="space-y-3">
-									{thread.map(({ author, body, createdAt }, position) => (
-										<Comment
-											key={position}
-											comment={{ body, at: Date.parse(createdAt), url: null }}
-											author={author}
-											action={position === 0 ? "commented" : "replied"}
-										/>
-									))}
-								</ul>
-							</li>
-						))}
+					<ul className="space-y-1.5 text-sm">
+						{attachments.map(({ title, url }, index) => {
+							const Icon = pullRequestOfUrl(url) ? GitPullRequest : Link2;
+							return (
+								// Linear can attach one address twice.
+								<li key={index} className="flex min-w-0 items-center gap-2">
+									<Icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+									<a href={url} target="_blank" rel="noreferrer" title={title} className="min-w-0 truncate underline-offset-2 hover:underline">
+										{title}
+									</a>
+								</li>
+							);
+						})}
 					</ul>
 				</DetailSection>
 			)}

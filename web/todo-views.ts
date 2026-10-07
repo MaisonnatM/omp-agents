@@ -3,6 +3,7 @@ import { Archive, Bot, CalendarClock, ListTodo, type LucideIcon, MessageCircleQu
 import type { UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
 import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "./days";
+import { DAY_FORMAT } from "./labels";
 import type { TodoListView } from "./routing";
 import { workStateOf, type TodoSessions } from "./todo-work-state";
 
@@ -40,9 +41,6 @@ export const SIDEBAR_LISTS: { view: Exclude<TodoListView, { kind: "category" }>;
 
 export const titleOf = (list: UserTodoList, view: TodoListView): string =>
 	view.kind === "category" ? (list.categories.find(({ id }) => id === view.id)?.name ?? LIST_KINDS.category.title) : LIST_KINDS[view.kind].title;
-
-/** A day as the lists show it: `Oct 5`. */
-export const DAY_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 
 /** A due day as the lists read it, and whether it has passed; `day` is today. */
 export function dueLabel(due: string, day: string): { text: string; overdue: boolean } {

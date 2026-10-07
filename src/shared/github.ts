@@ -19,6 +19,14 @@ export const prKey = (pr: PullRequest): string => `${repoKey(pr)}#${pr.number}`;
 
 export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
 
+const PULL_REQUEST_URL = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#]|$)/;
+
+/** The pull request a GitHub address points at, its `/files` or `#discussion` pages too; `null` for any other address. */
+export function pullRequestOfUrl(url: string): PullRequest | null {
+	const match = PULL_REQUEST_URL.exec(url);
+	return match ? { owner: match[1]!, repo: match[2]!, number: Number(match[3]) } : null;
+}
+
 /** A branch's key: `owner/repo:branch`, the repository lowercased and the branch, which git keeps case-sensitive, as is. */
 export const headKey = (repo: Repo, branch: string): string => `${repoKey(repo)}:${branch}`;
 
