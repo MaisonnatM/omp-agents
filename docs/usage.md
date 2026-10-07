@@ -98,7 +98,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 - The right sidebar shows the focused pane's conversation at a glance, and what its agent changed and captured: a live session, one of its subagents, or a past session, each from its own transcript file.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
-- Tabs split it: **Outline**, **Files**, and **Media**.
+- Tabs split it: **Outline**, **Files**, **Media**, and **PRs**.
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
   The sidebar remembers the tab you chose, for every view.
@@ -134,6 +134,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Click one to see it large, with the tool and what the call said it did; the arrows, or the Left and Right keys, step to newer and older images.
   **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in a new tab.
   New images show up while the agents run.
+- **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
+  A session with several lists them first, each with whether it submitted or worked on it; click one to show it.
+  The first one shows until you pick another.
+  **Open #N in the inbox** opens its details in the main area.
+  Under it, the pull request shows as its details in the inbox do, in one column: its state with links to GitHub and Graphite, its **Next move**, **Status**, **Checks**, **Reviewers**, its other quick actions and the sessions on it, its stack, then its description, unresolved review comments, conversation, and changed files.
+  The quick actions apply only when the inbox of the sidebar's project lists the pull request.
+  Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
 
 ## Session changes

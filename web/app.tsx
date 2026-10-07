@@ -129,6 +129,8 @@ export function App() {
 		document.title = title;
 	}, [title]);
 	const viewSession = viewHost ?? viewPast;
+	/** The view's roster row, an ended session's last one, or its past entry: what the PRs tab lists. */
+	const viewRow = viewHost ?? viewLastHost ?? viewPast;
 	const viewCwd = viewSession?.cwd;
 	const [switches, setSwitches] = useState(0);
 	const checkout = viewSession ? { dir: viewSession.worktree ?? viewSession.cwd, sessionId: viewSession.sessionId, working: viewHost?.status === "working" } : null;
@@ -488,6 +490,9 @@ export function App() {
 									view={detailsView}
 									working={detailsView.kind === "live" && subjectOf(detailsView, viewHost ?? null, viewLastHost).working}
 									sessionId={detailsView.kind === "past" ? detailsView.sessionId : detailsView.agentId === null ? ((viewHost ?? viewLastHost)?.sessionId ?? null) : null}
+									pullRequests={viewRow?.pullRequests ?? []}
+									project={project}
+									hosts={visible.hosts}
 								/>
 							</DashboardSidebar>
 						)}

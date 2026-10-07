@@ -1,6 +1,7 @@
-import { FileDiff, FileMinus, FilePen, FilePlus, Images, type LucideIcon, TableOfContents } from "lucide-react";
+import { FileDiff, FileMinus, FilePen, FilePlus, GitPullRequest, Images, type LucideIcon, TableOfContents } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
-import type { View } from "../../src/shared/sessions";
+import type { LinkedPullRequest } from "../../src/shared/github";
+import type { RosterHost, View } from "../../src/shared/sessions";
 import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals, parseDiffLine } from "../../src/shared/transcript";
 import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
@@ -14,6 +15,7 @@ import { useStoredState } from "../stored-state";
 import { outline } from "../transcript-view";
 import { MediaTab } from "./media-tab";
 import { OutlineTab } from "./outline-tab";
+import { PullRequestsTab } from "./pull-requests-tab";
 
 const CHANGE_LABEL: Record<FileChangeKind, string> = { created: "Created", edited: "Edited", rewritten: "Rewritten", deleted: "Deleted" };
 
@@ -130,7 +132,7 @@ function FileRow({ file }: { file: ChangedFile }) {
 /** The right sidebar's tab, which localStorage keeps across views. The key keeps its old name, and a tab that no longer exists reads as the outline. */
 const TAB_KEY = "omp-agents.plan-tab";
 
-const DETAILS_TABS = ["outline", "files", "media"] as const;
+const DETAILS_TABS = ["outline", "files", "media", "pull-requests"] as const;
 type DetailsTab = (typeof DETAILS_TABS)[number];
 
 /** Each tab names itself and counts its items in a badge, which screen readers hear through the tab's name. */
@@ -144,12 +146,24 @@ const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
 /** Keeps each tab's content off the header's hairline at rest, and scrolls away with it. */
 const PANEL_VIEWPORT = "pt-2";
 
+interface SessionDetailsProps {
+	view: View;
+	/** Marks the last turn as still running; a change also reads the shown pull request again. */
+	working: boolean;
+	/** The session whose changes page the Files tab links to, `null` for a subagent's view. */
+	sessionId: string | null;
+	/** What the view's session and its subagents submitted or worked on, the session's own first. */
+	pullRequests: LinkedPullRequest[];
+	/** The sidebar's project `cwd`, or `null` for every project. */
+	project: string | null;
+	hosts: RosterHost[];
+}
+
 /**
  * The right sidebar's content for the focused view: an outline of its conversation's turns, the files its agent changed,
- * and the images its agents' tools returned, each tab apart. `working` marks the last turn as still running, and
- * `sessionId` names the session whose changes page the Files tab links to, `null` for a subagent's view.
+ * the images its agents' tools returned, and its session's pull requests, each tab apart.
  */
-export function SessionDetails({ view, working, sessionId }: { view: View; working: boolean; sessionId: string | null }) {
+export function SessionDetails({ view, working, sessionId, pullRequests, project, hosts }: SessionDetailsProps) {
 	const { items, loaded, files: changedFiles, media } = usePane(view);
 	const [tab, setTab] = useStoredState<DetailsTab>(TAB_KEY, raw => DETAILS_TABS.find(tab => tab === raw) ?? "outline");
 	const turns = useMemo(() => outline(items, working), [items, working]);
@@ -163,6 +177,7 @@ export function SessionDetails({ view, working, sessionId }: { view: View; worki
 						<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", turns.length)} />
 						<TabItem value="files" icon={FileDiff} className={TAB_CLASS} {...tabLabel("Files", files.length)} />
 						<TabItem value="media" icon={Images} className={TAB_CLASS} {...tabLabel("Media", media?.length ?? 0)} />
+						<TabItem value="pull-requests" icon={GitPullRequest} className={TAB_CLASS} {...tabLabel("PRs", pullRequests.length)} />
 					</TabsList>
 				</SizeProvider>
 			</SidebarHeader>
@@ -208,6 +223,11 @@ export function SessionDetails({ view, working, sessionId }: { view: View; worki
 			<TabPanel value="media" asChild>
 				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
 					<MediaTab media={media} view={view} />
+				</SidebarContent>
+			</TabPanel>
+			<TabPanel value="pull-requests" asChild>
+				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
+					<PullRequestsTab pullRequests={pullRequests} project={project} hosts={hosts} version={working} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>
