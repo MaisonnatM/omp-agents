@@ -15,7 +15,7 @@ interface HeaderProps {
 /** The title, an optional meta line, and controls that head a pane or a page. */
 export function Header({ title, meta, status, alert = false, leading, children }: HeaderProps) {
 	return (
-		<header className="flex h-(--page-header-height) shrink-0 items-center justify-between gap-4 border-b border-border px-6 py-3">
+		<header className="flex h-(--page-header-height) shrink-0 items-center justify-between gap-4 border-b border-border px-6">
 			<div className="flex min-w-0 items-center gap-2">
 				{leading}
 				<div className="min-w-0">

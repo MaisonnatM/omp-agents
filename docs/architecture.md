@@ -318,7 +318,7 @@ Any other `/api/` path answers a JSON 404.
 The page reports a response that is not JSON with its status and text.
 Every endpoint needs the access token's cookie; see [SECURITY.md](../SECURITY.md).
 
-`GET /api/git?cwd=<directory>` answers the git checkout that the directory is in, or `null` outside one: the GitHub repository that `origin` names, the checked-out branch, every local branch with the worktree that has it checked out, and the main worktree.
+`GET /api/git?cwd=<directory>` answers the git checkout that the directory is in, or `null` outside one: the checked-out branch, every local branch with the worktree that has it checked out, and the main worktree.
 
 `GET /api/git/status?cwd=<directory>` answers the status bar's view of the checkout the directory is in, or `null` outside one: its top directory, the checked-out branch (`null` while HEAD is detached), the upstream with the commits ahead and behind, and each uncommitted file with its kind, from `git status --porcelain=v2 --branch -z --untracked-files=all`.
 `PUT /api/git/switch` takes `{ cwd, choice }`, an existing branch or a new one with its base as a start's `branch` does, runs `git switch --no-guess` in the checkout `cwd` is in, and answers its new status.

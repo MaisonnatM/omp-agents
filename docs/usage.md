@@ -25,7 +25,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Sessions sidebar
 
-- The content header and both sidebar header rows are 64 px tall at the default font size, each with a hairline under it.
+- The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
 - The dot before each session shows its state.
   Green means a turn is running, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
 - Under **All projects**, a session row with a title starts with a badge that names its project, the last segment of its working directory.
@@ -271,8 +271,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
   Hover it to see the full model selector.
   The settings page labels models the same way.
-- Click the branch of a pull request's details, of a Linear issue's detail view, or of the new-session draft's header to copy its name; its icon turns into a check mark for a moment.
-  A long branch name keeps its start and end with `…` in the middle, in the new-session header, the status bar, a branch picker, a pull request's branches, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
+- Click the branch of a pull request's details or of a Linear issue's detail view to copy its name; its icon turns into a check mark for a moment.
+  A long branch name keeps its start and end with `…` in the middle, in the status bar, a branch picker, a pull request's branches, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.
 
@@ -370,7 +370,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 ## Starting, ending, resuming, and forking
 
 - To start a session, click **New session** at the top of the **Sessions** tab.
-  The page shows a new-session draft with the same composer as a running session, and the header names the directory that omp will run in.
+  The page shows a new-session draft with the same header and composer as a running session: its trail reads `webapp / New session`, and hovering the project shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
   The directory is the selected project's, else the open session's, else the newest live session's, else the newest past session's.
   To start in another directory, under **All projects** or not, pick it in the directory picker after the model picker.
@@ -395,13 +395,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Click it to start this one session without the skill.
   It is greyed out when the directory has no skill of that name, and the session then starts without it.
   A first message that starts with `/` keeps its own command and skips the pinned skill.
-- When the directory is in a git checkout, the draft's header names its GitHub repository and branch, and a branch picker sits after the directory picker.
+- When the directory is in a git checkout, a branch picker sits after the directory picker.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
   Picking the checked-out branch keeps the directory as it is.
   Picking another branch runs omp in the worktree that has it checked out, or adds a worktree for it when none has.
   Type a name that no branch has to create that branch from the branch picked before it, as GitHub's branch menu does; a new branch always gets its own worktree.
   A new worktree goes beside the repository's main worktree, named after both with each run of characters other than letters, digits, `.`, `-`, and `_` turned into `-` (`~/code/webapp-fix-login` for `fix/login`).
-  The header shows the directory omp will run in, marked `new worktree` when sending adds it.
+  Hovering the project in the header then shows the directory omp will run in, after the draft's own.
   The worktree is added only when you send the first message, and a branch or worktree that git refuses shows git's reason above the composer.
 - omp titles a session that the dashboard started from its first message, as it does in a terminal, within a few seconds and while the first turn still runs.
   omp's RPC mode titles no prompt by itself, so once omp holds a message of an untitled session, the dashboard sends it a bare `/rename`, which makes omp title the session from the conversation so far.

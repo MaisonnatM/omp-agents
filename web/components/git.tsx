@@ -1,12 +1,11 @@
 import { Check, GitBranch, GitBranchPlus } from "lucide-react";
-import { Fragment, useState } from "react";
+import { useState } from "react";
 import { type BranchChoice, type GitCheckout, worktreeDir } from "../../src/shared/git";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { projectName } from "../labels";
 import { useCopy } from "../use-copy";
 import { CommandPicker } from "./command-picker";
-import { OrgIcon } from "./org-icon";
 
 /** A branch label that keeps both ends visible when space runs out; `title` shows the full name where no tooltip does. */
 export function BranchLabel({ name, title = false, className }: { name: string; title?: boolean; className?: string }) {
@@ -42,34 +41,8 @@ export function BranchName({ name, className }: { name: string; className?: stri
 	);
 }
 
-/** The GitHub repository, linked, then the branch, for a header's meta line; nothing outside a git checkout. */
-export function GitRef({ github, branch }: { github: GitCheckout["github"]; branch: string | null }) {
-	const parts = [
-		github && (
-			<Tooltip key="repo" content={`${github.owner}/${github.repo} on GitHub`}>
-				<a
-					href={`https://github.com/${github.owner}/${github.repo}`}
-					target="_blank"
-					rel="noreferrer"
-					className="underline-offset-2 hover:text-foreground hover:underline"
-				>
-					<OrgIcon org="github" className="mr-1 inline align-[-0.125em]" />
-					{github.owner}/{github.repo}
-				</a>
-			</Tooltip>
-		),
-		branch && <BranchName key="branch" name={branch} />,
-	].filter(Boolean);
-	return parts.map((part, index) => (
-		<Fragment key={index}>
-			{index > 0 && " · "}
-			{part}
-		</Fragment>
-	));
-}
-
 /** The branch a new session works on, as the picker shows it: `null` keeps the directory as it is. */
-export const chosenBranch = (checkout: GitCheckout, choice: BranchChoice | null): string | null => choice?.name ?? checkout.branch;
+const chosenBranch = (checkout: GitCheckout, choice: BranchChoice | null): string | null => choice?.name ?? checkout.branch;
 
 /** The directory a new session on `choice` runs in, and whether starting it adds that worktree. */
 export function targetOf(checkout: GitCheckout, cwd: string, choice: BranchChoice | null): { dir: string; creates: boolean } {

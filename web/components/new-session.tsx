@@ -17,10 +17,11 @@ import { useDefaultModel } from "../use-default-model";
 import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation } from "./composer";
-import { BranchPicker, chosenBranch, GitRef, targetOf } from "./git";
+import { BranchPicker, targetOf } from "./git";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
 import { type ModelMenuOpen, ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
+import { SessionTrail } from "./session-meta";
 import { DirectoryPicker } from "./workspace-picker";
 
 interface NewSessionProps {
@@ -126,22 +127,10 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const directCommand = blockedShortcut(draft, "new");
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
 	const name = projectName(target.dir) ?? target.dir;
-	const meta = (
-		<>
-			{checkout && (
-				<>
-					<GitRef github={checkout.github} branch={chosenBranch(checkout, choice)} />
-					{" · "}
-				</>
-			)}
-			<Tooltip content={target.dir}>
-				<span>{target.creates ? `new worktree ${target.dir}` : target.dir}</span>
-			</Tooltip>
-		</>
-	);
+	const title = <SessionTrail cwdDisplay={cwd} worktree={target.dir === cwd ? null : target.dir} path={["New session"]} />;
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<Header title="New session" meta={meta} status={starting ? "Starting omp…" : undefined} />
+			<Header title={title} status={starting ? "Starting omp…" : undefined} />
 			{launch?.phase === "failed" && (
 				<p role="alert" className="border-b border-border px-6 py-2 text-xs text-red-600 dark:text-red-400">
 					{launch.error}

@@ -2,7 +2,6 @@
 import { existsSync } from "node:fs";
 import { realpath } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import { repoOf } from "./github";
 import { run, runChecked } from "./proc";
 import { type BranchChoice, type GitCheckout, type GitStatus, type StatusKind, worktreeDir } from "./shared/git";
 
@@ -78,18 +77,16 @@ export async function worktreeAt(dir: string): Promise<WorktreeAt | null> {
 export async function gitCheckout(cwd: string): Promise<GitCheckout | null> {
 	const inside = await run(["git", "-C", cwd, "rev-parse", "--is-inside-work-tree"]);
 	if (inside.code !== 0 || inside.stdout.trim() !== "true") return null;
-	const [worktrees, names, head, github] = await Promise.all([
+	const [worktrees, names, head] = await Promise.all([
 		worktreesOf(cwd).then(rows => rows.filter(row => row.prunable === null)),
 		branchesOf(cwd),
 		run(["git", "-C", cwd, "symbolic-ref", "--quiet", "HEAD"]),
-		repoOf(cwd),
 	]);
 	const ref = head.stdout.trim();
 	const branch = head.code === 0 && ref.startsWith(HEADS) ? ref.slice(HEADS.length) : null;
 	const worktreeOf = new Map(worktrees.flatMap(worktree => (worktree.branch ? [[worktree.branch, worktree.path] as const] : [])));
 	const ordered = branch === null ? names : [branch, ...names.filter(name => name !== branch)];
 	return {
-		github,
 		branch,
 		branches: ordered.map(name => ({ name, worktree: worktreeOf.get(name) ?? null })),
 		mainWorktree: worktrees[0]?.path ?? cwd,

@@ -1,5 +1,4 @@
 /** Git checkouts and branches a new session can work on. */
-import type { Repo } from "./github";
 
 /** A local branch, and the worktree that has it checked out, `null` when none has. */
 export interface LocalBranch {
@@ -7,10 +6,8 @@ export interface LocalBranch {
 	worktree: string | null;
 }
 
-/** The git checkout a directory is in: what the new-session draft's branch picker lists and a session's header names. */
+/** The git checkout a directory is in: what the new-session draft's branch picker lists. */
 export interface GitCheckout {
-	/** The GitHub repository that `origin` names, `null` when `origin` is not on GitHub. */
-	github: Repo | null;
 	/** The branch checked out in the directory, `null` when HEAD is detached. */
 	branch: string | null;
 	/** Every local branch, the checked-out one first, then the most recently committed to. */

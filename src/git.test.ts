@@ -33,7 +33,6 @@ describe("gitCheckout", () => {
 		const { parent, main } = await repo();
 		mkdirSync(join(main, "src"));
 		expect(await gitCheckout(join(main, "src"))).toEqual({
-			github: null,
 			branch: "main",
 			branches: [
 				{ name: "main", worktree: main },
