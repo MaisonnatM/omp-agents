@@ -1,5 +1,6 @@
-// The `user_todo` tool: lets an agent read the omp-agents dashboard's Todo list, add a todo for a step only the user
-// can take, and check one off; a session that a todo links to is told so, to check it off once its work is done.
+// The `user_todo` tool: lets an agent read the omp-agents dashboard's Todo list, add a todo for a step outside the
+// session that only the user can take, and check one off. A session is told at each prompt which open todo links to it
+// and which open todos it added, so it checks them off once done and does not add them twice.
 // Changes go to the dashboard's todo inbox, one file each, which the dashboard server applies and deletes, so it
 // stays the only writer of todos.json and a todo filed while it is down waits for it.
 import { randomUUID } from "node:crypto";
@@ -22,6 +23,7 @@ interface Todo extends Leaf {
 	categoryId?: string | null;
 	children?: Leaf[];
 	links?: { kind: string; sessionId?: string }[];
+	addedBy?: string | null;
 }
 interface List {
 	categories?: { id: string; name: string }[];
@@ -30,9 +32,12 @@ interface List {
 
 const isDone = (todo: Leaf): boolean => (todo.doneAt ?? null) !== null;
 
-/** The open todo that links to session `sessionId`, such as the one it was started for. */
-const todoOf = (list: List, sessionId: string): Todo | undefined =>
-	list.todos?.find(todo => !isDone(todo) && todo.links?.some(link => link.kind === "session" && link.sessionId === sessionId));
+/** The open top-level todos that concern session `sessionId`: the one that links to it, such as the one it was started for, and the ones it added. */
+function todosOf(list: List, sessionId: string): { linked: Todo | undefined; added: Todo[] } {
+	const open = (list.todos ?? []).filter(todo => !isDone(todo));
+	const linked = open.find(todo => todo.links?.some(link => link.kind === "session" && link.sessionId === sessionId));
+	return { linked, added: open.filter(todo => todo.addedBy === sessionId) };
+}
 
 function readList(): List {
 	try {
@@ -74,10 +79,10 @@ export default function todos(pi: ExtensionAPI) {
 	const z = pi.zod;
 	const params = z.object({
 		action: z.enum(["list", "add", "check"]).describe("list the todos left, add one, or check one off"),
-		text: z.string().min(1).max(2000).optional().describe("add: the todo's title, one line, an action the user takes"),
+		text: z.string().max(2000).optional().describe("add: the todo's title, one line, an action the user takes"),
 		notes: z.string().max(100_000).optional().describe("add: markdown notes, such as the PR or command it needs"),
-		due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("add: the day it is due, YYYY-MM-DD"),
-		id: z.string().min(1).max(64).optional().describe("check: the todo's id, from list"),
+		due: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/).optional().describe("add: the day it is due, YYYY-MM-DD"),
+		id: z.string().max(64).optional().describe("check: the todo's id, from list"),
 	});
 	pi.registerTool({
 		loadMode: "essential",
@@ -85,9 +90,10 @@ export default function todos(pi: ExtensionAPI) {
 		label: "User todo",
 		description: [
 			"The user's own todo list in the omp-agents dashboard.",
-			"Use add when you stop on a step only the user can take (approve, review, decide, run on their machine), so it does not stay buried in your reply.",
-			"When you finish the work a todo asks for, check it off.",
-			"Never add your own work items; use your todo tool for those. You cannot remove or edit todos.",
+			"Use add only for a step outside this conversation that only the user can take, such as setting up an account, a console, or a credential, running something on their machine, or reviewing a pull request.",
+			"Never add a todo to ask for an approval, an answer, or a reply in this session; ask in your reply instead.",
+			"Never add your own work items; use your todo tool for those.",
+			"When you finish the work a todo asks for, or the user has done the step it names, check it off. You cannot remove or edit todos.",
 		].join(" "),
 		parameters: params,
 		async execute(_id, raw, _signal, _onUpdate, ctx) {
@@ -100,6 +106,9 @@ export default function todos(pi: ExtensionAPI) {
 				case "add": {
 					const title = text?.replace(/\s+/g, " ").trim();
 					if (!title) return { content: [{ type: "text", text: "add needs text." }], isError: true };
+					const sessionId = ctx.sessionManager.getSessionId();
+					const same = todosOf(readList(), sessionId).added.find(todo => todo.text === title);
+					if (same) return { content: [{ type: "text", text: `This session already added it (id ${same.id}).` }] };
 					const todoId = randomUUID();
 					leave({
 						op: "add",
@@ -109,8 +118,8 @@ export default function todos(pi: ExtensionAPI) {
 						categoryId: null,
 						text: title,
 						body: notes ?? "",
-						due: due ?? null,
-						addedBy: ctx.sessionManager.getSessionId(),
+						due: due || null,
+						addedBy: sessionId,
 					});
 					return { content: [{ type: "text", text: `Added to the user's todo list (id ${todoId}).` }] };
 				}
@@ -122,15 +131,20 @@ export default function todos(pi: ExtensionAPI) {
 			}
 		},
 	});
-	// Read on every prompt, so a todo linked or checked mid-session shows in the next turn.
+	// Read on every prompt, so a todo linked, added, or checked mid-session shows in the next turn.
 	pi.on("before_agent_start", (event, ctx) => {
-		const todo = todoOf(readList(), ctx.sessionManager.getSessionId());
-		if (!todo) return;
-		return {
-			systemPrompt: [
-				...event.systemPrompt,
-				`This session works on the user's todo ${JSON.stringify(todo.text)} (id ${todo.id}). Once you have finished the work it asks for, check it off with the user_todo tool. Leave it open while the work still waits on the user's answer or approval.`,
-			],
-		};
+		const { linked, added } = todosOf(readList(), ctx.sessionManager.getSessionId());
+		const notes: string[] = [];
+		if (linked)
+			notes.push(
+				`This session works on the user's todo ${JSON.stringify(linked.text)} (id ${linked.id}). Once you have finished the work it asks for, check it off with the user_todo tool. Leave it open while the work still waits on the user's answer or approval.`,
+			);
+		const filed = added.filter(todo => todo !== linked);
+		if (filed.length > 0)
+			notes.push(
+				`This session added these todos to the user's list, still open:\n${filed.map(todo => `- ${todo.text} (id ${todo.id})`).join("\n")}\nCheck one off with the user_todo tool once the user has done it or it no longer applies, and do not add it again.`,
+			);
+		if (notes.length === 0) return;
+		return { systemPrompt: [...event.systemPrompt, ...notes] };
 	});
 }
