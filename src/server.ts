@@ -263,6 +263,11 @@ try {
 					if (!file || !saved) return null;
 					return { file, dir: files.factsOf(sessionId).worktree ?? sessions.bySessionId(sessionId)?.cwd ?? saved.cwd };
 				},
+				busyDirs: () =>
+					sessions
+						.rows(files.factsOf)
+						.filter(host => host.status === "working" || host.status === "needs-input")
+						.map(host => host.worktree ?? host.cwd),
 			}),
 		},
 		fetch(req, srv) {

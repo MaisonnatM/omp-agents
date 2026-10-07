@@ -435,3 +435,10 @@ export function parseWorktreeRemoval(body: unknown): WorktreeRemovalRequest | nu
 	}
 	return { action: "remove", plans };
 }
+
+/** The body of `PUT /api/git/switch`: `{ cwd, choice }`, the directory whose checkout switches and the branch it switches to. */
+export function parseBranchSwitch(body: unknown): { cwd: string; choice: BranchChoice } | null {
+	if (!isObject(body) || !isNonEmpty(body.cwd)) return null;
+	const choice = parseBranchChoice(body.choice);
+	return choice?.ok ? { cwd: body.cwd, choice: choice.ok } : null;
+}

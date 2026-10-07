@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ClientMsg } from "../shared/protocol";
 import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
-import { parseClientMsg, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
+import { parseBranchSwitch, parseClientMsg, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -262,6 +262,20 @@ describe("parseClientMsg", () => {
 		expect(msg(edit)).toEqual(edit);
 		expect(msg({ ...edit, entryId: "" })).toBeNull();
 		expect(msg({ ...edit, text: "  \n" })).toBeNull();
+	});
+});
+
+describe("parseBranchSwitch", () => {
+	test("takes a directory with an existing branch, or a new one with its base", () => {
+		expect(parseBranchSwitch({ cwd: "/r", choice: { kind: "existing", name: "main" } })).toEqual({ cwd: "/r", choice: { kind: "existing", name: "main" } });
+		expect(parseBranchSwitch({ cwd: "/r", choice: { kind: "new", name: "fix", base: "main" } })).toEqual({ cwd: "/r", choice: { kind: "new", name: "fix", base: "main" } });
+	});
+
+	test("rejects a missing branch, a new branch without a base, and a missing directory", () => {
+		expect(parseBranchSwitch({ cwd: "/r", choice: null })).toBeNull();
+		expect(parseBranchSwitch({ cwd: "/r" })).toBeNull();
+		expect(parseBranchSwitch({ cwd: "/r", choice: { kind: "new", name: "fix" } })).toBeNull();
+		expect(parseBranchSwitch({ cwd: "", choice: { kind: "existing", name: "main" } })).toBeNull();
 	});
 });
 

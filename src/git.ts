@@ -4,7 +4,7 @@ import { realpath } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { repoOf } from "./github";
 import { run, runChecked } from "./proc";
-import { type BranchChoice, type GitCheckout, worktreeDir } from "./shared/git";
+import { type BranchChoice, type GitCheckout, type GitStatus, type StatusKind, worktreeDir } from "./shared/git";
 
 const HEADS = "refs/heads/";
 
@@ -128,4 +128,68 @@ export async function checkoutDir(cwd: string, choice: BranchChoice): Promise<st
 			: ["git", "-C", cwd, "worktree", "add", "--", dir, choice.name],
 	);
 	return dir;
+}
+
+/** The kind of a `1` record's first status letter that is not `.`: the index's, else the worktree's. */
+const ORDINARY: Record<string, StatusKind> = { M: "modified", T: "modified", A: "added", D: "deleted" };
+
+/** What follows the first `fields` space-separated fields of a record: its path, which may hold spaces. */
+function pathAfter(record: string, fields: number): string {
+	let index = 0;
+	for (let field = 0; field < fields; field++) index = record.indexOf(" ", index) + 1;
+	return record.slice(index);
+}
+
+/** `git status --porcelain=v2 --branch -z` of the checkout at `root`. */
+export function parseStatus(root: string, porcelain: string): GitStatus {
+	const records = porcelain.split("\0");
+	let branch: string | null = null;
+	let upstream: string | null = null;
+	let counts: { ahead: number; behind: number } | null = null;
+	const files: GitStatus["files"] = [];
+	for (let index = 0; index < records.length; index++) {
+		const record = records[index]!;
+		if (record.startsWith("# branch.head ")) {
+			const head = record.slice("# branch.head ".length);
+			branch = head === "(detached)" ? null : head;
+		} else if (record.startsWith("# branch.upstream ")) upstream = record.slice("# branch.upstream ".length);
+		else if (record.startsWith("# branch.ab ")) {
+			const [ahead = "", behind = ""] = record.slice("# branch.ab ".length).split(" ");
+			counts = { ahead: Math.abs(Number(ahead)), behind: Math.abs(Number(behind)) };
+		} else if (record.startsWith("1 ")) {
+			const [x = ".", y = "."] = record.slice(2, 4);
+			files.push({ path: pathAfter(record, 8), kind: ORDINARY[x === "." ? y : x] ?? "modified" });
+		} else if (record.startsWith("2 ")) {
+			files.push({ path: pathAfter(record, 9), kind: record[2] === "C" ? "added" : "renamed" });
+			// The path it was renamed or copied from follows as a record of its own.
+			index++;
+		} else if (record.startsWith("u ")) files.push({ path: pathAfter(record, 10), kind: "conflicted" });
+		else if (record.startsWith("? ")) files.push({ path: record.slice(2), kind: "untracked" });
+	}
+	// git names an upstream whose ref is gone but counts nothing against it.
+	return { root, branch, upstream: upstream !== null && counts ? { name: upstream, ...counts } : null, files };
+}
+
+/** The branch and uncommitted files of the checkout `dir` is in, `null` outside one. */
+export async function gitStatus(dir: string): Promise<GitStatus | null> {
+	const at = await worktreeAt(dir);
+	return at && parseStatus(at.top, await git(at.top, "status", "--porcelain=v2", "--branch", "-z", "--untracked-files=all"));
+}
+
+/**
+ * Switches the checkout `dir` is in to an existing branch, or to a new one from `base`, carrying its uncommitted changes
+ * as `git switch` does.
+ * @throws Error with git's reason, as when another worktree has the branch checked out or a change would be overwritten.
+ */
+export async function switchBranch(dir: string, choice: BranchChoice): Promise<void> {
+	const names = await branchesOf(dir);
+	const from = choice.kind === "existing" ? choice.name : choice.base;
+	if (!names.includes(from)) throw new Error(`No local branch is named ${from}.`);
+	if (choice.kind === "existing") {
+		await git(dir, "switch", "--no-guess", choice.name);
+		return;
+	}
+	if (names.includes(choice.name)) throw new Error(`A branch named ${choice.name} already exists.`);
+	await git(dir, "check-ref-format", "--branch", choice.name);
+	await git(dir, "switch", "--no-guess", "-c", choice.name, choice.base);
 }

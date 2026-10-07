@@ -77,7 +77,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the session details sidebar.
   Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
 - The left sidebar's session rows leave out the full working directory and the model; the pane header shows both.
-- The bottom of the sidebar shows how much quota is left on each plan that `omp usage` reports, one line per plan: its provider's logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
+- A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
   Hover the logo to see the plan's name and account.
   A provider without a logo shows the plan's name instead.
   A window is named by its length plus its model tier (`7d fable`).
@@ -85,6 +85,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Amber means less than 20% is left, and red means none.
   Hover or focus a window to see omp's full limit name and when it resets.
   The server runs `omp usage --json` at startup and every minute after that.
+- The strip's right side shows the git checkout of the focused pane's session, its worktree else its directory, as an editor's status bar does; it hides while no session is focused or outside a git checkout.
+  The branch button lists the local branches that no other worktree has checked out; pick one to switch the checkout to it, or type a new name to create that branch from the current one.
+  The switch is `git switch` in place: uncommitted changes come along, and git's refusal, as when a change would be overwritten, shows next to the button.
+  The dashboard refuses a switch while a session's turn runs in that checkout.
+  `↑2 ↓1` counts the commits ahead of and behind the branch's upstream, as last fetched; it hides for a branch without one.
+  The file count is the checkout's uncommitted files, untracked ones included; hover it to see the first twelve with their kind, and click it to open the session's **Changes** page.
+  The strip reads the checkout again every five seconds while the page is visible, and when a turn starts or ends.
 
 ## Session details sidebar
 

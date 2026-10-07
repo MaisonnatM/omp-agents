@@ -1,6 +1,5 @@
-import { createContext, type ReactNode } from "react";
+import { createContext } from "react";
 import type { PlanUsage, PlanWindow } from "../../src/shared/models";
-import { SidebarFooter } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DashboardState } from "../dashboard-state";
@@ -39,7 +38,7 @@ function WindowLeft({ window }: { window: PlanWindow }) {
 function PlanRow({ plan }: { plan: PlanUsage }) {
 	const label = plan.account ? `${plan.name} · ${plan.account}` : plan.name;
 	return (
-		<li className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+		<li className="flex items-center gap-2">
 			<Tooltip content={label}>
 				<span role="img" aria-label={label} className="flex shrink-0 items-center">
 					<OrgIcon
@@ -55,29 +54,21 @@ function PlanRow({ plan }: { plan: PlanUsage }) {
 	);
 }
 
-/** Plan quota, pinned to the bottom of the sidebar. */
-export function PlanUsageFooter({ usage }: { usage: DashboardState["usage"] }) {
-	let body: ReactNode;
-	if (usage === null) body = <p className="text-muted-foreground">Checking plans…</p>;
-	else if (usage.error !== null)
-		body = <p className="text-red-600 dark:text-red-400">Cannot read plan usage: {usage.error}</p>;
-	else if (usage.plans.length === 0)
-		body = (
+/** Plan quota, one plan after another, for the status bar. */
+export function PlanUsageList({ usage }: { usage: DashboardState["usage"] }) {
+	if (usage === null) return <p className="text-muted-foreground">Checking plans…</p>;
+	if (usage.error !== null) return <p className="min-w-0 truncate text-red-600 dark:text-red-400">Cannot read plan usage: {usage.error}</p>;
+	if (usage.plans.length === 0)
+		return (
 			<p className="text-muted-foreground">
 				<code>omp usage</code> reports no plan limits.
 			</p>
 		);
-	else
-		body = (
-			<ul className="flex flex-col gap-1">
-				{usage.plans.map((plan, index) => (
-					<PlanRow key={`${plan.provider}:${plan.account ?? index}`} plan={plan} />
-				))}
-			</ul>
-		);
 	return (
-		<SidebarFooter className="gap-2 px-3 py-2 text-xs">
-			{body}
-		</SidebarFooter>
+		<ul aria-label="Plan usage" className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-0.5">
+			{usage.plans.map((plan, index) => (
+				<PlanRow key={`${plan.provider}:${plan.account ?? index}`} plan={plan} />
+			))}
+		</ul>
 	);
 }

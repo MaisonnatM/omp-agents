@@ -7,7 +7,7 @@ import { buildAnalytics, type SessionFacts as AnalyticsSessionFacts } from "../a
 import { errorText } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
-import { gitCheckout } from "../git";
+import { gitCheckout, gitStatus, switchBranch, worktreeAt } from "../git";
 import type { GoogleCalendar } from "../google-calendar";
 import { loadInbox, loadPullRequestDetail } from "../inbox";
 import { loadIntegrations, signOutIntegration, startIntegrationSignIn } from "../integrations";
@@ -28,7 +28,7 @@ import { TICKET_ID } from "../shared/tickets";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseGoogleCalendarAddress, parseGoogleCalendarId, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseBranchSwitch, parseGoogleCalendarAddress, parseGoogleCalendarId, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
@@ -49,6 +49,8 @@ export interface RouteEnv {
 	google: GoogleCalendar;
 	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
 	placeOf(sessionId: string): SessionPlace | null;
+	/** The directories that live sessions whose turn runs, or waits on a question, work in: each one's worktree, else its cwd. */
+	busyDirs(): string[];
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -233,6 +235,32 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return cwd instanceof Response ? cwd : answer(() => gitCheckout(cwd));
 	});
 
+	/** `GET /api/git/status?cwd=<dir>`: the branch, upstream, and uncommitted files of a directory's checkout, `null` outside one, for the status bar. */
+	const status = get(params => {
+		const cwd = dirParam(params);
+		return cwd instanceof Response ? cwd : answer(() => gitStatus(cwd));
+	});
+
+	/**
+	 * `PUT /api/git/switch`: `{ cwd, choice }` switches the checkout `cwd` is in to an existing branch or a new one, and
+	 * answers its status. Refused while a session's turn runs in that checkout, and with git's reason when git refuses.
+	 */
+	const branchSwitch: Handler = async req => {
+		const write = await guards.writeBody(req);
+		if (write instanceof Response) return write;
+		const body = parseBranchSwitch(write.body);
+		const cwd = body && directoryOf(body.cwd);
+		if (!body || !cwd) return fail(400, "Expected { cwd, choice } naming a directory and a branch");
+		const target = await worktreeAt(cwd);
+		if (!target) return fail(404, `${cwd} is not in a git checkout`);
+		const busy = await Promise.all(env.busyDirs().map(dir => worktreeAt(dir)));
+		if (busy.some(at => at?.top === target.top)) return fail(409, "A session's turn runs in this checkout; switch once it ends.");
+		return answer(async () => {
+			await switchBranch(target.top, body.choice);
+			return gitStatus(target.top);
+		}, err => fail(409, errorText(err)));
+	};
+
 	/**
 	 * `GET /api/image?hash=<sha256>&type=<image type>`: an image of a prompt that omp moved from its session file to its
 	 * blob store, served as `type`, one of the prompt image types, since the store keeps no type.
@@ -369,6 +397,8 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/worktrees/metrics": { GET: worktreeMetrics },
 		"/api/worktrees/removal": { PUT: worktreeRemoval },
 		"/api/git": { GET: git },
+		"/api/git/status": { GET: status },
+		"/api/git/switch": { PUT: branchSwitch },
 		"/api/image": { GET: image },
 		"/api/file": { GET: textFile },
 		"/api/changes": { GET: changes },

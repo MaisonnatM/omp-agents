@@ -10,7 +10,7 @@ import { IntegrationsPage } from "./components/integrations/integrations-page";
 import { PullRequestPage } from "./components/inbox/pr-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
-import { NO_PLANS, PlanUsageFooter, Plans } from "./components/plan-usage";
+import { NO_PLANS, Plans } from "./components/plan-usage";
 import { Roster, useProject } from "./components/roster";
 import { SessionDetails } from "./components/session-details";
 import { SettingsPage } from "./components/settings/settings-page";
@@ -18,6 +18,7 @@ import type { SettingsTab } from "./components/settings/settings-nav";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
+import { StatusBar } from "./components/status-bar";
 import { SplitResizeHandle, splitAt, useSplitRatio } from "./components/split-resize-handle";
 import { RoutinesPage } from "./components/routines/routines-page";
 import { CalendarPage } from "./components/calendar/calendar-page";
@@ -49,6 +50,7 @@ import { startOf } from "./starts";
 import { PINNED_SESSIONS_KEY, useStoredKeys } from "./stored-state";
 import { quickAddTodo } from "./todo-quick-add";
 import { localDay } from "./days";
+import { CheckoutVersion } from "./use-git-checkout";
 import { useDashboard } from "./use-dashboard";
 
 /** The sidebar tab that goes with each page; the panes keep the one you chose. A session's changes go with the sessions. */
@@ -124,7 +126,10 @@ export function App() {
 	useEffect(() => {
 		document.title = title;
 	}, [title]);
-	const viewCwd = (viewHost ?? viewPast)?.cwd;
+	const viewSession = viewHost ?? viewPast;
+	const viewCwd = viewSession?.cwd;
+	const [switches, setSwitches] = useState(0);
+	const checkout = viewSession ? { dir: viewSession.worktree ?? viewSession.cwd, sessionId: viewSession.sessionId, working: viewHost?.status === "working" } : null;
 	const split = layout.panes.length > 1;
 	const [columns, setColumns] = useSplitRatio("columns");
 	const [rows, setRows] = useSplitRatio("rows");
@@ -403,91 +408,95 @@ export function App() {
 
 	return (
 		<DashboardContext.Provider value={dashboard}>
-			<SidebarProvider persist={false} shortcut={null} className="h-svh">
-				<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
-					<Roster
-						projects={projects}
-						lists={lists}
-						waiting={waitingCount(projectLists)}
-						query={sessionQuery}
-						onQuery={setSessionQuery}
-						onTogglePin={togglePin}
-						open={cover ? [] : layout.panes}
-						newSessionOpen={page?.kind === "new"}
-						integrationsOpen={page?.kind === "integrations"}
-						ticketsShown={ticketsShown}
-						tab={tab}
-						onTab={showTab}
-						userTodos={state.userTodos}
-						todoView={todoView}
-						todoSessions={{ hosts: state.hosts, past: state.past }}
-						routines={state.routines}
-						calendarTab={page?.kind === "calendar" ? page : page?.kind === "routines" ? { kind: "routines", target: routinesTarget } : null}
-						settingsTab={settingsTab}
-						onSettingsTab={setSettingsTab}
-						sectionTarget={sectionTarget}
-						onSectionTarget={setSectionTarget}
-						inbox={
-							// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
-							state.listed ? (
-								<InboxNav project={project} hosts={visible.hosts} past={visible.past} target={inboxTarget} />
-							) : (
-								<p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>
-							)
-						}
-						hosts={visible.hosts}
-						project={project}
-						onPickProject={switchProject}
-						onShowSearch={() => dispatchPalette({ type: "open" })}
-						onShowShortcuts={() => setShortcutsOpen(true)}
-						toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
-					/>
-					<PlanUsageFooter usage={state.usage} />
-				</DashboardSidebar>
-				<SidebarInset>
-					<Plans value={state.usage?.plans ?? NO_PLANS}>
-						<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
-					</Plans>
-				</SidebarInset>
-				{detailsView && (
-					<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-						<SessionDetails
-							key={hashForView(detailsView)}
-							view={detailsView}
-							working={detailsView.kind === "live" && subjectOf(detailsView, viewHost ?? null, viewLastHost).working}
-							sessionId={detailsView.kind === "past" ? detailsView.sessionId : detailsView.agentId === null ? ((viewHost ?? viewLastHost)?.sessionId ?? null) : null}
-						/>
-					</DashboardSidebar>
-				)}
-				<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-				{filePath !== null && <FileDialog key={filePath} path={filePath} onClose={() => setFilePath(null)} />}
-				<CommandPalette
-					state={palette}
-					dispatch={dispatchPalette}
-					hosts={visible.hosts}
-					past={visible.past}
-					projects={projects}
-					project={project}
-					onOpenSession={(picked, cwd, mode) => {
-						const next = projectSwitch(project, cwd);
-						if (next !== null) pickProject(next);
-						open(picked, mode);
-					}}
-					onPickProject={switchProject}
-					pinned={pinned}
-					onTogglePin={togglePin}
-					handlers={handlers}
-					unavailable={unavailable}
-					onCreateTodo={
-						state.connected && state.userTodos
-							? text => {
-									const change = quickAddTodo(text, state.userTodos?.categories ?? [], localDay());
-									if (change) changeTodo(change);
+			<CheckoutVersion.Provider value={switches}>
+				<div className="flex h-svh flex-col">
+					<SidebarProvider persist={false} shortcut={null} className="min-h-0 flex-1">
+						<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
+							<Roster
+								projects={projects}
+								lists={lists}
+								waiting={waitingCount(projectLists)}
+								query={sessionQuery}
+								onQuery={setSessionQuery}
+								onTogglePin={togglePin}
+								open={cover ? [] : layout.panes}
+								newSessionOpen={page?.kind === "new"}
+								integrationsOpen={page?.kind === "integrations"}
+								ticketsShown={ticketsShown}
+								tab={tab}
+								onTab={showTab}
+								userTodos={state.userTodos}
+								todoView={todoView}
+								todoSessions={{ hosts: state.hosts, past: state.past }}
+								routines={state.routines}
+								calendarTab={page?.kind === "calendar" ? page : page?.kind === "routines" ? { kind: "routines", target: routinesTarget } : null}
+								settingsTab={settingsTab}
+								onSettingsTab={setSettingsTab}
+								sectionTarget={sectionTarget}
+								onSectionTarget={setSectionTarget}
+								inbox={
+									// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
+									state.listed ? (
+										<InboxNav project={project} hosts={visible.hosts} past={visible.past} target={inboxTarget} />
+									) : (
+										<p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>
+									)
 								}
-							: undefined
-					}
-				/>
-			</SidebarProvider>
+								hosts={visible.hosts}
+								project={project}
+								onPickProject={switchProject}
+								onShowSearch={() => dispatchPalette({ type: "open" })}
+								onShowShortcuts={() => setShortcutsOpen(true)}
+								toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
+							/>
+						</DashboardSidebar>
+						<SidebarInset>
+							<Plans value={state.usage?.plans ?? NO_PLANS}>
+								<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
+							</Plans>
+						</SidebarInset>
+						{detailsView && (
+							<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
+								<SessionDetails
+									key={hashForView(detailsView)}
+									view={detailsView}
+									working={detailsView.kind === "live" && subjectOf(detailsView, viewHost ?? null, viewLastHost).working}
+									sessionId={detailsView.kind === "past" ? detailsView.sessionId : detailsView.agentId === null ? ((viewHost ?? viewLastHost)?.sessionId ?? null) : null}
+								/>
+							</DashboardSidebar>
+						)}
+						<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+						{filePath !== null && <FileDialog key={filePath} path={filePath} onClose={() => setFilePath(null)} />}
+						<CommandPalette
+							state={palette}
+							dispatch={dispatchPalette}
+							hosts={visible.hosts}
+							past={visible.past}
+							projects={projects}
+							project={project}
+							onOpenSession={(picked, cwd, mode) => {
+								const next = projectSwitch(project, cwd);
+								if (next !== null) pickProject(next);
+								open(picked, mode);
+							}}
+							onPickProject={switchProject}
+							pinned={pinned}
+							onTogglePin={togglePin}
+							handlers={handlers}
+							unavailable={unavailable}
+							onCreateTodo={
+								state.connected && state.userTodos
+									? text => {
+											const change = quickAddTodo(text, state.userTodos?.categories ?? [], localDay());
+											if (change) changeTodo(change);
+										}
+									: undefined
+							}
+						/>
+					</SidebarProvider>
+					<StatusBar usage={state.usage} checkout={checkout} onSwitched={() => setSwitches(count => count + 1)} />
+				</div>
+			</CheckoutVersion.Provider>
 		</DashboardContext.Provider>
 	);
 }

@@ -27,3 +27,18 @@ export const worktreeDir = (mainWorktree: string, branch: string): string => `${
  * the main one when none has), or a new branch from `base`, always in a new worktree.
  */
 export type BranchChoice = { kind: "existing"; name: string } | { kind: "new"; name: string; base: string };
+
+/** How `git status` reports an uncommitted file: staged or not, it counts once. */
+export type StatusKind = "modified" | "added" | "deleted" | "renamed" | "untracked" | "conflicted";
+
+/** A checkout as the window's status bar shows it: its branch against its upstream, and its uncommitted files. */
+export interface GitStatus {
+	/** The checkout's root directory. */
+	root: string;
+	/** The branch checked out, `null` when HEAD is detached. */
+	branch: string | null;
+	/** The branch's upstream and how many commits the branch is ahead of and behind it; `null` without an upstream. */
+	upstream: { name: string; ahead: number; behind: number } | null;
+	/** Staged, unstaged, and untracked files, relative to {@link root}, in `git status` order. */
+	files: { path: string; kind: StatusKind }[];
+}
