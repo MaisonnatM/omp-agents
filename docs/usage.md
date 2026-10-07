@@ -493,13 +493,17 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Drag a repository's name to reorder the repositories, and a section's heading to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
   The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
-- The details of a pull request that the inbox lists open on its **Next move**: the move's badge, its reason, and one button that makes it.
+- The details of a pull request lay out like Graphite's: the repository and number above the title, then its author, the branch and the one it merges into, its files, the lines added and removed, and when it opened.
+  Beside them, a column shows its state with links to it on GitHub and on Graphite, then its **Next move**: the move's badge, its reason, and one button that makes it.
   The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**.
   **Merge** offers **Merge on GitHub**, and **Answer** and **Working** offer **Open the session**.
-  Then **Status** shows what stands between the pull request and its merge: **Ready to merge**, a draft, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first.
-  A blocker that another quick action works on carries that action's button, and the header keeps the other actions.
-  Then it shows the branch and the one it merges into, the lines added and removed, the description, folded after about 16 lines behind **Show more**, the head commit's checks (failing and pending ones listed, passing and skipped ones folded behind their counts), the unresolved review comments by file and line, the conversation of comments and reviews, and the changed files, with links to the pull request on GitHub and on Graphite.
-  The dot on a reviewer's picture shows where they stand: green approved, red requested changes, grey commented, and amber means a review from them is still requested.
+  Under it, **Status** shows what stands between the pull request and its merge: **Ready to merge**, a draft, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first.
+  A blocker that another quick action works on carries that action's button, and **Actions** at the bottom of the column keeps the other actions with the sessions on the pull request.
+  **Checks** shows a bar of the head commit's checks by state, the failing and pending ones, and the passing and skipped ones folded behind their counts.
+  **Reviewers** lists each reviewer with an icon for where they stand: approved, requested changes, commented, or a review still requested.
+  When the inbox lists another pull request of its stack, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, marks this one, and links to the others.
+  Then come the description, folded after about 16 lines behind **Show more**, the unresolved review comments by file and line, the conversation of comments and reviews, and the changed files.
+  A narrow page puts the column above the details.
   Each opening reads the pull request again; the server keeps its answer for 30 seconds.
 - The inbox works from the keyboard, outside text fields, while its tab shows.
   J and K move to the next and previous row, and Enter shows the focused row's details.

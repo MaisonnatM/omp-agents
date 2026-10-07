@@ -1,7 +1,7 @@
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { type Inbox, type InboxPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
-import { agentOn, listedPullRequest, moveAction, moveOf, reason } from "../../inbox-model";
+import { agentOn, listedPullRequest, moveAction, moveOf, pullRequestStack, reason } from "../../inbox-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { actionOn, pendingOf, pullRequestStart } from "../../quick-actions";
 import { inboxStore } from "../../reads";
@@ -51,6 +51,7 @@ export function PullRequestPage({ project, hosts, target }: PullRequestPageProps
 			meta="Your pull requests and review requests on GitHub"
 			backHref={hashForInbox(null)}
 			backLabel="Back to the inbox"
+			wide
 			notice={
 				<>
 					{read && !listed && (
@@ -73,6 +74,7 @@ export function PullRequestPage({ project, hosts, target }: PullRequestPageProps
 				sessions={sessions}
 				onOpen={open}
 				next={listed ? nextMove(listed.pr, hosts, sessions) : null}
+				stack={read ? pullRequestStack(read.data, target) : []}
 			/>
 		</DetailPage>
 	);
