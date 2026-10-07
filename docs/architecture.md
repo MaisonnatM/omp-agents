@@ -196,7 +196,7 @@ A user item's `images` holds a `data:` URL for an inline image and `/api/image?h
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
 Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process, `bun src/server.ts`, and never imports it.
 It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/user-todos-parse.ts`, `src/user-todos-shared.ts`, and `src/user-todos.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
-It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching the file's directory since the server replaces the file, and its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/server/address.ts`, in the page, which `web/app.tsx` answers by opening the session switcher, where **Create todo** is.
+It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching the file's directory since the server replaces the file, and its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/server/address.ts`, in the page, which `web/app.tsx` answers by opening the command palette on its **Create todo** view.
 `src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
 
 - At launch it calls `loadToken`, as the server does, so whichever runs first creates the token file, and asks `GET /?token=<token>` on the port.
@@ -610,10 +610,13 @@ The page lives in `web/`.
   `web/components/skill-picker.tsx` is the skill picker that the settings' pinned skill and the routine editor share.
   The checkout, the default model, and the skills are each one `useRead`.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
-  `web/components/session-switcher.tsx` is the search over every session, opened from the sidebar header or with Cmd+K. What you type there can also be added as a todo.
+  Shortcuts with a `command` title are also the command palette's commands, and `web/app.tsx` hands the palette the same handlers it gives `useShortcuts`.
+- `web/command-palette.ts`: the command palette's model, which renders nothing: its items and their actions, the reducer over its stack of views and its action panel, and the ranking, which multiplies cmdk's match score by a frecency boost kept in localStorage.
+  `web/components/command-palette/` draws it, opened from the sidebar header or with Cmd+K: the dialog and its list, the action panel that Cmd+K opens on the highlighted entry, and the footer.
+  `web/session-actions.ts` lists what can be done to a session, which both a sidebar row's menu and the palette offer.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
-- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the session details tab, the sidebar's project, the pinned skill, and the inbox's order; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
+- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the session details tab, the sidebar's project, the pinned skill, the inbox's order, and how often and how lately each command palette entry ran; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
 - `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab.
@@ -628,7 +631,7 @@ The page lives in `web/`.
   `detail.tsx` is the open todo: a bar with its place and the ↑, ↓, and **×** buttons, its title, its property chips, live agent question, links, **Start session**, **Create Linear ticket**, and notes, which `web/components/markdown-editor.tsx` renders through `message-markdown.tsx` until you click them to edit; `links.tsx` draws a todo's link chips and work-state pill, each with an icon-only form for rows, and `add-button.tsx` is the button that adds a todo linking to an inbox row, a ticket row, or a session's header.
   `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds, each category's badge color, how a due day reads, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows, and the keys also step the open todo.
   `web/todo-work-state.ts` derives the pill and the **Needs you** filter from the latest linked session's live status, outstanding question, submitted pull request, or recorded `/ship` merge; it keeps unknown and ended sessions distinct from new ideas.
-  `web/todo-quick-add.ts` reads a trailing due day and `#category` off a new todo's title, in the page's new todos and in the session switcher's **Create todo**.
+  `web/todo-quick-add.ts` reads a trailing due day and `#category` off a new todo's title, in the page's new todos and in the command palette's **Create todo**.
 - `web/components/routines/routines-page.tsx`: the Routines page, its list with each routine's menu, and one routine's settings and runs, which open the sessions they started.
   It, the Calendar page, and the session rows read the time through `web/use-minute.ts`, one timer renewed each minute for every component that reads it.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.

@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { QUICK_TODO_EVENT } from "../src/server/address";
 import { callable, signedIn } from "../src/shared/accounts";
 import type { UserTodoList } from "../src/user-todos-shared";
@@ -15,7 +15,7 @@ import { Roster, useProject } from "./components/roster";
 import { SessionDetails } from "./components/session-details";
 import { SettingsPage } from "./components/settings/settings-page";
 import type { SettingsTab } from "./components/settings/settings-nav";
-import { SessionSwitcher } from "./components/session-switcher";
+import { CommandPalette } from "./components/command-palette/command-palette";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { DashboardSidebar, SidebarToggle, useSidebarPanels } from "./components/sidebar-panel";
 import { SplitResizeHandle, splitAt, useSplitRatio } from "./components/split-resize-handle";
@@ -42,8 +42,9 @@ import {
 	type TodoListView,
 } from "./routing";
 import type { SectionTarget } from "./section";
+import { paletteReducer } from "./command-palette";
 import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, searchSessions, sidebarSessions, waitingCount, workspaces } from "./sessions";
-import { useShortcuts } from "./shortcuts";
+import { type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
 import { PINNED_SESSIONS_KEY, useStoredKeys } from "./stored-state";
 import { quickAddTodo } from "./todo-quick-add";
@@ -172,7 +173,7 @@ export function App() {
 	}, [page?.kind]);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
-	const [switcherOpen, setSwitcherOpen] = useState(false);
+	const [palette, dispatchPalette] = useReducer(paletteReducer, null);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const linear = integrationsStore.usePolling().read?.data.integrations.linear ?? null;
 	/** The Tickets tab and its shortcut show once omp holds a sign-in to Linear, even one Linear refuses, which the tickets page then offers to reconnect. */
@@ -194,9 +195,9 @@ export function App() {
 		routedTodoList === null || (routedTodoList.kind === "category" && !state.userTodos?.categories.some(({ id }) => id === routedTodoList.id))
 			? { kind: "all" }
 			: routedTodoList;
-	/** The desktop shell's quick-capture shortcut opens the command palette, where Create todo is. */
+	/** The desktop shell's quick-capture shortcut opens the command palette on Create todo. */
 	useEffect(() => {
-		const open = (): void => setSwitcherOpen(true);
+		const open = (): void => dispatchPalette({ type: "open", view: "createTodo" });
 		window.addEventListener(QUICK_TODO_EVENT, open);
 		return () => window.removeEventListener(QUICK_TODO_EVENT, open);
 	}, []);
@@ -213,9 +214,10 @@ export function App() {
 		if (next) open(next, "replace");
 		else if (!listed.length) return false;
 	};
-	useShortcuts({
+	/** What the page's shortcuts run, and the command palette's commands. */
+	const handlers: ShortcutHandlers = {
 		help: () => setShortcutsOpen(open => !open),
-		switcher: () => setSwitcherOpen(open => !open),
+		switcher: () => dispatchPalette(palette ? { type: "close" } : { type: "open" }),
 		newSession: openNewSession,
 		previousSession: () => step(-1),
 		nextSession: () => step(1),
@@ -258,7 +260,10 @@ export function App() {
 			if (!maximized) return false;
 			show({ ...layout, maximized: false });
 		},
-	});
+	};
+	useShortcuts(handlers);
+	/** Commands that would do nothing now. */
+	const unavailable = new Set<ShortcutId>([...(ticketsShown ? [] : ["tickets" as const]), ...(detailsView ? [] : ["detailsSidebar" as const])]);
 
 	const panes = (): ReactNode => {
 		if (layout.panes.length > 0) {
@@ -433,7 +438,7 @@ export function App() {
 						hosts={visible.hosts}
 						project={project}
 						onPickProject={switchProject}
-						onShowSearch={() => setSwitcherOpen(true)}
+						onShowSearch={() => dispatchPalette({ type: "open" })}
 						onShowShortcuts={() => setShortcutsOpen(true)}
 						toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
 					/>
@@ -456,16 +461,23 @@ export function App() {
 				)}
 				<ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
 				{filePath !== null && <FileDialog key={filePath} path={filePath} onClose={() => setFilePath(null)} />}
-				<SessionSwitcher
-					open={switcherOpen}
-					onOpenChange={setSwitcherOpen}
+				<CommandPalette
+					state={palette}
+					dispatch={dispatchPalette}
 					hosts={visible.hosts}
 					past={visible.past}
-					onPick={(picked, cwd) => {
+					projects={projects}
+					project={project}
+					onOpenSession={(picked, cwd, mode) => {
 						const next = projectSwitch(project, cwd);
 						if (next !== null) pickProject(next);
-						open(picked, "replace");
+						open(picked, mode);
 					}}
+					onPickProject={switchProject}
+					pinned={pinned}
+					onTogglePin={togglePin}
+					handlers={handlers}
+					unavailable={unavailable}
 					onCreateTodo={
 						state.connected && state.userTodos
 							? text => {

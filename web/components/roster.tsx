@@ -271,8 +271,8 @@ export function Roster({
 			<SidebarHeader className="flex-row items-center justify-between gap-2 px-2 pt-4">
 				<h1 className="sr-only">omp sessions</h1>
 				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
-				<Tooltip content="Search sessions" shortcut={shortcutLabels("switcher")} side="bottom">
-					<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Search sessions" onClick={onShowSearch}>
+				<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
+					<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
 						<Search />
 					</Button>
 				</Tooltip>

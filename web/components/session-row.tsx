@@ -1,6 +1,6 @@
-import { AppWindow, Archive, CircleStop, Columns2, Copy, Ellipsis, Folder, GitPullRequest, Pin, PinOff, Play, Settings } from "lucide-react";
-import { memo, type ReactElement, type ReactNode, useState } from "react";
-import { type PullRequest, pullRequestUrl } from "../../src/shared/github";
+import { Ellipsis } from "lucide-react";
+import { Fragment, memo, type ReactElement, type ReactNode, useState } from "react";
+import type { PullRequest } from "../../src/shared/github";
 import type { PastSession, RosterHost, ShipProgress, View } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,9 +17,10 @@ import {
 } from "@/components/ui/menu";
 import { SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
+import type { PaletteAction } from "../command-palette";
 import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
-import { PAGE_ICON } from "../page-icons";
-import { hashForSettings, hashForTickets, type OpenMode } from "../routing";
+import type { OpenMode } from "../routing";
+import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
 import { useMinute } from "../use-minute";
 import { useDashboardContext } from "./dashboard-context";
 import { ShipStep } from "./ship-step";
@@ -81,37 +82,39 @@ function ProjectBadge({ cwdDisplay }: { cwdDisplay: string }) {
 }
 
 interface RowMenuProps {
-	view: View;
 	/** The row's name, which the "More actions" button is labelled after. */
 	label: string;
-	/** `view` is on screen, which leaves out Open in split. */
-	isOpen: boolean;
-	onOpen: (view: View, mode: OpenMode) => void;
+	entry: SessionEntry;
+	/** The session shows in a pane. */
+	onScreen: boolean;
+	pinned: boolean;
+	onTogglePin: (sessionId: string) => void;
 	/** The row's `SidebarMenuButton`. */
 	children: ReactElement;
-	/** The row's own items, after Open and Open in split. */
-	items?: ReactNode;
 }
 
-/** A sidebar row whose quick actions open on right-click and from its hover-revealed "More actions" button. */
-function RowMenu({ view, label, isOpen, onOpen, children, items }: RowMenuProps) {
+/** A sidebar row whose {@link sessionActions} open on right-click and from its hover-revealed "More actions" button. */
+function RowMenu({ label, entry, onScreen, pinned, onTogglePin, children }: RowMenuProps) {
+	const { open, send, start, starts, end } = useDashboardContext();
 	const [menuOpen, setMenuOpen] = useState(false);
-	const menuItems = (
-		<>
-			<MenuItem onClick={() => onOpen(view, "replace")}>
-				<AppWindow />
-				Open
-			</MenuItem>
-			{!isOpen && (
-				<MenuItem onClick={() => onOpen(view, "split")}>
-					<Columns2 />
-					Open in split
-					<MenuShortcut>{SPLIT_CLICK}</MenuShortcut>
-				</MenuItem>
-			)}
-			{items}
-		</>
-	);
+	const actions = sessionActions(entry, {
+		onScreen,
+		pinned,
+		resuming: starts.resume?.phase === "starting" ? starts.resume.op.sessionId : null,
+		open,
+		togglePin: onTogglePin,
+		resume: sessionId => start({ kind: "resume", sessionId }),
+		dismissInterrupted: sessionId => send({ t: "dismiss-interrupted", sessionId }),
+		end,
+	});
+	const menuItems = actions.map((group, index) => (
+		<Fragment key={group[0].id}>
+			{index > 0 && <MenuSeparator />}
+			{group.map(action => (
+				<ActionItem key={action.id} action={action} />
+			))}
+		</Fragment>
+	));
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger render={<SidebarMenuItem />}>
@@ -130,47 +133,23 @@ function RowMenu({ view, label, isOpen, onOpen, children, items }: RowMenuProps)
 	);
 }
 
-interface SessionItemsProps {
-	row: { cwd: string; sessionId: string; pullRequests: PullRequest[]; tickets: string[] };
-	pinned: boolean;
-	onTogglePin: (sessionId: string) => void;
-}
-
-/** Items a running or past session's menu shares: pinning it, its pull requests and Linear issues, its workspace's settings, and copying its ids. */
-function SessionItems({ row, pinned, onTogglePin }: SessionItemsProps) {
-	return (
-		<>
-			<MenuItem onClick={() => onTogglePin(row.sessionId)}>
-				{pinned ? <PinOff /> : <Pin />}
-				{pinned ? "Unpin" : "Pin"}
-			</MenuItem>
-			<MenuSeparator />
-			{row.pullRequests.map(pr => (
-				<MenuLinkItem key={pullRequestUrl(pr)} href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
-					<GitPullRequest />
-					Open {pr.repo}#{pr.number}
-				</MenuLinkItem>
-			))}
-			{row.tickets.map(id => (
-				<MenuLinkItem key={id} href={hashForTickets(id)}>
-					<PAGE_ICON.tickets />
-					Open {id}
-				</MenuLinkItem>
-			))}
-			<MenuLinkItem href={hashForSettings(row.cwd)}>
-				<Settings />
-				Workspace settings
+/** One session action as a menu item. Open in split names the click that also runs it from the row. */
+function ActionItem({ action }: { action: PaletteAction<SessionRun> }) {
+	const { icon: Icon, title, run } = action;
+	if (run.kind === "link") {
+		return (
+			<MenuLinkItem href={run.href} target={run.external ? "_blank" : undefined} rel={run.external ? "noreferrer" : undefined}>
+				<Icon />
+				{title}
 			</MenuLinkItem>
-			<MenuSeparator />
-			<MenuItem onClick={() => void navigator.clipboard.writeText(row.cwd)}>
-				<Folder />
-				Copy path
-			</MenuItem>
-			<MenuItem onClick={() => void navigator.clipboard.writeText(row.sessionId)}>
-				<Copy />
-				Copy session ID
-			</MenuItem>
-		</>
+		);
+	}
+	return (
+		<MenuItem variant={action.tone} disabled={action.disabled} onClick={run.fn}>
+			<Icon />
+			{title}
+			{action.id === "split" && <MenuShortcut>{SPLIT_CLICK}</MenuShortcut>}
+		</MenuItem>
 	);
 }
 
@@ -192,40 +171,11 @@ interface RowProps<T> {
 
 /** A past session's row, with Resume, and Move to past while it is interrupted. */
 export const PastRow = memo(function PastRow({ session, pinned, open, showProject, onTogglePin }: RowProps<PastSession>) {
-	const { open: onOpen, send, start, starts } = useDashboardContext();
-	const { resume } = starts;
+	const { open: onOpen } = useDashboardContext();
 	const view: View = { kind: "past", sessionId: session.sessionId };
 	const label = pastLabel(session);
 	return (
-		<RowMenu
-			view={view}
-			label={label}
-			isOpen={open}
-			onOpen={onOpen}
-			items={
-				<>
-					{/* One resume runs at a time, as the pane's Resume button allows. */}
-					<MenuItem
-						disabled={resume?.phase === "starting"}
-						onClick={() => {
-							// The pane shows the resume's progress and failure, and the live session takes it over.
-							onOpen(view, "replace");
-							start({ kind: "resume", sessionId: session.sessionId });
-						}}
-					>
-						<Play />
-						{resume?.phase === "starting" && resume.op.sessionId === session.sessionId ? "Resuming…" : "Resume"}
-					</MenuItem>
-					{session.interrupted && (
-						<MenuItem onClick={() => send({ t: "dismiss-interrupted", sessionId: session.sessionId })}>
-							<Archive />
-							Move to past
-						</MenuItem>
-					)}
-					<SessionItems row={session} pinned={pinned} onTogglePin={onTogglePin} />
-				</>
-			}
-		>
+		<RowMenu label={label} entry={{ kind: "past", session }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}
@@ -243,31 +193,11 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showProjec
 
 /** A running session's row, with its status dot, and End session where the server controls it. */
 export const HostRow = memo(function HostRow({ session: host, pinned, open, showProject, onTogglePin }: RowProps<RosterHost>) {
-	const { open: onOpen, end } = useDashboardContext();
+	const { open: onOpen } = useDashboardContext();
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 	const label = hostLabel(host);
 	return (
-		<RowMenu
-			view={view}
-			label={label}
-			isOpen={open}
-			onOpen={onOpen}
-			items={
-				<>
-					<SessionItems row={host} pinned={pinned} onTogglePin={onTogglePin} />
-					{/* The server ends only what it controls: a dashboard session, or a terminal room shared writable. */}
-					{host.control.phase === "live" && !host.control.readOnly && (
-						<>
-							<MenuSeparator />
-							<MenuItem variant="destructive" onClick={() => end(host.instanceId)}>
-								<CircleStop />
-								End session
-							</MenuItem>
-						</>
-					)}
-				</>
-			}
-		>
+		<RowMenu label={label} entry={{ kind: "live", host }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}
