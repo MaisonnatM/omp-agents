@@ -2,7 +2,9 @@
  * The pull requests each session submitted or worked on, read from its own tool calls and its subagents'.
  * A submission is a per-branch line `gt submit` prints, or the URL a `gh pr create` call prints. Work is a
  * `gh pr checkout|edit|comment|review|merge|ready` call that names a PR, a `git push` that updated a PR's head
- * branch, or an omp `pr://` read. A PR a session only quoted, listed, or was handed is not linked to it.
+ * branch, an omp `pr://` read, or the branch checked out in the linked worktree the session works in, when a PR
+ * heads it. A PR a session only quoted, listed, or was handed is not linked to it; nor is the main checkout's
+ * branch, which every session started there shares.
  *
  * The same scan collects the Linear issues a session worked on: the ones omp's Linear MCP tools read
  * (`get_issue`, `list_comments`), changed or opened (`save_issue`), or commented on (`save_comment`), and the
@@ -315,7 +317,7 @@ interface SessionScan {
 	transcripts: Map<string, TranscriptScan>;
 	/** Every transcript's refs, in transcript order. */
 	refs: PullRequestRef[];
-	/** The repository `origin` names in `cwd`, looked up once a bare PR number needs it; `null` until found. */
+	/** The repository `origin` names in `cwd`, looked up once a bare PR number or `branch` needs it; `null` until found. */
 	repo: Repo | null;
 	pullRequests: LinkedPullRequest[];
 	/** Every transcript's Linear issues, each once, the session's own first. */
@@ -324,6 +326,8 @@ interface SessionScan {
 	workDirs: string[];
 	/** The linked worktree it works in, when that is not the checkout `cwd` is in. */
 	worktree: string | null;
+	/** The branch checked out in the linked worktree it works in, `worktree` or else `cwd`'s; `null` in a main checkout or on a detached HEAD. */
+	branch: string | null;
 }
 
 /**
@@ -400,15 +404,14 @@ export class SessionFactsIndex {
 			if (!this.#heads.has(key)) this.#heads.set(key, { owner: pr.owner, repo: pr.repo, number: pr.number });
 		}
 		let changed = false;
-		for (const session of this.#sessions.values()) {
-			if (session.refs.some(ref => ref.kind === "branch") && this.#resolve(session)) changed = true;
-		}
+		for (const session of this.#sessions.values()) if (this.#resolve(session)) changed = true;
 		return changed;
 	}
 
-	/** Recompute a session's pull requests; returns whether they changed. */
+	/** Recompute a session's pull requests, from its transcripts' refs and then its linked worktree's branch; returns whether they changed. */
 	#resolve(session: SessionScan): boolean {
-		const pullRequests = resolveLinks(session.refs, session.repo, this.#heads);
+		const { refs, repo, branch } = session;
+		const pullRequests = resolveLinks(repo && branch !== null ? [...refs, { kind: "branch", ...repo, branch }] : refs, repo, this.#heads);
 		const before = session.pullRequests;
 		const same = pullRequests.length === before.length && pullRequests.every((pr, i) => prKey(pr) === prKey(before[i]!) && pr.link === before[i]!.link);
 		if (same) return false;
@@ -443,15 +446,6 @@ export class SessionFactsIndex {
 		const touched = scans.map(scan => scan.session);
 		/** Sessions whose bash calls named a new `cwd`, or whose worktree is gone: the others keep theirs without asking git. */
 		const moved = scans.filter(scan => scan.moved).map(scan => scan.session);
-		// One `git` call per directory, all at once, and only for sessions that name a PR by number alone.
-		await Promise.all(
-			touched
-				.filter(session => session.repo === null && session.refs.some(ref => ref.kind === "number"))
-				.map(async session => {
-					session.repo = await this.#repoOf(session.cwd);
-				}),
-		);
-		for (const session of touched) if (this.#resolve(session)) changed = true;
 		// Sessions share directories, so each is asked about once per refresh.
 		const asked = new Map<string, Promise<WorktreeAt | null>>();
 		const worktreeAt = (dir: string): Promise<WorktreeAt | null> => {
@@ -465,6 +459,26 @@ export class SessionFactsIndex {
 			session.worktree = worktrees[i]!;
 			changed = true;
 		});
+		// A session that wrote to its transcript may have switched its worktree's branch since: two `git` calls per writing session's directory per refresh.
+		const checkouts = await Promise.all(
+			touched.map(session => {
+				const dir = session.worktree ?? session.cwd;
+				return existsSync(dir) ? worktreeAt(dir) : null;
+			}),
+		);
+		touched.forEach((session, i) => {
+			const at = checkouts[i];
+			session.branch = at?.linked ? at.branch : null;
+		});
+		// One `git` call per directory, all at once, and only for sessions that name a PR by number alone or sit on a linked worktree's branch.
+		await Promise.all(
+			touched
+				.filter(session => session.repo === null && (session.branch !== null || session.refs.some(ref => ref.kind === "number")))
+				.map(async session => {
+					session.repo = await this.#repoOf(session.cwd);
+				}),
+		);
+		for (const session of touched) if (this.#resolve(session)) changed = true;
 		return changed;
 	}
 
@@ -472,7 +486,7 @@ export class SessionFactsIndex {
 	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; moved: boolean }> {
 		let session = this.#sessions.get(path);
 		const previousShip = session?.transcripts.get(path)?.scan.ship;
-		session ??= { modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path)]]), refs: [], repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null };
+		session ??= { modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path)]]), refs: [], repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null, branch: null };
 		this.#sessions.set(path, session);
 		for (const file of await subagentFiles(path)) {
 			if (!session.transcripts.has(file)) session.transcripts.set(file, new TranscriptScan(file));

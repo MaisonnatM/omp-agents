@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkoutDir, gitCheckout, gitStatus, switchBranch } from "./git";
+import { checkoutDir, gitCheckout, gitStatus, switchBranch, worktreeAt } from "./git";
 import { runChecked } from "./proc";
 
 const dirs: string[] = [];
@@ -27,6 +27,20 @@ async function repo(): Promise<{ parent: string; main: string }> {
 	await git(main, "worktree", "add", "-q", "-b", "wip", join(parent, "app-wip"));
 	return { parent, main };
 }
+
+describe("worktreeAt", () => {
+	test("tells a linked worktree from the main checkout, with the branch each has checked out, none while HEAD is detached", async () => {
+		const { parent, main } = await repo();
+		mkdirSync(join(main, "src"));
+		const common = join(main, ".git");
+		expect(await worktreeAt(join(main, "src"))).toEqual({ top: main, common, linked: false, branch: "main" });
+		expect(await worktreeAt(join(parent, "app-wip"))).toEqual({ top: join(parent, "app-wip"), common, linked: true, branch: "wip" });
+		await git(main, "update-ref", "refs/tags/wip", "HEAD");
+		expect((await worktreeAt(join(parent, "app-wip")))?.branch).toBe("wip");
+		await git(main, "switch", "-q", "--detach", "old");
+		expect((await worktreeAt(main))?.branch).toBeNull();
+	});
+});
 
 describe("gitCheckout", () => {
 	test("lists the checked-out branch first and where each branch is checked out", async () => {

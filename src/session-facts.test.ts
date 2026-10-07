@@ -198,6 +198,20 @@ const sessionDir = () => {
 	return dir;
 };
 
+const IDENTITY = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
+const git = (cwd: string, ...args: string[]): Promise<string> => runChecked(["git", "-C", cwd, ...args], { env: IDENTITY });
+
+/** A repository at `<parent>/app` on `main`, with `wip` and `done` checked out in worktrees `app-wip` and `app-done`. Returns the main checkout. */
+async function repoWithWorktrees(parent: string): Promise<string> {
+	const main = join(parent, "app");
+	mkdirSync(main);
+	await git(main, "init", "-q", "-b", "main");
+	await git(main, "commit", "-q", "--allow-empty", "-m", "one");
+	await git(main, "worktree", "add", "-q", "-b", "wip", join(parent, "app-wip"));
+	await git(main, "worktree", "add", "-q", "-b", "done", join(parent, "app-done"));
+	return main;
+}
+
 describe("SessionFactsIndex", () => {
 	test("folds in subagents' submissions and picks up appends once the session file changes", async () => {
 		const dir = sessionDir();
@@ -300,13 +314,8 @@ describe("SessionFactsIndex", () => {
 
 	test("names the linked worktree the session's own bash calls last ran in, passing over others, and none once it is gone", async () => {
 		const parent = realpathSync(sessionDir());
-		const git = (cwd: string, ...args: string[]) => runChecked(["git", "-C", cwd, ...args], { env: { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
-		const main = join(parent, "app");
-		mkdirSync(join(main, "src"), { recursive: true });
-		await git(main, "init", "-q", "-b", "main");
-		await git(main, "commit", "-q", "--allow-empty", "-m", "one");
-		await git(main, "worktree", "add", "-q", "-b", "wip", join(parent, "app-wip"));
-		await git(main, "worktree", "add", "-q", "-b", "done", join(parent, "app-done"));
+		const main = await repoWithWorktrees(parent);
+		mkdirSync(join(main, "src"));
 		const other = join(parent, "other");
 		mkdirSync(other);
 		await git(other, "init", "-q");
@@ -333,6 +342,46 @@ describe("SessionFactsIndex", () => {
 		appendFileSync(session, `${ran("../../app-wip")}\n${ran("../../app-done")}\n`);
 		expect(await index.refresh(listed(4))).toBe(true);
 		expect(index.factsOf(session).worktree).toBeNull();
+	});
+
+	test("links the PR that heads the branch of the linked worktree a session works in, not the main checkout's, and follows a branch switch", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		const inWorktree = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		const intoWorktree = join(parent, "2026-10-01T00-00-00-000Z_s2.jsonl");
+		const inMain = join(parent, "2026-10-01T00-00-00-000Z_s3.jsonl");
+		const ran = (cwd: string) => toolCall(`b-${cwd}`, "bash", { command: "bun test", cwd });
+		writeFileSync(inWorktree, `${ran(".")}\n`);
+		writeFileSync(intoWorktree, `${ran(join(parent, "app-done"))}\n`);
+		writeFileSync(inMain, `${ran(".")}\n`);
+		const repo = { owner: "acme", repo: "webapp" };
+		const listed = (modifiedAt: number) => [
+			{ path: inWorktree, cwd: join(parent, "app-wip"), modifiedAt },
+			{ path: intoWorktree, cwd: main, modifiedAt },
+			{ path: inMain, cwd: main, modifiedAt },
+		];
+		const heads = ["wip", "done", "main", "next"].map((head, i) => ({ ...repo, number: i + 1, head }));
+		const linked = (number: number) => [{ ...repo, number, link: "worked" as const }];
+		const index = new SessionFactsIndex(async () => repo, worktreeAt);
+
+		await index.refresh(listed(1));
+		expect(index.learnHeads(repo, heads)).toBe(true);
+		expect(index.factsOf(inWorktree).pullRequests).toEqual(linked(1));
+		expect(index.factsOf(intoWorktree).pullRequests).toEqual(linked(2));
+		expect(index.factsOf(inMain).pullRequests).toEqual([]);
+
+		await git(join(parent, "app-wip"), "switch", "-q", "-c", "next");
+		await git(join(parent, "app-done"), "switch", "-q", "--detach");
+		appendFileSync(inWorktree, `${ran(".")}\n`);
+		appendFileSync(intoWorktree, `${ran(join(parent, "app-done"))}\n`);
+		expect(await index.refresh(listed(2))).toBe(true);
+		expect(index.factsOf(inWorktree).pullRequests).toEqual(linked(4));
+		expect(index.factsOf(intoWorktree).pullRequests).toEqual([]);
+
+		const offGitHub = new SessionFactsIndex(async () => null, worktreeAt);
+		await offGitHub.refresh(listed(1));
+		offGitHub.learnHeads(repo, heads);
+		expect(offGitHub.factsOf(inWorktree).pullRequests).toEqual([]);
 	});
 });
 

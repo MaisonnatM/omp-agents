@@ -64,26 +64,33 @@ export interface WorktreeAt {
 	top: string;
 	/** The git directory every worktree of the repository shares. */
 	common: string;
+	/** Whether it is a linked worktree rather than the repository's main checkout. */
+	linked: boolean;
+	/** The branch it has checked out, `null` when HEAD is detached. */
+	branch: string | null;
 }
 
 /** The worktree `dir` is in, `null` when it is in none. */
 export async function worktreeAt(dir: string): Promise<WorktreeAt | null> {
-	const { code, stdout } = await run(["git", "-C", dir, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"]);
-	const [top, common] = stdout.trim().split("\n");
-	return code === 0 && top && common ? { top, common } : null;
+	const [{ code, stdout }, head] = await Promise.all([
+		run(["git", "-C", dir, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir", "--git-dir"]),
+		run(["git", "-C", dir, "symbolic-ref", "--quiet", "HEAD"]),
+	]);
+	const [top, common, own] = stdout.trim().split("\n");
+	if (code !== 0 || !top || !common || !own) return null;
+	const ref = head.stdout.trim();
+	return { top, common, linked: own !== common, branch: head.code === 0 && ref.startsWith(HEADS) ? ref.slice(HEADS.length) : null };
 }
 
 /** The checkout `cwd` is in, `null` when it is in none. */
 export async function gitCheckout(cwd: string): Promise<GitCheckout | null> {
-	const inside = await run(["git", "-C", cwd, "rev-parse", "--is-inside-work-tree"]);
-	if (inside.code !== 0 || inside.stdout.trim() !== "true") return null;
-	const [worktrees, names, head] = await Promise.all([
+	const at = await worktreeAt(cwd);
+	if (!at) return null;
+	const [worktrees, names] = await Promise.all([
 		worktreesOf(cwd).then(rows => rows.filter(row => row.prunable === null)),
 		branchesOf(cwd),
-		run(["git", "-C", cwd, "symbolic-ref", "--quiet", "HEAD"]),
 	]);
-	const ref = head.stdout.trim();
-	const branch = head.code === 0 && ref.startsWith(HEADS) ? ref.slice(HEADS.length) : null;
+	const { branch } = at;
 	const worktreeOf = new Map(worktrees.flatMap(worktree => (worktree.branch ? [[worktree.branch, worktree.path] as const] : [])));
 	const ordered = branch === null ? names : [branch, ...names.filter(name => name !== branch)];
 	return {
