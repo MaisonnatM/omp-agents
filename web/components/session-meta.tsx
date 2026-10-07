@@ -1,77 +1,89 @@
-import { ArrowUpRight } from "lucide-react";
-import { Fragment } from "react";
+import { ChevronDown, GitPullRequest } from "lucide-react";
+import { Fragment, useState } from "react";
 import { type LinkedPullRequest, pullRequestUrl } from "../../src/shared/github";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { graphiteUrl } from "../inbox-model";
 import { projectName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
-import { hashForInbox, hashForTickets } from "../routing";
+import { hashForInbox } from "../routing";
 import { OrgIcon } from "./org-icon";
 
-/** The project a session runs in, with its full directory, and the worktree it works in when another, on hover. */
-export const Project = ({ cwdDisplay, worktree }: { cwdDisplay: string; worktree: string | null }) => (
-	<Tooltip content={worktree ? `${cwdDisplay}, working in ${worktree}` : cwdDisplay}>
-		<span>{projectName(cwdDisplay) ?? cwdDisplay}</span>
-	</Tooltip>
-);
+const PARENT_CRUMB = "font-normal text-muted-foreground";
 
 /**
- * The PRs a session submitted or worked on, after a separator. The inbox icon and number open the PR's details in the
- * inbox, the arrow after them opens the PR on GitHub, and the Graphite mark opens it on Graphite.
+ * `webapp / Fix login`: the project a session runs in, then `path`, each name below the one before it. Hover the project
+ * for its full directory, and the worktree it works in when another.
  */
-export function PullRequests({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
-	return pullRequests.map(pr => {
-		const name = `${pr.owner}/${pr.repo}#${pr.number}`;
-		return (
-			<Fragment key={name}>
-				{" · "}
-				<Tooltip content={`${name}, which this session ${pr.link === "submitted" ? "submitted" : "worked on"}, in the inbox`}>
-					<a
-						href={hashForInbox(pr)}
-						className="underline-offset-2 hover:text-foreground hover:underline"
-					>
-						<PAGE_ICON.inbox aria-hidden className="mr-0.5 inline size-3 align-[-0.125em]" />
-						#{pr.number}
-					</a>
-				</Tooltip>
-				<Tooltip content={`${name} on GitHub`}>
-					<a
-						href={pullRequestUrl(pr)}
-						target="_blank"
-						rel="noreferrer"
-						aria-label={`${name} on GitHub`}
-						className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-					>
-						<ArrowUpRight aria-hidden className="inline size-3 align-[-0.125em]" />
-					</a>
-				</Tooltip>
-				<Tooltip content={`${name} on Graphite`}>
-					<a
-						href={graphiteUrl(pr)}
-						target="_blank"
-						rel="noreferrer"
-						aria-label={`${name} on Graphite`}
-						className="ml-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-					>
-						<OrgIcon org="graphite" className="inline align-[-0.125em]" />
-					</a>
-				</Tooltip>
-			</Fragment>
-		);
-	});
+export function SessionTrail({ cwdDisplay, worktree, path }: { cwdDisplay: string; worktree: string | null; path: string[] }) {
+	return (
+		<>
+			<Tooltip content={worktree ? `${cwdDisplay}, working in ${worktree}` : cwdDisplay}>
+				<span className={path.length > 0 ? PARENT_CRUMB : undefined}>{projectName(cwdDisplay) ?? cwdDisplay}</span>
+			</Tooltip>
+			{path.map((name, index) => (
+				<Fragment key={index}>
+					<span aria-hidden className="px-1.5 font-normal text-muted-foreground/60">
+						/
+					</span>
+					<span className={index < path.length - 1 ? PARENT_CRUMB : undefined}>{name}</span>
+				</Fragment>
+			))}
+		</>
+	);
 }
 
-/** The Linear issues a session worked on, after a separator; each opens the issue's sheet on the tickets page. */
-export function Tickets({ tickets }: { tickets: string[] }) {
-	return tickets.map(id => (
-		<Fragment key={id}>
-			{" · "}
-			<Tooltip content={`${id}, which this session worked on, in the tickets page`}>
-				<a href={hashForTickets(id)} className="underline-offset-2 hover:text-foreground hover:underline">
-					<PAGE_ICON.tickets aria-hidden className="mr-0.5 inline size-3 align-[-0.125em]" />
-					{id}
-				</a>
+/** The PRs a session submitted or worked on, behind one button: each opens on GitHub, on Graphite, or in the inbox's details. */
+export function PullRequestMenu({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
+	const [open, setOpen] = useState(false);
+	const [first] = pullRequests;
+	if (!first) return null;
+	const more = pullRequests.length - 1;
+	return (
+		<DropdownMenu open={open} onOpenChange={setOpen}>
+			<Tooltip
+				content={more > 0 ? `This session's ${pullRequests.length} pull requests` : `${first.owner}/${first.repo}#${first.number}`}
+				forceOpen={open ? false : undefined}
+				side="bottom"
+			>
+				<DropdownMenuTrigger render={<Button variant="secondary" size="compact" leadingIcon={GitPullRequest} trailingIcon={ChevronDown} active={open} />}>
+					#{first.number}
+					{more > 0 && <span className="text-muted-foreground">+{more}</span>}
+				</DropdownMenuTrigger>
 			</Tooltip>
-		</Fragment>
-	));
+			<DropdownMenuContent align="end">
+				{pullRequests.map((pr, index) => (
+					<Fragment key={pullRequestUrl(pr)}>
+						{index > 0 && <MenuSeparator />}
+						<MenuLinkItem href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
+							<OrgIcon org="github" className="size-4" />#{pr.number} on GitHub
+						</MenuLinkItem>
+						<MenuLinkItem href={graphiteUrl(pr)} target="_blank" rel="noreferrer">
+							<OrgIcon org="graphite" className="size-4" />#{pr.number} on Graphite
+						</MenuLinkItem>
+						<MenuLinkItem href={hashForInbox(pr)}>
+							<PAGE_ICON.inbox />#{pr.number} in the inbox
+						</MenuLinkItem>
+					</Fragment>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+/** Cursor's link that opens `dir` as a folder, which macOS hands to Cursor. */
+export const cursorUrl = (dir: string): string => `cursor://file${encodeURI(dir)}`;
+
+const CursorLogo = ({ size }: { size?: number | string }) => <OrgIcon org="cursor" className={size === 16 ? "size-4" : "size-3.5"} />;
+
+/** Opens the directory a session works in as a Cursor window. */
+export function OpenInCursor({ dir }: { dir: string }) {
+	return (
+		<Tooltip content={`Open ${dir} in Cursor`} side="bottom">
+			<Button variant="secondary" size="compact" leadingIcon={CursorLogo} render={<a href={cursorUrl(dir)} />}>
+				Cursor
+			</Button>
+		</Tooltip>
+	);
 }
