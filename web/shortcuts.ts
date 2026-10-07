@@ -49,7 +49,7 @@ export type ShortcutId =
 export type Scope = "composer" | "outside-fields" | "anywhere";
 
 /** A key plus the modifiers it needs. `mod` is ⌘ on macOS and Ctrl elsewhere, as web apps bind it. */
-interface Chord {
+export interface Chord {
 	/** A lowercase letter, a printable symbol, or a `KeyboardEvent.key` name such as `Escape`. */
 	key: string;
 	mod?: true;
@@ -65,6 +65,8 @@ export interface Shortcut {
 	id: ShortcutId;
 	label: string;
 	keys: readonly Binding[];
+	/** What the command palette lists the shortcut as, for the page-wide actions it runs: `Go to inbox`. */
+	command?: string;
 }
 
 /** Every dashboard shortcut, in the order a key tries them. The reference dialog lists exactly these. */
@@ -81,29 +83,41 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		keys: [{ chord: { key: "Enter", mod: true }, scope: "composer" }],
 	},
 	{ id: "dequeue", label: "Move the last queued message back into the empty composer", keys: [{ chord: { key: "ArrowUp" }, scope: "composer" }] },
-	{ id: "switcher", label: "Jump to a session, or create a todo", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
-	{ id: "newSession", label: "Start a new session", keys: [{ chord: { key: "o", mod: true, shift: true }, scope: "anywhere" }] },
+	{ id: "switcher", label: "Open the command menu", keys: [{ chord: { key: "k", mod: true }, scope: "anywhere" }] },
+	{ id: "newSession", label: "Start a new session", command: "New session", keys: [{ chord: { key: "o", mod: true, shift: true }, scope: "anywhere" }] },
 	{ id: "endSession", label: "End the focused session", keys: [{ chord: { key: "x", mod: true, shift: true }, scope: "anywhere" }] },
-	{ id: "previousSession", label: "Open the previous session in the sidebar", keys: [{ chord: { key: "[", mod: true }, scope: "anywhere" }] },
-	{ id: "nextSession", label: "Open the next session in the sidebar", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
+	{
+		id: "previousSession",
+		label: "Open the previous session in the sidebar",
+		command: "Open previous session",
+		keys: [{ chord: { key: "[", mod: true }, scope: "anywhere" }],
+	},
+	{ id: "nextSession", label: "Open the next session in the sidebar", command: "Open next session", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
 	{ id: "model", label: "Choose the session's model", keys: [{ chord: { key: "/", mod: true, alt: true }, scope: "anywhere" }] },
 	{ id: "thinking", label: "Cycle the thinking level", keys: [{ chord: { key: "Tab", shift: true }, scope: "composer" }] },
-	{ id: "tools", label: "Expand or collapse tool calls", keys: [{ chord: { key: "e", mod: true }, scope: "anywhere" }] },
-	{ id: "sessionsSidebar", label: "Show or hide the sessions sidebar, on the left", keys: [{ chord: { key: "b", mod: true }, scope: "anywhere" }] },
+	{ id: "tools", label: "Expand or collapse tool calls", command: "Toggle tool calls", keys: [{ chord: { key: "e", mod: true }, scope: "anywhere" }] },
+	{
+		id: "sessionsSidebar",
+		label: "Show or hide the sessions sidebar, on the left",
+		command: "Toggle sessions sidebar",
+		keys: [{ chord: { key: "b", mod: true }, scope: "anywhere" }],
+	},
 	{
 		id: "detailsSidebar",
 		label: "Show or hide the session details sidebar, on the right",
+		command: "Toggle details sidebar",
 		keys: [{ chord: { key: "b", mod: true, alt: true }, scope: "anywhere" }],
 	},
 	{
 		id: "settings",
 		label: "Open or close settings",
+		command: "Toggle settings",
 		keys: [
 			{ chord: { key: ",", mod: true }, scope: "anywhere" },
 			{ chord: { key: "j", mod: true, shift: true }, scope: "anywhere" },
 		],
 	},
-	{ id: "help", label: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
+	{ id: "help", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{
 		id: "focusComposer",
@@ -113,12 +127,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "i", mod: true }, scope: "anywhere" },
 		],
 	},
-	{ id: "inbox", label: "Go to the pull request inbox", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
-	{ id: "tickets", label: "Go to your Linear tickets", keys: [{ chord: { key: "2", mod: true }, scope: "anywhere" }] },
-	{ id: "sessions", label: "Go to the sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },
-	{ id: "todo", label: "Go to your todo list", keys: [{ chord: { key: "4", mod: true }, scope: "anywhere" }] },
-	{ id: "calendar", label: "Go to your calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },
-	{ id: "routines", label: "Go to your routines", keys: [{ goTo: "r" }] },
+	{ id: "inbox", label: "Go to the pull request inbox", command: "Go to inbox", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
+	{ id: "tickets", label: "Go to your Linear tickets", command: "Go to tickets", keys: [{ chord: { key: "2", mod: true }, scope: "anywhere" }] },
+	{ id: "sessions", label: "Go to the sessions", command: "Go to sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },
+	{ id: "todo", label: "Go to your todo list", command: "Go to todo list", keys: [{ chord: { key: "4", mod: true }, scope: "anywhere" }] },
+	{ id: "calendar", label: "Go to your calendar", command: "Go to calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },
+	{ id: "routines", label: "Go to your routines", command: "Go to routines", keys: [{ goTo: "r" }] },
 	{ id: "project", label: "Choose the sidebar's project", keys: [{ goTo: "p" }] },
 	{ id: "nextPullRequest", label: "Inbox: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", label: "Inbox: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
@@ -140,7 +154,8 @@ const GO = "g";
 /** How long G waits for the key it goes to. */
 const GO_TO_MS = 1500;
 
-type KeyEvent = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "altKey" | "metaKey" | "shiftKey">;
+/** The parts of a DOM or React key press that a chord reads. */
+export type KeyEvent = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "altKey" | "metaKey" | "shiftKey">;
 
 function keyOf({ key, code, metaKey, ctrlKey }: KeyEvent): string {
 	// AZERTY needs physical number-row keys for shortcuts; unmodified symbols must still match as typed.
@@ -167,25 +182,27 @@ export interface Match {
 	scope: Scope;
 }
 
+/** Whether `event` presses `chord`. `mac` reads ⌘ as `mod` instead of Ctrl. */
+export function pressesChord(event: KeyEvent, chord: Chord, mac = IS_MAC): boolean {
+	const key = keyOf(event);
+	// Which symbols need Shift depends on the layout (`?` is Shift+/ in US, Shift+, in AZERTY), so symbols ignore it.
+	const symbol = key.length === 1 && !/[a-z0-9]/.test(key);
+	return (
+		chord.key === key &&
+		event.metaKey === (mac && !!chord.mod) &&
+		event.ctrlKey === (!mac && !!chord.mod) &&
+		event.altKey === !!chord.alt &&
+		(symbol || event.shiftKey === !!chord.shift)
+	);
+}
+
 /**
  * The shortcuts `event` presses, in {@link SHORTCUTS} order. `previous` is the plain key pressed just before outside a
  * text field, which a G pair needs. `mac` reads ⌘ as `mod` instead of Ctrl.
  */
 export function shortcutsFor(event: KeyEvent, previous: string | null = null, mac = IS_MAC): Match[] {
-	const key = keyOf(event);
-	// Which symbols need Shift depends on the layout (`?` is Shift+/ in US, Shift+, in AZERTY), so symbols ignore it.
-	const symbol = key.length === 1 && !/[a-z0-9]/.test(key);
-	const presses = (binding: Binding): boolean => {
-		if ("goTo" in binding) return previous === GO && key === binding.goTo && plain(event);
-		const { chord } = binding;
-		return (
-			chord.key === key &&
-			event.metaKey === (mac && !!chord.mod) &&
-			event.ctrlKey === (!mac && !!chord.mod) &&
-			event.altKey === !!chord.alt &&
-			(symbol || event.shiftKey === !!chord.shift)
-		);
-	};
+	const presses = (binding: Binding): boolean =>
+		"goTo" in binding ? previous === GO && keyOf(event) === binding.goTo && plain(event) : pressesChord(event, binding.chord, mac);
 	return SHORTCUTS.flatMap(({ id, keys }) =>
 		keys.filter(presses).map((binding): Match => ({ id, scope: scopeOf(binding) })),
 	);
@@ -202,13 +219,17 @@ const KEY_LABEL: Record<string, string> = {
 	Tab: IS_MAC ? "⇥" : "Tab",
 };
 
-/** `⇧⌘O` on macOS, `Ctrl+Shift+O` elsewhere, `G then P` for a pair. */
-export function bindingLabel(binding: Binding): string {
-	if ("goTo" in binding) return `${GO.toUpperCase()} then ${binding.goTo.toUpperCase()}`;
-	const { key, mod, alt, shift } = binding.chord;
+/** `⇧⌘O` on macOS, `Ctrl+Shift+O` elsewhere. */
+export function chordLabel({ key, mod, alt, shift }: Chord): string {
 	const name = KEY_LABEL[key] ?? key.toUpperCase();
 	if (IS_MAC) return `${alt ? "⌥" : ""}${shift ? "⇧" : ""}${mod ? "⌘" : ""}${name}`;
 	return [mod && "Ctrl", alt && "Alt", shift && "Shift", name].filter(Boolean).join("+");
+}
+
+/** {@link chordLabel}, or `G then P` for a pair. */
+export function bindingLabel(binding: Binding): string {
+	if ("goTo" in binding) return `${GO.toUpperCase()} then ${binding.goTo.toUpperCase()}`;
+	return chordLabel(binding.chord);
 }
 
 const EITHER = new Intl.ListFormat("en", { type: "disjunction" });

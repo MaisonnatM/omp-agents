@@ -40,7 +40,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected project when there is one, and stays highlighted while the draft is open.
 - The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected project.
   A group left without a match hides, and `No sessions match` shows when none is left; Esc clears the field.
-  Cmd+K searches every project instead and opens the session you pick.
+  Cmd+K opens the command menu, which searches every project instead.
 - Sessions in `/tmp` or `/private/tmp`, including their subdirectories, are hidden from project and workspace pickers, session lists and counts, and session search.
   Starting or opening one does not replace the saved project.
   Their saved transcripts remain available through a direct session link.
@@ -591,7 +591,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A category's **⋯** menu renames it or deletes it; deleting a category keeps its todos, in no category.
 - **Add a todo** at the bottom of a list starts a new todo in that list's category; type its title and press Enter.
   Enter then starts the next todo below it, and Enter on an empty one, Esc, or a click elsewhere stops.
-- A new todo's title, here or in **Create todo** in Cmd+K, can end with a due day: `today`, `tomorrow`, a weekday such as `fri` or `friday`, or a `YYYY-MM-DD` date.
+- A new todo's title, here or in the command menu's **Create todo**, can end with a due day: `today`, `tomorrow`, a weekday such as `fri` or `friday`, or a `YYYY-MM-DD` date.
   A new top-level todo's title can also end with `#` and the name of an existing category in any case, before or after the day.
   They set the todo's due day and category and leave its title, and a word that names neither stays in the title.
   A weekday names its next date, today included.
@@ -790,7 +790,7 @@ Alt is Option on macOS.
 | Cmd+Enter | Composer | Steer the running turn immediately; on an empty composer, deliver a pending steer now |
 | Shift+Tab | Composer | Cycle the thinking level |
 | ↑ | Empty composer | Move the last queued message back into the composer |
-| Cmd+K | Anywhere | Jump to a session, or create a todo |
+| Cmd+K | Anywhere | Open the command menu |
 | Cmd+Shift+O | Anywhere | Start a new session |
 | Cmd+Shift+X | Anywhere | End the focused session |
 | Cmd+[ | Anywhere | Open the previous session in the sidebar |
@@ -833,12 +833,19 @@ Alt is Option on macOS.
   Esc leaves the composer; Cmd+Shift+Backspace interrupts the turn.
   ↑ moves the last queued message back only while the composer is empty, as ↑ edits your last message in Slack.
   With a draft, ↑ moves the caret as usual.
-- Cmd+K searches every running and past session, in every project, by title or directory, and opens the one you pick in the focused pane.
-  The search button in the sidebar header, immediately before the keyboard button, opens that search.
+- Cmd+K opens the command menu, which searches every running and past session, in every project, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to inbox** or **Toggle sessions sidebar**.
+  The search button in the sidebar header, immediately before the keyboard button, opens it too.
+  With nothing typed, **Suggestions** lists the five entries you use most, by how often and how lately, then **Running**, **Commands**, and **Past**.
+  What you type ranks every match by how well it matches and how much you use it, and the menu remembers that in this browser.
+  Enter runs the highlighted entry's main action, which opens a session in the focused pane, and Cmd+Enter runs its second, which opens a session in a split.
   A session from another project switches the sidebar to that project.
-  Type a title and choose **Create todo** to add it at the end of **All**, with no category. You stay on the page you were on.
+  Cmd+K inside the menu lists every action of the highlighted entry, as the session row's menu does, and you can search them; Cmd+Shift+P pins or unpins a session, Cmd+Shift+C copies its path, and Cmd+Shift+X ends it, without opening that list.
+  **Choose project…** switches the sidebar's project, and **Create todo** asks for a todo's title; Esc or Backspace in the empty field goes back.
+  The bar at the bottom names where you are, what Enter does, and **Actions**, which opens the same list as Cmd+K.
+  Esc closes the action list, then goes back, then clears what you typed, then closes the menu.
+  Whatever you type also offers **Create todo**, last, which adds it at the end of **All**, with no category.
+  You stay on the page you were on.
   The title can end with a due day or a `#category`, as in [Todo list](#todo-list).
-  Enter still opens the highlighted session, and creates the todo when none matches. Cmd+Enter creates it either way.
   Cmd+[ and Cmd+] walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
   From a subagent they step from its session's row.
 - Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does.
@@ -882,7 +889,7 @@ Alt is Option on macOS.
 - The window title follows what the page shows, and a browser tab's title does too: the focused session's name, a subagent's name ahead of its session's, `Inbox`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, or `New session`, then `omp agents`.
   A session without a name reads as its project, and nothing open reads `omp agents`.
 - The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
-- Alt+Shift+Cmd+T, from any app, brings the window up with Cmd+K's search open, so you can type a title and press Cmd+Enter to create a todo.
+- Alt+Shift+Cmd+T, from any app, brings the window up with the command menu's **Create todo** open, so you can type a title and press Enter to create a todo.
   When another app holds the keys, the app logs so and the shortcut does nothing.
 - The Dock icon's badge counts the top-level todos left to do, as **All** does, and goes away at none.
 
