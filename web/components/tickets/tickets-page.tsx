@@ -172,7 +172,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	);
 }
 
-/** The tickets page while omp cannot read Linear: Linear's integration row, to connect from here as from the Integrations page. */
+/** The tickets page while omp cannot read Linear: Linear's integration row, to connect from here as from Settings › Integrations. */
 export function TicketsDisconnected({ linear }: { linear: McpIntegration }) {
 	return (
 		<PageFrame title={TITLE} meta={META}>

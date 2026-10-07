@@ -289,7 +289,7 @@ async function request(server: McpServer, method: string, params: Record<string,
 			if (status !== 401) return new Error(`The "${server.name}" MCP server answered HTTP ${status}`);
 			tokens.drop(server.credentialId);
 			checks.drop(server.credentialId);
-			return new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it on the Integrations page, or run /mcp reauth ${server.name} in omp.`);
+			return new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it in Settings › Integrations, or run /mcp reauth ${server.name} in omp.`);
 		},
 	});
 	if (response.error) throw new Error(response.error.message || "The MCP server answered an error");

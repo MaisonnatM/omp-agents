@@ -37,15 +37,15 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 test("browser-reserved chords stay the browser's", () => {
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["6", "Digit6"], ["9", "Digit9"], ["0", "Digit0"]]) {
+		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["9", "Digit9"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
 		}
 	}
 });
 
-test("Cmd+1–5 selects dashboard tabs on macOS, Ctrl+1–5 elsewhere, including AZERTY", () => {
-	const tabs = ["inbox", "tickets", "sessions", "todo", "calendar"] as const;
-	const azerty = ["&", "é", "\"", "'", "("];
+test("Cmd+1–6 selects dashboard tabs on macOS, Ctrl+1–6 elsewhere, including AZERTY", () => {
+	const tabs = ["inbox", "tickets", "sessions", "todo", "calendar", "settings"] as const;
+	const azerty = ["&", "é", "\"", "'", "(", "-"];
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
 		for (const [index, id] of tabs.entries()) {
@@ -59,12 +59,13 @@ test("Cmd+1–5 selects dashboard tabs on macOS, Ctrl+1–5 elsewhere, including
 			expect(pressOn(mac, key, code, { meta: true, ctrl: true })).toEqual([]);
 		}
 	}
+	expect(press(",", "Comma", { ctrl: true })).toEqual([]);
+	expect(press("J", "KeyJ", { ctrl: true, shift: true })).toEqual([]);
 });
 
 test("a letter key that types no ASCII letter matches by its physical key, an ASCII symbol as typed", () => {
 	expect(press("л", "KeyK", { ctrl: true })).toEqual(["switcher"]);
 	expect(pressOn(true, "˚", "KeyK", { meta: true })).toEqual(["switcher"]);
-	expect(press(",", "KeyM", { ctrl: true })).toEqual(["settings"]);
 	expect(press("?", "KeyM", { shift: true })).toEqual(["help"]);
 	expect(press("?", "Slash", { shift: true })).toEqual(["help"]);
 	expect(press("/", "Digit7", { shift: true })).toEqual(["focusComposer", "todoSearch"]);
@@ -95,7 +96,6 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 		{ id: "todoSearch", scope: "outside-fields" },
 	]);
 	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
-	expect(press("J", "KeyJ", { ctrl: true, shift: true })).toEqual(["settings"]);
 });
 
 test("↑ takes back a queued message, Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", () => {

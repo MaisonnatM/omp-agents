@@ -211,7 +211,7 @@ export class GoogleCalendar {
 			}),
 		);
 		const read = lists.filter(list => list !== null);
-		if (read.length === 0) throw new Error(this.#calendars[0]?.error ?? "No Google calendar is added. Add one on the Integrations page.");
+		if (read.length === 0) throw new Error(this.#calendars[0]?.error ?? "No Google calendar is added. Add one in Settings › Integrations.");
 		return { events: read.flat() };
 	}
 }

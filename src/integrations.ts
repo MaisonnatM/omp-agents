@@ -31,7 +31,7 @@ const lastConnections = new Map<McpIntegrationId, McpConnection>();
 /** omp's server for `id`, which reads and writes the service through its tools. */
 export async function integrationServer(id: McpIntegrationId): Promise<McpServer> {
 	const server = await findMcpServer(MCP_SERVICES[id].host);
-	if (!server) throw new Error(`${MCP_SERVICES[id].label} is not connected. Connect it on the Integrations page.`);
+	if (!server) throw new Error(`${MCP_SERVICES[id].label} is not connected. Connect it in Settings › Integrations.`);
 	return server;
 }
 

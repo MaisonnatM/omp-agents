@@ -122,15 +122,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		command: "Toggle details sidebar",
 		keys: [{ chord: { key: "b", mod: true, alt: true }, scope: "anywhere" }],
 	},
-	{
-		id: "settings",
-		label: "Open or close settings",
-		command: "Toggle settings",
-		keys: [
-			{ chord: { key: ",", mod: true }, scope: "anywhere" },
-			{ chord: { key: "j", mod: true, shift: true }, scope: "anywhere" },
-		],
-	},
+	{ id: "settings", label: "Open or close settings", command: "Toggle settings", keys: [{ chord: { key: "6", mod: true }, scope: "anywhere" }] },
 	{ id: "help", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{

@@ -21,8 +21,6 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return "Routines";
 		case "calendar":
 			return "Calendar";
-		case "integrations":
-			return "Integrations";
 		case "changes":
 			return page.path ? `${page.path.split("/").pop()} · Changes` : "Changes";
 		case undefined: {

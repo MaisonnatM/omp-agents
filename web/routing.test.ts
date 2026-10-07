@@ -8,7 +8,6 @@ import {
 	hashForChanges,
 	hashForInbox,
 	hashForLayout,
-	hashForIntegrations,
 	hashForNewSession,
 	hashForRoutines,
 	hashForSettings,
@@ -154,7 +153,6 @@ describe("layout hash", () => {
 	test("every page hash names its page and route, and a session or layout hash names none", () => {
 		expect(routeFromHash(hashForSettings("/work/app"))).toEqual({ kind: "page", page: { kind: "settings", cwd: "/work/app" } });
 		expect(routeFromHash(hashForInbox(null))).toEqual({ kind: "page", page: { kind: "inbox", target: null } });
-		expect(routeFromHash(hashForIntegrations())).toEqual({ kind: "page", page: { kind: "integrations" } });
 		expect(routeFromHash(hashForNewSession(null))).toEqual({ kind: "page", page: { kind: "new", cwd: null, todoId: null } });
 		expect(routeFromHash("#session/01a0f6a5-181e")).toEqual({ kind: "session", sessionId: "01a0f6a5-181e" });
 		expect(routeFromHash("#7c51f77b2a1bf7ba,past/9d2e0000").kind).toBe("panes");

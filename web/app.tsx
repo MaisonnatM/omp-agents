@@ -7,7 +7,6 @@ import { DashboardContext } from "./components/dashboard-context";
 import { FileDialog } from "./components/file-dialog";
 import { InboxIndex, InboxNav } from "./components/inbox/inbox-nav";
 import { InboxPage } from "./components/inbox/inbox-page";
-import { IntegrationsPage } from "./components/integrations/integrations-page";
 import { PullRequestPage } from "./components/inbox/pr-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
@@ -354,9 +353,6 @@ export function App() {
 		case "settings":
 			main = <SettingsPage cwd={page.cwd} workspaces={projects} tab={settingsTab} />;
 			break;
-		case "integrations":
-			main = <IntegrationsPage />;
-			break;
 		case "inbox":
 			main = page.target ? (
 				<PullRequestPage project={project} hosts={visible.hosts} target={page.target} />
@@ -437,7 +433,6 @@ export function App() {
 								onTogglePin={togglePin}
 								open={page ? [] : layout.panes}
 								newSessionOpen={page?.kind === "new"}
-								integrationsOpen={page?.kind === "integrations"}
 								ticketsShown={ticketsShown}
 								tab={tab}
 								onTab={showTab}

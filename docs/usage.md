@@ -589,17 +589,17 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The server keeps Linear's answer for 30 seconds, and **Refresh** asks again at once.
 - The dashboard reads Linear through omp's Linear MCP server and its sign-in, so there is no key to set.
   Until omp is signed in to that server, the sidebar has no **Tickets** tab, Cmd+2 keeps its browser behavior, and a `#tickets` address shows Linear's integration row instead of the issues.
-- To connect, open the **Integrations** page and choose **Connect** on Linear's row; see [Integrations](#integrations).
+- To connect, open **Settings › Integrations** and choose **Connect** on Linear's row; see [Integrations](#integrations).
   A new browser tab opens Linear's sign-in page; approve omp there, and the **Tickets** tab appears within a few seconds.
   When Linear later refuses the sign-in, the **Tickets** tab stays and its page shows Linear's row with **Reconnect**; the Todo page's **Create Linear ticket** and the Calendar's tickets hide until it works again.
 
 ## Integrations
 
-- The plug button in the sidebar header, or a `#integrations` address, opens the **Integrations** page: a row for each service omp's sessions reach through an MCP server, Linear and Slack so far, and one for Google Calendar, which only the dashboard reads.
+- **Integrations** is a section of [Settings](#settings): a row for each service omp's sessions reach through an MCP server, Linear and Slack so far, and one for Google Calendar, which only the dashboard reads.
   **Connected** lists the services that hold a sign-in, working or not, and **Available** lists the rest.
 - Each MCP row shows whether omp is connected, by listing the server's tools with omp's sign-in: **Connected** with the server's host and the number of tools, which unfolds to their names, **Needs reconnecting** when the server refuses the sign-in, **Unreachable** with the server's error and **Check again**, or **Not connected** or **Signed out** when omp has no server or no sign-in for it.
   An unconfigured Slack row says **Not set up** until its app settings are saved.
-  The page checks again every minute, and **Refresh** checks at once.
+  The section checks again every minute while it is open, and **Refresh** checks at once.
 - **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp` or `https://mcp.slack.com/mcp`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
   Linear sends the browser back to `localhost:3000`, so that port must be free while you sign in.
   Slack sends the browser to the HTTPS redirect saved for the app, and omp listens for HTTP on the saved callback port.
@@ -626,7 +626,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Slack requires confidential OAuth with the app's client ID and secret.
   Paste the client ID and the client secret.
   omp stores the client secret in that server's entry in `~/.omp/agent/mcp.json`.
-  The Integrations page does not show the saved secret.
+  The Integrations section does not show the saved secret.
   Leave the secret blank to keep the saved secret when the client ID stays the same.
   A new client ID needs its own secret.
   A saved row shows the registered redirect and the callback listener, such as `localhost:3000`.
@@ -736,7 +736,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - Click an entry to open its routine, its todo list, or its ticket; a Google event opens its day in Google Calendar in a new tab.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
 - To show Google events, open Google Calendar's settings, choose a calendar under **Settings for my calendars**, then **Integrate calendar**, and copy its **Secret address in iCal format**.
-  On the **Integrations** page, choose **Add calendar** on Google Calendar's row and paste it; add each calendar you want shown.
+  In **Settings › Integrations**, choose **Add calendar** on Google Calendar's row and paste it; add each calendar you want shown.
   Anyone with the address can read the calendar, so the server keeps it in `google.json` beside its access token with owner-only file permissions and never sends it to the page; **Reset** in Google Calendar's settings makes a new one.
   A Workspace administrator can turn the secret address off, and then Google Calendar's settings do not show it.
   The page expands repeating events, leaves out canceled events and the ones you declined, repeats multi-day events on each day, and refreshes the open month every minute.
@@ -779,7 +779,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - **Settings** is the last sidebar tab, after **Calendar**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
-  The sidebar lists seven sections: **Analytics**, **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **New sessions**, and **Appearance**.
+  The sidebar lists eight sections: **Analytics**, **Model roles & provider order**, **Retry and fallback**, **Files**, **Worktrees**, **New sessions**, **Integrations**, and **Appearance**.
   It opens on **Analytics**.
   Switching sections keeps an unsaved edit, and the selected section stays when you change workspace.
   The arrow keys move between section buttons; Enter or Space opens the focused section.
@@ -832,6 +832,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The picker lists the skills of the workspace that the settings show, or your own skills with **User files only**.
   Choose **None** to unpin.
   The pin is saved in the browser's localStorage, not in omp's files.
+- **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar; see [Integrations](#integrations).
 - **Appearance** sets the dashboard's theme: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one.
   The choice applies at once and is saved in the browser's localStorage, not in omp's files, so it does not change omp's terminal theme.
 - **Settings** opens on the workspace of the session that you had open, so it includes that project's files and its `.omp/config.yml` overrides.
@@ -864,7 +865,6 @@ Alt is Option on macOS.
 | Alt+T | Anywhere | Show or hide thinking |
 | Cmd+B | Anywhere | Show or hide the sessions sidebar |
 | Cmd+Alt+B | Anywhere | Show or hide the session details sidebar |
-| Cmd+, / Cmd+Shift+J | Anywhere | Open or close settings |
 | Esc | Maximized pane | Restore the split |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
@@ -873,6 +873,7 @@ Alt is Option on macOS.
 | Cmd+3 | Anywhere | Go to the sessions |
 | Cmd+4 | Anywhere | Go to your todo list |
 | Cmd+5 | Anywhere | Go to your calendar |
+| Cmd+6 | Anywhere | Open or close settings |
 | G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Choose the sidebar's project |
 | J | Inbox, outside text fields | Move to the next pull request, or show its details while one shows |
@@ -921,10 +922,10 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in this browser.
-  Cmd+, or Cmd+Shift+J opens Settings, where the model roles live, and closes it again.
 - Cmd+1 opens the Inbox tab, and Cmd+2 opens Tickets when connected to Linear.
   Cmd+3 goes back from the inbox, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
   Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, and G then R the **Routines** page.
+  Cmd+6 opens Settings, where the model roles and the integrations live, and closes it again.
   G then P opens the project picker with its search field focused.
 - Session shortcuts act on the focused pane.
   The dashboard does not read `~/.omp/agent/keybindings.yml`.

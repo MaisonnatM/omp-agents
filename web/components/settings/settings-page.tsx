@@ -10,6 +10,7 @@ import { AnalyticsTab } from "./analytics-tab";
 import { AppearanceTab } from "./appearance-tab";
 import type { Catalog, Editing } from "./editor";
 import { Files } from "./files-tab";
+import { IntegrationsTab } from "./integrations-tab";
 import { NewSessionsTab } from "./new-sessions-tab";
 import { RetrySection, RolesTab } from "./routing-tab";
 import { WorktreesTab } from "./worktrees-tab";
@@ -105,6 +106,7 @@ export function SettingsPage({ cwd, workspaces, tab }: { cwd: string | null; wor
 		analytics: <AnalyticsTab active={tab === "analytics"} />,
 		worktrees: <WorktreesTab cwd={cwd} active={tab === "worktrees"} />,
 		"new-sessions": <NewSessionsTab cwd={cwd} />,
+		integrations: <IntegrationsTab active={tab === "integrations"} />,
 		appearance: <AppearanceTab />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.
@@ -118,7 +120,7 @@ export function SettingsPage({ cwd, workspaces, tab }: { cwd: string | null; wor
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<Header
 				title="Settings"
-				meta={cwd === null ? "omp's usage, model routing, and your files" : "omp's usage, and its model routing and files as a session in this workspace loads them"}
+				meta={cwd === null ? "omp's usage, model routing, integrations, and your files" : "omp's usage and integrations, and its model routing and files as a session in this workspace loads them"}
 			>
 				<WorkspacePicker cwd={cwd} workspaces={workspaces} />
 			</Header>
