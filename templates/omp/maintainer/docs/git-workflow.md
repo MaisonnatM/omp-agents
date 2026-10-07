@@ -14,6 +14,16 @@ In a linked worktree, `.git` is a file pointing to worktree-specific metadata; G
 `--path-format=absolute` makes the result independent of the current subdirectory.
 If Graphite is configured, prefer `gt create` and `gt submit`; `git worktree add` alone does not register a branch with Graphite.
 
+## Create drafts before publishing
+
+Create the PR as a draft with `gt submit --draft` when Graphite is configured, or `gh pr create --draft` otherwise.
+The ship extension blocks publication until a thermonuclear review is applied and pushed.
+Run the thermonuclear stage, commit and push its fixes, then add `- [x] Thermo-nuclear code quality review` to the PR body.
+Follow `~/.omp/agent/docs/review-workflow.md` for the review and checkbox rules.
+Only then request ready-gate approval and run `gt submit --publish` or `gh pr ready <N>`.
+A new branch has no PR body to check: create its draft first rather than retrying publication.
+Authentication or network errors still require fixing the reported access failure, not creating another PR.
+
 ## Register every branch with an open PR
 
 Graphite never auto-discovers a PR opened through plain `git` and `gh pr create`.

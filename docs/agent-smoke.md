@@ -6,8 +6,11 @@ Every check starts with [Server lifecycle and authentication](#server-lifecycle-
 
 `bun start` serves `http://127.0.0.1:4317`, where the user's own dashboard usually runs.
 Other agent sessions run smoke servers at the same time, so pick a smoke port between 4400 and 4899 for the whole session.
-Start the server as a named service with `PORT=<port> bun src/server.ts`, ready on its `Sign in at` log line, which only your own server prints.
-Stop it with `proc://<name>/kill`; `kill $(lsof -ti tcp:<port>)` also kills every process connected to the port, such as another session's desktop window.
+Start the server with `bash` as a named service: `command: "PORT=<port> bun src/server.ts"`, `name: "<unique-name>"`, and `ready: {log: "Sign in at"}`.
+Service calls omit `async` and `timeout`; a readiness deadline belongs in `ready.timeout`.
+Finite checks use `async: true` when needed, without `name` or `ready`.
+Stop only your service with `write({path: "proc://<name>/kill"})`, omitting `content`; reading that path does not stop it.
+`kill $(lsof -ti tcp:<port>)` also kills every process connected to the port, such as another session's desktop window.
 
 Every request needs the access token, stored in `~/.config/omp-agents/token` and printed at startup as `Sign in at http://127.0.0.1:<port>/?token=<token>`.
 Open that address rather than `/`; for curl, send `Cookie: omp-agents-token=<token>` and a matching `Host` header.

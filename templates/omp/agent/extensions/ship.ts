@@ -30,7 +30,7 @@ const LABEL: Record<Stage | LiveWork, string> = {
 const NEXT: Record<Stage, string> = {
 	ticket: "Create or link the Linear issue, then record it with ship_stage({stage: 'implement', issue}).",
 	implement: "Implement and commit on the issue's branch. Do not open a PR in this stage.",
-	draft_pr: "Push and run `gh pr create --draft` with the issue ID in the title and `Fixes <ID>` in the body.",
+	draft_pr: "Create a draft with `gt submit --draft` for a Graphite repository, or push and run `gh pr create --draft` otherwise. Include the issue ID in the title and `Fixes <ID>` in the body.",
 	thermonuclear: `Run thermonuclear-reviewer on the PR diff, apply the findings, push, then add \`${CHECKBOX}\` to the PR body.`,
 	ready_gate: "Ask the user to approve, then run `gh pr ready <N>`.",
 	live: "Work the first need below. Stop when the forge reports merge-ready or while waiting for review. Never merge without an explicit request.",
@@ -244,7 +244,13 @@ export default function ship(pi: ExtensionAPI) {
 
 	async function bodyHasCheckbox(selector: string[], cwd: string): Promise<string | undefined> {
 		const r = await gh(["pr", "view", ...selector, "--json", "body", "-q", ".body"], cwd);
-		if (r.code !== 0) return `Could not read the PR body to check the thermonuclear review: ${r.stderr.trim() || r.stdout.trim()}`;
+		if (r.code !== 0) {
+			const error = r.stderr.trim() || r.stdout.trim();
+			if (/^no pull requests found for branch\b/i.test(error)) {
+				return "Blocked: this branch has no PR yet. Create a draft with `gt submit --draft` for Graphite, or `gh pr create --draft` otherwise. Then run the thermonuclear stage, commit and push its fixes, add the review checkbox, and pass the ready gate before publishing.";
+			}
+			return `Could not read the PR body to check the thermonuclear review: ${error}`;
+		}
 		if (!r.stdout.includes(CHECKBOX)) return `Blocked: the PR is not live until the thermonuclear review is applied and pushed. Run the thermonuclear stage, then add \`${CHECKBOX}\` to the PR body.`;
 		return undefined;
 	}

@@ -30,7 +30,8 @@ Restart running omp sessions to pick up the new files and settings.
 Settings, in `config.yml`:
 
 - `modelRoles`: an Anthropic model for every role.
-- `retry.fallbackChains`: per role, OpenAI Codex, then Cursor, then OpenRouter (open-weight models only), with `retry.usageAwareFallback` on so that a plan with no quota left is skipped.
+- `retry.fallbackChains`: Codex first, Cursor Composer for cheap roles, and open-weight OpenRouter last, with quota-aware skipping enabled.
+  Cursor Grok is opt-in rather than an automatic fallback; existing fallback settings are preserved unless `--force` is used.
 - `modelProviderOrder`: the same four providers in the same order.
 - `task.isolation`: subagents work in their own worktree, and successful changes apply back as a patch.
   At most two subagents run at once.
@@ -39,20 +40,24 @@ Settings, in `config.yml`:
 Files, in `agent/`:
 
 - `AGENTS.md`: worktree and force-push safety, plus conditional pointers for model routing and reviews.
-  Read the matching reference before taking that branch of the workflow.
+  Read the matching reference under `~/.omp/agent/docs/` before taking that branch of the workflow, regardless of the repository's working directory.
 - `docs/`: `model-routing.md` covers provider order and quota handling, and `review-workflow.md` covers thermonuclear review and PR descriptions.
   These references load on demand rather than in every session's context.
 - `APPEND_SYSTEM.md`: final replies in three parts (Résumé, Action, What next), and `isolated: true` for every subagent that touches a git repo.
 - `agents/thermonuclear-reviewer.md`: a read-only reviewer that runs the thermo-nuclear code quality review on the `plan` role's model.
 - `commands/ship.md` and `extensions/ship.ts`: `/ship <Linear issue>` drives an issue from ticket to draft PR, thermonuclear review, and live review.
   The extension adds the `ship_stage` tool and shows the stage and the PR's needs in the session.
+  A branch without a PR gets draft-first recovery instructions; authentication failures retain their actual error.
 - `extensions/cache-tail.ts`: Anthropic caches the tools and system prompt for an hour and the conversation for five minutes.
   A five-minute cache write costs 1.25 times the input price and an hour-long one twice that, and a conversation tail is read again within seconds, so this cuts the write bill without losing the warm head after a pause.
   It also stops cache warming while the session is idle.
   Set `OMP_CACHE_TAIL_TTL=1h` to turn it off.
 - `extensions/end-session.ts`: the `end_session` tool, with which an agent ends its own session once its turn is over and, with `removeWorktree`, has the omp-agents dashboard remove its worktree, so a prompt such as "Merge on main, delete the worktree, then end the session" runs to the end.
 - `extensions/worktree-guard.ts`: holds back a session's first `edit` or `write` in a repository's main checkout and tells the agent to work in a linked worktree; trying the same call again goes through, for when you asked it to work in place.
+- `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add/check changes.
+  An omitted or empty `due` value means no due date; a nonempty value must use `YYYY-MM-DD`.
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.
+  The alias maps Cursor-only cleanup and runtime-control instructions to omp's available tools without editing the plugin cache.
 
 ## Requirements
 
@@ -66,7 +71,8 @@ Files, in `agent/`:
 ## Maintainer git profile
 
 `bun run omp-template --maintainer` also copies [`maintainer/`](maintainer) on top of the same relative paths.
-That copy is `AGENTS.md`, which tells a session to push local `main` and to clean up worktrees, and `docs/git-workflow.md`, which registers Graphite branches.
+The profile includes `AGENTS.md` for local-main pushing and worktree cleanup, `docs/git-workflow.md` for draft-first Graphite shipping, and `skills/mma-mode/` for maintainer steering.
+Mma-mode resolves poteto by URI and loads only references matching the current task instead of a monolithic contract.
 The default install does not copy those files.
 `--force` still overwrites a file you already have, including one the profile replaces.
 

@@ -2,7 +2,7 @@
 # Keys you already set keep their value unless you pass --force. Every other key in your
 # config.yml stays as it is.
 
-# Primary model per role. Anthropic first; see AGENTS.md for the provider order.
+# Primary model per role. Anthropic first; see ~/.omp/agent/docs/model-routing.md.
 modelRoles:
   default: anthropic/claude-opus-5-5:high
   slow: anthropic/claude-opus-5-5:high
@@ -19,27 +19,22 @@ retry:
   usageAwareFallback: true
   usageReservePct: 0
   usageReservePolicy: auto
-  # Per role: OpenAI Codex, then Cursor, then OpenRouter (open-weight models only).
+  # Codex first; cheap roles may use Cursor Composer; OpenRouter remains last.
   fallbackChains:
     default:
       - openai-codex/gpt-6-sol:high
-      - cursor/grok-4.7-high
       - openrouter/deepseek/deepseek-v4.1-flash:high
     slow:
       - openai-codex/gpt-6-astra:xhigh
-      - cursor/grok-4.7-xhigh
       - openrouter/moonshotai/kimi-k3:high
     plan:
       - openai-codex/gpt-6-sol:high
-      - cursor/grok-4.7-high
       - openrouter/z-ai/glm-5.3:high
     advisor:
       - openai-codex/gpt-5.6-terra:medium
-      - cursor/grok-4.7-medium
       - openrouter/z-ai/glm-5.3:low
     vision:
       - openai-codex/gpt-5.6-terra
-      - cursor/grok-4.7-medium
       - openrouter/z-ai/glm-5.3-flash:low
     smol:
       - openai-codex/gpt-6-luna
@@ -55,7 +50,6 @@ retry:
       - openrouter/minimax/minimax-m3
     task:
       - openai-codex/gpt-6-sol:high
-      - cursor/grok-4.7-high
       - openrouter/moonshotai/kimi-k3:high
 
 modelProviderOrder:
