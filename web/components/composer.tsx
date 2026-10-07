@@ -33,7 +33,7 @@ export function EmptyConversation({ title, children }: { title: string; children
 			<ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
 				{[
 					["/", "commands and skills"],
-					["@", "files"],
+					["@", "files, todos, tickets, PRs, sessions"],
 				].map(([key, label]) => (
 					<li key={key} className="flex items-center gap-1.5">
 						<kbd className="inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-[5px] border border-border bg-background px-1.5 font-sans text-xs text-foreground">

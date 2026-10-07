@@ -22,12 +22,17 @@ export function textFilePath(href: string): string | null {
 	return TEXT_FILE.test(path) ? path : null;
 }
 
+/** Whether `path` is absolute or `~/`, as the transcript writes a path outside the session's directory. */
+export function isAbsolutePath(path: string): boolean {
+	return path.startsWith("/") || path.startsWith("~/");
+}
+
 /**
  * The path the server reads for `path`: as it is when absolute or `~/`, else resolved against `base`, the session's
  * directory or the open file's; `null` without one.
  */
 export function absoluteFilePath(path: string, base: string | null): string | null {
-	if (path.startsWith("/") || path.startsWith("~/")) return path;
+	if (isAbsolutePath(path)) return path;
 	if (base === null) return null;
 	const segments: string[] = [];
 	for (const segment of `${base}/${path}`.split("/")) {

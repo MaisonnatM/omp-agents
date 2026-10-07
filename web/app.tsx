@@ -3,7 +3,7 @@ import { QUICK_TODO_EVENT } from "../src/server/address";
 import { callable, signedIn } from "../src/shared/accounts";
 import type { UserTodoList } from "../src/user-todos-shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
-import { DashboardContext } from "./components/dashboard-context";
+import { DashboardContext, MentionListsContext } from "./components/dashboard-context";
 import { FileDialog } from "./components/file-dialog";
 import { InboxIndex, InboxNav } from "./components/inbox/inbox-nav";
 import { InboxPage } from "./components/inbox/inbox-page";
@@ -158,6 +158,7 @@ export function App() {
 		() => ({ send, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, connected: state.connected, starts: { fork, resume, quick, resumeAll } }),
 		[send, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, state.connected, fork, resume, quick, resumeAll],
 	);
+	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
 	const onPaneLayout = useCallback((index: number, kind: "max" | "close") => {
 		const current = latest.current.layout;
 		show(kind === "max" ? { ...current, focus: index, maximized: !current.maximized } : closePane(current, index));
@@ -484,7 +485,9 @@ export function App() {
 						<SidebarInset>
 							<Plans value={state.usage?.plans ?? NO_PLANS}>
 								<ActivityVisibility.Provider value={activityVisibility}>
-									<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
+									<ToolsExpanded value={toolsExpanded}>
+										<MentionListsContext.Provider value={mentionLists}>{main}</MentionListsContext.Provider>
+									</ToolsExpanded>
 								</ActivityVisibility.Provider>
 							</Plans>
 						</SidebarInset>
