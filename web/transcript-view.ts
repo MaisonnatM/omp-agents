@@ -2,17 +2,19 @@
 import type { Item } from "../src/shared/transcript";
 
 export type ToolItem = Extract<Item, { kind: "tool" }>;
+/** A tool call or the thinking that sits with it. Consecutive ones render as one activity group between messages. */
+export type ActivityItem = Extract<Item, { kind: "tool" | "thinking" }>;
 
-/** Consecutive tool calls render as one activity group between messages. */
-export type Block = { kind: "item"; item: Exclude<Item, ToolItem> } | { kind: "tools"; id: string; tools: ToolItem[] };
+export type Block = { kind: "item"; item: Exclude<Item, ActivityItem> } | { kind: "activity"; id: string; entries: ActivityItem[] };
 
 export function toBlocks(items: Item[]): Block[] {
 	const blocks: Block[] = [];
 	for (const item of items) {
 		const last = blocks.at(-1);
-		if (item.kind !== "tool") blocks.push({ kind: "item", item });
-		else if (last?.kind === "tools") last.tools.push(item);
-		else blocks.push({ kind: "tools", id: item.id, tools: [item] });
+		if (item.kind === "tool" || item.kind === "thinking") {
+			if (last?.kind === "activity") last.entries.push(item);
+			else blocks.push({ kind: "activity", id: item.id, entries: [item] });
+		} else blocks.push({ kind: "item", item });
 	}
 	return blocks;
 }

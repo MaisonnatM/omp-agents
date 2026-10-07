@@ -207,6 +207,14 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - The transcript fades at its top or bottom edge only while more of it lies past that edge, so a conversation that fits the pane shows no fade.
 - Each tool call in a tool group shows an icon for its tool, such as a terminal for `bash`, a page for `read`, and a plug for an MCP tool; a tool without its own icon shows a wrench.
   The icon of a call that failed is red, and the group's heading counts the failures.
+- The model's thinking is a row in that same group.
+  It shows while the model is still writing it, then stays.
+  A thinking block the provider redacts, which has no text, stays out.
+  Buttons on the heading hide the tool rows and the thinking text, each on its own, and the heading stays so you can show them again.
+  The choice is saved in this browser.
+  Cmd+Shift+E shows or hides the tool rows, and Alt+T (Option+T on macOS) shows or hides the thinking.
+  Cmd+E still opens or closes the group.
+  Hiding either leaves the outline's tool count as it was.
 - A `task` tool call lists the subagents it spawned, by id, under its row: each one as it starts while the call runs, and every one once the call finishes.
   A tool group that spawned subagents stays open.
   In a live session or subagent, each id is a link with the subagent's status dot (green running, blue idle, hollow parked, red aborted); hover it for the subagent's type, status, and what it is doing.
@@ -854,6 +862,8 @@ Alt is Option on macOS.
 | Cmd+] | Anywhere | Open the next session in the sidebar |
 | Cmd+Alt+/ | Anywhere | Choose the session's model |
 | Cmd+E | Anywhere | Expand or collapse tool calls |
+| Cmd+Shift+E | Anywhere | Show or hide tool calls |
+| Alt+T | Anywhere | Show or hide thinking |
 | Cmd+B | Anywhere | Show or hide the sessions sidebar |
 | Cmd+Alt+B | Anywhere | Show or hide the session details sidebar |
 | Cmd+, / Cmd+Shift+J | Anywhere | Open or close settings |
@@ -910,7 +920,9 @@ Alt is Option on macOS.
   It does nothing in a subagent, a read-only room, or a past session.
   `/` or Cmd+I puts the cursor in the focused pane's composer.
 - Cmd+Alt+/ opens the model picker, and Shift+Tab in a composer moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.
-  Cmd+E expands or collapses every tool call.
+  Cmd+E expands or collapses every tool group.
+  Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
+  Both stay as you set them in this browser.
   Cmd+, or Cmd+Shift+J opens Settings, where the model roles live, and closes it again.
 - Cmd+1 opens the Inbox tab, and Cmd+2 opens Tickets when connected to Linear.
   Cmd+3 goes back from the inbox, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.

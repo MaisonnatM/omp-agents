@@ -500,6 +500,7 @@ The Calendar page reads the open month's events through `calendarEventsStore` in
 The page uses [Fluid Functionalism](https://www.fluidfunctionalism.com/) components in their Radix flavor, installed with the shadcn CLI into `web/components/ui`.
 The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, **Todo**, **Calendar**, and **Settings** switch uses `tabs`, installed from `https://www.fluidfunctionalism.com/r/radix/tabs.json`.
 User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
+The model's thinking text uses that same group.
 `thinking-indicator` shows while the agent works.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
 The model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern, and the Calendar page's day cards shadcn's `hover-card`.

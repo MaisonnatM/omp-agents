@@ -12,7 +12,8 @@ import { Work } from "./work";
 const PUBLISH_WINDOW_MS = 50;
 
 /** Whether a message is still being written, so that another update of it is likely to follow within the window. */
-const inFlux = (item: Item): boolean => (item.kind === "assistant" && item.streaming) || (item.kind === "tool" && item.status === "running");
+const inFlux = (item: Item): boolean =>
+	((item.kind === "assistant" || item.kind === "thinking") && item.streaming) || (item.kind === "tool" && item.status === "running");
 
 /** Folds a transcript's appended entries into a {@link Transcript} and a {@link Work} and publishes their changes; {@link LineReader} reads the file. */
 export class FileTail {

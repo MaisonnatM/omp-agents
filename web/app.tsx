@@ -27,7 +27,7 @@ import { ChangesPage } from "./components/changes/changes-page";
 import { TicketsDisconnected, TicketsPage } from "./components/tickets/tickets-page";
 import { subjectOf } from "./components/subject";
 import { TodoPage } from "./components/todo/page";
-import { ToolsExpanded } from "./components/transcript";
+import { ActivityVisibility, HIDE_THINKING_KEY, HIDE_TOOL_CALLS_KEY, ToolsExpanded } from "./components/transcript";
 import { documentTitle } from "./document-title";
 import { SPLIT_CLICK } from "./labels";
 import { inboxStore, integrationsStore, UNREAD } from "./reads";
@@ -48,7 +48,7 @@ import { paletteReducer } from "./command-palette";
 import { defaultCwd, discoverableSessions, listedViews, projectSession, projectSwitch, searchSessions, sidebarSessions, waitingCount, workspaces } from "./sessions";
 import { type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
 import { startOf } from "./starts";
-import { PINNED_SESSIONS_KEY, useStoredKeys } from "./stored-state";
+import { PINNED_SESSIONS_KEY, useStoredKeys, useStoredState } from "./stored-state";
 import { quickAddTodo } from "./todo-quick-add";
 import { localDay } from "./days";
 import { CheckoutVersion } from "./use-git-checkout";
@@ -179,6 +179,14 @@ export function App() {
 		if (page?.kind !== "settings") setSettingsTab("analytics");
 	}, [page?.kind]);
 	const [toolsExpanded, setToolsExpanded] = useState(false);
+	const [hideTools, setHideTools] = useStoredState(HIDE_TOOL_CALLS_KEY, raw => raw === "true");
+	const [hideThinking, setHideThinking] = useStoredState(HIDE_THINKING_KEY, raw => raw === "true");
+	const toggleHideTools = useCallback(() => setHideTools(value => !value), [setHideTools]);
+	const toggleHideThinking = useCallback(() => setHideThinking(value => !value), [setHideThinking]);
+	const activityVisibility = useMemo(
+		(): ActivityVisibility => ({ hideTools, hideThinking, toggleTools: toggleHideTools, toggleThinking: toggleHideThinking }),
+		[hideTools, hideThinking, toggleHideTools, toggleHideThinking],
+	);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 	const [palette, dispatchPalette] = useReducer(paletteReducer, null);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
@@ -229,6 +237,8 @@ export function App() {
 		previousSession: () => step(-1),
 		nextSession: () => step(1),
 		tools: () => setToolsExpanded(expanded => !expanded),
+		hideTools: toggleHideTools,
+		hideThinking: toggleHideThinking,
 		sessionsSidebar: () => toggleSidebar("left"),
 		detailsSidebar: () => {
 			if (!detailsView) return false;
@@ -460,7 +470,9 @@ export function App() {
 						</DashboardSidebar>
 						<SidebarInset>
 							<Plans value={state.usage?.plans ?? NO_PLANS}>
-								<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
+								<ActivityVisibility.Provider value={activityVisibility}>
+									<ToolsExpanded value={toolsExpanded}>{main}</ToolsExpanded>
+								</ActivityVisibility.Provider>
 							</Plans>
 						</SidebarInset>
 						{detailsView && (

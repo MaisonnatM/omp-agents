@@ -59,8 +59,9 @@ import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import { modeOf, skillLabel, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
+import { type ShortcutId, shortcutLabels } from "../shortcuts";
 import type { StartOf } from "../starts";
-import { editablePrompt, type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies } from "../transcript-view";
+import { type ActivityItem, editablePrompt, type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies } from "../transcript-view";
 import { useCopy } from "../use-copy";
 import { MessageMarkdown } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -118,6 +119,24 @@ export const NOTICE_TONE: Record<Extract<Item, { kind: "notice" }>["level"], str
 
 /** Whether finished tool groups show their steps. The tools shortcut flips it for every pane. */
 export const ToolsExpanded = createContext(false);
+
+/** Whether tool rows and thinking text stay hidden. Each choice is this browser's, and every pane shares it. */
+export interface ActivityVisibility {
+	hideTools: boolean;
+	hideThinking: boolean;
+	toggleTools: () => void;
+	toggleThinking: () => void;
+}
+
+export const ActivityVisibility = createContext<ActivityVisibility>({
+	hideTools: false,
+	hideThinking: false,
+	toggleTools: () => {},
+	toggleThinking: () => {},
+});
+
+export const HIDE_TOOL_CALLS_KEY = "omp-agents.hide-tool-calls";
+export const HIDE_THINKING_KEY = "omp-agents.hide-thinking";
 
 /**
  * Where a `task` row's subagents open: the live session the transcript belongs to, its registered subagents for their
@@ -185,9 +204,31 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 	);
 }
 
-function ToolGroup({ tools }: { tools: ToolItem[] }) {
+function HideButton({ hidden, label, shortcut, onToggle, icon: Icon }: { hidden: boolean; label: string; shortcut: ShortcutId; onToggle: () => void; icon: LucideIcon }) {
+	const action = hidden ? "Show" : "Hide";
+	return (
+		<Tooltip content={`${action} ${label}`} shortcut={shortcutLabels(shortcut)}>
+			<Button
+				variant="ghost"
+				size="icon-compact"
+				aria-pressed={hidden}
+				aria-label={`${action} ${label}`}
+				className={cn("shrink-0", hidden && "text-muted-foreground")}
+				onClick={onToggle}
+			>
+				<Icon />
+			</Button>
+		</Tooltip>
+	);
+}
+
+function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
 	const expanded = useContext(ToolsExpanded);
-	const running = tools.some(tool => tool.status === "running");
+	const { hideTools, hideThinking, toggleTools, toggleThinking } = useContext(ActivityVisibility);
+	const tools = entries.filter((entry): entry is ToolItem => entry.kind === "tool");
+	const thinking = entries.some(entry => entry.kind === "thinking");
+	const running =
+		tools.some(tool => tool.status === "running") || entries.some(entry => entry.kind === "thinking" && entry.streaming);
 	const failed = tools.filter(tool => tool.status === "error").length;
 	// A group that spawned subagents stays open, so their links stay one click away.
 	const spawned = tools.some(tool => tool.agents.length > 0);
@@ -196,24 +237,39 @@ function ToolGroup({ tools }: { tools: ToolItem[] }) {
 	const open = toggle?.expanded === expanded ? toggle.open : running || expanded || spawned;
 	const header = running
 		? "Working"
-		: `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`;
+		: tools.length
+			? `Ran ${tools.length} tool${tools.length === 1 ? "" : "s"}${failed ? `, ${failed} failed` : ""}`
+			: "Thought";
+	const visible = entries.filter(entry => (entry.kind === "thinking" ? !hideThinking : !hideTools));
 	return (
 		<ThinkingSteps open={open} onOpenChange={next => setToggle({ open: next, expanded })} className="w-full max-w-2xl self-start">
-			<ThinkingStepsHeader>{header}</ThinkingStepsHeader>
+			<div className="flex items-center">
+				<ThinkingStepsHeader>{header}</ThinkingStepsHeader>
+				{tools.length > 0 && <HideButton hidden={hideTools} label="tool calls" shortcut="hideTools" onToggle={toggleTools} icon={Wrench} />}
+				{thinking && <HideButton hidden={hideThinking} label="thinking" shortcut="hideThinking" onToggle={toggleThinking} icon={Brain} />}
+			</div>
 			<ThinkingStepsContent>
-				{tools.map((tool, index) => (
-					<ThinkingStep
-						key={tool.id}
-						icon={Object.hasOwn(TOOL_ICON, tool.name) ? TOOL_ICON[tool.name] : tool.name.startsWith("mcp__") ? Plug : Wrench}
-						iconClassName={tool.status === "error" ? "text-red-600 dark:text-red-400" : undefined}
-						label={tool.name}
-						description={tool.summary || undefined}
-						status={tool.status === "running" ? "active" : "complete"}
-						isLast={index === tools.length - 1}
-					>
-						{tool.agents.length > 0 && <SpawnedAgents ids={tool.agents} />}
-					</ThinkingStep>
-				))}
+				{visible.map((entry, index) =>
+					entry.kind === "thinking" ? (
+						<ThinkingStep key={entry.id} icon={Brain} label="Thinking" status={entry.streaming ? "active" : "complete"} isLast={index === visible.length - 1}>
+							<div data-thinking={entry.streaming ? "live" : "done"}>
+								<MessageMarkdown text={entry.text} />
+							</div>
+						</ThinkingStep>
+					) : (
+						<ThinkingStep
+							key={entry.id}
+							icon={Object.hasOwn(TOOL_ICON, entry.name) ? TOOL_ICON[entry.name] : entry.name.startsWith("mcp__") ? Plug : Wrench}
+							iconClassName={entry.status === "error" ? "text-red-600 dark:text-red-400" : undefined}
+							label={entry.name}
+							description={entry.summary || undefined}
+							status={entry.status === "running" ? "active" : "complete"}
+							isLast={index === visible.length - 1}
+						>
+							{entry.agents.length > 0 && <SpawnedAgents ids={entry.agents} />}
+						</ThinkingStep>
+					),
+				)}
 			</ThinkingStepsContent>
 		</ThinkingSteps>
 	);
@@ -339,7 +395,7 @@ export function SkillBadge({ name }: { name: string }) {
 }
 
 /** What a message's copy button copies: a skill prompt as the user typed it, not the skill's text. `item.text` is the reply with its suggestions block already split off, so the body it renders is uniform. */
-const copyText = (item: Exclude<Item, ToolItem>): string =>
+const copyText = (item: Exclude<Item, ActivityItem>): string =>
 	item.kind === "user" && item.skill ? [`/skill:${item.skill}`, item.text].filter(Boolean).join(" ") : item.text;
 
 /**
@@ -362,10 +418,10 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 			<MessageScrollerViewport>
 				<MessageScrollerContent className="mx-auto max-w-3xl gap-3 p-3" aria-relevant="additions text" data-transcript>
 					{blocks.map(block => {
-						if (block.kind === "tools") {
+						if (block.kind === "activity") {
 							return (
 								<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
-									<ToolGroup tools={block.tools} />
+									<ActivityGroup entries={block.entries} />
 								</MessageScrollerItem>
 							);
 						}

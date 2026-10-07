@@ -152,6 +152,32 @@ describe("Transcript", () => {
 		expect(t.items()).toEqual([{ id: "tool:c2", kind: "tool", name: "bash", summary: "sleep 40", status: "error", agents: [] }]);
 	});
 
+	test("thinking streams in place, a redacted block is left out, and an interrupt stops it streaming", () => {
+		const t = new Transcript();
+		const thinking = (value: string) => ({ type: "thinking", thinking: value });
+		const partial = (value: string) =>
+			t.applyEvent({
+				type: "message_update",
+				assistantMessageEvent: { partial: assistant(200, [thinking(value), { type: "redactedThinking", data: "x" }]) },
+			});
+		expect(partial("")).toEqual([]);
+		expect(partial("hm")).toEqual([{ id: "m200:0", kind: "thinking", text: "hm", streaming: true }]);
+		expect(partial("hmm")).toEqual([{ id: "m200:0", kind: "thinking", text: "hmm", streaming: true }]);
+		t.applyEvent({ type: "agent_end" });
+		expect(t.items()).toEqual([{ id: "m200:0", kind: "thinking", text: "hmm", streaming: false }]);
+
+		const saved = new Transcript();
+		saved.applyEntry({
+			type: "message",
+			id: "e2",
+			message: assistant(200, [thinking("hmm"), { type: "redactedThinking", data: "x" }, text("ok")], { stopReason: "stop" }),
+		});
+		expect(saved.items()).toEqual([
+			{ id: "m200:0", kind: "thinking", text: "hmm", streaming: false },
+			{ id: "m200:2", kind: "assistant", text: "ok", streaming: false, suggestions: [] },
+		]);
+	});
+
 	test("a task row names its subagents by the ids omp gave them, not the task names, from progress and results alike", () => {
 		const t = new Transcript();
 		const call = { type: "toolCall", id: "k1", name: "task", arguments: { tasks: [{ name: "Fix" }, { name: "Fix" }] } };

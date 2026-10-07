@@ -13,6 +13,8 @@ export type ShortcutId =
 	| "model"
 	| "thinking"
 	| "tools"
+	| "hideTools"
+	| "hideThinking"
 	| "sessionsSidebar"
 	| "detailsSidebar"
 	| "settings"
@@ -96,6 +98,18 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "model", label: "Choose the session's model", keys: [{ chord: { key: "/", mod: true, alt: true }, scope: "anywhere" }] },
 	{ id: "thinking", label: "Cycle the thinking level", keys: [{ chord: { key: "Tab", shift: true }, scope: "composer" }] },
 	{ id: "tools", label: "Expand or collapse tool calls", command: "Toggle tool calls", keys: [{ chord: { key: "e", mod: true }, scope: "anywhere" }] },
+	{
+		id: "hideTools",
+		label: "Show or hide tool calls",
+		command: "Show or hide tool calls",
+		keys: [{ chord: { key: "e", mod: true, shift: true }, scope: "anywhere" }],
+	},
+	{
+		id: "hideThinking",
+		label: "Show or hide thinking",
+		command: "Show or hide thinking",
+		keys: [{ chord: { key: "t", alt: true }, scope: "anywhere" }],
+	},
 	{
 		id: "sessionsSidebar",
 		label: "Show or hide the sessions sidebar, on the left",
