@@ -389,7 +389,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   It comes from `~/.omp/agent/extensions/end-session.ts`, which `bun run omp-template` installs.
   The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **End session**, not as interrupted.
   With `removeWorktree`, the dashboard then removes the git worktree the session works in, the one its header names the branch of, with the checks of **Settings → Worktrees**, and keeps its branch.
-  A worktree that those checks keep, such as one with uncommitted changes, one another session uses, or the main checkout, stays, and a todo names why.
+  A worktree that those checks keep, such as one with uncommitted changes, one another session uses, or the main checkout, stays in **Settings → Worktrees**, whose **Delete** applies the same checks.
   The tool leaves its request as `<session id>.json` in `end-inbox/` beside `todos.json`; a message sent before the dashboard acts withdraws it, and a request waits while the dashboard is down.
 - **Resume** in a past session's header starts omp on that session's file from the dashboard, as `omp --resume <session id>` does in a terminal.
   The pane then shows the live session, which carries on in the same file and moves to the running sessions.

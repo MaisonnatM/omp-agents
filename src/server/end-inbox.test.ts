@@ -15,8 +15,8 @@ function inboxDir(): string {
 	return dir;
 }
 
-/** An inbox whose live sessions are `live`, recording what it ends, removes, and reports, in order. */
-function inboxOf(dir: string, live: string[], removal: (dir: string) => Promise<string | null> = async () => null) {
+/** An inbox whose live sessions are `live`, recording what it ends and removes, in order. */
+function inboxOf(dir: string, live: string[]) {
 	const log: string[] = [];
 	const env: EndInboxEnv = {
 		session: sessionId =>
@@ -30,9 +30,8 @@ function inboxOf(dir: string, live: string[], removal: (dir: string) => Promise<
 				: null,
 		removeWorktree: async workDir => {
 			log.push(`remove ${workDir}`);
-			return removal(workDir);
+			return null;
 		},
-		report: (sessionId, text, body) => log.push(`report ${sessionId}: ${text}: ${body}`),
 	};
 	return { inbox: new EndInbox(dir, env), log };
 }
@@ -65,15 +64,5 @@ describe("EndInbox", () => {
 		await inbox.drain();
 		expect(log).toEqual(["end later"]);
 		expect(readdirSync(dir).sort()).toEqual(["bad.json.invalid", "other.json.invalid", "s1.tmp"]);
-	});
-
-	test("a worktree that stays leaves the user a todo naming why", async () => {
-		const dir = inboxDir();
-		writeFileSync(join(dir, "s1.json"), JSON.stringify({ sessionId: "s1", removeWorktree: true }));
-		const { inbox, log } = inboxOf(dir, ["s1"], async () => "Tracked modifications or untracked files must be preserved before removal.");
-		await inbox.drain();
-		expect(log.at(-1)).toBe(
-			"report s1: Remove the worktree /work/s1: The session asked to end and to remove its worktree, which stayed: Tracked modifications or untracked files must be preserved before removal.",
-		);
 	});
 });
