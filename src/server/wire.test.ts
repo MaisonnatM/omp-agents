@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ClientMsg } from "../shared/protocol";
 import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
-import { parseBranchSwitch, parseClientMsg, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseSlackClient, parseTicketEdit } from "./wire";
+import { parseBranchSwitch, parseClientMsg, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -326,24 +326,6 @@ describe("parseSlackClient", () => {
 		expect(parseSlackClient({ ...app, redirectUri: "https://[::1]:8443/callback", callbackPort: 8443 })).toHaveProperty("error");
 		expect(parseSlackClient({ ...app, scope: "constructor" })).toHaveProperty("error");
 		expect(parseSlackClient({ ...app, callbackPort: 3.5 })).toHaveProperty("error");
-	});
-});
-
-describe("parseSessionLinks", () => {
-	const body = { owner: "a", repo: "b", number: 3, sessionIds: ["s1", "s2"] };
-
-	test("returns the pull request with its session ids", () => {
-		expect(parseSessionLinks(body)).toEqual(body);
-	});
-
-	test("rejects a number that is not positive, and bad names or session lists", () => {
-		expect(parseSessionLinks({ ...body, number: 0 })).toBeNull();
-		expect(parseSessionLinks({ ...body, number: -2 })).toBeNull();
-		expect(parseSessionLinks({ ...body, number: "3" })).toBeNull();
-		expect(parseSessionLinks({ ...body, owner: "a b" })).toBeNull();
-		expect(parseSessionLinks({ ...body, sessionIds: [] })).toBeNull();
-		expect(parseSessionLinks({ ...body, sessionIds: ["s1", 2] })).toBeNull();
-		expect(parseSessionLinks("nope")).toBeNull();
 	});
 });
 

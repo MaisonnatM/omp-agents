@@ -9,8 +9,8 @@ export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.co
 /** What a pull request waits on next. */
 export type MoveId = "review" | "merge" | "fix-ci" | "rebase" | "reply" | "answer" | "agent" | "in-review" | "checks-running" | "draft" | "merged";
 
-/** Whose move it is; the inbox's sections, in page order. */
-export type MoveGroup = "Your move" | "Agent on it" | "Waiting on others" | "Drafts" | "Recently merged";
+/** Whose move it is, or for your approved pull requests that need no fix, that they are approved; the inbox's sections, in page order. */
+export type MoveGroup = "Your move" | "Agent on it" | "Approved" | "Waiting on others" | "Drafts" | "Recently merged";
 
 interface Move {
 	/** The verb on the row's badge. */
@@ -42,12 +42,19 @@ const MOVE_IDS = Object.keys(MOVES) as MoveId[];
 const GROUPS: Record<MoveGroup, { folded: boolean }> = {
 	"Your move": { folded: false },
 	"Agent on it": { folded: false },
+	Approved: { folded: false },
 	"Waiting on others": { folded: true },
 	Drafts: { folded: false },
 	"Recently merged": { folded: true },
 };
 
 const GROUP_TITLES = Object.keys(GROUPS) as MoveGroup[];
+
+/** The moves, in rank order, that leave an approved pull request of yours in **Approved**: none asks you to fix anything. */
+const APPROVED_MOVES: MoveId[] = ["merge", "checks-running", "draft"];
+
+/** The section `pr` goes in while it waits on `move`. */
+const groupOf = (pr: InboxPullRequest, move: MoveId): MoveGroup => (pr.review === "approved" && APPROVED_MOVES.includes(move) ? "Approved" : MOVES[move].group);
 
 /** A running session's turn on a pull request: it works, or it asks you something. */
 export type AgentState = Extract<HostStatus, "working" | "needs-input">;
@@ -249,7 +256,7 @@ export const orderedRepos = <R extends Repo>(repos: readonly R[], order: InboxOr
 export function inboxSections(pullRequests: InboxPullRequest[], order: InboxOrder, agentOn: AgentOn): InboxSection[] {
 	const members = stackMembers(pullRequests);
 	const moved = pullRequests.map((pr): Moved => ({ pr, move: moveOf(pr, agentOn(pr)) }));
-	const taken = Map.groupBy(sorted(moved, order), ({ move }) => MOVES[move].group);
+	const taken = Map.groupBy(sorted(moved, order), ({ pr, move }) => groupOf(pr, move));
 	return sectionTitles(order).flatMap((title): InboxSection[] => {
 		const prs = taken.get(title);
 		if (!prs) return [];
@@ -275,7 +282,8 @@ export function inboxSections(pullRequests: InboxPullRequest[], order: InboxOrde
 
 /** What a section holds by move, in rank order, such as `2 in review · 1 CI running`; `null` for a section only one move goes in, whose count says it all. */
 export function movesSummary({ title, rows }: InboxSection): string | null {
-	if (MOVE_IDS.filter(move => MOVES[move].group === title).length < 2) return null;
+	const moves = title === "Approved" ? APPROVED_MOVES : MOVE_IDS.filter(move => MOVES[move].group === title);
+	if (moves.length < 2) return null;
 	const counts = Map.groupBy(rows, row => row.move);
 	return MOVE_IDS.flatMap(move => {
 		const count = counts.get(move)?.length;
@@ -375,7 +383,7 @@ export function pullRequestStack({ repos }: Inbox, pr: PullRequest): InboxPullRe
 
 /** How many pull requests in `inbox` wait on your move. */
 export const yourMoveCount = ({ repos }: Inbox, agentOn: AgentOn): number =>
-	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => MOVES[moveOf(pr, agentOn(pr))].group === "Your move").length;
+	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => groupOf(pr, moveOf(pr, agentOn(pr))) === "Your move").length;
 
 /** One fact about where a pull request stands, as its details' Status lists it. */
 export type StatusItem =

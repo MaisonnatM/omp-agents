@@ -318,11 +318,6 @@ Any other `/api/` path answers a JSON 404.
 The page reports a response that is not JSON with its status and text.
 Every endpoint needs the access token's cookie; see [SECURITY.md](../SECURITY.md).
 
-`PUT /api/pull-request/sessions` takes `{ owner, repo, number, sessionIds }`, the link button's request.
-The server refuses a session that did not submit or work on that pull request by the rules in [Pull requests and the inbox](usage.md#pull-requests-and-the-inbox).
-It reads the description with `gh api repos/<owner>/<repo>/pulls/<number>`, puts the session block in it, and writes it back with `gh api --method PATCH` only when the text changed.
-The answer is `{ changed }`, or `{ error }` with the HTTP status.
-
 `GET /api/git?cwd=<directory>` answers the git checkout that the directory is in, or `null` outside one: the GitHub repository that `origin` names, the checked-out branch, every local branch with the worktree that has it checked out, and the main worktree.
 
 `GET /api/git/status?cwd=<directory>` answers the status bar's view of the checkout the directory is in, or `null` outside one: its top directory, the checked-out branch (`null` while HEAD is detached), the upstream with the commits ahead and behind, and each uncommitted file with its kind, from `git status --porcelain=v2 --branch -z --untracked-files=all`.
@@ -556,7 +551,6 @@ The server lives in `src/`:
 - `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
   The worktree comes from the `cwd` arguments of the session's own bash calls, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.
   `git.ts`'s `worktreeAt` answers each directory once per refresh.
-- `src/session-links.ts`: writes the session block into a pull request's description.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
   A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `MergeFacts` in `web/inbox-model.ts` takes either.

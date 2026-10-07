@@ -58,6 +58,12 @@ export const useInboxOrder = () => useStoredState(ORDER_KEY, decodeOrder, JSON.s
 /** The inbox's folds, which the page and the sidebar share and the browser keeps. */
 export const useInboxFolds = (): Folds => useFolds(FOLDS_KEY, foldedByDefault);
 
+/** `order` with the repository `key` put on the `where` side of `beside`; the repositories a list does not show, `shown` being those it does, keep their place behind them. */
+export const withRepoMoved = (order: InboxOrder, shown: string[], key: string, beside: string, where: Where): InboxOrder => ({
+	...order,
+	repos: moveKey([...shown, ...order.repos.filter(other => !shown.includes(other))], key, beside, where),
+});
+
 /** Moves a focused heading or row one place; `false` at the edge. */
 type Move = (by: 1 | -1) => boolean;
 
@@ -277,9 +283,7 @@ export function useInboxBoard({ project, hosts, past, target }: BoardProps): Inb
 	const shownOrder = order.sort === "manual" && order.manual.length > 0
 		? order.manual
 		: repos.flatMap(repo => ("error" in repo ? [] : inboxSections(repo.pullRequests, order, agent).flatMap(({ rows }) => rows.map(row => prKey(row.pr)))));
-	const moveRepo = (key: string, beside: string, where: Where): void =>
-		// Repositories of other projects keep their place behind the ones shown.
-		setOrder({ ...order, repos: moveKey([...repoKeys, ...order.repos.filter(other => !repoKeys.includes(other))], key, beside, where) });
+	const moveRepo = (key: string, beside: string, where: Where): void => setOrder(withRepoMoved(order, repoKeys, key, beside, where));
 	const moveSection = (title: string, beside: string, where: Where): void => setOrder({ ...order, sections: moveKey(sectionTitles(order), title, beside, where) });
 
 	const repoView = (repo: RepoInbox): RepoView => {

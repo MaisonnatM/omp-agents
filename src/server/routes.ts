@@ -16,20 +16,19 @@ import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { sessionsDir } from "../omp/sessions";
 import { readStats } from "../omp/stats";
 import { directoryOf } from "../paths";
-import { linkSessions, type SessionEntry } from "../session-links";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { SlackConfigError } from "../omp/mcp";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
-import { type LinkedPullRequest, type PullRequest, type Repo, samePullRequest } from "../shared/github";
+import type { PullRequest, Repo } from "../shared/github";
 import { PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseBranchSwitch, parseGoogleCalendarAddress, parseGoogleCalendarId, parseIntegrationId, parsePullRequestQuery, parseSessionLinks, parseSlackClient, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseBranchSwitch, parseGoogleCalendarAddress, parseGoogleCalendarId, parseIntegrationId, parsePullRequestQuery, parseSlackClient, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
@@ -37,14 +36,11 @@ const MAX_EVENT_SPAN_MS = 62 * 86_400_000;
 
 export interface RouteEnv {
 	guards: Guards;
-	/** Where this server listens, for the links written into pull request descriptions. */
-	origin: string;
 	/** Directories sessions ran in: live ones first, then saved ones newest first. */
 	knownCwds(): string[];
 	worktrees: Worktrees;
 	/** The listed file of a session, for Analytics' title and working directory. */
 	savedOf(sessionId: string): AnalyticsSessionFacts | null;
-	pullRequestsOf(sessionId: string): LinkedPullRequest[];
 	/** The inbox listed `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
 	google: GoogleCalendar;
@@ -330,26 +326,6 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 			);
 		};
 
-	/**
-	 * `PUT /api/pull-request/sessions`: `{ owner, repo, number, sessionIds }`. Writes links to those sessions into the
-	 * PR's description on GitHub, each of which must have submitted or worked on that PR. Answers `{ changed }`.
-	 */
-	const sessionLinks: Handler = async req => {
-		const write = await guards.writeBody(req);
-		if (write instanceof Response) return write;
-		const edit = parseSessionLinks(write.body);
-		if (!edit) return fail(400, "Expected { owner, repo, number, sessionIds }");
-		const { sessionIds, ...pr } = edit;
-		const name = `${pr.owner}/${pr.repo}#${pr.number}`;
-		const sessions: SessionEntry[] = [];
-		for (const sessionId of new Set(sessionIds)) {
-			const linked = env.pullRequestsOf(sessionId).find(other => samePullRequest(other, pr));
-			if (!linked) return fail(404, `Session ${sessionId} did not submit or work on ${name}`);
-			sessions.push({ sessionId, link: linked.link });
-		}
-		return answer(() => linkSessions(pr, sessions, env.origin));
-	};
-
 	/** `GET /api/worktrees[?cwd=]`: every registered worktree of the repositories sessions ran in, or of the repository containing `cwd`. */
 	const worktreeInventory = get(params => answer(() => env.worktrees.inventory(params.get("cwd"))));
 
@@ -386,7 +362,6 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/models/roles": { GET: roles },
 		"/api/analytics": { GET: analytics },
 		"/api/skills": { GET: skills },
-		"/api/pull-request/sessions": { PUT: sessionLinks },
 		"/api/inbox": { GET: inbox },
 		"/api/tickets": { GET: tickets },
 		"/api/integrations": { GET: integrations },

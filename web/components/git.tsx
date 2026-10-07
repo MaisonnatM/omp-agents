@@ -8,6 +8,21 @@ import { useCopy } from "../use-copy";
 import { CommandPicker } from "./command-picker";
 import { OrgIcon } from "./org-icon";
 
+/** A branch label that keeps both ends visible when space runs out; `title` shows the full name where no tooltip does. */
+export function BranchLabel({ name, title = false, className }: { name: string; title?: boolean; className?: string }) {
+	let split = Math.ceil(name.length / 2);
+	const before = name.charCodeAt(split - 1);
+	if (before >= 0xd800 && before <= 0xdbff) split++;
+	return (
+		<span title={title ? name : undefined} className={cn("inline-flex min-w-0 max-w-full align-bottom", className)}>
+			<span className="min-w-0 truncate">{name.slice(0, split)}</span>
+			<span className="flex min-w-0 justify-end overflow-hidden">
+				<span className="whitespace-nowrap">{name.slice(split)}</span>
+			</span>
+		</span>
+	);
+}
+
 /** A branch name, with its icon, that copies the name when clicked; the icon turns into a check mark once it is copied. */
 export function BranchName({ name, className }: { name: string; className?: string }) {
 	const { copied, copy } = useCopy();
@@ -18,10 +33,10 @@ export function BranchName({ name, className }: { name: string; className?: stri
 				type="button"
 				aria-label={`Copy branch ${name}`}
 				onClick={() => copy(name)}
-				className={cn("rounded-sm text-left underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring", className)}
+				className={cn("inline-flex min-w-0 max-w-64 items-center gap-0.5 rounded-sm text-left underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring", className)}
 			>
-				<Icon aria-hidden className="mr-0.5 inline size-3 align-[-0.125em]" />
-				{name}
+				<Icon aria-hidden className="size-3 shrink-0" />
+				<BranchLabel name={name} />
 			</button>
 		</Tooltip>
 	);
@@ -84,9 +99,14 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 	return (
 		<CommandPicker
 			trigger={
-				<span className="max-w-64 truncate">
-					{label}
-					{choice?.kind === "new" && <span className="text-muted-foreground"> from {choice.base}</span>}
+				<span className="inline-flex min-w-0 max-w-64 items-center gap-1">
+					<BranchLabel name={label} />
+					{choice?.kind === "new" && (
+						<>
+							<span className="shrink-0 text-muted-foreground">from</span>
+							<BranchLabel name={choice.base} className="text-muted-foreground" />
+						</>
+					)}
 				</span>
 			}
 			icon={choice?.kind === "new" ? GitBranchPlus : GitBranch}
@@ -109,7 +129,7 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 							value: branch.name,
 							label: (
 								<>
-									<span className="truncate">{branch.name}</span>
+									<BranchLabel name={branch.name} title />
 									<span className="ml-auto shrink-0 text-xs text-muted-foreground" title={branch.worktree ?? undefined}>
 										{branch.name === checkout.branch ? "here" : branch.worktree ? projectName(branch.worktree) : "new worktree"}
 									</span>
@@ -130,8 +150,11 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 											label: (
 												<>
 													<GitBranchPlus aria-hidden />
-													<span className="truncate">
-														Create branch <strong className="font-medium">{name}</strong> from {base}
+													<span className="flex min-w-0 items-center gap-1">
+														<span className="shrink-0">Create branch</span>
+														<BranchLabel name={name} title className="font-medium" />
+														<span className="shrink-0">from</span>
+														<BranchLabel name={base} title />
 													</span>
 												</>
 											),

@@ -12,12 +12,12 @@ import { readTime } from "../../labels";
 import { inboxStore } from "../../reads";
 import { hashForInbox } from "../../routing";
 import type { SectionTarget } from "../../section";
-import { DROP_LINE } from "../../use-drag-order";
+import { DROP_LINE, useDragOrder } from "../../use-drag-order";
 import { useDashboardContext } from "../dashboard-context";
 import { FoldButton } from "../fold";
 import { QuickStartNotice } from "../quick-actions";
 import { SectionLink } from "../section-link";
-import { inboxSection, type RepoView, type SectionView, SortMenu, UnmatchedTip, useInboxBoard, useInboxOrder, workspacesLabel } from "./inbox-board";
+import { inboxSection, type RepoView, type SectionView, SortMenu, UnmatchedTip, useInboxBoard, useInboxOrder, withRepoMoved, workspacesLabel } from "./inbox-board";
 import { PullRequestRow } from "./pr-row";
 
 const note = (text: string) => <p className="px-3 py-1 text-xs text-muted-foreground">{text}</p>;
@@ -150,21 +150,24 @@ interface InboxIndexProps {
 	onTarget: (target: SectionTarget) => void;
 }
 
-/** The sidebar beside the inbox page: each repository's sections with their pull request counts, each a link to its card on the page. */
+/** The sidebar beside the inbox page: each repository's sections with their pull request counts, each a link to its card on the page. Drag a repository's name to reorder them, as on the page. */
 export function InboxIndex({ project, hosts, target, onTarget }: InboxIndexProps) {
 	const { read, error } = inboxStore.use(project);
-	const [order] = useInboxOrder();
+	const [order, setOrder] = useInboxOrder();
+	const drag = useDragOrder();
 	if (!read) return note(error ? `Cannot load the inbox: ${error}` : "Asking GitHub for pull requests…");
 	const agent = agentOn(hosts);
 	const repos = orderedRepos(read.data.repos, order);
 	if (repos.length === 0) return note("No session ran in a GitHub repository.");
+	const repoKeys = repos.map(repoKey);
 	return repos.map(repo => {
 		const key = repoKey(repo);
 		const name = `${repo.owner}/${repo.repo}`;
 		const sections = "error" in repo ? [] : inboxSections(repo.pullRequests, order, agent);
+		const item = drag("repos", key, (dragged, where) => setOrder(withRepoMoved(order, repoKeys, dragged, key, where)));
 		return (
-			<SidebarGroup key={key}>
-				<SidebarGroupLabel>{name}</SidebarGroupLabel>
+			<SidebarGroup key={key} {...item.target} className={cn(item.dragging && "opacity-50", item.dropAt && DROP_LINE[item.dropAt])}>
+				<SidebarGroupLabel {...item.handle}>{name}</SidebarGroupLabel>
 				{"error" in repo && note("Cannot read it from GitHub.")}
 				{sections.length > 0 && (
 					<SidebarMenu aria-label={`${name} sections`}>
@@ -186,3 +189,4 @@ export function InboxIndex({ project, hosts, target, onTarget }: InboxIndexProps
 		);
 	});
 }
+

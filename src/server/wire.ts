@@ -10,7 +10,7 @@ import { MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type Slac
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import type { BranchChoice } from "../shared/git";
-import type { PullRequest, SessionLinksEdit } from "../shared/github";
+import type { PullRequest } from "../shared/github";
 import type { ModelOption } from "../shared/models";
 import type { ClientMsg } from "../shared/protocol";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
@@ -340,15 +340,6 @@ export function parsePullRequest(owner: unknown, repo: unknown, number: unknown)
 /** `?owner=<o>&repo=<r>&number=<n>` of `GET /api/pull-request`. */
 export function parsePullRequestQuery(params: URLSearchParams): PullRequest | null {
 	return parsePullRequest(params.get("owner"), params.get("repo"), Number(params.get("number")));
-}
-
-/** The body of `PUT /api/pull-request/sessions`: a pull request and at least one session id. */
-export function parseSessionLinks(body: unknown): SessionLinksEdit | null {
-	if (!isObject(body)) return null;
-	const pr = parsePullRequest(body.owner, body.repo, body.number);
-	const { sessionIds } = body;
-	if (!pr || !Array.isArray(sessionIds) || sessionIds.length === 0) return null;
-	return sessionIds.every((id): id is string => typeof id === "string") ? { ...pr, sessionIds } : null;
 }
 
 /** The body of `PUT /api/google/calendars`: `{ url }`, a Google calendar's address in iCal format. */

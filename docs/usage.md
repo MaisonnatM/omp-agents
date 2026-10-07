@@ -259,6 +259,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The page reads the branch again whenever a turn starts or ends, so a session that switches branches shows the new one.
   Click the branch to copy its name; its icon turns into a check mark for a moment.
   The same works on the branch of a pull request's details and of a Linear issue's detail view.
+  A long branch name keeps its start and end with `…` in the middle, in a header, the status bar, a branch picker, a pull request's branches, a Linear issue's branch, and a stack's base name; its full name shows on hover where the label has no tooltip, and copying still copies the full name.
 - A live session's header shows no connection status.
   It says **Connecting…**, **Reconnecting…**, or **Disconnected** only while the pane is not live; the sidebar's status dot tells whether the session works, idles, or waits on a question.
 
@@ -455,10 +456,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The inbox covers the GitHub repository of the project that the sidebar's picker shows, or under **All projects** every repository that a session ran in, one section per repository.
   A workspace's repository is the one its `origin` remote names.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
-  They sort by whose move it is: **Your move**, **Agent on it**, **Waiting on others**, **Drafts**, and **Recently merged**.
+  They sort by whose move it is: **Your move**, **Agent on it**, **Approved**, **Waiting on others**, **Drafts**, and **Recently merged**.
   A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, and its checks.
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
-  The inbox page's table shows each section as a card, one row per pull request: the move's badge, the title with its author, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, and its age.
+  The inbox page's table shows each section as a card, one row per pull request: the move's badge, the title with its author, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and quick actions at the far right.
   A narrow page drops the sessions, stack, and line columns.
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.
@@ -472,6 +473,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Once you ask every reviewer who requested changes for a new review, the pull request is **In review** again, though GitHub still reports the change request until they review again.
   **Review**, **Merge**, **Fix CI**, **Rebase**, and **Reply** are your moves, in that order within **Your move**.
   **Answer** and **Working** are the agent's, **In review** and **CI running** wait on others, and **Draft** has its own section, **Drafts**.
+  Your approved pull request that is **Merge**, **CI running**, or **Draft** goes in **Approved** instead, so it leaves the **Your move** count; one that needs a rebase, a CI fix, or a reply stays in **Your move**.
   Within a section, the pull requests of each move are most recently updated first.
   When the inbox lists another pull request of its stack, the row shows its place from the bottom, such as `2/4`, and its tooltip names the branch it is stacked on; otherwise a row stacked on another branch names it, as in `on fix/base`.
   Within a section, a stack's pull requests sit together, top first, where its first one would, and a line joins each to the one below it.
@@ -482,12 +484,15 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   `+N` after the chip lists every session on the pull request, each with whether it submitted or worked on it; choose one to open it.
   The table shows up to two reviewers' pictures and lists the rest under `+N`; with no reviewer, an icon shows the review state.
   A pull request with more than 100 review conversations shows the count among the first 100 with a `+`, for example `12+ open threads`.
-  The todo, lightning, and link buttons show while you hover or focus the row, while a start on it runs, and after a link write on it, so its outcome stays readable.
+  The lightning button is always visible in the table when quick actions apply; in the sidebar it shows while you hover or focus the row, or while a session starts on it.
+  Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
   Click a repository or a section heading to fold it; the browser's localStorage keeps your choice across reloads.
   A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
   A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository the inbox could not read.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
-  Click the title to show the pull request's details in the main area; the back arrow at the start of the page header, **Back to the inbox**, brings the inbox page back.
+  Click the row to show the pull request's details in the main area; session chips, move badges, and quick actions keep their own clicks.
+  The title remains a link for keyboard and modifier-click navigation.
+  The back arrow at the start of the page header, **Back to the inbox**, brings the inbox page back.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Inbox** tab's count stays current.
   Reopening the inbox, even after a reload, shows the last inbox read for the chosen project at once; the top of the list says when that inbox was read, and the browser's localStorage keeps the last one of each project.
@@ -497,7 +502,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.
   In **Manual**, a pull request you never placed comes first, most recently updated first.
   A stack moves as one, and its pull requests keep their order from the top of the stack.
-  Drag a repository's name to reorder the repositories, and a section's heading to reorder the sections, which applies to every repository.
+  Drag a repository's name on the page or in its sidebar index to reorder the repositories, and a section's heading on the page to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
   The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
 - The details of a pull request lay out like Graphite's: the repository and number above the title, then its author, the branch and the one it merges into, its files, the lines added and removed, and when it opened.
@@ -520,13 +525,6 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - `#inbox/<owner>/<repo>/<number>` shows one pull request's details.
   The sidebar unfolds its row's repository and section, scrolls the row into view, and highlights it.
   When the inbox does not list that pull request, a note says why, and the details still show.
-- The link button on an inbox row with sessions writes links to those sessions into the pull request's description on GitHub, through `gh`, so that the PR leads back to them.
-  It writes only when you click it.
-  The links sit between `<!-- omp-sessions -->` and `<!-- /omp-sessions -->`, before Cursor's `<!-- CURSOR_SUMMARY -->` block when the description has one, else at the end.
-  Another click replaces that block rather than adding a second one.
-  Each link is `http://127.0.0.1:<port>/#session/<session id>`, and the block says that the links open only on the machine that runs the dashboard.
-  They carry no token, so they open the session in a browser that has signed in to the dashboard, and show the sign-in page elsewhere.
-  The button's tooltip reports whether the description changed or why the write failed.
 - A lightning button on an inbox row, and buttons in the pull request's details, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
   The inbox stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   The chip stays while the session runs, after a reload too, so the row says whether an agent still works on the pull request.
@@ -699,7 +697,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - An open top-level todo's **Start session**, its main button, opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.
   The session links to the todo once omp starts, and its agent checks the todo off once it finishes the work; see [Todos from agents](#todos-from-agents).
 - With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, then opens an issue from the title and notes, assigned to you, and links it to the todo.
-- The list icon on an inbox pull request and a ticket adds a todo of no category, last in the list, that links to it.
+- The list icon on a ticket adds a todo of no category, last in the list, that links to it.
 - The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
   A `todos.json` from before categories, notes, due days, links, or the archive still loads, with none of them; a todo checked then reads as checked when the server loads it.
   A `todos.json` that the server cannot read as a todo list is moved to `todos.json.invalid` rather than written over.

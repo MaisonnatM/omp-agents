@@ -3,7 +3,7 @@
  * terms. The repository and pull request keys, which the page uses too, live in `shared.ts`.
  */
 import { isObject, str } from "./json";
-import { run, runChecked, runJson } from "./proc";
+import { run, runJson } from "./proc";
 import type { CheckRunState, Person, PullRequestEvent, PullRequestFile, Repo, ReviewDecision, ReviewerState } from "./shared/github";
 
 const GH_TIMEOUT_MS = 20_000;
@@ -68,16 +68,6 @@ export function repoOf(cwd: string): Promise<Repo | null> {
 export function ghGraphql(query: string, vars: Record<string, string | number>): Promise<unknown> {
 	const fields = Object.entries(vars).flatMap(([name, value]) => [typeof value === "number" ? "-F" : "-f", `${name}=${value}`]);
 	return runJson(["gh", "api", "graphql", "-f", `query=${query}`, ...fields], { timeoutMs: GH_TIMEOUT_MS });
-}
-
-/** `gh api`'s JSON answer to a REST `GET` of `path`. @throws Error with `gh`'s message when the call fails. */
-export async function ghGet(path: string): Promise<unknown> {
-	return JSON.parse(await runChecked(["gh", "api", path], { timeoutMs: GH_TIMEOUT_MS }));
-}
-
-/** A REST `PATCH` of `path` with `body` as its JSON. @throws Error with `gh`'s message when the call fails. */
-export async function ghPatch(path: string, body: unknown): Promise<void> {
-	await runChecked(["gh", "api", "--method", "PATCH", path, "--input", "-"], { input: JSON.stringify(body), timeoutMs: GH_TIMEOUT_MS });
 }
 
 /** The data of a `gh api graphql` answer, or GitHub's errors thrown. */

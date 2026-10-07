@@ -136,7 +136,7 @@ describe("next move", () => {
 });
 
 describe("inbox sections", () => {
-	test("pull requests group by whose move it is, by move then most recently updated, and empty sections drop out", () => {
+	test("pull requests group by whose move it is, approved ones with nothing to fix apart, by move then most recently updated, and empty sections drop out", () => {
 		const agent: AgentOn = ({ number }) => (number === 9 ? "working" : number === 10 ? "needs-input" : null);
 		const sections = inboxSections(
 			[
@@ -148,17 +148,20 @@ describe("inbox sections", () => {
 				pr(6, { state: "draft", review: "approved" }),
 				pr(7, { state: "merged", review: "approved" }),
 				pr(8, { role: "reviewer", state: "merged" }),
-				pr(9),
+				pr(9, { review: "approved" }),
 				pr(10),
+				pr(11, { review: "approved", checks: "pending" }),
+				pr(12, { review: "none", checks: "none" }),
+				pr(13, { review: "approved", checks: "failing" }),
 			],
 			DEFAULT_ORDER,
 			agent,
 		);
 		expect(sections.map(section => [section.title, section.rows.map(row => [row.pr.number, row.move])])).toEqual([
-			["Your move", [[1, "review"], [3, "merge"], [2, "reply"]]],
+			["Your move", [[1, "review"], [12, "merge"], [13, "fix-ci"], [2, "reply"]]],
 			["Agent on it", [[10, "answer"], [9, "agent"]]],
+			["Approved", [[3, "merge"], [11, "checks-running"], [6, "draft"]]],
 			["Waiting on others", [[4, "in-review"], [5, "checks-running"]]],
-			["Drafts", [[6, "draft"]]],
 			["Recently merged", [[8, "merged"], [7, "merged"]]],
 		]);
 		expect(inboxSections([pr(1, { state: "draft" })], DEFAULT_ORDER, noAgent).map(section => section.title)).toEqual(["Drafts"]);
@@ -182,7 +185,7 @@ describe("inbox sections", () => {
 	test("stack places count across sections, and the rail joins only neighbors in the same section", () => {
 		const sections = inboxSections([pr(1, { review: "approved" }), pr(2, { stackedOn: "me/branch-1" }), pr(3, { checks: "pending", stackedOn: "me/branch-2" })], DEFAULT_ORDER, noAgent);
 		expect(sections.map(({ title, rows }) => [title, rows.map(({ pr: { number }, stack }) => [number, stack])])).toEqual([
-			["Your move", [[1, { position: 1, size: 3, joinsAbove: false, joinsBelow: false }]]],
+			["Approved", [[1, { position: 1, size: 3, joinsAbove: false, joinsBelow: false }]]],
 			[
 				"Waiting on others",
 				[
@@ -208,8 +211,13 @@ describe("inbox sections", () => {
 	});
 
 	test("a section that holds several moves sums them up in rank order; one that holds a single move does not", () => {
-		const sections = inboxSections([pr(1), pr(2, { state: "draft" }), pr(3), pr(4, { checks: "pending" }), pr(5, { state: "merged" })], DEFAULT_ORDER, noAgent);
+		const sections = inboxSections(
+			[pr(1), pr(2, { state: "draft" }), pr(3), pr(4, { checks: "pending" }), pr(5, { state: "merged" }), pr(6, { review: "approved" }), pr(7, { review: "approved", checks: "pending" })],
+			DEFAULT_ORDER,
+			noAgent,
+		);
 		expect(sections.map(section => [section.title, movesSummary(section)])).toEqual([
+			["Approved", "1 merge · 1 CI running"],
 			["Waiting on others", "2 in review · 1 CI running"],
 			["Drafts", null],
 			["Recently merged", null],
@@ -218,18 +226,12 @@ describe("inbox sections", () => {
 });
 
 test("only the sections with nothing to do now start folded", () => {
-	expect(["acme/webapp:Recently merged", "acme/webapp:Waiting on others", "acme/webapp:Your move", "acme/webapp:Agent on it", "acme/webapp:Drafts", "acme/webapp", "Recently merged"].map(foldedByDefault)).toEqual([
-		true,
-		true,
-		false,
-		false,
-		false,
-		false,
-		false,
-	]);
+	expect(
+		["acme/webapp:Recently merged", "acme/webapp:Waiting on others", "acme/webapp:Your move", "acme/webapp:Agent on it", "acme/webapp:Approved", "acme/webapp:Drafts", "acme/webapp", "Recently merged"].map(foldedByDefault),
+	).toEqual([true, true, false, false, false, false, false, false]);
 });
 
-test("your move counts what waits on you across repositories, leaving out what an agent holds, waits on others, and unreadable repositories", () => {
+test("your move counts what waits on you across repositories, leaving out what an agent holds, approved pull requests with nothing to fix, what waits on others, and unreadable repositories", () => {
 	const repo = (pullRequests: InboxPullRequest[]): RepoInbox => ({ owner: "acme", repo: "webapp", cwds: [], pullRequests });
 	const inbox = {
 		repos: [
@@ -239,7 +241,7 @@ test("your move counts what waits on you across repositories, leaving out what a
 		],
 		unmatched: [],
 	};
-	expect(yourMoveCount(inbox, ({ number }) => (number === 7 ? "working" : null))).toBe(5);
+	expect(yourMoveCount(inbox, ({ number }) => (number === 7 ? "working" : null))).toBe(4);
 });
 
 test("the shown pull requests follow page order and leave out folded repositories, folded sections, and unreadable repositories", () => {
@@ -290,8 +292,8 @@ describe("inbox order", () => {
 	test("sections and repositories follow your order, and those it does not name follow in their default order", () => {
 		const prs = [pr(1, { review: "approved" }), pr(2), pr(3, { state: "merged" })];
 		const sections = inboxSections(prs, order({ sections: ["Recently merged", "Gone section", "Waiting on others"] }), noAgent);
-		expect(sections.map(section => section.title)).toEqual(["Recently merged", "Waiting on others", "Your move"]);
-		expect(sectionTitles(order({ sections: ["Recently merged"] }))).toEqual(["Recently merged", "Your move", "Agent on it", "Waiting on others", "Drafts"]);
+		expect(sections.map(section => section.title)).toEqual(["Recently merged", "Waiting on others", "Approved"]);
+		expect(sectionTitles(order({ sections: ["Recently merged"] }))).toEqual(["Recently merged", "Your move", "Agent on it", "Approved", "Waiting on others", "Drafts"]);
 		const repos = ["a", "b", "c"].map(repo => ({ owner: "acme", repo }));
 		expect(orderedRepos(repos, order({ repos: ["acme/c", "acme/gone", "acme/a"] })).map(({ repo }) => repo)).toEqual(["c", "a", "b"]);
 	});

@@ -166,13 +166,3 @@ export interface PullRequestDetail extends PullRequest {
 	/** In ms since the epoch. */
 	createdAt: number;
 }
-
-/** `PUT /api/pull-request/sessions`: write links to these sessions, each linked to the PR, into its description on GitHub. */
-export interface SessionLinksEdit extends PullRequest {
-	sessionIds: string[];
-}
-
-/** The answer to a {@link SessionLinksEdit}: whether the description changed. A rerun with the same sessions changes nothing. */
-export interface SessionLinksResult {
-	changed: boolean;
-}

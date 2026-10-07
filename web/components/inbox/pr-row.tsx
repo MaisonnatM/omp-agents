@@ -1,20 +1,18 @@
-import { Check, CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, Link2, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
-import { useState } from "react";
-import { type InboxPullRequest, type PullRequest, pullRequestUrl, type PullRequestLink, type SessionLinksEdit, type SessionLinksResult, repoKey, samePullRequest } from "../../../src/shared/github";
+import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
+import { type MouseEvent, useState } from "react";
+import { type InboxPullRequest, type PullRequest, type PullRequestLink, repoKey, samePullRequest } from "../../../src/shared/github";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
-import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { errorText, putJson } from "../../api";
-import { inboxAge, type InboxRow, MOVES, type MoveId, reason, type StackPlace } from "../../inbox-model";
+import { inboxAge, type InboxRow, MOVES, type MoveId, moveAction, reason, type StackPlace } from "../../inbox-model";
 import { hashForInbox, type OpenMode } from "../../routing";
 import { hostLabel, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
-import type { QuickActionId } from "../../quick-actions";
+import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { DROP_LINE, type DragItem } from "../../use-drag-order";
-import { AddToTodo } from "../todo/add-button";
+import { BranchLabel } from "../git";
 import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
 import { StatusDot, statusLabel } from "../status-dot";
@@ -37,18 +35,52 @@ const MOVE_LOOK: Record<MoveId, [string, LucideIcon | null]> = {
 	merged: [MUTED, null],
 };
 
-/** The move a pull request waits on, as a fixed-width verb; an agent's work leads with the green dot of a working session. */
-export function MoveBadge({ move, className }: { move: MoveId; className?: string }) {
-	const [tone, Icon] = MOVE_LOOK[move];
+const BADGE = "flex h-5 w-16 shrink-0 items-center justify-center gap-1 rounded-[5px] px-1 text-[11px] whitespace-nowrap";
+
+function BadgeFace({ move }: { move: MoveId }) {
+	const Icon = MOVE_LOOK[move][1];
 	return (
-		<span
-			className={cn("flex h-5 w-16 shrink-0 items-center justify-center gap-1 rounded-[5px] px-1 text-[11px] whitespace-nowrap", tone, className)}
-			style={{ fontVariationSettings: fontWeights.semibold }}
-		>
+		<>
 			{move === "agent" && <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" />}
 			{Icon && <Icon aria-hidden className="size-3 shrink-0" />}
 			{MOVES[move].label}
+		</>
+	);
+}
+
+/** The move a pull request waits on, as a fixed-width verb; an agent's work leads with the green dot of a working session. */
+export function MoveBadge({ move, className }: { move: MoveId; className?: string }) {
+	return (
+		<span className={cn(BADGE, MOVE_LOOK[move][0], className)} style={{ fontVariationSettings: fontWeights.semibold }}>
+			<BadgeFace move={move} />
 		</span>
+	);
+}
+
+/** A row's move badge: a button that starts the quick action handing the move to an agent, when one applies, else the plain badge. */
+function RowMoveBadge({ pr, move, pending, onQuickAction }: { pr: InboxPullRequest; move: MoveId } & Pick<RowProps, "pending" | "onQuickAction">) {
+	const action = moveAction(pr, move);
+	if (!action) return <MoveBadge move={move} />;
+	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}`;
+	return (
+		<Tooltip content={`${label}. ${QUICK_ACTIONS[action].description}`}>
+			<button
+				type="button"
+				aria-label={label}
+				aria-busy={pending === action}
+				disabled={pending !== null}
+				onClick={() => onQuickAction(action)}
+				className={cn(
+					BADGE,
+					MOVE_LOOK[move][0],
+					"cursor-pointer outline-none hover:ring-1 hover:ring-current/40 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default",
+					pending === action && "motion-safe:animate-pulse",
+				)}
+				style={{ fontVariationSettings: fontWeights.semibold }}
+			>
+				<BadgeFace move={move} />
+			</button>
+		</Tooltip>
 	);
 }
 
@@ -177,7 +209,7 @@ function StackInfo({ stack, base }: { stack: StackPlace | null; base: string | n
 		<Tooltip content={label}>
 			<span role="img" aria-label={label} className="flex min-w-0 items-center gap-1 tabular-nums">
 				<Layers aria-hidden className="size-3 shrink-0" />
-				{stack ? `${stack.position}/${stack.size}` : <span className="max-w-24 truncate font-mono">{base}</span>}
+				{stack ? `${stack.position}/${stack.size}` : base && <BranchLabel name={base} className="max-w-24 font-mono" />}
 			</span>
 		</Tooltip>
 	);
@@ -189,47 +221,6 @@ export const rowId = (pr: PullRequest): string => `inbox-pr-${repoKey(pr)}/${pr.
 /** The row's element and its link: what the inbox's keys reach by id, so the markup below is their contract. */
 export const rowElement = (pr: PullRequest): HTMLElement | null => document.getElementById(rowId(pr));
 export const rowLink = (pr: PullRequest): HTMLAnchorElement | null => rowElement(pr)?.querySelector("a") ?? null;
-
-type Writing = { phase: "idle" | "writing" } | { phase: "done"; changed: boolean } | { phase: "failed"; error: string };
-
-/** Writes links to the PR's sessions into its description on GitHub. Only a click writes, and a rerun replaces the links it wrote. */
-function LinkSessionsButton({ pr, sessions }: { pr: PullRequest; sessions: SessionLink[] }) {
-	const [writing, setWriting] = useState<Writing>({ phase: "idle" });
-	const write = async (): Promise<void> => {
-		setWriting({ phase: "writing" });
-		const edit: SessionLinksEdit = { owner: pr.owner, repo: pr.repo, number: pr.number, sessionIds: sessions.map(session => session.sessionId) };
-		try {
-			setWriting({ phase: "done", changed: (await putJson<SessionLinksResult>("/api/pull-request/sessions", edit)).changed });
-		} catch (err) {
-			setWriting({ phase: "failed", error: errorText(err) });
-		}
-	};
-	const count = sessions.length === 1 ? "this session" : `these ${sessions.length} sessions`;
-	const label =
-		writing.phase === "done"
-			? writing.changed
-				? `Linked ${count} in the pull request's description`
-				: `The pull request's description already links ${count}`
-			: writing.phase === "failed"
-				? `Cannot write the description: ${writing.error}`
-				: `Link ${count} in the pull request's description on GitHub. The links open only on this machine.`;
-	return (
-		<Tooltip content={label}>
-			<Button
-				variant="ghost"
-				size="icon-compact"
-				aria-label={label}
-				loading={writing.phase === "writing"}
-				// Keeps the row's hover-only buttons shown while the write runs and after, so its outcome stays readable.
-				data-busy={writing.phase === "idle" ? undefined : ""}
-				className={cn("text-muted-foreground", writing.phase === "failed" && "text-red-600 dark:text-red-400")}
-				onClick={() => void write()}
-			>
-				{writing.phase === "done" ? <Check /> : <Link2 />}
-			</Button>
-		</Tooltip>
-	);
-}
 
 export interface RowProps {
 	row: InboxRow;
@@ -248,36 +239,34 @@ export interface RowProps {
 	moveId: string;
 }
 
-/** The row's todo, quick actions, and session links buttons, shown on hover over `className`'s background; they stay while an action starts. */
-function RowActions({ pr, sessions, pending, onQuickAction, actionsOpen, onActionsOpenChange, className }: Omit<RowProps, "row" | "targeted" | "onOpen" | "drag" | "moveId"> & { pr: InboxPullRequest; className: string }) {
+function RowQuickActions({ pr, pending, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: InboxPullRequest }) {
 	return (
-		<span
-			className={cn(
-				"absolute flex items-center gap-0.5 rounded-md transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-busy]]:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
-				pending === null && "opacity-0",
-				className,
-			)}
-		>
-			<AddToTodo
-				text={pr.title}
-				body={`Pull request ${pullRequestUrl(pr)}`}
-				link={{ kind: "pull-request", owner: pr.owner, repo: pr.repo, number: pr.number }}
-				label={`Add ${pr.repo}#${pr.number} to your todo list`}
-			/>
-			<QuickActionsMenu
-				actions={pullRequestActions(pr)}
-				pending={pending}
-				onRun={onQuickAction}
-				open={actionsOpen}
-				onOpenChange={onActionsOpenChange}
-				label="Quick actions: start a session in the background that works on this pull request"
-			/>
-			{sessions.length > 0 && <LinkSessionsButton pr={pr} sessions={sessions} />}
-		</span>
+		<QuickActionsMenu
+			actions={pullRequestActions(pr)}
+			pending={pending}
+			onRun={onQuickAction}
+			open={actionsOpen}
+			onOpenChange={onActionsOpenChange}
+			label="Quick actions: start a session in the background that works on this pull request"
+		/>
 	);
 }
 
-/** The pull request's title, which opens its details: the row's first link, which the inbox's keys focus. */
+function openFromRow(event: MouseEvent<HTMLElement>, pr: PullRequest): void {
+	const target = event.target;
+	if (!(target instanceof Element) || event.defaultPrevented || !event.currentTarget.contains(target) || target.closest("a, button, [role=menuitem]")) return;
+	if (window.getSelection()?.isCollapsed === false) return;
+	rowLink(pr)?.dispatchEvent(new window.MouseEvent("click", {
+		bubbles: true,
+		cancelable: true,
+		metaKey: event.metaKey,
+		ctrlKey: event.ctrlKey,
+		shiftKey: event.shiftKey,
+		altKey: event.altKey,
+	}));
+}
+
+/** The pull request's title link remains the keyboard and modifier-click target. */
 function TitleLink({ pr, targeted, className }: { pr: InboxPullRequest; targeted: boolean; className: string }) {
 	return (
 		<Tooltip content={`${pr.owner}/${pr.repo}#${pr.number} · ${pr.title}`}>
@@ -303,12 +292,19 @@ function Age({ at, className }: { at: number; className?: string }) {
 }
 
 /**
- * A pull request in the sidebar's inbox: its title and age, then its move and why it waits on it, with its actions on
- * hover. A rail on the left joins the rows of a stack.
+ * A pull request in the sidebar's inbox: its title and age, then its move and why it waits on it, with its quick
+ * actions on hover. A rail on the left joins the rows of a stack.
  */
 export function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
 	return (
-		<li id={rowId(pr)} {...drag.handle} {...drag.target} data-move={moveId} className={cn("group/row relative", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}>
+		<li
+			id={rowId(pr)}
+			{...drag.handle}
+			{...drag.target}
+			data-move={moveId}
+			onClick={event => openFromRow(event, pr)}
+			className={cn("group/row relative cursor-pointer", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
+		>
 			{stack?.joinsAbove && <span aria-hidden className="absolute top-0 left-1 h-4 w-px bg-border" />}
 			{stack?.joinsBelow && <span aria-hidden className="absolute top-4 bottom-0 left-1 w-px bg-border" />}
 			{stack && <span aria-hidden className="absolute top-3.5 left-[2.5px] size-1 rounded-full bg-muted-foreground/60" />}
@@ -318,7 +314,7 @@ export function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, o
 					<Age at={pr.updatedAt} className="w-7 leading-5" />
 				</div>
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
-					<MoveBadge move={move} />
+					<RowMoveBadge pr={pr} move={move} {...actions} />
 					<span className="shrink-0 tabular-nums">#{pr.number}</span>
 					<span aria-hidden>·</span>
 					<span className="min-w-0 truncate">{reason(pr, move)}</span>
@@ -329,17 +325,24 @@ export function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, o
 					</span>
 				</p>
 			</div>
-			<RowActions pr={pr} sessions={sessions} {...actions} className="top-1 right-1 bg-sidebar" />
+			<span
+				className={cn(
+					"absolute top-1 right-1 rounded-md bg-sidebar transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 has-[[data-popup-open]]:opacity-100 [@media(hover:none)]:opacity-100",
+					actions.pending === null && "opacity-0",
+				)}
+			>
+				<RowQuickActions pr={pr} {...actions} />
+			</span>
 		</li>
 	);
 }
 
 /**
- * The page's columns: move, title, sessions, stack, checks, review, size, and age. The sessions, stack, and size
- * columns drop out when the page is too narrow for them.
+ * The page's columns: move, title, sessions, stack, checks, review, size, age, and quick actions. The sessions, stack,
+ * and size columns drop out when the page is too narrow for them.
  */
 const TABLE_COLUMNS =
-	"grid grid-cols-[4rem_minmax(0,1fr)_1.25rem_3.5rem_2rem] items-center gap-x-3 @3xl/inbox:grid-cols-[4rem_minmax(0,1fr)_10rem_3.5rem_1.25rem_3.5rem_6rem_2rem]";
+	"grid grid-cols-[4rem_minmax(0,1fr)_1.25rem_3.5rem_2rem_1.75rem] items-center gap-x-3 @3xl/inbox:grid-cols-[4rem_minmax(0,1fr)_10rem_3.5rem_1.25rem_3.5rem_6rem_2rem_1.75rem]";
 
 const WIDE = "hidden @3xl/inbox:flex";
 
@@ -353,9 +356,10 @@ export function PullRequestTableRow({ row: { pr, move, stack }, sessions, target
 			{...drag.handle}
 			{...drag.target}
 			data-move={moveId}
-			className={cn("group/row relative px-3 py-2 hover:bg-muted/40", TABLE_COLUMNS, drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
+			onClick={event => openFromRow(event, pr)}
+			className={cn("group/row relative cursor-pointer px-3 py-2 hover:bg-muted/40", TABLE_COLUMNS, drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}
 		>
-			<MoveBadge move={move} />
+			<RowMoveBadge pr={pr} move={move} {...actions} />
 			<div className="min-w-0">
 				<TitleLink pr={pr} targeted={targeted} className="block truncate" />
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
@@ -376,13 +380,15 @@ export function PullRequestTableRow({ row: { pr, move, stack }, sessions, target
 			<span className={cn(WIDE, "min-w-0 text-xs text-muted-foreground")}>
 				<StackInfo stack={stack} base={pr.stackedOn} />
 			</span>
-			<ChecksIcon checks={pr.checks} />
-			<ReviewState pr={pr} max={2} />
+			<span><ChecksIcon checks={pr.checks} /></span>
+			<span><ReviewState pr={pr} max={2} /></span>
 			<span className={cn(WIDE, "justify-end")}>
 				<DiffSize pr={pr} />
 			</span>
 			<Age at={pr.updatedAt} />
-			<RowActions pr={pr} sessions={sessions} {...actions} className="top-1/2 right-2 -translate-y-1/2 bg-background" />
+			<span className="flex justify-end">
+				<RowQuickActions pr={pr} {...actions} />
+			</span>
 		</li>
 	);
 }

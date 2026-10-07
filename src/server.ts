@@ -245,11 +245,9 @@ try {
 		routes: {
 			...createRoutes({
 				guards,
-				origin: originOf(PORT),
 				knownCwds,
 				savedOf: files.savedOf,
 				worktrees,
-				pullRequestsOf: sessionId => files.factsOf(sessionId).pullRequests,
 				learnHeads(repo, pullRequests) {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},

@@ -8,6 +8,7 @@ import { useRead } from "../reads";
 import { hashForChanges } from "../routing";
 import { CheckoutVersion, useCheckoutVersion, useGitCheckout } from "../use-git-checkout";
 import { CommandPicker, type PickerGroup } from "./command-picker";
+import { BranchLabel } from "./git";
 import { PlanUsageList } from "./plan-usage";
 
 /** How often the status bar reads the checkout again, for changes made outside the dashboard. */
@@ -94,7 +95,7 @@ function BranchSwitcher({ dir, branch, onSwitch }: { dir: string; branch: string
 						.filter(other => other.worktree === null || other.name === checkout.branch)
 						.map(other => ({
 							value: other.name,
-							label: <span className="truncate">{other.name}</span>,
+							label: <BranchLabel name={other.name} title />,
 							selected: other.name === checkout.branch,
 							onSelect: () => {
 								if (other.name !== checkout.branch) onSwitch({ kind: "existing", name: other.name });
@@ -112,8 +113,11 @@ function BranchSwitcher({ dir, branch, onSwitch }: { dir: string; branch: string
 										label: (
 											<>
 												<GitBranchPlus aria-hidden />
-												<span className="truncate">
-													Create branch <strong className="font-medium">{name}</strong> from {base}
+												<span className="flex min-w-0 items-center gap-1">
+													<span className="shrink-0">Create branch</span>
+													<BranchLabel name={name} title className="font-medium" />
+													<span className="shrink-0">from</span>
+													<BranchLabel name={base} title />
 												</span>
 											</>
 										),
@@ -127,7 +131,7 @@ function BranchSwitcher({ dir, branch, onSwitch }: { dir: string; branch: string
 		: [];
 	return (
 		<CommandPicker
-			trigger={<span className="max-w-64 truncate">{label}</span>}
+			trigger={<BranchLabel name={label} className="max-w-64" />}
 			icon={GitBranch}
 			ariaLabel={`Branch: ${label}`}
 			tooltip={`Branch: ${label}. Choose another to switch this checkout, carrying its uncommitted changes.`}

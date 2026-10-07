@@ -33,12 +33,9 @@ The dashboard treats it that way:
 - On top of the token, every request must name `127.0.0.1:<port>` or `localhost:<port>` as its `Host`, so DNS rebinding does not get around the checks.
   The WebSocket and the writes also need an `Origin` that matches it, and the writes require a `Content-Type: application/json` body, which a cross-site form cannot send.
   Every `/api/` request, reads included, is refused when its `Sec-Fetch-Site` header is present and not `same-origin`, so a page on another site cannot make your browser start an inbox or model lookup.
-- The session links that the link button writes into a pull request, `http://127.0.0.1:<port>/#session/<session id>`, carry no token.
+- Session addresses such as `http://127.0.0.1:<port>/#session/<session id>` carry no token.
   Clicking one in a browser that has signed in opens the session: the cross-site click arrives without the `Strict` cookie, so `/` answers a small page, with no data, that sends the browser on to `/` from the dashboard's own origin, with the cookie and the `#session` hash.
   In a browser that never signed in, it shows the 401 page.
-- The pull-request write edits a description on GitHub as the account that `gh` is signed in to.
-  It writes only the marked block of session links, and only for sessions that submitted or worked on that pull request.
-  Anyone who can read the pull request sees the session ids and the dashboard's port, not the transcripts, which never leave this machine.
 - Agent text cannot load remote images: Markdown images in transcripts render as links unless they are `data:` URLs, so a prompt-injected reply cannot send data out through an image URL.
   Text from GitHub keeps images only from GitHub's own image hosts.
   The page's `Content-Security-Policy` limits scripts, connections, and workers to the dashboard itself, and images to the dashboard, `data:`, `blob:`, and those GitHub hosts.

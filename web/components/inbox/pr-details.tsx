@@ -22,7 +22,7 @@ import type { PullRequestActionId } from "../../../src/pull-request-actions";
 import type { QuickActionId } from "../../quick-actions";
 import { hashForInbox, type OpenMode } from "../../routing";
 import { useRead } from "../../reads";
-import { BranchName } from "../git";
+import { BranchLabel, BranchName } from "../git";
 import { DetailQuickActions, QuickActionButton, type QuickActionsProps } from "../quick-actions";
 import { Clamped, Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
 import { Avatar, IconTip, STATE_ICON } from "./avatars";
@@ -357,10 +357,10 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next, st
 								<Avatar person={detail.author} label={`Opened by ${detail.author.login}`} />
 								<span className="text-foreground">{detail.author.login}</span>
 							</span>
-							<span className="flex min-w-0 items-center gap-1.5">
-								<BranchName name={detail.head} className="min-w-0 truncate rounded bg-muted px-1.5 py-0.5 font-mono" />
+							<span className="flex min-w-0 max-w-full items-center gap-1.5">
+								<BranchName name={detail.head} className="rounded bg-muted px-1.5 py-0.5 font-mono" />
 								<ArrowRight aria-label="into" className="size-3 shrink-0" />
-								<span className="font-mono">{detail.base}</span>
+								<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
 							</span>
 							<span className="ml-auto flex items-center gap-3 tabular-nums">
 								<span>

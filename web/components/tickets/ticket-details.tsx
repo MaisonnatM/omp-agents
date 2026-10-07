@@ -109,7 +109,7 @@ function TicketLinks({ detail: { branch, attachments } }: { detail: TicketDetail
 		<>
 			{branch && (
 				<DetailSection title="Branch">
-					<BranchName name={branch} className="max-w-full truncate font-mono text-xs" />
+					<BranchName name={branch} className="max-w-full font-mono text-xs" />
 				</DetailSection>
 			)}
 			{attachments.length > 0 && (
