@@ -118,6 +118,15 @@ export function moveAction(pr: InboxPullRequest, move: MoveId): PullRequestActio
 	return action && pullRequestActions(pr).includes(action) ? action : null;
 }
 
+/** How long ago `at` was, in its largest whole unit: `<1m`, `19m`, `17h`, `2d`, so the inbox's ages line up in a narrow column. */
+export function inboxAge(at: number, now = Date.now()): string {
+	const minutes = Math.floor((now - at) / 60_000);
+	if (minutes < 1) return "<1m";
+	if (minutes < 60) return `${minutes}m`;
+	if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h`;
+	return `${Math.floor(minutes / (60 * 24))}d`;
+}
+
 /** Where a pull request sits in a stack of two or more that the inbox lists: `position` 1 is the bottom, which merges first. */
 export interface StackPlace {
 	position: number;
@@ -327,6 +336,39 @@ export function listedPullRequest(inbox: Inbox, pr: PullRequest): { pr: InboxPul
 		if (listed && repo.cwds[0] !== undefined) return { pr: listed, cwd: repo.cwds[0] };
 	}
 	return null;
+}
+
+/**
+ * The open and draft pull requests stacked with `pr`, by the chain of base branches, top first; empty unless the inbox
+ * lists two or more. Pull requests stacked on the same branch follow each other above it, lowest number first.
+ */
+export function pullRequestStack({ repos }: Inbox, pr: PullRequest): InboxPullRequest[] {
+	const repo = repos.find(other => repoKey(other) === repoKey(pr));
+	if (!repo || "error" in repo) return [];
+	const live = repo.pullRequests.filter(other => other.state !== "merged");
+	const self = live.find(other => samePullRequest(other, pr));
+	if (!self) return [];
+	const byHead = new Map(live.map(other => [other.head, other]));
+	const byBase = Map.groupBy(live.toSorted((a, b) => a.number - b.number), other => other.stackedOn ?? "");
+	// GitHub cannot report a cycle of bases, but one must not hang the page.
+	const seen = new Set([self]);
+	const below: InboxPullRequest[] = [];
+	for (let next = byHead.get(self.stackedOn ?? ""); next && !seen.has(next); next = byHead.get(next.stackedOn ?? "")) {
+		seen.add(next);
+		below.push(next);
+	}
+	const above: InboxPullRequest[] = [];
+	const climb = (from: InboxPullRequest): void => {
+		for (const next of byBase.get(from.head) ?? []) {
+			if (seen.has(next)) continue;
+			seen.add(next);
+			above.push(next);
+			climb(next);
+		}
+	};
+	climb(self);
+	if (seen.size < 2) return [];
+	return [...above.toReversed(), self, ...below];
 }
 
 /** How many pull requests in `inbox` wait on your move. */

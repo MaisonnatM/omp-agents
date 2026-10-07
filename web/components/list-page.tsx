@@ -80,12 +80,16 @@ interface ListPageProps<Data> {
 	notice: ReactNode;
 	/** Classes for the column that holds the lists: the spacing between them, and a width other than the reading width. */
 	className?: string;
+	/** Buttons before Refresh. */
+	actions?: ReactNode;
+	/** What stays pinned under the lists while they scroll. */
+	footer?: ReactNode;
 	/** The page's lists, from its read. */
 	children: (data: Data) => ReactNode;
 }
 
 /** A page of lists read from GitHub or Linear with a Refresh button, `notice`, and the lists once the first read loads. */
-export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, className, children }: ListPageProps<Data>) {
+export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, className, actions, footer, children }: ListPageProps<Data>) {
 	const { read, error, refreshing } = poll;
 	let body: ReactNode;
 	if (!read) body = <LoadNote loading={loading} error={error && `Cannot load ${noun}: ${error}`} />;
@@ -103,9 +107,12 @@ export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, no
 			title={title}
 			meta={read ? `${meta} · updated ${readTime(read.at)}` : meta}
 			actions={
-				<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={onRefresh}>
-					{refreshing ? "Refreshing…" : "Refresh"}
-				</Button>
+				<>
+					{actions}
+					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={onRefresh}>
+						{refreshing ? "Refreshing…" : "Refresh"}
+					</Button>
+				</>
 			}
 		>
 			<TooltipProvider>
@@ -113,6 +120,7 @@ export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, no
 					{notice}
 					{body}
 				</div>
+				{footer}
 			</TooltipProvider>
 		</PageFrame>
 	);

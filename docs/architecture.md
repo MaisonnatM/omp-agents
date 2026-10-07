@@ -568,7 +568,7 @@ The page lives in `web/`.
 `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
 - `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for a pull request's details, tickets, todo, calendar, routines, settings, and new-session pages, and focus handling.
-  `#inbox` alone keeps the pane grid and only switches the sidebar to its Inbox tab.
+  `#inbox` alone shows the inbox page, and the sidebar's Inbox tab then lists its sections.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which runs in the background.
@@ -623,9 +623,10 @@ The page lives in `web/`.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
 - `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the session details tab, the sidebar's project, the pinned skill, the inbox's order, and how often and how lately each command palette entry ran; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
+  Every component that holds the same key sees a change at once, so the inbox page and its sidebar index share their folds and order.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
-- `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab.
+- `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab, and `web/components/section-link.tsx` the section link that the tickets list and the inbox's section index share.
   `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed; their ages count up on the page's one minute timer.
   `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Done**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab, the calendar and then the routines by name.
@@ -656,14 +657,16 @@ The page lives in `web/`.
   `web/components/integrations/` holds the Integrations page, which sorts its rows into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which the tickets page also shows while Linear is not connected, and `google-calendar.tsx` is Google Calendar's, with the form that adds a calendar by its address.
   Both lay out through `integration-row.tsx` and draw their brand marks from `brand-logos.tsx`; `mcp-integration.tsx` starts its sign-ins with `web/use-sign-in.ts`, and its `SignOutConfirm` asks before a sign-out and shows its failure.
   `web/components/more-actions-menu.tsx` is the ⋯ menu of a row's rarer actions, which the integration rows and the Routines page share.
-  `inbox-nav.tsx` lists the pull requests in the sidebar with its sort menu, and `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue; both wrap their details in `DetailPage` from `web/components/list-page.tsx`.
-  `pr-row.tsx` exports the DOM lookups of a row and its link that the inbox's keys use.
+  `inbox-board.tsx` holds `useInboxBoard`, the inbox's logic that the sidebar list and the page share: its sections, folds, order, drag, keys, and rows, with the sort menu and the keys line.
+  Only one board mounts at a time, since its rows carry document ids and its keys are global, so the inbox page (`inbox-page.tsx`) shows the table while the sidebar shows `InboxIndex`, its sections as links, and `inbox-nav.tsx` lists the pull requests in the sidebar otherwise.
+  `pr-page.tsx` shows one pull request's details in the main content, as the tickets page shows an issue; both wrap their details in `DetailPage` from `web/components/list-page.tsx`.
+  `pr-row.tsx` draws the sidebar row and the table row, and exports the DOM lookups of a row and its link that the inbox's keys use.
   `web/use-drag-order.ts` drags the inbox's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
-  The tickets page uses `web/components/list-page.tsx` for its frame, header, and load and refresh states, its issue details use its `DetailPage`, and the pull request, Todo, Routines, and Calendar pages its `PageFrame`.
+  The tickets and inbox pages use `web/components/list-page.tsx` for their frame, header, and load and refresh states, its issue details use its `DetailPage`, and the pull request, Todo, Routines, and Calendar pages its `PageFrame`.
   Both details views use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
   `LoadNote` is the loading or error line that the pull request's details, the issue's, and the list page share, and `Clamped` folds a long description behind **Show more**.
   `web/components/fold.tsx` holds the fold button that the inbox and tickets share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
-  The sidebar's inbox binds J, K, O, E, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/inbox-model.ts` lists in sidebar order, so a folded section's rows drop out, and binds Alt+Shift+↑ and ↓ to move the focused heading or row by its `data-move` attribute.
+  The inbox binds J, K, O, E, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/inbox-model.ts` lists in order, so a folded section's rows drop out, and binds Alt+Shift+↑ and ↓ to move the focused heading or row by its `data-move` attribute.
 - `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry, and `web/components/kibo-ui` from Kibo UI's; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).

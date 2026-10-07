@@ -77,6 +77,9 @@ export interface InboxPullRequest extends PullRequest {
 	checks: CheckState;
 	/** True when GitHub reports the PR as `CONFLICTING` with its base branch; false for `MERGEABLE`, `UNKNOWN` (not computed yet), and merged PRs. */
 	conflicts: boolean;
+	/** Lines the pull request adds and removes. */
+	additions: number;
+	deletions: number;
 	head: string;
 	/** The branch it merges into when that is not the repository's default branch: the PR below it in a stack. */
 	stackedOn: string | null;

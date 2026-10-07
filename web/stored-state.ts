@@ -1,24 +1,38 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export const PINNED_SESSIONS_KEY = "omp-agents.pinned-sessions";
+
+/** The setters of every mounted {@link useStoredState} by key, so a write in one component shows in the others. */
+const holders = new Map<string, Set<(value: unknown) => void>>();
 
 /**
  * A value that localStorage keeps under `key`, read once, and its setter, which stores it at once and stays the same
  * function across renders. `decode` turns what is stored into a value; what it makes of `null`, when nothing is stored,
  * is the default. The default is removed rather than stored, so a value reset to it follows the default if it changes.
- * The setter also takes an update of the value it last set, so two in one event both apply.
+ * The setter also takes an update of the value it last set, so two in one event both apply. Every component that holds
+ * the same key sees the write, such as the inbox's sidebar and its page.
  */
 export function useStoredState<T>(key: string, decode: (raw: string | null) => T, encode: (value: T) => string = String): [T, (next: T | ((prev: T) => T)) => void] {
 	const [value, setValue] = useState(() => decode(localStorage.getItem(key)));
 	const latest = useRef({ value, decode, encode });
 	latest.current.decode = decode;
 	latest.current.encode = encode;
+	useEffect(() => {
+		const hold = (next: unknown): void => {
+			latest.current.value = next as T;
+			setValue(next as T);
+		};
+		const set = holders.get(key) ?? new Set();
+		holders.set(key, set.add(hold));
+		return () => void set.delete(hold);
+	}, [key]);
 	const store = useCallback(
 		(next: T | ((prev: T) => T)): void => {
 			const codec = latest.current;
 			const resolved = typeof next === "function" ? (next as (prev: T) => T)(codec.value) : next;
 			codec.value = resolved;
 			setValue(resolved);
+			for (const hold of holders.get(key) ?? []) hold(resolved);
 			const raw = codec.encode(resolved);
 			if (raw === codec.encode(codec.decode(null))) localStorage.removeItem(key);
 			else localStorage.setItem(key, raw);

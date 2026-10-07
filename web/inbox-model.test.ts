@@ -7,6 +7,7 @@ import {
 	DEFAULT_ORDER,
 	decodeOrder,
 	foldedByDefault,
+	inboxAge,
 	type InboxOrder,
 	inboxSections,
 	moveKey,
@@ -14,6 +15,7 @@ import {
 	movesSummary,
 	orderedRepos,
 	placedManual,
+	pullRequestStack,
 	pullRequestStatus,
 	reason,
 	sectionTitles,
@@ -34,6 +36,8 @@ const pr = (number: number, fields: Partial<InboxPullRequest> = {}): InboxPullRe
 	review: "review-required",
 	checks: "passing",
 	conflicts: false,
+	additions: 0,
+	deletions: 0,
 	head: `me/branch-${number}`,
 	stackedOn: null,
 	unresolved: { count: 0, exact: true },
@@ -111,6 +115,12 @@ describe("next move", () => {
 			"no review needed · no checks",
 			"@teammate",
 		]);
+	});
+
+	test("an age shows its largest whole unit, rounding down at each boundary", () => {
+		const now = Date.parse("2026-10-02T12:00:00Z");
+		const ago = (minutes: number): string => inboxAge(now - minutes * 60_000, now);
+		expect([ago(0), ago(0.9), ago(1), ago(59), ago(60), ago(23 * 60 + 59), ago(24 * 60), ago(-5)]).toEqual(["<1m", "<1m", "1m", "59m", "1h", "23h", "1d", "<1m"]);
 	});
 });
 
@@ -230,6 +240,21 @@ test("the shown pull requests follow page order and leave out folded repositorie
 	};
 	const folded = new Set(["acme/folded", "acme/webapp:Recently merged"]);
 	expect(shownPullRequests(inbox, key => folded.has(key), DEFAULT_ORDER, noAgent).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
+});
+
+test("a pull request's stack runs top first along the chain of bases, and a pull request alone in it has none", () => {
+	const stacked = (number: number, below: number | null, fields: Partial<InboxPullRequest> = {}) => pr(number, { stackedOn: below === null ? null : `me/branch-${below}`, ...fields });
+	const inbox = {
+		repos: [
+			{ owner: "acme", repo: "webapp", cwds: [], pullRequests: [stacked(1, null), stacked(3, 2), stacked(2, 1), stacked(5, null, { state: "merged" }), stacked(6, 5), stacked(7, null)] },
+		],
+		unmatched: [],
+	};
+	const numbers = (number: number) => pullRequestStack(inbox, { owner: "acme", repo: "webapp", number }).map(({ number }) => number);
+	expect(numbers(2)).toEqual([3, 2, 1]);
+	expect(numbers(1)).toEqual([3, 2, 1]);
+	expect(numbers(6)).toEqual([]);
+	expect(numbers(7)).toEqual([]);
 });
 
 describe("inbox order", () => {

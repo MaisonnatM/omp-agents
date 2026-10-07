@@ -5,7 +5,8 @@ import type { UserTodoList } from "../src/user-todos-shared";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { DashboardContext } from "./components/dashboard-context";
 import { FileDialog } from "./components/file-dialog";
-import { InboxNav } from "./components/inbox/inbox-nav";
+import { InboxIndex, InboxNav } from "./components/inbox/inbox-nav";
+import { InboxPage } from "./components/inbox/inbox-page";
 import { IntegrationsPage } from "./components/integrations/integrations-page";
 import { PullRequestPage } from "./components/inbox/pr-page";
 import { NewSession } from "./components/new-session";
@@ -115,14 +116,15 @@ export function App() {
 		if (next !== null) pickProject(next);
 	}, [started]);
 	const { layout } = state;
-	/** The pull request whose details the main area shows; `#inbox` alone keeps the panes, with the inbox in the sidebar. */
+	/** The pull request whose details the main area shows; `#inbox` alone shows the inbox page, with its sections in the sidebar. */
 	const inboxTarget = page?.kind === "inbox" ? page.target : null;
-	const cover = page?.kind === "inbox" && !inboxTarget ? null : page;
+	/** The inbox page lists the pull requests itself, so the sidebar's inbox tab shows its sections then. */
+	const onInboxPage = page?.kind === "inbox" && !inboxTarget;
 	const view = focusedView(layout);
 	const viewHost = view?.kind === "live" ? all.hosts.find(h => h.instanceId === view.instanceId) : undefined;
 	const viewPast = view?.kind === "past" ? all.past.find(s => s.sessionId === view.sessionId) : undefined;
 	const viewLastHost = view?.kind === "live" ? state.lastHosts.get(view.instanceId) ?? null : null;
-	const title = documentTitle(cover, view, viewHost ?? viewLastHost, viewPast ?? null);
+	const title = documentTitle(page ?? null, view, viewHost ?? viewLastHost, viewPast ?? null);
 	useEffect(() => {
 		document.title = title;
 	}, [title]);
@@ -133,7 +135,7 @@ export function App() {
 	const split = layout.panes.length > 1;
 	const [columns, setColumns] = useSplitRatio("columns");
 	const [rows, setRows] = useSplitRatio("rows");
-	const maximized = layout.maximized && !cover;
+	const maximized = layout.maximized && !page;
 	const [sessionQuery, setSessionQuery] = useState("");
 	const projectLists = useMemo(() => sidebarSessions(visible.hosts, visible.past, project, pinned), [visible, project, pinned]);
 	const defaultWorkspace = defaultCwd(view, visible.hosts, visible.past, project);
@@ -157,7 +159,7 @@ export function App() {
 		show(kind === "max" ? { ...current, focus: index, maximized: !current.maximized } : closePane(current, index));
 	}, [show]);
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
-	const detailsView = cover || (split && !maximized) ? null : view;
+	const detailsView = page || (split && !maximized) ? null : view;
 	const toggleSidebar = useCallback((side: SidebarSide): void => {
 		const { sidebars } = latest.current;
 		sidebars.setOpen(side, !sidebars.panels[side].open);
@@ -168,7 +170,7 @@ export function App() {
 	const switchProject = (cwd: string | null): void => {
 		pickProject(cwd);
 		// A page such as the tickets stays; only the panes follow the sidebar into the project.
-		const next = cover ? null : projectSession(cwd, visible.hosts, viewCwd);
+		const next = page ? null : projectSession(cwd, visible.hosts, viewCwd);
 		if (next) open(next, "replace");
 	};
 	const settingsPage: Page = { kind: "settings", cwd: page?.kind === "settings" ? page.cwd : viewCwd || null };
@@ -237,7 +239,7 @@ export function App() {
 			else navigate(settingsPage);
 		},
 		inbox: () => {
-			if (tab === "inbox" && !cover) return;
+			if (onInboxPage) return;
 			showTab("inbox");
 		},
 		tickets: () => {
@@ -246,7 +248,7 @@ export function App() {
 			showTab("tickets");
 		},
 		sessions: () => {
-			if (tab === "sessions" && !cover) return;
+			if (tab === "sessions" && !page) return;
 			showTab("sessions");
 		},
 		todo: () => {
@@ -346,7 +348,11 @@ export function App() {
 			main = <IntegrationsPage />;
 			break;
 		case "inbox":
-			main = page.target ? <PullRequestPage project={project} hosts={visible.hosts} target={page.target} /> : panes();
+			main = page.target ? (
+				<PullRequestPage project={project} hosts={visible.hosts} target={page.target} />
+			) : (
+				<InboxPage project={project} hosts={visible.hosts} past={visible.past} section={sectionTarget} />
+			);
 			break;
 		case "tickets":
 			if (linear && !linearCallable) main = <TicketsDisconnected linear={linear} />;
@@ -419,7 +425,7 @@ export function App() {
 								query={sessionQuery}
 								onQuery={setSessionQuery}
 								onTogglePin={togglePin}
-								open={cover ? [] : layout.panes}
+								open={page ? [] : layout.panes}
 								newSessionOpen={page?.kind === "new"}
 								integrationsOpen={page?.kind === "integrations"}
 								ticketsShown={ticketsShown}
@@ -436,10 +442,12 @@ export function App() {
 								onSectionTarget={setSectionTarget}
 								inbox={
 									// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
-									state.listed ? (
-										<InboxNav project={project} hosts={visible.hosts} past={visible.past} target={inboxTarget} />
-									) : (
+									!state.listed ? (
 										<p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>
+									) : onInboxPage ? (
+										<InboxIndex project={project} hosts={visible.hosts} target={sectionTarget} onTarget={setSectionTarget} />
+									) : (
+										<InboxNav project={project} hosts={visible.hosts} past={visible.past} target={inboxTarget} />
 									)
 								}
 								hosts={visible.hosts}
