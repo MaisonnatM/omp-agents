@@ -153,7 +153,7 @@ export function SessionDetails({ view, working, sessionId }: { view: View; worki
 	const files = changedFiles ?? [];
 	return (
 		<Tabs value={tab} onValueChange={value => setTab(value as DetailsTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
-			<SidebarHeader className="flex-row items-center gap-2 px-2 pt-4">
+			<SidebarHeader className="min-h-(--page-header-height) flex-row items-center gap-2 px-2 py-3">
 				<h2 className="sr-only">Session details</h2>
 				<SizeProvider size="compact">
 					<TabsList aria-label="Session details">

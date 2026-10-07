@@ -25,6 +25,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Sessions sidebar
 
+- Both sidebar header rows match the content header's height.
 - The dot before each session shows its state.
   Green means a turn is running, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
 - Under **All projects**, a session row with a title starts with a badge that names its project, the last segment of its working directory.
