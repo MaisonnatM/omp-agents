@@ -1,12 +1,35 @@
-import { ArrowRight, Check, CircleCheck, CircleDashed, CircleSlash, CircleX, Eye, GitMerge, GitPullRequestDraft, Layers, type LucideIcon, MessageSquare } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import {
+	ArrowLeft,
+	Bot,
+	Check,
+	ChevronDown,
+	CircleCheck,
+	CircleDashed,
+	CircleDot,
+	CircleSlash,
+	CircleX,
+	Copy,
+	Ellipsis,
+	ExternalLink,
+	Eye,
+	FileDiff,
+	GitMerge,
+	GitPullRequestDraft,
+	Layers,
+	type LucideIcon,
+	MessageSquare,
+	Tag,
+	Users,
+	Zap,
+} from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
 	type CheckRunState,
 	type InboxPullRequest,
 	type PullRequest,
+	type PullRequestChanges,
 	type PullRequestCheck,
 	type PullRequestDetail,
-	type PullRequestEvent,
 	pullRequestUrl,
 	type Reviewer,
 	type ReviewerState,
@@ -14,19 +37,27 @@ import {
 } from "../../../src/shared/github";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
+import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, inboxAge, type MoveId, pullRequestStatus, type StatusItem } from "../../inbox-model";
 import { age, modeOf } from "../../labels";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
-import type { QuickActionId } from "../../quick-actions";
+import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { hashForInbox, hashForPullRequestFiles, type OpenMode } from "../../routing";
 import { useRead } from "../../reads";
+import { useCopy } from "../../use-copy";
+import { ChangesExplorer } from "../changes/changes-explorer";
 import { BranchLabel, BranchName } from "../git";
-import { DetailQuickActions, QuickActionButton, type QuickActionsProps } from "../quick-actions";
-import { Clamped, Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
+import { QuickActionButton, type QuickActionsProps } from "../quick-actions";
+import { LiveSessionChips } from "../session-chip";
+import { Clamped, DetailSection, LoadNote, Markdown } from "../sheet-details";
 import { Avatar, IconTip, STATE_ICON } from "./avatars";
 import { ChecksIcon, MoveBadge } from "./pr-row";
+import { Timeline } from "./pr-timeline";
 
 const CHECK_RUN_ICON: Record<CheckRunState, [LucideIcon, string]> = {
 	failing: [CircleX, "text-red-600 dark:text-red-400"],
@@ -48,17 +79,6 @@ const REVIEWER_ICON: Record<ReviewerState, [LucideIcon, string, string]> = {
 	"changes-requested": [CircleX, "text-red-600 dark:text-red-400", "Requested changes"],
 	commented: [MessageSquare, "text-muted-foreground", "Commented"],
 	requested: [CircleDashed, "text-amber-600 dark:text-amber-400", "Review requested"],
-};
-
-const STATE_LABEL: Record<PullRequestDetail["state"], string> = { open: "Open", draft: "Draft", merged: "Merged", closed: "Closed" };
-
-/** What a comment or review did, after its author's name. */
-const EVENT_ACTION: Record<NonNullable<PullRequestEvent["review"]> | "comment", string> = {
-	approved: "approved",
-	"changes-requested": "requested changes",
-	commented: "reviewed",
-	dismissed: "reviewed, since dismissed",
-	comment: "commented",
 };
 
 const AND = new Intl.ListFormat("en", { type: "conjunction" });
@@ -126,29 +146,6 @@ function placeFixes(items: StatusItem[], actions: QuickActionId[]): PlacedItem[]
 		offered.add(fix);
 		return { item, fix };
 	});
-}
-
-function Status({ placed, quick }: { placed: PlacedItem[]; quick: QuickActionsProps }) {
-	return (
-		<ul className="space-y-2.5 text-sm">
-			{placed.map(({ item, fix }) => {
-				const { tone, icon: Icon, text } = viewOf(item);
-				return (
-					<li key={item.kind} className="space-y-1.5">
-						<p className="flex items-start gap-2">
-							<Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", TONE_COLOR[tone])} />
-							<span className="min-w-0">{text(item)}</span>
-						</p>
-						{fix && (
-							<div className="pl-6">
-								<QuickActionButton action={fix} pending={quick.pending} onRun={quick.onRun} />
-							</div>
-						)}
-					</li>
-				);
-			})}
-		</ul>
-	);
 }
 
 function CheckRow({ check: { name, state, url } }: { check: PullRequestCheck }) {
@@ -220,50 +217,6 @@ export interface NextMove {
 	session: RosterHost | null;
 }
 
-/** The one thing to do about the pull request now: its move, why, and the button that makes it. */
-function NextMoveCard({ pr, next, quick, onOpen }: { pr: PullRequest; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"] }) {
-	const { move, reason, action, session } = next;
-	let button: ReactNode = null;
-	if (action) button = <QuickActionButton action={action} pending={quick.pending} onRun={quick.onRun} primary />;
-	else if (move === "merge")
-		button = (
-			<Button variant="primary" size="compact" render={<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" />}>
-				Merge on GitHub
-			</Button>
-		);
-	else if (session)
-		button = (
-			<Button variant="primary" size="compact" onClick={event => onOpen({ kind: "live", instanceId: session.instanceId, agentId: null }, modeOf(event))}>
-				Open the session
-			</Button>
-		);
-	return (
-		<section aria-label="Next move" className="space-y-2 rounded-lg border border-border p-3">
-			<p className="flex items-center gap-2 text-xs text-muted-foreground">
-				Next move
-				<MoveBadge move={move} />
-			</p>
-			<p className="text-sm">{reason}</p>
-			{button}
-		</section>
-	);
-}
-
-function ReviewerList({ reviewers }: { reviewers: Reviewer[] }) {
-	if (reviewers.length === 0) return <p className="text-sm text-muted-foreground">No reviewers.</p>;
-	return (
-		<ul className="space-y-2 text-sm">
-			{reviewers.map(reviewer => (
-				<li key={reviewer.login} className="flex items-center gap-2">
-					<Avatar person={reviewer} label={reviewer.login} />
-					<span className="min-w-0 flex-1 truncate">{reviewer.login}</span>
-					<IconTip icon={REVIEWER_ICON[reviewer.state]} />
-				</li>
-			))}
-		</ul>
-	);
-}
-
 const RAIL = "absolute left-3.5 w-px bg-muted-foreground/30";
 const RAIL_DOT = "absolute top-1/2 left-[10.5px] size-2 -translate-y-1/2 rounded-full ring-2 ring-background";
 
@@ -328,222 +281,377 @@ interface DetailContentProps {
 	placement: Placement;
 	/** A change reads the pull request from GitHub again. */
 	version?: unknown;
+	/** The changed file the route opens in the Code tab; `null` shows the Summary. */
+	files?: { path: string | null } | null;
 }
 
 export type Placement = "page" | "sidebar";
 
-const HEADING: Record<Placement, { tag: "h1" | "h3"; className: string }> = {
-	page: { tag: "h1", className: "text-xl" },
-	sidebar: { tag: "h3", className: "text-base" },
-};
+type DetailTab = "summary" | "timeline" | "code";
 
-/**
- * A pull request read from GitHub, laid out like Graphite's: a header that names it, then its stack and details, beside
- * a column of its state, next move, Status, where each blocker offers the quick action that works on it, checks,
- * reviewers, and the other quick actions with the sessions that work on it. The column stacks above the details when the
- * container is narrow, as in the sidebar. The next move's action shows only in its card. The other quick actions show
- * once the read settles, so the buttons do not move when the details arrive.
- */
-export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next, stack, placement, version }: DetailContentProps) {
-	const { data: detail, error } = useRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`, version);
-	const headingRef = useRef<HTMLHeadingElement>(null);
-	useEffect(() => {
-		// The sidebar's details must leave the cursor in the pane's composer.
-		if (placement === "page") headingRef.current?.focus({ preventScroll: true });
-	}, [placement]);
-	const offered = quick.actions.filter(action => action !== next?.action);
-	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
-	const otherActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];
-	const { tag: Heading, className: headingSize } = HEADING[placement];
+/** The Next move's one button, as the header's primary action. */
+function NextMoveButton({ pr, next, quick, onOpen }: { pr: PullRequest; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"] }) {
+	const { move, reason, action, session } = next;
+	let button: ReactNode = null;
+	if (action) button = <QuickActionButton action={action} pending={quick.pending} onRun={quick.onRun} primary />;
+	else if (move === "merge")
+		button = (
+			<Button variant="primary" size="compact" leadingIcon={GitMerge} render={<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" />}>
+				Merge on GitHub
+			</Button>
+		);
+	else if (session)
+		button = (
+			<Button variant="primary" size="compact" onClick={event => onOpen({ kind: "live", instanceId: session.instanceId, agentId: null }, modeOf(event))}>
+				Open the session
+			</Button>
+		);
 	return (
-		<div className="@container/pr">
-			<div className="grid gap-x-10 gap-y-6 @4xl/pr:grid-cols-[minmax(0,1fr)_18rem]">
-				<header className="min-w-0 space-y-2 @4xl/pr:col-start-1">
-					<p className="text-sm tabular-nums text-muted-foreground">
-						{pr.repo} #{pr.number}
-					</p>
-					<Heading ref={headingRef} tabIndex={-1} className={cn(headingSize, "leading-snug font-semibold outline-none")}>
-						{detail?.title ?? `${pr.owner}/${pr.repo}#${pr.number}`}
-					</Heading>
-					{detail && (
-						<div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-xs text-muted-foreground">
-							<span className="flex items-center gap-1.5">
-								<Avatar person={detail.author} label={`Opened by ${detail.author.login}`} />
-								<span className="text-foreground">{detail.author.login}</span>
-							</span>
-							<span className="flex min-w-0 max-w-full items-center gap-1.5">
-								<BranchName name={detail.head} className="rounded bg-muted px-1.5 py-0.5 font-mono" />
-								<ArrowRight aria-label="into" className="size-3 shrink-0" />
-								<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
-							</span>
-							<span className="ml-auto flex items-center gap-3 tabular-nums">
-								<span>
-									{detail.changedFiles} {detail.changedFiles === 1 ? "file" : "files"}
-								</span>
-								<span>
-									<span className="text-emerald-600 dark:text-emerald-400">+{detail.additions}</span>{" "}
-									<span className="text-red-600 dark:text-red-400">−{detail.deletions}</span>
-								</span>
-								<Tooltip content={new Date(detail.createdAt).toLocaleString()}>
-									<span>Opened {age(detail.createdAt)} ago</span>
-								</Tooltip>
-							</span>
-						</div>
-					)}
-				</header>
-				<aside aria-label="Where the pull request stands" className="min-w-0 space-y-5 @4xl/pr:col-start-2 @4xl/pr:row-span-2 @4xl/pr:row-start-1">
-					<div className="flex items-center gap-3 text-xs text-muted-foreground">
-						{detail && <StateLabel state={detail.state} />}
-						<span className="ml-auto flex gap-3">
-							<OutLink href={pullRequestUrl(pr)}>GitHub</OutLink>
-							<OutLink href={graphiteUrl(pr)}>Graphite</OutLink>
-						</span>
-					</div>
-					{next && <NextMoveCard pr={pr} next={next} quick={quick} onOpen={onOpen} />}
-					{placed.length > 0 && (
-						<DetailSection title="Status">
-							<Status placed={placed} quick={quick} />
-						</DetailSection>
-					)}
-					{detail && detail.checkRuns.length > 0 && (
-						<DetailSection
-							title={
-								<>
-									Checks <span className="tabular-nums">{detail.checkRuns.length}</span>
-								</>
-							}
-						>
-							<Checks checks={detail.checkRuns} />
-						</DetailSection>
-					)}
-					{detail && (
-						<DetailSection title="Reviewers">
-							<ReviewerList reviewers={detail.reviewers} />
-						</DetailSection>
-					)}
-					{(otherActions.length > 0 || sessions.length > 0) && (
-						<DetailSection title="Actions">
-							<DetailQuickActions actions={otherActions} pending={quick.pending} onRun={quick.onRun} sessions={sessions} onOpen={onOpen} />
-						</DetailSection>
-					)}
-				</aside>
-				<div className="min-w-0 space-y-6 @4xl/pr:col-start-1">
-					{stack.length > 0 && <StackSection stack={stack} current={pr} />}
-					{detail ? <PullRequestSections detail={detail} /> : <LoadNote loading="Asking GitHub for the pull request…" error={error && `Cannot load the pull request: ${error}`} />}
-				</div>
-			</div>
-		</div>
-	);
-}
-
-function StateLabel({ state }: { state: PullRequestDetail["state"] }) {
-	const [Icon, color] = STATE_ICON[state];
-	return (
-		<span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-			<Icon aria-hidden className={cn("size-4", color)} />
-			{STATE_LABEL[state]}
+		<span className="flex items-center gap-2">
+			<Tooltip content={reason}>
+				<span>
+					<MoveBadge move={move} />
+				</span>
+			</Tooltip>
+			{button}
 		</span>
 	);
 }
 
-/** A pull request's description, unresolved comments, conversation, and files. */
-function PullRequestSections({ detail }: { detail: PullRequestDetail }) {
-	const { body, threads, conversation, files } = detail;
+/** The header's `⋯`: the quick actions the Next move does not make, then the pull request elsewhere. */
+function MoreMenu({ pr, actions, quick }: { pr: PullRequest; actions: QuickActionId[]; quick: QuickActionsProps }) {
+	return (
+		<DropdownMenu>
+			<Tooltip content="More actions">
+				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label="More actions" loading={quick.pending !== null} />}>
+					<Ellipsis />
+				</DropdownMenuTrigger>
+			</Tooltip>
+			<DropdownMenuContent align="end" className="min-w-56">
+				{actions.map(id => (
+					<MenuItem key={id} title={QUICK_ACTIONS[id].description} onClick={() => quick.onRun(id)}>
+						<Zap />
+						{QUICK_ACTIONS[id].label}
+					</MenuItem>
+				))}
+				{actions.length > 0 && <MenuSeparator />}
+				<MenuLinkItem href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
+					<ExternalLink />
+					Open on GitHub
+				</MenuLinkItem>
+				<MenuLinkItem href={graphiteUrl(pr)} target="_blank" rel="noreferrer">
+					<ExternalLink />
+					Open on Graphite
+				</MenuLinkItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+function CheckoutCommand({ pr }: { pr: PullRequest }) {
+	const { copied, copy } = useCopy();
+	const command = `gh pr checkout ${pr.number}`;
+	return (
+		<Tooltip content={copied ? "Copied" : "Copy the command"}>
+			<button type="button" onClick={() => copy(command)} className="group flex shrink-0 items-center gap-1.5 rounded px-1 font-mono text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+				{copied ? <Check aria-hidden className="size-3" /> : <Copy aria-hidden className="size-3 opacity-0 group-hover:opacity-100" />}
+				{command}
+			</button>
+		</Tooltip>
+	);
+}
+
+/** The checks at a glance on the tab bar's right, with the full list in a popover. */
+function ChecksSummary({ checks }: { checks: PullRequestCheck[] }) {
+	if (checks.length === 0) return null;
+	const count = (state: CheckRunState): number => checks.filter(check => check.state === state).length;
+	const failing = count("failing");
+	const pending = count("pending");
+	const [Icon, color, text] =
+		failing > 0
+			? [CircleX, CHECK_RUN_ICON.failing[1], `${failing} of ${checks.length} failing`]
+			: pending > 0
+				? [CircleDashed, CHECK_RUN_ICON.pending[1], `${pending} of ${checks.length} running`]
+				: [CircleCheck, CHECK_RUN_ICON.passing[1], `${checks.length} passing`];
+	return (
+		<Popover>
+			<PopoverTrigger asChild>
+				<Button variant="ghost" size="compact" className="text-muted-foreground" aria-label={`Checks: ${text}`}>
+					<span className="flex items-center gap-1.5">
+						<Icon aria-hidden className={cn("size-4", color)} />
+						<span className="hidden tabular-nums @sm/pr:inline">{text}</span>
+					</span>
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent align="end" className="w-80 p-3">
+				<Checks checks={checks} />
+			</PopoverContent>
+		</Popover>
+	);
+}
+
+function Property({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
 	return (
 		<>
-			<DetailSection title="Description">
-				<div className="rounded-lg border border-border px-4 py-3">
-					{body.trim() ? (
+			<dt className="flex items-center gap-2 pt-1 text-muted-foreground @sm/pr:py-1">
+				<Icon aria-hidden className="size-4" />
+				{label}
+			</dt>
+			<dd className="min-w-0 pt-1 pb-2 @sm/pr:py-1">{children}</dd>
+		</>
+	);
+}
+
+function LabelChips({ labels }: { labels: PullRequestDetail["labels"] }) {
+	if (labels.length === 0) return <span className="text-muted-foreground">None</span>;
+	return (
+		<span className="flex flex-wrap gap-1.5">
+			{labels.map(label => (
+				<span key={label.name} className="flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs">
+					<span aria-hidden className="size-2 rounded-full" style={{ backgroundColor: `#${label.color}` }} />
+					{label.name}
+				</span>
+			))}
+		</span>
+	);
+}
+
+function StatusInline({ placed, quick }: { placed: PlacedItem[]; quick: QuickActionsProps }) {
+	return (
+		<ul className="space-y-1.5">
+			{placed.map(({ item, fix }) => {
+				const { tone, icon: Icon, text } = viewOf(item);
+				return (
+					<li key={item.kind} className="flex flex-wrap items-center gap-2">
+						<Icon aria-hidden className={cn("size-4 shrink-0", TONE_COLOR[tone])} />
+						<span className="min-w-0">{text(item)}</span>
+						{fix && <QuickActionButton action={fix} pending={quick.pending} onRun={quick.onRun} />}
+					</li>
+				);
+			})}
+		</ul>
+	);
+}
+
+function ReviewerInline({ reviewers }: { reviewers: Reviewer[] }) {
+	if (reviewers.length === 0) return <span className="text-muted-foreground">None</span>;
+	return (
+		<span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+			{reviewers.map(reviewer => (
+				<span key={reviewer.login} className="flex items-center gap-1.5">
+					<Avatar person={reviewer} label={reviewer.login} />
+					{reviewer.login}
+					<IconTip icon={REVIEWER_ICON[reviewer.state]} />
+				</span>
+			))}
+		</span>
+	);
+}
+
+interface SummaryProps {
+	pr: PullRequest;
+	detail: PullRequestDetail;
+	placed: PlacedItem[];
+	quick: QuickActionsProps;
+	stack: InboxPullRequest[];
+	sessions: RosterHost[];
+	onOpen: DetailContentProps["onOpen"];
+}
+
+function Summary({ pr, detail, placed, quick, stack, sessions, onOpen }: SummaryProps) {
+	const [descriptionOpen, setDescriptionOpen] = useState(true);
+	return (
+		<div className="space-y-6">
+			<dl className="grid grid-cols-1 items-start gap-x-4 text-sm @sm/pr:grid-cols-[8rem_minmax(0,1fr)] @sm/pr:gap-y-1">
+				{placed.length > 0 && (
+					<Property icon={CircleDot} label="Status">
+						<StatusInline placed={placed} quick={quick} />
+					</Property>
+				)}
+				<Property icon={Users} label="Reviewers">
+					<ReviewerInline reviewers={detail.reviewers} />
+				</Property>
+				<Property icon={Tag} label="Labels">
+					<LabelChips labels={detail.labels} />
+				</Property>
+				{sessions.length > 0 && (
+					<Property icon={Bot} label="Sessions">
+						<LiveSessionChips hosts={sessions} onOpen={onOpen} />
+					</Property>
+				)}
+			</dl>
+			{stack.length > 0 && <StackSection stack={stack} current={pr} />}
+			<section className="space-y-3">
+				<button type="button" onClick={() => setDescriptionOpen(open => !open)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground" aria-expanded={descriptionOpen}>
+					Description
+					<ChevronDown aria-hidden className={cn("size-4 transition-transform", !descriptionOpen && "-rotate-90")} />
+				</button>
+				{descriptionOpen &&
+					(detail.body.trim() ? (
 						<Clamped>
-							<Markdown text={body} />
+							<Markdown text={detail.body} />
 						</Clamped>
 					) : (
 						<p className="text-sm text-muted-foreground">No description.</p>
-					)}
+					))}
+			</section>
+		</div>
+	);
+}
+
+/** The Code tab: on the page, the changes explorer; in the narrow sidebar, the files, each opening the page's Code tab. */
+function Code({ pr, detail, placement, path, version }: { pr: PullRequest; detail: PullRequestDetail; placement: Placement; path: string | null; version?: unknown }) {
+	const query = `owner=${encodeURIComponent(pr.owner)}&repo=${encodeURIComponent(pr.repo)}&number=${pr.number}`;
+	const list = useRead<PullRequestChanges>(placement === "page" ? `/api/pull-request/files?${query}` : null, version);
+	if (placement === "sidebar") {
+		return (
+			<ul className="divide-y divide-border rounded-lg border border-border font-mono text-xs">
+				{detail.files.map(file => (
+					<li key={file.path}>
+						<a href={hashForPullRequestFiles(detail, file.path)} className="flex min-w-0 items-center gap-3 px-2.5 py-1 hover:bg-muted">
+							<span className="min-w-0 flex-1 truncate">{file.path}</span>
+							<span className="shrink-0 tabular-nums">
+								<span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span> <span className="text-red-600 dark:text-red-400">−{file.deletions}</span>
+							</span>
+						</a>
+					</li>
+				))}
+			</ul>
+		);
+	}
+	if (!list.data) {
+		return (
+			<div className="px-6 py-4">
+				<LoadNote loading="Reading changes…" error={list.error && `Cannot load the changes: ${list.error}`} />
+			</div>
+		);
+	}
+	if (list.data.files.length === 0) return <p className="m-auto text-sm text-muted-foreground">The pull request changes no file.</p>;
+	return (
+		<ChangesExplorer
+			files={list.data.files}
+			path={path}
+			hrefFor={file => hashForPullRequestFiles(pr, file)}
+			fileUrl={file => `/api/pull-request/file?${query}&path=${encodeURIComponent(file)}`}
+			version={String(version ?? 0)}
+		/>
+	);
+}
+
+/**
+ * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
+ * of the other actions; then Summary, Timeline, and Code tabs, with the checks at a glance on the tab bar.
+ */
+export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next, stack, placement, version, files = null }: DetailContentProps) {
+	const { data: detail, error } = useRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`, version);
+	const headingRef = useRef<HTMLHeadingElement>(null);
+	const [tab, setTab] = useState<DetailTab>(files ? "code" : "summary");
+	useEffect(() => {
+		if (files) setTab("code");
+	}, [files]);
+	useEffect(() => {
+		// The sidebar's details must leave the cursor in the pane's composer.
+		if (placement === "page") headingRef.current?.focus({ preventScroll: true });
+	}, [placement]);
+	const choose = (value: DetailTab): void => {
+		setTab(value);
+		if (placement !== "page") return;
+		if (value === "code" && !files) location.hash = hashForPullRequestFiles(pr);
+		else if (value !== "code" && files) location.hash = hashForInbox(pr);
+	};
+	const offered = quick.actions.filter(action => action !== next?.action);
+	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
+	const otherActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];
+	const page = placement === "page";
+	const Heading = page ? "h1" : "h3";
+	const stackedBase = detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
+	const comments = detail ? detail.conversation.length + detail.threads.length : 0;
+	return (
+		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
+			<header className={cn("space-y-2 border-b border-border pb-4", page ? "px-6 pt-5" : "pt-1")}>
+				<div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+					<p className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">
+						{detail && <IconTip icon={STATE_ICON[detail.state]} />}
+						<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 truncate hover:text-foreground">
+							{pr.owner}/{pr.repo} <span className="text-emerald-700 dark:text-emerald-400">#{pr.number}</span>
+							<ExternalLink aria-hidden className="size-3" />
+						</a>
+					</p>
+					<span className="ml-auto flex shrink-0 items-center gap-1.5">
+						{next && <NextMoveButton pr={pr} next={next} quick={quick} onOpen={onOpen} />}
+						<MoreMenu pr={pr} actions={otherActions} quick={quick} />
+					</span>
 				</div>
-			</DetailSection>
-			{threads.length > 0 && (
-				<DetailSection
-					title={
-						<>
-							Unresolved comments <span className="tabular-nums">{threads.length}</span>
-						</>
-					}
-				>
-					<ul className="space-y-3">
-						{threads.map((thread, index) => (
-							<li key={index} className="space-y-3 rounded-lg border border-border p-3">
-								<a
-									href={hashForPullRequestFiles(detail, thread.path)}
-									className="block truncate font-mono text-xs text-muted-foreground hover:text-foreground hover:underline"
-									title={`${thread.path}: open its changes`}
-								>
-									{thread.path}
-									{thread.line !== null && `:${thread.line}`}
-								</a>
-								<ul className="space-y-3">
-									{thread.comments.map((comment, position) => (
-										<Comment
-											key={position}
-											comment={comment}
-											avatar={<Avatar person={comment.author} label={comment.author.login} className="mr-0.5" />}
-											author={comment.author.login}
-											action={position === 0 ? "commented" : "replied"}
-										/>
-									))}
-								</ul>
-							</li>
-						))}
-					</ul>
-				</DetailSection>
-			)}
-			{conversation.length > 0 && (
-				<DetailSection title="Conversation">
-					<ul className="space-y-4">
-						{conversation.map((event, index) => (
-							<Comment
-								key={index}
-								comment={event}
-								avatar={<Avatar person={event.author} label={event.author.login} className="mr-0.5" />}
-								author={event.author.login}
-								action={EVENT_ACTION[event.review ?? "comment"]}
-							/>
-						))}
-					</ul>
-				</DetailSection>
-			)}
-			{files.length > 0 && (
-				<DetailSection
-					title={
-						<>
-							Files <span className="tabular-nums">{detail.changedFiles}</span>
-						</>
-					}
-				>
-					<ul className="max-h-72 divide-y divide-border overflow-y-auto rounded-lg border border-border font-mono text-xs">
-						{files.map(file => (
-							<li key={file.path}>
-								<a
-									href={hashForPullRequestFiles(detail, file.path)}
-									title={`${file.path} (${file.change}): open its changes`}
-									className="flex min-w-0 items-center gap-3 px-2.5 py-1 outline-none hover:bg-muted focus-visible:bg-muted"
-								>
-									<span className="min-w-0 flex-1 truncate">{file.path}</span>
-									<span className="shrink-0 tabular-nums">
-										<span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>{" "}
-										<span className="text-red-600 dark:text-red-400">−{file.deletions}</span>
+				<Heading ref={headingRef} tabIndex={-1} className={cn(page ? "text-xl" : "text-base", "leading-snug font-semibold outline-none")}>
+					{detail?.title ?? `${pr.owner}/${pr.repo}#${pr.number}`}
+				</Heading>
+				{detail && (
+					<>
+						<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+							<span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+								<Avatar person={detail.author} label={`Opened by ${detail.author.login}`} />
+								<span className="truncate text-foreground">{detail.author.login}</span>
+								<span aria-hidden>·</span>
+								<Tooltip content={`Opened ${new Date(detail.createdAt).toLocaleString()}`}>
+									<span>updated {age(detail.updatedAt)} ago</span>
+								</Tooltip>
+							</span>
+							<span className="ml-auto whitespace-nowrap">
+								<CheckoutCommand pr={pr} />
+							</span>
+						</div>
+						<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+							<span className="flex min-w-0 max-w-full items-center gap-1.5">
+								{stackedBase ? (
+									<span className="flex min-w-0 items-center gap-1 text-amber-700 dark:text-amber-400">
+										<Layers aria-hidden className="size-3.5 shrink-0" />
+										<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
 									</span>
-								</a>
-							</li>
-						))}
-					</ul>
-					{detail.changedFiles > files.length && (
-						<p className="text-xs text-muted-foreground">
-							And {detail.changedFiles - files.length} more files, which <OutLink href={`${pullRequestUrl(detail)}/files`}>GitHub</OutLink> lists.
-						</p>
-					)}
-				</DetailSection>
+								) : (
+									<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
+								)}
+								<ArrowLeft aria-label="from" className="size-3 shrink-0" />
+								<BranchName name={detail.head} className="font-mono" />
+							</span>
+							<span className="ml-auto flex items-center gap-2 tabular-nums">
+								<FileDiff aria-hidden className="size-3.5" />
+								{detail.changedFiles} {detail.changedFiles === 1 ? "file" : "files"}
+								<span className="font-mono">
+									<span className="text-emerald-600 dark:text-emerald-400">+{detail.additions.toLocaleString()}</span>{" "}
+									<span className="text-red-600 dark:text-red-400">−{detail.deletions.toLocaleString()}</span>
+								</span>
+							</span>
+						</div>
+					</>
+				)}
+			</header>
+			<div className={cn("flex items-center gap-2 border-b border-border py-2", page && "px-6")}>
+				<SizeProvider size="compact">
+					<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>
+						<TabsList aria-label="Show">
+							<TabItem value="summary" label="Summary" />
+							<TabItem value="timeline" label="Timeline" badge={comments || undefined} aria-label={`Timeline, ${comments} comments`} />
+							<TabItem value="code" label="Code" />
+						</TabsList>
+					</Tabs>
+				</SizeProvider>
+				<span className="ml-auto">{detail && <ChecksSummary checks={detail.checkRuns} />}</span>
+			</div>
+			{!detail ? (
+				<div className={cn("py-4", page && "px-6")}>
+					<LoadNote loading="Asking GitHub for the pull request…" error={error && `Cannot load the pull request: ${error}`} />
+				</div>
+			) : tab === "code" ? (
+				<div className={cn("flex min-h-0 flex-1 flex-col", !page && "pt-3")}>
+					<Code pr={pr} detail={detail} placement={placement} path={files?.path ?? null} version={version} />
+				</div>
+			) : (
+				<div className={cn("min-h-0 flex-1 overflow-y-auto", page && "px-6")}>
+					<div className="py-4">
+						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} sessions={sessions} onOpen={onOpen} /> : <Timeline detail={detail} />}
+					</div>
+				</div>
 			)}
-		</>
+		</div>
 	);
 }

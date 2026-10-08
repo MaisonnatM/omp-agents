@@ -7,7 +7,6 @@ import { DashboardContext, MentionListsContext } from "./components/dashboard-co
 import { FileDialog } from "./components/file-dialog";
 import { InboxIndex, InboxNav } from "./components/inbox/inbox-nav";
 import { InboxPage } from "./components/inbox/inbox-page";
-import { PullRequestChangesPage } from "./components/inbox/pr-changes-page";
 import { PullRequestPage } from "./components/inbox/pr-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
@@ -390,10 +389,8 @@ export function App() {
 			main =
 				page.target === null ? (
 					<InboxPage project={project} hosts={visible.hosts} past={visible.past} section={sectionTarget} />
-				) : page.files ? (
-					<PullRequestChangesPage pr={page.target} path={page.files.path} />
 				) : (
-					<PullRequestPage project={project} hosts={visible.hosts} target={page.target} />
+					<PullRequestPage project={project} hosts={visible.hosts} target={page.target} files={page.files} />
 				);
 			break;
 		case "tickets":

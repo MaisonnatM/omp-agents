@@ -355,6 +355,9 @@ describe("pull request status", () => {
 		threads: [],
 		conversation: [],
 		createdAt: 0,
+		updatedAt: 0,
+		labels: [],
+		commits: [],
 		...fields,
 	});
 	const check = (state: PullRequestCheck["state"]) => ({ name: state, state, url: null });

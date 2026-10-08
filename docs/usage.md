@@ -135,7 +135,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A session with several lists them first, each with whether it submitted or worked on it; click one to show it.
   The first one shows until you pick another.
   **Open #N in the inbox** opens its details in the main area.
-  Under it, the pull request shows as its details in the inbox do, in one column: its state with links to GitHub and Graphite, its **Next move**, **Status**, **Checks**, **Reviewers**, its other quick actions and the sessions on it, its stack, then its description, unresolved review comments, conversation, and changed files; a changed file opens the pull request's changes page in the inbox.
+  Under it, the pull request shows as its details in the inbox do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, each a link to it on the inbox page's **Code** tab.
   The quick actions apply only when the inbox of the sidebar's project lists the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
@@ -526,34 +526,41 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Drag a repository's name on the page or in its sidebar index to reorder the repositories, and a section's heading on the page to reorder the sections, which applies to every repository.
   Alt+Shift+↑ and ↓ move the focused pull request, section heading, or repository name one place, as dragging does.
   The browser's localStorage keeps the order across reloads, and **Reset the order** in the sort menu restores the default.
-- The details of a pull request lay out like Graphite's: the repository and number above the title, then its author, the branch and the one it merges into, its files, the lines added and removed, and when it opened.
-  Beside them, a column shows its state with links to it on GitHub and on Graphite, then its **Next move**: the move's badge, its reason, and one button that makes it.
+- The details of a pull request open with a header: the repository and number, a link to it on GitHub, then the title, its author, when it last changed, and `gh pr checkout <number>`, which a click copies.
+  Its last line shows the branch it merges into, marked with a stack icon in amber when that is another pull request's branch, the branch it brings, its files, and the lines added and removed.
+  On the right of the first line, the **Next move** shows as its badge, with its reason on hover, and one button that makes it.
   The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**; a **Rebase** whose checks also failed offers **Fix CI and conflicts**.
-  **Merge** offers **Merge on GitHub**, and **Answer** and **Working** offer **Open the session**.
-  Under it, **Status** shows what stands between the pull request and its merge: **Ready to merge**, a draft, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first.
-  A blocker that another quick action works on carries that action's button, and **Actions** at the bottom of the column keeps the other actions with the sessions on the pull request.
-  **Checks** shows a bar of the head commit's checks by state, the failing and pending ones, and the passing and skipped ones folded behind their counts.
+  **Merge** offers **Merge on GitHub**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
+  The `⋯` menu beside it holds the other quick actions, then **Open on GitHub** and **Open on Graphite**.
+- Under the header, tabs split the details: **Summary**, **Timeline**, with the count of its comments, reviews, and review threads, and **Code**.
+  The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
+- **Summary** lists the pull request's properties.
+  **Status** shows what stands between the pull request and its merge: **Ready to merge**, a draft, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
   **Reviewers** lists each reviewer with an icon for where they stand: approved, requested changes, commented, or a review still requested.
+  **Labels** shows the labels in their GitHub colors, and **Sessions** the running sessions on the pull request.
   When the inbox lists another pull request of its stack, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, marks this one, and links to the others.
-  Then come the description, folded after about 16 lines behind **Show more**, the unresolved review comments by file and line, the conversation of comments and reviews, and the changed files, each a link to the file's changes.
-  A narrow page puts the column above the details.
-  Each opening reads the pull request again; the server keeps its answer for 30 seconds.
+  Then comes the description, folded after about 16 lines behind **Show more**; click **Description** to hide or show it.
+- **Timeline** lists what happened on the pull request as a chat does, newest first, with a line for each day that stays on top while you scroll its entries.
+  Each entry shows its author's avatar, name, and time: a push lists its commits, one author's commits within an hour as one entry, with each commit's short hash and lines added and removed; a review shows its verdict and words; a comment shows its words.
+  The pull request's own commits show, not those of its trunk that its branch took in; a commit counts as its own unless GitHub links it only to other pull requests.
+  An unresolved review thread shows its first comment, under the file and line it is on, which link to the file on the **Code** tab; its replies fold behind a bar that shows who replied, how many replies, and when the last came.
+  A red **New** line sits under what happened since you last opened the pull request's timeline in this browser, which its localStorage keeps for 30 days.
+  Above the list, the counts of comments and commits, and **Newest first**, which flips the order.
+- **Code** shows the pull request's files as the [session changes](#session-changes) page shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and the open file in **Diff** or **File**, with J and K to step through them.
+  A renamed file shows **R**, and a copied one **A**.
+  It reads the files from GitHub, so it needs no checkout of the repository; a file GitHub shows no diff for, such as a binary one or one with a very large diff, shows why instead.
+  Opening the tab reads the list from GitHub again, and the files you open within 30 seconds read from that list.
+  In the session details sidebar's **PRs** tab, **Code** lists the files instead, each a link to that file on the inbox page's **Code** tab.
+- Each opening reads the pull request again; the server keeps its answer for 30 seconds.
 - The inbox works from the keyboard, outside text fields, while its tab shows.
   J and K move to the next and previous row, and Enter shows the focused row's details.
-  While the details show, J and K show the next and previous pull request; while its changes page shows, they open the next and previous file.
+  While the details show, J and K show the next and previous pull request; while the **Code** tab shows, they open the next and previous file.
   O opens the focused row's pull request, or the one whose details show, on GitHub, and `.` opens the focused row's quick actions.
   E gives the focused row's move, or the move of the pull request whose details show, to an agent, when a quick action makes that move.
 - `#inbox/<owner>/<repo>/<number>` shows one pull request's details.
   The sidebar unfolds its row's repository and section, scrolls the row into view, and highlights it.
   When the inbox does not list that pull request, a note says why, and the details still show.
-- Click a changed file in the details, or the file above an unresolved review comment, to open the pull request's changes page on that file, in place of the details.
-  It shows the pull request's files as the [session changes](#session-changes) page shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and the open file in **Diff** or **File**, with J and K to step through them.
-  A renamed file shows **R**, and a copied one **A**.
-  The header names the branch and the one it merges into, and totals the files and the lines added and removed; the arrow before the title goes back to the details, and the round arrow reads the files again.
-  The page reads the files from GitHub, so it needs no checkout of the repository; a file GitHub shows no diff for, such as a binary one or one with a very large diff, shows why instead.
-  Opening the page reads the list from GitHub again, and the files you open within 30 seconds read from that list.
-  `#inbox/<owner>/<repo>/<number>/files` opens it on the first file, and `#inbox/<owner>/<repo>/<number>/files/<path>` on the file at that path, encoded.
-  The sidebar keeps the pull request highlighted, as for its details.
+  `#inbox/<owner>/<repo>/<number>/files` opens the details on the **Code** tab at the first file, and `#inbox/<owner>/<repo>/<number>/files/<path>` at the file at that path, encoded; choosing **Code** puts that address in the location bar, and another tab takes it out.
 - A lightning button on an inbox row, and buttons in the pull request's details, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
   The inbox stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   The chip stays while the session runs, after a reload too, so the row says whether an agent still works on the pull request.
@@ -955,7 +962,7 @@ Alt is Option on macOS.
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or inbox | Move the focused todo, or the inbox's focused pull request, section, or repository, up or down |
-| J / K | Changes page or a pull request's changes page, outside text fields | Open the next or previous changed file |
+| J / K | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop button, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.

@@ -350,6 +350,14 @@ describe("parseDetailAnswer", () => {
 		]).toEqual([true, true, false, false, false]);
 	});
 
+	test("keeps the pull request's own commits and drops the trunk commits its branch took in", () => {
+		const commit = (sha: string, owners: number[]) => ({
+			commit: { abbreviatedOid: sha, messageHeadline: sha, committedDate: "2026-09-30T09:00:00Z", author: { name: "Me", user: me }, associatedPullRequests: { nodes: owners.map(number => ({ number })) } },
+		});
+		const { commits } = parseDetailAnswer(answer({ history: { nodes: [commit("trunk", [5]), commit("mine", [7, 8]), commit("unpushed", [])] } }), pr);
+		expect(commits.map(({ sha }) => sha)).toEqual(["mine", "unpushed"]);
+	});
+
 	test("a repository without that pull request is an error, not an empty one", () => {
 		expect(() => parseDetailAnswer({ data: { repository: { pullRequest: null } } }, pr)).toThrow("GitHub has no pull request acme/webapp#7");
 	});

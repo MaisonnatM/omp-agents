@@ -1,6 +1,10 @@
+import { ArrowLeft } from "lucide-react";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { type Inbox, type InboxPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { agentOn, listedPullRequest, moveAction, moveOf, pullRequestStack, reason } from "../../inbox-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { actionOn, pendingOf, pullRequestStart } from "../../quick-actions";
@@ -8,7 +12,7 @@ import { inboxStore } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import { useDashboardContext } from "../dashboard-context";
-import { DetailPage } from "../list-page";
+import { Header } from "../page-header";
 import { QuickStartNotice } from "../quick-actions";
 import { type NextMove, type Placement, PullRequestDetailContent } from "./pr-details";
 import { rowId } from "./pr-row";
@@ -39,6 +43,8 @@ interface PullRequestDetailsProps {
 	placement: Placement;
 	/** A change reads `target` from GitHub again. */
 	version?: unknown;
+	/** The changed file the Code tab opens. */
+	files?: { path: string | null } | null;
 }
 
 /**
@@ -46,20 +52,26 @@ interface PullRequestDetailsProps {
  * became of a quick start on it. The page also says why the inbox does not list it; the sidebar does not, since most
  * past sessions' merged pull requests would carry that note.
  */
-export function PullRequestDetails({ project, hosts, target, placement, version }: PullRequestDetailsProps) {
+export function PullRequestDetails({ project, hosts, target, placement, version, files }: PullRequestDetailsProps) {
 	const { open, start, dismissStart, starts: { quick } } = useDashboardContext();
 	const { read } = inboxStore.use(project);
 	const listed = read && listedPullRequest(read.data, target);
 	const item: WorkItem = { kind: "pull-request", pr: target };
 	const sessions = sessionsOn(item, hosts);
+	const missing = placement === "page" && read && !listed;
+	const started = quick && actionOn(quick.op.subject, item) !== null;
 	return (
 		<>
-			{placement === "page" && read && !listed && (
-				<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-					{whyMissing(target, read.data, project === null)}
-				</p>
+			{(missing || started) && (
+				<div className={cn("space-y-2", placement === "page" && "px-6 pt-4")}>
+					{missing && (
+						<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+							{whyMissing(target, read.data, project === null)}
+						</p>
+					)}
+					{started && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
+				</div>
 			)}
-			{quick && actionOn(quick.op.subject, item) !== null && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
 			<PullRequestDetailContent
 				key={rowId(target)}
 				pr={target}
@@ -74,6 +86,7 @@ export function PullRequestDetails({ project, hosts, target, placement, version 
 				stack={read ? pullRequestStack(read.data, target) : []}
 				placement={placement}
 				version={version}
+				files={files}
 			/>
 		</>
 	);
@@ -81,9 +94,21 @@ export function PullRequestDetails({ project, hosts, target, placement, version 
 
 /** A pull request from the inbox in the main area, with the quick actions that start a session on it. */
 export function PullRequestPage(props: Omit<PullRequestDetailsProps, "placement" | "version">) {
+	const back = (
+		<Tooltip content="Back to the inbox" side="bottom">
+			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to the inbox" render={<a href={hashForInbox(null)} />}>
+				<ArrowLeft />
+			</Button>
+		</Tooltip>
+	);
 	return (
-		<DetailPage title="Inbox" meta="Your pull requests and review requests on GitHub" backHref={hashForInbox(null)} backLabel="Back to the inbox" className="max-w-7xl">
-			<PullRequestDetails {...props} placement="page" />
-		</DetailPage>
+		<div className="flex h-full min-h-0 flex-1 flex-col">
+			<Header title="Inbox" meta="Your pull requests and review requests on GitHub" leading={back} />
+			<TooltipProvider>
+				<div className="flex min-h-0 flex-1 flex-col">
+					<PullRequestDetails {...props} placement="page" />
+				</div>
+			</TooltipProvider>
+		</div>
 	);
 }

@@ -5,7 +5,7 @@
 import { createCache } from "./cache";
 import { CHANGE, CHECK_RUN, dataOf, ghGraphql, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
-import { type CheckRunState, type Inbox, type InboxPullRequest, type InboxRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, type Repo, type RepoInbox, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
+import { type CheckRunState, type Inbox, type InboxPullRequest, type InboxRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, type Repo, type RepoInbox, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
 
 export { parseRemote, repoOf } from "./github";
 
@@ -159,7 +159,12 @@ const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
 
 const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 	repository(owner: $owner, name: $repo) { pullRequest(number: $number) {
-		number title body isDraft state reviewDecision mergeable headRefName baseRefName createdAt additions deletions changedFiles
+		number title body isDraft state reviewDecision mergeable headRefName baseRefName createdAt updatedAt additions deletions changedFiles
+		labels(first: 20) { nodes { name color } }
+		history: commits(last: 100) { nodes { commit {
+			abbreviatedOid messageHeadline committedDate additions deletions author { name ${AVATAR} user { login ${AVATAR} } }
+			associatedPullRequests(first: 10) { nodes { number } }
+		} } }
 		${REVIEW_FIELDS}
 		commits(last: 1) { nodes { commit { statusCheckRollup { state contexts(first: 100) { nodes {
 			... on CheckRun { name status conclusion detailsUrl }
@@ -230,6 +235,18 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		const threadComments = nodesOf(thread.comments).flatMap(comment => parseComment(comment, isObject(comment) ? comment.createdAt : null) ?? []);
 		return [{ path: thread.path, line: typeof thread.line === "number" ? thread.line : null, comments: threadComments }];
 	});
+	// A branch that took in its trunk lists the trunk's commits too; each belongs to another, merged pull request.
+	const commitList = nodesOf(node.history).flatMap((entry): PullRequestCommit[] => {
+		const commit = isObject(entry) && isObject(entry.commit) ? entry.commit : null;
+		const at = Date.parse(str(commit?.committedDate) ?? "");
+		if (!commit || Number.isNaN(at)) return [];
+		const owners = nodesOf(commit.associatedPullRequests).map(owner => (isObject(owner) ? owner.number : null));
+		if (owners.length > 0 && !owners.includes(pr.number)) return [];
+		const author = isObject(commit.author) ? commit.author : {};
+		const person = parsePerson(author.user) ?? { login: str(author.name) ?? "unknown", avatarUrl: str(author.avatarUrl) ?? null };
+		return [{ sha: str(commit.abbreviatedOid) ?? "", headline: str(commit.messageHeadline) ?? "", author: person, at, additions: num(commit.additions) ?? 0, deletions: num(commit.deletions) ?? 0 }];
+	});
+	const labels = nodesOf(node.labels).flatMap(label => (isObject(label) && typeof label.name === "string" ? [{ name: label.name, color: str(label.color) ?? "888888" }] : []));
 	return {
 		owner: pr.owner,
 		repo: pr.repo,
@@ -243,6 +260,9 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		threads,
 		conversation: [...comments, ...reviews].toSorted((a, b) => a.at - b.at),
 		createdAt,
+		updatedAt: Date.parse(str(node.updatedAt) ?? "") || createdAt,
+		labels,
+		commits: commitList,
 	};
 }
 

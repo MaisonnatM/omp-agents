@@ -147,6 +147,23 @@ export interface PullRequestThread {
 	comments: PullRequestComment[];
 }
 
+/** A commit on the pull request's branch. */
+export interface PullRequestCommit {
+	sha: string;
+	headline: string;
+	author: Person;
+	/** When it was committed, in ms since the epoch. */
+	at: number;
+	additions: number;
+	deletions: number;
+}
+
+export interface PullRequestLabel {
+	name: string;
+	/** Hex, without `#`. */
+	color: string;
+}
+
 /** One pull request in full, as the inbox's details show it in place of opening GitHub. */
 export interface PullRequestDetail extends PullRequest {
 	title: string;
@@ -176,4 +193,8 @@ export interface PullRequestDetail extends PullRequest {
 	conversation: PullRequestEvent[];
 	/** In ms since the epoch. */
 	createdAt: number;
+	updatedAt: number;
+	labels: PullRequestLabel[];
+	/** Its own commits among the branch's latest 100, oldest first: none that GitHub links only to other pull requests. */
+	commits: PullRequestCommit[];
 }
