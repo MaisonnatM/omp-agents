@@ -113,7 +113,7 @@ const urlTransform = (url: string, key: string): string => {
  */
 export const MessageMarkdown = memo(function MessageMarkdown({ text, github = false }: { text: string; github?: boolean }) {
 	return (
-		<div className="message-markdown whitespace-normal break-words">
+		<div className="message-markdown max-w-full whitespace-normal break-words">
 			<ReactMarkdown
 				remarkPlugins={github ? REMARK_PLUGINS : AGENT_REMARK_PLUGINS}
 				rehypePlugins={github ? GITHUB_PLUGINS : AGENT_PLUGINS}
