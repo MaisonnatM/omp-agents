@@ -8,7 +8,8 @@ import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue,
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
 
 export type ServerMsg =
-	| { t: "roster"; hosts: RosterHost[]; error: string | null }
+	/** `reset` replaces the roster with `hosts`; otherwise `hosts` replace or join by `instanceId` and `removed` leave. `error` is why the registry could not be listed, and comes with every message. */
+	| { t: "roster"; reset: boolean; hosts: RosterHost[]; removed: string[]; error: string | null }
 	/** `reset` replaces the list with `sessions`; otherwise `sessions` replace or join by `sessionId` and `removed` leave. The page orders them with {@link newestPastFirst}. */
 	| { t: "past"; reset: boolean; sessions: PastSession[]; removed: string[] }
 	/** `reset` replaces the view's transcript; otherwise `items` are upserts by id, new ids appended. */

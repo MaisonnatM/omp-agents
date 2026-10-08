@@ -1,5 +1,5 @@
 import { Sparkles } from "lucide-react";
-import { useState } from "react";
+import { type KeyboardEvent, useRef, useState } from "react";
 import type { BranchChoice } from "../../src/shared/git";
 import { type ConnectedModels, type ModelOption, selectorOf } from "../../src/shared/models";
 import { Button } from "@/components/ui/button";
@@ -50,6 +50,7 @@ interface NewSessionProps {
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
 export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, todo }: NewSessionProps) {
+	const composerRef = useRef<HTMLDivElement>(null);
 	const [draft, setDraft] = useState(todo?.prompt ?? "");
 	const attachments = useImageAttachments();
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
@@ -96,6 +97,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		if (open !== null && modelsOpen === null) setModelOpens(count => count + 1);
 		setModelsOpen(open);
 	};
+	const completion = useCompletion({ composerRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const onComposerKey = useShortcuts({
 		model: () => {
 			if (starting || !connected) return false;
@@ -110,25 +112,19 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			pickThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
 		},
 		focusComposer: () => {
-			const el = completion.composerRef.current?.querySelector("textarea");
+			const el = composerRef.current?.querySelector("textarea");
 			if (!el || el.disabled) return false;
 			el.focus();
 		},
 	});
-	const completion = useCompletion({
-		draft,
-		setDraft,
-		completions,
-		onComplete,
-		composer: { sessionId: null, changed: [] },
-		onKeyDown: event => {
-			onComposerKey(event);
-			if (!event.defaultPrevented && event.key === "Escape") {
-				event.currentTarget.blur();
-				event.preventDefault();
-			}
-		},
-	});
+	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+		if (completion.onMenuKeyDown(event)) return;
+		onComposerKey(event);
+		if (!event.defaultPrevented && event.key === "Escape") {
+			event.currentTarget.blur();
+			event.preventDefault();
+		}
+	};
 	const directCommand = blockedShortcut(draft, "new");
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
 	const name = projectName(target.dir) ?? target.dir;
@@ -150,7 +146,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			<div className="relative mx-auto w-full max-w-3xl px-3 pb-5">
 				{completion.popup}
 				<InputMessage
-					ref={completion.composerRef}
+					ref={composerRef}
 					value={draft}
 					onValueChange={completion.onValueChange}
 					onSend={text => {
@@ -193,7 +189,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					rightSlot={({ openFilePicker }) => <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
 					disabled={starting || !connected}
 					sendLabel="Start session"
-					textareaProps={{ ...completion.textareaProps, autoFocus: true }}
+					textareaProps={{ ...completion.textareaProps, onKeyDown, autoFocus: true }}
 				/>
 				{directCommand && <ComposerNote text={directCommand} />}
 				{attachments.note && <ComposerNote text={attachments.note} />}

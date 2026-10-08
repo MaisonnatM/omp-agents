@@ -7,7 +7,7 @@ import { sameView } from "../routing";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
-import { useDashboardContext } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { HostRow, PastRow } from "./session-row";
 
 const COLLAPSED_GROUPS_KEY = "omp-agents.sidebar-collapsed-groups";
@@ -34,8 +34,8 @@ interface SessionListProps {
 
 /** The Sessions tab: New session, the search field, and the pinned, idle, running, interrupted, and past groups. */
 export function SessionList({ lists, query, onQuery, onTogglePin, open, showProject, newSessionOpen, newSessionLabel }: SessionListProps) {
-	const { start, dismissStart, openNewSession, connected, starts } = useDashboardContext();
-	const { resumeAll } = starts;
+	const { start, dismissStart, openNewSession } = useDashboardActions();
+	const { connected, starts: { resumeAll } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	const [pastShown, setPastShown] = useState(PAST_PAGE);
 	const { pinned, running, idle, interrupted, ended } = lists;

@@ -101,14 +101,26 @@ export const nextDueAt = (schedules: Schedules, after: number): number => Math.m
 export const isDue = (routine: Routine, now: number): boolean =>
 	routine.enabled && nextDueAt(routine.schedules, routine.runs[0]?.at ?? routine.createdAt) <= now;
 
+/** Whether `routine` already holds every field the page edits of `spec`. */
+function isSameSpec(routine: Routine, spec: Extract<RoutineChange, { op: "save" }>["routine"]): boolean {
+	return (
+		routine.name === spec.name &&
+		routine.cwd === spec.cwd &&
+		routine.skill === spec.skill &&
+		routine.enabled === spec.enabled &&
+		JSON.stringify([routine.schedules, routine.task]) === JSON.stringify([spec.schedules, spec.task])
+	);
+}
+
 /** `routines` after `change`, or `routines` itself when the change changes nothing. An edit keeps the routine's runs. */
 export function applyRoutine(routines: Routine[], change: Exclude<RoutineChange, { op: "run-now" }>, now: number): Routine[] {
 	switch (change.op) {
 		case "save": {
 			const index = routines.findIndex(routine => routine.id === change.routine.id);
 			if (index === -1) return [...routines, { ...change.routine, createdAt: now, runs: [] }];
-			const { createdAt, runs } = routines[index]!;
-			return routines.with(index, { ...change.routine, createdAt, runs });
+			const stored = routines[index]!;
+			if (isSameSpec(stored, change.routine)) return routines;
+			return routines.with(index, { ...change.routine, createdAt: stored.createdAt, runs: stored.runs });
 		}
 		case "remove": {
 			const kept = routines.filter(routine => routine.id !== change.id);

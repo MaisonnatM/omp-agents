@@ -10,7 +10,7 @@ import { ompVersion } from "./omp/install";
 import { installedOmp, latestOmp, updateOmp } from "./omp/release";
 import { sessionsDir } from "./omp/sessions";
 import { stopStats } from "./omp/stats";
-import { directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, projectsFile, routinesFile, sessionEndInboxDir, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
+import { directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
 import { runShell } from "./proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "./routines";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
@@ -21,6 +21,7 @@ import { EndInbox } from "./server/end-inbox";
 import { InterruptedSessions } from "./server/interrupted";
 import { LiveSessions, type SessionUpdate } from "./server/live-sessions";
 import { Loops } from "./server/loops";
+import { OwnerLock } from "./server/owner-lock";
 import { buildPage, servePage } from "./server/page";
 import { createRoutes } from "./server/routes";
 import { Notices } from "./server/notices";
@@ -59,7 +60,9 @@ function applyTodo(change: UserTodoChange): boolean {
 function clearOldDone(): void {
 	applyTodo({ op: "clear-done", categoryId: null, before: new Date(Date.now() - DONE_KEPT_HOURS * 3_600_000).toISOString() });
 }
-const inbox = new TodoInbox(userTodoInboxDir, applyTodo);
+/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the todo inbox. */
+const ownerLock = new OwnerLock(serverLockFile, PORT);
+const inbox = new TodoInbox(userTodoInboxDir, applyTodo, { active: () => ownerLock.held });
 const routines = new RoutinesFile(routinesFile);
 const projects = new ProjectsFile(projectsFile);
 const notices = new Notices(noticesFile, { latestOmp, installedOmp, updateOmp, modelUpdates, upgradeModel }, () => broadcasts.pushNotices());
@@ -73,7 +76,7 @@ const pathFor = (view: View): string | null =>
 	view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
 const views = new Views(pathFor, (topic, msg) => server.publish(topic, JSON.stringify(msg)));
 const broadcasts = new Broadcasts({
-	rosterMsg: () => ({ t: "roster", hosts: sessions.rows(files.factsOf), error: rosterError }),
+	roster: () => ({ hosts: sessions.rows(files.factsOf), error: rosterError }),
 	past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
 	userTodosMsg: () => ({ t: "user-todos", list: todos.list }),
 	routinesMsg: () => ({ t: "routines", routines: routines.routines }),
@@ -102,6 +105,7 @@ const loops = new Loops(sessionsDir, {
 	onRescanTick: rescanFiles,
 	onUsageTick: () => broadcasts.refreshUsage(),
 	async onMinuteTick() {
+		if (!claimUnattendedWork()) return;
 		clearOldDone();
 		await runner.tick();
 	},
@@ -133,7 +137,10 @@ const startSession = (request: StartRequest): Promise<StartResult> => worktrees.
 const endInbox = new EndInbox(sessionEndInboxDir, {
 	session(sessionId) {
 		const session = sessions.bySessionId(sessionId);
-		return session ? { workDir: files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() } : null;
+		if (!session) return null;
+		// Every server follows a terminal session, so only the owner acts on its request; a session started here is this server's alone.
+		if (!sessions.started(session.instanceId) && !ownerLock.held) return null;
+		return { workDir: files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() };
 	},
 	async removeWorktree(dir) {
 		const result = await worktrees.removeCheckout(dir);
@@ -173,6 +180,23 @@ const handleClientMsg = createClientHandler({
 	runRoutine: id => runner.runNow(id),
 	changeNotice: (id, op) => notices.apply(id, op),
 });
+
+/** Takes over routines and the todo inbox when the server that ran them is gone; whether this server runs them. */
+function claimUnattendedWork(): boolean {
+	const was = ownerLock.held;
+	const owns = ownerLock.acquire();
+	if (owns && !was) {
+		console.log("omp-agents: this server now runs routines and the todo inbox.");
+		// What the server that ran them saved since this one started.
+		routines.reload();
+		todos.reload();
+		broadcasts.pushRoutines();
+		broadcasts.pushUserTodos();
+		runner.recover();
+		void inbox.drain();
+	}
+	return owns;
+}
 
 /** Why the last registry listing failed, shown with the roster. */
 let rosterError: string | null = null;
@@ -314,11 +338,19 @@ try {
 }
 
 loops.watch();
+if (ownerLock.acquire()) {
+	runner.recover();
+} else {
+	const owner = ownerLock.holder();
+	console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the todo inbox; this one takes over when it exits.`);
+}
+// Also on a crash or `process.exit`, so a server that exits unannounced leaves no lock; a killed one leaves a stale lock that the next server takes over.
+process.on("exit", () => ownerLock.release());
 inbox.watch();
 endInbox.watch();
 await rescanFiles();
 await listRegistry();
-clearOldDone();
+if (ownerLock.held) clearOldDone();
 loops.start();
 console.log(listeningLine(PORT, ompVersion));
 console.log(`Sign in at ${originOf(PORT)}/?token=${token}`);

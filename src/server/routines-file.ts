@@ -85,7 +85,7 @@ function parseRoutine(value: unknown): Routine | "drop" | null {
 	if (!spec) return null;
 	const { createdAt } = value;
 	const runs = parseAll(value.runs, parseRun);
-	return typeof createdAt === "number" && runs ? { ...spec, createdAt, runs } : null;
+	return typeof createdAt === "number" && runs ? { ...spec.ok, createdAt, runs } : null;
 }
 
 function parseStored(value: unknown): Stored | null {
@@ -116,6 +116,11 @@ export class RoutinesFile {
 
 	get routines(): Routine[] {
 		return this.#routines;
+	}
+
+	/** Reads the file again, for a server that takes over from one that kept saving since this one started. */
+	reload(): void {
+		this.#routines = this.#file.load()?.routines ?? this.#routines;
 	}
 
 	/** Applies `change` at time `now` and saves; whether it changed anything. */

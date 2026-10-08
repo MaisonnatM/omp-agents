@@ -19,6 +19,11 @@ export class LiveSessions {
 	readonly #sessions = new Map<string, LiveSession>();
 	/** What the sessions started from a quick action work on, by instance id, for as long as they run. */
 	readonly #subjects = new Map<string, WorkItem>();
+	/**
+	 * The sessions by the session file they continue, the earliest added first. A session's id changes when omp moves it to
+	 * another file or the registry lists its host on another session, so the index is rebuilt where either can happen.
+	 */
+	#bySessionId = new Map<string, LiveSession>();
 	readonly #onUpdate: (instanceId: string, update: SessionUpdate) => void;
 
 	constructor(onUpdate: (instanceId: string, update: SessionUpdate) => void) {
@@ -31,8 +36,7 @@ export class LiveSessions {
 
 	/** The live session that continues session file `sessionId`. */
 	bySessionId(sessionId: string): LiveSession | undefined {
-		for (const session of this.#sessions.values()) if (session.sessionId === sessionId) return session;
-		return undefined;
+		return this.#bySessionId.get(sessionId);
 	}
 
 	/** Session `instanceId` when this dashboard started it: only those switch models and thinking levels. */
@@ -44,18 +48,35 @@ export class LiveSessions {
 	/** An instance id with the emitter its session reports through, decided before the session spawns so that nothing it reports precedes it. */
 	allocate(): { instanceId: string; emit: (update: SessionUpdate) => void } {
 		const instanceId = newInstanceId();
-		return { instanceId, emit: update => this.#onUpdate(instanceId, update) };
+		return {
+			instanceId,
+			emit: update => {
+				if (update.kind === "switched") this.#reindex();
+				this.#onUpdate(instanceId, update);
+			},
+		};
 	}
 
-	add(session: LiveSession, subject: WorkItem | null): void {
+	/** Lists `session`; `false` when it already finished, as a process that exited between its spawn and now, which would stay listed with no one to remove it. */
+	add(session: LiveSession, subject: WorkItem | null): boolean {
+		if (session.finished(Date.now())) return false;
 		this.#sessions.set(session.instanceId, session);
 		if (subject) this.#subjects.set(session.instanceId, subject);
+		this.#reindex();
+		return true;
 	}
 
 	remove(instanceId: string): void {
 		if (!this.#sessions.delete(instanceId)) return;
 		this.#subjects.delete(instanceId);
+		this.#reindex();
 		forgetSession(instanceId);
+	}
+
+	#reindex(): void {
+		const index = new Map<string, LiveSession>();
+		for (const session of this.#sessions.values()) if (!index.has(session.sessionId)) index.set(session.sessionId, session);
+		this.#bySessionId = index;
 	}
 
 	/** Each session's roster row, with its `cwdDisplay` and what the session files' index knows of it. */
@@ -82,17 +103,22 @@ export class LiveSessions {
 		return [...this.#sessions.values()].map(session => session.cwd);
 	}
 
-	/** Follow the registry: drop what it no longer lists, join new hosts. Whether a session joined or left. */
+	/** Follow the registry: drop what it no longer lists or let go of, join new hosts. Whether a session joined or left. */
 	follow(hosts: HostSnapshot[]): boolean {
 		const before = this.#sessions.size;
 		const listed = new Map(hosts.map(host => [host.instanceId, host]));
-		for (const [instanceId, session] of this.#sessions) if (!session.follow(listed)) this.remove(instanceId);
+		const now = Date.now();
+		for (const [instanceId, session] of this.#sessions) {
+			session.follow(listed);
+			if (session.finished(now)) this.remove(instanceId);
+		}
 		const kept = this.#sessions.size;
 		for (const host of hosts) {
 			if (!this.#sessions.has(host.instanceId)) {
 				this.#sessions.set(host.instanceId, new SessionGuest(host, update => this.#onUpdate(host.instanceId, update)));
 			}
 		}
+		this.#reindex();
 		return kept !== before || this.#sessions.size !== kept;
 	}
 

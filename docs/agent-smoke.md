@@ -11,6 +11,8 @@ Service calls omit `async` and `timeout`; a readiness deadline belongs in `ready
 Finite checks use `async: true` when needed, without `name` or `ready`.
 Stop only your service with `write({path: "proc://<name>/kill"})`, omitting `content`; reading that path does not stop it.
 `kill $(lsof -ti tcp:<port>)` also kills every process connected to the port, such as another session's desktop window.
+The user's own dashboard runs routines and takes the todos agents add, so a smoke server logs which port owns them and leaves them alone.
+It takes them over only when that dashboard is not running, so a smoke run that must not run routines should not start with the user's dashboard stopped.
 
 Every request needs the access token, stored in `~/.config/omp-agents/token` and printed at startup as `Sign in at http://127.0.0.1:<port>/?token=<token>`.
 Open that address rather than `/`; for curl, send `Cookie: omp-agents-token=<token>` and a matching `Host` header.

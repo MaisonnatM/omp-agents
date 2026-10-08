@@ -2,7 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type ClientSave, commitClientSave, googleSetupFrom, planGoogleSave, planSlackSave, slackSetupFrom } from "./mcp";
+import { type ClientSave, googleSetupFrom, planGoogleSave, planSlackSave, slackSetupFrom } from "./mcp-clients";
+import { writeMcpServer } from "./omp/mcp";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -25,7 +26,7 @@ const app = {
 
 async function save(path: string, input: typeof app | Omit<typeof app, "clientSecret">): Promise<ClientSave> {
 	const planned = await planSlackSave(path, input);
-	await commitClientSave(path, planned);
+	await writeMcpServer(path, planned.name, planned.server);
 	return planned;
 }
 
@@ -100,7 +101,7 @@ test("a Google client save asks for consent and the calendar scopes, redirects t
 	const path = configPath();
 	writeFileSync(path, JSON.stringify({ mcpServers: { calendar: { type: "http", url: "https://calendarmcp.googleapis.com/mcp/v1", auth: { type: "oauth", credentialId: "cal-id" } } } }));
 	const first = await planGoogleSave(path, { clientId: "1-a.apps.googleusercontent.com", clientSecret: "first-secret", callbackPort: 3119 });
-	await commitClientSave(path, first);
+	await writeMcpServer(path, first.name, first.server);
 	expect(first.name).toBe("calendar");
 	expect(JSON.parse(readFileSync(path, "utf8")).mcpServers.calendar.oauth).toEqual({
 		clientId: "1-a.apps.googleusercontent.com",

@@ -10,6 +10,11 @@ import type { RoutinesFile } from "./routines-file";
 
 /** Routine sessions that may run at once; a session waiting on a question holds its slot. */
 export const MAX_ROUTINE_SESSIONS = 3;
+/**
+ * How long a routine's session may stay idle before its first turn runs. A first prompt that omp rejects, an extension cancels,
+ * or a model that is unavailable leaves the session idle for good, and it would hold its slot until the dashboard stops.
+ */
+export const SESSION_START_DEADLINE_MS = 600_000;
 
 export interface RoutineRunnerDeps {
 	file: RoutinesFile;
@@ -26,6 +31,9 @@ export interface RoutineRunnerDeps {
 /** A session a routine started: `starting` until its turn is seen running, `working` after; it leaves once it finished. */
 interface Tracked {
 	routineId: string;
+	/** The run the session belongs to. */
+	runAt: number;
+	startedAt: number;
 	phase: "starting" | "working";
 }
 
@@ -45,12 +53,19 @@ export class RoutineRunner {
 
 	constructor(deps: RoutineRunnerDeps) {
 		this.#deps = deps;
-		// No command runs yet, so a run saved as running lost its command with the server that ran it.
-		for (const { id, runs } of deps.file.routines)
+	}
+
+	/**
+	 * Fails the runs that a stopped server left running: no command runs yet, so a run saved as running lost its command with
+	 * the server that ran it. Called by the server that owns routines, when it starts or takes over, and never beside one that runs them.
+	 */
+	recover(): void {
+		const { file, now } = this.#deps;
+		for (const { id, runs } of file.routines)
 			for (const { at, outcome } of runs)
 				if (outcome.kind === "command" && outcome.run.phase === "running") {
-					deps.file.command(id, at, { phase: "stopped", reason: "dashboard", output: "", startedAt: outcome.run.startedAt, endedAt: deps.now() });
-					deps.file.failed(id, at, "The dashboard stopped while the command ran.");
+					file.command(id, at, { phase: "stopped", reason: "dashboard", output: "", startedAt: outcome.run.startedAt, endedAt: now() });
+					file.failed(id, at, "The dashboard stopped while the command ran.");
 				}
 	}
 
@@ -143,7 +158,7 @@ export class RoutineRunner {
 		if (!result.ok || !session) {
 			file.failed(routine.id, at, `${routine.name}: ${result.ok ? "the session exited as it started." : result.error}`);
 		} else {
-			this.#tracked.set(result.instanceId, { routineId: routine.id, phase: turnRuns(session.status) ? "working" : "starting" });
+			this.#tracked.set(result.instanceId, { routineId: routine.id, runAt: at, startedAt: this.#deps.now(), phase: turnRuns(session.status) ? "working" : "starting" });
 			file.started(routine.id, at, { instanceId: result.instanceId, sessionId: session.sessionId });
 		}
 		this.#deps.onChange();
@@ -185,7 +200,10 @@ export class RoutineRunner {
 		for (const [instanceId, tracked] of this.#tracked) await this.#settle(instanceId, tracked);
 	}
 
-	/** Moves one tracked session along `starting -> working -> finished`; a session that is gone or finished leaves the slots. */
+	/**
+	 * Moves one tracked session along `starting -> working -> finished`; a session that is gone or finished leaves the slots.
+	 * One that is still idle {@link SESSION_START_DEADLINE_MS} after it started never began its turn: the run records it, and the session ends.
+	 */
 	async #settle(instanceId: string, tracked: Tracked): Promise<void> {
 		const session = this.#deps.session(instanceId);
 		if (!session) {
@@ -194,6 +212,11 @@ export class RoutineRunner {
 			tracked.phase = "working";
 		} else if (session.status === "idle" && tracked.phase === "working") {
 			this.#tracked.delete(instanceId);
+			await session.end();
+		} else if (tracked.phase === "starting" && this.#deps.now() - tracked.startedAt >= SESSION_START_DEADLINE_MS) {
+			this.#tracked.delete(instanceId);
+			this.#deps.file.failed(tracked.routineId, tracked.runAt, `The session never started its turn within ${SESSION_START_DEADLINE_MS / 60_000} minutes, so it was ended.`);
+			this.#deps.onChange();
 			await session.end();
 		}
 	}

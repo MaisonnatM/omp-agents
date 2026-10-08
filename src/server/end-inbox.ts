@@ -3,12 +3,11 @@
  * session as **End session** does, then, when it asked, remove the git worktree it works in. A worktree that the removal
  * checks keep stays, and Settings → Worktrees still lists it. The tool writes its request once the turn that
  * asked is over, and deletes it when the session starts another turn or stops, so a request always names a session that
- * idles after asking. One whose session the server does not follow yet waits for the next drain.
+ * idles after asking. A request for a session this server does not act on stays for the server that does, or for the next drain.
  */
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, watch } from "node:fs";
-import { join } from "node:path";
 import { errorText, isObject } from "../json";
 import { displayPath } from "../paths";
+import { type InboxEntry, JsonInboxDir } from "./json-inbox";
 
 export interface EndRequest {
 	sessionId: string;
@@ -17,8 +16,8 @@ export interface EndRequest {
 
 export interface EndInboxEnv {
 	/**
-	 * Live session `sessionId`, or `null` while the server does not follow it. `workDir` is where it works: the linked
-	 * worktree its bash calls last ran in, else its own directory.
+	 * Live session `sessionId` that this server acts on, or `null` while it does not follow it, or another server is the one
+	 * to end it. `workDir` is where it works: the linked worktree its bash calls last ran in, else its own directory.
 	 */
 	session(sessionId: string): { workDir: string; end(): Promise<void> } | null;
 	/** Removes the worktree `dir` is in: why it stayed, or `null` once it is gone. */
@@ -30,69 +29,40 @@ export function parseEndRequest(value: unknown): EndRequest | null {
 	return { sessionId: value.sessionId, removeWorktree: value.removeWorktree };
 }
 
-export class EndInbox {
-	readonly #dir: string;
-	readonly #env: EndInboxEnv;
+/** The request file `name` holds, which must be named for its session. */
+function parseEndFile(name: string, value: unknown): InboxEntry<EndRequest> {
+	const request = parseEndRequest(value);
+	if (!request) return { invalid: "it is not an end request" };
+	return `${request.sessionId}.json` === name ? { item: request } : { invalid: "its name is not its session id" };
+}
 
+async function end(env: EndInboxEnv, request: EndRequest, session: { workDir: string; end(): Promise<void> }): Promise<void> {
+	try {
+		await session.end();
+	} catch (err) {
+		console.error(`omp-agents: could not end session ${request.sessionId}: ${errorText(err)}`);
+		return;
+	}
+	if (!request.removeWorktree) return;
+	let why: string | null;
+	try {
+		why = await env.removeWorktree(session.workDir);
+	} catch (err) {
+		why = errorText(err);
+	}
+	if (why) console.error(`omp-agents: kept the worktree ${displayPath(session.workDir)} that session ${request.sessionId} asked to remove: ${why}`);
+}
+
+export class EndInbox extends JsonInboxDir<EndRequest> {
 	constructor(dir: string, env: EndInboxEnv) {
-		this.#dir = dir;
-		this.#env = env;
-	}
-
-	/** Ends the session of every request whose session runs, deleting the request first; settles once each has ended and its worktree is handled. */
-	async drain(): Promise<void> {
-		let names: string[];
-		try {
-			names = readdirSync(this.#dir).filter(name => name.endsWith(".json"));
-		} catch {
-			return;
-		}
-		const ending: Promise<void>[] = [];
-		for (const name of names) {
-			const path = join(this.#dir, name);
-			let request: EndRequest | null = null;
-			let why = "it is not an end request";
-			try {
-				request = parseEndRequest(JSON.parse(readFileSync(path, "utf8")));
-			} catch (err) {
-				// The tool deleted it between the listing and the read.
-				if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
-				why = errorText(err);
-			}
-			if (!request || `${request.sessionId}.json` !== name) {
-				console.error(`omp-agents: set aside ${path}: ${request ? "its name is not its session id" : why}`);
-				renameSync(path, `${path}.invalid`);
-				continue;
-			}
-			const session = this.#env.session(request.sessionId);
-			if (!session) continue;
-			rmSync(path, { force: true });
-			ending.push(this.#end(request, session));
-		}
-		await Promise.all(ending);
-	}
-
-	async #end(request: EndRequest, session: { workDir: string; end(): Promise<void> }): Promise<void> {
-		try {
-			await session.end();
-		} catch (err) {
-			console.error(`omp-agents: could not end session ${request.sessionId}: ${errorText(err)}`);
-			return;
-		}
-		if (!request.removeWorktree) return;
-		let why: string | null;
-		try {
-			why = await this.#env.removeWorktree(session.workDir);
-		} catch (err) {
-			why = errorText(err);
-		}
-		if (why) console.error(`omp-agents: kept the worktree ${displayPath(session.workDir)} that session ${request.sessionId} asked to remove: ${why}`);
-	}
-
-	/** Drains now and on every change to the directory, which it creates. */
-	watch(): void {
-		mkdirSync(this.#dir, { recursive: true });
-		watch(this.#dir, () => void this.drain());
-		void this.drain();
+		super(dir, {
+			parse: parseEndFile,
+			async apply(request) {
+				const session = env.session(request.sessionId);
+				if (!session) return false;
+				await end(env, request, session);
+				return true;
+			},
+		});
 	}
 }

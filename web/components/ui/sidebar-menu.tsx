@@ -9,7 +9,6 @@ import {
   useCallback,
   useMemo,
   useRef,
-  useId,
   forwardRef,
   Children,
   type ReactNode,
@@ -17,7 +16,6 @@ import {
   type CSSProperties,
   type HTMLAttributes,
   type LiHTMLAttributes,
-  type AnchorHTMLAttributes,
   type ButtonHTMLAttributes,
   type Ref,
   type RefObject,
@@ -526,7 +524,7 @@ function useMenuScope(
 
 // ─── SidebarMenu ─────────────────────────────────────────────────────────────
 
-export interface SidebarMenuProps extends HTMLAttributes<HTMLUListElement> {
+interface SidebarMenuProps extends HTMLAttributes<HTMLUListElement> {
   /** Pins the menu's rows to one step of the size ladder. Omitted, they
    *  follow the surrounding SizeProvider. */
   size?: SizeVariant;
@@ -564,9 +562,9 @@ const SidebarMenu = forwardRef<HTMLUListElement, SidebarMenuProps>(
 );
 SidebarMenu.displayName = "SidebarMenu";
 
-// ─── SidebarMenuItem / SidebarMenuSubItem ────────────────────────────────────
+// ─── SidebarMenuItem ─────────────────────────────────────────────────────────
 
-export type SidebarMenuItemProps = LiHTMLAttributes<HTMLLIElement>;
+type SidebarMenuItemProps = LiHTMLAttributes<HTMLLIElement>;
 
 function useMenuRow(rowRef: RefObject<HTMLLIElement | null>, isSubRow = false) {
   const scope = useContext(MenuScopeContext);
@@ -725,38 +723,6 @@ const SidebarMenuItem = forwardRef<HTMLLIElement, SidebarMenuItemProps>(
 );
 SidebarMenuItem.displayName = "SidebarMenuItem";
 
-export type SidebarMenuSubItemProps = LiHTMLAttributes<HTMLLIElement>;
-
-const SidebarMenuSubItem = forwardRef<HTMLLIElement, SidebarMenuSubItemProps>(
-  ({ className, children, ...props }, ref) => {
-    const rowRef = useRef<HTMLLIElement>(null);
-    const item = useMenuRow(rowRef, true);
-    const { attachRow } = item;
-    // Stable ref callback — same reason as SidebarMenuItem's.
-    const refCb = useCallback(
-      (node: HTMLLIElement | null) => {
-        attachRow(node);
-        if (typeof ref === "function") ref(node);
-        else if (ref) (ref as React.MutableRefObject<HTMLLIElement | null>).current = node;
-      },
-      [attachRow, ref]
-    );
-    return (
-      <MenuItemContext.Provider value={item}>
-        <li
-          ref={refCb}
-          data-sidebar="menu-sub-item"
-          className={cn("group/menu-sub-item relative", className)}
-          {...props}
-        >
-          {children}
-        </li>
-      </MenuItemContext.Provider>
-    );
-  }
-);
-SidebarMenuSubItem.displayName = "SidebarMenuSubItem";
-
 // ─── Row label (ghost-span weight animation) ─────────────────────────────────
 
 /** Splits leading string children out as the label so it can get the
@@ -835,7 +801,7 @@ function MenuRowLabel({
 
 // ─── SidebarMenuButton ───────────────────────────────────────────────────────
 
-export const sidebarMenuButtonVariants = cva(
+const sidebarMenuButtonVariants = cva(
   // The trailing gutter is an exact reservation published by the row (see
   // rowGutter): --row-gutter at rest, --row-gutter-hover once hover-revealed
   // actions are showing. One rule per state instead of a class per
@@ -855,7 +821,7 @@ export const sidebarMenuButtonVariants = cva(
   }
 );
 
-export interface SidebarMenuButtonProps
+interface SidebarMenuButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof sidebarMenuButtonVariants> {
   isActive?: boolean;
@@ -1019,7 +985,7 @@ SidebarMenuButton.displayName = "SidebarMenuButton";
 
 // ─── SidebarMenuAction ───────────────────────────────────────────────────────
 
-export interface SidebarMenuActionProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface SidebarMenuActionProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   showOnHover?: boolean;
   render?: ReactElement;
   asChild?: boolean;
@@ -1100,61 +1066,9 @@ const SidebarMenuAction = forwardRef<HTMLButtonElement, SidebarMenuActionProps>(
 );
 SidebarMenuAction.displayName = "SidebarMenuAction";
 
-// ─── SidebarMenuActions ──────────────────────────────────────────────────────
-
-export interface SidebarMenuActionsProps extends HTMLAttributes<HTMLDivElement> {
-  /** Hide the cluster until the row is hovered or focused. */
-  showOnHover?: boolean;
-}
-
-/** Row-level cluster for more than one SidebarMenuAction. It owns the
- *  positioning and publishes the whole count to the row, so the button
- *  reserves the exact gutter the cluster occupies. */
-const SidebarMenuActions = forwardRef<HTMLDivElement, SidebarMenuActionsProps>(
-  ({ className, showOnHover = false, children, ...props }, ref) => {
-    const item = useContext(MenuItemContext);
-    const sizeClasses = useSize();
-    const count = Children.count(children);
-
-    const setActions = item?.setActions;
-    useIsoLayoutEffect(() => {
-      setActions?.(count, showOnHover);
-      return () => setActions?.(0, false);
-    }, [setActions, count, showOnHover]);
-
-    return (
-      <div
-        ref={ref}
-        data-sidebar="menu-actions"
-        className={cn(
-          "absolute right-1.5 z-10 flex items-center gap-1",
-          // The badge keeps the rightmost slot; the cluster sits left of it.
-          item?.isSubRow
-            ? "group-has-[>[data-sidebar=menu-badge]]/menu-sub-item:right-8.5"
-            : "group-has-[>[data-sidebar=menu-badge]]/menu-item:right-8.5",
-          item?.isSubRow || sizeClasses.variant === "compact" ? "top-0.5" : "top-1",
-          showOnHover &&
-            (item?.isSubRow
-              ? "opacity-0 transition-opacity duration-80 group-hover/menu-sub-item:opacity-100 group-focus-within/menu-sub-item:opacity-100 has-[[data-state=open]]:opacity-100 has-[[data-popup-open]]:opacity-100"
-              // Peer-scoped for the same reason as a lone action: the row's
-              // <li> also wraps its sub-menu.
-              : "opacity-0 transition-opacity duration-80 peer-hover/menu-button:opacity-100 peer-focus-visible/menu-button:opacity-100 hover:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 has-[[data-popup-open]]:opacity-100"),
-          className
-        )}
-        {...props}
-      >
-        <MenuActionsClusterContext.Provider value={true}>
-          {children}
-        </MenuActionsClusterContext.Provider>
-      </div>
-    );
-  }
-);
-SidebarMenuActions.displayName = "SidebarMenuActions";
-
 // ─── SidebarMenuBadge ────────────────────────────────────────────────────────
 
-export type SidebarMenuBadgeProps = HTMLAttributes<HTMLDivElement>;
+type SidebarMenuBadgeProps = HTMLAttributes<HTMLDivElement>;
 
 const SidebarMenuBadge = forwardRef<HTMLDivElement, SidebarMenuBadgeProps>(
   ({ className, ...props }, ref) => {
@@ -1188,255 +1102,10 @@ const SidebarMenuBadge = forwardRef<HTMLDivElement, SidebarMenuBadgeProps>(
 );
 SidebarMenuBadge.displayName = "SidebarMenuBadge";
 
-// ─── SidebarMenuSkeleton ─────────────────────────────────────────────────────
-
-export interface SidebarMenuSkeletonProps extends HTMLAttributes<HTMLDivElement> {
-  showIcon?: boolean;
-}
-
-// Deterministic width cycle (not Math.random) so server and client render the
-// same markup — a random width per render is a hydration mismatch.
-const SKELETON_WIDTHS = ["62%", "74%", "55%", "82%", "68%"];
-
-const SidebarMenuSkeleton = forwardRef<HTMLDivElement, SidebarMenuSkeletonProps>(
-  ({ className, showIcon = false, ...props }, ref) => {
-    const sizeClasses = useSize();
-    const id = useId();
-    let sum = 0;
-    for (let i = 0; i < id.length; i++) sum += id.charCodeAt(i);
-    const width = SKELETON_WIDTHS[sum % SKELETON_WIDTHS.length];
-    return (
-      <div
-        ref={ref}
-        data-sidebar="menu-skeleton"
-        className={cn(
-          "flex items-center gap-2 px-2",
-          sizeClasses.variant === "compact" ? "h-7" : "h-8",
-          className
-        )}
-        {...props}
-      >
-        {showIcon && (
-          <div
-            data-sidebar="menu-skeleton-icon"
-            className="size-4 shrink-0 animate-pulse rounded-md bg-hover"
-          />
-        )}
-        <div
-          data-sidebar="menu-skeleton-text"
-          className="h-4 flex-1 animate-pulse rounded-md bg-hover"
-          style={{ maxWidth: width }}
-        />
-      </div>
-    );
-  }
-);
-SidebarMenuSkeleton.displayName = "SidebarMenuSkeleton";
-
-// ─── SidebarMenuSub ──────────────────────────────────────────────────────────
-
-export interface SidebarMenuSubProps extends HTMLAttributes<HTMLUListElement> {
-  /** Built-in measured-height collapse. Omitted, the sub-menu is always
-   *  visible; wire it to state (with a toggling SidebarMenuButton) for a
-   *  collapsible tree. */
-  open?: boolean;
-}
-
-const SidebarMenuSub = forwardRef<HTMLUListElement, SidebarMenuSubProps>(
-  ({ className, open = true, children, ...props }, ref) => {
-    const containerRef = useRef<HTMLUListElement>(null);
-    // The sub-menu is NOT its own highlight scope: its rows register with the
-    // surrounding SidebarMenu, so one hover background glides from a parent
-    // row into its children. Toggling flips the rows' visibility in place
-    // (they stay registered), so the scope re-reads what is visible.
-    const scope = useContext(MenuScopeContext);
-    const refreshVisibility = scope?.refreshVisibility;
-    useIsoLayoutEffect(() => {
-      refreshVisibility?.();
-    }, [open, refreshVisibility]);
-
-    // Measured-height collapse: animate between 0 and the content's real
-    // offsetHeight — never to "auto", which framer measures wrong under a
-    // scaled ancestor.
-    const [contentHeight, setContentHeight] = useState<number | null>(null);
-    useIsoLayoutEffect(() => {
-      const el = containerRef.current;
-      if (!el || typeof ResizeObserver === "undefined") return;
-      const measure = () => setContentHeight(el.offsetHeight);
-      measure();
-      const ro = new ResizeObserver(measure);
-      ro.observe(el);
-      return () => ro.disconnect();
-    }, []);
-    const measured = contentHeight !== null;
-
-    // Same rule as SidebarGroup: spring only when this sub-tree itself
-    // toggles. A height change coming from a nested sub collapsing inside it
-    // snaps, so the wrapper tracks its content instead of chasing it with a
-    // second spring and moving everything below late.
-    const prevOpenRef = useRef(open);
-    const togglingRef = useRef(false);
-    if (prevOpenRef.current !== open) {
-      prevOpenRef.current = open;
-      togglingRef.current = true;
-    }
-
-    return (
-      <motion.div
-        data-slot="sidebar-menu-sub-wrapper"
-        // `animate` stays defined from the first render — framer ignores an
-        // animate prop that appears later in the element's life. Until the
-        // content is measured, a closed sub collapses via the h-0 class and
-        // an open one keeps its natural height.
-        className={cn("overflow-hidden", !measured && !open && "h-0")}
-        initial={false}
-        animate={
-          measured
-            ? { height: open ? contentHeight : 0, opacity: open ? 1 : 0 }
-            : { opacity: open ? 1 : 0 }
-        }
-        // Do NOT simplify this to `open ? spring.moderate : …` — see the
-        // togglingRef note above. Springing on a re-measure stacks a second
-        // spring on a nested sub's own collapse.
-        transition={
-          togglingRef.current
-            ? open
-              ? spring.moderate
-              : spring.moderate.exit
-            : { duration: 0 }
-        }
-        onAnimationComplete={() => {
-          togglingRef.current = false;
-        }}
-      >
-        <ul
-          ref={(node) => {
-            containerRef.current = node;
-            if (typeof ref === "function") ref(node);
-            else if (ref) (ref as React.MutableRefObject<HTMLUListElement | null>).current = node;
-          }}
-          data-sidebar="menu-sub"
-          data-state={open ? "open" : "closed"}
-          aria-hidden={open ? undefined : true}
-          className={cn(
-            // ml-[15px] (a margin, not a translate, so the rows' measured
-            // rects include it) + 1px border + pl-2 lands the sub-row label
-            // (+ the row's own pl-2 = 32px) exactly on the parent label's x
-            // (px-2 + 16px icon + gap-2 = 32px).
-            "relative ml-[15px] flex min-w-0 flex-col border-l border-border pl-2 select-none",
-            className
-          )}
-          {...props}
-        >
-          {children}
-        </ul>
-      </motion.div>
-    );
-  }
-);
-SidebarMenuSub.displayName = "SidebarMenuSub";
-
-// ─── SidebarMenuSubButton ────────────────────────────────────────────────────
-
-export interface SidebarMenuSubButtonProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
-  isActive?: boolean;
-  size?: "sm" | "md";
-  icon?: IconComponent;
-  render?: ReactElement;
-  asChild?: boolean;
-}
-
-const SidebarMenuSubButton = forwardRef<HTMLAnchorElement, SidebarMenuSubButtonProps>(
-  ({ isActive = false, size = "md", icon: Icon, render, asChild, className, children, ...props }, ref) => {
-    const item = useContext(MenuItemContext);
-    const shape = useShape();
-    const sizeClasses = useSize();
-    const buttonRef = useRef<HTMLElement | null>(null);
-
-    const setActive = item?.setActive;
-    useIsoLayoutEffect(() => {
-      setActive?.(isActive);
-      return () => setActive?.(false);
-    }, [isActive, setActive]);
-
-    const setButtonEl = item?.setButtonEl;
-    useIsoLayoutEffect(() => {
-      setButtonEl?.(buttonRef.current);
-      return () => setButtonEl?.(null);
-    }, [setButtonEl]);
-
-    const lit = isActive || (item?.isHovered ?? false);
-    const tabIdx = isActive ? 0 : -1;
-
-    const gutterHover = rowGutter(item?.actionCount ?? 0, item?.hasBadge ?? false);
-    const gutterRest = item?.actionsShowOnHover
-      ? rowGutter(0, item?.hasBadge ?? false)
-      : gutterHover;
-    const gutterVars = {
-      "--row-gutter": `${gutterRest}px`,
-      "--row-gutter-hover": `${gutterHover}px`,
-    } as CSSProperties;
-
-    const { template, content } = resolveSlotTemplate(render, asChild, children);
-
-    return slotElement(
-      template,
-      "a",
-      {
-        ref: (node: HTMLElement | null) => {
-          buttonRef.current = node;
-          if (typeof ref === "function") ref(node as HTMLAnchorElement | null);
-          else if (ref) (ref as React.MutableRefObject<HTMLElement | null>).current = node;
-        },
-        "data-sidebar": "menu-sub-button",
-        "data-size": size,
-        "data-active": isActive ? "true" : undefined,
-        "aria-current": isActive ? "page" : undefined,
-        tabIndex: tabIdx,
-        className: cn(
-          "relative z-10 flex w-full cursor-pointer select-none items-center gap-2 pl-2 text-left outline-none",
-          "transition-[padding] duration-80 pr-[var(--row-gutter)] group-hover/menu-sub-item:pr-[var(--row-gutter-hover)] group-focus-within/menu-sub-item:pr-[var(--row-gutter-hover)] group-has-[[data-sidebar=menu-action]:is([data-state=open],[data-popup-open],[aria-expanded=true])]/menu-sub-item:pr-[var(--row-gutter-hover)]",
-          size === "sm" ? "h-6" : sizeClasses.variant === "compact" ? "h-6" : "h-7",
-          shape.item,
-          className
-        ),
-        ...props,
-        style: { ...gutterVars, ...(props.style ?? {}) },
-      },
-      <>
-        {Icon && (
-          <Icon
-            size={sizeClasses.icon}
-            strokeWidth={lit ? 2 : 1.5}
-            className={cn(
-              "shrink-0 transition-[color,stroke-width] duration-80",
-              lit ? "text-foreground" : "text-muted-foreground"
-            )}
-          />
-        )}
-        {/* Sub-rows keep the parent rows' type size — only the row height
-            steps down. */}
-        <MenuRowLabel
-          content={content}
-          lit={lit}
-          emphasized={isActive}
-          textClass={size === "sm" ? "text-[12px]" : sizeClasses.text}
-        />
-      </>
-    );
-  }
-);
-SidebarMenuSubButton.displayName = "SidebarMenuSubButton";
-
 export {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarMenuAction,
-  SidebarMenuActions,
   SidebarMenuBadge,
-  SidebarMenuSkeleton,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
 };

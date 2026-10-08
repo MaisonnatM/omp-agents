@@ -23,20 +23,40 @@ export function startScrollFade(): void {
 		watched.set(element, scroller);
 		resizes.observe(element);
 	};
-	// Content grows by resizing a child or adding one, and an unmounted transcript must not stay observed.
-	const sync = (): void => {
+	const watchScroller = (scroller: HTMLElement): void => {
+		watch(scroller, scroller);
+		for (const child of scroller.children) watch(child, scroller);
+	};
+	/** Watches every scroller in `node`, which a mutation added. */
+	const scan = (node: Node): void => {
+		if (!(node instanceof HTMLElement)) return;
+		if (node.matches(".scroll-fade")) watchScroller(node);
+		for (const scroller of node.querySelectorAll<HTMLElement>(".scroll-fade")) watchScroller(scroller);
+	};
+	// An unmounted transcript must not stay observed; one sweep per frame serves every removal in it.
+	let sweeping = false;
+	const sweep = (): void => {
+		sweeping = false;
 		for (const element of watched.keys()) {
 			if (element.isConnected) continue;
 			resizes.unobserve(element);
 			watched.delete(element);
 		}
-		for (const scroller of document.querySelectorAll<HTMLElement>(".scroll-fade")) {
-			watch(scroller, scroller);
-			for (const child of scroller.children) watch(child, scroller);
-		}
 	};
-	new MutationObserver(sync).observe(document.body, { childList: true, subtree: true });
-	sync();
+	// Content grows by resizing a child or adding one, so a node added to a scroller is watched too.
+	new MutationObserver(records => {
+		for (const { target, addedNodes, removedNodes } of records) {
+			if (watched.get(target as Element) === target) {
+				for (const node of addedNodes) if (node instanceof Element) watch(node, target as HTMLElement);
+			}
+			for (const node of addedNodes) scan(node);
+			if (removedNodes.length > 0 && !sweeping) {
+				sweeping = true;
+				requestAnimationFrame(sweep);
+			}
+		}
+	}).observe(document.body, { childList: true, subtree: true });
+	scan(document.body);
 	document.addEventListener(
 		"scroll",
 		event => {

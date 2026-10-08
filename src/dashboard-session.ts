@@ -4,7 +4,7 @@
  * machine. Like any session, its transcript is read from its session file.
  */
 import { randomBytes } from "node:crypto";
-import { statSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import { errorText, isObject, isTexts } from "./json";
 import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
 import { loadOmpConfig } from "./omp/config";
@@ -59,7 +59,7 @@ async function recordedCwd(sessionFile: string): Promise<string> {
 		})
 		.find(record => isObject(record) && record.type === "session");
 	if (!isObject(header) || typeof header.cwd !== "string") throw new Error("the session file has no readable header");
-	if (!statSync(header.cwd, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${header.cwd} no longer exists`);
+	if (!(await stat(header.cwd).catch(() => null))?.isDirectory()) throw new Error(`${header.cwd} no longer exists`);
 	return header.cwd;
 }
 
@@ -96,11 +96,15 @@ export class DashboardSession implements LiveSession {
 	#userCommand = false;
 	/** Whether **End session** stopped the process, rather than the dashboard shutting down or omp exiting on its own. */
 	#ended = false;
+	/** Whether the process exited, however it came to. */
+	#exited = false;
 	/** Prompt, dequeue, abort, flush, and edit, so an abort cannot land before the steer it should deliver. */
 	readonly #turn = new TurnGate();
 	/** Model setters and state reads share a lane, separate from ordered turn commands. */
 	readonly #modelGate = new TurnGate();
 	#refreshQueued = false;
+	/** Whether the automatic `/rename` was sent for this session; one try, so a title omp never makes does not repeat the note. */
+	#titled = false;
 
 	private constructor(
 		instanceId: string,
@@ -126,6 +130,7 @@ export class DashboardSession implements LiveSession {
 		client.onSubagentLifecycle(payload => this.#onSubagent(SUBAGENT_LIFECYCLE, payload));
 		client.onSubagentProgress(payload => this.#onSubagent(SUBAGENT_PROGRESS, payload));
 		void child.exited.then(() => {
+			this.#exited = true;
 			requests.clear();
 			emit({ kind: "exited", ended: this.#ended });
 		});
@@ -243,9 +248,12 @@ export class DashboardSession implements LiveSession {
 		return agentId ? this.agentFile(agentId) : this.sessionFile;
 	}
 
-	/** A session this dashboard started follows its own process, which reports its exit. */
-	follow(): boolean {
-		return true;
+	/** A session this dashboard started follows its own process, which reports its exit, so the registry tells it nothing. */
+	follow(): void {}
+
+	/** Once its process exited. That reports itself ({@link DashboardUpdate} `exited`), so this catches only a session that exited before it was listed. */
+	finished(): boolean {
+		return this.#exited;
 	}
 
 	/** The process stops, but the session counts as interrupted, to resume once the dashboard runs again. */
@@ -314,7 +322,7 @@ export class DashboardSession implements LiveSession {
 	async #shell(text: string): Promise<void> {
 		if (text.startsWith("!!")) throw new Error("omp's RPC mode cannot keep a command's output out of context. Use ! or the omp terminal.");
 		// omp writes a fresh session's file only with its first reply, so a command run before it would show nowhere.
-		if (!this.sessionFile || !statSync(this.sessionFile, { throwIfNoEntry: false })) {
+		if (!this.sessionFile || !(await stat(this.sessionFile).catch(() => null))) {
 			throw new Error("omp saves this session with its first reply. Send a prompt before a ! command.");
 		}
 		const command = text.slice(1).trim();
@@ -457,10 +465,15 @@ export class DashboardSession implements LiveSession {
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });
-		} else if (event.type === "message_end" && isObject(event.message) && isUserPrompt(event.message) && this.sessionName === null) {
+		} else if (event.type === "message_end" && isObject(event.message) && isUserPrompt(event.message) && this.sessionName === null && !this.#titled) {
 			// omp's RPC mode titles no prompt itself; a bare `/rename` makes omp title the session from the prompt it now holds.
 			// A `/skill:` prompt is a custom message, not a user one, and omp's title context reads it as the user's prompt.
-			this.#child.client.prompt("/rename").catch((err: unknown) => this.#fail("Titling failed", err));
+			// Through the turn gate, `/rename` can land after the turn's last state event, so read the title it made here.
+			this.#titled = true;
+			void this.#turn
+				.run(() => this.#child.client.prompt("/rename"))
+				.then(() => this.#refresh())
+				.catch((err: unknown) => this.#fail("Titling failed", err));
 		} else if (typeof event.type === "string" && STATE_EVENTS.has(event.type)) this.#refresh();
 	}
 
@@ -500,12 +513,13 @@ export class DashboardSession implements LiveSession {
 		const file = state.sessionFile ?? null;
 		if (file === this.sessionFile) return false;
 		// omp writes a moved session with no reply yet only with that reply, so the session follows on a later read.
-		if (file && !statSync(file, { throwIfNoEntry: false })) return false;
+		if (file && !(await stat(file).catch(() => null))) return false;
 		const cwd = file ? await recordedCwd(file) : this.cwd;
 		this.sessionFile = file;
 		this.cwd = cwd;
 		if (state.sessionId !== this.sessionId) {
 			this.sessionId = state.sessionId;
+			this.#titled = false;
 			this.#agents.clear();
 		}
 		return true;

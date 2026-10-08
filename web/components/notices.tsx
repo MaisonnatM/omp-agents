@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { useDashboardContext } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { toasts } from "./toaster";
 
 type Send = (msg: ClientMsg) => void;
@@ -81,7 +81,8 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: Sen
 
 /** The header's bell: how many notices there are, and a list of them to update or clear. */
 export function NoticesBell({ notices }: { notices: Notice[] }) {
-	const { send, connected } = useDashboardContext();
+	const { send } = useDashboardActions();
+	const { connected } = useDashboardStatus();
 	const [open, setOpen] = useState(false);
 	const label = notices.length === 0 ? "Updates" : `Updates, ${notices.length}`;
 	return (

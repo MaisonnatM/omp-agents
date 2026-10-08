@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { DashboardContext, type DashboardContextValue } from "./dashboard-context";
+import { DashboardActionsContext, type DashboardActions } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 import { MessageMarkdown } from "./message-markdown";
 
@@ -60,11 +60,11 @@ test("GitHub text shows only GitHub-hosted images and links other image URLs", (
 
 const fileLinks = (text: string, base: string | null): { html: string; count: number } => {
 	const html = renderToStaticMarkup(
-		<DashboardContext.Provider value={{ openFile: () => {} } as unknown as DashboardContextValue}>
+		<DashboardActionsContext.Provider value={{ openFile: () => {} } as unknown as DashboardActions}>
 			<FileBaseContext.Provider value={base}>
 				<MessageMarkdown text={text} />
 			</FileBaseContext.Provider>
-		</DashboardContext.Provider>,
+		</DashboardActionsContext.Provider>,
 	);
 	return { html, count: html.match(/class="file-link"/g)?.length ?? 0 };
 };

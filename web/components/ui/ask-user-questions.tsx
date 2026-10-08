@@ -29,7 +29,7 @@ import { useMergeSplitBlocks, SelectionBackgrounds } from "@/hooks/use-merge-spl
 import { Button } from "@/components/ui/button";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 
-export interface AskUserOption {
+interface AskUserOption {
   id?: string;
   title: string;
   description?: string;
@@ -91,7 +91,7 @@ export interface AskUserAnswer {
   skipped?: boolean;
 }
 
-export interface AskUserQuestionsProps
+interface AskUserQuestionsProps
   extends Omit<HTMLAttributes<HTMLDivElement>, "onChange"> {
   questions: AskUserQuestion[];
   currentIndex?: number;
@@ -1896,4 +1896,3 @@ function Row({
 }
 
 export { AskUserQuestions };
-export default AskUserQuestions;

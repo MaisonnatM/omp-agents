@@ -82,14 +82,6 @@ function rememberHosts(prev: Map<string, RosterHost>, hosts: RosterHost[], layou
 	return next;
 }
 
-/** `next` with each item that is unchanged since `prev` kept as it was, so what renders from it can skip the update. */
-function keepUnchanged<T extends { instanceId: string }>(prev: T[], next: T[]): T[] {
-	return next.map(row => {
-		const before = prev.find(other => other.instanceId === row.instanceId);
-		return before && JSON.stringify(before) === JSON.stringify(row) ? before : row;
-	});
-}
-
 /** `state` with `next` in its panes. */
 function withLayout(state: DashboardState, next: Layout): DashboardState {
 	if (hashForLayout(next) === hashForLayout(state.layout)) return state;
@@ -122,13 +114,10 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, starts: dismissSettled(state.starts, action.kind) };
 		case "new-session-completions":
 			return { ...state, newSessionCompletions: action.completions };
-		case "roster":
-			return {
-				...state,
-				hosts: keepUnchanged(state.hosts, action.hosts),
-				rosterError: action.error,
-				lastHosts: rememberHosts(state.lastHosts, action.hosts, state.layout),
-			};
+		case "roster": {
+			const hosts = applyDelta(state.hosts, action.reset, action.hosts, host => host.instanceId, action.removed);
+			return { ...state, hosts, rosterError: action.error, lastHosts: rememberHosts(state.lastHosts, hosts, state.layout) };
+		}
 		case "past":
 			return { ...state, past: applyDelta(state.past, action.reset, action.sessions, session => session.sessionId, action.removed).sort(newestPastFirst), listed: true };
 		case "started": {

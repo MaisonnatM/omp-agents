@@ -1,9 +1,12 @@
 import { useReducedMotion } from "framer-motion";
 import { Bot, Check, ChevronDown, ListChecks, Loader, type LucideIcon, Play, User } from "lucide-react";
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { View } from "../../src/shared/sessions";
 import { cn } from "@/lib/utils";
 import { skillLabel } from "../labels";
-import type { OutlineTurn } from "../transcript-view";
+import { usePaneLoaded, useTranscript } from "../pane-store";
+import { hashForView } from "../routing";
+import { type OutlineTurn, outline } from "../transcript-view";
 import { MessageMarkdown } from "./message-markdown";
 import { SkillBadge } from "./transcript";
 
@@ -49,17 +52,22 @@ const READER_SCROLL = ["wheel", "touchstart", "pointerdown", "keydown"] as const
 /**
  * Follows the focused transcript's scroll and names the turn being read. A jump pins its turn until the reader
  * scrolls, since the last turns can sit below the reading line even at the transcript's end.
+ * The listeners follow the view and its turns' ids, not each streamed token: the scroll handler reads the latest `turns`.
  */
-function useReadingTurn(turns: OutlineTurn[]): { current: string | null; pin: (id: string) => void } {
+function useReadingTurn(turns: OutlineTurn[], scope: string): { current: string | null; pin: (id: string) => void } {
 	const [current, setCurrent] = useState<string | null>(null);
 	const pinned = useRef<string | null>(null);
+	const latest = useRef(turns);
+	latest.current = turns;
+	const key = `${scope}\n${turns.map(turn => turn.id).join("\n")}`;
 	useEffect(() => {
-		const viewport = turns[0] && focusedMessage(turns[0].id)?.closest<HTMLElement>(VIEWPORT);
+		const first = latest.current[0];
+		const viewport = first && focusedMessage(first.id)?.closest<HTMLElement>(VIEWPORT);
 		if (!viewport) return;
 		let frame = 0;
 		const update = () => {
 			cancelAnimationFrame(frame);
-			frame = requestAnimationFrame(() => setCurrent(pinned.current ?? readingTurn(turns, viewport)));
+			frame = requestAnimationFrame(() => setCurrent(pinned.current ?? readingTurn(latest.current, viewport)));
 		};
 		const unpin = () => {
 			pinned.current = null;
@@ -72,7 +80,7 @@ function useReadingTurn(turns: OutlineTurn[]): { current: string | null; pin: (i
 			viewport.removeEventListener("scroll", update);
 			for (const type of READER_SCROLL) viewport.removeEventListener(type, unpin);
 		};
-	}, [turns]);
+	}, [key]);
 	const pin = (id: string) => {
 		pinned.current = id;
 		setCurrent(id);
@@ -262,9 +270,12 @@ function TurnRow({ turn, index, plan, last, current, onJump }: { turn: OutlineTu
  * full behind **Show more**, approvals on one line, and the first lines of every other prompt and final reply. A line
  * scrolls the pane's transcript to its message.
  */
-export function OutlineTab({ turns, loaded }: { turns: OutlineTurn[]; loaded: boolean }) {
+export function OutlineTab({ view, working }: { view: View; working: boolean }) {
+	const items = useTranscript(view);
+	const loaded = usePaneLoaded(view);
+	const turns = useMemo(() => outline(items, working), [items, working]);
 	const reduceMotion = useReducedMotion() ?? false;
-	const { current, pin } = useReadingTurn(turns);
+	const { current, pin } = useReadingTurn(turns, hashForView(view));
 	if (!loaded) return <p className="px-4 py-2 text-sm text-muted-foreground">Loading the conversation…</p>;
 	if (turns.length === 0) return <p className="px-4 py-2 text-sm text-muted-foreground">No messages yet.</p>;
 	const jump = (messageId: string, turnId: string) => {

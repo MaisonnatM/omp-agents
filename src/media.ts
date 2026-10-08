@@ -65,6 +65,17 @@ class MediaFile {
 	}
 }
 
+/** Lists `a` and `b`, each ordered by {@link newestMediaFirst}, as one ordered list; an item equal to one of `a` follows it, as in a stable sort of `[...a, ...b]`. */
+function merge(a: AgentMedia[], b: AgentMedia[]): AgentMedia[] {
+	const merged: AgentMedia[] = [];
+	let i = 0;
+	let j = 0;
+	while (i < a.length && j < b.length) merged.push(newestMediaFirst(b[j]!, a[i]!) < 0 ? b[j++]! : a[i++]!);
+	while (i < a.length) merged.push(a[i++]!);
+	while (j < b.length) merged.push(b[j++]!);
+	return merged;
+}
+
 /** The images of transcript `path` and of every subagent transcript in its artifacts directory. */
 export class MediaTree {
 	readonly path: string;
@@ -78,6 +89,7 @@ export class MediaTree {
 	readonly #reads = new ReadQueue(() => this.#read());
 	#media: AgentMedia[] = [];
 	#loaded = false;
+	#closed = false;
 	/** Whether a change under the artifacts directory came since the last read, so the next one lists and reads the subagent files too; the first read does. */
 	#subagentsChanged = true;
 
@@ -106,8 +118,16 @@ export class MediaTree {
 
 	/** Read what the change at `changedPath` appended: the tree's own file, and the subagent files when it is under the artifacts directory. */
 	poke(changedPath: string): void {
+		if (this.#closed) return;
 		if (changedPath !== this.path && changedPath !== this.#lock) this.#subagentsChanged = true;
 		this.#reads.poke();
+	}
+
+	/** Stops emitting: a read still in flight and every later poke are ignored, and the files read so far are released. */
+	close(): void {
+		this.#closed = true;
+		this.#subagents.clear();
+		this.#media = [];
 	}
 
 	async #read(): Promise<void> {
@@ -120,10 +140,11 @@ export class MediaTree {
 		}
 		const files = subagents ? [this.#own, ...this.#subagents.values()] : [this.#own];
 		const reads = await Promise.all(files.map(file => file.read()));
+		if (this.#closed) return;
 		if (this.#loaded && !reads.includes(null)) {
 			const added = reads.flatMap(read => read ?? []).sort(newestMediaFirst);
 			if (added.length === 0) return;
-			this.#media = [...this.#media, ...added].sort(newestMediaFirst);
+			this.#media = merge(this.#media, added);
 			this.#emit(false, added);
 			return;
 		}

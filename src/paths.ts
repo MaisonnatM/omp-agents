@@ -30,6 +30,8 @@ export const projectsFile = join(configDir, "projects.json");
 export const noticesFile = join(configDir, "notices.json");
 /** The Google calendars' secret addresses an older version kept, beside {@link tokenFile}; the server deletes it at startup. */
 export const oldGoogleFile = join(configDir, "google.json");
+/** Names the server that runs routines and applies the todo inbox, which servers side by side share, beside {@link tokenFile}. */
+export const serverLockFile = join(configDir, "server.lock");
 
 /** `path` with the home directory shortened to `~`. */
 export const displayPath = (path: string): string =>

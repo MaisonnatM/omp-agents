@@ -4,7 +4,7 @@ import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import type { SectionTarget } from "../../section";
 import { DROP_LINE } from "../../use-drag-order";
-import { useDashboardContext } from "../dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton, useReveal } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
@@ -96,7 +96,8 @@ interface InboxPageProps {
  * GitHub. It keeps the sidebar list's order, folds, and keys.
  */
 export function InboxPage({ project, hosts, past, section }: InboxPageProps) {
-	const { dismissStart, starts: { quick } } = useDashboardContext();
+	const { dismissStart } = useDashboardActions();
+	const { starts: { quick } } = useDashboardStatus();
 	const board = useInboxBoard({ project, hosts, past, route: { target: null } });
 	useReveal(section, board.folds, { token: section, block: "start", focus: true });
 	const unmatched = board.poll.read?.data.unmatched ?? [];

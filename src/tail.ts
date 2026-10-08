@@ -27,6 +27,7 @@ export class FileTail {
 	#pending = new Map<string, Item>();
 	#pendingReset = false;
 	#window: Timer | undefined;
+	#closed = false;
 	readonly #emit: (reset: boolean, items: Item[]) => void;
 	readonly #emitWork: (reset: boolean, files: ChangedFile[]) => void;
 
@@ -49,7 +50,13 @@ export class FileTail {
 
 	/** Read what was appended since the last read. Calls that arrive before a queued read starts share it. */
 	poke(): void {
-		this.#reads.poke();
+		if (!this.#closed) this.#reads.poke();
+	}
+
+	/** Stops publishing: drops what the window held back, and ignores a read still in flight and every later poke or live update. */
+	close(): void {
+		this.#closed = true;
+		this.#discardPending();
 	}
 
 	/**
@@ -57,6 +64,7 @@ export class FileTail {
 	 * message the file already settled is never overwritten by its stale live copy.
 	 */
 	live(apply: (transcript: Transcript) => Item[]): void {
+		if (this.#closed) return;
 		this.poke();
 		this.#reads.after(() => this.#publish(apply(this.transcript)));
 	}
@@ -67,6 +75,7 @@ export class FileTail {
 	 * final state is never delayed.
 	 */
 	#publish(changed: Item[]): void {
+		if (this.#closed) return;
 		if (this.transcript.takeReordered()) this.#pendingReset = true;
 		for (const item of changed) this.#pending.set(item.id, item);
 		if (!this.#pendingReset && this.#pending.size === 0) return;
@@ -106,7 +115,7 @@ export class FileTail {
 			}
 		});
 		// Unreadable for now: the next poke retries from the same offset.
-		if (!complete) return;
+		if (!complete || this.#closed) return;
 		const changed = entries.flatMap(entry => this.transcript.applyEntry(entry));
 		for (const entry of entries) this.#work.applyEntry(entry);
 		const changedFiles = this.#work.takeChanged();

@@ -30,26 +30,25 @@ import { useSize, useSizeVariant } from "@/lib/size-context";
 import { useIcon } from "@/lib/icon-context";
 import { useSurface, SurfaceProvider } from "@/lib/surface-context";
 import { surfaceClasses } from "@/lib/surface-classes";
-import { Button, type ButtonProps } from "@/components/ui/button";
 import { Tooltip, TooltipKbd } from "@/components/ui/tooltip";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const SIDEBAR_COOKIE_NAME = "sidebar_state";
-export const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-export const SIDEBAR_WIDTH = "16rem";
-export const SIDEBAR_WIDTH_MOBILE = "18rem";
+const SIDEBAR_COOKIE_NAME = "sidebar_state";
+const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+const SIDEBAR_WIDTH = "16rem";
+const SIDEBAR_WIDTH_MOBILE = "18rem";
 /** Bare-key toggle defaults: "[" for a left sidebar, "]" for a right one.
  *  Bare (no ⌘/Ctrl) so the browser's history shortcuts stay untouched. */
-export const SIDEBAR_KEYBOARD_SHORTCUT = "[";
-export const SIDEBAR_KEYBOARD_SHORTCUT_RIGHT = "]";
+const SIDEBAR_KEYBOARD_SHORTCUT = "[";
+const SIDEBAR_KEYBOARD_SHORTCUT_RIGHT = "]";
 /** Drag-resize clamp for the built-in rail handle (px). */
-export const SIDEBAR_MIN_WIDTH = 160;
-export const SIDEBAR_MAX_WIDTH = 360;
+const SIDEBAR_MIN_WIDTH = 160;
+const SIDEBAR_MAX_WIDTH = 360;
 /** Dragging this far past the minimum width collapses the sidebar instead of
  *  bottoming out — the same "throw it at the edge to dismiss" affordance
  *  native apps use. */
-export const SIDEBAR_COLLAPSE_SLOP = 56;
+const SIDEBAR_COLLAPSE_SLOP = 56;
 
 // ─── Context ─────────────────────────────────────────────────────────────────
 
@@ -57,7 +56,7 @@ export type SidebarSide = "left" | "right";
 export type SidebarVariant = "sidebar" | "floating" | "inset";
 export type SidebarCollapsible = "offcanvas" | "none";
 
-export interface SidebarContextValue {
+interface SidebarContextValue {
   state: "expanded" | "collapsed";
   open: boolean;
   setOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
@@ -129,7 +128,7 @@ function useIsMobile(breakpoint: number): boolean {
 
 // ─── SidebarProvider ─────────────────────────────────────────────────────────
 
-export interface SidebarProviderProps extends HTMLAttributes<HTMLDivElement> {
+interface SidebarProviderProps extends HTMLAttributes<HTMLDivElement> {
   defaultOpen?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -505,7 +504,7 @@ type MotionSafeDivProps = Omit<
   | "onAnimationIteration"
 >;
 
-export interface SidebarShellProps extends MotionSafeDivProps {
+interface SidebarShellProps extends MotionSafeDivProps {
   side: SidebarSide;
   variant: SidebarVariant;
   /** The `sidebar` variant's inner-edge border. Default true. */
@@ -846,9 +845,7 @@ const SidebarShell = forwardRef<HTMLDivElement, SidebarShellProps>(
 );
 SidebarShell.displayName = "SidebarShell";
 
-// ─── SidebarTrigger ──────────────────────────────────────────────────────────
-
-export type SidebarTriggerProps = ButtonProps;
+// ─── Shortcut key ────────────────────────────────────────────────────────────
 
 /** The tooltips always show the toggle keystroke, falling back to the
  *  side's default key even when the provider's binding is disabled. */
@@ -860,84 +857,9 @@ function useShortcutKey(): string {
   );
 }
 
-/** Ghost icon button calling toggleSidebar(). The icon mirrors the
- *  sidebar's side, and its tooltip names the action with the toggle
- *  keystroke by default. */
-const SidebarTrigger = forwardRef<HTMLButtonElement, SidebarTriggerProps>(
-  ({ onClick, size, children, ...props }, ref) => {
-    const {
-      toggleSidebar,
-      open,
-      openMobile,
-      isMobile,
-      side,
-      peek,
-      isPeeking,
-      schedulePeek,
-      cancelPeekTimer,
-    } = useSidebar();
-    const shortcutKey = useShortcutKey();
-    // With hover-peek enabled, the COLLAPSED trigger is a peek affordance
-    // too: resting on it floats the rail out exactly like the edge strip —
-    // same shared intent timer, so moving from the trigger into the peeked
-    // card (or back) cancels the pending dismissal.
-    const hoverPeek = peek === "hover" && !isMobile && !open;
-    const PanelLeftIcon = useIcon("panel-left");
-    const PanelRightIcon = useIcon("panel-right");
-    const TriggerIcon = side === "right" ? PanelRightIcon : PanelLeftIcon;
-    const iconSize = useSizeVariant() === "compact" ? ("icon-compact" as const) : ("icon" as const);
-    const collapsed = isMobile ? !openMobile : !open;
-
-    return (
-      <Tooltip
-        side="bottom"
-        content={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        shortcut={[shortcutKey]}
-      >
-        <Button
-          ref={ref}
-          variant="ghost"
-          size={size ?? iconSize}
-          data-sidebar="trigger"
-          aria-label="Toggle Sidebar"
-          onClick={(event) => {
-            onClick?.(event);
-            toggleSidebar();
-          }}
-          onPointerEnter={
-            hoverPeek
-              ? (event: React.PointerEvent) => {
-                  if (event.pointerType !== "mouse") return;
-                  if (isPeeking) cancelPeekTimer();
-                  else schedulePeek();
-                }
-              : undefined
-          }
-          // While PEEKED the shell's geometric watcher owns dismissal — a
-          // leave fired here can be the peek card sliding over a stationary
-          // cursor (layout-driven boundary event, no accompanying move to
-          // disarm it), which would flicker the peek closed and open again.
-          // This leave only retires a pending intent timer.
-          onPointerLeave={
-            hoverPeek
-              ? () => {
-                  if (!isPeeking) cancelPeekTimer();
-                }
-              : undefined
-          }
-          {...props}
-        >
-          {children ?? <TriggerIcon />}
-        </Button>
-      </Tooltip>
-    );
-  }
-);
-SidebarTrigger.displayName = "SidebarTrigger";
-
 // ─── SidebarRail ─────────────────────────────────────────────────────────────
 
-export interface SidebarRailProps extends HTMLAttributes<HTMLButtonElement> {
+interface SidebarRailProps extends HTMLAttributes<HTMLButtonElement> {
   /** Pin the tooltip open/closed; `undefined` leaves it on hover. */
   tooltipOpen?: boolean;
 }
@@ -1075,7 +997,7 @@ SidebarRail.displayName = "SidebarRail";
 
 // ─── SidebarInset ────────────────────────────────────────────────────────────
 
-export type SidebarInsetProps = HTMLAttributes<HTMLElement>;
+type SidebarInsetProps = HTMLAttributes<HTMLElement>;
 
 const SidebarInset = forwardRef<HTMLElement, SidebarInsetProps>(
   ({ className, ...props }, ref) => {
@@ -1108,7 +1030,7 @@ SidebarInset.displayName = "SidebarInset";
 
 // ─── SidebarInput ────────────────────────────────────────────────────────────
 
-export type SidebarInputProps = React.InputHTMLAttributes<HTMLInputElement>;
+type SidebarInputProps = React.InputHTMLAttributes<HTMLInputElement>;
 
 const SidebarInput = forwardRef<HTMLInputElement, SidebarInputProps>(
   ({ className, ...props }, ref) => {
@@ -1138,9 +1060,9 @@ const SidebarInput = forwardRef<HTMLInputElement, SidebarInputProps>(
 );
 SidebarInput.displayName = "SidebarInput";
 
-// ─── SidebarHeader / SidebarFooter / SidebarSeparator ────────────────────────
+// ─── SidebarHeader ───────────────────────────────────────────────────────────
 
-export type SidebarSectionProps = HTMLAttributes<HTMLDivElement>;
+type SidebarSectionProps = HTMLAttributes<HTMLDivElement>;
 
 const SidebarHeader = forwardRef<HTMLDivElement, SidebarSectionProps>(
   ({ className, ...props }, ref) => (
@@ -1153,32 +1075,6 @@ const SidebarHeader = forwardRef<HTMLDivElement, SidebarSectionProps>(
   )
 );
 SidebarHeader.displayName = "SidebarHeader";
-
-const SidebarFooter = forwardRef<HTMLDivElement, SidebarSectionProps>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      data-sidebar="footer"
-      className={cn("mt-auto flex shrink-0 flex-col gap-2 p-2", className)}
-      {...props}
-    />
-  )
-);
-SidebarFooter.displayName = "SidebarFooter";
-
-const SidebarSeparator = forwardRef<HTMLDivElement, SidebarSectionProps>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      data-sidebar="separator"
-      role="separator"
-      aria-orientation="horizontal"
-      className={cn("mx-2 h-px shrink-0 bg-border", className)}
-      {...props}
-    />
-  )
-);
-SidebarSeparator.displayName = "SidebarSeparator";
 
 // ─── SidebarGroup family ─────────────────────────────────────────────────────
 
@@ -1197,7 +1093,7 @@ interface SidebarGroupContextValue {
 
 const SidebarGroupContext = createContext<SidebarGroupContextValue | null>(null);
 
-export interface SidebarGroupProps extends SidebarSectionProps {
+interface SidebarGroupProps extends SidebarSectionProps {
   /** Makes the group's SidebarGroupLabel a toggle that collapses everything
    *  rendered after it — a group-level accordion. Uncontrolled by default;
    *  pass `open`/`onOpenChange` to control it. */
@@ -1351,7 +1247,7 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(
 );
 SidebarGroup.displayName = "SidebarGroup";
 
-export interface SidebarGroupLabelProps extends HTMLAttributes<HTMLDivElement> {
+interface SidebarGroupLabelProps extends HTMLAttributes<HTMLDivElement> {
   render?: ReactElement;
   asChild?: boolean;
 }
@@ -1479,7 +1375,7 @@ const SidebarGroupLabel = forwardRef<HTMLDivElement, SidebarGroupLabelProps>(
 );
 SidebarGroupLabel.displayName = "SidebarGroupLabel";
 
-export interface SidebarGroupActionProps extends HTMLAttributes<HTMLButtonElement> {
+interface SidebarGroupActionProps extends HTMLAttributes<HTMLButtonElement> {
   render?: ReactElement;
   asChild?: boolean;
 }
@@ -1534,7 +1430,7 @@ SidebarGroupAction.displayName = "SidebarGroupAction";
 /** Header action cluster: 1–3 SidebarGroupActions laid out in a row over the
  *  group label's right edge. Use instead of a lone SidebarGroupAction when a
  *  section needs several controls. */
-export type SidebarGroupActionsProps = HTMLAttributes<HTMLDivElement>;
+type SidebarGroupActionsProps = HTMLAttributes<HTMLDivElement>;
 
 const SidebarGroupActions = forwardRef<HTMLDivElement, SidebarGroupActionsProps>(
   ({ className, children, ...props }, ref) => {
@@ -1560,31 +1456,14 @@ const SidebarGroupActions = forwardRef<HTMLDivElement, SidebarGroupActionsProps>
 );
 SidebarGroupActions.displayName = "SidebarGroupActions";
 
-const SidebarGroupContent = forwardRef<HTMLDivElement, SidebarSectionProps>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      data-sidebar="group-content"
-      className={cn("w-full", className)}
-      {...props}
-    />
-  )
-);
-SidebarGroupContent.displayName = "SidebarGroupContent";
-
 export {
   SidebarProvider,
   SidebarShell,
-  SidebarTrigger,
-  SidebarRail,
   SidebarInset,
   SidebarInput,
   SidebarHeader,
-  SidebarFooter,
-  SidebarSeparator,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupAction,
   SidebarGroupActions,
-  SidebarGroupContent,
 };

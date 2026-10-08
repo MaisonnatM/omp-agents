@@ -4,53 +4,36 @@
  * todo or check one, which marks it Done; the inbox sets aside any other change, unchecking included, so it cannot undo
  * what you did.
  */
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, watch } from "node:fs";
-import { join } from "node:path";
 import { errorText } from "../json";
 import { parseAgentChange } from "../user-todos-parse";
 import type { UserTodoChange } from "../user-todos-shared";
+import { type InboxEntry, type InboxOptions, JsonInboxDir } from "./json-inbox";
 
-export class TodoInbox {
-	readonly #dir: string;
-	readonly #apply: (change: UserTodoChange) => void;
-
-	constructor(dir: string, apply: (change: UserTodoChange) => void) {
-		this.#dir = dir;
-		this.#apply = apply;
+/** `value` as a change an agent may make, or why not. */
+function parseTodoChange(value: unknown): InboxEntry<UserTodoChange> {
+	let change: UserTodoChange | null;
+	try {
+		change = parseAgentChange(value, new Date().toISOString());
+	} catch (err) {
+		return { invalid: errorText(err) };
 	}
+	if (!change) return { invalid: "it is not a change to the todo list" };
+	if (change.op === "add" || (change.op === "set-status" && change.status === "done")) return { item: change };
+	return { invalid: `an agent may only add or check a todo, not ${change.op === "set-status" ? `mark one ${change.status}` : change.op}` };
+}
 
-	/** Applies every change waiting, oldest name first, and deletes its file; one that is not a change an agent may make moves to `<name>.invalid`. */
-	drain(): void {
-		let names: string[];
-		try {
-			names = readdirSync(this.#dir).filter(name => name.endsWith(".json")).sort();
-		} catch {
-			return;
-		}
-		for (const name of names) {
-			const path = join(this.#dir, name);
-			let change: UserTodoChange | null = null;
-			let why = "it is not a change to the todo list";
-			try {
-				change = parseAgentChange(JSON.parse(readFileSync(path, "utf8")), new Date().toISOString());
-			} catch (err) {
-				why = errorText(err);
-			}
-			if (change && (change.op === "add" || (change.op === "set-status" && change.status === "done"))) {
-				this.#apply(change);
-				rmSync(path, { force: true });
-				continue;
-			}
-			if (change) why = `an agent may only add or check a todo, not ${change.op === "set-status" ? `mark one ${change.status}` : change.op}`;
-			console.error(`omp-agents: set aside ${path}: ${why}`);
-			renameSync(path, `${path}.invalid`);
-		}
-	}
-
-	/** Drains now and on every change to the directory, which it creates. */
-	watch(): void {
-		mkdirSync(this.#dir, { recursive: true });
-		watch(this.#dir, () => this.drain());
-		this.drain();
+export class TodoInbox extends JsonInboxDir<UserTodoChange> {
+	constructor(dir: string, apply: (change: UserTodoChange) => void, options?: InboxOptions) {
+		super(
+			dir,
+			{
+				parse: (_name, value) => parseTodoChange(value),
+				apply(change) {
+					apply(change);
+					return true;
+				},
+			},
+			options,
+		);
 	}
 }

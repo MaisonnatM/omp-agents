@@ -218,13 +218,27 @@ export default function ship(pi: ExtensionAPI) {
 		return r.code === 0 ? r.stdout.trim() || undefined : undefined;
 	}
 
-	async function refresh(ctx: ExtensionContext) {
+	/** One poll at a time: the interval, a turn's end, and a command can all ask while `gh` still answers an earlier one. */
+	let polling: Promise<void> | undefined;
+	function refresh(ctx: ExtensionContext): Promise<void> {
+		polling ??= pollPr(ctx).finally(() => {
+			polling = undefined;
+		});
+		return polling;
+	}
+
+	async function pollPr(ctx: ExtensionContext) {
 		lastRefresh = Date.now();
 		if (!state?.pr || !state.repo || state.stage === "merged") return render(ctx);
 		const [owner, name] = state.repo.split("/");
 		const r = await gh(["api", "graphql", "-f", `query=${PR_QUERY}`, "-F", `owner=${owner}`, "-F", `name=${name}`, "-F", `n=${state.pr}`], ctx.cwd);
 		if (r.code !== 0) return render(ctx);
-		const response: unknown = JSON.parse(r.stdout);
+		let response: unknown;
+		try {
+			response = JSON.parse(r.stdout);
+		} catch {
+			return render(ctx);
+		}
 		const raw = response && typeof response === "object" && "data" in response ? response.data : undefined;
 		const repository = raw && typeof raw === "object" && "repository" in raw ? raw.repository : undefined;
 		const payload = repository && typeof repository === "object" && "pullRequest" in repository ? repository.pullRequest : undefined;

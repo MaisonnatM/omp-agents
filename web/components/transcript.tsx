@@ -60,7 +60,8 @@ import { cn } from "@/lib/utils";
 import { modeOf, skillLabel, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
-import { type ActivityItem, editablePrompt, type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies } from "../transcript-view";
+import { usePaneLoaded, useTranscript } from "../pane-store";
+import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies } from "../transcript-view";
 import { useCopy } from "../use-copy";
 import { MessageMarkdown } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -203,7 +204,7 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 	);
 }
 
-function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
+const ActivityGroup = memo(function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
 	const expanded = useContext(ToolsExpanded);
 	const { hideTools, hideThinking } = useContext(ActivityVisibility);
 	const tools = entries.filter((entry): entry is ToolItem => entry.kind === "tool");
@@ -249,7 +250,7 @@ function ActivityGroup({ entries }: { entries: ActivityItem[] }) {
 			</ThinkingStepsContent>
 		</ThinkingSteps>
 	);
-}
+});
 
 function CopyButton({ text }: { text: string }) {
 	const { copied, copy } = useCopy();
@@ -344,13 +345,12 @@ function PromptEditor({ initial, onSave, onCancel }: { initial: string; onSave: 
 
 interface TranscriptProps {
 	view: View;
-	items: Item[];
 	working: boolean;
 	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
 	/** Replaces the last prompt with `text` and runs it again; omitted where the session cannot rewind. */
 	onEdit?: (entryId: string, text: string) => void;
-	/** Shown in place of the transcript until its first item or turn. */
+	/** Shown in place of the transcript, once it loaded, until its first item or turn. */
 	empty?: ReactNode;
 }
 
@@ -370,20 +370,106 @@ export function SkillBadge({ name }: { name: string }) {
 	);
 }
 
+/** A prompt or a reply: the user's and the agent's words. */
+type MessageItem = Exclude<Item, ActivityItem | Extract<Item, { kind: "notice" }>>;
+
 /** What a message's copy button copies: a skill prompt as the user typed it, not the skill's text. `item.text` is the reply with its suggestions block already split off, so the body it renders is uniform. */
-const copyText = (item: Exclude<Item, ActivityItem>): string =>
+const copyText = (item: MessageItem): string =>
 	item.kind === "user" && item.skill ? [`/skill:${item.skill}`, item.text].filter(Boolean).join(" ") : item.text;
+
+interface MessageRowProps {
+	item: MessageItem;
+	copyable: boolean;
+	/** The entry omp forks at from this message, or `null` where it cannot fork. */
+	forkAt: string | null;
+	/** Forking this message starts the composer with it to edit. */
+	prefill: boolean;
+	forking: boolean;
+	forkDisabled: boolean;
+	/** Why forking this message failed. */
+	failed: string | null;
+	/** The entry an edit of this message replaces, or `null` where it cannot be edited. */
+	editAt: string | null;
+	editing: boolean;
+	/** The turn is running, which an edit of this message stops; read only while `editing`. */
+	working: boolean;
+	onFork: (itemId: string, point: ForkPoint) => void;
+	onEdit?: (entryId: string, text: string) => void;
+	/** Start editing message `id`, or stop editing with `null`. */
+	onEditing: (id: string | null) => void;
+}
+
+/** One message with its actions. Every prop keeps its identity while the message is unchanged, so a streamed token renders only the row it extends. */
+const MessageRow = memo(function MessageRow({
+	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editing, working, onFork, onEdit, onEditing,
+}: MessageRowProps) {
+	const copied = copyText(item);
+	const point = forkAt === null ? null : { entryId: forkAt, prefill };
+	const edit = editAt !== null && onEdit ? { entryId: editAt, run: onEdit } : null;
+	const inEdit = edit !== null && editing;
+	return (
+		<MessageScrollerItem messageId={item.id} className="flex flex-col">
+			<ChatMessage
+				from={item.kind}
+				time={item.kind === "user" ? (item.from ?? undefined) : undefined}
+				images={item.kind === "user" ? item.images : undefined}
+				actions={
+					inEdit ? (
+						<span>{working ? "Enter stops the turn and resends · Esc cancels" : "Enter resends from here · Esc cancels"}</span>
+					) : copyable || point || edit ? (
+						<>
+							{copyable && <CopyButton text={copied} />}
+							{edit && <EditButton onEdit={() => onEditing(item.id)} />}
+							{point && <ForkButton point={point} forking={forking} disabled={forkDisabled} onFork={() => onFork(item.id, point)} />}
+						</>
+					) : undefined
+				}
+				onDoubleClick={edit && !inEdit ? () => onEditing(item.id) : undefined}
+				data-item={item.kind}
+				data-editing={inEdit || undefined}
+				data-streaming={item.kind === "assistant" ? item.streaming : undefined}
+			>
+				{inEdit ? (
+					<PromptEditor
+						initial={item.text}
+						onSave={text => {
+							onEditing(null);
+							edit.run(edit.entryId, text);
+						}}
+						onCancel={() => onEditing(null)}
+					/>
+				) : item.kind === "user" && item.skill ? (
+					<div className="flex flex-col items-start gap-1.5">
+						<SkillBadge name={item.skill} />
+						{item.text && <MessageMarkdown text={item.text} />}
+					</div>
+				) : item.text ? (
+					<MessageMarkdown text={item.text} />
+				) : null}
+			</ChatMessage>
+			{failed && (
+				<p role="alert" className={cn(item.kind === "user" ? "self-end" : "self-start", "text-xs", NOTICE_TONE.error)}>
+					{failed}
+				</p>
+			)}
+		</MessageScrollerItem>
+	);
+});
 
 /**
  * The scrolling message list. It follows new output until the reader scrolls up; the button jumps back to the end.
- * It renders again only when its own items, fork state, or callbacks change, not with the page around it.
+ * It reads the view's items itself, so a streamed token renders it and the outline alone, and of its rows only the
+ * ones whose message changed. It renders again for fork state or callbacks, not with the page around it.
  */
-export const Transcript = memo(function Transcript({ view, items, working, fork, onFork, onEdit, empty }: TranscriptProps) {
+export const Transcript = memo(function Transcript({ view, working, fork, onFork, onEdit, empty }: TranscriptProps) {
+	const items = useTranscript(view);
+	const loaded = usePaneLoaded(view);
 	const last = items.at(-1);
 	const streaming = last?.kind === "assistant" && last.streaming;
 	const forks = useMemo(() => forkPoints(items), [items]);
 	const replies = useMemo(() => turnReplies(items, working), [items, working]);
-	const blocks = useMemo(() => toBlocks(items), [items]);
+	const shown = useRef<Block[]>([]);
+	const blocks = useMemo(() => (shown.current = toBlocks(items, shown.current)), [items]);
 	const editable = useMemo(() => (onEdit ? editablePrompt(items) : null), [items, onEdit]);
 	const [editing, setEditing] = useState<string | null>(null);
 	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
@@ -411,68 +497,28 @@ export const Transcript = memo(function Transcript({ view, items, working, fork,
 								</MessageScrollerItem>
 							);
 						}
-						const copied = copyText(item);
-						const copyable = item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copied.trim() !== "";
 						const point = forks.get(item.id);
-						const failed = here?.phase === "failed" && here.op.itemId === item.id ? here.error : null;
-						const edit = editable?.itemId === item.id && onEdit ? { entryId: editable.entryId, run: onEdit } : null;
-						const inEdit = edit !== null && editing === item.id;
+						const isEditing = editing === item.id;
 						return (
-							<MessageScrollerItem key={item.id} messageId={item.id} className="flex flex-col">
-								<ChatMessage
-									from={item.kind}
-									time={item.kind === "user" ? (item.from ?? undefined) : undefined}
-									images={item.kind === "user" ? item.images : undefined}
-									actions={
-										inEdit ? (
-											<span>{working ? "Enter stops the turn and resends · Esc cancels" : "Enter resends from here · Esc cancels"}</span>
-										) : copyable || point || edit ? (
-											<>
-												{copyable && <CopyButton text={copied} />}
-												{edit && <EditButton onEdit={() => setEditing(item.id)} />}
-												{point && (
-													<ForkButton
-														point={point}
-														forking={here?.phase === "starting" && here.op.itemId === item.id}
-														disabled={fork?.phase === "starting"}
-														onFork={() => onFork(item.id, point)}
-													/>
-												)}
-											</>
-										) : undefined
-									}
-									onDoubleClick={edit && !inEdit ? () => setEditing(item.id) : undefined}
-									data-item={item.kind}
-									data-editing={inEdit || undefined}
-									data-streaming={item.kind === "assistant" ? item.streaming : undefined}
-								>
-									{inEdit ? (
-										<PromptEditor
-											initial={item.text}
-											onSave={text => {
-												setEditing(null);
-												edit.run(edit.entryId, text);
-											}}
-											onCancel={() => setEditing(null)}
-										/>
-									) : item.kind === "user" && item.skill ? (
-										<div className="flex flex-col items-start gap-1.5">
-											<SkillBadge name={item.skill} />
-											{item.text && <MessageMarkdown text={item.text} />}
-										</div>
-									) : item.text ? (
-										<MessageMarkdown text={item.text} />
-									) : null}
-								</ChatMessage>
-								{failed && (
-									<p role="alert" className={cn(item.kind === "user" ? "self-end" : "self-start", "text-xs", NOTICE_TONE.error)}>
-										{failed}
-									</p>
-								)}
-							</MessageScrollerItem>
+							<MessageRow
+								key={item.id}
+								item={item}
+								copyable={item.kind === "assistant" ? replies.has(item.id) && !item.streaming : copyText(item).trim() !== ""}
+								forkAt={point?.entryId ?? null}
+								prefill={point?.prefill ?? false}
+								forking={here?.phase === "starting" && here.op.itemId === item.id}
+								forkDisabled={fork?.phase === "starting"}
+								failed={here?.phase === "failed" && here.op.itemId === item.id ? here.error : null}
+								editAt={editable?.itemId === item.id ? editable.entryId : null}
+								editing={isEditing}
+								working={isEditing && working}
+								onFork={onFork}
+								onEdit={onEdit}
+								onEditing={setEditing}
+							/>
 						);
 					})}
-					{items.length === 0 && !working && empty}
+					{loaded && items.length === 0 && !working && empty}
 					{working && !streaming && (
 						<MessageScrollerItem messageId="thinking" className="flex flex-col">
 							<ThinkingIndicator className="self-start" />

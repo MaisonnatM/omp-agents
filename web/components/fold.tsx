@@ -1,6 +1,6 @@
 /** Foldable sections that a page keeps folded across reloads, and the reveal of a section or row in them: the inbox's and the tickets page's. */
 import { ChevronRight } from "lucide-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useStoredKeys } from "../stored-state";
 
@@ -11,14 +11,19 @@ export interface Folds {
 	unfold: (keys: string[]) => void;
 }
 
+const NEVER_FOLDED = (): boolean => false;
+
 /**
  * The folds that localStorage keeps under `storageKey`. It stores the keys you flipped from their default, so a section
- * `foldedByDefault` names stays folded until you unfold it.
+ * `foldedByDefault` names stays folded until you unfold it. The result stays the same until a fold flips, so a list
+ * built from it can memoize; pass a `foldedByDefault` that stays the same too.
  */
-export function useFolds(storageKey: string, foldedByDefault: (key: string) => boolean = () => false): Folds {
+export function useFolds(storageKey: string, foldedByDefault: (key: string) => boolean = NEVER_FOLDED): Folds {
 	const [flipped, flip] = useStoredKeys(storageKey);
-	const isFolded = (key: string): boolean => foldedByDefault(key) !== flipped.has(key);
-	return { isFolded, toggle: key => flip(key), unfold: keys => flip(...keys.filter(isFolded)) };
+	return useMemo(() => {
+		const isFolded = (key: string): boolean => foldedByDefault(key) !== flipped.has(key);
+		return { isFolded, toggle: key => flip(key), unfold: keys => flip(...keys.filter(isFolded)) };
+	}, [flipped, flip, foldedByDefault]);
 }
 
 interface RevealTarget {

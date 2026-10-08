@@ -11,6 +11,7 @@ const holders = new Map<string, Set<(value: unknown) => void>>();
  * is the default. The default is removed rather than stored, so a value reset to it follows the default if it changes.
  * The setter also takes an update of the value it last set, so two in one event both apply. Every component that holds
  * the same key sees the write, such as the inbox's sidebar and its page.
+ * `key` stays the same for as long as the component is mounted: the value is read when it mounts, not when `key` changes.
  */
 export function useStoredState<T>(key: string, decode: (raw: string | null) => T, encode: (value: T) => string = String): [T, (next: T | ((prev: T) => T)) => void] {
 	const [value, setValue] = useState(() => decode(localStorage.getItem(key)));
@@ -24,7 +25,10 @@ export function useStoredState<T>(key: string, decode: (raw: string | null) => T
 		};
 		const set = holders.get(key) ?? new Set();
 		holders.set(key, set.add(hold));
-		return () => void set.delete(hold);
+		return () => {
+			set.delete(hold);
+			if (set.size === 0) holders.delete(key);
+		};
 	}, [key]);
 	const store = useCallback(
 		(next: T | ((prev: T) => T)): void => {

@@ -1,12 +1,13 @@
 /**
  * Every recurring job of the server, with its cadence: the registry poll, the watcher on omp's sessions
  * directory and the throttled re-read it asks for, the full rescan, the `omp usage` poll, the routine tick, and the
- * update check. The handlers do the work. The registry, usage, and update polls schedule their next tick once the last
- * one finished.
+ * update check. The handlers do the work. Every loop schedules its next tick once the last one finished, so ticks never
+ * overlap, and one that fails is logged and tried again at the next turn.
  * The routine tick runs whether or not a page is connected, since routines start sessions on their own.
  */
 import { mkdirSync, watch } from "node:fs";
 import { join } from "node:path";
+import { errorText } from "../json";
 
 /** The registry has no change feed; listing it is one local IPC round trip per host. */
 const POLL_MS = 1500;
@@ -38,10 +39,26 @@ export interface LoopHandlers {
 	onNoticeTick(): Promise<void>;
 }
 
-/** Run `tick`, then again `ms` after each run finishes. */
-async function repeat(tick: () => Promise<void>, ms: number): Promise<void> {
-	await tick();
-	setTimeout(() => void repeat(tick, ms), ms);
+/**
+ * Run `tick` after `firstMs`, then again `ms` after each run finishes, whether it succeeded or not: a tick that throws or
+ * rejects is logged under `name` and the loop goes on. Returns the function that stops the loop.
+ */
+export function repeat(name: string, tick: () => Promise<void>, ms: number, firstMs = ms): () => void {
+	let stopped = false;
+	let timer: NodeJS.Timeout | undefined;
+	const run = async (): Promise<void> => {
+		try {
+			await tick();
+		} catch (err) {
+			console.error(`omp-agents: the ${name} loop failed: ${errorText(err)}`);
+		}
+		if (!stopped) timer = setTimeout(() => void run(), ms);
+	};
+	timer = setTimeout(() => void run(), firstMs);
+	return () => {
+		stopped = true;
+		clearTimeout(timer);
+	};
 }
 
 export class Loops {
@@ -64,16 +81,18 @@ export class Loops {
 
 	/** Start the registry poll, the rescans, the usage poll, the minute tick, and the update check. */
 	start(): void {
-		setTimeout(() => void repeat(this.#on.onRegistryTick, POLL_MS), POLL_MS);
-		setInterval(() => void this.#on.onRescanTick(), RESCAN_MS);
-		void repeat(this.#on.onUsageTick, USAGE_POLL_MS);
-		setInterval(() => void this.#on.onMinuteTick(), MINUTE_TICK_MS);
-		void repeat(this.#on.onNoticeTick, NOTICE_CHECK_MS);
+		repeat("registry", this.#on.onRegistryTick, POLL_MS);
+		repeat("rescan", this.#on.onRescanTick, RESCAN_MS);
+		repeat("usage", this.#on.onUsageTick, USAGE_POLL_MS, 0);
+		repeat("routine", this.#on.onMinuteTick, MINUTE_TICK_MS);
+		repeat("update check", this.#on.onNoticeTick, NOTICE_CHECK_MS, 0);
 	}
 
 	/** A file changed, reported by the watcher or by the session that wrote it. */
 	fileChanged(path: string): void {
-		if (this.#on.onFileChange(path)) this.#listTimer ??= setTimeout(() => void this.listNow(), LIST_THROTTLE_MS);
+		if (this.#on.onFileChange(path)) {
+			this.#listTimer ??= setTimeout(() => void this.listNow().catch((err: unknown) => console.error(`omp-agents: listing the session files failed: ${errorText(err)}`)), LIST_THROTTLE_MS);
+		}
 	}
 
 	/** Read the session files again now, in place of a pending throttled re-read. */

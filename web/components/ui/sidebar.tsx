@@ -139,7 +139,7 @@ function SidebarSheet({ side, open, onClose, children }: SidebarSheetProps) {
 
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
-export interface SidebarProps
+interface SidebarProps
   extends Omit<
     HTMLAttributes<HTMLDivElement>,
     "onDrag" | "onDragStart" | "onDragEnd" | "onAnimationStart" | "onAnimationEnd" | "onAnimationIteration"
@@ -221,7 +221,7 @@ Sidebar.displayName = "Sidebar";
 
 // ─── SidebarContent ──────────────────────────────────────────────────────────
 
-export interface SidebarContentProps extends HTMLAttributes<HTMLDivElement> {
+interface SidebarContentProps extends HTMLAttributes<HTMLDivElement> {
   viewportClassName?: string;
 }
 
@@ -269,63 +269,19 @@ export { Sidebar, SidebarContent };
 // Re-export the flavor-neutral parts so `sidebar` is a one-stop import.
 export {
   SidebarProvider,
-  useSidebar,
-  SidebarTrigger,
-  SidebarRail,
   SidebarInset,
   SidebarInput,
   SidebarHeader,
-  SidebarFooter,
-  SidebarSeparator,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupAction,
   SidebarGroupActions,
-  SidebarGroupContent,
-  SIDEBAR_COOKIE_NAME,
-  SIDEBAR_COOKIE_MAX_AGE,
-  SIDEBAR_WIDTH,
-  SIDEBAR_WIDTH_MOBILE,
-  SIDEBAR_KEYBOARD_SHORTCUT,
-  SIDEBAR_KEYBOARD_SHORTCUT_RIGHT,
-  SIDEBAR_MIN_WIDTH,
-  SIDEBAR_MAX_WIDTH,
 } from "@/components/ui/sidebar-core";
-export type {
-  SidebarContextValue,
-  SidebarProviderProps,
-  SidebarTriggerProps,
-  SidebarRailProps,
-  SidebarInsetProps,
-  SidebarInputProps,
-  SidebarSectionProps,
-  SidebarGroupLabelProps,
-  SidebarGroupActionProps,
-  SidebarSide,
-  SidebarVariant,
-  SidebarCollapsible,
-} from "@/components/ui/sidebar-core";
+export type { SidebarSide } from "@/components/ui/sidebar-core";
 export {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarMenuAction,
-  SidebarMenuActions,
   SidebarMenuBadge,
-  SidebarMenuSkeleton,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
-  sidebarMenuButtonVariants,
-} from "@/components/ui/sidebar-menu";
-export type {
-  SidebarMenuProps,
-  SidebarMenuItemProps,
-  SidebarMenuButtonProps,
-  SidebarMenuActionProps,
-  SidebarMenuBadgeProps,
-  SidebarMenuSkeletonProps,
-  SidebarMenuSubProps,
-  SidebarMenuSubItemProps,
-  SidebarMenuSubButtonProps,
 } from "@/components/ui/sidebar-menu";

@@ -11,7 +11,7 @@ import { actionOn, pendingOf, pullRequestStart } from "../../quick-actions";
 import { inboxStore } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { sessionsOn } from "../../sessions";
-import { useDashboardContext } from "../dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Header } from "../page-header";
 import { QuickStartNotice } from "../quick-actions";
 import { type NextMove, type Placement, PullRequestDetailContent } from "./pr-details";
@@ -53,7 +53,8 @@ interface PullRequestDetailsProps {
  * past sessions' merged pull requests would carry that note.
  */
 export function PullRequestDetails({ project, hosts, target, placement, version, files }: PullRequestDetailsProps) {
-	const { open, start, dismissStart, starts: { quick } } = useDashboardContext();
+	const { open, start, dismissStart } = useDashboardActions();
+	const { starts: { quick } } = useDashboardStatus();
 	const { read } = inboxStore.use(project);
 	const listed = read && listedPullRequest(read.data, target);
 	const item: WorkItem = { kind: "pull-request", pr: target };

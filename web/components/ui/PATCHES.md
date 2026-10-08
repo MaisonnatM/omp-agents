@@ -18,6 +18,8 @@ Dashboard behavior that can live outside these files does: the composer's queued
 - `afterActions`: a slot under the action bar, inside the composer's frame, where the dashboard renders its suggested prompts.
 - `useRegionHeight` and `useIsTouch`: exported, so the dashboard's rows in those slots animate and reveal their × as this component's own regions do.
 - The `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
+- `InputMessage` is wrapped in `memo` around its `forwardRef`, so a parent's render that leaves its props unchanged skips the composer.
+- The default export and the `InputMessageProps`, `InputMessageSlotContext`, and `QueuedMessage` type exports are removed, since nothing imports them.
 
 ## `ui/chat-message.tsx`
 
@@ -31,17 +33,24 @@ Dashboard behavior that can live outside these files does: the composer's queued
   The dashboard shows the question's status and **Dismiss** there.
 - `description` on a question: shows a confirm's message under its title.
 - The `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
+- The default export is removed, and `AskUserOption` and `AskUserQuestionsProps` are no longer exported, since nothing imports them.
 
 ## Others
 
 - `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`, and the exported `TooltipKbd` chip.
   Long labels wrap at 16rem.
-  `ui/sidebar-core.tsx` uses both for the sidebar toggle.
+  `ui/sidebar-core.tsx` uses `TooltipKbd` for the sidebar rail's tooltip.
 - `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys and keeps the tab's `data-state`, since the tooltip trigger stamps its own.
   `badge` on `TabItem` draws a count after the label, which the Sessions tab uses for the sessions waiting on you and the Inbox tab for the pull requests ready to merge.
 - `ui/thinking-steps.tsx`: `icon` takes a component as well as a name, and `iconClassName` styles it.
 - `ui/sidebar.tsx`: `scroll-fade-once-scrolled` on the scroll areas, so the fade shows only once scrolled.
 - `ui/sidebar-menu.tsx`: `gap-0.5` between rows, and the `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
+- `ui/sidebar-menu.tsx`: `SidebarMenuActions`, `SidebarMenuSkeleton`, `SidebarMenuSub`, `SidebarMenuSubItem`, and `SidebarMenuSubButton` are removed, since nothing renders them.
+  `sidebarMenuButtonVariants` and the `SidebarMenu*Props` types are no longer exported.
+  `useMenuRow`'s `isSubRow` and `MenuActionsClusterContext` stay, and now always take their default.
+- `ui/sidebar-core.tsx`: `SidebarTrigger`, `SidebarFooter`, `SidebarSeparator`, and `SidebarGroupContent` are removed, since nothing renders them, along with the unused `Button` import.
+  `SidebarRail`, the `SIDEBAR_*` constants, and the prop types are no longer exported; `SidebarShell` still renders the rail.
+- `ui/sidebar.tsx`: re-exports only the parts the dashboard imports, and `SidebarProps` and `SidebarContentProps` are no longer exported.
 - `ui/file-thumbnail.tsx`: the PDF worker comes from the page bundle, not a CDN, which the page's Content-Security-Policy blocks.
 - `lib/icon-context.tsx`: the `git-branch` icon.
 - `ui/fluid-hover-highlight.tsx` is the registry file unchanged, moved from `web/components/` into `ui/`.

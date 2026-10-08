@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
-import { useDashboardContext } from "./dashboard-context";
+import { useDashboardActions } from "./dashboard-context";
 import { Header } from "./page-header";
 import { OpenInCursor, PullRequestMenu, SessionTrail } from "./session-meta";
 import type { Subject } from "./subject";
@@ -32,7 +32,7 @@ interface ConversationHeaderProps {
  */
 export function ConversationHeader({ view, subject, onEnd, actions }: ConversationHeaderProps) {
 	const { host, shown, agent, phase, live } = subject;
-	const { open } = useDashboardContext();
+	const { open } = useDashboardActions();
 	const status =
 		phase.phase === "live" ? undefined : phase.phase === "connecting" ? CONTROL_LABEL.connecting : `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
 	const path = [shown?.sessionName, agent?.id].filter((name): name is string => !!name);

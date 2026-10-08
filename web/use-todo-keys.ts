@@ -92,9 +92,9 @@ export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onC
 		todoStatus: () => pickerFor("status"),
 		todoPriority: () => pickerFor("priority"),
 		todoDue: () => pickerFor("due"),
+		// Claims C even when it adds nothing, so the page's own key never falls through to the App's Create ticket.
 		todoNew: () => {
-			if (disabled || onNew === null) return false;
-			onNew();
+			if (!disabled && onNew !== null) onNew();
 		},
 		todoClose: () => {
 			if (openId === null) return false;

@@ -3,9 +3,10 @@
  * session's own `edit` and `write` calls changed, and each such file in full with its diff. The page names a file by the
  * path the list gave it, and the server reads only a path the list holds.
  */
-import { stat } from "node:fs/promises";
 import { join, relative } from "node:path";
+import { createCache } from "./cache";
 import { git } from "./git";
+import { LineReader } from "./line-reader";
 import { displayPath } from "./paths";
 import { run } from "./proc";
 import { type ChangedEntry, type ChangedFileText, type ChangeStatus, contextRows, MAX_CHANGED_FILE_BYTES, parseFullDiff, type SessionChanges } from "./shared/changes";
@@ -22,30 +23,48 @@ type Located = ChangedEntry & { absolute: string };
 
 const STATUS: Record<string, ChangeStatus> = { A: "added", M: "modified", D: "deleted", T: "modified" };
 
-/** Each transcript's folded {@link Work}, kept while its size and time stay the same. */
-const folded = new Map<string, { size: number; mtimeMs: number; paths: string[] }>();
+/** A transcript folded as far as it has been read: only the lines appended since the last read are parsed. */
+class FoldedTranscript {
+	#work = new Work();
+	readonly #reader: LineReader;
+	/** Reads one after another, so two callers never fold the same appended lines twice. */
+	#chain: Promise<unknown> = Promise.resolve();
 
-/** The absolute paths the transcript's `edit` and `write` calls changed, in first-touch order. */
-async function sessionPaths(file: string): Promise<string[]> {
-	const info = await stat(file).catch(() => null);
-	if (!info) return [];
-	const known = folded.get(file);
-	if (known && known.size === info.size && known.mtimeMs === info.mtimeMs) return known.paths;
-	const work = new Work();
-	for (const line of (await Bun.file(file).text()).split("\n")) {
-		if (!line) continue;
-		let entry: unknown;
-		try {
-			entry = JSON.parse(line);
-		} catch {
-			continue;
-		}
-		work.applyEntry(entry);
+	constructor(file: string) {
+		this.#reader = new LineReader(file, () => {
+			this.#work = new Work();
+		});
 	}
-	const paths = work.paths();
-	if (folded.size > 32) folded.delete(folded.keys().next().value!);
-	folded.set(file, { size: info.size, mtimeMs: info.mtimeMs, paths });
-	return paths;
+
+	/** The absolute paths the transcript's `edit` and `write` calls changed, in first-touch order. */
+	paths(): Promise<string[]> {
+		const next = this.#chain.then(async () => {
+			await this.#reader.read(line => {
+				try {
+					this.#work.applyEntry(JSON.parse(line));
+				} catch {
+					/* A line that is not JSON is not an entry. */
+				}
+			});
+			return this.#work.paths();
+		});
+		this.#chain = next.catch(() => {});
+		return next;
+	}
+}
+
+/** The most transcripts kept folded; the oldest is forgotten first. */
+const MAX_FOLDED = 32;
+const folded = new Map<string, FoldedTranscript>();
+
+function sessionPaths(file: string): Promise<string[]> {
+	let transcript = folded.get(file);
+	if (!transcript) {
+		if (folded.size >= MAX_FOLDED) folded.delete(folded.keys().next().value!);
+		transcript = new FoldedTranscript(file);
+		folded.set(file, transcript);
+	}
+	return transcript.paths();
 }
 
 /**
@@ -104,7 +123,7 @@ async function gitChanges(root: string, sha: string): Promise<Located[]> {
 }
 
 /** The list with each entry's absolute path, which the file read checks a request against. */
-async function locate(place: SessionPlace): Promise<{ changes: SessionChanges; files: Located[] }> {
+async function scan(place: SessionPlace): Promise<LocatedList> {
 	const [checkout, touched] = await Promise.all([checkoutOf(place.dir), sessionPaths(place.file)]);
 	const files = checkout ? await gitChanges(checkout.root, checkout.base.sha) : [];
 	const byPath = new Map(files.map(file => [file.absolute, file]));
@@ -128,8 +147,19 @@ async function locate(place: SessionPlace): Promise<{ changes: SessionChanges; f
 	return { changes, files };
 }
 
+interface LocatedList {
+	changes: SessionChanges;
+	files: Located[];
+}
+
+/** The last list of each place for a few seconds, so opening several files of one list scans the checkout once. */
+const lists = createCache<LocatedList>(3_000);
+
+const placeKey = (place: SessionPlace): string => `${place.file}\0${place.dir}`;
+
+/** `listChanges` always scans anew and keeps the answer for the file reads that follow it. */
 export async function listChanges(place: SessionPlace): Promise<SessionChanges> {
-	return (await locate(place)).changes;
+	return (await lists.get(placeKey(place), () => scan(place), true)).changes;
 }
 
 /** Bytes of a side as UTF-8 text, or why it does not show. */
@@ -142,9 +172,9 @@ function decode(bytes: Uint8Array): { text: string } | { note: string } {
 	}
 }
 
-/** The file of the list at `path`, with every line of its diff; `null` when the list holds no such path. */
+/** The file of the list at `path`, with every line of its diff; `null` when the list holds no such path. The list is the one `listChanges` last made, up to three seconds old. */
 export async function readChangedFile(place: SessionPlace, path: string): Promise<ChangedFileText | null> {
-	const { changes, files } = await locate(place);
+	const { changes, files } = await lists.get(placeKey(place), () => scan(place));
 	const entry = files.find(file => file.path === path);
 	if (!entry) return null;
 	const shown = (rows: ChangedFileText["rows"], note: string | null = null): ChangedFileText => ({ path, rows, note });

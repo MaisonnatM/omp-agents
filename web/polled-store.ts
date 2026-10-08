@@ -52,7 +52,10 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 	const cached = storedEntries();
 	const entries = keyedStore(empty);
 	for (const [key, read] of cached) entries.set(key, { ...empty, read });
-	let inflight: { key: string; controller: AbortController } | null = null;
+	/** The read of each scope in flight, by key. */
+	const inflight = new Map<string, AbortController>();
+	/** The timer of each scope that a mounted component polls, and how many components share it. */
+	const pollers = new Map<string, { callers: number; timer: ReturnType<typeof setInterval> }>();
 
 	function update(key: string, patch: Partial<PolledEntry<T>>): void {
 		entries.set(key, { ...entries.get(key), ...patch });
@@ -67,39 +70,51 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 		}
 	}
 
-	/** Reads `scope` again, superseding any read in flight. */
+	/** Reads `scope` again, superseding a read of the same scope in flight; reads of other scopes run on. */
 	async function refresh(scope: string | null = null, { fresh = false }: { fresh?: boolean } = {}): Promise<void> {
 		const key = scope ?? "";
-		if (inflight) {
-			inflight.controller.abort();
-			update(inflight.key, { refreshing: false });
-		}
-		const current = { key, controller: new AbortController() };
-		inflight = current;
+		inflight.get(key)?.abort();
+		const controller = new AbortController();
+		inflight.set(key, controller);
 		update(key, { refreshing: true });
 		try {
-			const data = await getJson<T>(url(scope, fresh), current.controller.signal);
-			if (current.controller.signal.aborted) return;
+			const data = await getJson<T>(url(scope, fresh), controller.signal);
+			if (controller.signal.aborted) return;
 			const read = { data, at: Date.now() };
 			update(key, { read, error: null, refreshing: false });
 			cached.set(key, read);
 			persist();
 		} catch (err) {
-			if (!current.controller.signal.aborted) update(key, { error: errorText(err), refreshing: false });
+			if (!controller.signal.aborted) update(key, { error: errorText(err), refreshing: false });
 		} finally {
-			if (inflight === current) inflight = null;
+			if (inflight.get(key) === controller) inflight.delete(key);
 		}
 	}
 
-	function useEntry(scope: string | null, poll: boolean): PolledEntry<T> {
+	/**
+	 * Reads `scope` now and every {@link POLL_MS} until the returned function is called. Callers of the same scope share
+	 * one timer: the first starts it, and the last to stop clears it.
+	 */
+	function poll(scope: string | null = null): () => void {
 		const key = scope ?? "";
-		useEffect(() => {
-			if (!poll) return;
+		const running = pollers.get(key);
+		if (running) {
+			running.callers += 1;
+		} else {
 			void refresh(scope);
-			const timer = setInterval(() => void refresh(scope), POLL_MS);
-			return () => clearInterval(timer);
-		}, [scope, poll]);
-		return entries.use(key);
+			pollers.set(key, { callers: 1, timer: setInterval(() => void refresh(scope), POLL_MS) });
+		}
+		return () => {
+			const poller = pollers.get(key);
+			if (!poller || --poller.callers > 0) return;
+			clearInterval(poller.timer);
+			pollers.delete(key);
+		};
+	}
+
+	function useEntry(scope: string | null, polling: boolean): PolledEntry<T> {
+		useEffect(() => (polling ? poll(scope) : undefined), [scope, polling]);
+		return entries.use(scope ?? "");
 	}
 
 	return {
@@ -107,6 +122,7 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 		use: (scope: string | null = null): PolledEntry<T> => useEntry(scope, false),
 		/** `scope`'s entry, read again now and every {@link POLL_MS} while mounted and `enabled`, showing the kept read meanwhile. */
 		usePolling: (scope: string | null = null, enabled = true): PolledEntry<T> => useEntry(scope, enabled),
+		poll,
 		refresh,
 	};
 }

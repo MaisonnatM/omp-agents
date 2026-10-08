@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { HostStatus, StartRequest, StartResult } from "../shared/sessions";
 import type { RoutineTask } from "../routines";
-import { RoutineRunner } from "./routine-runner";
+import { RoutineRunner, SESSION_START_DEADLINE_MS } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 
 const dirs: string[] = [];
@@ -165,6 +165,32 @@ describe("RoutineRunner", () => {
 		expect(fake.sessions.get("i2")?.ended).toBe(false);
 	});
 
+	test("a session that is still idle when the start deadline passes fails its run, ends, and frees its slot", async () => {
+		const file = fileWith(routinesPath());
+		addPrompts(file, 4);
+		const { runner, fake } = harness(file);
+		await runner.tick();
+		expect(fake.requests).toHaveLength(3);
+		for (const session of fake.sessions.values()) session.status = "idle";
+
+		fake.now += SESSION_START_DEADLINE_MS - 1;
+		await runner.tick();
+		expect([...fake.sessions.values()].map(session => session.ended)).toEqual([false, false, false]);
+
+		// One of them did start its turn in time.
+		fake.sessions.get("i2")!.status = "working";
+		fake.now += 1;
+		await runner.tick();
+		expect([...fake.sessions.values()].map(session => session.ended)).toEqual([true, false, true]);
+		expect(file.routines[0]?.runs[0]?.errors).toEqual(["The session never started its turn within 10 minutes, so it was ended."]);
+		expect(file.routines[1]?.runs[0]?.errors).toEqual([]);
+		expect(fake.requests).toHaveLength(3);
+
+		// The freed slots take the routine that waited.
+		await runner.tick();
+		expect(fake.requests).toHaveLength(4);
+	});
+
 	test("a session ends as soon as its row reports the turn over, without waiting for a tick", async () => {
 		const { runner, fake } = harness(fileWith(routinesPath()));
 		await runner.tick();
@@ -180,6 +206,7 @@ describe("RoutineRunner", () => {
 		const file = fileWith(routinesPath(), { kind: "prompt", prompt: "Summarize yesterday's commits." });
 		const { runner, fake } = harness(file);
 		await runner.tick();
+		fake.sessions.get("i1")!.status = "working";
 		fake.now += HOUR;
 		await runner.tick();
 		expect(fake.requests.length).toBe(1);
@@ -261,6 +288,7 @@ describe("RoutineRunner", () => {
 
 			const file = new RoutinesFile(path);
 			const second = harness(file);
+			second.runner.recover();
 			await second.runner.tick();
 			expect(second.fake.execs).toEqual([]);
 			expect(file.routines[0]?.runs).toEqual([

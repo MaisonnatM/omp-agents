@@ -4,6 +4,7 @@ import { lstat, readdir } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, sep } from "node:path";
 import { canonical, commonDir, git, worktreesOf, type Registration } from "./git";
 import { errorText } from "./json";
+import { mapLimit } from "./map-limit";
 import { run } from "./proc";
 import type { WorktreeBlocker, WorktreeConfirmation, WorktreeEntry, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult, WorktreeTarget } from "./worktrees-shared";
 
@@ -31,6 +32,8 @@ interface UseSnapshot {
 	activity: { id: string; path: string; modifiedAt: number }[];
 }
 
+/** Most checkouts read at once, each by a git call or a few. */
+const READ_CONCURRENCY = 4;
 
 const beneath = (parent: string, child: string): boolean => {
 	const suffix = relative(parent, child);
@@ -100,8 +103,8 @@ export class Worktrees {
 		return (this.#server ??= canonical(this.env.serverCwd));
 	}
 
-	/** One canonical view of live sessions and saved activity, reused for every worktree in the request. */
-	async #snapshot(): Promise<UseSnapshot> {
+	/** Every live session's canonical directory, with the repository of one that has resident subagents. */
+	async #liveHosts(): Promise<HostUse[]> {
 		const hosts: HostUse[] = [];
 		for (const host of this.env.live()) {
 			const path = await canonical(host.cwd);
@@ -116,6 +119,12 @@ export class Worktrees {
 			}
 			hosts.push({ path, unknownAgents: host.unknownAgents, repository, unknownRepository });
 		}
+		return hosts;
+	}
+
+	/** One canonical view of live sessions and saved activity, reused for every worktree in the request. */
+	async #snapshot(): Promise<UseSnapshot> {
+		const hosts = await this.#liveHosts();
 		const activity: UseSnapshot["activity"] = [];
 		for (const session of this.env.activity()) {
 			if (!session.cwd) continue;
@@ -147,6 +156,15 @@ export class Worktrees {
 		return !refs.trim();
 	}
 
+	/** The repository a checkout belongs to and, unless it is bare, its top-level directory, from one git call. */
+	async #identity(path: string, bare: boolean): Promise<{ common: string; top: string | null }> {
+		if (bare) return { common: await commonDir(path), top: null };
+		const lines = (await git(path, "rev-parse", "--path-format=absolute", "--git-common-dir", "--show-toplevel")).trim().split("\n");
+		// A path that holds a newline cannot be told apart in the lines, so those ask git twice.
+		if (lines.length !== 2) return { common: await commonDir(path), top: await canonical((await git(path, "rev-parse", "--show-toplevel")).trim()) };
+		return { common: await canonical(lines[0]!.trim()), top: await canonical(lines[1]!.trim()) };
+	}
+
 	async #entry(repository: string, registration: Registration, mainPath: string, serverPath: string, snapshot: UseSnapshot | null): Promise<WorktreeEntry> {
 		const path = await canonical(registration.path);
 		const blockers: WorktreeBlocker[] = [];
@@ -158,7 +176,8 @@ export class Worktrees {
 		try {
 			const stat = await lstat(registration.path);
 			if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("The registered path is not a real checkout directory.");
-			if ((await commonDir(path)) !== repository || (!registration.bare && (await canonical((await git(path, "rev-parse", "--show-toplevel")).trim())) !== path)) {
+			const { common, top } = await this.#identity(path, registration.bare);
+			if (common !== repository || (top !== null && top !== path)) {
 				blockers.push({ code: "foreign", message: "The checkout does not belong to this Git registration." });
 			}
 		} catch (err) {
@@ -190,8 +209,7 @@ export class Worktrees {
 				known.add(repository);
 				const listed = await worktreesOf(repository);
 				const mainPath = listed[0] ? await canonical(listed[0].path) : "";
-				const worktrees = [];
-				for (const registration of listed) worktrees.push(await this.#entry(repository, registration, mainPath, serverPath, snapshot));
+				const worktrees = await mapLimit(listed, READ_CONCURRENCY, registration => this.#entry(repository, registration, mainPath, serverPath, snapshot));
 				result.repositories.push({ repository, path: listed[0]?.path ?? cwd, name: basename(listed[0]?.path ?? cwd), worktrees });
 			} catch (err) {
 				result.errors.push({ path: cwd, error: errorText(err) });
@@ -255,6 +273,12 @@ export class Worktrees {
 			result.errors.push(errorText(err));
 		}
 		return result;
+	}
+
+	/** The plans for `targets`, in their order, read concurrently from one snapshot of what uses them. */
+	async previewAll(targets: WorktreeTarget[]): Promise<WorktreeRemovalPlan[]> {
+		const snapshot = await this.#snapshot();
+		return mapLimit(targets, READ_CONCURRENCY, target => this.preview(target, snapshot));
 	}
 
 	async preview(target: WorktreeTarget, snapshot?: UseSnapshot): Promise<WorktreeRemovalPlan> {
@@ -332,17 +356,13 @@ export class Worktrees {
 	async removeCheckout(cwd: string, waitMs = 15000): Promise<WorktreeRemovalResult> {
 		const target = { repository: await commonDir(cwd), path: await canonical((await git(cwd, "rev-parse", "--show-toplevel")).trim()) };
 		const until = Date.now() + waitMs;
-		for (;;) {
-			const plan = await this.preview(target);
-			if (plan.blockers.some(blocker => blocker.code === "occupied") && Date.now() < until) {
-				await Bun.sleep(500);
-				continue;
-			}
-			// An unreadable plan always names its blocker.
-			if (plan.blockers.length || plan.kind === "unreadable") return { ...target, removed: false, blockers: plan.blockers, error: null };
-			const [result] = await this.remove([{ ...target, confirmation: plan.confirmation }]);
-			if (!result) throw new Error("Git worktree removal returned no result.");
-			return result;
-		}
+		// Only live sessions decide this wait, so the checkout is read in full once, after they leave or the time is up.
+		while (Date.now() < until && this.#occupancy({ hosts: await this.#liveHosts(), activity: [] }, target.repository, target.path).some(blocker => blocker.code === "occupied")) await Bun.sleep(500);
+		const plan = await this.preview(target);
+		// An unreadable plan always names its blocker.
+		if (plan.blockers.length || plan.kind === "unreadable") return { ...target, removed: false, blockers: plan.blockers, error: null };
+		const [result] = await this.remove([{ ...target, confirmation: plan.confirmation }]);
+		if (!result) throw new Error("Git worktree removal returned no result.");
+		return result;
 	}
 }

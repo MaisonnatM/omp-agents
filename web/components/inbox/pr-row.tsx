@@ -1,5 +1,5 @@
 import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
-import { type MouseEvent, useState } from "react";
+import { memo, type MouseEvent, useState } from "react";
 import { type InboxPullRequest, type PullRequest, type PullRequestLink, repoKey, samePullRequest } from "../../../src/shared/github";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
@@ -7,7 +7,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { inboxAge, type InboxRow, MOVES, type MoveId, moveAction, reason, type StackPlace } from "../../inbox-model";
-import { hashForInbox, type OpenMode } from "../../routing";
+import { hashForInbox, type OpenMode, sameView } from "../../routing";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
@@ -58,7 +58,7 @@ export function MoveBadge({ move, className }: { move: MoveId; className?: strin
 }
 
 /** A row's move badge: a button that starts the quick action handing the move to an agent, when one applies, else the plain badge. */
-function RowMoveBadge({ pr, move, pending, onQuickAction }: { pr: InboxPullRequest; move: MoveId } & Pick<RowProps, "pending" | "onQuickAction">) {
+function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: InboxPullRequest; move: MoveId } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
 	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}`;
@@ -69,7 +69,7 @@ function RowMoveBadge({ pr, move, pending, onQuickAction }: { pr: InboxPullReque
 				aria-label={label}
 				aria-busy={pending === action}
 				disabled={pending !== null}
-				onClick={() => onQuickAction(action)}
+				onClick={() => onQuickAction(pr, cwd, action)}
 				className={cn(
 					BADGE,
 					MOVE_LOOK[move][0],
@@ -228,23 +228,52 @@ export interface RowProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The quick action whose session is starting for this PR, if any. */
 	pending: QuickActionId | null;
-	onQuickAction: (action: PullRequestActionId) => void;
+	/** The workspace a session on the pull request starts in. */
+	cwd: string;
+	/** The same function for every row, so a row that its props leave unchanged is not drawn again. */
+	onQuickAction: (pr: InboxPullRequest, cwd: string, action: PullRequestActionId) => void;
 	/** Whether the row's quick actions menu is open, which the `.` shortcut also sets. */
 	actionsOpen: boolean;
-	onActionsOpenChange: (open: boolean) => void;
+	/** The same function for every row, like `onQuickAction`. */
+	onActionsOpenChange: (pr: PullRequest, open: boolean) => void;
 	drag: DragItem;
 	/** What the move shortcuts name the row by. */
 	moveId: string;
 }
 
-function RowQuickActions({ pr, pending, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: InboxPullRequest }) {
+const sameStack = (a: StackPlace | null, b: StackPlace | null): boolean =>
+	a === b || (a !== null && b !== null && a.position === b.position && a.size === b.size && a.joinsAbove === b.joinsAbove && a.joinsBelow === b.joinsBelow);
+
+const sameSessions = (a: SessionLink[], b: SessionLink[]): boolean =>
+	a.length === b.length && a.every((link, at) => link.sessionId === b[at]!.sessionId && link.label === b[at]!.label && link.link === b[at]!.link && link.status === b[at]!.status && sameView(link.view, b[at]!.view));
+
+/** How each prop of a row is compared. A row's data is rebuilt whenever the roster or the sort changes, so it is compared by what it holds; the drag item is its handlers, which stay the same, and where a drop would land. */
+const PROP_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => boolean } = {
+	row: (a, b) => a === b || (a.pr === b.pr && a.move === b.move && a.unit === b.unit && sameStack(a.stack, b.stack)),
+	sessions: sameSessions,
+	targeted: Object.is,
+	onOpen: Object.is,
+	pending: Object.is,
+	cwd: Object.is,
+	onQuickAction: Object.is,
+	actionsOpen: Object.is,
+	onActionsOpenChange: Object.is,
+	drag: (a, b) => a.handle === b.handle && a.target === b.target && a.dropAt === b.dropAt && a.dragging === b.dragging,
+	moveId: Object.is,
+};
+
+const sameRowProps = (a: RowProps, b: RowProps): boolean =>
+	(Object.keys(PROP_EQUAL) as (keyof RowProps)[]).every(key => (PROP_EQUAL[key] as (x: unknown, y: unknown) => boolean)(a[key], b[key]));
+
+function RowQuickActions({ pr, pending, cwd, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: InboxPullRequest }) {
 	return (
 		<QuickActionsMenu
 			actions={pullRequestActions(pr)}
 			pending={pending}
-			onRun={onQuickAction}
+			// The menu lists `pullRequestActions(pr)`, so it runs only one of those.
+			onRun={action => onQuickAction(pr, cwd, action as PullRequestActionId)}
 			open={actionsOpen}
-			onOpenChange={onActionsOpenChange}
+			onOpenChange={open => onActionsOpenChange(pr, open)}
 			label="Quick actions: start a session in the background that works on this pull request"
 		/>
 	);
@@ -293,7 +322,7 @@ function Age({ at, className }: { at: number; className?: string }) {
  * A pull request in the sidebar's inbox: its title and age, then its move and why it waits on it, with its quick
  * actions on hover. A rail on the left joins the rows of a stack.
  */
-export function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
+export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
 	return (
 		<li
 			id={rowId(pr)}
@@ -333,7 +362,7 @@ export function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, o
 			</span>
 		</li>
 	);
-}
+}, sameRowProps);
 
 /**
  * The page's columns: move, title, sessions, stack, checks, review, size, age, and quick actions. The sessions, stack,
@@ -345,7 +374,7 @@ const TABLE_COLUMNS =
 const WIDE = "hidden @3xl/inbox:flex";
 
 /** A pull request in the inbox page's table: one line per column, with the author, number, and reason under its title. */
-export function PullRequestTableRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
+export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
 	// A review's reason names its author, which this row shows already.
 	const why = move === "review" ? null : reason(pr, move);
 	return (
@@ -389,4 +418,4 @@ export function PullRequestTableRow({ row: { pr, move, stack }, sessions, target
 			</span>
 		</li>
 	);
-}
+}, sameRowProps);

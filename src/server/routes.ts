@@ -20,7 +20,7 @@ import { listPullRequestChanges, readPullRequestFile } from "../pull-request-fil
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
-import { ClientConfigError } from "../omp/mcp";
+import { ClientConfigError } from "../mcp-clients";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
@@ -66,6 +66,31 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		(handle: (params: URLSearchParams, req: Request) => Response | Promise<Response>): Handler =>
 		async req =>
 			guards.admit(req) ?? handle(new URL(req.url).searchParams, req);
+
+	/** The write behind every `PUT`: admitted with its JSON body, `decide`d into an input or a refusing response, and `act`ed on; `refuse` answers an error `act` throws. */
+	const write =
+		<T>(decide: (body: unknown) => T | Response, act: (input: T) => Promise<unknown>, refuse?: (err: unknown) => Response | null): Handler =>
+		async req => {
+			const guarded = await guards.writeBody(req);
+			if (guarded instanceof Response) return guarded;
+			const input = decide(guarded.body);
+			return input instanceof Response ? input : answer(() => act(input), refuse);
+		};
+
+	/** A write whose body `parse` reads; a body it returns `null` for is a 400 with `badRequest`, and it may return its own refusing response. */
+	const put = <T>(parse: (body: unknown) => T | Response | null, act: (input: T) => Promise<unknown>, badRequest: string, refuse?: (err: unknown) => Response | null): Handler =>
+		write(body => parse(body) ?? fail(400, badRequest), act, refuse);
+
+	/** A write of an OAuth client: `parse` says why it refuses a body, and a client the config cannot take is a 400. */
+	const putClient = <T>(parse: (body: unknown) => { ok: T } | { error: string }, save: (input: T) => Promise<unknown>): Handler =>
+		write(
+			body => {
+				const parsed = parse(body);
+				return "error" in parsed ? fail(400, parsed.error) : parsed.ok;
+			},
+			save,
+			err => (err instanceof ClientConfigError ? fail(400, err.message) : null),
+		);
 
 	/**
 	 * The `cwd` a request names, `null` when it names none, or the response refusing it. `cwd` must be a
@@ -136,14 +161,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	const integrations = get(params => answer(() => loadIntegrations(params.has("fresh"))));
 
 	/** A write of `{ id }` naming an MCP integration, answered with that integration as `act` leaves it. */
-	const integrationWrite =
-		(act: (id: McpIntegrationId) => Promise<McpIntegration>): Handler =>
-		async req => {
-			const write = await guards.writeBody(req);
-			if (write instanceof Response) return write;
-			const id = parseIntegrationId(write.body);
-			return id ? answer(() => act(id)) : fail(400, "Expected { id } naming an integration");
-		};
+	const integrationWrite = (act: (id: McpIntegrationId) => Promise<McpIntegration>): Handler => put(parseIntegrationId, act, "Expected { id } naming an integration");
 
 	/** `PUT /api/integrations/sign-in`: starts a sign-in and answers with its authorization address to open. */
 	const integrationSignIn = integrationWrite(startIntegrationSignIn);
@@ -151,22 +169,11 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	/** `PUT /api/integrations/sign-out`: removes the sign-ins omp manages for the integration's server, as `/mcp unauth` does; its config stays. */
 	const integrationSignOut = integrationWrite(signOutIntegration);
 
-	const slackClient: Handler = async req => {
-		const write = await guards.writeBody(req);
-		if (write instanceof Response) return write;
-		const parsed = parseSlackClient(write.body);
-		if ("error" in parsed) return fail(400, parsed.error);
-		return answer(() => saveSlackClient(parsed.ok), err => (err instanceof ClientConfigError ? fail(400, err.message) : null));
-	};
+	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app. */
+	const slackClient = putClient(parseSlackClient, saveSlackClient);
 
 	/** `PUT /api/integrations/google-calendar/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client. */
-	const googleClient: Handler = async req => {
-		const write = await guards.writeBody(req);
-		if (write instanceof Response) return write;
-		const parsed = parseGoogleClient(write.body);
-		if ("error" in parsed) return fail(400, parsed.error);
-		return answer(() => saveGoogleClient(parsed.ok), err => (err instanceof ClientConfigError ? fail(400, err.message) : null));
-	};
+	const googleClient = putClient(parseGoogleClient, saveGoogleClient);
 
 	/** `GET /api/google[?fresh]`: the calendars checked in your Google Calendar's list, with why each one's last read failed. */
 	const googleStatus = get(params => answer(() => google.status(params.has("fresh"))));
@@ -187,33 +194,20 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	});
 
 	/** `PUT /api/ticket`: `TicketEdit`, applied in Linear; answers the issue in full as it is after it. */
-	const ticketWrite: Handler = async req => {
-		const write = await guards.writeBody(req);
-		if (write instanceof Response) return write;
-		const edit = parseTicketEdit(write.body);
-		return edit ? answer(() => saveTicket(edit)) : fail(400, "Expected { id } naming a Linear issue and at least one field to change");
-	};
+	const ticketWrite = put(parseTicketEdit, saveTicket, "Expected { id } naming a Linear issue and at least one field to change");
 
 	/** `PUT /api/ticket/new`: `TicketDraft`, opened in Linear; answers `{ identifier }`. */
-	const ticketCreate: Handler = async req => {
-		const write = await guards.writeBody(req);
-		if (write instanceof Response) return write;
-		const draft = parseTicketDraft(write.body);
-		return draft ? answer(() => createTicket(draft)) : fail(400, "Expected { title, description, team } naming a Linear team by id, and fields of their own types");
-	};
+	const ticketCreate = put(parseTicketDraft, createTicket, "Expected { title, description, team } naming a Linear team by id, and fields of their own types");
 
 	/** `PUT /api/ticket/attachment`: `TicketAttachmentUpload`, attached to the issue in Linear; answers `{}`. */
-	const ticketAttach: Handler = async req => {
-		const write = await guards.writeBody(req);
-		if (write instanceof Response) return write;
-		const upload = parseTicketAttachment(write.body);
-		return upload
-			? answer(async () => {
-					await attachToTicket(upload);
-					return {};
-				})
-			: fail(400, `Expected { issue, name, type, data } naming a Linear issue, with a file of at most ${MAX_TICKET_ATTACHMENT_BYTES / 1024 / 1024} MB in base64`);
-	};
+	const ticketAttach = put(
+		parseTicketAttachment,
+		async upload => {
+			await attachToTicket(upload);
+			return {};
+		},
+		`Expected { issue, name, type, data } naming a Linear issue, with a file of at most ${MAX_TICKET_ATTACHMENT_BYTES / 1024 / 1024} MB in base64`,
+	);
 
 	/** `GET /api/linear/teams`: the workspace's Linear teams, `{ id, name, key }`, for the team a new issue goes in. */
 	const teams = get(() => answer(loadTeams));
@@ -343,32 +337,26 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	});
 
 	/** `PUT /api/worktrees/removal`: preview a removal, or remove checkouts whose confirmation still matches. */
-	const worktreeRemoval: Handler = async req => {
-		const write = await guards.writeBody(req);
-		if (write instanceof Response) return write;
-		const body = parseWorktreeRemoval(write.body);
-		if (!body) return fail(400, "Expected a preview with targets or removal with confirmed plans, up to 100 worktrees.");
-		if (body.action === "preview") {
-			return answer(async () => {
-				const plans = [];
-				for (const target of body.targets) plans.push(await env.worktrees.preview(target));
-				return { plans };
-			});
-		}
-		return answer(async () => ({ results: await env.worktrees.remove(body.plans) }));
-	};
+	const worktreeRemoval = put(
+		parseWorktreeRemoval,
+		async body => (body.action === "preview" ? { plans: await env.worktrees.previewAll(body.targets) } : { results: await env.worktrees.remove(body.plans) }),
+		"Expected a preview with targets or removal with confirmed plans, up to 100 worktrees.",
+	);
 
 	/** `PUT /api/projects` `{ op, cwd }`: add a directory as a project, or hide or show one. */
-	const projectChange: Handler = async req => {
-		const write = await guards.writeBody(req);
-		if (write instanceof Response) return write;
-		const change = parseProjectChange(write.body);
-		if (!change) return fail(400, "Expected { op, cwd } with op add, hide, or show");
-		const cwd = change.op === "add" ? directoryOf(change.cwd) : change.cwd;
-		if (!cwd) return fail(400, `${change.cwd.trim()} is not a directory.`);
-		env.changeProjects({ op: change.op, cwd });
-		return Response.json({});
-	};
+	const projectChange = put(
+		body => {
+			const change = parseProjectChange(body);
+			if (!change) return null;
+			const cwd = change.op === "add" ? directoryOf(change.cwd) : change.cwd;
+			return cwd ? { op: change.op, cwd } : fail(400, `${change.cwd.trim()} is not a directory.`);
+		},
+		async change => {
+			env.changeProjects(change);
+			return {};
+		},
+		"Expected { op, cwd } with op add, hide, or show",
+	);
 
 	return {
 		"/api/settings": { GET: settings },

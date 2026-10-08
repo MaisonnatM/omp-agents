@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { View } from "../src/shared/sessions";
-import { applyPaneMessage, retainPanes, usePane } from "./pane-store";
+import { applyPaneMessage, retainPanes, usePaneLoaded, useTranscript } from "./pane-store";
 
 const view = (instanceId: string): View => ({ kind: "live", instanceId, agentId: null });
 
 function Probe({ view: shown }: { view: View }) {
-	const pane = usePane(shown);
-	return <span>{pane.loaded ? pane.items.length : "empty"}</span>;
+	const items = useTranscript(shown);
+	const loaded = usePaneLoaded(shown);
+	return <span>{loaded ? items.length : "empty"}</span>;
 }
 
 describe("pane store", () => {

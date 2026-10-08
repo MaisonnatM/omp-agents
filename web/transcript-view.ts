@@ -7,7 +7,16 @@ export type ActivityItem = Extract<Item, { kind: "tool" | "thinking" }>;
 
 export type Block = { kind: "item"; item: Exclude<Item, ActivityItem> } | { kind: "activity"; id: string; entries: ActivityItem[] };
 
-export function toBlocks(items: Item[]): Block[] {
+const blockKey = (block: Block): string => (block.kind === "item" ? block.item.id : block.id);
+
+const sameBlock = (a: Block, b: Block): boolean =>
+	a.kind === "item" ? b.kind === "item" && a.item === b.item : b.kind === "activity" && a.entries.length === b.entries.length && a.entries.every((entry, i) => entry === b.entries[i]);
+
+/**
+ * The blocks of `items`. A block of `previous` whose items are the same objects comes back as the same object, so a
+ * row of an unchanged message or tool group, memoized on its block, skips the render that a streamed token starts.
+ */
+export function toBlocks(items: Item[], previous: readonly Block[] = []): Block[] {
 	const blocks: Block[] = [];
 	for (const item of items) {
 		const last = blocks.at(-1);
@@ -16,8 +25,16 @@ export function toBlocks(items: Item[]): Block[] {
 			else blocks.push({ kind: "activity", id: item.id, entries: [item] });
 		} else blocks.push({ kind: "item", item });
 	}
-	return blocks;
+	if (previous.length === 0) return blocks;
+	const before = new Map(previous.map(block => [blockKey(block), block]));
+	return blocks.map(block => {
+		const kept = before.get(blockKey(block));
+		return kept && sameBlock(kept, block) ? kept : block;
+	});
 }
+
+/** How many turns the transcript holds: one per prompt, as {@link outline} counts them. */
+export const turnCount = (items: Item[]): number => items.reduce((count, item) => count + (item.kind === "user" ? 1 : 0), 0);
 
 /**
  * The reply each turn ends on: its last assistant message with text. The copy button shows only on these,

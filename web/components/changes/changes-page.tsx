@@ -2,7 +2,7 @@ import { ArrowLeft, RotateCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { SessionChanges } from "../../../src/shared/changes";
 import { hashForSession, type PastSession, type RosterHost } from "../../../src/shared/sessions";
-import { usePane } from "../../pane-store";
+import { useChangedFiles } from "../../pane-store";
 import { hostLabel, pastLabel } from "../../labels";
 import { useRead } from "../../reads";
 import { hashForChanges } from "../../routing";
@@ -33,7 +33,7 @@ export function ChangesPage({ sessionId, path, host, past }: ChangesPageProps) {
 	const [reads, setReads] = useState(0);
 	// The session's own edits arrive as its `work`, so each one reads the changes again. A turn that starts or ends does
 	// too: bash and subagents edit files without telling the page, and one that ended may have committed since the last read.
-	const work = usePane(host ? { kind: "live", instanceId: host.instanceId, agentId: null } : { kind: "past", sessionId }).files;
+	const work = useChangedFiles(host ? { kind: "live", instanceId: host.instanceId, agentId: null } : { kind: "past", sessionId });
 	const edits = work?.reduce((count, file) => count + file.changes.length, 0) ?? 0;
 	const version = `${reads}:${host?.status ?? "past"}:${edits}`;
 	const list = useRead<SessionChanges>(`/api/changes?session=${encodeURIComponent(sessionId)}`, version);

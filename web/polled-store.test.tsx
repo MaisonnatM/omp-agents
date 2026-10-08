@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, jest, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createPolledStore, type PolledEntry } from "./polled-store";
 
@@ -65,6 +65,62 @@ describe("polled store", () => {
 		await older;
 		await newer;
 		expect(text(polled, "a")).toBe("<span>2:still:</span>");
+	});
+
+	test("reads of two scopes in flight at once both complete, and each refresh aborts only a read of its own scope", async () => {
+		const polled = store();
+		const pending = new Map<string, { signal: AbortSignal; finish: (n: number) => void }>();
+		globalThis.fetch = ((url: string, { signal }: { signal: AbortSignal }) =>
+			new Promise<Response>((resolve, reject) => {
+				signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+				pending.set(url, { signal, finish: n => resolve(new Response(JSON.stringify({ n }), { status: 200 })) });
+			})) as unknown as typeof fetch;
+		const a = polled.refresh("a");
+		const b = polled.refresh("b");
+		expect(pending.get("/polled/a")?.signal.aborted).toBe(false);
+		expect(pending.get("/polled/b")?.signal.aborted).toBe(false);
+		pending.get("/polled/a")?.finish(1);
+		pending.get("/polled/b")?.finish(2);
+		await Promise.all([a, b]);
+		expect(text(polled, "a")).toBe("<span>1:still:</span>");
+		expect(text(polled, "b")).toBe("<span>2:still:</span>");
+
+		const first = polled.refresh("a");
+		const firstRead = pending.get("/polled/a");
+		const second = polled.refresh("a");
+		expect(firstRead?.signal.aborted).toBe(true);
+		pending.get("/polled/a")?.finish(3);
+		await Promise.all([first, second]);
+		expect(text(polled, "a")).toBe("<span>3:still:</span>");
+	});
+
+	test("callers that poll one scope share one timer and one read per tick, which stops with the last of them", () => {
+		jest.useFakeTimers();
+		try {
+			const polled = store();
+			const requested: string[] = [];
+			globalThis.fetch = (async (url: string) => {
+				requested.push(url);
+				return new Response(JSON.stringify({ n: 1 }), { status: 200 });
+			}) as unknown as typeof fetch;
+			const stopFirst = polled.poll("a");
+			const stopSecond = polled.poll("a");
+			const stopOther = polled.poll("b");
+			expect(requested).toEqual(["/polled/a", "/polled/b"]);
+			jest.advanceTimersByTime(60_000);
+			expect(requested).toEqual(["/polled/a", "/polled/b", "/polled/a", "/polled/b"]);
+			stopFirst();
+			jest.advanceTimersByTime(60_000);
+			expect(requested.length).toBe(6);
+			stopSecond();
+			stopOther();
+			jest.advanceTimersByTime(120_000);
+			expect(requested.length).toBe(6);
+			polled.poll("a")();
+			expect(requested.length).toBe(7);
+		} finally {
+			jest.useRealTimers();
+		}
 	});
 
 	test("localStorage keeps only reads whose data has the store's shape", () => {

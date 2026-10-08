@@ -147,14 +147,16 @@ describe("DashboardSession state refresh", () => {
 			const client = new FakeClient();
 			fakeOmp(client);
 			const switched = Promise.withResolvers<void>();
+			const refreshed = Promise.withResolvers<void>();
 			const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => {
 				if (update.kind === "switched") switched.resolve();
+				if (update.kind === "roster") refreshed.resolve();
 			});
 			const file = join(dir, "moved.jsonl");
 			client.getState = async () => ({ ...STATE, sessionFile: file, sessionName: "moved" });
 
 			client.fire({ type: "turn_end" });
-			await settle();
+			await refreshed.promise;
 			expect(session.sessionName).toBe("moved");
 			expect(session.sessionFile).toBeNull();
 			expect(session.cwd).toBe("/tmp/project");
@@ -171,6 +173,14 @@ describe("DashboardSession state refresh", () => {
 });
 
 describe("DashboardSession turns", () => {
+	test("an untitled session asks omp for a title once, through the turn gate, however many prompts follow", async () => {
+		const { client } = await startSession();
+		client.fire({ type: "message_end", message: { role: "user" } });
+		client.fire({ type: "message_end", message: { role: "user" } });
+		await settle();
+		expect(client.calls).toEqual(["prompt /rename"]);
+	});
+
 	test("an agent_end that is not terminal hands over to a queued follow-up, so the session keeps working", async () => {
 		const { session, client } = await startSession();
 		client.fire({ type: "agent_start" });

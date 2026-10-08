@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared/transcript";
-import { editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnReplies } from "./transcript-view";
+import { editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnCount, turnReplies } from "./transcript-view";
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
@@ -15,6 +15,24 @@ describe("transcript rendering", () => {
 			"u",
 			"t3",
 		]);
+	});
+
+	test("a block whose items did not change comes back as the same object, so a streamed token renders only its own row", () => {
+		const reply = (text: string): Item => ({ id: "a", kind: "assistant", text, streaming: true, suggestions: [] });
+		const t1 = tool("t1", "ok");
+		const t2 = tool("t2", "running");
+		const first = toBlocks([user, t1, t2, reply("he")]);
+		const next = toBlocks([user, t1, t2, reply("hel")], first);
+		expect(next[0]).toBe(first[0]);
+		expect(next[1]).toBe(first[1]);
+		expect(next[2]).not.toBe(first[2]);
+		const grown = toBlocks([user, t1, t2, tool("t3", "running"), reply("hel")], next);
+		expect(grown[0]).toBe(first[0]);
+		expect(grown[1]).not.toBe(next[1]);
+	});
+
+	test("turnCount counts the prompts", () => {
+		expect(turnCount([user, tool("t1", "ok"), { ...user, id: "u2" }])).toBe(2);
 	});
 });
 

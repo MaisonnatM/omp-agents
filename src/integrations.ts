@@ -4,21 +4,18 @@
  * user-level MCP config when omp has none.
  */
 import { errorText } from "./json";
+import { clientSetups, type ClientSave, planGoogleSave, planSlackSave } from "./mcp-clients";
 import {
 	addMcpServer,
 	checkMcpServer,
-	type ClientSave,
-	clientSetups,
-	commitClientSave,
 	findMcpServer,
 	type McpServer,
 	McpRefused,
 	mcpSignedIn,
-	planGoogleSave,
-	planSlackSave,
 	signInMcp,
 	signOutMcp,
 	userMcpConfigPath,
+	writeMcpServer,
 } from "./omp/mcp";
 import {
 	type GoogleClientInput,
@@ -115,7 +112,7 @@ async function saveClient(id: Exclude<McpIntegrationId, "linear">, plan: (path: 
 	const planned = await plan(path);
 	signIns[id].cancel();
 	if (planned.dropCredentials && planned.credential) await signOutMcp(planned.credential);
-	await commitClientSave(path, planned);
+	await writeMcpServer(path, planned.name, planned.server);
 	return loadIntegration(id, await findServer(id), false);
 }
 

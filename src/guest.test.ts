@@ -477,20 +477,32 @@ describe("SessionGuest lifetime", () => {
 		expect(socket.messages).toEqual([]);
 	});
 
-	test("a host that is gone from the registry, or moved to a new room generation, ends the guest", async () => {
+	test("a host that is gone from the registry, or moved to a new room generation, ends the guest and replaces it at once", async () => {
 		const gone = await joinRoom();
-		expect(gone.guest.follow(new Map())).toBe(false);
+		gone.guest.follow(new Map());
 		expect(gone.guest.control).toMatchObject(ENDED);
+		expect(gone.guest.finished(Date.now())).toBe(true);
 
 		const moved = await joinRoom({ host: { instanceId: "inst-3" } });
 		const next = host({ instanceId: "inst-3", generation: 2 });
-		expect(moved.guest.follow(new Map([[next.instanceId, next]]))).toBe(false);
+		moved.guest.follow(new Map([[next.instanceId, next]]));
 		expect(moved.guest.control).toMatchObject(ENDED);
+		expect(moved.guest.finished(Date.now())).toBe(true);
 
 		const same = await joinRoom({ host: { instanceId: "inst-4" } });
 		const listed = host({ instanceId: "inst-4", participants: 3 });
-		expect(same.guest.follow(new Map([[listed.instanceId, listed]]))).toBe(true);
+		same.guest.follow(new Map([[listed.instanceId, listed]]));
+		expect(same.guest.finished(Date.now())).toBe(false);
 		expect(same.guest.row()).toMatchObject({ participants: 3 });
+	});
+
+	test("a guest that ended while its host stays listed is replaced only after the rejoin wait", async () => {
+		const { guest } = await joinRoom({ host: { instanceId: "inst-5" } });
+		expect(guest.finished(Date.now() + 60_000)).toBe(false);
+		guest.disconnect("The relay gave up.");
+		const now = Date.now();
+		expect(guest.finished(now + 5000)).toBe(false);
+		expect(guest.finished(now + 5001)).toBe(true);
 	});
 
 	test("a host error names the subagent it concerns, or reports as the host's", async () => {

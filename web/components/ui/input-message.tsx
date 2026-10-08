@@ -2,6 +2,7 @@
 
 import {
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useId,
@@ -450,7 +451,7 @@ function SuggestionRow({
 
 // ─── InputMessage ─────────────────────────────────────────────────────────
 
-const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
+const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
   (
     {
       size,
@@ -1414,10 +1415,8 @@ const InputMessage = forwardRef<HTMLDivElement, InputMessageProps>(
     // messages included — to one ladder step (matches InputGroup).
     return size ? <SizeProvider size={size}>{composer}</SizeProvider> : composer;
   }
-);
+));
 
 InputMessage.displayName = "InputMessage";
 
 export { InputMessage };
-export type { InputMessageProps, InputMessageSlotContext, QueuedMessage };
-export default InputMessage;

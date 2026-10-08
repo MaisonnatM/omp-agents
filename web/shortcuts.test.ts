@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { pairing, shortcutsFor } from "./shortcuts";
+import { createShortcutStack, IS_MAC, pairing, type ShortcutHandlers, shortcutsFor } from "./shortcuts";
 
 type Mods = { ctrl?: boolean; alt?: boolean; meta?: boolean; shift?: boolean };
 const keyEvent = (key: string, code: string, mods: Mods = {}) => ({
@@ -145,4 +145,80 @@ test("a pair forms from a plain key outside text fields, within a second and a h
 	broken(at(0, "g"), true);
 	broken(at(100, "x"), true);
 	expect(broken(at(200, "i"), true)).toBe("x");
+});
+
+const pressed = (key: string, code: string, mods: Mods = {}) => {
+	const event = { ...keyEvent(key, code, mods), defaultPrevented: false, preventDefault: () => (event.defaultPrevented = true) };
+	return event;
+};
+
+test("the newest registration tries a key first, and the first handler that takes it ends the press", () => {
+	const stack = createShortcutStack();
+	const calls: string[] = [];
+	stack.add(1, () => ({ nextPullRequest: () => void calls.push("app") }));
+	stack.add(3, () => ({ todoNext: () => void calls.push("page") }));
+	stack.add(2, () => ({ nextChangedFile: () => void calls.push("middle") }));
+	const event = pressed("j", "KeyJ");
+	stack.dispatch(event, true, null);
+	expect(calls).toEqual(["page"]);
+	expect(event.defaultPrevented).toBe(true);
+});
+
+test("a handler that declines passes the key to the registration below, and one that returns nothing takes it", () => {
+	const stack = createShortcutStack();
+	const calls: string[] = [];
+	stack.add(1, () => ({ focusComposer: () => void calls.push("app") }));
+	stack.add(2, () => ({ todoSearch: () => (calls.push("page"), false) }));
+	const event = pressed("/", "Slash");
+	stack.dispatch(event, true, null);
+	expect(calls).toEqual(["page", "app"]);
+	expect(event.defaultPrevented).toBe(true);
+	const declined = pressed("/", "Slash");
+	const empty = createShortcutStack();
+	empty.add(1, () => ({ todoSearch: () => false }));
+	empty.dispatch(declined, true, null);
+	expect(declined.defaultPrevented).toBe(false);
+});
+
+test("a registration reads its handlers when the key is pressed, and removing it returns the key to the one below", () => {
+	const stack = createShortcutStack();
+	const calls: string[] = [];
+	let handlers: ShortcutHandlers = {};
+	stack.add(1, () => ({ newTicket: () => void calls.push("app") }));
+	const remove = stack.add(2, () => handlers);
+	expect(stack.size).toBe(2);
+	stack.dispatch(pressed("c", "KeyC"), true, null);
+	expect(calls).toEqual(["app"]);
+	handlers = { todoNew: () => void calls.push("page") };
+	stack.dispatch(pressed("c", "KeyC"), true, null);
+	expect(calls).toEqual(["app", "page"]);
+	remove();
+	expect(stack.size).toBe(1);
+	stack.dispatch(pressed("c", "KeyC"), true, null);
+	expect(calls).toEqual(["app", "page", "app"]);
+});
+
+test("scope limits who runs: text fields keep their keys, chords work anywhere, and composer bindings never reach the page", () => {
+	const stack = createShortcutStack();
+	const calls: string[] = [];
+	stack.add(1, () => ({
+		newTicket: () => void calls.push("ticket"),
+		switcher: () => void calls.push("switcher"),
+		interrupt: () => void calls.push("interrupt"),
+	}));
+	const mod = IS_MAC ? { meta: true } : { ctrl: true };
+	stack.dispatch(pressed("c", "KeyC"), false, null);
+	stack.dispatch(pressed("k", "KeyK", mod), false, null);
+	stack.dispatch(pressed("Backspace", "Backspace", { ...mod, shift: true }), true, null);
+	expect(calls).toEqual(["switcher"]);
+});
+
+test("a key something nearer already handled is left alone", () => {
+	const stack = createShortcutStack();
+	const calls: string[] = [];
+	stack.add(1, () => ({ newTicket: () => void calls.push("app") }));
+	const event = pressed("c", "KeyC");
+	event.preventDefault();
+	stack.dispatch(event, true, null);
+	expect(calls).toEqual([]);
 });

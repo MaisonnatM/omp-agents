@@ -18,7 +18,7 @@ import {
 	Search,
 	Wrench,
 } from "lucide-react";
-import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useRef } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useMemo, useRef } from "react";
 import type { Project } from "../../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import {
@@ -45,7 +45,7 @@ import type { OpenMode } from "../../routing";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
-import { useDashboardContext } from "../dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { StatusDot } from "../status-dot";
 import { ActionPanel } from "./action-panel";
 import { Kbd, PaletteFooter } from "./palette-footer";
@@ -98,119 +98,82 @@ interface CommandPaletteProps {
  * Searches running and past sessions in every project, the page's commands, and projects; Enter runs the highlighted
  * entry's first action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title.
  */
-export function CommandPalette(props: CommandPaletteProps) {
-	const { state, dispatch, onCreateTodo, onCreateTicket } = props;
-	const { send, start, starts, end } = useDashboardContext();
+export function CommandPalette({ state, dispatch, hosts, past, projects, project, onOpenSession, onPickProject, pinned, onTogglePin, handlers, unavailable, onCreateTodo, onCreateTicket }: CommandPaletteProps) {
+	const { send, start, end } = useDashboardActions();
+	const { starts } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const focusInput = useCallback(() => inputRef.current?.focus(), []);
-	if (state === null) return null;
-	const frame = topFrame(state);
-	const view = PALETTE_VIEWS[frame.view];
-	const search = frame.query.trim();
+	const open = state !== null;
+	// One clock for as long as the palette is open, so a row's frecency does not decay and reorder the list under the pointer.
+	const now = useMemo(() => Date.now(), [open]);
+	const frame = state ? topFrame(state) : null;
+	const viewId = frame?.view ?? "root";
+	const view = PALETTE_VIEWS[viewId];
+	const query = frame?.query ?? "";
+	const search = query.trim();
 	const resuming = starts.resume?.phase === "starting" ? starts.resume.op.sessionId : null;
 
-	const sessionItem = (entry: SessionEntry): PaletteItem => {
-		const row = entry.kind === "live" ? entry.host : entry.session;
-		const actions = sessionActions(entry, {
-			onScreen: false,
-			pinned: props.pinned.has(row.sessionId),
-			resuming,
-			open: (picked, mode) => props.onOpenSession(picked, row.cwd, mode),
-			togglePin: props.onTogglePin,
-			resume: sessionId => start({ kind: "resume", sessionId }),
-			dismissInterrupted: sessionId => send({ t: "dismiss-interrupted", sessionId }),
-			end,
+	// While the palette is closed a roster push builds nothing, so each list below is empty then.
+	const sessionItems = useMemo((): PaletteItem[] => {
+		if (!open) return [];
+		const sessionItem = (entry: SessionEntry): PaletteItem => {
+			const row = entry.kind === "live" ? entry.host : entry.session;
+			const actions = sessionActions(entry, {
+				onScreen: false,
+				pinned: pinned.has(row.sessionId),
+				resuming,
+				open: (picked, mode) => onOpenSession(picked, row.cwd, mode),
+				togglePin: onTogglePin,
+				resume: sessionId => start({ kind: "resume", sessionId }),
+				dismissInterrupted: sessionId => send({ t: "dismiss-interrupted", sessionId }),
+				end,
+			});
+			const keywords = [...row.pullRequests.map(pr => `${pr.repo}#${pr.number}`), ...row.tickets];
+			return entry.kind === "live"
+				? {
+						id: `session:${entry.host.instanceId}`,
+						section: "running",
+						title: hostLabel(entry.host),
+						subtitle: row.cwdDisplay,
+						keywords,
+						icon: PAGE_ICON.sessions,
+						accessories: [
+							{ kind: "status", status: entry.host.status },
+							{ kind: "age", at: entry.host.startedAt },
+						],
+						kind: "Session",
+						actions,
+					}
+				: {
+						id: `session:${entry.session.sessionId}`,
+						section: "past",
+						title: pastLabel(entry.session),
+						subtitle: row.cwdDisplay,
+						keywords,
+						icon: History,
+						accessories: [{ kind: "age", at: entry.session.modifiedAt }],
+						kind: "Session",
+						actions,
+					};
+		};
+		return [...hosts.map(host => sessionItem({ kind: "live", host })), ...past.map(session => sessionItem({ kind: "past", session }))];
+	}, [open, hosts, past, pinned, resuming, onOpenSession, onTogglePin, start, send, end]);
+
+	const commandItems = useMemo((): PaletteItem[] => {
+		if (!open) return [];
+		const pushItem = (id: string, title: string, icon: LucideIcon, target: PaletteViewId, keywords: string[], keys: readonly string[]): PaletteItem => ({
+			id,
+			section: "commands",
+			title,
+			keywords,
+			icon,
+			accessories: keys.length > 0 ? [{ kind: "keys", labels: keys }] : [],
+			kind: "Command",
+			actions: [[{ id: "open", title: "Open", icon, run: { kind: "push", view: target } }]],
 		});
-		const keywords = [...row.pullRequests.map(pr => `${pr.repo}#${pr.number}`), ...row.tickets];
-		return entry.kind === "live"
-			? {
-					id: `session:${entry.host.instanceId}`,
-					section: "running",
-					title: hostLabel(entry.host),
-					subtitle: row.cwdDisplay,
-					keywords,
-					icon: PAGE_ICON.sessions,
-					accessories: [
-						{ kind: "status", status: entry.host.status },
-						{ kind: "age", at: entry.host.startedAt },
-					],
-					kind: "Session",
-					actions,
-				}
-			: {
-					id: `session:${entry.session.sessionId}`,
-					section: "past",
-					title: pastLabel(entry.session),
-					subtitle: row.cwdDisplay,
-					keywords,
-					icon: History,
-					accessories: [{ kind: "age", at: entry.session.modifiedAt }],
-					kind: "Session",
-					actions,
-				};
-	};
-	const todoItem = (id: string, section: "fallback" | "createTodo", title: string, subtitle?: string): PaletteItem[] =>
-		onCreateTodo && search
-			? [
-					{
-						id,
-						section,
-						title,
-						subtitle,
-						keywords: [],
-						icon: ListTodo,
-						accessories: [],
-						kind: "Todo",
-						actions: [[{ id: "create", title: "Create todo", icon: ListTodo, run: { kind: "do", fn: () => onCreateTodo(search) } }]],
-					},
-				]
-			: [];
-	/** What you typed, as the title of a new Linear issue in the dialog that opens it. */
-	const ticketItem = (): PaletteItem[] =>
-		onCreateTicket && search
-			? [
-					{
-						id: "fallback:create-ticket",
-						section: "fallback",
-						title: `Create ticket “${search}”`,
-						keywords: [],
-						icon: PAGE_ICON.tickets,
-						accessories: [],
-						kind: "Ticket",
-						actions: [[{ id: "create", title: "Create ticket", icon: PAGE_ICON.tickets, run: { kind: "do", fn: () => onCreateTicket(search) } }]],
-					},
-				]
-			: [];
-	const pushItem = (id: string, title: string, icon: LucideIcon, target: PaletteViewId, keywords: string[], keys: readonly string[]): PaletteItem => ({
-		id,
-		section: "commands",
-		title,
-		keywords,
-		icon,
-		accessories: keys.length > 0 ? [{ kind: "keys", labels: keys }] : [],
-		kind: "Command",
-		actions: [[{ id: "open", title: "Open", icon, run: { kind: "push", view: target } }]],
-	});
-	const pickProject = (cwd: string | null): void => {
-		if (cwd !== props.project) props.onPickProject(cwd);
-	};
-	const projectItem = (id: string, title: string, subtitle: string | undefined, icon: LucideIcon, cwd: string | null): PaletteItem => ({
-		id,
-		section: "projects",
-		title,
-		subtitle,
-		keywords: [],
-		icon,
-		accessories: cwd === props.project ? [{ kind: "text", text: "Current" }] : [],
-		kind: "Project",
-		actions: [[{ id: "pick", title: "Show its sessions", icon, run: { kind: "do", fn: () => pickProject(cwd) } }]],
-	});
-	const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
-		root: () => [
-			...props.hosts.map(host => sessionItem({ kind: "live", host })),
-			...props.past.map(session => sessionItem({ kind: "past", session })),
-			...paletteCommands(props.handlers, props.unavailable).map(
+		return [
+			...paletteCommands(handlers, unavailable).map(
 				({ id, command, label }): PaletteItem => ({
 					id: `command:${id}`,
 					section: "commands",
@@ -219,21 +182,78 @@ export function CommandPalette(props: CommandPaletteProps) {
 					icon: COMMAND_ICON[id] ?? Command,
 					accessories: [{ kind: "keys", labels: shortcutLabels(id) }],
 					kind: "Command",
-					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? Command, run: { kind: "do", fn: () => void props.handlers[id]?.() } }]],
+					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? Command, run: { kind: "do", fn: () => void handlers[id]?.() } }]],
 				}),
 			),
 			pushItem("command:project", "Choose project…", Folder, "projects", ["switch project", "workspace"], shortcutLabels("project")),
 			pushItem("command:create-todo", "Create todo", ListTodo, "createTodo", ["add todo", "task"], []),
-			...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`),
-			...ticketItem(),
-		],
-		projects: () => [
+		];
+	}, [open, handlers, unavailable]);
+
+	const projectItems = useMemo((): PaletteItem[] => {
+		if (!open) return [];
+		const pickProject = (cwd: string | null): void => {
+			if (cwd !== project) onPickProject(cwd);
+		};
+		const projectItem = (id: string, title: string, subtitle: string | undefined, icon: LucideIcon, cwd: string | null): PaletteItem => ({
+			id,
+			section: "projects",
+			title,
+			subtitle,
+			keywords: [],
+			icon,
+			accessories: cwd === project ? [{ kind: "text", text: "Current" }] : [],
+			kind: "Project",
+			actions: [[{ id: "pick", title: "Show its sessions", icon, run: { kind: "do", fn: () => pickProject(cwd) } }]],
+		});
+		return [
 			projectItem("project:all", "All projects", undefined, Layers, null),
-			...props.projects.map(({ cwd, cwdDisplay }) => projectItem(`project:${cwd}`, projectName(cwdDisplay) ?? cwdDisplay, cwdDisplay, Folder, cwd)),
-		],
-		createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
-	};
-	const sections = paletteSections(itemsOf[frame.view](), frame.query, frecency, Date.now(), view.suggestions);
+			...projects.map(({ cwd, cwdDisplay }) => projectItem(`project:${cwd}`, projectName(cwdDisplay) ?? cwdDisplay, cwdDisplay, Folder, cwd)),
+		];
+	}, [open, projects, project, onPickProject]);
+
+	const items = useMemo((): PaletteItem[] => {
+		const todoItem = (id: string, section: "fallback" | "createTodo", title: string, subtitle?: string): PaletteItem[] =>
+			onCreateTodo && search
+				? [
+						{
+							id,
+							section,
+							title,
+							subtitle,
+							keywords: [],
+							icon: ListTodo,
+							accessories: [],
+							kind: "Todo",
+							actions: [[{ id: "create", title: "Create todo", icon: ListTodo, run: { kind: "do", fn: () => onCreateTodo(search) } }]],
+						},
+					]
+				: [];
+		/** What you typed, as the title of a new Linear issue in the dialog that opens it. */
+		const ticketItem = (): PaletteItem[] =>
+			onCreateTicket && search
+				? [
+						{
+							id: "fallback:create-ticket",
+							section: "fallback",
+							title: `Create ticket “${search}”`,
+							keywords: [],
+							icon: PAGE_ICON.tickets,
+							accessories: [],
+							kind: "Ticket",
+							actions: [[{ id: "create", title: "Create ticket", icon: PAGE_ICON.tickets, run: { kind: "do", fn: () => onCreateTicket(search) } }]],
+						},
+					]
+				: [];
+		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
+			root: () => [...sessionItems, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
+			projects: () => projectItems,
+			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
+		};
+		return itemsOf[viewId]();
+	}, [viewId, sessionItems, commandItems, projectItems, search, onCreateTodo, onCreateTicket]);
+	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
+	if (state === null || frame === null) return null;
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;
 	const empty =

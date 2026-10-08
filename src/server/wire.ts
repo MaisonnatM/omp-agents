@@ -167,14 +167,14 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 export type RoutineSpec = Extract<RoutineChange, { op: "save" }>["routine"];
 
 /** A routine as the page saves it, or `null` when a field is missing, of the wrong type, or out of range; other fields drop. */
-export function parseRoutineSpec(value: unknown): RoutineSpec | null {
+export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
 	if (!isObject(value)) return null;
 	const { id, name, cwd, enabled } = value;
 	const schedules = parseSchedules(value.schedules);
 	const task = parseRoutineTask(value.task);
 	const skill = parseSkill(value.skill);
 	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !skill) return null;
-	return { id, name, cwd, schedules: schedules.ok, task: task.ok, skill: skill.ok, enabled };
+	return { ok: { id, name, cwd, schedules: schedules.ok, task: task.ok, skill: skill.ok, enabled } };
 }
 
 function parseRoutineChange(value: unknown): Parsed<RoutineChange> {
@@ -182,7 +182,7 @@ function parseRoutineChange(value: unknown): Parsed<RoutineChange> {
 	const { op } = value;
 	if (op === "save") {
 		const routine = parseRoutineSpec(value.routine);
-		return routine && { ok: { op, routine } };
+		return routine && { ok: { op, routine: routine.ok } };
 	}
 	const { id } = value;
 	if (!isNonEmpty(id)) return null;

@@ -74,7 +74,7 @@ export class Views {
 			const entry = this.#watched.get(key);
 			if (entry && --entry.sockets === 0) {
 				this.#watched.delete(key);
-				this.#resources.delete(key);
+				this.#drop(key);
 			}
 		}
 		const added = [...next].filter(([key]) => !prev.has(key));
@@ -88,31 +88,34 @@ export class Views {
 		for (const [key, view] of added) for (const msg of snapshot(view, this.#resources.get(key))) send(ws, msg);
 	}
 
+	/** Forget the tail and media tree of view `key`, and stop them publishing. */
+	#drop(key: string): void {
+		const resources = this.#resources.get(key);
+		if (!resources) return;
+		this.#resources.delete(key);
+		resources.tail.close();
+		resources.media.close();
+	}
+
 	/** Point every watched view's tail and media tree at its current file: the file shows up, the host switches sessions, a subagent registers. */
 	sync(): void {
 		for (const [key, { view }] of this.#watched) {
 			const path = this.#pathFor(view);
 			const previous = this.#resources.get(key);
 			if (previous?.tail.path === path) continue;
-			this.#resources.delete(key);
+			this.#drop(key);
 			if (!path) {
 				if (previous) for (const msg of snapshot(view, undefined)) this.#publish(viewTopic(key), msg);
 				continue;
 			}
-			const next = new FileTail(
+			const tail = new FileTail(
 				path,
-				(reset, items) => {
-					if (this.#resources.get(key)?.tail === next) this.#publish(viewTopic(key), { t: "items", view, reset, items });
-				},
-				(reset, files) => {
-					if (this.#resources.get(key)?.tail === next) this.#publish(viewTopic(key), { t: "work", view, reset, files });
-				},
+				(reset, items) => this.#publish(viewTopic(key), { t: "items", view, reset, items }),
+				(reset, files) => this.#publish(viewTopic(key), { t: "work", view, reset, files }),
 			);
-			const media = new MediaTree(path, view.kind === "live" ? view.agentId : null, (reset, list) => {
-				if (this.#resources.get(key)?.media === media) this.#publish(viewTopic(key), { t: "media", view, reset, media: list });
-			});
-			this.#resources.set(key, { tail: next, media });
-			next.poke();
+			const media = new MediaTree(path, view.kind === "live" ? view.agentId : null, (reset, list) => this.#publish(viewTopic(key), { t: "media", view, reset, media: list }));
+			this.#resources.set(key, { tail, media });
+			tail.poke();
 			media.poke(path);
 		}
 	}

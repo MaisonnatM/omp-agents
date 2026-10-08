@@ -10,7 +10,7 @@ import { readPinnedSkill } from "../../pinned-skill";
 import { hashForRoutines } from "../../routing";
 import { draftOf, lastRunWords, newDraft, nextRunWords, type RoutineDraft, runWords, scheduleWords, schedulesWords, taskWords } from "../../routines-model";
 import { useMinute } from "../../use-minute";
-import { useDashboardContext } from "../dashboard-context";
+import { useDashboardActions } from "../dashboard-context";
 import { PageFrame } from "../list-page";
 import { SessionChip } from "../session-chip";
 import { statusLabel } from "../status-dot";
@@ -104,7 +104,7 @@ function CommandOutput({ output }: { output: string }) {
 }
 
 function RunItem({ run, routine, hosts }: { run: RoutineRun; routine: Routine; hosts: RosterHost[] }) {
-	const { open } = useDashboardContext();
+	const { open } = useDashboardActions();
 	const { outcome } = run;
 	const started = outcome.kind === "session" ? sessionView(outcome, hosts) : null;
 	return (
@@ -288,7 +288,7 @@ interface RoutinesPageProps {
 
 /** Your routines, one routine's settings and runs, or the editor for a new one or an edit. */
 export function RoutinesPage({ routines, target, hosts, workspaces, defaultCwd, connected }: RoutinesPageProps) {
-	const { send } = useDashboardContext();
+	const { send } = useDashboardActions();
 	const now = useMinute();
 	const [editing, setEditing] = useState<{ draft: RoutineDraft; isNew: boolean } | null>(null);
 	const onChange = (change: RoutineChange): void => send({ t: "routine", change });

@@ -94,6 +94,7 @@ Every transcript comes from the session files on this machine, not from a networ
 Sessions started in a terminal are reached through their Collab room:
 
 - Every 1.5 seconds the server lists the local hosts through the registry, and pushes the roster when a row or the registry error changed; the past list goes out again only when a session joined or left.
+  The roster goes out the way the past list does: whole when a page connects, then each push carries only the rows that changed or joined, the instance ids that left, and the registry error.
   That is the same call that backs `omp collab list`.
 - The server joins every listed session's room as a guest named `omp-agents`, as `omp join` would.
   The guest is how the dashboard prompts a session (`prompt` frames), stops a turn (`abort`), messages a subagent (`agent-cmd` `chat`; the host steers, prompts, or revives it), and cancels a running subagent (`agent-cmd` `kill`).
@@ -258,7 +259,7 @@ A run holds its slot time, its errors, and one `outcome`: `pending` from its cla
 A run from before `outcome` migrates as the file loads, in `parseRun`, and nothing else sees the old fields: its `command` becomes a `command` outcome, a started session a `session` (the first, of the several that a pull request routine's run started), and otherwise `pending`, queued when its `queued` is set or its `queue` list holds an entry.
 A run stays queued from its claim until the drain starts its session or command.
 
-`src/server/routine-runner.ts` runs on a 60 s tick in `src/server/loops.ts`, whether or not a page is connected.
+`src/server/routine-runner.ts` runs on a 60 s tick in `src/server/loops.ts`, whether or not a page is connected, and only on the server that owns routines; see [One server runs the unattended work](#one-server-runs-the-unattended-work).
 Each tick does three things, in order:
 
 1. It claims each due slot: it saves a new queued run before it starts anything.
@@ -277,16 +278,30 @@ Each tick does three things, in order:
    `observe` also ends a session as soon as its row shows the turn over, so a finished session frees its slot at once rather than at the next tick.
    Its transcript stays a past session, and **Resume** continues it.
    A session that waits on a question holds its slot.
+   A session that is still in its `starting` phase 10 minutes after its start (`SESSION_START_DEADLINE_MS`) never began its turn: the runner records that on the run as an error, releases the slot, and ends the session.
 
 Running a tick twice starts nothing new, since the slot is claimed, and a tick that comes while one runs is skipped.
 A crash after a claim loses no queued run, since it is on disk. A start that had not finished waits for the routine's next slot.
 After a restart the runner tracks no session, which is right, because the dashboard's sessions die with the server.
 Stopping the server stops every running command, right before it exits, so the result of a command it stopped is never saved as a time-limit stop.
 A run saves its command as `running` before the command starts, then as `exited`, `stopped`, or `failed` when it ends.
-No command resumes after a restart: the next server turns each run still saved as `running` into `stopped` by the dashboard, with that error.
+No command resumes after a restart: the server that owns routines turns each run still saved as `running` into `stopped` by the dashboard, with that error, when it starts or takes over (`RoutineRunner.recover`).
 
 A `routine` socket message carries one change: `save`, `remove`, `enable`, or `run-now`, which claims a slot now, whatever the schedules, and drains it.
 Every socket hears the routines after each change and each step of a run as a `routines` message on the roster topic, also sent when a socket opens.
+
+### One server runs the unattended work
+
+Servers on different ports share `~/.config/omp-agents`: your app and a smoke run, say.
+Routines, the todo inbox, and the daily clean-up of checked todos write that directory without anyone asking, so one server at a time runs them.
+`src/server/owner-lock.ts` decides which, with `server.lock`, a file that holds `{pid, port}` of the owner.
+A server creates it whole through a draft file and a hard link, so a reader never sees half of it, and it takes over a lock whose process is gone or whose content is not a lock.
+A process id that another program reused keeps the lock held; delete `server.lock` to release it.
+At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
+On a takeover the server logs it, reads `routines.json` and `todos.json` again, since the previous owner kept saving them, fails the runs that were running, and drains the todo inbox.
+A server that exits normally deletes its lock.
+The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, or **Run now**; only the minute tick, the todo inbox, and the end inbox's requests for sessions started in a terminal are left to the owner.
+Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
 
 ## Updates
 
@@ -575,9 +590,13 @@ The server lives in `src/`:
   `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`.
   Each session's `row()` returns a `LiveRow`, what its transport knows; `rows()` adds `cwdDisplay`, the session's facts, and the subject a quick action started it on, to make the roster rows.
+  The registry indexes its sessions by session id for `bySessionId`, and rebuilds the index when a session joins or leaves or a dashboard session reports `switched`.
+  `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
+  After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
+- `src/server/loops.ts`: the registry, rescan, usage, and routine minute loops, each started through `repeat`, which waits for a tick to finish before it schedules the next and logs a tick that throws, so no loop overlaps itself or dies on one failure.
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
-  `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle.
+  `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle: a view nobody shows any more, or one whose file changes, has its tail and media tree closed, so a read still in flight and the tail's held-back updates publish nothing.
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
   `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations and their OAuth client setups, the Google calendars, and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; `notices.ts` the bell's notices; and `analytics.ts` the Analytics section.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
@@ -605,13 +624,15 @@ The server lives in `src/`:
   The details also read the last 100 commits with the pull requests GitHub links each to, and keep a commit linked to none or to this one, since a branch that merged its trunk lists the trunk's commits too.
 - `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), and the worktree a new session's branch runs in.
   It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, and `worktreesOf`, which parses `git worktree list --porcelain -z`.
-- `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `Worktrees.start` and `Worktrees.remove` order starts against removals; `removeCheckout` removes the checkout a directory is in, waiting up to 15 seconds for a session that just ended to leave it.
+- `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `Worktrees.start` and `Worktrees.remove` order starts against removals; `removeCheckout` removes the checkout a directory is in, waiting up to 15 seconds for a session that just ended to leave it: it polls only which live sessions occupy the checkout, then runs the full preview once.
+  The inventory reads a repository's checkouts four at a time with one `git rev-parse` for their identity, and `previewAll` previews several targets from one snapshot of what uses them, four at a time; `src/map-limit.ts` holds `mapLimit`, the ordered, bounded `Promise.all` they share.
 - `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows.
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
-- `src/changes.ts`: the changes page's reads for `GET /api/changes` and `GET /api/changes/file`, a session's checkout diff merged with its own changed files; `src/shared/changes.ts` holds the shapes the page shares, `parseFullDiff`, which numbers the rows of a whole-file diff, and `patchRows`, which fills GitHub's patch out to the whole file.
+- `src/changes.ts`: the changes page's reads for `GET /api/changes` and `GET /api/changes/file`, a session's checkout diff merged with its own changed files, the last scan of each place kept for three seconds so that reading a file does not list every change again, and each session transcript folded into its changed files once, by the lines it gained since; `src/shared/changes.ts` holds the shapes the page shares, `parseFullDiff`, which numbers the rows of a whole-file diff, and `patchRows`, which fills GitHub's patch out to the whole file.
 - `src/pull-request-files.ts`: the reads of a pull request's **Code** tab for `GET /api/pull-request/files` and `GET /api/pull-request/file`, from GitHub's REST API and one GraphQL blob read.
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
+  `src/mcp-clients.ts` plans a Slack or Google Calendar OAuth client save, the setup each form shows and the server entry the save writes, from omp's MCP servers that `src/omp/mcp.ts` reads and writes.
   `src/integrations.ts` finds omp's server for each MCP integration, checks it, and runs the sign-ins and sign-outs that Settings › Integrations starts; see [Integrations](#integrations).
 - `src/google-calendar.ts`: `GoogleCalendarReader`, the calendars checked in your Google Calendar and their events in a span, read from Google's Calendar API with omp's Google Calendar sign-in.
 - `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout behind `src/integrations.ts`.
@@ -635,15 +656,21 @@ The server lives in `src/`:
   `src/server/projects-file.ts` keeps the list in `projects.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `projects.json.invalid`.
 - `src/shared/notices.ts`: the bell's `Notice`, a newer omp or a `ModelUpdate`, with its seen flag and `NoticeStatus`, and the socket's `NOTICE_OPS`.
   `src/server/notices.ts` checks for them and runs their updates through `src/omp/release.ts` and `src/settings.ts`; `src/omp/model-updates.ts` finds the newer models and the routing edits that switch to them; see [Updates](#updates).
-- `src/server/todo-inbox.ts`: applies the changes that omp's `user_todo` tool (`templates/omp/agent/extensions/todos.ts`) leaves in `todo-inbox/` beside `todos.json`, one JSON file each, written under a `.tmp` name then renamed.
+- `src/server/json-inbox.ts`: `JsonInboxDir<T>`, the directory of one-JSON-file requests that `todo-inbox.ts` and `end-inbox.ts` both read.
+  Each inbox gives it a `parse` that turns a file into a request, or says why it is not one, and an `apply` that returns whether the file is done.
+  A drain reads the files oldest name first, moves a file that does not parse, or whose `apply` throws, to `<name>.invalid` with a logged reason, deletes a file once `apply` returns true, and leaves one that returns false for the next drain.
+  Overlapping drains never apply a file twice, a drain never rejects, and `watch()` creates the directory and drains when it changes.
+  An inbox may take an `active` check; while it is false every file stays untouched, invalid ones included.
+- `src/server/owner-lock.ts`: `OwnerLock`, the `server.lock` that picks the server that runs routines and the todo inbox; see [One server runs the unattended work](#one-server-runs-the-unattended-work).
+- `src/server/todo-inbox.ts`: applies the changes that omp's `user_todo` tool (`templates/omp/agent/extensions/todos.ts`) leaves in `todo-inbox/` beside `todos.json`, one JSON file each, written under a `.tmp` name then renamed, and drains only on the server that owns the lock.
   `parseAgentChange` reads each file in the extension's own format: an `add` becomes a `todo` of no priority added at that time, and a `toggle` that checks becomes `set-status` `done` at its time.
   The inbox takes `add`, and `set-status` `done`, deletes each file it applies, and moves any other to `<name>.invalid` with a logged reason, so the server stays the only writer of `todos.json` and an agent cannot undo what you did.
   The extension's `before_agent_start` handler reads `todos.json` at each prompt and adds to the system prompt the title and id of the open top-level todo that links to its session, and of each other open one whose `addedBy` is its session, so the agent checks them off once done.
   `add` returns the open todo its session already added with the same title instead of adding it again.
 - `src/server/end-inbox.ts`: ends the sessions that omp's `end_session` tool (`templates/omp/agent/extensions/end-session.ts`) asks to end, one `<session id>.json` each in `end-inbox/` beside `todos.json`.
   The tool writes its request at `agent_end`, after the turn that called it, and deletes it at the next `agent_start` or `session_shutdown`, so a request names a session that idles.
-  The inbox drains when the directory changes and after each registry poll, finds the live session through `LiveSessions.bySessionId`, deletes the request, and calls `end()`, the path **End session** takes, so the session is not marked interrupted.
-  A request whose session the server does not follow yet stays for a later drain, and a file that is not a request, or whose name is not its session id, moves to `<name>.invalid`.
+  The inbox drains when the directory changes and after each registry poll, finds the live session through `LiveSessions.bySessionId`, calls `end()`, the path **End session** takes, so the session is not marked interrupted, then deletes the request.
+  A request whose session this server does not host yet stays for a later drain, and so does one for a session started in a terminal while another server owns the lock, since every server follows those; a file that is not a request, or whose name is not its session id, moves to `<name>.invalid`.
   With `removeWorktree`, it then calls `Worktrees.removeCheckout` on the session's worktree from `SessionFacts`, else its cwd, and logs the blockers of a checkout that stays, which **Settings → Worktrees** still lists.
 - `src/tickets.ts` also lists the workspace's Linear teams with their keys (`loadTeams`, `GET /api/linear/teams`) and opens an issue (`createTicket`, `PUT /api/ticket/new`), assigned to the viewer unless the draft names another assignee or `null`, with any fields the draft sets, from a todo or from the new-issue dialog (`web/components/tickets/new-ticket.tsx`), which `App` opens through `openNewTicket` in the dashboard context.
   The dialog's pills are the shared `FieldPicker` and `DuePicker` from `web/components/field-picker.tsx` with `look="chip"`, and `web/components/tickets/team-select.tsx` remembers the last team used, for the dialog and the todo's team select alike.
@@ -661,14 +688,22 @@ The server lives in `src/`:
 The page lives in `web/`.
 `src/server/page.ts` bundles `web/index.html` and `web/main.tsx` with `Bun.build`, and `bun-plugin-tailwind` compiles Tailwind v4:
 
-- `web/app.tsx`: the page shell, which holds the sidebars, the pane grid, the routes for a pull request's details, tickets, todo, calendar, routines, settings, and new-session pages, and focus handling.
+- `web/app.tsx`: the page shell.
+  It builds the two dashboard contexts and lays out the sidebars, the page, the command palette, and the dialogs, and leaves each slice of state to a hook of its own.
+  `web/use-workspace.ts` holds the visible sessions, the projects, the selected project, and its inbox poll.
+  `web/use-focused-session.ts` holds the focused pane's session, the document title, and the sidebar following a `/move`.
+  `web/use-session-lists.ts` holds the Sessions tab's lists, search, and pins, and `web/use-sidebar-tab.ts` the tab and `showTab`.
+  `web/use-overlays.ts` holds the shortcuts dialog, the command palette, the file dialog, and the new-ticket dialog.
+  `web/use-transcript-display.ts` holds how transcripts show tool calls and thinking, and `web/use-page-shortcuts.ts` the page-wide shortcuts and the commands the palette runs.
+  `web/components/app-sidebar.tsx` wires the roster to the page, `web/components/page-switch.tsx` picks the page or the panes, and `web/components/pane-grid.tsx` lays out the panes.
   `#inbox` alone shows the inbox page, and the sidebar's Inbox tab then lists its sections.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which runs in the background.
-- `web/pane-store.ts`: each open view's transcript, changed files, images, and completions, outside the page state, so a token in one pane re-renders only that pane.
-  It and `web/polled-store.ts` share `web/keyed-store.ts`, one snapshot and subscription per key.
-  It and the page state apply the server's list updates through `applyDelta` in `web/keyed-list.ts`, which keeps every entry an update leaves alone as the same object.
+- `web/pane-store.ts`: each open view's transcript, changed files, images, and completions, outside the page state.
+  A component reads one field through a selector hook (`useTranscript`, `useChangedFiles`, `useMedia`, `useComposerData`, `useTurnCount`, …), built on `useSelect` in `web/keyed-store.ts`, which `web/polled-store.ts` shares, one snapshot and subscription per key, and renders again only when that field changes, so a streamed token renders the transcript and what reads `items`, and not the pane, the composer, or the details.
+  `toBlocks` in `web/transcript-view.ts` keeps the blocks that a token leaves alone as the same objects, and the transcript's rows are memoized on them.
+  It and the page state apply the server's list updates, the roster's and the past sessions', through `applyDelta` in `web/keyed-list.ts`, which keeps every entry an update leaves alone as the same object.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/inbox-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, `web/calendar-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
 - `web/changes-model.ts`: the changes page's explorer tree, the diff's folded runs, and the file view's gutter marks; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines.
@@ -704,7 +739,9 @@ The page lives in `web/`.
   `useRead` reads one URL, such as the pull request or the Linear issue the main content shows, the settings page's model catalog, or the new-session draft's model list.
   `useReplaceableRead` shows the version a save answered until that URL is read again.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, one for the MCP integrations, one for the Google calendars shown, and one for the Calendar page's Google events, with one entry per month.
+  A read in flight belongs to its entry: a new read of an entry replaces only the read of that entry in flight, and the components that poll one entry share one timer, which starts with the first and stops with the last.
   `web/app.tsx` polls the inbox instead, on every page once the sessions are listed, for the Inbox tab's count, and the sidebar's inbox reads that entry.
+  The composer's `@` menu reads the inbox entry that `inboxScope` in the status context names, the one `web/app.tsx` polls, so it starts no poll of its own and never reads the all-projects entry, which asks GitHub about every repository, in place of the selected project's.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes; the picker button and its searchable list, and the due date's, live in `web/components/field-picker.tsx`, which the Todo page shares, with an open state its owner can hold so a key opens it, and digits that pick a choice.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft's branch picker.
   `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the inbox and tickets also show.
@@ -714,7 +751,8 @@ The page lives in `web/`.
   `web/components/skill-picker.tsx` is the skill picker that the settings' pinned skill and the routine editor share.
   The checkout, the default model, and the skills are each one `useRead`.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
-  Shortcuts with a `command` title are also the command palette's commands, and `web/app.tsx` hands the palette the same handlers it gives `useShortcuts`.
+  One `keydown` listener on the window serves every `useShortcuts` registration, which `createShortcutStack` orders: the registration that mounted last tries a key first, and the first handler that takes it ends the press, so a page's own bindings come before `web/use-page-shortcuts.ts`'s, which `web/app.tsx` mounts first, and a handler that returns `false` lets the key fall to the one below.
+  Shortcuts with a `command` title are also the command palette's commands, and `web/app.tsx` hands the palette the same handlers it registers.
 - `web/command-palette.ts`: the command palette's model, which renders nothing: its items and their actions, the reducer over its stack of views and its action panel, and the ranking, which multiplies cmdk's match score by a frecency boost kept in localStorage.
   `web/components/command-palette/` draws it, opened from the sidebar header or with Cmd+K: the dialog and its list, the action panel that Cmd+K opens on the highlighted entry, and the footer.
   `web/session-actions.ts` lists what can be done to a session, which both a sidebar row's menu and the palette offer.
@@ -722,11 +760,13 @@ The page lives in `web/`.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
 - `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the session details tab, the sidebar's project, the pinned skill, the inbox's order, and how often and how lately each command palette entry ran; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the inbox's and tickets page's folded sections.
   Every component that holds the same key sees a change at once, so the inbox page and its sidebar index share their folds and order.
+  A component keeps one key for as long as it is mounted.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
+- `web/project.ts`: `useProject`, the sidebar's selected project, kept in localStorage, which `web/use-workspace.ts` uses to scope the sidebar and the inbox.
 - `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab, and `web/components/section-link.tsx` the section link that the tickets list and the inbox's section index share.
   `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more.
-  `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed; their ages count up on the page's one minute timer.
+  `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed; the row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
   `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab, the calendar and then the routines by name.
 - `web/components/toaster.tsx`: `toasts`, the page's one Base UI toast manager, which shows a toast from anywhere without rendering its caller again, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
   `web/components/notices.tsx` holds `NoticesBell`, the roster header's bell and its list, and `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once, even with the sidebar hidden.
@@ -750,7 +790,8 @@ The page lives in `web/`.
   `composer.tsx` holds `blockedShortcut`, `ComposerNote`, and `EmptyConversation`, which the new-session draft and the pages share, and `page-header.tsx` the `Header` every page uses.
   `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeTextarea` and `afterActions` slots.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
-- `web/components/dashboard-context.tsx`: the stable dashboard actions (`send`, `open`, `start`, `end`, …) and the last start of each kind, provided once by `App`, which the sidebar, the panes, and the pages read instead of taking them as props.
+- `web/components/dashboard-context.tsx`: two contexts that `App` provides and the sidebar, the panes, and the pages read instead of taking props: the actions (`send`, `open`, `start`, `end`, …), which keep one identity for the page's life, and the status, which holds the connection, the last start of each kind, and `inboxScope`; a component that reads only the actions never renders for a change of the status.
+  `MentionListsContext` carries the lists of the composer's `@` menu apart from both.
 - `web/components/session-details.tsx`: the right sidebar's tabs for the focused pane: `outline-tab.tsx`, its turns from `outline` in `web/transcript-view.ts`, which scroll the focused pane's transcript to their prompt or reply and mark the turn its scroll is on; its changed files; `media-tab.tsx`, its images and their viewer; and `pull-requests-tab.tsx`, its session's pull requests, each shown through `PullRequestDetails` from `web/components/inbox/pr-page.tsx`.
 - `web/components/changes/`: the changes page, `changes-page.tsx`, with its explorer and editor, `changes-explorer.tsx`, which a pull request's **Code** tab shows too, the explorer's tree, `file-tree.tsx`, and its Diff and File views, `code-view.tsx`.
 - `web/components/inbox/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.

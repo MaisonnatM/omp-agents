@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SidebarGroup } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { age } from "../labels";
-import { useDashboardContext } from "./dashboard-context";
+import { useDashboardActions } from "./dashboard-context";
 
 const agentName = (media: AgentMedia): string => media.agentId ?? "Main agent";
 
@@ -19,7 +19,7 @@ const mediaKey = (media: AgentMedia): string => `${media.agentId}:${media.at}:${
 
 /** One image large, with what took it, the images before and after it, and a way to the agent's conversation. */
 function MediaViewer({ media, index, view, onShow }: { media: AgentMedia[]; index: number; view: View; onShow: (key: string | null) => void }) {
-	const { open } = useDashboardContext();
+	const { open } = useDashboardActions();
 	const shown = media[index]!;
 	const step = (by: 1 | -1): void => onShow(mediaKey(media[Math.min(media.length - 1, Math.max(0, index + by))]!));
 	const agentView: View | null = view.kind === "live" && shown.agentId !== view.agentId ? { ...view, agentId: shown.agentId } : null;

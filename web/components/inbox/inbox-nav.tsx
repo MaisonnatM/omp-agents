@@ -13,7 +13,7 @@ import { inboxStore } from "../../reads";
 import { hashForInbox, type InboxRoute } from "../../routing";
 import type { SectionTarget } from "../../section";
 import { DROP_LINE, useDragOrder } from "../../use-drag-order";
-import { useDashboardContext } from "../dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton } from "../fold";
 import { QuickStartNotice } from "../quick-actions";
 import { SectionLink } from "../section-link";
@@ -109,7 +109,8 @@ interface InboxNavProps {
  * project, by repository in sections named after whose move it is, read from GitHub.
  */
 export function InboxNav({ project, hosts, past, route }: InboxNavProps) {
-	const { dismissStart, starts: { quick } } = useDashboardContext();
+	const { dismissStart } = useDashboardActions();
+	const { starts: { quick } } = useDashboardStatus();
 	const board = useInboxBoard({ project, hosts, past, route });
 	const { read, error, refreshing } = board.poll;
 	return (

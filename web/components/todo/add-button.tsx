@@ -4,7 +4,7 @@ import { addTodo } from "../../../src/user-todos";
 import type { UserTodoLink } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { useDashboardContext } from "../dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 
 /** How long the button shows that it added the todo. */
 const ADDED_MS = 2000;
@@ -22,7 +22,8 @@ interface AddToTodoProps {
 
 /** Adds a todo of no category, last in your list, that links to what the row shows. */
 export function AddToTodo({ text, body, link, label }: AddToTodoProps) {
-	const { changeTodo, connected } = useDashboardContext();
+	const { changeTodo } = useDashboardActions();
+	const { connected } = useDashboardStatus();
 	const [added, setAdded] = useState(false);
 	useEffect(() => {
 		if (!added) return;

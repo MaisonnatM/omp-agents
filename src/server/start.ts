@@ -96,7 +96,8 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 		const outcome = await spawnFor(request);
 		if ("error" in outcome) return { ok: false, error: outcome.error };
 		const { session, prompt, first } = outcome.started;
-		sessions.add(session, request.kind === "new" ? request.subject : null);
+		// A session whose omp exited since it spawned would stay in the roster with no one to remove it.
+		if (!sessions.add(session, request.kind === "new" ? request.subject : null)) return { ok: false, error: "omp exited as the session started." };
 		// The todo links first, so the session's first turn already knows the todo it works on.
 		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
 		// The new session's first message goes in once it is in the registry, where its events find their view.

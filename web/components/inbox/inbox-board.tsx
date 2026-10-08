@@ -1,7 +1,7 @@
 /** What the inbox's two lists share, the sidebar's and the page's: their state, their keys, and the board they render. */
 import { ArrowDownUp, Unplug } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
-import { pullRequestActions } from "../../../src/pull-request-actions";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { type Inbox, type InboxPullRequest, type PullRequest, prKey, pullRequestUrl, type RepoInbox, repoKey, samePullRequest } from "../../../src/shared/github";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,7 @@ import { type SectionTarget, sectionId } from "../../section";
 import { useShortcuts } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { type DragItem, useDragOrder } from "../../use-drag-order";
-import { useDashboardContext } from "../dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { type Folds, useFolds, useReveal } from "../fold";
 import { type RowProps, rowElement, rowId, rowLink, sessionsFor } from "./pr-row";
 
@@ -252,20 +252,22 @@ interface BoardProps {
  */
 export function useInboxBoard({ project, hosts, past, route }: BoardProps): InboxBoard {
 	const { target } = route;
-	const { open, start, starts: { quick } } = useDashboardContext();
+	const targetKey = target ? prKey(target) : null;
+	const { open, start } = useDashboardActions();
+	const { starts: { quick } } = useDashboardStatus();
 	const poll = inboxStore.use(project);
 	const { read } = poll;
+	const inbox = read?.data ?? null;
 	const folds = useInboxFolds();
 	const [order, setOrder] = useInboxOrder();
 	const drag = useDragOrder();
-	const moves = new Map<string, Move>();
-	const agent = agentOn(hosts);
-	const place = read && target ? placeOf(read.data, target, agent) : null;
+	const agent = useMemo(() => agentOn(hosts), [hosts]);
+	const place = useMemo(() => (inbox && target ? placeOf(inbox, target, agent) : null), [inbox, targetKey, agent]);
 	const reveal = target && place ? { id: rowId(target), folds: [place.repo, place.section] } : null;
 	useReveal(reveal, folds, { token: reveal?.id, block: "nearest", focus: false });
 	/** Starts the quick action that makes `pr`'s move, the one its row's menu would; `false` when no action makes it. */
 	const giveToAgent = (pr: PullRequest): boolean => {
-		const listed = read && listedPullRequest(read.data, pr);
+		const listed = inbox && listedPullRequest(inbox, pr);
 		const action = listed && moveAction(listed.pr, moveOf(listed.pr, agent(listed.pr)));
 		if (!listed || !action) return false;
 		start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()));
@@ -278,85 +280,96 @@ export function useInboxBoard({ project, hosts, past, route }: BoardProps): Inbo
 		setActionsOpen(rowId(pr));
 		return true;
 	};
-	useTriageKeys(read ? shownPullRequests(read.data, folds.isFolded, order, agent) : [], route, giveToAgent, openActions);
-	useMoveKeys(moves);
+	// The functions every row shares, so a row's props change only with what the row shows.
+	const onQuickAction = useCallback((pr: InboxPullRequest, cwd: string, action: PullRequestActionId) => start(pullRequestStart(pr, action, cwd, readPinnedSkill())), [start]);
+	const onActionsOpenChange = useCallback((pr: PullRequest, next: boolean) => setActionsOpen(next ? rowId(pr) : null), []);
+	const shown = useMemo(() => (inbox ? shownPullRequests(inbox, folds.isFolded, order, agent) : []), [inbox, folds.isFolded, order, agent]);
+	useTriageKeys(shown, route, giveToAgent, openActions);
 
-	const repos = read ? orderedRepos(read.data.repos, order) : [];
-	const repoKeys = repos.map(repoKey);
+	const repos = useMemo(() => (inbox ? orderedRepos(inbox.repos, order) : []), [inbox, order]);
+	const sectionsOf = useMemo(() => repos.map(repo => ("error" in repo ? [] : inboxSections(repo.pullRequests, order, agent))), [repos, order, agent]);
 	// The page shows its pull requests in this order now; placing one by hand starts the manual sort from it.
-	const shownOrder = order.sort === "manual" && order.manual.length > 0
-		? order.manual
-		: repos.flatMap(repo => ("error" in repo ? [] : inboxSections(repo.pullRequests, order, agent).flatMap(({ rows }) => rows.map(row => prKey(row.pr)))));
-	const moveRepo = (key: string, beside: string, where: Where): void => setOrder(withRepoMoved(order, repoKeys, key, beside, where));
-	const moveSection = (title: string, beside: string, where: Where): void => setOrder({ ...order, sections: moveKey(sectionTitles(order), title, beside, where) });
+	const shownOrder = useMemo(
+		() => (order.sort === "manual" && order.manual.length > 0 ? order.manual : sectionsOf.flatMap(sections => sections.flatMap(({ rows }) => rows.map(row => prKey(row.pr))))),
+		[order, sectionsOf],
+	);
+	const { views, moves } = useMemo(() => {
+		const moves = new Map<string, Move>();
+		const repoKeys = repos.map(repoKey);
+		const moveRepo = (key: string, beside: string, where: Where): void => setOrder(withRepoMoved(order, repoKeys, key, beside, where));
+		const moveSection = (title: string, beside: string, where: Where): void => setOrder({ ...order, sections: moveKey(sectionTitles(order), title, beside, where) });
 
-	const repoView = (repo: RepoInbox): RepoView => {
-		const key = repoKey(repo);
-		const moveId = `repo:${key}`;
-		moves.set(moveId, by => {
-			const step = stepTarget(repoKeys, key, by);
-			if (step) moveRepo(key, step.target, step.where);
-			return step !== null;
-		});
-		const sections = "error" in repo ? [] : inboxSections(repo.pullRequests, order, agent);
-		const titles = sections.map(({ title }) => title);
-		return {
-			repo,
-			key,
-			name: `${repo.owner}/${repo.repo}`,
-			bodyId: sectionId("inbox", key),
-			open: !folds.isFolded(key),
-			toggle: () => folds.toggle(key),
-			drag: drag("repos", key, (dragged, where) => moveRepo(dragged, key, where)),
-			moveId,
-			sections: sections.map((section): SectionView => {
-				const foldKey = sectionFoldKey(key, section.title);
-				const sectionOpen = !folds.isFolded(foldKey);
-				const sectionMoveId = `section:${foldKey}`;
-				moves.set(sectionMoveId, by => {
-					const step = stepTarget(titles, section.title, by);
-					if (step) moveSection(section.title, step.target, step.where);
-					return step !== null;
-				});
-				const units = [...new Set(section.rows.map(({ unit }) => unit))];
-				const placeUnit = (unit: string, beside: string, where: Where): void =>
-					setOrder({ ...order, sort: "manual", manual: placedManual(shownOrder, repo, sections, section.title, unit, beside, where) });
-				return {
-					section,
-					foldKey,
-					listId: sectionId("inbox", key, section.title),
-					open: sectionOpen,
-					toggle: () => folds.toggle(foldKey),
-					summary: sectionOpen ? null : movesSummary(section),
-					drag: drag(`sections:${key}`, section.title, (dragged, where) => moveSection(dragged, section.title, where)),
-					moveId: sectionMoveId,
-					rows: section.rows.map((row, at): RowProps => {
-						const rowItem = drag(`pull-requests:${foldKey}`, row.unit, (dragged, where) => placeUnit(dragged, row.unit, where));
-						// A stack takes a drop as one: the line shows above its top row or under its bottom one.
-						const edge = rowItem.dropAt === "before" ? section.rows[at - 1] : section.rows[at + 1];
-						const rowMoveId = `pull-request:${prKey(row.pr)}`;
-						moves.set(rowMoveId, by => {
-							const step = stepTarget(units, row.unit, by);
-							if (step) placeUnit(row.unit, step.target, step.where);
-							return step !== null;
-						});
-						return {
-							row,
-							sessions: sessionsFor(row.pr, hosts, past),
-							targeted: target !== null && samePullRequest(row.pr, target),
-							onOpen: open,
-							pending: pendingOf(quick, { kind: "pull-request", pr: row.pr }),
-							onQuickAction: action => start(pullRequestStart(row.pr, action, repo.cwds[0]!, readPinnedSkill())),
-							actionsOpen: actionsOpen === rowId(row.pr),
-							onActionsOpenChange: next => setActionsOpen(next ? rowId(row.pr) : null),
-							drag: { ...rowItem, dropAt: edge?.unit === row.unit ? null : rowItem.dropAt },
-							moveId: rowMoveId,
-						};
-					}),
-				};
-			}),
+		const repoView = (repo: RepoInbox, at: number): RepoView => {
+			const key = repoKey(repo);
+			const moveId = `repo:${key}`;
+			moves.set(moveId, by => {
+				const step = stepTarget(repoKeys, key, by);
+				if (step) moveRepo(key, step.target, step.where);
+				return step !== null;
+			});
+			const sections = sectionsOf[at]!;
+			const titles = sections.map(({ title }) => title);
+			return {
+				repo,
+				key,
+				name: `${repo.owner}/${repo.repo}`,
+				bodyId: sectionId("inbox", key),
+				open: !folds.isFolded(key),
+				toggle: () => folds.toggle(key),
+				drag: drag("repos", key, (dragged, where) => moveRepo(dragged, key, where)),
+				moveId,
+				sections: sections.map((section): SectionView => {
+					const foldKey = sectionFoldKey(key, section.title);
+					const sectionOpen = !folds.isFolded(foldKey);
+					const sectionMoveId = `section:${foldKey}`;
+					moves.set(sectionMoveId, by => {
+						const step = stepTarget(titles, section.title, by);
+						if (step) moveSection(section.title, step.target, step.where);
+						return step !== null;
+					});
+					const units = [...new Set(section.rows.map(({ unit }) => unit))];
+					const placeUnit = (unit: string, beside: string, where: Where): void =>
+						setOrder({ ...order, sort: "manual", manual: placedManual(shownOrder, repo, sections, section.title, unit, beside, where) });
+					return {
+						section,
+						foldKey,
+						listId: sectionId("inbox", key, section.title),
+						open: sectionOpen,
+						toggle: () => folds.toggle(foldKey),
+						summary: sectionOpen ? null : movesSummary(section),
+						drag: drag(`sections:${key}`, section.title, (dragged, where) => moveSection(dragged, section.title, where)),
+						moveId: sectionMoveId,
+						rows: section.rows.map((row, at): RowProps => {
+							const rowItem = drag(`pull-requests:${foldKey}`, row.unit, (dragged, where) => placeUnit(dragged, row.unit, where));
+							// A stack takes a drop as one: the line shows above its top row or under its bottom one.
+							const edge = rowItem.dropAt === "before" ? section.rows[at - 1] : section.rows[at + 1];
+							const rowMoveId = `pull-request:${prKey(row.pr)}`;
+							moves.set(rowMoveId, by => {
+								const step = stepTarget(units, row.unit, by);
+								if (step) placeUnit(row.unit, step.target, step.where);
+								return step !== null;
+							});
+							return {
+								row,
+								sessions: sessionsFor(row.pr, hosts, past),
+								targeted: targetKey !== null && prKey(row.pr) === targetKey,
+								onOpen: open,
+								pending: pendingOf(quick, { kind: "pull-request", pr: row.pr }),
+								cwd: repo.cwds[0]!,
+								onQuickAction,
+								actionsOpen: actionsOpen === rowId(row.pr),
+								onActionsOpenChange,
+								drag: { ...rowItem, dropAt: edge?.unit === row.unit ? null : rowItem.dropAt },
+								moveId: rowMoveId,
+							};
+						}),
+					};
+				}),
+			};
 		};
-	};
+		return { views: repos.map(repoView), moves };
+	}, [repos, sectionsOf, shownOrder, order, setOrder, folds, drag, hosts, past, targetKey, open, quick, actionsOpen, onQuickAction, onActionsOpenChange]);
+	useMoveKeys(moves);
 
 	return {
 		poll,
@@ -365,6 +378,6 @@ export function useInboxBoard({ project, hosts, past, route }: BoardProps): Inbo
 		onSort: sort => setOrder({ ...order, sort, manual: sort === "manual" ? shownOrder : order.manual }),
 		onReset: () => setOrder(DEFAULT_ORDER),
 		folds,
-		repos: repos.map(repoView),
+		repos: views,
 	};
 }

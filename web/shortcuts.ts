@@ -1,4 +1,4 @@
-import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 
 export type ShortcutId =
 	| "interrupt"
@@ -295,23 +295,71 @@ export function pairing(): (event: KeyEvent & Pick<KeyboardEvent, "timeStamp">, 
 }
 
 /**
+ * Every `useShortcuts` of the page, tried for each key press by precedence: the highest rank first, and the first
+ * handler that takes the key ends the press. A rank is assigned when its component first renders, so a component
+ * renders after the ones that contain it and mounts after the ones already on the page: a page beats the App's
+ * shared bindings, and a dialog beats the page under it. Within one rank, {@link SHORTCUTS} order decides.
+ */
+export interface ShortcutStack {
+	/** Registers the handlers `read` returns at `rank`. Returns what removes them. */
+	add(rank: number, read: () => ShortcutHandlers): () => void;
+	/** Offers a key press to each registration in turn. `outside` is whether no text field has focus; `previous` is the key a G pair completes with. */
+	dispatch(event: HandledEvent, outside: boolean, previous: string | null): void;
+	readonly size: number;
+}
+
+export function createShortcutStack(): ShortcutStack {
+	const entries: { rank: number; read: () => ShortcutHandlers }[] = [];
+	return {
+		add(rank, read) {
+			const entry = { rank, read };
+			entries.push(entry);
+			entries.sort((a, b) => b.rank - a.rank);
+			return () => {
+				entries.splice(entries.indexOf(entry), 1);
+			};
+		},
+		dispatch(event, outside, previous) {
+			const inScope = (scope: Scope): boolean => scope === "anywhere" || (scope === "outside-fields" && outside);
+			for (const { read } of entries) {
+				if (event.defaultPrevented) return;
+				dispatch(event, read(), inScope, previous);
+			}
+		},
+		get size() {
+			return entries.length;
+		},
+	};
+}
+
+const stack = createShortcutStack();
+const nextKey = pairing();
+let ranks = 0;
+
+/** The page's one keydown listener, attached while any component registers shortcuts. */
+function onKeyDown(event: KeyboardEvent): void {
+	if (event.isComposing) return;
+	const outside = !typing(event.target);
+	stack.dispatch(event, outside, nextKey(event, outside));
+}
+
+/**
  * Runs `handlers` for page-wide shortcuts, and returns the key handler a composer's textarea attaches for `composer`
  * ones. That handler runs before the page-wide listener, so a composer binding wins over a page-wide one on the same key.
+ * Page-wide handlers share one window listener and try in the order of {@link ShortcutStack}.
  */
 export function useShortcuts(handlers: ShortcutHandlers): (event: ReactKeyboardEvent) => void {
 	const latest = useRef(handlers);
 	latest.current = handlers;
+	const [rank] = useState(() => ++ranks);
 	useEffect(() => {
-		const previousKey = pairing();
-		const onKeyDown = (event: KeyboardEvent): void => {
-			if (event.isComposing) return;
-			const outside = !typing(event.target);
-			const previous = previousKey(event, outside);
-			dispatch(event, latest.current, scope => scope === "anywhere" || (scope === "outside-fields" && outside), previous);
-		};
+		const remove = stack.add(rank, () => latest.current);
 		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, []);
+		return () => {
+			remove();
+			if (stack.size === 0) window.removeEventListener("keydown", onKeyDown);
+		};
+	}, [rank]);
 	return useCallback((event: ReactKeyboardEvent) => {
 		if (!event.nativeEvent.isComposing) dispatch(event, latest.current, scope => scope === "composer", null);
 	}, []);

@@ -11,21 +11,28 @@ const blank = (): DashboardState => initialState({ kind: "panes", layout: layout
 describe("dashboard state", () => {
 	test("a layout keeps the roster row of a pane that stays open, and the last row after it leaves the roster", () => {
 		const open = reduce(blank(), { t: "route", route: { kind: "panes", layout: layout([live("a")]) } });
-		const listed = reduce(open, { t: "roster", hosts: [host("a", "/work")], error: null });
+		const listed = reduce(open, { t: "roster", reset: true, hosts: [host("a", "/work")], removed: [], error: null });
 		expect(listed.lastHosts.get("a")?.cwd).toBe("/work");
-		const gone = reduce(listed, { t: "roster", hosts: [], error: null });
+		const gone = reduce(listed, { t: "roster", reset: false, hosts: [], removed: ["a"], error: null });
+		expect(gone.hosts).toEqual([]);
 		expect(gone.lastHosts.get("a")?.cwd).toBe("/work");
 		const closed = reduce(gone, { t: "route", route: { kind: "panes", layout: layout([]) } });
 		expect(closed.lastHosts.size).toBe(0);
 	});
 
-	test("a roster row that did not change stays the same object", () => {
-		const first = host("a", "/work");
-		const listed = reduce(blank(), { t: "roster", hosts: [first], error: null });
-		const again = reduce(listed, { t: "roster", hosts: [host("a", "/work")], error: null });
-		expect(again.hosts[0]).toBe(first);
-		const moved = reduce(again, { t: "roster", hosts: [host("a", "/other")], error: null });
-		expect(moved.hosts[0]?.cwd).toBe("/other");
+	test("a roster delta replaces or adds the rows it names, drops the removed, and leaves the rest as the same objects; a reset replaces them all", () => {
+		const [a, b] = [host("a", "/work"), host("b", "/other")];
+		const listed = reduce(blank(), { t: "roster", reset: true, hosts: [a, b], removed: [], error: null });
+		const moved = host("a", "/moved");
+		const delta = reduce(listed, { t: "roster", reset: false, hosts: [moved, host("c", "/new")], removed: ["b"], error: "registry down" });
+		expect(delta.hosts.map(row => row.cwd)).toEqual(["/moved", "/new"]);
+		expect(delta.hosts[0]).toBe(moved);
+		expect(delta.rosterError).toBe("registry down");
+		const untouched = reduce(listed, { t: "roster", reset: false, hosts: [], removed: [], error: null });
+		expect(untouched.hosts[0]).toBe(a);
+		expect(untouched.hosts[1]).toBe(b);
+		const again = reduce(delta, { t: "roster", reset: true, hosts: [b], removed: [], error: null });
+		expect(again.hosts).toEqual([b]);
 	});
 
 	test("the same panes stay the same objects, and a layout that names them again changes nothing", () => {

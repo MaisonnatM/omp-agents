@@ -13,7 +13,7 @@
  * The session's own bash calls tell which linked worktree it works in: a session started in a repository's main
  * checkout often adds a worktree and runs its commands there with bash's `cwd`.
  */
-import { existsSync } from "node:fs";
+import { access } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { WorktreeAt } from "./git";
 import { parseRemote } from "./github";
@@ -330,6 +330,8 @@ interface SessionScan {
 	branch: string | null;
 }
 
+const exists = (path: string): Promise<boolean> => access(path).then(() => true, () => false);
+
 /**
  * The linked worktree of `cwd`'s repository, other than the one `cwd` is in, that the most recent of `workDirs` in
  * one is in. Directories in `cwd`'s own checkout, outside git, or in another repository are passed over; a directory
@@ -340,7 +342,7 @@ async function workingWorktree(cwd: string, workDirs: readonly string[], worktre
 	const own = await worktreeAt(cwd);
 	if (!own) return null;
 	for (const dir of workDirs) {
-		if (!existsSync(dir)) return null;
+		if (!(await exists(dir))) return null;
 		const at = await worktreeAt(dir);
 		if (at && at.top !== own.top && at.common === own.common) return at.top;
 	}
@@ -461,9 +463,9 @@ export class SessionFactsIndex {
 		});
 		// A session that wrote to its transcript may have switched its worktree's branch since: two `git` calls per writing session's directory per refresh.
 		const checkouts = await Promise.all(
-			touched.map(session => {
+			touched.map(async session => {
 				const dir = session.worktree ?? session.cwd;
-				return existsSync(dir) ? worktreeAt(dir) : null;
+				return (await exists(dir)) ? worktreeAt(dir) : null;
 			}),
 		);
 		touched.forEach((session, i) => {
@@ -499,7 +501,7 @@ export class SessionFactsIndex {
 		const workDirs = [...own.workDirs].reverse().map(dir => (dir === "~" || dir.startsWith("~/") ? HOME + dir.slice(1) : resolve(cwd, dir)));
 		const before = session.workDirs;
 		const same = workDirs.length === before.length && workDirs.every((dir, i) => dir === before[i]);
-		const moved = !same || (session.worktree !== null && !existsSync(session.worktree));
+		const moved = !same || (session.worktree !== null && !(await exists(session.worktree)));
 		session.workDirs = workDirs;
 		const ticketsChanged = this.#gather(session);
 		return { session, changed: shipChanged || ticketsChanged, moved };

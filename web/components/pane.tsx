@@ -5,12 +5,11 @@ import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/s
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { usePane } from "../pane-store";
 import type { ModelList } from "../reads";
 import { shortcutLabels } from "../shortcuts";
 import type { ForkPoint } from "../transcript-view";
 import { Conversation } from "./conversation";
-import { useDashboardContext } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 import { PastConversation } from "./past-conversation";
 import { SidebarToggle } from "./sidebar-panel";
@@ -39,12 +38,12 @@ interface PaneProps {
 const paneArea = (index: number, count: number): string =>
 	count === 3 && index === 2 ? "2 / 1 / 3 / 3" : `${Math.floor(index / 2) + 1} / ${(index % 2) + 1}`;
 
-/** Its own external-store subscription means another pane's token never asks this pane to render. */
+/** It reads none of its view's data, which `Conversation` and `Transcript` read by field, so a streamed token never asks this pane to render. */
 export const Pane = memo(function Pane({
 	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models, workspaces, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
-	const { send, start, focus, open, end, starts: { fork, resume } } = useDashboardContext();
-	const { items, loaded, completions, dequeued, files } = usePane(view);
+	const { send, start, focus, open, end } = useDashboardActions();
+	const { fork, resume } = useDashboardStatus().starts;
 	const instanceId = view.kind === "live" ? view.instanceId : null;
 	const agents = host?.agents;
 	const writable = host?.control.phase === "live" && !host.control.readOnly;
@@ -81,21 +80,16 @@ export const Pane = memo(function Pane({
 		</>
 	);
 	const content = view.kind === "past" ? (
-		<PastConversation sessionId={view.sessionId} session={session} items={items} fork={fork} onFork={onFork} resume={resume} onResume={onResume} actions={actions} />
+		<PastConversation sessionId={view.sessionId} session={session} fork={fork} onFork={onFork} resume={resume} onResume={onResume} actions={actions} />
 	) : (
 		<Conversation
 			view={view}
 			host={host}
 			lastHost={lastHost}
-			items={items}
-			loaded={loaded}
 			initialDraft={initialDraft}
 			fork={fork}
 			onFork={onFork}
-			completions={completions}
-			changed={files ?? []}
 			models={models}
-			dequeued={dequeued}
 			send={send}
 			onEnd={end}
 			actions={actions}

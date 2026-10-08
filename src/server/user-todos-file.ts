@@ -20,6 +20,11 @@ export class UserTodosFile {
 		return this.#list;
 	}
 
+	/** Reads the file again, for a server that takes over from one that kept saving since this one started. */
+	reload(): void {
+		this.#list = this.#file.load() ?? this.#list;
+	}
+
 	/** Applies `change` and saves the list; whether it changed. */
 	apply(change: UserTodoChange): boolean {
 		const next = applyUserTodo(this.#list, change);

@@ -5,7 +5,7 @@ import { completionTrigger, type MentionToken } from "../completion-trigger";
 import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
 import type { Completions } from "../pane-store";
 import { inboxStore, ticketsStore } from "../reads";
-import { useMentionLists } from "./dashboard-context";
+import { useDashboardStatus, useMentionLists } from "./dashboard-context";
 
 export function CompletionPopup({ id, sections, active, onPick, error }: {
 	id: string;
@@ -61,23 +61,26 @@ export function CompletionPopup({ id, sections, active, onPick, error }: {
 }
 
 interface CompletionOptions {
+	/** The composer's `InputMessage` element, whose textarea the caret is read from; the caller owns it, so the keys it handles can reach it before this hook runs. */
+	composerRef: RefObject<HTMLDivElement | null>;
 	draft: string;
 	setDraft: (text: string) => void;
 	/** The server's last answer to this composer's `complete`. */
 	completions: Completions | null;
 	onComplete: (reqId: number, text: string, cursor: number) => void;
-	/** The composer's own keys, which run while no list is open. */
-	onKeyDown?: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void;
 	composer: Composer;
 }
 
 interface Completion {
-	/** For the composer's `InputMessage`, whose textarea the caret is read from. */
-	composerRef: RefObject<HTMLDivElement | null>;
 	/** The open list, placed just before the composer. */
 	popup: ReactNode;
 	onValueChange: (text: string) => void;
 	textareaProps: TextareaHTMLAttributes<HTMLTextAreaElement>;
+	/**
+	 * Runs the open list's keys: Esc, the arrows, Tab, and Enter. Returns whether the list owns the key, so the composer's
+	 * own keys run only when it does not: while no list is open, during composition, and for Shift+Tab.
+	 */
+	onMenuKeyDown: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => boolean;
 	close: () => void;
 }
 
@@ -86,19 +89,19 @@ interface Completion {
  * arrows, Tab, and Enter. Live sessions and the new-session draft share it, so both offer the same commands and skills.
  * The `@` menu adds todos, tickets, pull requests, and sessions to omp's files; it asks the server only for files.
  */
-export function useCompletion({ draft, setDraft, completions, onComplete, onKeyDown, composer }: CompletionOptions): Completion {
+export function useCompletion({ composerRef, draft, setDraft, completions, onComplete, composer }: CompletionOptions): Completion {
 	/** The `@` token the open list answers, `null` for `/`, and the `complete` request whose answer it shows, if it sent one. */
 	const [menu, setMenu] = useState<{ token: MentionToken | null; reqId: number | null } | null>(null);
 	const [active, setActive] = useState(0);
 	const nextId = useRef(0);
-	const composerRef = useRef<HTMLDivElement>(null);
 	const popupId = useId();
 	const lists = useMentionLists();
 
 	const token = menu?.token ?? null;
 	const query = token && mentionQuery(token);
 	const tickets = ticketsStore.usePolling(null, query !== null && wants(query, "ticket")).read?.data.tickets ?? [];
-	const inbox = inboxStore.usePolling(null, query !== null && wants(query, "pull-request")).read?.data.repos ?? [];
+	// The pull requests are the project's entry that `App` polls; the unscoped read would ask GitHub about every repository.
+	const inbox = inboxStore.use(useDashboardStatus().inboxScope).read?.data.repos ?? [];
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	const sections: MenuSection[] =
 		menu === null
@@ -136,7 +139,6 @@ export function useCompletion({ draft, setDraft, completions, onComplete, onKeyD
 	};
 
 	return {
-		composerRef,
 		popup: menu !== null && <CompletionPopup id={popupId} sections={sections} active={shown} error={answer?.error ?? null} onPick={pick} />,
 		onValueChange: text => {
 			setDraft(text);
@@ -151,19 +153,20 @@ export function useCompletion({ draft, setDraft, completions, onComplete, onKeyD
 			onKeyUp: event => {
 				if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) suggest(draft, event.currentTarget.selectionStart);
 			},
-			onKeyDown: event => {
-				if (menu === null || event.nativeEvent.isComposing || (event.key === "Tab" && event.shiftKey)) return onKeyDown?.(event);
-				if (event.key === "Escape") {
-					event.preventDefault();
-					setMenu(null);
-				} else if (options.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
-					event.preventDefault();
-					setActive(index => (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length);
-				} else if (options.length && (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey))) {
-					event.preventDefault();
-					pick(options[shown]);
-				}
-			},
+		},
+		onMenuKeyDown: event => {
+			if (menu === null || event.nativeEvent.isComposing || (event.key === "Tab" && event.shiftKey)) return false;
+			if (event.key === "Escape") {
+				event.preventDefault();
+				setMenu(null);
+			} else if (options.length && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+				event.preventDefault();
+				setActive(index => (index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length);
+			} else if (options.length && (event.key === "Tab" || (event.key === "Enter" && !event.shiftKey))) {
+				event.preventDefault();
+				pick(options[shown]);
+			}
+			return true;
 		},
 		close: () => setMenu(null),
 	};

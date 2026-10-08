@@ -14,7 +14,7 @@ import type { SectionTarget } from "../../section";
 import type { StartOf } from "../../starts";
 import { shortcutLabels } from "../../shortcuts";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
-import { useDashboardContext } from "../dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton, useFolds, useReveal } from "../fold";
 import { DetailPage, ListPage, PageFrame } from "../list-page";
 import { DetailQuickActions, QuickStartNotice } from "../quick-actions";
@@ -87,7 +87,8 @@ interface TicketsPageProps {
 
 /** The viewer's assigned Linear issues by workflow state, as Linear's My issues lists them. */
 export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
-	const { open, start: startSession, dismissStart, openNewTicket, starts: { quick } } = useDashboardContext();
+	const { open, start: startSession, dismissStart, openNewTicket } = useDashboardActions();
+	const { starts: { quick } } = useDashboardStatus();
 	const poll = ticketsStore.usePolling();
 	const tickets = poll.read?.data.tickets ?? [];
 	const [version, setVersion] = useState(0);

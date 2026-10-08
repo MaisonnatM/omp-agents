@@ -1,15 +1,15 @@
-import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Project } from "../../src/shared/projects";
 import type { Delivery, LiveView, PromptImage, RosterHost } from "../../src/shared/sessions";
-import type { ChangedFile, Item } from "../../src/shared/transcript";
+import type { ChangedFile } from "../../src/shared/transcript";
 import { InputMessage } from "@/components/ui/input-message";
 import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
 import { projectName } from "../labels";
-import type { Completions } from "../pane-store";
+import { useChangedFiles, useComposerData, useNextSuggestions } from "../pane-store";
 import type { ModelList } from "../reads";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
-import { type ForkPoint, nextSuggestions } from "../transcript-view";
+import type { ForkPoint } from "../transcript-view";
 import type { Dashboard } from "../use-dashboard";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation } from "./composer";
@@ -27,26 +27,21 @@ import { DirectoryPicker } from "./workspace-picker";
 
 const STEER_KEYS = shortcutKeys("steer");
 
+/** The changed files before the server sent any, one array so the composer's menu is not rebuilt for it. */
+const NO_FILES: ChangedFile[] = [];
+
 interface ConversationProps {
 	view: LiveView;
 	/** Current roster row, or `null` once the session has left the roster. */
 	host: RosterHost | null;
 	/** Last known row, for the header after the session ended. */
 	lastHost: RosterHost | null;
-	items: Item[];
-	/** Whether `items` arrived, so an empty list is a conversation with no messages and not one still loading. */
-	loaded: boolean;
 	/** Composer text on mount, from a fork. */
 	initialDraft: string;
 	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
-	completions: Completions | null;
-	/** The files the view's agent changed, which the composer's `@` offers first. */
-	changed: ChangedFile[];
 	/** The last model list the server sent for this session; nothing while none has arrived. */
 	models: ModelList;
-	/** The server's last answer to this view's `dequeue`. */
-	dequeued: { reqId: number; texts: string[] } | null;
 	send: Dashboard["send"];
 	/** End running session `instanceId`, as the header's End session and its shortcut do. */
 	onEnd: (instanceId: string) => void;
@@ -81,15 +76,10 @@ function LiveConversation({
 	view,
 	host,
 	lastHost,
-	items,
-	loaded,
 	initialDraft,
 	fork,
 	onFork,
-	completions,
-	changed,
 	models,
-	dequeued,
 	send,
 	onEnd,
 	actions,
@@ -97,6 +87,9 @@ function LiveConversation({
 	workspaces,
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
+	const composerRef = useRef<HTMLDivElement>(null);
+	const { completions, dequeued } = useComposerData(view);
+	const changed = useChangedFiles(view) ?? NO_FILES;
 	const [draft, setDraft] = useState(initialDraft);
 	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
@@ -109,9 +102,17 @@ function LiveConversation({
 	const thinking = shown?.thinkingLevel ?? null;
 	const instanceId = view.instanceId;
 	const editPrompt = useCallback((entryId: string, text: string) => send({ t: "edit-prompt", instanceId, entryId, text }), [instanceId, send]);
+	const completion = useCompletion({
+		composerRef,
+		draft,
+		setDraft,
+		completions,
+		onComplete: (reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "live", view }, text, cursor }),
+		composer: { sessionId: shown?.sessionId ?? null, changed },
+	});
 
 	const switchingModel = !!switchable && switchable.switching;
-	const textarea = () => completion.composerRef.current?.querySelector("textarea");
+	const textarea = () => composerRef.current?.querySelector("textarea");
 	const { queued, take } = useQueue({
 		waiting: subject.queue,
 		dequeued,
@@ -121,9 +122,11 @@ function LiveConversation({
 			textarea()?.focus();
 		},
 	});
-	// The focused pane's composer takes the keyboard once it can be typed in: when the view opens, and when it goes live.
+	// The focused pane's composer takes the keyboard once it can be typed in: when the view opens, and when it goes live, not when focus moves.
+	const focusedNow = useRef(focused);
+	focusedNow.current = focused;
 	useEffect(() => {
-		if (focused && writable) textarea()?.focus();
+		if (focusedNow.current && writable) textarea()?.focus();
 	}, [writable]);
 	// Queued messages come back into the composer instead of running after the interrupt.
 	const interrupt = (): void => {
@@ -145,7 +148,7 @@ function LiveConversation({
 
 	const directCommand = blockedShortcut(draft, shell);
 	// What the finished turn suggests sending next, offered once nothing else waits on the user. Filtered to none the composer would hold back.
-	const turnSuggestions = useMemo(() => nextSuggestions(items, working), [items, working]);
+	const turnSuggestions = useNextSuggestions(view, working);
 	const suggestions = useSuggestions({
 		prompts: writable && requests.length === 0 ? turnSuggestions.filter(text => blockedShortcut(text, shell) === null) : [],
 		draft,
@@ -220,43 +223,31 @@ function LiveConversation({
 				}
 			: {}),
 	});
-	const completion = useCompletion({
-		draft,
-		setDraft,
-		completions,
-		onComplete: (reqId, text, cursor) => send({ t: "complete", reqId, scope: { kind: "live", view }, text, cursor }),
-		composer: { sessionId: shown?.sessionId ?? null, changed },
-		onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => {
-			onComposerKey(event);
-			if (!event.defaultPrevented) suggestions.onKeyDown(event);
-			if (!event.defaultPrevented && event.key === "Escape") {
-				event.currentTarget.blur();
-				event.preventDefault();
-			}
-		},
-	});
+	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+		if (completion.onMenuKeyDown(event)) return;
+		onComposerKey(event);
+		if (!event.defaultPrevented) suggestions.onKeyDown(event);
+		if (!event.defaultPrevented && event.key === "Escape") {
+			event.currentTarget.blur();
+			event.preventDefault();
+		}
+	};
+	const cwdDisplay = shown?.cwdDisplay;
+	// Kept across renders, so the memoized transcript does not render again for each keystroke in the composer.
+	const empty = useMemo(
+		() =>
+			session && writable && cwdDisplay !== undefined ? (
+				<EmptyConversation title="No messages yet">
+					omp is running in {projectName(cwdDisplay) ?? cwdDisplay}. Send a message to start its first turn.
+				</EmptyConversation>
+			) : undefined,
+		[session, writable, cwdDisplay],
+	);
 
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			<ConversationHeader view={view} subject={subject} onEnd={onEnd} actions={actions} />
-			<Transcript
-				view={view}
-				items={items}
-				working={working}
-				fork={fork}
-				onFork={onFork}
-				onEdit={switchable ? editPrompt : undefined}
-				empty={
-					loaded &&
-					session &&
-					writable &&
-					shown && (
-						<EmptyConversation title="No messages yet">
-							omp is running in {projectName(shown.cwdDisplay) ?? shown.cwdDisplay}. Send a message to start its first turn.
-						</EmptyConversation>
-					)
-				}
-			/>
+			<Transcript view={view} working={working} fork={fork} onFork={onFork} onEdit={switchable ? editPrompt : undefined} empty={empty} />
 			<div className="relative mx-auto w-full max-w-3xl px-3 pb-5">
 				{requests[0] && (
 					<UserRequestCard
@@ -268,12 +259,13 @@ function LiveConversation({
 				)}
 				{completion.popup}
 				<InputMessage
-					ref={completion.composerRef}
+					ref={composerRef}
 					value={draft}
 					onValueChange={completion.onValueChange}
 					textareaProps={{
 						...completion.textareaProps,
 						"aria-activedescendant": completion.textareaProps["aria-activedescendant"] ?? suggestions.activeId,
+						onKeyDown,
 						onBlur: suggestions.onBlur,
 					}}
 					onSend={sendText}

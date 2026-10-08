@@ -17,11 +17,10 @@ import { hashForTickets, type SettingsRoute, SIDEBAR_TABS, type SidebarTab, type
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
 import { shortcutLabels, useShortcuts } from "../shortcuts";
-import { useStoredState } from "../stored-state";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
-import { useDashboardContext } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { CalendarNav, type CalendarTabPage } from "./calendar/calendar-nav";
 import { SessionList } from "./session-list";
 import { SettingsNav } from "./settings/settings-nav";
@@ -29,15 +28,6 @@ import { workspaceItems } from "./workspace-picker";
 import { TodoCategories } from "./todo/categories";
 import type { KnownSessions } from "./todo/links";
 
-/** The project the sidebar and the inbox are scoped to, by `cwd`; absent for all projects. */
-const PROJECT_KEY = "omp-agents.sidebar-project";
-
-/** The project `cwd` the sidebar and the inbox show, `null` for all projects, and its setter, which localStorage keeps. */
-export function useProject(projects: { cwd: string }[]): [string | null, (cwd: string | null) => void] {
-	const [stored, pick] = useStoredState<string | null>(PROJECT_KEY, raw => raw, cwd => cwd ?? "");
-	// A stored project with no sessions left, or not yet loaded, shows all of them.
-	return [projects.some(({ cwd }) => cwd === stored) ? stored : null, pick];
-}
 interface ProjectPickerProps {
 	/** The projects, as {@link workspaces} lists them. */
 	projects: { cwd: string; cwdDisplay: string }[];
@@ -218,7 +208,8 @@ export function Roster({
 	bell,
 	toggle,
 }: RosterProps) {
-	const { changeTodo: onTodoChange, connected } = useDashboardContext();
+	const { changeTodo: onTodoChange } = useDashboardActions();
+	const { connected } = useDashboardStatus();
 	const inboxRead = inboxStore.use(project).read;
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {

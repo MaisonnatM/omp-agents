@@ -82,7 +82,9 @@ export class SessionGuest implements LiveSession {
 	generation: number | null = null;
 	control: ControlPhase = { phase: "connecting" };
 	/** When the guest ended, for rejoin backoff. */
-	endedAt: number | null = null;
+	#endedAt: number | null = null;
+	/** Whether the host left the registry or switched rooms: the guest leaves the roster at once, and a host still listed is joined anew. */
+	#replaced = false;
 	/** The host's last status-line snapshot; `null` until the welcome arrives. */
 	state: HostState | null = null;
 
@@ -162,18 +164,24 @@ export class SessionGuest implements LiveSession {
 		return this.#subagentFiles.pathOf(sessionFile, agentId, this.#agents);
 	}
 
-	follow(listed: ReadonlyMap<string, HostSnapshot>): boolean {
+	follow(listed: ReadonlyMap<string, HostSnapshot>): void {
 		const host = listed.get(this.instanceId);
 		if (!host) {
+			this.#replaced = true;
 			this.disconnect("This session is no longer running.");
-			return false;
+			return;
 		}
 		if (this.generation !== null && this.generation !== host.generation) {
+			this.#replaced = true;
 			this.disconnect("The session switched rooms; rejoining.");
-			return false;
+			return;
 		}
 		this.#host = host;
-		return this.endedAt === null || Date.now() - this.endedAt <= REJOIN_MS;
+	}
+
+	/** Gone, or ended for longer than {@link REJOIN_MS} while its host stays listed; the server then joins that host with a new guest. */
+	finished(now: number): boolean {
+		return this.#replaced || (this.#endedAt !== null && now - this.#endedAt > REJOIN_MS);
 	}
 
 	agents(): AgentRow[] {
@@ -322,7 +330,7 @@ export class SessionGuest implements LiveSession {
 	disconnect(reason: string): void {
 		if (this.#closed) return;
 		this.#closed = true;
-		this.endedAt = Date.now();
+		this.#endedAt = Date.now();
 		this.#socket?.close();
 		this.#socket = null;
 		this.#requests.clear();

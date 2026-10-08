@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listChanges, readChangedFile, type SessionPlace } from "./changes";
@@ -35,7 +35,7 @@ async function place(): Promise<{ place: SessionPlace; root: string; outside: st
 	const outside = join(parent, "notes.md");
 	writeFileSync(outside, "note\n");
 	const file = join(parent, "session.jsonl");
-	writeFileSync(file, [{ type: "session", cwd: root }, edit(join(root, "kept.ts")), edit("notes.md"), edit(outside)].map(entry => JSON.stringify(entry)).join("\n"));
+	writeFileSync(file, [{ type: "session", cwd: root }, edit(join(root, "kept.ts")), edit("notes.md"), edit(outside)].map(entry => `${JSON.stringify(entry)}\n`).join(""));
 	return { place: { file, dir: root }, root, outside };
 }
 
@@ -54,6 +54,17 @@ describe("listChanges", () => {
 			{ path: "notes.md", status: null, added: null, removed: null, session: true },
 			{ path: outside, status: null, added: null, removed: null, session: true },
 		]);
+	});
+
+	test("a transcript that grows lists the files its new lines changed, and one that is rewritten shorter forgets the old ones", async () => {
+		const { place: at, root, outside } = await place();
+		expect((await listChanges(at)).files.map(file => file.path)).not.toContain("later.ts");
+		appendFileSync(at.file, `${JSON.stringify(edit(join(root, "later.ts")))}\n`);
+		expect((await listChanges(at)).files.map(file => file.path)).toContain("later.ts");
+		writeFileSync(at.file, `${JSON.stringify({ type: "session", cwd: root })}\n`);
+		const paths = (await listChanges(at)).files.map(file => file.path);
+		expect(paths).not.toContain("later.ts");
+		expect(paths).not.toContain(outside);
 	});
 
 	test("a repository with no commit yet lists its files against the empty tree", async () => {

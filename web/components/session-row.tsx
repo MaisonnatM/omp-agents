@@ -22,7 +22,7 @@ import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLI
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
 import { useMinute } from "../use-minute";
-import { useDashboardContext } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
 
@@ -93,28 +93,41 @@ interface RowMenuProps {
 	children: ReactElement;
 }
 
-/** A sidebar row whose {@link sessionActions} open on right-click and from its hover-revealed "More actions" button. */
-function RowMenu({ label, entry, onScreen, pinned, onTogglePin, children }: RowMenuProps) {
-	const { open, send, start, starts, end } = useDashboardContext();
-	const [menuOpen, setMenuOpen] = useState(false);
+/**
+ * The actions of a row's menu. It reads the dashboard's actions and start state, which the menu's content mounts only
+ * while it is open, so a row that keeps its menu closed renders for neither.
+ */
+function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProps, "label" | "children">) {
+	const { open, send, start, end } = useDashboardActions();
+	const { resume } = useDashboardStatus().starts;
 	const actions = sessionActions(entry, {
 		onScreen,
 		pinned,
-		resuming: starts.resume?.phase === "starting" ? starts.resume.op.sessionId : null,
+		resuming: resume?.phase === "starting" ? resume.op.sessionId : null,
 		open,
 		togglePin: onTogglePin,
 		resume: sessionId => start({ kind: "resume", sessionId }),
 		dismissInterrupted: sessionId => send({ t: "dismiss-interrupted", sessionId }),
 		end,
 	});
-	const menuItems = actions.map((group, index) => (
-		<Fragment key={group[0].id}>
-			{index > 0 && <MenuSeparator />}
-			{group.map(action => (
-				<ActionItem key={action.id} action={action} />
+	return (
+		<>
+			{actions.map((group, index) => (
+				<Fragment key={group[0].id}>
+					{index > 0 && <MenuSeparator />}
+					{group.map(action => (
+						<ActionItem key={action.id} action={action} />
+					))}
+				</Fragment>
 			))}
-		</Fragment>
-	));
+		</>
+	);
+}
+
+/** A sidebar row whose {@link sessionActions} open on right-click and from its hover-revealed "More actions" button. */
+function RowMenu({ label, entry, onScreen, pinned, onTogglePin, children }: RowMenuProps) {
+	const [menuOpen, setMenuOpen] = useState(false);
+	const items = <RowMenuItems entry={entry} onScreen={onScreen} pinned={pinned} onTogglePin={onTogglePin} />;
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger render={<SidebarMenuItem />}>
@@ -125,10 +138,10 @@ function RowMenu({ label, entry, onScreen, pinned, onTogglePin, children }: RowM
 							<Ellipsis />
 						</DropdownMenuTrigger>
 					</Tooltip>
-					<DropdownMenuContent align="end">{menuItems}</DropdownMenuContent>
+					<DropdownMenuContent align="end">{items}</DropdownMenuContent>
 				</DropdownMenu>
 			</ContextMenuTrigger>
-			<ContextMenuContent>{menuItems}</ContextMenuContent>
+			<ContextMenuContent>{items}</ContextMenuContent>
 		</ContextMenu>
 	);
 }
@@ -171,7 +184,7 @@ interface RowProps<T> {
 
 /** A past session's row, with Resume, and Move to past while it is interrupted. */
 export const PastRow = memo(function PastRow({ session, pinned, open, showProject, onTogglePin }: RowProps<PastSession>) {
-	const { open: onOpen } = useDashboardContext();
+	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "past", sessionId: session.sessionId };
 	const label = pastLabel(session);
 	return (
@@ -193,7 +206,7 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showProjec
 
 /** A running session's row, with its status dot, and End session where the server controls it. */
 export const HostRow = memo(function HostRow({ session: host, pinned, open, showProject, onTogglePin }: RowProps<RosterHost>) {
-	const { open: onOpen } = useDashboardContext();
+	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 	const label = hostLabel(host);
 	return (

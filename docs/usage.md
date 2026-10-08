@@ -832,9 +832,12 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A prompt routine whose last session still runs records an error instead of starting a second one.
 - A routine session runs unattended: its prompt tells it not to ask questions.
   Once its turn finishes, the dashboard ends it, so it moves to the past sessions with its transcript, and **Resume** continues it.
+  A session that has not begun its turn 10 minutes after it started is ended, and its run records that as an error.
 - Routines run only while the dashboard runs.
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
+- When more than one dashboard runs, such as a second one on another port, only one runs the routines and takes the todos that agents add; it is the first one started, and the server on another port says so in its log when it starts.
+  If that one quits, another takes over within a minute.
 - The server keeps the routines in `routines.json` beside its access token, so every browser tab and the desktop app show the same ones.
   While the page has lost the server, the routines cannot be changed.
 

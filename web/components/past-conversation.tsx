@@ -1,6 +1,5 @@
 import { type ReactNode, useMemo } from "react";
 import type { PastSession } from "../../src/shared/sessions";
-import type { Item } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { MessageScrollerProvider } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -15,7 +14,6 @@ interface PastConversationProps {
 	sessionId: string;
 	/** The listed row, or `null` when the session is no longer listed. */
 	session: PastSession | null;
-	items: Item[];
 	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
 	resume: StartOf<"resume"> | null;
@@ -25,7 +23,7 @@ interface PastConversationProps {
 }
 
 /** A past session's saved transcript under its trail, `project / title`. It follows the file; **Resume** continues it in a session this dashboard starts. */
-export function PastConversation({ sessionId, session, items, fork, onFork, resume, onResume, actions }: PastConversationProps) {
+export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions }: PastConversationProps) {
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
 	const title = session ? <SessionTrail cwdDisplay={session.cwdDisplay} worktree={session.worktree} path={session.title ? [session.title] : []} /> : "Past session";
 	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
@@ -57,7 +55,7 @@ export function PastConversation({ sessionId, session, items, fork, onFork, resu
 						{failed}
 					</p>
 				)}
-				<Transcript view={view} items={items} working={false} fork={fork} onFork={onFork} />
+				<Transcript view={view} working={false} fork={fork} onFork={onFork} />
 			</div>
 		</MessageScrollerProvider>
 	);

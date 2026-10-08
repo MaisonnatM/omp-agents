@@ -1,5 +1,5 @@
 import { FileDiff, FileMinus, FilePen, FilePlus, GitPullRequest, Images, type LucideIcon, TableOfContents } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals, parseDiffLine } from "../../src/shared/transcript";
@@ -9,10 +9,9 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { age, readTime } from "../labels";
-import { usePane } from "../pane-store";
+import { useChangedFiles, useMedia, useTurnCount } from "../pane-store";
 import { hashForChanges } from "../routing";
 import { useStoredState } from "../stored-state";
-import { outline } from "../transcript-view";
 import { MediaTab } from "./media-tab";
 import { OutlineTab } from "./outline-tab";
 import { PullRequestsTab } from "./pull-requests-tab";
@@ -164,9 +163,10 @@ interface SessionDetailsProps {
  * the images its agents' tools returned, and its session's pull requests, each tab apart.
  */
 export function SessionDetails({ view, working, sessionId, pullRequests, project, hosts }: SessionDetailsProps) {
-	const { items, loaded, files: changedFiles, media } = usePane(view);
+	const changedFiles = useChangedFiles(view);
+	const media = useMedia(view);
+	const turnCount = useTurnCount(view);
 	const [tab, setTab] = useStoredState<DetailsTab>(TAB_KEY, raw => DETAILS_TABS.find(tab => tab === raw) ?? "outline");
-	const turns = useMemo(() => outline(items, working), [items, working]);
 	const files = changedFiles ?? [];
 	return (
 		<Tabs value={tab} onValueChange={value => setTab(value as DetailsTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
@@ -174,7 +174,7 @@ export function SessionDetails({ view, working, sessionId, pullRequests, project
 				<h2 className="sr-only">Session details</h2>
 				<SizeProvider size="compact">
 					<TabsList aria-label="Session details">
-						<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", turns.length)} />
+						<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", turnCount)} />
 						<TabItem value="files" icon={FileDiff} className={TAB_CLASS} {...tabLabel("Files", files.length)} />
 						<TabItem value="media" icon={Images} className={TAB_CLASS} {...tabLabel("Media", media?.length ?? 0)} />
 						<TabItem value="pull-requests" icon={GitPullRequest} className={TAB_CLASS} {...tabLabel("PRs", pullRequests.length)} />
@@ -183,7 +183,7 @@ export function SessionDetails({ view, working, sessionId, pullRequests, project
 			</SidebarHeader>
 			<TabPanel value="outline" asChild>
 				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-					<OutlineTab turns={turns} loaded={loaded} />
+					<OutlineTab view={view} working={working} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="files" asChild>

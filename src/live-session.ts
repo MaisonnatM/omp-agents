@@ -47,8 +47,13 @@ export interface LiveSession {
 	end(): Promise<void>;
 	/** Reply to one of the session's pending questions; a reply to a question already gone is dropped. */
 	answer(requestId: string, answer: UserAnswer): void;
-	/** Follow the Collab registry's latest listing. `false` once the session should leave the roster. */
-	follow(listed: ReadonlyMap<string, HostSnapshot>): boolean;
+	/** Take the Collab registry's latest listing; a terminal session whose host left it or switched rooms ends. */
+	follow(listed: ReadonlyMap<string, HostSnapshot>): void;
+	/**
+	 * Whether the session should leave the roster at `now`. A terminal session does when its host left the registry, and
+	 * when it ended while its host stays listed and waited long enough that the server joins that host again.
+	 */
+	finished(now: number): boolean;
 	/** Let go of the session as the dashboard shuts down: a terminal session keeps running, one this dashboard started stops. */
 	dispose(): Promise<void>;
 }

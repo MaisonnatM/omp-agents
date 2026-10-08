@@ -106,6 +106,13 @@ describe("applyRoutine", () => {
 		]);
 	});
 
+	test("a save that matches the stored routine returns the same list", () => {
+		const saved = routine({ runs: [{ at: at("2026-10-05T09:00:00+02:00"), outcome: { kind: "pending", queued: true }, errors: [] }] });
+		const list = [saved];
+		expect(applyRoutine(list, { op: "save", routine: spec }, now)).toBe(list);
+		expect(applyRoutine(list, { op: "save", routine: { ...spec, enabled: false } }, now)).not.toBe(list);
+	});
+
 	test("remove and enable change only what they name, and return the same list when nothing changes", () => {
 		const list = [routine({}), routine({ id: "r2" })];
 		expect(applyRoutine(list, { op: "remove", id: "r1" }, now).map(({ id }) => id)).toEqual(["r2"]);
