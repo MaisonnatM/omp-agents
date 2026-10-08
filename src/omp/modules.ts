@@ -202,6 +202,18 @@ export interface ModelResolverModule {
 	/** The listed model that omp runs for `provider/id`, following retired variant ids such as `grok-4.7-high` and dotted revision spellings. */
 	resolveProviderModelReference<M extends { provider: string; id: string }>(provider: string, modelId: string, models: readonly M[]): M | undefined;
 }
+/** omp's release lookup (src/cli/update-cli.ts), the one `omp update` makes. */
+export interface UpdateCliModule {
+	getLatestRelease(options: { timeoutMs: number; channel: string }): Promise<{ version: string }>;
+}
+export interface UpdateSettingsModule {
+	cfgStartupCheckUpdate: SettingsReader<boolean>;
+	cfgUpdateChannel: SettingsReader<string>;
+}
+/** pi-catalog's model identity (src/identity): the vendor lineage, product family, and `major.minor.patch` revision an id names. */
+export interface ModelIdentityModule {
+	classifyModel(provider: string, modelId: string, options: { lenient: true }): { class: string; family?: string; revision?: string };
+}
 
 /** Subset of omp's capability items (src/capability/types.ts): every item names the file it came from. */
 export interface CapabilityItem {
@@ -488,6 +500,14 @@ export const fallbackChains = await load<FallbackChainsModule>(join(srcDir, "ses
 });
 export const modelResolver = await load<ModelResolverModule>(join(srcDir, "config", "model-resolver.ts"), { resolveProviderModelReference: "function" });
 export const settingsRegistry = await load<SettingsRegistryModule>(join(srcDir, "config", "registry.ts"), { lookup: "function" });
+export const updateCli = await load<UpdateCliModule>(join(srcDir, "cli", "update-cli.ts"), { getLatestRelease: "function" });
+export const updateSettings = await load<UpdateSettingsModule>(join(srcDir, "modes", "settings.ts"), {
+	"cfgStartupCheckUpdate.get": "function",
+	"cfgUpdateChannel.get": "function",
+});
+export const modelIdentity = await load<ModelIdentityModule>(join(dirname(packageDir), "pi-catalog", "src", "identity", "index.ts"), {
+	classifyModel: "function",
+});
 
 export const discovery = await load<DiscoveryModule>(join(srcDir, "discovery", "index.ts"), { loadCapability: "function" });
 export const agentDiscovery = await load<AgentDiscoveryModule>(join(srcDir, "task", "discovery.ts"), { discoverAgents: "function" });

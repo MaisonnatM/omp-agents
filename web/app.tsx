@@ -10,6 +10,7 @@ import { InboxPage } from "./components/inbox/inbox-page";
 import { PullRequestPage } from "./components/inbox/pr-page";
 import { NewSession } from "./components/new-session";
 import { Pane } from "./components/pane";
+import { NoticesBell, useNoticeToasts } from "./components/notices";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { Roster, useProject } from "./components/roster";
 import { SessionDetails } from "./components/session-details";
@@ -94,6 +95,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 
 export function App() {
 	const { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo } = useDashboard();
+	useNoticeToasts(state.notices, state.connected, send);
 	const launch = startOf(state.starts, "new");
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
@@ -491,6 +493,7 @@ export function App() {
 							onPickProject={switchProject}
 							onShowSearch={() => dispatchPalette({ type: "open" })}
 							onShowShortcuts={() => setShortcutsOpen(true)}
+							bell={<NoticesBell notices={state.notices} />}
 							toggle={<SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />}
 						/>
 					</DashboardSidebar>

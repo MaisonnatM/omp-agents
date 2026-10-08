@@ -185,6 +185,8 @@ interface RosterProps {
 	onShowShortcuts: () => void;
 	/** The button that hides the sidebar, first in the header. */
 	toggle: ReactNode;
+	/** The notices' bell, between the command menu and the shortcuts. */
+	bell: ReactNode;
 }
 
 export function Roster({
@@ -213,6 +215,7 @@ export function Roster({
 	onPickProject,
 	onShowSearch,
 	onShowShortcuts,
+	bell,
 	toggle,
 }: RosterProps) {
 	const { changeTodo: onTodoChange, connected } = useDashboardContext();
@@ -235,6 +238,7 @@ export function Roster({
 						<Search />
 					</Button>
 				</Tooltip>
+				{bell}
 				<Tooltip content="Keyboard shortcuts" shortcut={shortcutLabels("help")} side="bottom">
 					<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
 						<Keyboard />

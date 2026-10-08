@@ -1,5 +1,6 @@
 /** What the page holds of the dashboard, and how the server's messages and the page's own actions change it. */
 import type { PlanUsage } from "../src/shared/models";
+import type { Notice } from "../src/shared/notices";
 import type { ServerMsg } from "../src/shared/protocol";
 import type { Project, ProjectList } from "../src/shared/projects";
 import { type LiveView, newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
@@ -44,10 +45,12 @@ export interface DashboardState {
 	routines: Routine[];
 	/** The directories Settings → Projects added and hid, empty until the server first sends them. */
 	projectList: ProjectList<Project>;
+	/** What the bell lists, empty until the server first sends it. */
+	notices: Notice[];
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "projects" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "projects" | "notices" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -156,6 +159,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, routines: action.routines };
 		case "projects":
 			return { ...state, projectList: action.list };
+		case "notices":
+			return { ...state, notices: action.list };
 		case "user-todo":
 			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
 		default: {
@@ -185,5 +190,6 @@ export function initialState(route: Route): DashboardState {
 		userTodos: null,
 		routines: [],
 		projectList: { added: [], hidden: [] },
+		notices: [],
 	};
 }

@@ -11,6 +11,7 @@ import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../sh
 import type { BranchChoice } from "../shared/git";
 import type { PullRequest } from "../shared/github";
 import type { ModelOption } from "../shared/models";
+import { NOTICE_OPS } from "../shared/notices";
 import type { ProjectChange } from "../shared/projects";
 import type { ClientMsg } from "../shared/protocol";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
@@ -32,6 +33,8 @@ export type MsgOf<T extends ClientMsg["t"]> = Extract<ClientMsg, { t: T }>;
 
 const isCounter = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 const isNonEmpty = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
+
+const isNoticeOp = oneOf(NOTICE_OPS);
 
 function parseLiveView(value: unknown): Parsed<LiveView> {
 	if (!isObject(value) || value.kind !== "live") return null;
@@ -315,6 +318,7 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const change = parseRoutineChange(value.change);
 		return change ? { ok: { t: "routine", change: change.ok } } : null;
 	},
+	notice: ({ id, op }) => (isNonEmpty(id) && isNoticeOp(op) ? { ok: { t: "notice", id, op } } : null),
 };
 
 const isClientMsgType = (t: unknown): t is ClientMsg["t"] => typeof t === "string" && Object.hasOwn(clientParsers, t);

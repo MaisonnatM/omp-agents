@@ -1,7 +1,8 @@
 /**
  * Every recurring job of the server, with its cadence: the registry poll, the watcher on omp's sessions
- * directory and the throttled re-read it asks for, the full rescan, the `omp usage` poll, and the routine tick.
- * The handlers do the work. The registry and usage polls schedule their next tick once the last one finished.
+ * directory and the throttled re-read it asks for, the full rescan, the `omp usage` poll, the routine tick, and the
+ * update check. The handlers do the work. The registry, usage, and update polls schedule their next tick once the last
+ * one finished.
  * The routine tick runs whether or not a page is connected, since routines start sessions on their own.
  */
 import { mkdirSync, watch } from "node:fs";
@@ -17,6 +18,8 @@ const RESCAN_MS = 60_000;
 const USAGE_POLL_MS = 60_000;
 /** Routine schedules count in minutes, and a Mac that wakes from sleep catches up at the next tick; checked todos clear on it too. */
 const MINUTE_TICK_MS = 60_000;
+/** omp and the model catalog release a few times a week; each check runs `omp models` and asks npm for omp's newest release. */
+const NOTICE_CHECK_MS = 6 * 60 * 60_000;
 
 export interface LoopHandlers {
 	/** Every {@link POLL_MS}. */
@@ -31,6 +34,8 @@ export interface LoopHandlers {
 	onUsageTick(): Promise<void>;
 	/** Every {@link MINUTE_TICK_MS}, listener or not. */
 	onMinuteTick(): Promise<void>;
+	/** At once, then every {@link NOTICE_CHECK_MS}, listener or not. */
+	onNoticeTick(): Promise<void>;
 }
 
 /** Run `tick`, then again `ms` after each run finishes. */
@@ -57,12 +62,13 @@ export class Loops {
 		});
 	}
 
-	/** Start the registry poll, the rescans, the usage poll, and the minute tick. */
+	/** Start the registry poll, the rescans, the usage poll, the minute tick, and the update check. */
 	start(): void {
 		setTimeout(() => void repeat(this.#on.onRegistryTick, POLL_MS), POLL_MS);
 		setInterval(() => void this.#on.onRescanTick(), RESCAN_MS);
 		void repeat(this.#on.onUsageTick, USAGE_POLL_MS);
 		setInterval(() => void this.#on.onMinuteTick(), MINUTE_TICK_MS);
+		void repeat(this.#on.onNoticeTick, NOTICE_CHECK_MS);
 	}
 
 	/** A file changed, reported by the watcher or by the session that wrote it. */

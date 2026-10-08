@@ -19,6 +19,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - [Calendar](#calendar)
 - [Routines](#routines)
 - [Settings](#settings)
+- [Updates](#updates)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Desktop app](#desktop-app)
 - [Limitations](#limitations)
@@ -911,6 +912,25 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A session's **Workspace settings** opens **Models** on that session's workspace.
   The page is in the URL hash, `#settings/<section>` or `#settings/<section>/<encoded directory>`, such as `#settings/integrations`; `#settings` opens **Analytics**.
   After each save the page shows the settings as omp loads them from disk.
+
+## Updates
+
+- The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists the updates the server found, and its badge counts them.
+- The server checks at startup, every six hours, and after each update, for two kinds of update.
+  - A newer omp release than the one installed, on the channel that omp's `update.channel` setting picks.
+    Turning off omp's `startup.checkUpdate` setting turns this check off too.
+  - A newer Claude or OpenAI model than one that your model roles or fallback chains name, from the same provider and the same line, such as Claude Opus 5.5 to Claude Opus 5.6.
+    Only models that `omp models` lists on a connected provider count, and dated snapshots are left out.
+- An update that no page has shown yet shows as a toast at the bottom right, which stays until you dismiss it.
+  **Dismiss** marks it seen, so it does not show as a toast again in any tab or after a reload, and it stays in the bell.
+- **Update**, on the toast or in the bell, runs the update; the notice shows its progress, then what changed or why it failed, and a failed update can run again.
+  - For omp, it runs `omp update`, which installs the newest release.
+    Restart omp-agents to load it, since the running server keeps the omp it started with.
+    An install that `omp update` leaves older than the notice's release, such as one that Nix manages, reports as failed with omp's last line of output.
+  - For a model, it puts the new model in place of the old one in every role and fallback chain of `~/.omp/agent/config.yml` that names it, and keeps each role's thinking level, as **Settings › Models** would save it.
+    A chain keyed by the old model keeps its key, and a workspace's `.omp/config.yml` stays as it was.
+- **×** clears a notice from the bell, until a newer version brings a new notice.
+- The server keeps which notices were seen and cleared in `notices.json` beside its access token.
 
 ## Keyboard shortcuts
 

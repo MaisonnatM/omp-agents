@@ -136,6 +136,7 @@ export function useDashboard(): Dashboard {
 					case "user-todos":
 					case "routines":
 					case "projects":
+					case "notices":
 						dispatch(msg);
 						return;
 					default: {

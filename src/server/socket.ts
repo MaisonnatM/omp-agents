@@ -3,6 +3,7 @@ import { complete } from "../commands";
 import { errorText } from "../json";
 import { directoryOf } from "../paths";
 import type { RoutineChange } from "../routines";
+import type { NoticeOp } from "../shared/notices";
 import type { ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { UserTodoChange } from "../user-todos-shared";
@@ -24,6 +25,8 @@ export interface SocketEnv {
 	changeRoutine(ws: Socket, change: Exclude<RoutineChange, { op: "run-now" }>): void;
 	/** Run routine `id` now, whatever its schedule. */
 	runRoutine(id: string): Promise<void>;
+	/** Act on notice `id`; every socket then gets the notices as they are after. */
+	changeNotice(id: string, op: NoticeOp): Promise<void>;
 }
 
 /**
@@ -127,6 +130,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	answer: ({ sessions }, _ws, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
 	"user-todo": ({ changeTodo }, ws, { change }) => changeTodo(ws, change),
 	routine: ({ changeRoutine, runRoutine }, ws, { change }) => (change.op === "run-now" ? runRoutine(change.id) : changeRoutine(ws, change)),
+	notice: ({ changeNotice }, _ws, { id, op }) => changeNotice(id, op),
 };
 
 /** `t` keys the handler that takes `msg`; spelled apart so TypeScript pairs them. */

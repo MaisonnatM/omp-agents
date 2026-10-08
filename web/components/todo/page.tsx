@@ -19,7 +19,6 @@ import type { KnownSessions } from "./links";
 import { ArchivedRow, DraftRow, TodoRow } from "./row";
 import { TodoSearch } from "./search";
 import { TodoSplit } from "./split";
-import { useUndo } from "./undo";
 
 interface TodoPageProps {
 	/** `null` until the server sends the list. */
@@ -65,8 +64,7 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todo => matches(todo, query)) };
 	// Looked up before the search filters the list, so typing a search keeps the open todo on screen.
 	const open = openId === null ? null : (placeIn([listed], openId)?.entry ?? null);
-	const undo = useUndo(onChange);
-	const editing = useTodoEditing({ list, kind, day, frozen, onChange, undo, onRemoved: id => openId === id && setOpenId(null), newSessionCwd });
+	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && setOpenId(null), newSessionCwd });
 	const drag = useTodoDrag(kind.canMove && !frozen, onChange);
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 
@@ -255,7 +253,6 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 					)
 				}
 			/>
-			{undo.toast}
 		</PageFrame>
 	);
 }

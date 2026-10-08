@@ -7,9 +7,10 @@ import { errorText } from "./json";
 import { readWithMcpSignIn } from "./omp/mcp";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
+import { installedOmp, latestOmp, updateOmp } from "./omp/release";
 import { sessionsDir } from "./omp/sessions";
 import { stopStats } from "./omp/stats";
-import { directoryOf, displayPath, interruptedFile, oldGoogleFile, projectsFile, routinesFile, sessionEndInboxDir, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
+import { directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, projectsFile, routinesFile, sessionEndInboxDir, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
 import { runShell } from "./proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "./routines";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
@@ -22,6 +23,7 @@ import { LiveSessions, type SessionUpdate } from "./server/live-sessions";
 import { Loops } from "./server/loops";
 import { buildPage, servePage } from "./server/page";
 import { createRoutes } from "./server/routes";
+import { Notices } from "./server/notices";
 import { RoutineRunner } from "./server/routine-runner";
 import { ProjectsFile } from "./server/projects-file";
 import { RoutinesFile } from "./server/routines-file";
@@ -32,6 +34,7 @@ import { TodoInbox } from "./server/todo-inbox";
 import { UserTodosFile } from "./server/user-todos-file";
 import { type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
+import { modelUpdates, upgradeModel } from "./settings";
 import type { StartRequest, StartResult, View } from "./shared/sessions";
 import { DONE_KEPT_HOURS, startChanges } from "./user-todos";
 import type { UserTodoChange } from "./user-todos-shared";
@@ -59,6 +62,7 @@ function clearOldDone(): void {
 const inbox = new TodoInbox(userTodoInboxDir, applyTodo);
 const routines = new RoutinesFile(routinesFile);
 const projects = new ProjectsFile(projectsFile);
+const notices = new Notices(noticesFile, { latestOmp, installedOmp, updateOmp, modelUpdates, upgradeModel }, () => broadcasts.pushNotices());
 // The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
 rmSync(oldGoogleFile, { force: true });
 const google = new GoogleCalendarReader(async url => readWithMcpSignIn(await integrationServer("google-calendar"), url));
@@ -77,6 +81,7 @@ const broadcasts = new Broadcasts({
 		const [added, hidden] = [projects.list.added, projects.list.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
 		return { t: "projects", list: { added, hidden } };
 	},
+	noticesMsg: () => ({ t: "notices", list: notices.list }),
 	publish: (topic, json) => void server.publish(topic, json),
 	subscriberCount: topic => server.subscriberCount(topic),
 	beforeRosterPush: () => views.sync(),
@@ -100,6 +105,7 @@ const loops = new Loops(sessionsDir, {
 		clearOldDone();
 		await runner.tick();
 	},
+	onNoticeTick: () => notices.check(),
 });
 /** Directories sessions ran in: live ones first, then saved ones newest first. */
 const knownCwds = (): string[] => [...new Set([...sessions.cwds(), ...files.cwds()].filter(Boolean))];
@@ -165,6 +171,7 @@ const handleClientMsg = createClientHandler({
 		else send(ws, { t: "routines", routines: routines.routines });
 	},
 	runRoutine: id => runner.runNow(id),
+	changeNotice: (id, op) => notices.apply(id, op),
 });
 
 /** Why the last registry listing failed, shown with the roster. */

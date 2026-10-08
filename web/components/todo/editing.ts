@@ -4,8 +4,28 @@ import type { TodoStatus, UserTodoChange, UserTodoLeaf, UserTodoList } from "../
 import { hashForNewSession } from "../../routing";
 import { quickAddTodo } from "../../todo-quick-add";
 import { type ListKind, lastOf, restoreOf, type Section } from "../../todo-views";
+import { toasts } from "../toaster";
 import type { TodoKey } from "./input";
-import type { Undo } from "./undo";
+
+/** How long **Undo** stays after a todo is deleted. */
+const UNDO_MS = 8000;
+const UNDO_TOAST = "todo-undo";
+
+/** **Undo** for the last delete, for {@link UNDO_MS}; a later delete takes its place. */
+function offerUndo(text: string, undo: () => void): void {
+	toasts.add({
+		id: UNDO_TOAST,
+		title: `Deleted “${text}”`,
+		timeout: UNDO_MS,
+		actionProps: {
+			children: "Undo",
+			onClick: () => {
+				undo();
+				toasts.close(UNDO_TOAST);
+			},
+		},
+	});
+}
 
 /** What the Todo page types into: a todo's title, or a todo not added yet, at its place in the list, with what it holds so far. */
 type Editing =
@@ -36,7 +56,6 @@ interface TodoEditingOptions {
 	/** The list cannot be changed here: the server is out of reach, or the list is the archive. */
 	frozen: boolean;
 	onChange: (change: UserTodoChange) => void;
-	undo: Undo;
 	/** Todo `id` was deleted. */
 	onRemoved: (id: string) => void;
 	/** Where **Start session** opens the new-session draft. */
@@ -67,7 +86,7 @@ export interface TodoEditing {
 }
 
 /** The page's typing: which title or new todo has the input, what its keys do, and deleting with **Undo**. */
-export function useTodoEditing({ list, kind, day, frozen, onChange, undo, onRemoved, newSessionCwd }: TodoEditingOptions): TodoEditing {
+export function useTodoEditing({ list, kind, day, frozen, onChange, onRemoved, newSessionCwd }: TodoEditingOptions): TodoEditing {
 	const [editing, setEditing] = useState<Editing>(NOT_EDITING);
 
 	/** Deletes todo `id` with the todos under it, and offers **Undo**, which puts it back where it was. */
@@ -75,7 +94,7 @@ export function useTodoEditing({ list, kind, day, frozen, onChange, undo, onRemo
 		const restore = restoreOf(list, id);
 		onChange({ op: "remove", id });
 		onRemoved(id);
-		if (restore) undo.offer(text, restore);
+		if (restore) offerUndo(text, () => onChange(restore));
 	};
 	/** Saves `text` as todo `todo`'s title; an empty one removes the todo. */
 	const commit = (todo: UserTodoLeaf, text: string): void => {

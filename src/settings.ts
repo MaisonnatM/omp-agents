@@ -5,9 +5,11 @@ import { atomicWriteText } from "./fs";
 import { errorText, isObject } from "./json";
 import { agentDir, assertRetryValue, expandDefaultRetryFallbackChains, loadOmpConfig, type OmpConfig, parseRetryFallbackSelector, retryChoices, writeRouting } from "./omp/config";
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
-import { listModels } from "./omp/models";
+import { findModelUpdates, upgradeEdits } from "./omp/model-updates";
+import { connectedProviders, listModels } from "./omp/models";
 import { displayPath, HOME } from "./paths";
 import type { CatalogModel, FileEdit, ModelChain, OmpFile, OmpSettings, RetrySettings, RoleRoute, RoutingEdit } from "./shared/models";
+import type { ModelUpdate } from "./shared/notices";
 
 /**
  * An edit the settings refuse, with the HTTP status the API answers it with: 400 for an edit omp could not use, 404 for
@@ -204,6 +206,22 @@ export function saveRouting(cwd: string | null, raw: unknown): Promise<OmpSettin
 		const edit = parseRoutingEdit(raw, { catalog: await listModels(), config });
 		await writeRouting(sessionCwd, edit);
 		return loadOmpSettings(cwd);
+	});
+}
+
+/** Each model the user's routing names that has a newer version `omp models` lists, as {@link findModelUpdates} finds them. */
+export async function modelUpdates(): Promise<ModelUpdate[]> {
+	const [catalog, connected, config] = await Promise.all([listModels(), connectedProviders(), loadOmpConfig(HOME)]);
+	return findModelUpdates(catalog, config, connected);
+}
+
+/** Names `update.to` in the user's `config.yml` wherever it names `update.from`, each role and fallback keeping its level. */
+export function upgradeModel({ provider, from, to }: ModelUpdate): Promise<void> {
+	return serialized(async () => {
+		const [catalog, config] = await Promise.all([listModels(), loadOmpConfig(HOME)]);
+		const edits = upgradeEdits(config, catalog, provider, from.id, to.id);
+		if (edits.length === 0) throw new Error(`The routing no longer names ${provider}/${from.id}`);
+		for (const edit of edits) await writeRouting(HOME, parseRoutingEdit(edit, { catalog, config }));
 	});
 }
 

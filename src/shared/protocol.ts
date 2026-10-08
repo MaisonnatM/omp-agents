@@ -2,6 +2,7 @@
 import type { Routine, RoutineChange } from "../routines";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
+import type { Notice, NoticeOp } from "./notices";
 import type { Project, ProjectList } from "./projects";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View } from "./sessions";
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
@@ -33,7 +34,9 @@ export type ServerMsg =
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
 	| { t: "routines"; routines: Routine[] }
 	/** The directories Settings → Projects added and hid, whole, sent when a socket opens and after every change. */
-	| { t: "projects"; list: ProjectList<Project> };
+	| { t: "projects"; list: ProjectList<Project> }
+	/** Every notice the bell lists, whole, sent when a socket opens and after every change. */
+	| { t: "notices"; list: Notice[] };
 
 export type ClientMsg =
 	/** The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming. */
@@ -75,4 +78,6 @@ export type ClientMsg =
 	/** Change the Todo page's list; every socket then gets the list as it is after. */
 	| { t: "user-todo"; change: UserTodoChange }
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
-	| { t: "routine"; change: RoutineChange };
+	| { t: "routine"; change: RoutineChange }
+	/** Update notice `id`, mark it seen, or clear it. */
+	| { t: "notice"; id: string; op: NoticeOp };

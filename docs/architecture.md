@@ -9,7 +9,7 @@ The server imports omp's own modules from the installed package, so it does not 
 `src/omp/modules.ts` loads every module once and checks at startup that each export this app uses exists, naming the omp version and the missing export when one does not.
 It finds the package through `omp` on `PATH`, or `OMP_PACKAGE_DIR` when set; with a Bun global install that is `~/.bun/install/global/node_modules/@oh-my-pi/pi-coding-agent`.
 
-Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
+Paths in this document that start with `pi-coding-agent/`, `pi-ai/`, `pi-catalog/`, `pi-tui/`, `pi-utils/`, or `omp-stats/` are inside that install, in `@oh-my-pi/`.
 They are not in this repository.
 The main ones:
 
@@ -35,6 +35,7 @@ The main ones:
 - Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
 - Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `rollup.ts` (`getProviderTimeSeries`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
   `src/omp/stats.ts` reads omp-stats' database and starts its live sync only after the Settings page's Analytics section first reads it.
+- Updates: `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts`, the `startup.checkUpdate` and `update.channel` readers in `pi-coding-agent/src/modes/settings.ts`, and `classifyModel` in `pi-catalog/src/identity/index.ts`, which `src/omp/release.ts` and `src/omp/model-updates.ts` use; see [Updates](#updates).
 
 ## Transcripts
 
@@ -287,6 +288,28 @@ No command resumes after a restart: the next server turns each run still saved a
 A `routine` socket message carries one change: `save`, `remove`, `enable`, or `run-now`, which claims a slot now, whatever the schedules, and drains it.
 Every socket hears the routines after each change and each step of a run as a `routines` message on the roster topic, also sent when a socket opens.
 
+## Updates
+
+`src/server/notices.ts` owns the bell's notices: what the last checks found, the status of each update a page started, and which notices the user saw or cleared, which it keeps in `notices.json` beside the access token.
+It checks at startup and every six hours from `src/server/loops.ts`, whether or not a page is connected, and again after each update that succeeds.
+
+- `latestOmp` in `src/omp/release.ts` asks `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts` for the newest release on omp's `update.channel`, unless `startup.checkUpdate` is off.
+  `installedOmp` reads the version from the installed package's `package.json` on each check, so the check is right after an update, before a restart.
+- `findModelUpdates` in `src/omp/model-updates.ts` reads the global `modelRoles` and `retry.fallbackChains` with `parseRetryFallbackSelector`, and keeps the listed models that `classifyModel` in `pi-catalog/src/identity/index.ts` places in an Anthropic or OpenAI family with a revision.
+  A model's line is its provider, its family, and its id with the version masked, so `claude-opus-5-5` and `claude-opus-5-6` share one.
+  It offers the newest revision of each line that a connected provider lists, and leaves dated snapshots out.
+
+A check that fails keeps what the last one found for its kind, and the seen and cleared marks for it.
+A notice whose update runs or ran stays after a check stops finding it, so the page shows how the update ended.
+A notice's id names its versions, `omp:<latest>` or `model:<provider>/<from>><to>`, so a newer version is a new notice even after the user cleared the last one.
+
+A `notice` socket message carries `{ id, op }`, with `op` one of `update`, `seen`, and `clear`.
+Every socket hears the list as a `notices` message on the roster topic after each change, also sent when a socket opens.
+`update` on omp runs `omp update` through `ompCommand` and succeeds when omp exits 0 and the version on disk is at least the notice's release; otherwise it fails with omp's last line of output, such as Nix's.
+The server keeps the omp modules it loaded until it restarts, and `src/omp/modules.ts` names any export the new release dropped at the next start.
+`update` on a model calls `upgradeModel` in `src/settings.ts`, which turns `upgradeEdits` into routing edits and writes each with `writeRouting`, under the same lock as a Settings › Models save.
+A role or chain entry keeps whatever follows the model in its selector, such as `:high` or `:auto`, and each chain that names the model is written whole.
+
 ## HTTP API
 
 **Settings** reads `GET /api/settings`, or `GET /api/settings?cwd=<directory>` for a workspace.
@@ -531,6 +554,8 @@ The sidebar rows' menus use Base UI's `ContextMenu` for right-click and its `Men
 Both share Base UI's menu items, so each row builds one item list and both menus render it.
 The wrapper also opens the context menu on the context-menu key and Shift+F10 at the focused row, because not every platform sends a `contextmenu` event for them.
 
+Toasts use Base UI's `Toast` through one manager in `web/components/toaster.tsx`, since the page has no Fluid or shadcn toast; they stack at the bottom right in the `popover` look.
+
 Questions use Fluid's `ask-user-questions`, installed from `https://www.fluidfunctionalism.com/r/radix/ask-user-questions.json`, in `web/components/user-request.tsx`.
 Each question is one Fluid question with one row per omp option.
 A confirm is a question with **Yes** and **No** rows, and an input or an editor is a free-text question.
@@ -554,12 +579,12 @@ The server lives in `src/`:
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle.
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
-  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations and their OAuth client setups, the Google calendars, and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; and `analytics.ts` the Analytics section.
+  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations and their OAuth client setups, the Google calendars, and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; `notices.ts` the bell's notices; and `analytics.ts` the Analytics section.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
-- `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, and `prompts.ts` wrap one area each.
+- `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, and `prompts.ts` wrap one area each.
 - `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and projects, joining saved-session titles and working directories without reading transcripts.
-- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, and `projects.json`; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `projects.json`, and `notices.json`; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
@@ -608,6 +633,8 @@ The server lives in `src/`:
   A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`, before it sends the first message, and `src/server.ts` applies the changes `startChanges` in `src/user-todos.ts` returns: the link, and `set-status` `in-progress` for a `backlog` or `todo` todo.
 - `src/shared/projects.ts`: the Settings › Projects list, `ProjectList` of added and hidden directories, its `ProjectChange`, and `applyProject`, which the server applies to its file.
   `src/server/projects-file.ts` keeps the list in `projects.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `projects.json.invalid`.
+- `src/shared/notices.ts`: the bell's `Notice`, a newer omp or a `ModelUpdate`, with its seen flag and `NoticeStatus`, and the socket's `NOTICE_OPS`.
+  `src/server/notices.ts` checks for them and runs their updates through `src/omp/release.ts` and `src/settings.ts`; `src/omp/model-updates.ts` finds the newer models and the routing edits that switch to them; see [Updates](#updates).
 - `src/server/todo-inbox.ts`: applies the changes that omp's `user_todo` tool (`templates/omp/agent/extensions/todos.ts`) leaves in `todo-inbox/` beside `todos.json`, one JSON file each, written under a `.tmp` name then renamed.
   `parseAgentChange` reads each file in the extension's own format: an `add` becomes a `todo` of no priority added at that time, and a `toggle` that checks becomes `set-status` `done` at its time.
   The inbox takes `add`, and `set-status` `done`, deletes each file it applies, and moves any other to `<name>.invalid` with a logged reason, so the server stays the only writer of `todos.json` and an agent cannot undo what you did.
@@ -701,11 +728,13 @@ The page lives in `web/`.
   `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed; their ages count up on the page's one minute timer.
   `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab, the calendar and then the routines by name.
+- `web/components/toaster.tsx`: `toasts`, the page's one Base UI toast manager, which shows a toast from anywhere without rendering its caller again, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
+  `web/components/notices.tsx` holds `NoticesBell`, the roster header's bell and its list, and `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once, even with the sidebar hidden.
 - `web/components/todo/`: the Todo page.
   `page.tsx` is the page and its lists, **Archive** included, which `LIST_KINDS` marks read-only: its rows put a todo back or delete it for good, and its header offers **Empty** where the others offer **Clear done**.
   Every other list groups its top-level todos by status, in `STATUS_GROUPS` order, under fold headers whose folds `useFolds` keeps; `split.tsx` puts the list on the left and the open todo's `detail.tsx` on the right, at a list width stored in localStorage.
   `row.tsx` holds a todo's row, with its priority and status buttons, category badge, work-state dot, link icons, and the day it was added, an archived todo's row, and the row of a todo not added yet; `fields.tsx` holds the status, priority, and due day pickers, as a row's icon or a labeled property button, and `input.tsx` the input a title is typed into, whose Cmd+Enter starts a session from the todo.
-  `editing.ts` holds `useTodoEditing`, which of those inputs is open, the status a new todo takes, and what its keys do, and deleting with **Undo**; `undo.tsx` is the **Undo** toast and `search.tsx` the search field.
+  `editing.ts` holds `useTodoEditing`, which of those inputs is open, the status a new todo takes, and what its keys do, and deleting with its **Undo** toast; `search.tsx` is the search field.
   `detail.tsx` is the open todo: a bar with its place, its status, and the ↑, ↓, and **×** buttons, its title, its property pickers, and notes, which `web/components/markdown-editor.tsx` renders through `message-markdown.tsx` until you click them to edit, then for a top-level todo its sub-todos, an agent card with the work state, live agent question, and **Start session**, its links with **Create Linear ticket**, and when it was added and by which session; `links.tsx` draws a todo's link chips and work-state pill, each with an icon-only form for rows, and `add-button.tsx` is the button that adds a todo linking to an inbox row or a ticket row.
   `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds, `TODO_STATUS`, each status's label and the Linear state type whose icon it takes, each category's badge color, how a due day reads, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows, and the keys also step the open todo and open its pickers.
   `web/todo-work-state.ts` derives the pill and the **Needs you** filter from the latest linked session's live status, outstanding question, submitted pull request, or recorded `/ship` merge; it keeps unknown and ended sessions distinct from new ideas.
