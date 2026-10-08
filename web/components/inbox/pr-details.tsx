@@ -54,6 +54,7 @@ import { useCopy } from "../../use-copy";
 import { useQueuedSave } from "../../use-queued-save";
 import { ChangesExplorer } from "../changes/changes-explorer";
 import { BranchLabel, BranchName } from "../git";
+import { OrgIcon } from "../org-icon";
 import { QuickActionButton, type QuickActionsProps } from "../quick-actions";
 import { LiveSessionChips } from "../session-chip";
 import { DetailSection, LoadNote, Markdown } from "../sheet-details";
@@ -224,8 +225,8 @@ export interface NextMove {
 const RAIL = "absolute left-3.5 w-px bg-muted-foreground/30";
 const RAIL_DOT = "absolute top-1/2 left-[10.5px] size-2 -translate-y-1/2 rounded-full ring-2 ring-background";
 
-/** The pull requests stacked with this one, top first, on a rail down to the branch the bottom one merges into; each other one links to its details. */
-function StackSection({ stack, current }: { stack: InboxPullRequest[]; current: PullRequest }) {
+/** The pull requests stacked with this one, top first, on a rail down to the branch the bottom one merges into; each other one links to its details, or `onPick` shows it in place. */
+function StackSection({ stack, current, onPick }: { stack: InboxPullRequest[]; current: PullRequest; onPick?: (pr: PullRequest) => void }) {
 	const at = stack.findIndex(pr => samePullRequest(pr, current));
 	const bottom = stack[stack.length - 1];
 	return (
@@ -250,6 +251,10 @@ function StackSection({ stack, current }: { stack: InboxPullRequest[]; current: 
 								<span aria-current="page" className="min-w-0 flex-1 truncate font-medium">
 									{label}
 								</span>
+							) : onPick ? (
+								<button type="button" onClick={() => onPick(pr)} className="min-w-0 flex-1 truncate text-left underline-offset-2 hover:underline">
+									{label}
+								</button>
 							) : (
 								<a href={hashForInbox(pr)} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
 									{label}
@@ -287,6 +292,8 @@ interface DetailContentProps {
 	version?: unknown;
 	/** The changed file the route opens in the Code tab; `null` shows the Summary. */
 	files?: { path: string | null } | null;
+	/** Shows another pull request of its stack in place; without it, each links to its page. */
+	onPick?: (pr: PullRequest) => void;
 	/** GitHub took a change made here. */
 	onSaved?: () => void;
 }
@@ -342,11 +349,11 @@ function MoreMenu({ pr, actions, quick }: { pr: PullRequest; actions: QuickActio
 				))}
 				{actions.length > 0 && <MenuSeparator />}
 				<MenuLinkItem href={pullRequestUrl(pr)} target="_blank" rel="noreferrer">
-					<ExternalLink />
+					<OrgIcon org="github" className="size-4" />
 					Open on GitHub
 				</MenuLinkItem>
 				<MenuLinkItem href={graphiteUrl(pr)} target="_blank" rel="noreferrer">
-					<ExternalLink />
+					<OrgIcon org="graphite" className="size-4" />
 					Open on Graphite
 				</MenuLinkItem>
 			</DropdownMenuContent>
@@ -462,12 +469,13 @@ interface SummaryProps {
 	stack: InboxPullRequest[];
 	sessions: RosterHost[];
 	onOpen: DetailContentProps["onOpen"];
+	onPick: DetailContentProps["onPick"];
 	save: SavePullRequest;
 	/** Why GitHub refused the last change; `null` when it took them all. */
 	saveError: string | null;
 }
 
-function Summary({ pr, detail, placed, quick, stack, sessions, onOpen, save, saveError }: SummaryProps) {
+function Summary({ pr, detail, placed, quick, stack, sessions, onOpen, onPick, save, saveError }: SummaryProps) {
 	const options = usePullRequestOptions(detail);
 	// The state picker says it is a draft already.
 	const blockers = placed.filter(({ item, fix }) => item.kind !== "draft" || fix);
@@ -501,7 +509,7 @@ function Summary({ pr, detail, placed, quick, stack, sessions, onOpen, save, sav
 					</Property>
 				)}
 			</dl>
-			{stack.length > 0 && <StackSection stack={stack} current={pr} />}
+			{stack.length > 0 && <StackSection stack={stack} current={pr} onPick={onPick} />}
 			<DetailSection title="Description">{detail.body.trim() ? <Markdown text={detail.body} /> : <p className="text-sm text-muted-foreground">No description.</p>}</DetailSection>
 		</div>
 	);
@@ -554,7 +562,7 @@ function Code({ pr, detail, placement, path, version }: { pr: PullRequest; detai
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
  * of the other actions; then Summary, Timeline, and Code tabs, with the checks at a glance on the tab bar.
  */
-export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: listedNext, stack, placement, version, files = null, onSaved }: DetailContentProps) {
+export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: listedNext, stack, placement, version, files = null, onPick, onSaved }: DetailContentProps) {
 	const [reads, setReads] = useState(0);
 	const readVersion = useMemo(() => [version, reads], [version, reads]);
 	const { data: detail, error, replace } = useReplaceableRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`, readVersion);
@@ -670,7 +678,7 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: li
 			) : (
 				<div className={cn("min-h-0 flex-1 overflow-y-auto", page && "px-6")}>
 					<div className="py-4">
-						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} sessions={sessions} onOpen={onOpen} save={save} saveError={queued.error} /> : <Timeline detail={detail} />}
+						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} saveError={queued.error} /> : <Timeline detail={detail} />}
 					</div>
 				</div>
 			)}

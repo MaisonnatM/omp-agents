@@ -45,6 +45,8 @@ interface PullRequestDetailsProps {
 	version?: unknown;
 	/** The changed file the Code tab opens. */
 	files?: { path: string | null } | null;
+	/** Shows another pull request of its stack in place; without it, each links to its page. */
+	onPick?: (pr: PullRequest) => void;
 }
 
 /**
@@ -52,7 +54,7 @@ interface PullRequestDetailsProps {
  * became of a quick start on it. The page also says why the inbox does not list it; the sidebar does not, since most
  * past sessions' merged pull requests would carry that note.
  */
-export function PullRequestDetails({ project, hosts, target, placement, version, files }: PullRequestDetailsProps) {
+export function PullRequestDetails({ project, hosts, target, placement, version, files, onPick }: PullRequestDetailsProps) {
 	const { open, start, dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const { read } = inboxStore.use(project);
@@ -88,6 +90,7 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 				placement={placement}
 				version={version}
 				files={files}
+				onPick={onPick}
 				onSaved={() => void inboxStore.refresh(project, { fresh: true })}
 			/>
 		</>

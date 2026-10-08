@@ -1,137 +1,19 @@
-import { FileDiff, FileMinus, FilePen, FilePlus, GitPullRequest, Images, type LucideIcon, TableOfContents } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { GitPullRequest, Images, TableOfContents } from "lucide-react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { RosterHost, View } from "../../src/shared/sessions";
-import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals, parseDiffLine } from "../../src/shared/transcript";
-import { SidebarContent, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
-import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
-import { cn } from "@/lib/utils";
-import { age, readTime } from "../labels";
-import { useChangedFiles, useMedia, useTurnCount } from "../pane-store";
-import { hashForChanges } from "../routing";
+import { useMedia, useTurnCount } from "../pane-store";
 import { useStoredState } from "../stored-state";
 import { MediaTab } from "./media-tab";
 import { OutlineTab } from "./outline-tab";
 import { PullRequestsTab } from "./pull-requests-tab";
 
-const CHANGE_LABEL: Record<FileChangeKind, string> = { created: "Created", edited: "Edited", rewritten: "Rewritten", deleted: "Deleted" };
-
-/** omp's numbered diff, `+12|added`, `-12|removed`, ` 12|context`, with blank lines between hunks, in the flow of the list. */
-function Diff({ diff }: { diff: string }) {
-	return (
-		<div className="font-mono text-[11px] leading-4" data-diff>
-			{diff.split("\n").map((line, index) => {
-				const parsed = parseDiffLine(line);
-				if (!parsed) return <div key={index} className="h-2" aria-hidden />;
-				const { sign, number, text } = parsed;
-				return (
-					<div
-						key={index}
-						className={cn(
-							"flex",
-							sign === "+" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300" : sign === "-" ? "bg-red-500/10 text-red-700 dark:text-red-300" : "text-muted-foreground",
-						)}
-					>
-						<span className="w-10 shrink-0 pr-1.5 text-right opacity-60 select-none">{number}</span>
-						<span className="w-3 shrink-0 select-none">{sign}</span>
-						<span className="min-w-0 flex-1 break-all whitespace-pre-wrap">{text || " "}</span>
-					</div>
-				);
-			})}
-		</div>
-	);
-}
-
-/** `+12 −3`, the lines added and removed. */
-function LineCounts({ added, removed }: { added: number; removed: number }) {
-	return (
-		<span className="shrink-0 whitespace-nowrap tabular-nums" aria-label={`${added} added, ${removed} removed`}>
-			<span className="text-emerald-600 dark:text-emerald-400">+{added}</span> <span className="text-red-600 dark:text-red-400">−{removed}</span>
-		</span>
-	);
-}
-
-const lines = (count: number): string => `${count} ${count === 1 ? "line" : "lines"}`;
-
-/** A change's kind and time, then what it recorded: an edit's line counts and diff, or how many lines a write wrote. */
-function Change({ change }: { change: FileChange }) {
-	let counts: ReactNode;
-	let body: ReactNode;
-	switch (change.tool) {
-		case "edit":
-			counts = <LineCounts added={change.added} removed={change.removed} />;
-			body = change.diff && <Diff diff={change.diff} />;
-			break;
-		case "write":
-			counts = change.lines !== null && <span className="tabular-nums">{lines(change.lines)}</span>;
-			body = <p className="text-xs text-muted-foreground">Written whole, so omp recorded no diff.</p>;
-			break;
-		default: {
-			const unhandled: never = change;
-			return unhandled;
-		}
-	}
-	return (
-		<li className="space-y-1">
-			<p className="flex items-baseline gap-1.5 text-xs text-muted-foreground">
-				<span className="font-medium text-foreground">{CHANGE_LABEL[change.kind]}</span>
-				{change.at !== null && <time dateTime={new Date(change.at).toISOString()}>{readTime(change.at)}</time>}
-				<span className="flex-1" />
-				{counts}
-			</p>
-			{body}
-		</li>
-	);
-}
-
-const FILE_LOOK: Record<FileStatus, { icon: LucideIcon; label: string }> = {
-	created: { icon: FilePlus, label: "New file" },
-	edited: { icon: FilePen, label: "Edited" },
-	deleted: { icon: FileMinus, label: "Deleted" },
-};
-
-function FileRow({ file }: { file: ChangedFile }) {
-	const [open, setOpen] = useState(false);
-	const slash = file.path.lastIndexOf("/");
-	const name = file.path.slice(slash + 1);
-	const dir = slash > 0 ? file.path.slice(0, slash) : "";
-	const { changes } = file;
-	const look = FILE_LOOK[fileStatus(changes)];
-	const last = changes[changes.length - 1].at;
-	const summary = [look.label, `${changes.length} ${changes.length === 1 ? "change" : "changes"}`, last !== null && `${age(last)} ago`].filter(Boolean).join(" · ");
-	return (
-		<SidebarMenuItem>
-			<Tooltip content={`${file.path} · ${summary}`} side="left">
-				<SidebarMenuButton icon={look.icon} aria-expanded={open} onClick={() => setOpen(!open)} className="h-auto min-h-8 items-start py-1.5 [&>svg]:mt-0.5">
-					<span className="flex min-w-0 flex-1 flex-col gap-0.5">
-						<span className="flex min-w-0 items-baseline gap-1.5">
-							<span className="min-w-0 truncate text-foreground">{name}</span>
-							<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{dir}</span>
-							<span className="text-xs">
-								<LineCounts {...lineTotals(changes)} />
-							</span>
-						</span>
-						<span className="truncate text-xs text-muted-foreground">{summary}</span>
-					</span>
-				</SidebarMenuButton>
-			</Tooltip>
-			{open && (
-				<ol className="space-y-3 border-l border-border py-2 pr-1 pl-3 ml-4" aria-label={`Changes to ${file.path}, newest first`}>
-					{changes.toReversed().map((change, index) => (
-						<Change key={changes.length - index} change={change} />
-					))}
-				</ol>
-			)}
-		</SidebarMenuItem>
-	);
-}
-
 /** The right sidebar's tab, which localStorage keeps across views. The key keeps its old name, and a tab that no longer exists reads as the outline. */
 const TAB_KEY = "omp-agents.plan-tab";
 
-const DETAILS_TABS = ["outline", "files", "media", "pull-requests"] as const;
+const DETAILS_TABS = ["outline", "media", "pull-requests"] as const;
 type DetailsTab = (typeof DETAILS_TABS)[number];
 
 /** Each tab names itself and counts its items in a badge, which screen readers hear through the tab's name. */
@@ -145,12 +27,13 @@ const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
 /** Keeps each tab's content off the header's hairline at rest, and scrolls away with it. */
 const PANEL_VIEWPORT = "pt-2";
 
+/** The PRs tab pins its pull request's header to the top edge, which must neither fade nor sit below a padding that the text scrolls through. */
+const PINNED_VIEWPORT = "scroll-fade-bottom-only";
+
 interface SessionDetailsProps {
 	view: View;
 	/** Marks the last turn as still running; a change also reads the shown pull request again. */
 	working: boolean;
-	/** The session whose changes page the Files tab links to, `null` for a subagent's view. */
-	sessionId: string | null;
 	/** What the view's session and its subagents submitted or worked on, the session's own first. */
 	pullRequests: LinkedPullRequest[];
 	/** The sidebar's project `cwd`, or `null` for every project. */
@@ -159,15 +42,13 @@ interface SessionDetailsProps {
 }
 
 /**
- * The right sidebar's content for the focused view: an outline of its conversation's turns, the files its agent changed,
- * the images its agents' tools returned, and its session's pull requests, each tab apart.
+ * The right sidebar's content for the focused view: an outline of its conversation's turns, the images its agents' tools
+ * returned, and its session's pull requests, each tab apart.
  */
-export function SessionDetails({ view, working, sessionId, pullRequests, project, hosts }: SessionDetailsProps) {
-	const changedFiles = useChangedFiles(view);
+export function SessionDetails({ view, working, pullRequests, project, hosts }: SessionDetailsProps) {
 	const media = useMedia(view);
 	const turnCount = useTurnCount(view);
 	const [tab, setTab] = useStoredState<DetailsTab>(TAB_KEY, raw => DETAILS_TABS.find(tab => tab === raw) ?? "outline");
-	const files = changedFiles ?? [];
 	return (
 		<Tabs value={tab} onValueChange={value => setTab(value as DetailsTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center gap-2 border-b border-border px-2 py-0">
@@ -175,7 +56,6 @@ export function SessionDetails({ view, working, sessionId, pullRequests, project
 				<SizeProvider size="compact">
 					<TabsList aria-label="Session details">
 						<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", turnCount)} />
-						<TabItem value="files" icon={FileDiff} className={TAB_CLASS} {...tabLabel("Files", files.length)} />
 						<TabItem value="media" icon={Images} className={TAB_CLASS} {...tabLabel("Media", media?.length ?? 0)} />
 						<TabItem value="pull-requests" icon={GitPullRequest} className={TAB_CLASS} {...tabLabel("PRs", pullRequests.length)} />
 					</TabsList>
@@ -186,47 +66,13 @@ export function SessionDetails({ view, working, sessionId, pullRequests, project
 					<OutlineTab view={view} working={working} />
 				</SidebarContent>
 			</TabPanel>
-			<TabPanel value="files" asChild>
-				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-					{changedFiles && files.length === 0 && <p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p>}
-					{files.length > 0 && (
-						<SidebarGroup>
-							<SidebarGroupLabel>
-								<span className="min-w-0 flex-1 truncate">
-									{files.length} {files.length === 1 ? "file" : "files"} changed
-								</span>
-								<LineCounts {...lineTotals(files.flatMap(file => file.changes))} />
-							</SidebarGroupLabel>
-							<SidebarMenu aria-label="Files changed">
-								{files.map(file => (
-									<FileRow key={file.path} file={file} />
-								))}
-							</SidebarMenu>
-						</SidebarGroup>
-					)}
-					{sessionId !== null && (
-						<SidebarGroup>
-							<SidebarMenu>
-								<SidebarMenuItem>
-									<SidebarMenuButton asChild>
-										<a href={hashForChanges(sessionId)}>
-											<FileDiff />
-											<span>Open the session's changes</span>
-										</a>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							</SidebarMenu>
-						</SidebarGroup>
-					)}
-				</SidebarContent>
-			</TabPanel>
 			<TabPanel value="media" asChild>
 				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
 					<MediaTab media={media} view={view} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="pull-requests" asChild>
-				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
+				<SidebarContent viewportClassName={PINNED_VIEWPORT}>
 					<PullRequestsTab pullRequests={pullRequests} project={project} hosts={hosts} version={working} />
 				</SidebarContent>
 			</TabPanel>

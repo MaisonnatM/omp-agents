@@ -94,10 +94,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 
 ## Session details sidebar
 
-- The right sidebar shows the focused pane's conversation at a glance, and what its agent changed and captured: a live session, one of its subagents, or a past session, each from its own transcript file.
+- The right sidebar shows the focused pane's conversation at a glance, and what its agent captured and shipped: a live session, one of its subagents, or a past session, each from its own transcript file.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
-- Tabs split it: **Outline**, **Files**, **Media**, and **PRs**.
-  Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
+- Tabs split it: **Outline**, **Media**, and **PRs**.
+  Each tab shows its name and, in a badge, how many items it holds, such as `3` images.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
   The sidebar remembers the tab you chose, for every view.
 - **Outline** shows the conversation's turns in order, each weighted by how much it matters.
@@ -116,14 +116,6 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The turn you are reading carries a shaded background, and moves as you scroll the transcript; the outline scrolls to keep it in view.
   After you click a turn it stays marked until you scroll the transcript yourself, since the last turns may never reach the top of the transcript.
   The list follows the conversation as it goes.
-- **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
-  Each row shows whether the session created, edited, or deleted the file, how many times it changed it, how long ago the last change was, and the lines added and removed, which the list's heading totals.
-  A path inside the session's working directory shows relative to it.
-  Click a file to unfold its changes under it, newest first: each with its kind, its time, its lines added and removed, and its diff as omp recorded it with line numbers.
-  A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
-  A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
-  A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
-  **Open the session's changes**, under the list, opens the session's [changes page](#session-changes); a subagent's Files tab has no such link.
 - Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
 - **Media** shows the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
   On a session that is every image of the session; on a subagent it is that subagent's and its own subagents'.
@@ -133,17 +125,17 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in a new tab.
   New images show up while the agents run.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
-  A session with several lists them first, each with whether it submitted or worked on it; click one to show it.
-  The first one shows until you pick another.
+  The first one shows until you pick another: click another pull request of its **Stack** to show it in place.
+  The session's pull requests that the stack does not show are listed above the details, each with whether the session submitted or worked on it.
   The pull request then shows as its details in the inbox do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
-  The header and the tab bar stay on top while the details scroll.
+  The header and the tab bar stay pinned to the top of the sidebar while the details scroll, with no fade over them.
   The quick actions apply only when the inbox of the sidebar's project lists the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
 
 ## Session changes
 
-- **Open the session's changes** in the sidebar's **Files** tab or a `#changes/<session id>` address shows the files the session changed as an editor does, in place of the panes.
+- A `#changes/<session id>` address shows the files the session changed as an editor does, in place of the panes.
   The sidebar stays on **Sessions**, and the arrow before the title goes back to the session.
 - The page lists two sets of files at once.
   One is what the session's git checkout changed: its worktree, else its directory, against the commit its branch forked from the remote's default branch, else against `HEAD`, else against nothing before the first commit, with uncommitted and untracked files included.
@@ -532,7 +524,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   On the right of the first line, the **Next move** shows as its badge, with its reason on hover, and one button that makes it.
   The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**; a **Rebase** whose checks also failed offers **Fix CI and conflicts**.
   **Merge** offers **Merge on GitHub**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
-  The `⋯` menu beside it holds the other quick actions, then **Open on GitHub** and **Open on Graphite**.
+  The `⋯` menu beside it holds the other quick actions, then **Open on GitHub** and **Open on Graphite**, each with its logo.
 - Under the header, tabs split the details: **Summary**, **Timeline**, with the count of its comments, reviews, and review threads, and **Code**.
   The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
 - **Summary** lists the pull request's properties.
@@ -544,7 +536,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The lists of reviewers and labels come from GitHub on the first click, and the server keeps them for 5 minutes.
   A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details say why and read the pull request again.
   **Sessions** shows the running sessions on the pull request.
-  When the inbox lists another pull request of its stack, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, marks this one, and links to the others.
+  When the inbox lists another pull request of its stack, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, marks this one, and links to the others; in the session details sidebar, a click shows the other one there instead.
   Then comes the description in full.
 - **Timeline** lists what happened on the pull request as a chat does, newest first, with a line for each day that stays on top while you scroll its entries.
   Each entry shows its author's avatar, name, and time: a push lists its commits, one author's commits within an hour as one entry, with each commit's short hash and lines added and removed; a review shows its verdict and words; a comment shows its words.

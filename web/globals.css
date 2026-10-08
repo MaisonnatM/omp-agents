@@ -298,6 +298,11 @@
     mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
     -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, var(--sf-start)) 0, #000 var(--scroll-fade-size), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
 }
+  /* For a scroller whose content pins its own header at the top: that edge never fades, so nothing shows through the header. */
+  .scroll-fade.scroll-fade-once-scrolled.scroll-fade-bottom-only {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
+}
 
 @supports (timeline-scope: --sf) {
   .scroll-divider {

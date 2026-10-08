@@ -206,7 +206,6 @@ export function App() {
 									key={hashForView(detailsView)}
 									view={detailsView}
 									working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
-									sessionId={detailsView.kind === "past" ? detailsView.sessionId : detailsView.agentId === null ? ((focused.host ?? focused.lastHost)?.sessionId ?? null) : null}
 									pullRequests={focused.row?.pullRequests ?? []}
 									project={project}
 									hosts={visible.hosts}
