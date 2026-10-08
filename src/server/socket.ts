@@ -15,6 +15,8 @@ export interface SocketEnv {
 	sessions: LiveSessions;
 	views: Views;
 	start(request: StartRequest): Promise<StartResult>;
+	/** End live session `instanceId` as **End session** does, then remove the git worktree it worked in. */
+	end(instanceId: string): Promise<void>;
 	/** Move interrupted session `sessionId` to the past sessions. */
 	dismissInterrupted(sessionId: string): void;
 	/** Whether interrupted session `sessionId` stopped while its turn ran. */
@@ -109,9 +111,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 		});
 	},
 	"dismiss-interrupted": ({ dismissInterrupted }, _ws, { sessionId }) => dismissInterrupted(sessionId),
-	async end({ sessions }, _ws, { instanceId }) {
-		await sessions.get(instanceId)?.end();
-	},
+	end: ({ end }, _ws, { instanceId }) => end(instanceId),
 	async "list-models"({ sessions }, ws, { instanceId }) {
 		const session = sessions.started(instanceId);
 		if (!session) {

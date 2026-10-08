@@ -4,6 +4,7 @@ import type { Server } from "bun";
 import { GoogleCalendarReader } from "./google-calendar";
 import { integrationServer } from "./integrations";
 import { errorText } from "./json";
+import type { LiveSession } from "./live-session";
 import { readWithMcpSignIn } from "./omp/mcp";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
@@ -29,6 +30,7 @@ import { RoutineRunner } from "./server/routine-runner";
 import { ProjectsFile } from "./server/projects-file";
 import { RoutinesFile } from "./server/routines-file";
 import { SessionFiles } from "./server/session-files";
+import { endSession } from "./server/session-end";
 import { createClientHandler } from "./server/socket";
 import { createStarter } from "./server/start";
 import { TodoInbox } from "./server/todo-inbox";
@@ -134,17 +136,16 @@ const worktrees = new Worktrees({
 	},
 });
 const startSession = (request: StartRequest): Promise<StartResult> => worktrees.start(() => starter(request), request.kind === "new" && request.branch !== null);
+/** Ends `session` as **End session** does, then removes the linked worktree it worked in: the one its bash calls last ran in, else its own directory's. */
+const endLive = (session: LiveSession): Promise<void> =>
+	endSession({ sessionId: session.sessionId, workDir: files.factsOf(session.sessionId).worktree ?? session.cwd, end: () => session.end() }, dir => worktrees.removeCheckout(dir));
 const endInbox = new EndInbox(sessionEndInboxDir, {
-	session(sessionId) {
+	async end(sessionId) {
 		const session = sessions.bySessionId(sessionId);
-		if (!session) return null;
 		// Every server follows a terminal session, so only the owner acts on its request; a session started here is this server's alone.
-		if (!sessions.started(session.instanceId) && !ownerLock.held) return null;
-		return { workDir: files.factsOf(sessionId).worktree ?? session.cwd, end: () => session.end() };
-	},
-	async removeWorktree(dir) {
-		const result = await worktrees.removeCheckout(dir);
-		return result.removed ? null : (result.error ?? result.blockers.map(blocker => blocker.message).join(" "));
+		if (!session || (!sessions.started(session.instanceId) && !ownerLock.held)) return false;
+		await endLive(session);
+		return true;
 	},
 });
 const runner = new RoutineRunner({
@@ -166,6 +167,10 @@ const handleClientMsg = createClientHandler({
 	sessions,
 	views,
 	start: startSession,
+	async end(instanceId) {
+		const session = sessions.get(instanceId);
+		if (session) await endLive(session);
+	},
 	dismissInterrupted(sessionId) {
 		if (interrupted.dismiss(sessionId)) broadcasts.pushPast();
 	},

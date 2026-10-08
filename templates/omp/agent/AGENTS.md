@@ -11,6 +11,12 @@ Skip the worktree only for read-only investigation or an explicit user request t
 Every subagent touching a Git repository uses `isolated: true`, independently of the session's own worktree.
 Force-pushes and rewriting `main` still require explicit approval.
 
+## Test servers
+
+A server, dev server, or other listener you start to test or verify never takes a default port, such as 3000, 3001, 4200, 4317, 5000, 5173, 8000, or 8080: the user's own servers and other sessions run there.
+Use the port range the repository's docs name; otherwise pick a random port between 20000 and 39999 and check it is free with `lsof -nP -iTCP:<port> -sTCP:LISTEN` first.
+Pass the port through the tool's port flag or `PORT`, and point every browser, curl, and proxy call at it.
+
 ## Conditional references
 
 - Models: before configuring model roles, reasoning levels, fallback chains, or responding to quota exhaustion, read `~/.omp/agent/docs/model-routing.md`.

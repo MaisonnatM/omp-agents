@@ -37,7 +37,8 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   When omp ends a reply with a `Suggestions:` block, as the starter kit's system prompt asks it to, the composer lists them; press a number key to send one, or pick one with ↓ and ↑.
 - **Session lifecycle.**
   Start a session in any project, on any branch or a new one in its own git worktree, resume a past one, or fork a conversation from any prompt or reply.
-  An agent can end its own session and remove its worktree through the starter kit's `end_session` tool, so "Merge on main, delete the worktree, then end the session" needs no follow-up.
+  Ending a session removes the git worktree it worked in, and keeps its branch and any worktree with uncommitted changes.
+  An agent can end its own session through the starter kit's `end_session` tool, so "Merge on main, then end the session" needs no follow-up.
 - **Pull request inbox.**
   A Graphite-style inbox of your GitHub pull requests, linked to the sessions that submitted or worked on them.
 - **Linear tickets.**

@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { lstat, readdir } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, sep } from "node:path";
-import { canonical, commonDir, git, worktreesOf, type Registration } from "./git";
+import { canonical, commonDir, git, worktreeAt, worktreesOf, type Registration } from "./git";
 import { errorText } from "./json";
 import { mapLimit } from "./map-limit";
 import { run } from "./proc";
@@ -350,11 +350,14 @@ export class Worktrees {
 	}
 
 	/**
-	 * Removes the linked worktree that `cwd` is in, with the checks **Delete** makes, once no live session uses it.
+	 * Removes the linked worktree that `cwd` is in, with the checks **Delete** makes, once no live session uses it; `null`
+	 * when `cwd` is in none, such as a main checkout or a directory outside git.
 	 * A session that was just ended takes a moment to leave, so an `occupied` checkout is tried again until `waitMs` passes.
 	 */
-	async removeCheckout(cwd: string, waitMs = 15000): Promise<WorktreeRemovalResult> {
-		const target = { repository: await commonDir(cwd), path: await canonical((await git(cwd, "rev-parse", "--show-toplevel")).trim()) };
+	async removeCheckout(cwd: string, waitMs = 15000): Promise<WorktreeRemovalResult | null> {
+		const at = await worktreeAt(cwd);
+		if (!at?.linked) return null;
+		const target = { repository: await canonical(at.common), path: await canonical(at.top) };
 		const until = Date.now() + waitMs;
 		// Only live sessions decide this wait, so the checkout is read in full once, after they leave or the time is up.
 		while (Date.now() < until && this.#occupancy({ hosts: await this.#liveHosts(), activity: [] }, target.repository, target.path).some(blocker => blocker.code === "occupied")) await Bun.sleep(500);

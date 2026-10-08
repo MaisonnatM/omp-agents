@@ -406,13 +406,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - A running session shows **End session** in its header, unless its room is read-only.
   **End session** stops its omp process: one that the dashboard started stops over its pipe, and a terminal session gets `SIGTERM`, as when its terminal closes, so its terminal returns to the shell.
   omp records the exit in the session file, and the session moves to the past sessions, where **Resume** continues it.
+  The dashboard then removes the git worktree the session works in, the one its header names the branch of, with the checks of **Settings → Worktrees**, and keeps its branch; **Resume** then reports that the directory no longer exists until you check the branch out there again.
+  A worktree that those checks keep, such as one with uncommitted changes or one another session uses, stays in **Settings → Worktrees**, whose **Delete** applies the same checks; a session in a main checkout or outside git leaves its directory as it is.
   Each pane that showed the session, or one of its subagents, moves to the next running session the sidebar lists, else the previous one, skipping sessions already open in a pane.
   With none left, the pane stays on the ended session.
-- An agent ends its own session through the `end_session` tool, when you ask it to, for example "Merge on main, delete the worktree, then end the session".
+- An agent ends its own session through the `end_session` tool, when you ask it to, for example "Merge on main, then end the session".
   It comes from `~/.omp/agent/extensions/end-session.ts`, which `bun run omp-template` installs.
-  The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **End session**, not as interrupted.
-  With `removeWorktree`, the dashboard then removes the git worktree the session works in, the one its header names the branch of, with the checks of **Settings → Worktrees**, and keeps its branch.
-  A worktree that those checks keep, such as one with uncommitted changes, one another session uses, or the main checkout, stays in **Settings → Worktrees**, whose **Delete** applies the same checks.
+  The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **End session**, not as interrupted, its worktree removed the same way.
   The tool leaves its request as `<session id>.json` in `end-inbox/` beside `todos.json`; a message sent before the dashboard acts withdraws it, and a request waits while the dashboard is down.
 - **Resume** in a past session's header starts omp on that session's file from the dashboard, as `omp --resume <session id>` does in a terminal.
   The pane then shows the live session, which carries on in the same file and moves to the running sessions.

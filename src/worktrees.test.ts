@@ -74,7 +74,7 @@ describe("worktree removal", () => {
 		expect((await git(main, "show-ref", "--verify", "refs/heads/keep-me")).trim()).toContain("refs/heads/keep-me");
 	});
 
-	test("removeCheckout waits for the session that just ended to leave, and refuses the main checkout", async () => {
+	test("removeCheckout waits for the session that just ended to leave, and leaves a main checkout or a directory outside git alone", async () => {
 		const { parent, main } = await repo();
 		const path = await linked(parent, main, "ending");
 		let leaving = 2;
@@ -84,12 +84,13 @@ describe("worktree removal", () => {
 			live: () => (leaving-- > 0 ? [{ cwd: join(path, "src"), unknownAgents: false }] : []),
 			serverCwd: "/no/such/dashboard",
 		});
-		expect((await worktrees.removeCheckout(join(path, "."))).removed).toBe(true);
+		expect((await worktrees.removeCheckout(join(path, ".")))?.removed).toBe(true);
 		expect(existsSync(path)).toBe(false);
-		expect((await worktrees.removeCheckout(main)).blockers.map(blocker => blocker.code)).toContain("main");
+		expect(await worktrees.removeCheckout(main)).toBeNull();
+		expect(await worktrees.removeCheckout(parent)).toBeNull();
 		const stuck = await linked(parent, main, "stuck");
 		const busy = new Worktrees({ knownCwds: () => [], activity: () => [], live: () => [{ cwd: stuck, unknownAgents: false }], serverCwd: "/no/such/dashboard" });
-		expect((await busy.removeCheckout(stuck, 0)).blockers.map(blocker => blocker.code)).toEqual(["occupied"]);
+		expect((await busy.removeCheckout(stuck, 0))?.blockers.map(blocker => blocker.code)).toEqual(["occupied"]);
 	});
 
 	test("refuses a dirty checkout, a lock, a live session, an unknown subagent, and the server checkout", async () => {

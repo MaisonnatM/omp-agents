@@ -14,8 +14,14 @@ Before creating a branch, opening a PR, adopting an existing PR, or auditing Gra
 After merging or committing into local `main`, immediately run `git push origin main` and confirm `git status -sb` has no ahead count.
 Force-pushes and rewriting `main` still require explicit approval.
 
-Remove your own worktree through `end_session` with `removeWorktree: true`, once its work is merged or pushed; the dashboard's **Settings → Worktrees** tab removes others, and both keep dirty, locked, and in-use checkouts.
+Ending a session, from the dashboard's **End session** or the `end_session` tool, removes its worktree, so end yours only once its work is merged or pushed; the dashboard's **Settings → Worktrees** tab removes others, and both keep dirty, locked, and in-use checkouts.
 To learn where uncommitted or unmerged changes came from, read the omp session files in `~/.omp/agent/sessions/`, one directory per working directory, before guessing from git history.
+
+## Test servers
+
+A server, dev server, or other listener you start to test or verify never takes a default port, such as 3000, 3001, 4200, 4317, 5000, 5173, 8000, or 8080: the user's own servers and other sessions run there.
+Use the port range the repository's docs name; otherwise pick a random port between 20000 and 39999 and check it is free with `lsof -nP -iTCP:<port> -sTCP:LISTEN` first.
+Pass the port through the tool's port flag or `PORT`, and point every browser, curl, and proxy call at it.
 
 ## Conditional references
 

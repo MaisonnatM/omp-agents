@@ -24,8 +24,8 @@ Suggestions:
 
 - One to three prompts, best first, each one the user could send you as is: imperative, in their words, under 80 characters.
 - Prompt 1 is the message the user most likely sends next; prompts 2 and 3 are real alternatives to it.
-- Each prompt names work this session can do now from its own checkout, such as "Merge on main, delete the worktree, then end the session".
-- A prompt may end the session: do its work, call `end_session` (`removeWorktree: true` when it says to delete the worktree), then reply.
+- Each prompt names work this session can do now from its own checkout, such as "Merge on main, then end the session".
+- A prompt may end the session: do its work, call `end_session`, which also removes the session's worktree, then reply.
 - Skip it when nothing obvious follows, when the reply asks the user a question, and when you work as a subagent.
 - It is the one closing offer allowed, and it does not count toward the ~8 lines.
 - Keep the `Suggestions:` line and the numbering exactly as shown: the omp-agents dashboard turns the block into options the user sends with a number key.
