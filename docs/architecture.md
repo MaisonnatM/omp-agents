@@ -546,14 +546,19 @@ A sign-in that omp does not manage stays, and the route answers an error that sa
 `src/google-calendar.ts` reads Google Calendar's REST API (`https://www.googleapis.com/calendar/v3`) with the token omp holds for its Google Calendar MCP server, so the Calendar page needs no sign-in of its own.
 Google Calendar's MCP tools answer only for OAuth clients enrolled in Google's Workspace Developer Preview Program, while the API answers any client that requested the same scopes.
 `readWithMcpSignIn` in `src/omp/mcp.ts` sends the server's token; a 401 forgets the token and the tool list and throws `McpRefused`, and any other failure throws Google's `error.message`.
-`GET /api/google` answers the calendars checked in your Google Calendar's list (`calendarList`, `selected`), each with its id, the name you gave it or else its own, its color, and the error of its last read.
-With no calendar checked, the events read is an error that asks you to check one in Google Calendar.
-`GET /api/calendar/events?from=<ISO time>&to=<ISO time>` reads at most 62 days, and reads the list and each calendar's events at most once a minute, unless `fresh` asks again.
+`GET /api/google` answers the calendars checked in your Google Calendar's list (`calendarList`, `selected`), each with its id, the name you gave it or else its own, its color, its `group`, its `shown` flag, and the error of its last read.
+`group` is `mine` for a calendar whose `accessRole` is `owner`, Google Calendar's **My calendars**, and `other` for the rest, its **Other calendars**.
+`shown` is false for a calendar unchecked in the Calendar page's sidebar.
+`PUT /api/google/calendars` takes `{ id, shown }`, checked by `parseCalendarShown` in `src/server/wire.ts`, saves the choice in `calendars.json`, and answers the calendars as `GET /api/google` does.
+`src/server/calendars-file.ts` keeps the `hidden` calendar ids there, and `GoogleCalendarReader` reads that set on each call.
+With no calendar checked in Google Calendar, the events read is an error that asks you to check one there; with every checked calendar hidden in the sidebar, it answers no events.
+`GET /api/calendar/events?from=<ISO time>&to=<ISO time>` reads at most 62 days, and reads the list and each shown calendar's events at most once a minute, unless `fresh` asks again; a hidden calendar's events are not read.
 Each calendar's `events` read uses `singleEvents=true`, so Google expands repeating events with their removed and moved repeats, and follows `nextPageToken` to the last page.
 Canceled events, events you declined, working-location events, and events with no length are left out, and Google's exclusive all-day end becomes the last included day.
 An event's id is its calendar's id and Google's event id, and it links to the event in Google Calendar.
 One calendar that cannot be read keeps its error for the Integrations row while the others still answer; only when none can is the answer an error.
 The Calendar page reads the open month's events through `calendarEventsStore` in `web/reads.ts` every minute while Google Calendar's connection is `ready` or `failing`, and puts a multi-day event on each day it covers.
+The Calendar tab's sidebar reads the calendars through `googleStore`, and a checkbox's `PUT` reads both stores again, so the open month changes at once.
 The server deletes the `google.json` that an older version kept the calendars' secret iCal addresses in when it starts.
 
 ## Front-end components
@@ -609,7 +614,7 @@ The server lives in `src/`:
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, and `prompts.ts` wrap one area each.
 - `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and projects, joining saved-session titles and working directories without reading transcripts.
-- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `projects.json`, and `notices.json`; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `projects.json`, `calendars.json`, and `notices.json`; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
@@ -641,7 +646,8 @@ The server lives in `src/`:
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/mcp-clients.ts` plans a Slack or Google Calendar OAuth client save, the setup each form shows and the server entry the save writes, from omp's MCP servers that `src/omp/mcp.ts` reads and writes.
   `src/integrations.ts` finds omp's server for each MCP integration, checks it, and runs the sign-ins and sign-outs that Settings › Integrations starts; see [Integrations](#integrations).
-- `src/google-calendar.ts`: `GoogleCalendarReader`, the calendars checked in your Google Calendar and their events in a span, read from Google's Calendar API with omp's Google Calendar sign-in.
+- `src/google-calendar.ts`: `GoogleCalendarReader`, the calendars checked in your Google Calendar and the events in a span of those the Calendar page shows, read from Google's Calendar API with omp's Google Calendar sign-in.
+  `src/server/calendars-file.ts` keeps the ids of the calendars unchecked in the Calendar tab's sidebar in `calendars.json` beside the access token, and moves a file it cannot read to `calendars.json.invalid`.
 - `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout behind `src/integrations.ts`.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the inbox's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
 - `src/user-todos-shared.ts`: the Todo page's types, which the server, the page, and the extension that reads `todos.json` all follow: `UserTodoList`, `UserTodo`, `UserTodoLink`, `UserTodoChange`, and the statuses (`TODO_STATUSES`, `isClosed`) and priorities (`TODO_PRIORITIES`, Linear's scale, as tickets use).
@@ -773,7 +779,7 @@ The page lives in `web/`.
 - `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the project picker; `web/components/inbox/inbox-nav.tsx` is its Inbox tab, and `web/components/section-link.tsx` the section link that the tickets list and the inbox's section index share.
   `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed; the row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
-  `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab, the calendar and then the routines by name.
+  `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab: the calendar, the Google calendars under **My calendars** and **Other calendars**, each a checkbox that shows or hides its events, and then the routines by name.
 - `web/components/toaster.tsx`: `toasts`, the page's one Base UI toast manager, which shows a toast from anywhere without rendering its caller again, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
   `web/components/notices.tsx` holds `NoticesBell`, the roster header's bell and its list, and `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once, even with the sidebar hidden.
 - `web/components/todo/`: the Todo page.

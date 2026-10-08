@@ -3,7 +3,7 @@ import type { ClientMsg } from "../shared/protocol";
 import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseClientMsg, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
+import { parseCalendarShown, parseClientMsg, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -339,6 +339,16 @@ describe("parseIntegrationId", () => {
 		expect(parseIntegrationId({})).toBeNull();
 		expect(parseIntegrationId("linear")).toBeNull();
 		expect(parseIntegrationId(null)).toBeNull();
+	});
+});
+
+describe("parseCalendarShown", () => {
+	test("takes a calendar id and a boolean, and refuses an empty id or another value for shown", () => {
+		expect(parseCalendarShown({ id: "team@group.calendar.google.com", shown: false })).toEqual({ id: "team@group.calendar.google.com", shown: false });
+		expect(parseCalendarShown({ id: "max@example.com", shown: true, extra: 1 })).toEqual({ id: "max@example.com", shown: true });
+		expect(parseCalendarShown({ id: "", shown: true })).toBeNull();
+		expect(parseCalendarShown({ id: "max@example.com", shown: "false" })).toBeNull();
+		expect(parseCalendarShown({ id: "max@example.com" })).toBeNull();
 	});
 });
 

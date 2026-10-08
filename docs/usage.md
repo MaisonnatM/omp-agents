@@ -686,7 +686,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Under [Credentials](https://console.cloud.google.com/apis/credentials), create an OAuth client ID of type **Web application**, and add `http://localhost:3119/callback`, with your callback port, as an authorized redirect URI.
   Paste the client ID and secret, then **Connect**; Google asks you to grant reading and editing your events, reading your calendar list, and free/busy.
   omp stores the secret in that server's entry in `~/.omp/agent/mcp.json`, and the secret, client-change, and **Replace OAuth client** rules are Slack's.
-  Once connected, the row lists the calendars the Calendar page shows, in their colors, with why the last read of one failed.
+  Once connected, the row lists the calendars checked in Google Calendar's own list, in their colors, with why the last read of one failed; one you unchecked in the Calendar page's sidebar shows muted and says **Hidden on the Calendar page**.
   Google Calendar's MCP tools answer omp's sessions only when the client's Google Cloud project is in Google's Workspace Developer Preview Program; the Calendar page reads Google's Calendar API and does not need it.
 
 ## Todo list
@@ -784,7 +784,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 ## Calendar
 
 - The **Calendar** tab, or a `#calendar` address, shows a month in place of the panes, Monday first.
-  The sidebar then lists **Calendar**, then **All** and each routine by name.
+  The sidebar then lists **Calendar**, then, once Google Calendar is connected, your Google calendars under **My calendars** and **Other calendars**, then **All** and each routine by name.
 - Each day lists its routine runs, the todos due on it, and, once connected, the Linear tickets due on it and events of the Google calendars you added.
   A green dot is a run that went through, a red one a run that failed, and a hollow one a run still to come.
   A violet dot is a todo, an amber one a ticket, and a timed Google event uses its calendar's color; an all-day event is a band in that color; a done or canceled todo or ticket is struck through.
@@ -799,8 +799,11 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - Click an entry to open its routine, its todo list, or its ticket; a Google event opens in Google Calendar in a new tab.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
 - To show Google events, connect Google Calendar in **Settings › Integrations**; see [Integrations](#integrations).
-  The page shows the calendars checked in Google Calendar's own list, so check or uncheck one there to show or hide it here.
-  It leaves out canceled events, the ones you declined, and working locations, repeats multi-day events on each day, and refreshes the open month every minute.
+  The sidebar lists the calendars checked in Google Calendar's own list, the ones you own under **My calendars** and the ones you subscribed to or others share under **Other calendars**, as Google Calendar groups them.
+  Each has a checkbox in its color: uncheck one to hide its events on this page, and check it to show them again; the month updates at once.
+  The server keeps the choice in `calendars.json` beside its access token, so every browser tab and the desktop app show the same calendars.
+  A calendar unchecked in Google Calendar's own list is not listed; check it there first.
+  The page leaves out canceled events, the ones you declined, and working locations, repeats multi-day events on each day, and refreshes the open month every minute.
 
 ## Routines
 

@@ -5,7 +5,7 @@
  */
 import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
-import { GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
+import { type CalendarShownInput, GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import type { BranchChoice } from "../shared/git";
@@ -375,6 +375,10 @@ const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
 /** The body of `PUT /api/integrations/sign-in` and `/sign-out`: `{ id }` naming an MCP integration. */
 export const parseIntegrationId = (body: unknown): McpIntegrationId | null => (isObject(body) && isMcpIntegration(body.id) ? body.id : null);
+
+/** The body of `PUT /api/google/calendars`: `{ id, shown }`, a Google calendar's id and whether the Calendar page shows it. */
+export const parseCalendarShown = (body: unknown): CalendarShownInput | null =>
+	isObject(body) && isNonEmpty(body.id) && typeof body.shown === "boolean" ? { id: body.id, shown: body.shown } : null;
 
 const validPort = (port: unknown): port is number => typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
 

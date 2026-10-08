@@ -5,8 +5,8 @@ const OCTOBER = [new Date("2026-10-01T00:00:00+02:00"), new Date("2026-11-01T00:
 
 const CALENDARS = {
 	items: [
-		{ id: "max@example.com", summary: "max@example.com", backgroundColor: "#9fe1e7", selected: true, primary: true },
-		{ id: "team@group.calendar.google.com", summary: "Team", summaryOverride: "Eng team", backgroundColor: "#b99aff", selected: true },
+		{ id: "max@example.com", summary: "max@example.com", backgroundColor: "#9fe1e7", selected: true, primary: true, accessRole: "owner" },
+		{ id: "team@group.calendar.google.com", summary: "Team", summaryOverride: "Eng team", backgroundColor: "#b99aff", selected: true, accessRole: "reader" },
 		{ id: "hidden@group.calendar.google.com", summary: "Hidden", backgroundColor: "#16a765" },
 	],
 };
@@ -48,8 +48,12 @@ const WORK_EVENTS = {
 	],
 };
 
-/** A reader over `answers`, by the path and `pageToken` of each address, with the addresses it read. */
-function readerOf(answers: Record<string, unknown>): { reader: GoogleCalendarReader; reads: string[] } {
+const TEAM_EVENTS = {
+	items: [{ id: "retro", status: "confirmed", summary: "Retro", htmlLink: "https://www.google.com/calendar/event?eid=retro", start: { dateTime: "2026-10-09T15:00:00+02:00" }, end: { dateTime: "2026-10-09T16:00:00+02:00" } }],
+};
+
+/** A reader over `answers`, by the path and `pageToken` of each address, that leaves out the `hidden` calendars, with the addresses it read. */
+function readerOf(answers: Record<string, unknown>, hidden: ReadonlySet<string> = new Set()): { reader: GoogleCalendarReader; reads: string[] } {
 	const reads: string[] = [];
 	const get: GoogleGet = async url => {
 		reads.push(url);
@@ -60,7 +64,7 @@ function readerOf(answers: Record<string, unknown>): { reader: GoogleCalendarRea
 		if (answer === undefined) throw new Error(`unexpected read ${key}`);
 		return answer;
 	};
-	return { reader: new GoogleCalendarReader(get), reads };
+	return { reader: new GoogleCalendarReader(get, () => hidden), reads };
 }
 
 const LIST = "/calendar/v3/users/me/calendarList";
@@ -105,4 +109,33 @@ test("a calendar that cannot be read keeps its error for the settings while the 
 	await expect(none.events(...OCTOBER)).rejects.toThrow("Forbidden");
 	const empty = readerOf({ [LIST]: { items: [CALENDARS.items[2]] } }).reader;
 	await expect(empty.events(...OCTOBER)).rejects.toThrow("No calendar is checked");
+});
+
+test("a calendar unchecked on the Calendar page is not read and its events are left out, and the list keeps it unshown in Google Calendar's group", async () => {
+	const hidden = new Set(["max@example.com"]);
+	const { reader, reads } = readerOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: TEAM_EVENTS }, hidden);
+	expect(await reader.events(...OCTOBER)).toEqual({
+		events: [
+			{ id: "team@group.calendar.google.com/retro", title: "Retro", calendar: "Eng team", color: "#b99aff", url: "https://www.google.com/calendar/event?eid=retro", when: { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") } },
+		],
+	});
+	expect(reads.some(url => url.includes("max%40example.com"))).toBe(false);
+	expect((await reader.status()).calendars).toEqual([
+		{ id: "max@example.com", name: "max@example.com", color: "#9fe1e7", group: "mine", shown: false, error: null },
+		{ id: "team@group.calendar.google.com", name: "Eng team", color: "#b99aff", group: "other", shown: true, error: null },
+	]);
+
+	hidden.delete("max@example.com");
+	expect((await reader.events(...OCTOBER)).events.map(event => event.id)).toEqual([
+		"max@example.com/standup_20261005T073000Z",
+		"max@example.com/standup_20261026T083000Z",
+		"max@example.com/offsite",
+		"team@group.calendar.google.com/retro",
+	]);
+});
+
+test("with every calendar unchecked on the Calendar page, the events are none and no calendar is read", async () => {
+	const { reader, reads } = readerOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: TEAM_EVENTS }, new Set(["max@example.com", "team@group.calendar.google.com"]));
+	expect(await reader.events(...OCTOBER)).toEqual({ events: [] });
+	expect(reads.map(url => new URL(url).pathname)).toEqual([LIST]);
 });

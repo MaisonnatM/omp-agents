@@ -88,11 +88,15 @@ export const integrationsStore = createPolledStore<IntegrationsAnswer>({
 	},
 });
 
-/** The calendars checked in your Google Calendar's list, which the Calendar page reads. */
+/** The calendars checked in your Google Calendar's list, which the Calendar page reads unless you unchecked one in its sidebar. */
 export const googleStore = createPolledStore<GoogleStatus>({
 	cacheKey: "omp-agents.google-cache",
 	url: (_, fresh) => `/api/google${fresh ? "?fresh" : ""}`,
-	isValid: (value): value is GoogleStatus => Array.isArray((value as Partial<GoogleStatus> | null)?.calendars),
+	// A read an older version kept has no `shown`, which would show every calendar unchecked until the first poll.
+	isValid: (value): value is GoogleStatus => {
+		const calendars = isObject(value) ? value.calendars : null;
+		return Array.isArray(calendars) && calendars.every(calendar => isObject(calendar) && typeof calendar.shown === "boolean");
+	},
 });
 
 /** Your Google events over a span, by its `from` and `to` query, which the Calendar page reads a month at a time. */
@@ -101,3 +105,7 @@ export const calendarEventsStore = createPolledStore<CalendarEventsAnswer>({
 	url: (span, fresh) => `/api/calendar/events?${span}${fresh ? "&fresh" : ""}`,
 	isValid: (value): value is CalendarEventsAnswer => Array.isArray((value as Partial<CalendarEventsAnswer> | null)?.events),
 });
+
+/** The {@link calendarEventsStore} scope of the month of `year` and `month` (0 for January), from its first local midnight to the next month's. */
+export const monthSpan = (year: number, month: number): string =>
+	new URLSearchParams({ from: new Date(year, month, 1).toISOString(), to: new Date(year, month + 1, 1).toISOString() }).toString();

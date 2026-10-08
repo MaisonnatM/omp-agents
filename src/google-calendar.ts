@@ -1,7 +1,8 @@
 /**
  * Google Calendar, read-only: the calendars checked in your Google Calendar's list and their events, which the Calendar
- * page lists. It reads Google's Calendar API with the token omp holds for its Google Calendar MCP server, the same
- * sign-in and scopes: the server's own tools answer only for OAuth clients in Google's Developer Preview Program.
+ * page lists unless you unchecked a calendar there. It reads Google's Calendar API with the token omp holds for its
+ * Google Calendar MCP server, the same sign-in and scopes: the server's own tools answer only for OAuth clients in
+ * Google's Developer Preview Program.
  */
 import { createCache } from "./cache";
 import { errorText, isObject, nonEmptyStr, str } from "./json";
@@ -16,13 +17,21 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 /** Reads the JSON at a Google Calendar API address with your sign-in. */
 export type GoogleGet = (url: string) => Promise<unknown>;
 
+/** A calendar list entry as Google Calendar lists it, before the Calendar page's own checkbox and last read. */
+type ListedCalendar = Omit<GoogleCalendar, "shown" | "error">;
+
 /** A calendar list entry as the page shows it, or `null` for one unchecked in Google Calendar or without an id. */
-function calendarOf(item: unknown): Omit<GoogleCalendar, "error"> | null {
+function calendarOf(item: unknown): ListedCalendar | null {
 	if (!isObject(item) || item.selected !== true) return null;
 	const id = nonEmptyStr(item.id);
 	if (!id) return null;
 	const color = str(item.backgroundColor);
-	return { id, name: nonEmptyStr(item.summaryOverride) ?? nonEmptyStr(item.summary) ?? id, color: color && HEX_COLOR.test(color) ? color : DEFAULT_COLOR };
+	return {
+		id,
+		name: nonEmptyStr(item.summaryOverride) ?? nonEmptyStr(item.summary) ?? id,
+		color: color && HEX_COLOR.test(color) ? color : DEFAULT_COLOR,
+		group: item.accessRole === "owner" ? "mine" : "other",
+	};
 }
 
 /** The day before `day`, both `YYYY-MM-DD`. */
@@ -32,7 +41,7 @@ const dayBefore = (day: string): string => new Date(Date.parse(`${day}T00:00:00Z
  * One event as the page shows it, or `null` for one Google Calendar hides or draws apart: canceled, declined by you,
  * a working location, or with no length.
  */
-function eventOf(item: unknown, calendar: Omit<GoogleCalendar, "error">): CalendarEvent | null {
+function eventOf(item: unknown, calendar: ListedCalendar): CalendarEvent | null {
 	if (!isObject(item) || item.status === "cancelled" || item.eventType === "workingLocation") return null;
 	const id = nonEmptyStr(item.id);
 	if (!id || !isObject(item.start) || !isObject(item.end)) return null;
@@ -56,17 +65,20 @@ function eventOf(item: unknown, calendar: Omit<GoogleCalendar, "error">): Calend
 	return end > start ? { ...event, when: { allDay: false, start, end } } : null;
 }
 
-/** The calendars your Google Calendar shows, and their events, each read at most once a minute. */
+/** The calendars your Google Calendar shows, and the events of those the Calendar page shows, each read at most once a minute. */
 export class GoogleCalendarReader {
 	readonly #get: GoogleGet;
-	readonly #lists = createCache<Omit<GoogleCalendar, "error">[]>(60_000);
+	/** The ids of the calendars the Calendar page's sidebar unchecked. */
+	readonly #hidden: () => ReadonlySet<string>;
+	readonly #lists = createCache<ListedCalendar[]>(60_000);
 	/** Each calendar's events by calendar and span. */
 	readonly #reads = createCache<CalendarEvent[]>(60_000);
 	/** Why each calendar's last read failed, by its id. */
 	readonly #errors = new Map<string, string>();
 
-	constructor(get: GoogleGet) {
+	constructor(get: GoogleGet, hidden: () => ReadonlySet<string>) {
 		this.#get = get;
+		this.#hidden = hidden;
 	}
 
 	/** Every item of the list at `url`, following Google's page tokens. */
@@ -82,7 +94,7 @@ export class GoogleCalendarReader {
 		}
 	}
 
-	#calendars(fresh: boolean): Promise<Omit<GoogleCalendar, "error">[]> {
+	#calendars(fresh: boolean): Promise<ListedCalendar[]> {
 		return this.#lists.get(
 			"",
 			async () => {
@@ -94,12 +106,13 @@ export class GoogleCalendarReader {
 		);
 	}
 
-	/** The calendars checked in Google Calendar's list, each with why its last read failed. `fresh` lists them again. */
+	/** The calendars checked in Google Calendar's list, each with whether the Calendar page shows it and why its last read failed. `fresh` lists them again. */
 	async status(fresh = false): Promise<GoogleStatus> {
-		return { calendars: (await this.#calendars(fresh)).map(calendar => ({ ...calendar, error: this.#errors.get(calendar.id) ?? null })) };
+		const hidden = this.#hidden();
+		return { calendars: (await this.#calendars(fresh)).map(calendar => ({ ...calendar, shown: !hidden.has(calendar.id), error: this.#errors.get(calendar.id) ?? null })) };
 	}
 
-	#events(calendar: Omit<GoogleCalendar, "error">, from: Date, to: Date, fresh: boolean): Promise<CalendarEvent[]> {
+	#events(calendar: ListedCalendar, from: Date, to: Date, fresh: boolean): Promise<CalendarEvent[]> {
 		const [timeMin, timeMax] = [from.toISOString(), to.toISOString()];
 		return this.#reads.get(
 			`${calendar.id} ${timeMin} ${timeMax}`,
@@ -114,11 +127,15 @@ export class GoogleCalendarReader {
 
 	/**
 	 * The events from `from` to `to` of the shown calendars, each repeat apart. `fresh` reads every calendar again.
-	 * A calendar that cannot be read keeps its error for the settings, and the others still answer; only when none can is it an error.
+	 * A calendar unchecked on the Calendar page is not read. A calendar that cannot be read keeps its error for the
+	 * settings, and the others still answer; only when none can is it an error.
 	 */
 	async events(from: Date, to: Date, fresh = false): Promise<CalendarEventsAnswer> {
-		const calendars = await this.#calendars(fresh);
-		if (calendars.length === 0) throw new Error("No calendar is checked in your Google Calendar's list. Check one there to see its events here.");
+		const listed = await this.#calendars(fresh);
+		if (listed.length === 0) throw new Error("No calendar is checked in your Google Calendar's list. Check one there to see its events here.");
+		const hidden = this.#hidden();
+		const calendars = listed.filter(calendar => !hidden.has(calendar.id));
+		if (calendars.length === 0) return { events: [] };
 		const lists = await Promise.all(
 			calendars.map(async calendar => {
 				try {

@@ -32,7 +32,7 @@ import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseCalendarShown, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -53,6 +53,8 @@ export interface RouteEnv {
 	/** The inbox listed `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
 	google: GoogleCalendarReader;
+	/** Show or hide Google calendar `id`'s events on the Calendar page, and save the choice. */
+	setCalendarShown(id: string, shown: boolean): void;
 	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
 	placeOf(sessionId: string): SessionPlace | null;
 }
@@ -178,6 +180,16 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 
 	/** `GET /api/google[?fresh]`: the calendars checked in your Google Calendar's list, with why each one's last read failed. */
 	const googleStatus = get(params => answer(() => google.status(params.has("fresh"))));
+
+	/** `PUT /api/google/calendars` `{ id, shown }`: show or hide one calendar's events on the Calendar page; answers the calendars after it. */
+	const calendarShown = put(
+		parseCalendarShown,
+		async ({ id, shown }) => {
+			env.setCalendarShown(id, shown);
+			return google.status();
+		},
+		"Expected { id, shown } naming a calendar",
+	);
 
 	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your shown Google calendars in that span. */
 	const calendarEvents = get(params => {
@@ -385,6 +397,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/integrations/slack/client": { PUT: slackClient },
 		"/api/integrations/google-calendar/client": { PUT: googleClient },
 		"/api/google": { GET: googleStatus },
+		"/api/google/calendars": { PUT: calendarShown },
 		"/api/calendar/events": { GET: calendarEvents },
 		"/api/linear/teams": { GET: teams },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },

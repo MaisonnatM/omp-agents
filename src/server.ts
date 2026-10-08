@@ -11,7 +11,7 @@ import { ompVersion } from "./omp/install";
 import { installedOmp, latestOmp, updateOmp } from "./omp/release";
 import { sessionsDir } from "./omp/sessions";
 import { stopStats } from "./omp/stats";
-import { directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
+import { calendarsFile, directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
 import { runShell } from "./proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "./routines";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
@@ -27,6 +27,7 @@ import { buildPage, servePage } from "./server/page";
 import { createRoutes } from "./server/routes";
 import { Notices } from "./server/notices";
 import { RoutineRunner } from "./server/routine-runner";
+import { CalendarsFile } from "./server/calendars-file";
 import { ProjectsFile } from "./server/projects-file";
 import { RoutinesFile } from "./server/routines-file";
 import { SessionFiles } from "./server/session-files";
@@ -70,7 +71,8 @@ const projects = new ProjectsFile(projectsFile);
 const notices = new Notices(noticesFile, { latestOmp, installedOmp, updateOmp, modelUpdates, upgradeModel }, () => broadcasts.pushNotices());
 // The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
 rmSync(oldGoogleFile, { force: true });
-const google = new GoogleCalendarReader(async url => readWithMcpSignIn(await integrationServer("google-calendar"), url));
+const calendars = new CalendarsFile(calendarsFile);
+const google = new GoogleCalendarReader(async url => readWithMcpSignIn(await integrationServer("google-calendar"), url), () => calendars.hidden);
 /** Aborts as the server stops, which stops every routine command still running. */
 const stopping = new AbortController();
 /** The file a view reads, or `null` while it is not known (not listed yet, or no such session). */
@@ -301,6 +303,7 @@ try {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},
 				google,
+				setCalendarShown: (id, shown) => calendars.setShown(id, shown),
 				addedCwds: () => projects.list.added,
 				changeProjects(change) {
 					if (projects.apply(change)) broadcasts.pushProjects();

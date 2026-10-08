@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { type CalendarEntry, calendarEntries } from "../../calendar-model";
 import { localDay } from "../../days";
-import { calendarEventsStore, integrationsStore, ticketsStore } from "../../reads";
+import { calendarEventsStore, integrationsStore, monthSpan, ticketsStore } from "../../reads";
 import { hashForRoutines, hashForTickets, hashForTodo } from "../../routing";
 import { scheduleWords, timeWords } from "../../routines-model";
 import { useMinute } from "../../use-minute";
@@ -270,8 +270,7 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 	const tickets = ticketsStore.usePolling(null, ticketsShown).read?.data.tickets ?? null;
 	const googleConnection = integrationsStore.usePolling().read?.data.integrations["google-calendar"].connection;
 	const connected = googleConnection !== undefined && callable(googleConnection);
-	const span = new URLSearchParams({ from: new Date(year, month, 1).toISOString(), to: new Date(year, month + 1, 1).toISOString() }).toString();
-	const eventsRead = calendarEventsStore.usePolling(span, connected);
+	const eventsRead = calendarEventsStore.usePolling(monthSpan(year, month), connected);
 	const events = connected ? (eventsRead.read?.data.events ?? null) : null;
 	const byDay = useMemo(() => {
 		const days = new Map<string, CalendarEntry[]>();

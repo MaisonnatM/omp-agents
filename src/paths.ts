@@ -26,6 +26,8 @@ export const sessionEndInboxDir = join(configDir, "end-inbox");
 export const routinesFile = join(configDir, "routines.json");
 /** The directories Settings → Projects added and hid, beside {@link tokenFile}. */
 export const projectsFile = join(configDir, "projects.json");
+/** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
+export const calendarsFile = join(configDir, "calendars.json");
 /** The notices the bell's user saw or cleared, beside {@link tokenFile}. */
 export const noticesFile = join(configDir, "notices.json");
 /** The Google calendars' secret addresses an older version kept, beside {@link tokenFile}; the server deletes it at startup. */
