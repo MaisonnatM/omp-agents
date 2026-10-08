@@ -135,8 +135,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   A session with several lists them first, each with whether it submitted or worked on it; click one to show it.
   The first one shows until you pick another.
-  **Open #N in the inbox** opens its details in the main area.
-  Under it, the pull request shows as its details in the inbox do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, each a link to it on the inbox page's **Code** tab.
+  The pull request then shows as its details in the inbox do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
+  The header and the tab bar stay on top while the details scroll.
   The quick actions apply only when the inbox of the sidebar's project lists the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
@@ -536,11 +536,16 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - Under the header, tabs split the details: **Summary**, **Timeline**, with the count of its comments, reviews, and review threads, and **Code**.
   The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
 - **Summary** lists the pull request's properties.
-  **Status** shows what stands between the pull request and its merge: **Ready to merge**, a draft, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
+  **Status** shows the pull request's state, then what stands between the pull request and its merge: **Ready to merge**, merge conflicts, failed checks, requested changes, unresolved review threads, checks still running, the reviews it waits on, approvals, and passed checks, blockers first; a blocker that another quick action works on carries that action's button.
+  Click the state to make the pull request **Open**, **Draft**, or **Closed**; a merged one keeps its state.
   **Reviewers** lists each reviewer with an icon for where they stand: approved, requested changes, commented, or a review still requested.
-  **Labels** shows the labels in their GitHub colors, and **Sessions** the running sessions on the pull request.
+  Click the reviewers for the people who can review on the repository, its author left out: picking one asks them for a review, again when they reviewed already, and picking someone already asked withdraws the request.
+  **Labels** shows the labels in their GitHub colors; click them for the repository's labels, and pick one to add or remove it.
+  The lists of reviewers and labels come from GitHub on the first click, and the server keeps them for 5 minutes.
+  A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details say why and read the pull request again.
+  **Sessions** shows the running sessions on the pull request.
   When the inbox lists another pull request of its stack, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, marks this one, and links to the others.
-  Then comes the description, folded after about 16 lines behind **Show more**; click **Description** to hide or show it.
+  Then comes the description in full.
 - **Timeline** lists what happened on the pull request as a chat does, newest first, with a line for each day that stays on top while you scroll its entries.
   Each entry shows its author's avatar, name, and time: a push lists its commits, one author's commits within an hour as one entry, with each commit's short hash and lines added and removed; a review shows its verdict and words; a comment shows its words.
   The pull request's own commits show, not those of its trunk that its branch took in; a commit counts as its own unless GitHub links it only to other pull requests.
@@ -551,7 +556,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A renamed file shows **R**, and a copied one **A**.
   It reads the files from GitHub, so it needs no checkout of the repository; a file GitHub shows no diff for, such as a binary one or one with a very large diff, shows why instead.
   Opening the tab reads the list from GitHub again, and the files you open within 30 seconds read from that list.
-  In the session details sidebar's **PRs** tab, **Code** lists the files instead, each a link to that file on the inbox page's **Code** tab.
+  In the session details sidebar's **PRs** tab, **Code** lists the files instead; a click on one opens the explorer in a dialog at that file, where the others open in place.
 - Each opening reads the pull request again; the server keeps its answer for 30 seconds.
 - The inbox works from the keyboard, outside text fields, while its tab shows.
   J and K move to the next and previous row, and Enter shows the focused row's details.

@@ -198,3 +198,22 @@ export interface PullRequestDetail extends PullRequest {
 	/** Its own commits among the branch's latest 100, oldest first: none that GitHub links only to other pull requests. */
 	commits: PullRequestCommit[];
 }
+
+/** The states the details can set; GitHub alone merges. */
+export const SETTABLE_STATES = ["open", "draft", "closed"] as const;
+export type SettableState = (typeof SETTABLE_STATES)[number];
+
+/** One pick in the details' fields: a label or a review request added or removed, or the state set. */
+export type PullRequestChange = { field: "label"; name: string; on: boolean } | { field: "reviewer"; login: string; on: boolean } | { field: "state"; state: SettableState };
+
+/** The body of `PUT /api/pull-request`. */
+export interface PullRequestEdit extends PullRequest {
+	change: PullRequestChange;
+}
+
+/** What the details' Labels and Reviewers pickers offer for a repository. */
+export interface PullRequestOptions {
+	labels: PullRequestLabel[];
+	/** The people a review can be asked of: those GitHub lets the repository assign. */
+	reviewers: Person[];
+}

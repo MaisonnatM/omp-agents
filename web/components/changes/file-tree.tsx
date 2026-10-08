@@ -47,13 +47,15 @@ interface FileTreeProps {
 	open: string | null;
 	/** The address that opens the file at `path`. */
 	hrefFor: (path: string) => string;
+	/** Opens the file at `path` in place on a plain click, which then leaves the address alone. */
+	onPick?: (path: string) => void;
 }
 
 /**
  * The changed files as folders, each folder open until you close it, and opened again when a file in it opens. A dot
  * marks the files a session's own calls changed.
  */
-export function FileTree({ tree, open, hrefFor }: FileTreeProps) {
+export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 	const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
 	const [revealed, setRevealed] = useState(open);
 	if (revealed !== open) {
@@ -103,6 +105,14 @@ export function FileTree({ tree, open, hrefFor }: FileTreeProps) {
 							ref={current ? openRow : undefined}
 							href={hrefFor(file.path)}
 							title={`${file.path}: ${statusLabel(file)}`}
+							onClick={
+								onPick &&
+								(event => {
+									if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+									event.preventDefault();
+									onPick(file.path);
+								})
+							}
 							aria-current={current ? "page" : undefined}
 							className={cn("flex w-full items-center gap-1.5 rounded-md py-0.5 pr-1 text-left text-xs hover:bg-muted", current && "bg-muted font-medium")}
 							style={{ paddingLeft: depth * 12 + 20 }}

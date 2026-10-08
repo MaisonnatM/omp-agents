@@ -22,6 +22,8 @@ interface ChangesExplorerProps {
 	path: string | null;
 	/** The address that opens the file at `path`. */
 	hrefFor: (path: string) => string;
+	/** Opens the file at `path` in place, for the files, J, and K, instead of through its address. */
+	onPick?: (path: string) => void;
 	/** The read of the file at `path` in full, with its diff. */
 	fileUrl: (path: string) => string;
 	/** A new version reads the open file again. */
@@ -32,7 +34,7 @@ interface ChangesExplorerProps {
  * Changed files as an editor shows them, for a session's changes page and a pull request's: the explorer lists them as
  * folders, and the editor shows the open file's diff or the whole file with its changes marked.
  */
-export function ChangesExplorer({ files, path, hrefFor, fileUrl, version }: ChangesExplorerProps) {
+export function ChangesExplorer({ files, path, hrefFor, onPick, fileUrl, version }: ChangesExplorerProps) {
 	const [mode, setMode] = useStoredState<Mode>(MODE_KEY, raw => MODES.find(mode => mode === raw) ?? "diff");
 	const tree = useMemo(() => fileTree(files), [files]);
 	const order = useMemo(() => treeOrder(tree), [tree]);
@@ -41,7 +43,9 @@ export function ChangesExplorer({ files, path, hrefFor, fileUrl, version }: Chan
 	const step = (by: 1 | -1): boolean => {
 		if (!entry) return false;
 		const next = order[order.indexOf(entry) + by];
-		if (next) location.hash = hrefFor(next.path);
+		if (!next) return true;
+		if (onPick) onPick(next.path);
+		else location.hash = hrefFor(next.path);
 		return true;
 	};
 	useShortcuts({ nextChangedFile: () => step(1), previousChangedFile: () => step(-1) });
@@ -53,7 +57,7 @@ export function ChangesExplorer({ files, path, hrefFor, fileUrl, version }: Chan
 					<kbd>{shortcutLabels("nextChangedFile")[0]}</kbd> and <kbd>{shortcutLabels("previousChangedFile")[0]}</kbd> step through the files
 				</p>
 				<div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
-					<FileTree tree={tree} open={entry?.path ?? null} hrefFor={hrefFor} />
+					<FileTree tree={tree} open={entry?.path ?? null} hrefFor={hrefFor} onPick={onPick} />
 				</div>
 			</nav>
 			{entry && (

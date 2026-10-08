@@ -16,6 +16,7 @@ import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { sessionsDir } from "../omp/sessions";
 import { readStats } from "../omp/stats";
 import { directoryOf } from "../paths";
+import { loadPullRequestOptions, savePullRequest } from "../pull-request-edit";
 import { listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
@@ -31,7 +32,7 @@ import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -236,6 +237,15 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return pr ? answer(() => loadPullRequestDetail(pr)) : fail(400, "Expected ?owner=&repo=&number=");
 	});
 
+	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
+	const pullRequestWrite = put(parsePullRequestEdit, savePullRequest, "Expected { owner, repo, number, change } with a label or reviewer to add or remove, or a state of open, draft, or closed");
+
+	/** `GET /api/pull-request/options?owner=<o>&repo=<r>`: the labels and reviewers that repository's pull requests can take. */
+	const pullRequestOptions = get(params => {
+		const repo = parseRepoQuery(params);
+		return repo ? answer(() => loadPullRequestOptions(repo)) : fail(400, "Expected ?owner=&repo=");
+	});
+
 	/** `GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>`: every file that pull request changes, read from GitHub anew, for its changes page. */
 	const pullRequestFiles = get(params => {
 		const pr = parsePullRequestQuery(params);
@@ -382,7 +392,8 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/ticket/attachment": { PUT: ticketAttach },
 		"/api/ticket/options": { GET: ticketOptions },
 		"/api/ticket/media": { GET: ticketMedia },
-		"/api/pull-request": { GET: pullRequest },
+		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
+		"/api/pull-request/options": { GET: pullRequestOptions },
 		"/api/pull-request/files": { GET: pullRequestFiles },
 		"/api/pull-request/file": { GET: pullRequestFile },
 		"/api/worktrees": { GET: worktreeInventory },

@@ -3,7 +3,7 @@
  * terms. The repository and pull request keys, which the page uses too, live in `shared.ts`.
  */
 import { isObject, str } from "./json";
-import { run, runJson } from "./proc";
+import { run, runChecked, runJson } from "./proc";
 import type { ChangeStatus } from "./shared/changes";
 import type { CheckRunState, Person, PullRequestEvent, PullRequestFile, Repo, ReviewDecision, ReviewerState } from "./shared/github";
 
@@ -74,6 +74,11 @@ export function ghGraphql(query: string, vars: Record<string, string | number>):
 /** `gh api`'s answer for REST `path`; `paginate` reads every page, answering an array of the pages. */
 export function ghRest(path: string, paginate = false): Promise<unknown> {
 	return runJson(["gh", "api", ...(paginate ? ["--paginate", "--slurp"] : []), path], { timeoutMs: GH_TIMEOUT_MS });
+}
+
+/** `method` on REST `path` through `gh api`, each field a `-f` of its JSON body, a `name[]` field one item of an array; throws GitHub's refusal. */
+export async function ghRestWrite(method: "POST" | "PATCH" | "DELETE", path: string, fields: [name: string, value: string][] = []): Promise<void> {
+	await runChecked(["gh", "api", "-X", method, path, ...fields.flatMap(([name, value]) => ["-f", `${name}=${value}`])], { timeoutMs: GH_TIMEOUT_MS });
 }
 
 /** The data of a `gh api graphql` answer, or GitHub's errors thrown. */

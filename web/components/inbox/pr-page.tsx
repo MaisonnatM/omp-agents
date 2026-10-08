@@ -88,6 +88,7 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 				placement={placement}
 				version={version}
 				files={files}
+				onSaved={() => void inboxStore.refresh(project, { fresh: true })}
 			/>
 		</>
 	);

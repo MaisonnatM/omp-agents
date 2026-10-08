@@ -4,8 +4,6 @@ import { type LinkedPullRequest, prKey } from "../../src/shared/github";
 import type { RosterHost } from "../../src/shared/sessions";
 import { SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { LINK_VERB } from "../labels";
-import { PAGE_ICON } from "../page-icons";
-import { hashForInbox } from "../routing";
 import { PullRequestDetails } from "./inbox/pr-page";
 
 interface PullRequestsTabProps {
@@ -19,8 +17,8 @@ interface PullRequestsTabProps {
 }
 
 /**
- * The session's pull requests in the right sidebar: a list to pick one when it has several, a link to its details in
- * the inbox, and its details as the inbox page shows them. The first one shows until another is picked.
+ * The session's pull requests in the right sidebar: a list to pick one when it has several, then its details as the
+ * inbox page shows them. The first one shows until another is picked.
  */
 export function PullRequestsTab({ pullRequests, project, hosts, version }: PullRequestsTabProps) {
 	const [picked, setPicked] = useState<string | null>(null);
@@ -44,15 +42,6 @@ export function PullRequestsTab({ pullRequests, project, hosts, version }: PullR
 					</SidebarMenu>
 				</SidebarGroup>
 			)}
-			<SidebarGroup>
-				<SidebarMenu>
-					<SidebarMenuItem>
-						<SidebarMenuButton asChild icon={PAGE_ICON.inbox}>
-							<a href={hashForInbox(shown)}>Open #{shown.number} in the inbox</a>
-						</SidebarMenuButton>
-					</SidebarMenuItem>
-				</SidebarMenu>
-			</SidebarGroup>
 			<div className="space-y-3 px-4 pt-1 pb-4">
 				<PullRequestDetails project={project} hosts={hosts} target={shown} placement="sidebar" version={version} />
 			</div>

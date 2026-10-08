@@ -3,7 +3,7 @@ import type { ClientMsg } from "../shared/protocol";
 import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseClientMsg, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
+import { parseClientMsg, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -299,6 +299,33 @@ describe("parsePullRequestQuery", () => {
 		expect(query("owner=a/b&repo=c&number=1")).toBeNull();
 		expect(query("owner=a&repo=b%20c&number=1")).toBeNull();
 		expect(query("owner=&repo=b&number=1")).toBeNull();
+	});
+});
+
+describe("parsePullRequestEdit", () => {
+	const pr = { owner: "anthropics", repo: "omp-agents", number: 12 };
+
+	test("takes one label, reviewer, or state change to a pull request", () => {
+		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "good first issue", on: true } })).toEqual({ ...pr, change: { field: "label", name: "good first issue", on: true } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "reviewer", login: "octo-cat", on: false } })).toEqual({ ...pr, change: { field: "reviewer", login: "octo-cat", on: false } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "draft" } })).toEqual({ ...pr, change: { field: "state", state: "draft" } });
+	});
+
+	test("rejects a merge, an empty label, a login with a slash, a change without its direction, and no pull request", () => {
+		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "merged" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: " ", on: true } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "reviewer", login: "org/team", on: true } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "bug" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "title", title: "x" } })).toBeNull();
+		expect(parsePullRequestEdit({ owner: "a", repo: "b", change: { field: "state", state: "open" } })).toBeNull();
+	});
+});
+
+describe("parseRepoQuery", () => {
+	test("names a repository by owner and name, each without a slash or space", () => {
+		expect(parseRepoQuery(new URLSearchParams("owner=anthropics&repo=omp.agents"))).toEqual({ owner: "anthropics", repo: "omp.agents" });
+		expect(parseRepoQuery(new URLSearchParams("owner=a/b&repo=c"))).toBeNull();
+		expect(parseRepoQuery(new URLSearchParams("owner=a"))).toBeNull();
 	});
 });
 

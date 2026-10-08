@@ -1,4 +1,4 @@
-/** Linear's field pickers: a button that opens a searchable list of a field's choices, and the due date's. The issue detail, the new-issue dialog, and the Todo page share them. */
+/** Linear's field pickers: a button that opens a searchable list of a field's choices, and the due date's. The issue detail, the new-issue dialog, the Todo page, and a pull request's details share them. */
 import { Calendar, Check, Ellipsis } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -51,17 +51,17 @@ interface FieldPickerProps extends OpenState {
 	look?: PickerLook;
 	/** The trigger button's classes, in place of the look's. */
 	className?: string;
-	/** `null` while Linear's options load, or when they failed to, with `error`. */
+	/** `null` while the choices load, or when they failed to, with `error`. */
 	choices: Choice[] | null;
 	error?: string | null;
 	selected: string[];
 	/** Several choices at once: the list stays open while the choices toggle. */
 	multi?: boolean;
-	/** The field cannot change yet: Linear has not answered for the issue. */
+	/** The field cannot change yet, as before the item's details arrive. */
 	disabled?: boolean;
 	/** The digit that picks the first choice while the list is open, the next digit the next one, as Linear's status (1) and priority (0) menus do. */
 	firstKey?: number;
-	/** A click opened the list: the issue fields ask Linear for the choices then. */
+	/** A click opened the list: the fields ask for the choices then. */
 	onOpen?: () => void;
 	onPick: (value: string) => void;
 }
@@ -101,7 +101,7 @@ export function FieldPicker({ field, current, trigger, look = "field", className
 					<CommandList>
 						{choices === null ? (
 							<p role={error ? "alert" : undefined} className={cn("px-3 py-2 text-xs", error ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
-								{error ?? "Asking Linear…"}
+								{error ?? "Loading the choices…"}
 							</p>
 						) : (
 							<>

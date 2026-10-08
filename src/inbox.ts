@@ -268,9 +268,9 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 
 const details = createCache<PullRequestDetail>();
 
-/** One pull request in full, live from `gh`. */
-export function loadPullRequestDetail(pr: PullRequest): Promise<PullRequestDetail> {
-	return details.get(prKey(pr), async () => parseDetailAnswer(await ghGraphql(DETAIL_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }), pr));
+/** One pull request in full, live from `gh`; `fresh` skips the kept answer, as after a change. */
+export function loadPullRequestDetail(pr: PullRequest, fresh = false): Promise<PullRequestDetail> {
+	return details.get(prKey(pr), async () => parseDetailAnswer(await ghGraphql(DETAIL_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }), pr), fresh);
 }
 
 /** The inbox for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache. */

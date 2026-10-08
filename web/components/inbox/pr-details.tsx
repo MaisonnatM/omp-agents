@@ -2,7 +2,6 @@ import {
 	ArrowLeft,
 	Bot,
 	Check,
-	ChevronDown,
 	CircleCheck,
 	CircleDashed,
 	CircleDot,
@@ -22,11 +21,12 @@ import {
 	Users,
 	Zap,
 } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
 	type CheckRunState,
 	type InboxPullRequest,
 	type PullRequest,
+	type PullRequestChange,
 	type PullRequestChanges,
 	type PullRequestCheck,
 	type PullRequestDetail,
@@ -44,18 +44,22 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, inboxAge, type MoveId, pullRequestStatus, type StatusItem } from "../../inbox-model";
+import { putJson } from "../../api";
 import { age, modeOf } from "../../labels";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
 import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { hashForInbox, hashForPullRequestFiles, type OpenMode } from "../../routing";
-import { useRead } from "../../reads";
+import { useRead, useReplaceableRead } from "../../reads";
 import { useCopy } from "../../use-copy";
+import { useQueuedSave } from "../../use-queued-save";
 import { ChangesExplorer } from "../changes/changes-explorer";
 import { BranchLabel, BranchName } from "../git";
 import { QuickActionButton, type QuickActionsProps } from "../quick-actions";
 import { LiveSessionChips } from "../session-chip";
-import { Clamped, DetailSection, LoadNote, Markdown } from "../sheet-details";
+import { DetailSection, LoadNote, Markdown } from "../sheet-details";
 import { Avatar, IconTip, STATE_ICON } from "./avatars";
+import { LabelDot, LabelsField, ReviewersField, type SavePullRequest, StateField, usePullRequestOptions } from "./pr-fields";
+import { PullRequestFilesDialog } from "./pr-files-dialog";
 import { ChecksIcon, MoveBadge } from "./pr-row";
 import { Timeline } from "./pr-timeline";
 
@@ -283,6 +287,8 @@ interface DetailContentProps {
 	version?: unknown;
 	/** The changed file the route opens in the Code tab; `null` shows the Summary. */
 	files?: { path: string | null } | null;
+	/** GitHub took a change made here. */
+	onSaved?: () => void;
 }
 
 export type Placement = "page" | "sidebar";
@@ -408,7 +414,7 @@ function LabelChips({ labels }: { labels: PullRequestDetail["labels"] }) {
 		<span className="flex flex-wrap gap-1.5">
 			{labels.map(label => (
 				<span key={label.name} className="flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs">
-					<span aria-hidden className="size-2 rounded-full" style={{ backgroundColor: `#${label.color}` }} />
+					<LabelDot label={label} />
 					{label.name}
 				</span>
 			))}
@@ -456,23 +462,38 @@ interface SummaryProps {
 	stack: InboxPullRequest[];
 	sessions: RosterHost[];
 	onOpen: DetailContentProps["onOpen"];
+	save: SavePullRequest;
+	/** Why GitHub refused the last change; `null` when it took them all. */
+	saveError: string | null;
 }
 
-function Summary({ pr, detail, placed, quick, stack, sessions, onOpen }: SummaryProps) {
-	const [descriptionOpen, setDescriptionOpen] = useState(true);
+function Summary({ pr, detail, placed, quick, stack, sessions, onOpen, save, saveError }: SummaryProps) {
+	const options = usePullRequestOptions(detail);
+	// The state picker says it is a draft already.
+	const blockers = placed.filter(({ item, fix }) => item.kind !== "draft" || fix);
 	return (
 		<div className="space-y-6">
+			{saveError && (
+				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
+					GitHub did not take the change: {saveError}
+				</p>
+			)}
 			<dl className="grid grid-cols-1 items-start gap-x-4 text-sm @sm/pr:grid-cols-[8rem_minmax(0,1fr)] @sm/pr:gap-y-1">
-				{placed.length > 0 && (
-					<Property icon={CircleDot} label="Status">
-						<StatusInline placed={placed} quick={quick} />
-					</Property>
-				)}
+				<Property icon={CircleDot} label="Status">
+					<div className="space-y-1.5">
+						<StateField detail={detail} save={save} />
+						{blockers.length > 0 && <StatusInline placed={blockers} quick={quick} />}
+					</div>
+				</Property>
 				<Property icon={Users} label="Reviewers">
-					<ReviewerInline reviewers={detail.reviewers} />
+					<ReviewersField detail={detail} options={options} save={save}>
+						<ReviewerInline reviewers={detail.reviewers} />
+					</ReviewersField>
 				</Property>
 				<Property icon={Tag} label="Labels">
-					<LabelChips labels={detail.labels} />
+					<LabelsField detail={detail} options={options} save={save}>
+						<LabelChips labels={detail.labels} />
+					</LabelsField>
 				</Property>
 				{sessions.length > 0 && (
 					<Property icon={Bot} label="Sessions">
@@ -481,42 +502,33 @@ function Summary({ pr, detail, placed, quick, stack, sessions, onOpen }: Summary
 				)}
 			</dl>
 			{stack.length > 0 && <StackSection stack={stack} current={pr} />}
-			<section className="space-y-3">
-				<button type="button" onClick={() => setDescriptionOpen(open => !open)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground" aria-expanded={descriptionOpen}>
-					Description
-					<ChevronDown aria-hidden className={cn("size-4 transition-transform", !descriptionOpen && "-rotate-90")} />
-				</button>
-				{descriptionOpen &&
-					(detail.body.trim() ? (
-						<Clamped>
-							<Markdown text={detail.body} />
-						</Clamped>
-					) : (
-						<p className="text-sm text-muted-foreground">No description.</p>
-					))}
-			</section>
+			<DetailSection title="Description">{detail.body.trim() ? <Markdown text={detail.body} /> : <p className="text-sm text-muted-foreground">No description.</p>}</DetailSection>
 		</div>
 	);
 }
 
-/** The Code tab: on the page, the changes explorer; in the narrow sidebar, the files, each opening the page's Code tab. */
+/** The Code tab: on the page, the changes explorer; in the narrow sidebar, the files, each opening its diff over the page. */
 function Code({ pr, detail, placement, path, version }: { pr: PullRequest; detail: PullRequestDetail; placement: Placement; path: string | null; version?: unknown }) {
 	const query = `owner=${encodeURIComponent(pr.owner)}&repo=${encodeURIComponent(pr.repo)}&number=${pr.number}`;
 	const list = useRead<PullRequestChanges>(placement === "page" ? `/api/pull-request/files?${query}` : null, version);
+	const [shown, setShown] = useState<string | null>(null);
 	if (placement === "sidebar") {
 		return (
-			<ul className="divide-y divide-border rounded-lg border border-border font-mono text-xs">
-				{detail.files.map(file => (
-					<li key={file.path}>
-						<a href={hashForPullRequestFiles(detail, file.path)} className="flex min-w-0 items-center gap-3 px-2.5 py-1 hover:bg-muted">
-							<span className="min-w-0 flex-1 truncate">{file.path}</span>
-							<span className="shrink-0 tabular-nums">
-								<span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span> <span className="text-red-600 dark:text-red-400">−{file.deletions}</span>
-							</span>
-						</a>
-					</li>
-				))}
-			</ul>
+			<>
+				<ul className="divide-y divide-border rounded-lg border border-border font-mono text-xs">
+					{detail.files.map(file => (
+						<li key={file.path}>
+							<button type="button" onClick={() => setShown(file.path)} className="flex w-full min-w-0 items-center gap-3 px-2.5 py-1 text-left hover:bg-muted">
+								<span className="min-w-0 flex-1 truncate">{file.path}</span>
+								<span className="shrink-0 tabular-nums">
+									<span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span> <span className="text-red-600 dark:text-red-400">−{file.deletions}</span>
+								</span>
+							</button>
+						</li>
+					))}
+				</ul>
+				{shown !== null && <PullRequestFilesDialog pr={pr} title={detail.title} path={shown} version={version} onClose={() => setShown(null)} />}
+			</>
 		);
 	}
 	if (!list.data) {
@@ -542,8 +554,14 @@ function Code({ pr, detail, placement, path, version }: { pr: PullRequest; detai
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
  * of the other actions; then Summary, Timeline, and Code tabs, with the checks at a glance on the tab bar.
  */
-export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next, stack, placement, version, files = null }: DetailContentProps) {
-	const { data: detail, error } = useRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`, version);
+export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: listedNext, stack, placement, version, files = null, onSaved }: DetailContentProps) {
+	const [reads, setReads] = useState(0);
+	const readVersion = useMemo(() => [version, reads], [version, reads]);
+	const { data: detail, error, replace } = useReplaceableRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`, readVersion);
+	const queued = useQueuedSave({ replace, reload: () => setReads(count => count + 1), onSaved });
+	const save = (change: PullRequestChange, shown: Partial<PullRequestDetail>): void => {
+		if (detail) queued.save({ ...detail, ...shown }, () => putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change }));
+	};
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	const [tab, setTab] = useState<DetailTab>(files ? "code" : "summary");
 	useEffect(() => {
@@ -559,6 +577,8 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next, st
 		if (value === "code" && !files) location.hash = hashForPullRequestFiles(pr);
 		else if (value !== "code" && files) location.hash = hashForInbox(pr);
 	};
+	// GitHub's search, which the inbox reads, can list a pull request for a while after it closes.
+	const next = detail?.state === "closed" ? null : listedNext;
 	const offered = quick.actions.filter(action => action !== next?.action);
 	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];
 	const otherActions = detail || error ? offered.filter(action => !placed.some(({ fix }) => fix === action)) : [];
@@ -568,74 +588,76 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next, st
 	const comments = detail ? detail.conversation.length + detail.threads.length : 0;
 	return (
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
-			<header className={cn("space-y-2 border-b border-border pb-4", page ? "px-6 pt-5" : "pt-1")}>
-				<div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-					<p className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">
-						{detail && <IconTip icon={STATE_ICON[detail.state]} />}
-						<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 truncate hover:text-foreground">
-							{pr.owner}/{pr.repo} <span className="text-emerald-700 dark:text-emerald-400">#{pr.number}</span>
-							<ExternalLink aria-hidden className="size-3" />
-						</a>
-					</p>
-					<span className="ml-auto flex shrink-0 items-center gap-1.5">
-						{next && <NextMoveButton pr={pr} next={next} quick={quick} onOpen={onOpen} />}
-						<MoreMenu pr={pr} actions={otherActions} quick={quick} />
-					</span>
-				</div>
-				<Heading ref={headingRef} tabIndex={-1} className={cn(page ? "text-xl" : "text-base", "leading-snug font-semibold outline-none")}>
-					{detail?.title ?? `${pr.owner}/${pr.repo}#${pr.number}`}
-				</Heading>
-				{detail && (
-					<>
-						<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-							<span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-								<Avatar person={detail.author} label={`Opened by ${detail.author.login}`} />
-								<span className="truncate text-foreground">{detail.author.login}</span>
-								<span aria-hidden>·</span>
-								<Tooltip content={`Opened ${new Date(detail.createdAt).toLocaleString()}`}>
-									<span>updated {age(detail.updatedAt)} ago</span>
-								</Tooltip>
-							</span>
-							<span className="ml-auto whitespace-nowrap">
-								<CheckoutCommand pr={pr} />
-							</span>
-						</div>
-						<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-							<span className="flex min-w-0 max-w-full items-center gap-1.5">
-								{stackedBase ? (
-									<span className="flex min-w-0 items-center gap-1 text-amber-700 dark:text-amber-400">
-										<Layers aria-hidden className="size-3.5 shrink-0" />
-										<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
-									</span>
-								) : (
-									<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
-								)}
-								<ArrowLeft aria-label="from" className="size-3 shrink-0" />
-								<BranchName name={detail.head} className="font-mono" />
-							</span>
-							<span className="ml-auto flex items-center gap-2 tabular-nums">
-								<FileDiff aria-hidden className="size-3.5" />
-								{detail.changedFiles} {detail.changedFiles === 1 ? "file" : "files"}
-								<span className="font-mono">
-									<span className="text-emerald-600 dark:text-emerald-400">+{detail.additions.toLocaleString()}</span>{" "}
-									<span className="text-red-600 dark:text-red-400">−{detail.deletions.toLocaleString()}</span>
+			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4")}>
+				<header className={cn("space-y-2 border-b border-border pb-4", page ? "px-6 pt-5" : "pt-1")}>
+					<div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+						<p className="flex min-w-0 items-center gap-2 text-sm whitespace-nowrap text-muted-foreground">
+							{detail && <IconTip icon={STATE_ICON[detail.state]} />}
+							<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 truncate hover:text-foreground">
+								{pr.owner}/{pr.repo} <span className="text-emerald-700 dark:text-emerald-400">#{pr.number}</span>
+								<ExternalLink aria-hidden className="size-3" />
+							</a>
+						</p>
+						<span className="ml-auto flex shrink-0 items-center gap-1.5">
+							{next && <NextMoveButton pr={pr} next={next} quick={quick} onOpen={onOpen} />}
+							<MoreMenu pr={pr} actions={otherActions} quick={quick} />
+						</span>
+					</div>
+					<Heading ref={headingRef} tabIndex={-1} className={cn(page ? "text-xl" : "text-base", "leading-snug font-semibold outline-none")}>
+						{detail?.title ?? `${pr.owner}/${pr.repo}#${pr.number}`}
+					</Heading>
+					{detail && (
+						<>
+							<div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+								<span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+									<Avatar person={detail.author} label={`Opened by ${detail.author.login}`} />
+									<span className="truncate text-foreground">{detail.author.login}</span>
+									<span aria-hidden>·</span>
+									<Tooltip content={`Opened ${new Date(detail.createdAt).toLocaleString()}`}>
+										<span>updated {age(detail.updatedAt)} ago</span>
+									</Tooltip>
 								</span>
-							</span>
-						</div>
-					</>
-				)}
-			</header>
-			<div className={cn("flex items-center gap-2 border-b border-border py-2", page && "px-6")}>
-				<SizeProvider size="compact">
-					<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>
-						<TabsList aria-label="Show">
-							<TabItem value="summary" label="Summary" />
-							<TabItem value="timeline" label="Timeline" badge={comments || undefined} aria-label={`Timeline, ${comments} comments`} />
-							<TabItem value="code" label="Code" />
-						</TabsList>
-					</Tabs>
-				</SizeProvider>
-				<span className="ml-auto">{detail && <ChecksSummary checks={detail.checkRuns} />}</span>
+								<span className="ml-auto whitespace-nowrap">
+									<CheckoutCommand pr={pr} />
+								</span>
+							</div>
+							<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+								<span className="flex min-w-0 max-w-full items-center gap-1.5">
+									{stackedBase ? (
+										<span className="flex min-w-0 items-center gap-1 text-amber-700 dark:text-amber-400">
+											<Layers aria-hidden className="size-3.5 shrink-0" />
+											<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
+										</span>
+									) : (
+										<BranchLabel name={detail.base} title className="max-w-64 font-mono" />
+									)}
+									<ArrowLeft aria-label="from" className="size-3 shrink-0" />
+									<BranchName name={detail.head} className="font-mono" />
+								</span>
+								<span className="ml-auto flex items-center gap-2 tabular-nums">
+									<FileDiff aria-hidden className="size-3.5" />
+									{detail.changedFiles} {detail.changedFiles === 1 ? "file" : "files"}
+									<span className="font-mono">
+										<span className="text-emerald-600 dark:text-emerald-400">+{detail.additions.toLocaleString()}</span>{" "}
+										<span className="text-red-600 dark:text-red-400">−{detail.deletions.toLocaleString()}</span>
+									</span>
+								</span>
+							</div>
+						</>
+					)}
+				</header>
+				<div className={cn("flex items-center gap-2 border-b border-border py-2", page && "px-6")}>
+					<SizeProvider size="compact">
+						<Tabs value={tab} onValueChange={value => choose(value as DetailTab)}>
+							<TabsList aria-label="Show">
+								<TabItem value="summary" label="Summary" />
+								<TabItem value="timeline" label="Timeline" badge={comments || undefined} aria-label={`Timeline, ${comments} comments`} />
+								<TabItem value="code" label="Code" />
+							</TabsList>
+						</Tabs>
+					</SizeProvider>
+					<span className="ml-auto">{detail && <ChecksSummary checks={detail.checkRuns} />}</span>
+				</div>
 			</div>
 			{!detail ? (
 				<div className={cn("py-4", page && "px-6")}>
@@ -648,7 +670,7 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next, st
 			) : (
 				<div className={cn("min-h-0 flex-1 overflow-y-auto", page && "px-6")}>
 					<div className="py-4">
-						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} sessions={sessions} onOpen={onOpen} /> : <Timeline detail={detail} />}
+						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} sessions={sessions} onOpen={onOpen} save={save} saveError={queued.error} /> : <Timeline detail={detail} />}
 					</div>
 				</div>
 			)}

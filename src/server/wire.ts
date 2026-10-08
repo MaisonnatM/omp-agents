@@ -9,7 +9,7 @@ import { GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpInt
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import type { BranchChoice } from "../shared/git";
-import type { PullRequest } from "../shared/github";
+import { type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
 import type { ModelOption } from "../shared/models";
 import { NOTICE_OPS } from "../shared/notices";
 import type { ProjectChange } from "../shared/projects";
@@ -344,6 +344,31 @@ export function parsePullRequest(owner: unknown, repo: unknown, number: unknown)
 /** `?owner=<o>&repo=<r>&number=<n>` of `GET /api/pull-request` and its `/files` and `/file`. */
 export function parsePullRequestQuery(params: URLSearchParams): PullRequest | null {
 	return parsePullRequest(params.get("owner"), params.get("repo"), Number(params.get("number")));
+}
+
+const isSettableState = oneOf(SETTABLE_STATES);
+
+function parsePullRequestChange(change: unknown): PullRequestChange | null {
+	if (!isObject(change)) return null;
+	if (change.field === "label" && isNonEmpty(change.name) && typeof change.on === "boolean") return { field: "label", name: change.name, on: change.on };
+	if (change.field === "reviewer" && typeof change.login === "string" && NAME.test(change.login) && typeof change.on === "boolean") return { field: "reviewer", login: change.login, on: change.on };
+	if (change.field === "state" && isSettableState(change.state)) return { field: "state", state: change.state };
+	return null;
+}
+
+/** The body of `PUT /api/pull-request`: a pull request and one change to it. */
+export function parsePullRequestEdit(body: unknown): PullRequestEdit | null {
+	if (!isObject(body)) return null;
+	const pr = parsePullRequest(body.owner, body.repo, body.number);
+	const change = parsePullRequestChange(body.change);
+	return pr && change && { ...pr, change };
+}
+
+/** `?owner=<o>&repo=<r>` of `GET /api/pull-request/options`. */
+export function parseRepoQuery(params: URLSearchParams): Repo | null {
+	const owner = params.get("owner") ?? "";
+	const repo = params.get("repo") ?? "";
+	return NAME.test(owner) && NAME.test(repo) ? { owner, repo } : null;
 }
 
 const isMcpIntegration = oneOf(MCP_INTEGRATIONS);

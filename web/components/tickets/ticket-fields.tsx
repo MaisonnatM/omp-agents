@@ -1,10 +1,11 @@
 import { Box, CircleUser, Tag } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { Ticket, TicketDetail, TicketFieldValues, TicketOptions, TicketPriority } from "../../../src/shared/tickets";
 import { cn } from "@/lib/utils";
-import { errorText, putJson } from "../../api";
+import { putJson } from "../../api";
 import { ticketsStore, useRead } from "../../reads";
 import { PRIORITY_LABEL, statusOrder } from "../../tickets-model";
+import { useQueuedSave } from "../../use-queued-save";
 import { DuePicker, FieldPicker } from "../field-picker";
 import { DetailSection } from "../sheet-details";
 import { LabelDot, PRIORITY_ICON, statusIcon, TicketChip } from "./ticket-row";
@@ -40,10 +41,7 @@ interface TicketFieldsProps {
 export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsProps) {
 	const [opened, setOpened] = useState(false);
 	const [retry, setRetry] = useState(0);
-	const [saveError, setSaveError] = useState<string | null>(null);
-	const queue = useRef<Promise<unknown>>(Promise.resolve());
-	const unsent = useRef(0);
-	const refused = useRef(false);
+	const queued = useQueuedSave({ replace, reload, onSaved: () => void ticketsStore.refresh() });
 	const options = useRead<TicketOptions>(opened && detail ? `/api/ticket/options?${new URLSearchParams({ team: detail.teamId })}` : null, retry);
 
 	const open = (): void => {
@@ -52,28 +50,7 @@ export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsPr
 	};
 
 	const save = (change: TicketFieldValues, shown: Partial<TicketDetail>): void => {
-		if (!detail) return;
-		replace({ ...detail, ...shown });
-		setSaveError(null);
-		unsent.current++;
-		queue.current = queue.current.then(() =>
-			putJson<TicketDetail>("/api/ticket", { id: detail.id, ...change })
-				.then(
-					after => {
-						replace(after);
-						void ticketsStore.refresh();
-					},
-					(err: unknown) => {
-						setSaveError(errorText(err));
-						refused.current = true;
-					},
-				)
-				.then(() => {
-					if (--unsent.current > 0 || !refused.current) return;
-					refused.current = false;
-					reload();
-				}),
-		);
+		if (detail) queued.save({ ...detail, ...shown }, () => putJson<TicketDetail>("/api/ticket", { id: detail.id, ...change }));
 	};
 
 	const [StatusIcon, statusColor] = statusIcon(ticket);
@@ -82,9 +59,9 @@ export function TicketFields({ ticket, detail, replace, reload }: TicketFieldsPr
 
 	return (
 		<>
-			{saveError && (
+			{queued.error && (
 				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
-					Linear did not take the change: {saveError}
+					Linear did not take the change: {queued.error}
 				</p>
 			)}
 			<FieldGroup title="Properties">
