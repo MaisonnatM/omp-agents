@@ -268,6 +268,10 @@ The dashboard calls omp-stats' aggregate and tool reads for the selected range, 
 `src/omp/stats.ts` reads time buckets by recorded provider through omp-stats' rollup-aware `getProviderTimeSeries`, using the same source as the totals cards.
 `src/analytics.ts` derives chart totals and provider totals from those rows, fills missing buckets with zeros, and starts all time at the first request.
 `web/components/settings/provider-trend.tsx` renders Recharts stacked bars, bucket details, and an optional data table from that provider breakdown.
+The page and an Analytics API read with no range default to `24h`.
+`analyticsStore` in `web/reads.ts` uses `createPolledStore` to keep each range's last successful answer in memory and localStorage, discarding incompatible saved shapes.
+`AnalyticsTab` shows that answer while refreshing on activation or a range change, and every two seconds during indexing or 30 seconds otherwise while active.
+A failed refresh keeps the last successful answer and reports its error without replacing another range's data.
 The displayed cost is omp's API-equivalent list price, not the user's subscription bill.
 
 ## Routines

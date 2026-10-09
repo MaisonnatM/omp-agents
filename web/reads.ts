@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { isObject } from "../src/json";
 import { type CalendarEventsAnswer, type GoogleStatus, type IntegrationsAnswer, MCP_INTEGRATIONS } from "../src/shared/accounts";
+import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
 import type { Inbox, RepoInbox } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
 import type { TicketsAnswer } from "../src/shared/tickets";
@@ -75,6 +76,42 @@ export const ticketsStore = createPolledStore<TicketsAnswer>({
 		const answer = value as Partial<TicketsAnswer> | null;
 		// A read saved before tickets carried their opening date reads Linear again.
 		return Array.isArray(answer?.tickets) && answer.tickets.every(ticket => typeof ticket.createdAt === "string");
+	},
+});
+
+export const analyticsStore = createPolledStore<Analytics>({
+	cacheKey: "omp-agents.analytics-cache",
+	url: range => `/api/analytics?range=${range ?? "24h"}`,
+	isValid: (value): value is Analytics => {
+		const numbers = (item: unknown, fields: string[]): boolean =>
+			isObject(item) && fields.every(field => typeof item[field] === "number");
+		const usage = (item: unknown): boolean =>
+			isObject(item) && numbers(item, ["requests", "failed", "cost", "cacheRate"])
+			&& numbers(item.tokens, ["input", "output", "cacheRead", "cacheWrite", "total"]);
+		const provider = (item: unknown): boolean =>
+			isObject(item) && typeof item.provider === "string" && numbers(item, ["tokens", "cost", "requests"]);
+		if (!isObject(value) || typeof value.range !== "string" || !isAnalyticsRange(value.range)) return false;
+		const { sync } = value;
+		return isObject(sync) && typeof sync.phase === "string" && ["idle", "syncing", "error"].includes(sync.phase)
+			&& numbers(sync, ["current", "total"]) && (sync.lastSyncedAt === null || typeof sync.lastSyncedAt === "number")
+			&& (sync.error === null || typeof sync.error === "string")
+			&& usage(value.totals) && numbers(value.agents, ["main", "subagent", "advisor"])
+			&& Array.isArray(value.providers) && value.providers.every(provider)
+			&& Array.isArray(value.series) && value.series.every(bucket =>
+				isObject(bucket) && numbers(bucket, ["start", "tokens", "cost", "requests"])
+				&& Array.isArray(bucket.providers) && bucket.providers.every(provider))
+			&& Array.isArray(value.models) && value.models.every(model =>
+				isObject(model) && typeof model.selector === "string" && usage(model)
+				&& (model.tokensPerSecond === null || typeof model.tokensPerSecond === "number"))
+			&& Array.isArray(value.projects) && value.projects.every(project =>
+				isObject(project) && typeof project.cwd === "string" && usage(project))
+			&& Array.isArray(value.tools) && value.tools.every(tool =>
+				isObject(tool) && typeof tool.name === "string" && numbers(tool, ["calls", "errors", "tokenShare"]))
+			&& Array.isArray(value.sessions) && value.sessions.every(session =>
+				isObject(session) && typeof session.sessionId === "string" && typeof session.cwd === "string"
+				&& (session.title === null || typeof session.title === "string") && typeof session.listed === "boolean"
+				&& usage(session.usage) && numbers(session, ["subagentTokens", "lastAt"])
+				&& Array.isArray(session.models) && session.models.every(model => typeof model === "string"));
 	},
 });
 

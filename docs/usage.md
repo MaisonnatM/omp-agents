@@ -887,8 +887,11 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   **Workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the chosen workspace loads them; only these sections show the workspace picker.
   It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit, and the selected section stays when you change workspace.
-- **Analytics** shows request usage for the last seven days.
+- **Analytics** shows request usage for the last 24 hours.
   Choose **24h**, **7d**, **30d**, **90d**, or **All** to change the range.
+  Each range's last result is cached in your browser, so switching back, reopening the page, or reloading shows it while a fresh read runs.
+  A failed refresh keeps the cached result and shows the error.
+  Refreshes run only while **Analytics** is open, every two seconds during indexing and every 30 seconds otherwise.
   It shows tokens, estimated cost, requests, cache hit rate, and a chart of token usage over time.
   The cost is omp's API-equivalent list price, not what your subscription bills.
   The chart stacks token usage by the provider that handled each request, with a fixed color and a legend entry for each provider.
@@ -900,7 +903,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The top 20 sessions include their subagents' usage; select a session to open it.
   omp keeps the usage of a session whose transcript you deleted, so it stays listed as **Deleted session**, without a link.
   It covers every session whatever workspace the header picks.
-  omp indexes session files when you first open **Settings** and updates the tab while indexing continues.
+  omp indexes session files when you first open **Analytics** and updates the tab while indexing continues.
   New requests appear as omp syncs them, including requests from sessions started outside the dashboard.
 - **Worktrees** lists every Git worktree in repositories where a session ran, and a path you enter lists that repository too.
   Each row shows the branch and path, the last time an omp session file in that checkout changed, the last commit, approximate disk use, and tracked or untracked changes.

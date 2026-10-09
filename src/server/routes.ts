@@ -135,7 +135,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 
 	/** `GET /api/analytics?range=`: omp-stats' request usage and live sync state. */
 	const analytics = get(params => {
-		const value = params.get("range") ?? "7d";
+		const value = params.get("range") ?? "24h";
 		return isAnalyticsRange(value)
 			? answer(async () => buildAnalytics(value, await readStats(value), sessionsDir, env.savedOf))
 			: fail(400, "Unknown analytics range");

@@ -5,7 +5,7 @@ import { ANALYTICS_RANGES, type Analytics, type AnalyticsRange, type AnalyticsSe
 import { hashForSession } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { modelLabel, modelOrg, projectName, providerLabel, readTime } from "../../labels";
-import { useRead } from "../../reads";
+import { analyticsStore } from "../../reads";
 import { OrgIcon } from "../org-icon";
 import { LoadNote } from "../sheet-details";
 import { compact, dollars, full } from "./analytics-format";
@@ -166,14 +166,18 @@ function UsageBody({ data }: { data: Analytics }) {
 
 /** Analytics over the chosen range, refreshed while the tab shows: often while omp-stats indexes, slower after it finishes. */
 export function AnalyticsTab({ active }: { active: boolean }) {
-	const [range, setRange] = useState<AnalyticsRange>("7d");
-	const [version, setVersion] = useState(0);
-	const { data, error } = useRead<Analytics>(`/api/analytics?range=${range}`, version);
+	const [range, setRange] = useState<AnalyticsRange>("24h");
+	const entry = analyticsStore.use(range);
+	const data = entry.read?.data ?? null;
+	const { error } = entry;
+	useEffect(() => {
+		if (active) void analyticsStore.refresh(range);
+	}, [active, range]);
 	useEffect(() => {
 		if (!active) return;
-		const timer = setInterval(() => setVersion(value => value + 1), data?.sync.phase === "syncing" ? 2_000 : 30_000);
+		const timer = setInterval(() => void analyticsStore.refresh(range), data?.sync.phase === "syncing" ? 2_000 : 30_000);
 		return () => clearInterval(timer);
-	}, [active, data?.sync.phase]);
+	}, [active, range, data?.sync.phase]);
 	return (
 		<div className="space-y-7">
 			<div role="group" aria-label="Time range" className="flex flex-wrap gap-1">
