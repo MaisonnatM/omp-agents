@@ -92,11 +92,16 @@ export class Terminal {
 	}
 }
 
+/** The most shells the panel runs at once; past it a new one is refused, so a page cannot fork shells without bound. */
+export const MAX_TERMINALS = 16;
+
 /** Every shell the panel runs, by id, until it exits. */
 export class Terminals {
 	readonly #all = new Map<string, Terminal>();
 
-	open(cwd: string, size: { cols: number; rows: number }): Terminal {
+	/** A new shell in `cwd`, or `null` while {@link MAX_TERMINALS} run. */
+	open(cwd: string, size: { cols: number; rows: number }): Terminal | null {
+		if (this.#all.size >= MAX_TERMINALS) return null;
 		const terminal = new Terminal(cwd, size, exited => this.#all.delete(exited.id));
 		this.#all.set(terminal.id, terminal);
 		return terminal;

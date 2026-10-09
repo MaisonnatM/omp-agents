@@ -4,7 +4,7 @@ import { lstat, readdir } from "node:fs/promises";
 import { basename, isAbsolute, join, relative, sep } from "node:path";
 import { canonical, commonDir, git, worktreeAt, worktreesOf, type Registration } from "./git";
 import { errorText } from "./json";
-import { mapLimit } from "./map-limit";
+import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { run } from "./proc";
 import type { WorktreeBlocker, WorktreeConfirmation, WorktreeEntry, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult, WorktreeTarget } from "./worktrees-shared";
 
@@ -34,6 +34,29 @@ interface UseSnapshot {
 
 /** Most checkouts read at once, each by a git call or a few. */
 const READ_CONCURRENCY = 4;
+
+/** A probe's value, or the error it failed with, kept for each caller to judge. */
+type Probed<T> = { ok: true; value: T } | { ok: false; error: unknown };
+
+const settle = <T>(probe: Promise<T>): Promise<Probed<T>> =>
+	probe.then(
+		(value): Probed<T> => ({ ok: true, value }),
+		(error: unknown): Probed<T> => ({ ok: false, error }),
+	);
+
+/** The probe's value; its error rethrown when it failed. */
+function unwrap<T>(probed: Probed<T> | undefined): T {
+	if (!probed) throw new Error("No probe ran here.");
+	if (!probed.ok) throw probed.error;
+	return probed.value;
+}
+
+/** `probe` of each distinct key once, at most `PROBE_PARALLEL` at once, by key: most sessions share a handful of directories. */
+async function probeEach<T>(keys: Iterable<string>, probe: (key: string) => Promise<T>): Promise<Map<string, Probed<T>>> {
+	const distinct = [...new Set(keys)];
+	const probed = await mapLimit(distinct, PROBE_PARALLEL, key => settle(probe(key)));
+	return new Map(distinct.map((key, index) => [key, probed[index]!]));
+}
 
 const beneath = (parent: string, child: string): boolean => {
 	const suffix = relative(parent, child);
@@ -105,35 +128,27 @@ export class Worktrees {
 
 	/** Every live session's canonical directory, with the repository of one that has resident subagents. */
 	async #liveHosts(): Promise<HostUse[]> {
-		const hosts: HostUse[] = [];
-		for (const host of this.env.live()) {
-			const path = await canonical(host.cwd);
-			let repository: string | null = null;
-			let unknownRepository = false;
-			if (host.unknownAgents) {
-				try {
-					repository = await commonDir(path);
-				} catch {
-					unknownRepository = true;
-				}
-			}
-			hosts.push({ path, unknownAgents: host.unknownAgents, repository, unknownRepository });
-		}
-		return hosts;
+		const live = this.env.live();
+		const canonicalOf = await probeEach(live.map(host => host.cwd), canonical);
+		const paths = live.map(host => unwrap(canonicalOf.get(host.cwd)));
+		const repositoryOf = await probeEach(paths.filter((_, index) => live[index]!.unknownAgents), commonDir);
+		return live.map((host, index) => {
+			const path = paths[index]!;
+			const probed = host.unknownAgents ? repositoryOf.get(path) : undefined;
+			return { path, unknownAgents: host.unknownAgents, repository: probed?.ok ? probed.value : null, unknownRepository: probed?.ok === false };
+		});
 	}
 
 	/** One canonical view of live sessions and saved activity, reused for every worktree in the request. */
 	async #snapshot(): Promise<UseSnapshot> {
 		const hosts = await this.#liveHosts();
-		const activity: UseSnapshot["activity"] = [];
-		for (const session of this.env.activity()) {
-			if (!session.cwd) continue;
-			try {
-				activity.push({ id: session.id, path: await canonical(session.cwd), modifiedAt: session.modifiedAt });
-			} catch {
-				/* An unavailable saved directory is not activity in this checkout. */
-			}
-		}
+		const sessions = this.env.activity().filter(session => session.cwd);
+		const canonicalOf = await probeEach(sessions.map(session => session.cwd), canonical);
+		// An unavailable saved directory is not activity in this checkout.
+		const activity = sessions.flatMap(session => {
+			const probed = canonicalOf.get(session.cwd);
+			return probed?.ok ? [{ id: session.id, path: probed.value, modifiedAt: session.modifiedAt }] : [];
+		});
 		return { hosts, activity };
 	}
 
@@ -201,15 +216,28 @@ export class Worktrees {
 		const result: WorktreeInventory = { repositories: [], errors: [] };
 		const snapshot = await this.#snapshot();
 		const serverPath = await this.#serverPath();
+		const cwds = scope === null ? this.env.knownCwds() : [scope];
+		const repositoryOf = await probeEach(cwds, commonDir);
+		const repositories = new Set(cwds.flatMap(cwd => {
+			const probed = repositoryOf.get(cwd);
+			return probed?.ok ? [probed.value] : [];
+		}));
+		const listingOf = await probeEach(repositories, async repository => {
+			const listed = await worktreesOf(repository);
+			return { listed, mainPath: listed[0] ? await canonical(listed[0].path) : "" };
+		});
+		// Every repository's checkouts in one queue, so many repositories read no more checkouts at once than one does.
+		const reads = [...listingOf].flatMap(([repository, probed]) => (probed.ok ? probed.value.listed.map(registration => ({ repository, registration, mainPath: probed.value.mainPath })) : []));
+		const read = await mapLimit(reads, READ_CONCURRENCY, ({ repository, registration, mainPath }) => settle(this.#entry(repository, registration, mainPath, serverPath, snapshot)));
+		const entriesOf = Map.groupBy(read, (_, index) => reads[index]!.repository);
 		const known = new Set<string>();
-		for (const cwd of scope === null ? this.env.knownCwds() : [scope]) {
+		for (const cwd of cwds) {
 			try {
-				const repository = await commonDir(cwd);
+				const repository = unwrap(repositoryOf.get(cwd));
 				if (known.has(repository)) continue;
 				known.add(repository);
-				const listed = await worktreesOf(repository);
-				const mainPath = listed[0] ? await canonical(listed[0].path) : "";
-				const worktrees = await mapLimit(listed, READ_CONCURRENCY, registration => this.#entry(repository, registration, mainPath, serverPath, snapshot));
+				const { listed } = unwrap(listingOf.get(repository));
+				const worktrees = (entriesOf.get(repository) ?? []).map(unwrap);
 				result.repositories.push({ repository, path: listed[0]?.path ?? cwd, name: basename(listed[0]?.path ?? cwd), worktrees });
 			} catch (err) {
 				result.errors.push({ path: cwd, error: errorText(err) });

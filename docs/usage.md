@@ -106,6 +106,7 @@ An action that fails shows its error, and its control becomes available again.
   The tab is named by that directory; hover it for the full path.
   `+` opens another tab in the same place, and the shell gets neither the server's `PORT` nor `OMP_AGENTS_PARENT`, so a dev server it starts does not reach for the dashboard's port.
   A new tab shows **Starting shell…** until the server opens its shell.
+  The server refuses a new shell in a directory that no longer exists, such as a removed worktree, and while 16 shells already run; that tab reads that the server hung up on it.
 - A shell keeps running while the panel is hidden and across a page reload: the reloaded page reopens a tab for each shell with its last megabyte of output.
   It ends when you type `exit`, when the tab's × hangs up on it, or when the server stops; the last tab closing hides the panel.
   The close button spins until the tab closes.

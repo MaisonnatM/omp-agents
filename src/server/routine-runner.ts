@@ -6,7 +6,7 @@
 import { errorText } from "../json";
 import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, type RoutineRun, type RoutineTask } from "../routines";
 import type { PinChange } from "../shared/pins";
-import type { HostStatus, StartRequest, StartResult } from "../shared/sessions";
+import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import type { RoutinesFile } from "./routines-file";
 
 /** Routine sessions that may run at once; a session waiting on a question holds its slot. */
@@ -145,18 +145,7 @@ export class RoutineRunner {
 			this.#deps.onChange();
 			return;
 		}
-		const result = await this.#deps.start({
-			kind: "new",
-			cwd: routine.cwd,
-			prompt: `${prompt} ${UNATTENDED}`,
-			images: [],
-			branch: null,
-			model: null,
-			thinking: null,
-			skill: routine.skill,
-			subject: null,
-			todoId: null,
-		});
+		const result = await this.#deps.start(newSessionRequest(routine.cwd, `${prompt} ${UNATTENDED}`, { skill: routine.skill }));
 		const session = result.ok ? this.#deps.session(result.instanceId) : null;
 		if (!result.ok || !session) {
 			file.failed(routine.id, at, `${routine.name}: ${result.ok ? "the session exited as it started." : result.error}`);

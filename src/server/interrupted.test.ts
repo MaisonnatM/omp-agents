@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { flushJsonFiles } from "../fs";
 import { InterruptedSessions } from "./interrupted";
 
 const dirs: string[] = [];
@@ -79,6 +80,7 @@ describe("InterruptedSessions", () => {
 	test("a file that is not a list of sessions reads as none", () => {
 		const path = fileIn();
 		new InterruptedSessions(path).interrupt("a");
+		flushJsonFiles();
 		writeFileSync(path, '{"running": "a"}');
 		expect(new InterruptedSessions(path).has("a")).toBe(false);
 	});

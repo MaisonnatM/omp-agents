@@ -1,12 +1,13 @@
 /**
  * What the page sends, checked before anything acts on it: the socket's messages and the HTTP routes' bodies and queries.
  * Each socket message has one parser in {@link clientParsers}, so a {@link ClientMsg} variant without one does not compile.
- * Socket parsers return `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller casts what it received.
+ * Every parser returns a {@link Parsed}: `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller
+ * casts what it received; a parser whose refusal the page shows returns `{ error }` in place of `null`.
  */
 import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
 import { type CalendarShownInput, GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
-import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
+import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import type { BranchChoice } from "../shared/git";
@@ -28,8 +29,8 @@ const MAX_COMPLETION_TEXT = 4096;
 /** GitHub's owner and repository names. */
 const NAME = /^[\w.-]+$/;
 
-/** A checked value, or `null` when it is not one. */
-type Parsed<T> = { ok: T } | null;
+/** A checked value as `{ ok }`, or the refusal: `null`, or `{ error }` from a parser that says why. */
+export type Parsed<T, Refusal extends { error: string } | null = null> = { ok: T } | Refusal;
 
 /** The variant of {@link ClientMsg} that `t` names. */
 export type MsgOf<T extends ClientMsg["t"]> = Extract<ClientMsg, { t: T }>;
@@ -119,7 +120,7 @@ function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
 	if (value.kind === "ticket") return typeof value.id === "string" && TICKET_ID.test(value.id) ? { ok: { kind: "ticket", id: value.id } } : null;
 	if (value.kind !== "pull-request" || !isObject(value.pr)) return null;
 	const pr = parsePullRequest(value.pr.owner, value.pr.repo, value.pr.number);
-	return pr && { ok: { kind: "pull-request", pr } };
+	return pr && { ok: { kind: "pull-request", pr: pr.ok } };
 }
 
 const isIntIn = (value: unknown, min: number, max: number): value is number => Number.isSafeInteger(value) && (value as number) >= min && (value as number) <= max;
@@ -201,11 +202,11 @@ function parseRoutineChange(value: unknown): Parsed<RoutineChange> {
 }
 
 /** One or more session ids to pin or unpin. */
-function parsePinChange(value: unknown): PinChange | null {
+function parsePinChange(value: unknown): Parsed<PinChange> {
 	if (!isObject(value)) return null;
 	const { op, sessionIds } = value;
 	if (op !== "pin" && op !== "unpin") return null;
-	return Array.isArray(sessionIds) && sessionIds.length > 0 && sessionIds.every(isNonEmpty) ? { op, sessionIds } : null;
+	return Array.isArray(sessionIds) && sessionIds.length > 0 && sessionIds.every(isNonEmpty) ? { ok: { op, sessionIds } } : null;
 }
 
 function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest> {
@@ -222,7 +223,7 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !subject) return null;
 			if (todoId !== null && !isTodoId(todoId)) return null;
 			return prompt.trim() || images.ok.length > 0
-				? { ok: { kind: "new", cwd, prompt, images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId } }
+				? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId }) }
 				: null;
 		}
 		case "fork": {
@@ -334,15 +335,15 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	},
 	pin(value) {
 		const change = parsePinChange(value.change);
-		return change && { ok: { t: "pin", change } };
+		return change && { ok: { t: "pin", change: change.ok } };
 	},
 	notice: ({ ids, op }) => (Array.isArray(ids) && ids.length > 0 && ids.every(isNonEmpty) && isNoticeOp(op) ? { ok: { t: "notice", ids, op } } : null),
 };
 
 const isClientMsgType = (t: unknown): t is ClientMsg["t"] => typeof t === "string" && Object.hasOwn(clientParsers, t);
 
-/** A socket message from the page, or `null` when it is not valid JSON, not one of {@link ClientMsg}, or tagged with an `ack` that is not a counter. */
-export function parseClientMsg(raw: string | Buffer): ClientFrame | null {
+/** A socket message from the page; `null` when it is not valid JSON, not one of {@link ClientMsg}, or tagged with an `ack` that is not a counter. */
+export function parseClientMsg(raw: string | Buffer): Parsed<ClientFrame> {
 	let value: unknown;
 	try {
 		value = JSON.parse(String(raw));
@@ -352,16 +353,16 @@ export function parseClientMsg(raw: string | Buffer): ClientFrame | null {
 	if (!isObject(value) || !isClientMsgType(value.t)) return null;
 	const { ack } = value;
 	if (ack !== undefined && !isCounter(ack)) return null;
-	const msg = clientParsers[value.t](value)?.ok;
+	const msg = clientParsers[value.t](value);
 	if (!msg) return null;
-	return ack === undefined ? msg : { ...msg, ack };
+	return { ok: ack === undefined ? msg.ok : { ...msg.ok, ack } };
 }
 
 /** A terminal's columns or rows: xterm's own bounds. */
 const isTerminalSide = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 1000;
 
-/** A text frame on a terminal socket, or `null` when it is not one of {@link TerminalClientMsg}. */
-export function parseTerminalMsg(raw: string): TerminalClientMsg | null {
+/** A text frame on a terminal socket; `null` when it is not one of {@link TerminalClientMsg}. */
+export function parseTerminalMsg(raw: string): Parsed<TerminalClientMsg> {
 	let value: unknown;
 	try {
 		value = JSON.parse(raw);
@@ -369,65 +370,65 @@ export function parseTerminalMsg(raw: string): TerminalClientMsg | null {
 		return null;
 	}
 	if (!isObject(value)) return null;
-	if (value.t === "kill") return { t: "kill" };
-	if (value.t === "resize" && isTerminalSide(value.cols) && isTerminalSide(value.rows)) return { t: "resize", cols: value.cols, rows: value.rows };
+	if (value.t === "kill") return { ok: { t: "kill" } };
+	if (value.t === "resize" && isTerminalSide(value.cols) && isTerminalSide(value.rows)) return { ok: { t: "resize", cols: value.cols, rows: value.rows } };
 	return null;
 }
 
 /** `?id=<id>` of `/ws/terminal`, which attaches to a shell, or `?cwd=<dir>&cols=<n>&rows=<n>`, which opens one. */
-export function parseTerminalQuery(params: URLSearchParams): { id: string } | { cwd: string; cols: number; rows: number } | null {
+export function parseTerminalQuery(params: URLSearchParams): Parsed<{ id: string } | { cwd: string; cols: number; rows: number }> {
 	const id = params.get("id");
-	if (id !== null) return isNonEmpty(id) ? { id } : null;
+	if (id !== null) return isNonEmpty(id) ? { ok: { id } } : null;
 	const cwd = params.get("cwd");
 	const cols = Number(params.get("cols"));
 	const rows = Number(params.get("rows"));
-	return isNonEmpty(cwd) && isTerminalSide(cols) && isTerminalSide(rows) ? { cwd, cols, rows } : null;
+	return isNonEmpty(cwd) && isTerminalSide(cols) && isTerminalSide(rows) ? { ok: { cwd, cols, rows } } : null;
 }
 
 /** A pull request named by an owner, repository, and number, as the routes that take one receive them. */
-export function parsePullRequest(owner: unknown, repo: unknown, number: unknown): PullRequest | null {
+export function parsePullRequest(owner: unknown, repo: unknown, number: unknown): Parsed<PullRequest> {
 	if (typeof owner !== "string" || typeof repo !== "string" || !NAME.test(owner) || !NAME.test(repo)) return null;
-	return typeof number === "number" && Number.isSafeInteger(number) && number >= 1 ? { owner, repo, number } : null;
+	return typeof number === "number" && Number.isSafeInteger(number) && number >= 1 ? { ok: { owner, repo, number } } : null;
 }
 
 /** `?owner=<o>&repo=<r>&number=<n>` of `GET /api/pull-request` and its `/files` and `/file`. */
-export function parsePullRequestQuery(params: URLSearchParams): PullRequest | null {
+export function parsePullRequestQuery(params: URLSearchParams): Parsed<PullRequest> {
 	return parsePullRequest(params.get("owner"), params.get("repo"), Number(params.get("number")));
 }
 
 const isSettableState = oneOf(SETTABLE_STATES);
 
-function parsePullRequestChange(change: unknown): PullRequestChange | null {
+function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (!isObject(change)) return null;
-	if (change.field === "label" && isNonEmpty(change.name) && typeof change.on === "boolean") return { field: "label", name: change.name, on: change.on };
-	if (change.field === "reviewer" && typeof change.login === "string" && NAME.test(change.login) && typeof change.on === "boolean") return { field: "reviewer", login: change.login, on: change.on };
-	if (change.field === "state" && isSettableState(change.state)) return { field: "state", state: change.state };
+	if (change.field === "label" && isNonEmpty(change.name) && typeof change.on === "boolean") return { ok: { field: "label", name: change.name, on: change.on } };
+	if (change.field === "reviewer" && typeof change.login === "string" && NAME.test(change.login) && typeof change.on === "boolean") return { ok: { field: "reviewer", login: change.login, on: change.on } };
+	if (change.field === "state" && isSettableState(change.state)) return { ok: { field: "state", state: change.state } };
 	return null;
 }
 
 /** The body of `PUT /api/pull-request`: a pull request and one change to it. */
-export function parsePullRequestEdit(body: unknown): PullRequestEdit | null {
+export function parsePullRequestEdit(body: unknown): Parsed<PullRequestEdit> {
 	if (!isObject(body)) return null;
 	const pr = parsePullRequest(body.owner, body.repo, body.number);
 	const change = parsePullRequestChange(body.change);
-	return pr && change && { ...pr, change };
+	return pr && change && { ok: { ...pr.ok, change: change.ok } };
 }
 
 /** `?owner=<o>&repo=<r>` of `GET /api/pull-request/options`. */
-export function parseRepoQuery(params: URLSearchParams): Repo | null {
+export function parseRepoQuery(params: URLSearchParams): Parsed<Repo> {
 	const owner = params.get("owner") ?? "";
 	const repo = params.get("repo") ?? "";
-	return NAME.test(owner) && NAME.test(repo) ? { owner, repo } : null;
+	return NAME.test(owner) && NAME.test(repo) ? { ok: { owner, repo } } : null;
 }
 
 const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
 /** The body of `PUT /api/integrations/sign-in` and `/sign-out`: `{ id }` naming an MCP integration. */
-export const parseIntegrationId = (body: unknown): McpIntegrationId | null => (isObject(body) && isMcpIntegration(body.id) ? body.id : null);
+export const parseIntegrationId = (body: unknown): Parsed<McpIntegrationId> => (isObject(body) && isMcpIntegration(body.id) ? { ok: body.id } : null);
 
 /** The body of `PUT /api/google/calendars`: `{ id, shown }`, a Google calendar's id and whether the Calendar page shows it. */
-export const parseCalendarShown = (body: unknown): CalendarShownInput | null =>
-	isObject(body) && isNonEmpty(body.id) && typeof body.shown === "boolean" ? { id: body.id, shown: body.shown } : null;
+export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>
+	isObject(body) && isNonEmpty(body.id) && typeof body.shown === "boolean" ? { ok: { id: body.id, shown: body.shown } } : null;
 
 const validPort = (port: unknown): port is number => typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
 
@@ -439,7 +440,7 @@ function secretOf(body: Record<string, unknown>): string | undefined | null {
 }
 
 /** The body of `PUT /api/integrations/slack/client`. An empty secret is omitted so the saved secret can stay. */
-export function parseSlackClient(body: unknown): { ok: SlackClientInput } | { error: string } {
+export function parseSlackClient(body: unknown): Parsed<SlackClientInput, { error: string }> {
 	if (!isObject(body)) return { error: "Expected { clientId, redirectUri, callbackPort, scope } for the Slack app." };
 	if (typeof body.clientId !== "string" || body.clientId.trim() === "") return { error: "Slack needs the app's client ID." };
 	const clientSecret = secretOf(body);
@@ -457,7 +458,7 @@ export function parseSlackClient(body: unknown): { ok: SlackClientInput } | { er
 }
 
 /** The body of `PUT /api/integrations/google-calendar/client`. An empty secret is omitted so the saved secret can stay. */
-export function parseGoogleClient(body: unknown): { ok: GoogleClientInput } | { error: string } {
+export function parseGoogleClient(body: unknown): Parsed<GoogleClientInput, { error: string }> {
 	if (!isObject(body)) return { error: "Expected { clientId, callbackPort } for the Google OAuth client." };
 	const clientId = typeof body.clientId === "string" ? body.clientId.trim() : "";
 	if (!GOOGLE_CLIENT_ID.test(clientId)) return { error: "Enter the OAuth client's ID, which ends in .apps.googleusercontent.com." };
@@ -470,7 +471,7 @@ export function parseGoogleClient(body: unknown): { ok: GoogleClientInput } | { 
 const isTicketPriority = oneOf(TICKET_PRIORITIES);
 
 /** The fields a picker sets, each left out unchanged and `null` clearing it, each of its own type; `null` for any other value. */
-function parseTicketFields(body: Record<string, unknown>): TicketFieldValues | null {
+function parseTicketFields(body: Record<string, unknown>): Parsed<TicketFieldValues> {
 	const { state, assignee, priority, labels, project, dueDate } = body;
 	const fields: TicketFieldValues = {};
 	if (state !== undefined) {
@@ -497,40 +498,40 @@ function parseTicketFields(body: Record<string, unknown>): TicketFieldValues | n
 		if (dueDate !== null && !isDay(dueDate)) return null;
 		fields.dueDate = dueDate;
 	}
-	return fields;
+	return { ok: fields };
 }
 
 /** The body of `PUT /api/ticket/new`: a title and a description, each within its limit, a team by id, and any picker's fields. */
-export function parseTicketDraft(body: unknown): TicketDraft | null {
+export function parseTicketDraft(body: unknown): Parsed<TicketDraft> {
 	if (!isObject(body)) return null;
 	const { title, description, team } = body;
 	if (!isNonEmpty(title) || title.length > MAX_TICKET_TITLE || typeof description !== "string" || description.length > MAX_TICKET_DESCRIPTION || !isNonEmpty(team)) return null;
 	const fields = parseTicketFields(body);
-	return fields && { ...fields, title: title.trim(), description, team };
+	return fields && { ok: { ...fields.ok, title: title.trim(), description, team } };
 }
 
 /** The body of `PUT /api/ticket`: an issue identifier and at least one field to change, each of its own type. */
-export function parseTicketEdit(body: unknown): TicketEdit | null {
+export function parseTicketEdit(body: unknown): Parsed<TicketEdit> {
 	if (!isObject(body) || typeof body.id !== "string" || !TICKET_ID.test(body.id)) return null;
 	const fields = parseTicketFields(body);
-	return fields && Object.keys(fields).length > 0 ? { id: body.id, ...fields } : null;
+	return fields && Object.keys(fields.ok).length > 0 ? { ok: { id: body.id, ...fields.ok } } : null;
 }
 
 /** The body of `PUT /api/ticket/attachment`: an issue identifier, a file name and MIME type, and its bytes in base64 within the size limit. */
-export function parseTicketAttachment(body: unknown): TicketAttachmentUpload | null {
+export function parseTicketAttachment(body: unknown): Parsed<TicketAttachmentUpload> {
 	if (!isObject(body)) return null;
 	const { issue, name, type, data } = body;
 	if (typeof issue !== "string" || !TICKET_ID.test(issue) || !isNonEmpty(name) || !isNonEmpty(type) || typeof data !== "string") return null;
 	if (data.length > Math.ceil(MAX_TICKET_ATTACHMENT_BYTES / 3) * 4 || (data !== "" && !BASE64.test(data))) return null;
-	return { issue, name, type, data };
+	return { ok: { issue, name, type, data } };
 }
 
 /** The body of `PUT /api/attachment/document`: a file name, and the file's bytes in base64 within the size limit. */
-export function parsePromptDocument(body: unknown): PromptDocument | null {
+export function parsePromptDocument(body: unknown): Parsed<PromptDocument> {
 	if (!isObject(body)) return null;
 	const { name, data } = body;
 	if (!isNonEmpty(name) || typeof data !== "string" || data.length > Math.ceil(MAX_PROMPT_DOCUMENT_BYTES / 3) * 4) return null;
-	return data === "" || BASE64.test(data) ? { name, data } : null;
+	return data === "" || BASE64.test(data) ? { ok: { name, data } } : null;
 }
 
 export const SHA256 = /^[0-9a-f]{64}$/;
@@ -539,7 +540,7 @@ const worktreeTarget = (value: unknown): WorktreeTarget | null =>
 	isObject(value) && isNonEmpty(value.repository) && isNonEmpty(value.path) ? { repository: value.repository, path: value.path } : null;
 
 /** The body of `PUT /api/worktrees/removal`: a preview of up to 100 registered checkouts, or the confirmations from such a preview. */
-export function parseWorktreeRemoval(body: unknown): WorktreeRemovalRequest | null {
+export function parseWorktreeRemoval(body: unknown): Parsed<WorktreeRemovalRequest> {
 	if (!isObject(body)) return null;
 	if (body.action === "preview") {
 		if (!Array.isArray(body.targets) || body.targets.length === 0 || body.targets.length > 100) return null;
@@ -549,7 +550,7 @@ export function parseWorktreeRemoval(body: unknown): WorktreeRemovalRequest | nu
 			if (!target) return null;
 			targets.push(target);
 		}
-		return { action: "preview", targets };
+		return { ok: { action: "preview", targets } };
 	}
 	if (body.action !== "remove" || !Array.isArray(body.plans) || body.plans.length === 0 || body.plans.length > 100) return null;
 	const plans: WorktreeConfirmation[] = [];
@@ -559,13 +560,13 @@ export function parseWorktreeRemoval(body: unknown): WorktreeRemovalRequest | nu
 		if (!target || !confirmation || !SHA256.test(confirmation)) return null;
 		plans.push({ ...target, confirmation });
 	}
-	return { action: "remove", plans };
+	return { ok: { action: "remove", plans } };
 }
 
 const isProjectOp = oneOf(["add", "hide", "show"] as const);
 
 /** The body of `PUT /api/projects`: `{ op, cwd }`. Adding takes any path a new session takes; hiding and showing name an absolute directory. */
-export function parseProjectChange(body: unknown): ProjectChange | null {
+export function parseProjectChange(body: unknown): Parsed<ProjectChange> {
 	if (!isObject(body) || !isProjectOp(body.op) || !isNonEmpty(body.cwd)) return null;
-	return body.op === "add" || body.cwd.startsWith("/") ? { op: body.op, cwd: body.cwd } : null;
+	return body.op === "add" || body.cwd.startsWith("/") ? { ok: { op: body.op, cwd: body.cwd } } : null;
 }

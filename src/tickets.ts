@@ -237,18 +237,20 @@ const readIssueTexts = (server: McpServer, id: string): Promise<[string, string]
 export async function loadTicketDetail(id: string): Promise<TicketDetail> {
 	const server = await linearServer();
 	const [[issue, comments], colors] = await Promise.all([readIssueTexts(server, id), loadLabelColors(server, [id])]);
-	rememberUploads(issue, comments);
-	return parseIssueDetail(issue, comments, colors);
+	const detail = parseIssueDetail(issue, comments, colors);
+	// Under the id that `linearMarkdown` wrote into its media addresses, the one the page asks the media route with.
+	rememberUploads(detail.id, issue, comments);
+	return detail;
 }
 
 /** The files of one issue whose addresses expired share one read of the issue, which signs them all anew. */
 const resigned = createCache<void>(10_000);
 
-/** Upload `path` that issue `id` embeds, as `serveUpload` answers it. */
+/** Upload `path` that issue `id` embeds, as `serveUpload` answers it; a path that only another issue embeds is not served. */
 export const loadTicketMedia = (id: string, path: string, range: string | null, signal: AbortSignal): Promise<Response | null> =>
-	serveUpload(path, range, signal, () =>
+	serveUpload(id, path, range, signal, () =>
 		resigned.get(id, async () => {
-			rememberUploads(...(await readIssueTexts(await linearServer(), id)));
+			rememberUploads(id, ...(await readIssueTexts(await linearServer(), id)));
 		}),
 	);
 

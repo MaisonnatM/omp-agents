@@ -20,6 +20,7 @@ import { branchAt, type HeadHistory, type WorktreeAt } from "./git";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
 import { LineReader } from "./line-reader";
+import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { HOME } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
 import { subagentFiles } from "./subagents";
@@ -423,8 +424,11 @@ export interface ListedSession {
 	modifiedAt: number;
 }
 
-/** Sessions a refresh reads at once. */
-const SCAN_PARALLEL = 16;
+/** Sessions a refresh reads at once, and `git` calls it runs at once. */
+const SCAN_PARALLEL = PROBE_PARALLEL;
+
+/** The facts of a session before its first scan: one value, so that a caller can tell by identity that they did not change. */
+const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, worktree: null };
 
 export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
@@ -452,15 +456,12 @@ export class SessionFactsIndex {
 	/**
 	 * What the session in `sessionPath` and its subagents submitted, worked on, and linked, or none before its first scan.
 	 * The /ship stage and the worktree are the session's own transcript's, not its subagents', which run in worktrees of their own.
+	 * Each field keeps its identity until a refresh changes it, so a caller can compare them with `===`.
 	 */
 	factsOf(sessionPath: string): SessionFacts {
 		const session = this.#sessions.get(sessionPath);
-		return {
-			pullRequests: session?.pullRequests ?? [],
-			tickets: session?.tickets ?? [],
-			ship: session?.transcripts.get(sessionPath)?.scan.ship ?? null,
-			worktree: session?.worktree ?? null,
-		};
+		if (!session) return NO_FACTS;
+		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.scan.ship ?? null, worktree: session.worktree };
 	}
 
 	/**
@@ -519,56 +520,42 @@ export class SessionFactsIndex {
 		for (const path of this.#sessions.keys()) if (!listed.has(path)) this.#sessions.delete(path);
 		// A subagent's writes do not touch the session file, but its result does once it finishes.
 		const stale = sessions.filter(({ path, modifiedAt }) => this.#sessions.get(path)?.modifiedAt !== modifiedAt);
-		const scans: { session: SessionScan; changed: boolean; moved: boolean }[] = [];
 		// The first refresh reads every transcript; a few sessions at a time keep the disk busy without opening every file at once.
-		let next = 0;
-		const worker = async (): Promise<void> => {
-			while (next < stale.length) scans.push(await this.#scan(stale[next++]!));
-		};
-		await Promise.all(Array.from({ length: Math.min(SCAN_PARALLEL, stale.length) }, worker));
+		const scans = await mapLimit(stale, SCAN_PARALLEL, listed => this.#scan(listed));
 		let changed = scans.some(scan => scan.changed);
 		const touched = scans.map(scan => scan.session);
 		/** Sessions whose bash calls named a new `cwd`, or whose worktree is gone: the others keep theirs without asking git. */
 		const moved = scans.filter(scan => scan.moved).map(scan => scan.session);
-		// Sessions share directories, so each is asked about once per refresh.
+		// Sessions share directories, so each is asked about once per refresh, and a few `git` calls run at a time.
 		const worktreeAt = once(this.#worktreeAt);
-		const worktrees = await Promise.all(moved.map(session => workingWorktree(session.cwd, session.workDirs, worktreeAt)));
+		const repoOf = once(this.#repoOf);
+		const historyOf = once(this.#headHistory);
+		const worktrees = await mapLimit(moved, SCAN_PARALLEL, session => workingWorktree(session.cwd, session.workDirs, worktreeAt));
 		moved.forEach((session, i) => {
 			if (worktrees[i] === session.worktree) return;
 			session.worktree = worktrees[i]!;
 			changed = true;
 		});
 		// A session that wrote to its transcript may have switched its worktree's branch since: two `git` calls per writing session's directory per refresh.
-		const checkouts = await Promise.all(
-			touched.map(async session => {
-				const dir = session.worktree ?? session.cwd;
-				return (await exists(dir)) ? worktreeAt(dir) : null;
-			}),
-		);
+		const checkouts = await mapLimit(touched, SCAN_PARALLEL, async session => {
+			const dir = session.worktree ?? session.cwd;
+			return (await exists(dir)) ? worktreeAt(dir) : null;
+		});
 		touched.forEach((session, i) => {
 			const at = checkouts[i];
 			session.branch = at?.linked ? at.branch : null;
 		});
-		// One `git` call per directory, all at once, and only for sessions that name a PR by number alone or sit on a linked worktree's branch.
-		await Promise.all(
-			touched
-				.filter(session => session.repo === null && (session.branch !== null || session.refs.some(ref => ref.kind === "number")))
-				.map(async session => {
-					session.repo = await this.#repoOf(session.cwd);
-				}),
-		);
+		// One `git` call per directory, and only for sessions that name a PR by number alone or sit on a linked worktree's branch.
+		const unknownRepo = touched.filter(session => session.repo === null && (session.branch !== null || session.refs.some(ref => ref.kind === "number")));
+		await mapLimit(unknownRepo, SCAN_PARALLEL, async session => {
+			session.repo = await repoOf(session.cwd);
+		});
 		// A submit's branch stays what it was at its time, so each is looked up once: one `git` call for its repository and two for its HEAD reflog per directory.
-		const repoOf = once(this.#repoOf);
-		const historyOf = once(this.#headHistory);
-		await Promise.all(
-			touched.flatMap(session =>
-				session.refs.map(async ref => {
-					if (ref.kind !== "submit" || session.submitted.has(refKey(ref))) return;
-					const submitted = await submittedBranch(ref, session.cwd, repoOf, historyOf);
-					if (submitted) session.submitted.set(refKey(ref), submitted);
-				}),
-			),
-		);
+		const submits = touched.flatMap(session => session.refs.flatMap(ref => (ref.kind === "submit" && !session.submitted.has(refKey(ref)) ? [{ session, ref }] : [])));
+		await mapLimit(submits, SCAN_PARALLEL, async ({ session, ref }) => {
+			const submitted = await submittedBranch(ref, session.cwd, repoOf, historyOf);
+			if (submitted) session.submitted.set(refKey(ref), submitted);
+		});
 		for (const session of touched) if (this.#resolve(session)) changed = true;
 		return changed;
 	}

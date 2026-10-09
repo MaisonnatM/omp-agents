@@ -534,4 +534,34 @@ describe("SessionGuest lifetime", () => {
 		socket.frame(state(false));
 		expect(socket.messages).toEqual([]);
 	});
+
+	test("end signals the host only while a fresh listing shows the same omp process hosting the session", async () => {
+		const { guest } = await joinRoom({ host: { instanceId: "inst-6", pid: 4242 } });
+		const kill = spyOn(process, "kill").mockImplementation(() => true);
+		const listHosts = spyOn(collab, "listHosts");
+
+		listHosts.mockResolvedValue([]);
+		await guest.end();
+		listHosts.mockResolvedValue([host({ instanceId: "inst-6", pid: 5151 })]);
+		await guest.end();
+		listHosts.mockResolvedValue([host({ instanceId: "inst-7", pid: 4242 })]);
+		await guest.end();
+		listHosts.mockResolvedValue([host({ instanceId: "inst-6", pid: 4242, sessionId: "session-2" })]);
+		await guest.end();
+		expect(kill).not.toHaveBeenCalled();
+
+		listHosts.mockResolvedValue([host({ instanceId: "inst-6", pid: 4242, generation: 2 })]);
+		await guest.end();
+		expect(kill).toHaveBeenCalledTimes(1);
+		expect(kill).toHaveBeenCalledWith(4242, "SIGTERM");
+	});
+
+	test("a read-only room ends nothing and lists nothing", async () => {
+		const { guest } = await joinRoom({ writable: false });
+		const kill = spyOn(process, "kill").mockImplementation(() => true);
+		const listHosts = spyOn(collab, "listHosts").mockResolvedValue([host()]);
+		await guest.end();
+		expect(listHosts).not.toHaveBeenCalled();
+		expect(kill).not.toHaveBeenCalled();
+	});
 });

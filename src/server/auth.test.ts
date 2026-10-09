@@ -80,6 +80,8 @@ describe("API and socket guards", () => {
 		expect(guards.admit(request("/api/settings", { cookie: `${COOKIE}=wrong` }))?.status).toBe(401);
 		expect(guards.admit(request(`/api/settings?token=${TOKEN}`))?.status).toBe(401);
 		expect(guards.admit(request("/api/settings", signedIn))).toBeNull();
+		// A stray `?token=` beside the cookie, as the desktop shell's probe carries, is no reason to refuse.
+		expect(guards.admit(request(`/api/settings?token=${TOKEN}`, signedIn))).toBeNull();
 	});
 
 	test("a cross-site GET is refused even with the cookie, and a foreign Host first", () => {

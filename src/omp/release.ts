@@ -1,10 +1,8 @@
 /** omp's releases: the newest one on the channel omp follows, the one installed on disk, and `omp update`. */
-import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isObject } from "../json";
 import { HOME } from "../paths";
 import { run } from "../proc";
-import { ompCommand, packageDir } from "./install";
+import { ompCommand, packageDir, readManifest } from "./install";
 import { config, updateCli, updateSettings } from "./modules";
 
 const RELEASE_TIMEOUT_MS = 10_000;
@@ -22,8 +20,8 @@ export async function latestOmp(): Promise<string | null> {
 /** The version of the omp package on disk now, which `omp update` changes while this server keeps the modules it loaded. */
 export function installedOmp(): string {
 	const path = join(packageDir, "package.json");
-	const manifest: unknown = JSON.parse(readFileSync(path, "utf8"));
-	if (!isObject(manifest) || typeof manifest.version !== "string") throw new Error(`${path} names no version`);
+	const manifest = readManifest(path);
+	if (typeof manifest.version !== "string") throw new Error(`${path} names no version`);
 	return manifest.version;
 }
 

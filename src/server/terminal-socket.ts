@@ -1,9 +1,8 @@
 /** `/ws/terminal`: one socket per terminal tab, carrying the shell's output and what you type as binary frames. */
-import { homedir } from "node:os";
 import type { ServerWebSocket } from "bun";
 import { directoryOf } from "../paths";
 import type { TerminalServerMsg } from "../shared/terminals";
-import type { Terminal, Terminals } from "../terminals";
+import { MAX_TERMINALS, type Terminal, type Terminals } from "../terminals";
 import { fail } from "./http";
 import { parseTerminalMsg, parseTerminalQuery } from "./wire";
 
@@ -16,14 +15,17 @@ export interface TerminalSocketData {
 export type TerminalSocket = ServerWebSocket<TerminalSocketData>;
 
 /**
- * The shell a `/ws/terminal` upgrade names: `?id=` an open one, `?cwd=` a new one there, or the home directory when
- * `cwd` is no directory, such as a removed worktree. A refusal when the query names neither or the shell has exited.
+ * The shell a `/ws/terminal` upgrade names: `?id=` an open one, which a reloaded page reattaches to, or `?cwd=` a new one there.
+ * A refusal when the query names neither, the shell has exited, `cwd` is no directory, such as a removed worktree, or {@link MAX_TERMINALS} shells run.
  */
-export function terminalFor(terminals: Terminals, params: URLSearchParams): Terminal | Response {
+export async function terminalFor(terminals: Terminals, params: URLSearchParams): Promise<Terminal | Response> {
 	const target = parseTerminalQuery(params);
 	if (!target) return fail(400, "Name a terminal with ?id=, or open one with ?cwd=&cols=&rows=.");
-	if ("id" in target) return terminals.get(target.id) ?? fail(404, "That terminal has exited.");
-	return terminals.open(directoryOf(target.cwd) ?? homedir(), target);
+	const query = target.ok;
+	if ("id" in query) return terminals.get(query.id) ?? fail(404, "That terminal has exited.");
+	const cwd = await directoryOf(query.cwd);
+	if (!cwd) return fail(404, `${query.cwd.trim()} is not a directory.`);
+	return terminals.open(cwd, query) ?? fail(429, `${MAX_TERMINALS} terminals are open. Close one to open another.`);
 }
 
 const sendMsg = (ws: TerminalSocket, msg: TerminalServerMsg): void => void ws.send(JSON.stringify(msg));
@@ -43,7 +45,7 @@ export const terminalSocket = {
 	message(ws: TerminalSocket, raw: string | Buffer): void {
 		const { terminal } = ws.data;
 		if (typeof raw !== "string") return terminal.write(raw);
-		const msg = parseTerminalMsg(raw);
+		const msg = parseTerminalMsg(raw)?.ok;
 		if (msg?.t === "resize") terminal.resize(msg.cols, msg.rows);
 		else if (msg?.t === "kill") terminal.kill();
 	},

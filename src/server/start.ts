@@ -47,7 +47,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 	async function spawnFor(request: StartRequest): Promise<{ started: Started } | { error: string }> {
 		switch (request.kind) {
 			case "new": {
-				const dir = directoryOf(request.cwd);
+				const dir = await directoryOf(request.cwd);
 				if (!dir) return { error: `${request.cwd.trim()} is not a directory.` };
 				// omp writes a fresh session's file only with its first reply, so a first `!` command would show nowhere.
 				if (request.prompt.startsWith("!")) return { error: "Start the session with a prompt. A ! command runs once omp has replied." };

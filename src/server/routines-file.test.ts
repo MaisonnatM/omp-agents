@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { flushJsonFiles } from "../fs";
 import { RoutinesFile } from "./routines-file";
 
 const dirs: string[] = [];
@@ -86,6 +87,7 @@ test("an older file keeps its other routines, reads one schedule as a list and a
 	expect(existsSync(`${path}.invalid`)).toBe(false);
 
 	file.apply({ op: "enable", id: "r1", enabled: false }, 2);
+	flushJsonFiles();
 	const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: { task: { kind: string }; schedules?: unknown; schedule?: unknown }[] };
 	expect(saved.routines.map(routine => routine.task.kind)).toEqual(["command"]);
 	expect(saved.routines[0]?.schedules).toEqual([{ kind: "every", minutes: 60 }]);
@@ -114,6 +116,7 @@ test("a prompt task from before `pin` reads as unpinned, and the next save write
 	expect(existsSync(`${path}.invalid`)).toBe(false);
 
 	file.apply({ op: "enable", id: "r1", enabled: false }, 2);
+	flushJsonFiles();
 	const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: { task: unknown }[] };
 	expect(saved.routines[0]?.task).toEqual({ kind: "prompt", prompt: "Write the daily retro.", pin: false });
 });

@@ -72,7 +72,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 		// A live view completes as its session; a draft as a session not started yet in its cwd.
 		let target: { instanceId: string | null; cwd: string };
 		if (scope.kind === "new") {
-			const cwd = directoryOf(scope.cwd);
+			const cwd = await directoryOf(scope.cwd);
 			if (!cwd) {
 				send(ws, { t: "completions", scope, reqId, items: [], error: `${scope.cwd.trim()} is not a directory.` });
 				return;
@@ -144,8 +144,11 @@ async function dispatch<T extends ClientMsg["t"]>(env: SocketEnv, ws: Socket, t:
 	await clientHandlers[t](env, ws, msg);
 }
 
+/** Handles one message from a dashboard socket. */
+export type ClientHandler = (ws: Socket, frame: ClientFrame) => Promise<void>;
+
 /** Handles one message; one tagged `ack` then gets `done`, with the error when its handler threw, which it still throws for the server to log. */
-export function createClientHandler(env: SocketEnv): (ws: Socket, frame: ClientFrame) => Promise<void> {
+export function createClientHandler(env: SocketEnv): ClientHandler {
 	return async (ws, frame) => {
 		const { ack } = frame;
 		if (ack === undefined) return dispatch(env, ws, frame.t, frame);

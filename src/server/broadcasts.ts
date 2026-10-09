@@ -161,10 +161,13 @@ export class Broadcasts {
 	}
 }
 
-/** A keyed list as the listeners last heard it: each entry's JSON, by key. */
+/**
+ * A keyed list as the listeners last heard it: each entry and its JSON, by key. An entry passed again as the same object
+ * is unchanged without serializing it, so a list whose rows keep their identity costs a lookup per unchanged row.
+ */
 class HeardList<T> {
 	readonly #keyOf: (entry: T) => string;
-	#heard = new Map<string, string>();
+	#heard = new Map<string, { entry: T; json: string }>();
 
 	constructor(keyOf: (entry: T) => string) {
 		this.#keyOf = keyOf;
@@ -172,11 +175,19 @@ class HeardList<T> {
 
 	/** The entries of `entries` that changed or joined since the last sync, and the keys that left; `entries` is what the listeners have heard from now on. */
 	sync(entries: readonly T[]): { changed: T[]; removed: string[] } {
-		const next = new Map(entries.map(entry => [this.#keyOf(entry), JSON.stringify(entry)]));
-		const changed = entries.filter(entry => {
+		const next = new Map<string, { entry: T; json: string }>();
+		const changed: T[] = [];
+		for (const entry of entries) {
 			const key = this.#keyOf(entry);
-			return this.#heard.get(key) !== next.get(key);
-		});
+			const heard = this.#heard.get(key);
+			if (heard?.entry === entry) {
+				next.set(key, heard);
+				continue;
+			}
+			const json = JSON.stringify(entry);
+			next.set(key, { entry, json });
+			if (heard?.json !== json) changed.push(entry);
+		}
 		const removed = [...this.#heard.keys()].filter(key => !next.has(key));
 		this.#heard = next;
 		return { changed, removed };

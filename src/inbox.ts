@@ -277,7 +277,8 @@ export function loadPullRequestDetail(pr: PullRequest, fresh = false): Promise<P
 export async function loadInbox(cwds: string[], fresh: boolean): Promise<Inbox> {
 	const byRepo = new Map<string, Repo & { cwds: string[] }>();
 	const unmatched: string[] = [];
-	const resolved = await Promise.all(cwds.filter(cwd => directoryOf(cwd) !== null).map(async cwd => [cwd, await repoOf(cwd)] as const));
+	const present = await Promise.all(cwds.map(async cwd => ((await directoryOf(cwd)) === null ? null : cwd)));
+	const resolved = await Promise.all(present.filter(cwd => cwd !== null).map(async cwd => [cwd, await repoOf(cwd)] as const));
 	for (const [cwd, repo] of resolved) {
 		if (!repo) {
 			unmatched.push(cwd);

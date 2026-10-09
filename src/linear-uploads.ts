@@ -1,7 +1,8 @@
 /**
  * The files that Linear issues embed. Linear hands them out as `uploads.linear.app` addresses signed for five minutes,
  * so the page loads each through this server, which keeps the latest signed address and asks Linear for a new one once
- * it expires: a video still plays, and seeks, long after the sheet opened.
+ * it expires: a video still plays, and seeks, long after the sheet opened. An address is kept under the issue whose
+ * text named it, and served only for that issue.
  */
 import { TICKET_MEDIA_PATH } from "./shared/tickets";
 
@@ -17,8 +18,14 @@ const PASSED_HEADERS = ["content-type", "content-length", "content-range", "acce
 /** Types that render inside the page; anything else downloads. */
 const INLINE_TYPE = /^(?:image\/(?:png|jpe?g|gif|webp|avif)|video\/|audio\/)/i;
 
-/** The latest signed address of each upload path. */
+/** Most signed addresses kept; past it the oldest goes, since signing one anew costs one read of its issue. */
+const MAX_SIGNED = 256;
+
+/** The latest signed address of each upload path, by the issue whose text named it. */
 const signed = new Map<string, { url: string; expiresAt: number }>();
+
+/** The key of upload `path` of issue `issue`; a newline is in neither. */
+const keyOf = (issue: string, path: string): string => `${issue}\n${path}`;
 
 /** When the `signature` JWT of a signed address expires, in ms since the epoch. */
 function expiryOf(url: URL): number {
@@ -50,43 +57,56 @@ export const proxyUploads = (issue: string, text: string): string =>
 		return url ? `${TICKET_MEDIA_PATH}?${new URLSearchParams({ issue, path: url.pathname })}` : address;
 	});
 
-/** Keeps the signed address of each upload in `texts`, the raw answers of Linear's tools, for the media route to fetch. */
-export function rememberUploads(...texts: string[]): void {
+/** Keeps the signed address of each upload in `texts`, the raw answers of Linear's tools about issue `issue`, for the media route to fetch. */
+export function rememberUploads(issue: string, ...texts: string[]): void {
 	const now = Date.now();
-	for (const [path, entry] of signed) if (entry.expiresAt <= now) signed.delete(path);
+	for (const [key, entry] of signed) if (entry.expiresAt <= now) signed.delete(key);
 	for (const text of texts) {
 		for (const [address] of text.matchAll(UPLOAD_URL)) {
 			const url = uploadUrl(address);
-			if (url) signed.set(url.pathname, { url: url.href, expiresAt: expiryOf(url) });
+			if (!url) continue;
+			const key = keyOf(issue, url.pathname);
+			// Deleting first moves the key to the end of the map's order, which is the order of eviction.
+			signed.delete(key);
+			signed.set(key, { url: url.href, expiresAt: expiryOf(url) });
 		}
+	}
+	for (const key of signed.keys()) {
+		if (signed.size <= MAX_SIGNED) break;
+		signed.delete(key);
 	}
 }
 
 export const isUploadPath = (path: string): boolean => UPLOAD_PATH.test(path);
 
-function current(path: string): string | undefined {
-	const entry = signed.get(path);
-	return entry && entry.expiresAt - MARGIN_MS > Date.now() ? entry.url : undefined;
+/** The kept address of upload `key` while it is good for a read; an expired one is dropped. */
+function current(key: string): string | undefined {
+	const entry = signed.get(key);
+	if (!entry) return undefined;
+	if (entry.expiresAt - MARGIN_MS > Date.now()) return entry.url;
+	signed.delete(key);
+	return undefined;
 }
 
 /**
- * Upload `path` as Linear serves it, the `range` header passed on, or `null` when no read of its issue names it.
- * `refresh` reads the issue again and `rememberUploads` its answers, which signs its uploads anew; it runs when the kept
- * address expired, or Linear refused it.
+ * Upload `path` of issue `issue` as Linear serves it, the `range` header passed on, or `null` when no read of that issue
+ * names it. `refresh` reads the issue again and `rememberUploads` its answers, which signs its uploads anew; it runs when
+ * the kept address expired, or Linear refused it.
  */
-export async function serveUpload(path: string, range: string | null, signal: AbortSignal, refresh: () => Promise<void>): Promise<Response | null> {
+export async function serveUpload(issue: string, path: string, range: string | null, signal: AbortSignal, refresh: () => Promise<void>): Promise<Response | null> {
+	const key = keyOf(issue, path);
 	const read = (url: string) => fetch(url, { headers: range ? { range } : {}, signal });
-	let url = current(path);
+	let url = current(key);
 	if (!url) {
 		await refresh();
-		url = current(path);
+		url = current(key);
 	}
 	if (!url) return null;
 	let upstream = await read(url);
 	if (upstream.status === 401 || upstream.status === 403) {
-		signed.delete(path);
+		signed.delete(key);
 		await refresh();
-		url = current(path);
+		url = current(key);
 		if (!url) return null;
 		upstream = await read(url);
 	}

@@ -188,4 +188,23 @@ describe("worktree removal", () => {
 		expect(listed.repositories[0]?.worktrees.map(entry => entry.path)).toEqual([main]);
 		expect((await quiet.inventory(null)).repositories).toEqual([]);
 	});
+
+	test("lists each repository once, in the order of the first directory in it, and a directory outside git as an error", async () => {
+		const first = await repo();
+		const second = await repo();
+		const wip = await linked(first.parent, first.main);
+		const outside = realpathSync(mkdtempSync(join(tmpdir(), "omp-worktrees-outside-")));
+		dirs.push(outside);
+		const sessions = [wip, wip, first.main, wip].map((cwd, index) => ({ id: `s${index}`, cwd, modifiedAt: index }));
+		const listed = await new Worktrees({
+			knownCwds: () => [second.main, wip, outside, first.main],
+			activity: () => [...sessions, { id: "gone", cwd: join(outside, "missing", "deeper"), modifiedAt: 9 }],
+			live: () => [],
+			serverCwd: "/no/such/dashboard",
+		}).inventory(null);
+		expect(listed.repositories.map(item => item.path)).toEqual([second.main, first.main]);
+		expect(listed.repositories[1]?.worktrees.map(entry => entry.path)).toEqual([first.main, wip]);
+		expect(listed.repositories[1]?.worktrees[1]?.savedSessionIds).toEqual(["s0", "s1", "s3"]);
+		expect(listed.errors.map(error => error.path)).toEqual([outside]);
+	});
 });

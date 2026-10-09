@@ -1,9 +1,11 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { agentDir } from "./omp/config";
+import { tokenFile } from "./paths";
 import { MAX_TEXT_FILE_BYTES } from "./shared/transcript";
-import { readTextFile } from "./text-file";
+import { DENIED_DIRS, readTextFile } from "./text-file";
 
 const dir = await mkdtemp(join(tmpdir(), "omp-agents-text-file-"));
 afterAll(() => rm(dir, { recursive: true, force: true }));
@@ -37,4 +39,37 @@ test("a large file stops at the limit without splitting a character", async () =
 	if (!read.ok) throw new Error(read.error);
 	expect(read.file.truncated).toBe(true);
 	expect(read.file.text).toBe("a".repeat(MAX_TEXT_FILE_BYTES - 1));
+});
+
+test("omp-agents' directory and omp's agent directory are denied, Markdown in omp's still opens", () => {
+	expect(DENIED_DIRS).toEqual([
+		{ dir: dirname(tokenFile), opens: [] },
+		{ dir: agentDir, opens: ["md", "markdown"] },
+	]);
+});
+
+test("a text file in a denied directory is refused, by its real path, but for the extensions that directory opens", async () => {
+	const secrets = join(dir, "secrets");
+	const agent = join(dir, "agent");
+	await mkdir(join(secrets, "nested"), { recursive: true });
+	await mkdir(join(agent, "skills"), { recursive: true });
+	await writeFile(join(secrets, "nested", "routines.json"), "{}");
+	await writeFile(join(secrets, "notes.md"), "# mine");
+	await writeFile(join(agent, "mcp.json"), '{"headers":{}}');
+	await writeFile(join(agent, "skills", "SKILL.md"), "# skill");
+	await writeFile(join(dir, "secrets-but-not.json"), "{}");
+	await symlink(join(agent, "mcp.json"), join(dir, "harmless.json"));
+	// The denied directory named through a link still matches the file's real path.
+	await symlink(agent, join(dir, "agent-link"));
+	const denied = [
+		{ dir: secrets, opens: [] },
+		{ dir: join(dir, "agent-link"), opens: ["md"] },
+	];
+
+	expect(await readTextFile(join(secrets, "nested", "routines.json"), denied)).toMatchObject({ ok: false, status: 403 });
+	expect(await readTextFile(join(secrets, "notes.md"), denied)).toMatchObject({ ok: false, status: 403 });
+	expect(await readTextFile(join(agent, "mcp.json"), denied)).toMatchObject({ ok: false, status: 403 });
+	expect(await readTextFile(join(dir, "harmless.json"), denied)).toMatchObject({ ok: false, status: 403 });
+	expect(await readTextFile(join(agent, "skills", "SKILL.md"), denied)).toMatchObject({ ok: true, file: { text: "# skill" } });
+	expect(await readTextFile(join(dir, "secrets-but-not.json"), denied)).toMatchObject({ ok: true, file: { text: "{}" } });
 });

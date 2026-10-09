@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Scrollback, type Terminal, type TerminalListener, Terminals } from "./terminals";
+import { MAX_TERMINALS, Scrollback, type Terminal, type TerminalListener, Terminals } from "./terminals";
 
 describe("Scrollback", () => {
 	test("drops the oldest output once it holds over its limit, and keeps a chunk larger than the limit whole", () => {
@@ -29,6 +29,13 @@ describe("Terminals", () => {
 		}
 		rmSync(dir, { recursive: true, force: true });
 	});
+
+	/** A shell in the test directory, which the cap must not refuse. */
+	function opened(terminals: Terminals): Terminal {
+		const terminal = terminals.open(dir, { cols: 80, rows: 24 });
+		if (!terminal) throw new Error("The terminal was refused.");
+		return terminal;
+	}
 
 	/** Collects what `terminal` sends a page; `shows` resolves once the output holds `needle`, and `exited` with the exit code. */
 	function watch(terminal: Terminal) {
@@ -58,7 +65,7 @@ describe("Terminals", () => {
 
 	test("runs the shell in its directory without the server's PORT, and replays its output to a page that attaches later", async () => {
 		const terminals = new Terminals();
-		const terminal = terminals.open(dir, { cols: 80, rows: 24 });
+		const terminal = opened(terminals);
 		const first = watch(terminal);
 		terminal.write('echo "at $(pwd) port=${PORT:-unset}"\r');
 		await first.shows(`at ${dir} port=unset`);
@@ -73,7 +80,7 @@ describe("Terminals", () => {
 
 	test("an exit reaches every page that shows the shell, and the shell leaves the list", async () => {
 		const terminals = new Terminals();
-		const terminal = terminals.open(dir, { cols: 80, rows: 24 });
+		const terminal = opened(terminals);
 		const one = watch(terminal);
 		const two = watch(terminal);
 		terminal.write("exit 3\r");
@@ -85,12 +92,26 @@ describe("Terminals", () => {
 
 	test("resizing the terminal resizes what the shell sees, and a kill hangs up on it", async () => {
 		const terminals = new Terminals();
-		const terminal = terminals.open(dir, { cols: 80, rows: 24 });
+		const terminal = opened(terminals);
 		const page = watch(terminal);
 		terminal.resize(132, 40);
 		terminal.write("stty size\r");
 		await page.shows("40 132");
 		terminal.kill();
 		expect(await page.exited).toBeNull();
+	});
+
+	test("refuses a shell past the cap until one exits", async () => {
+		const terminals = new Terminals();
+		const first = opened(terminals);
+		const others = Array.from({ length: MAX_TERMINALS - 1 }, () => opened(terminals));
+		expect(terminals.open(dir, { cols: 80, rows: 24 })).toBeNull();
+		const page = watch(first);
+		first.kill();
+		await page.exited;
+		const rest = [...others, opened(terminals)].map(watch);
+		terminals.dispose();
+		await Promise.all(rest.map(page => page.exited));
+		expect(terminals.list()).toEqual([]);
 	});
 });

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyPins } from "../shared/pins";
-import type { HostStatus, StartRequest, StartResult } from "../shared/sessions";
+import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import type { RoutineTask } from "../routines";
 import { RoutineRunner, SESSION_START_DEADLINE_MS } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
@@ -138,11 +138,13 @@ describe("RoutineRunner", () => {
 	test("each start takes the prompt with the unattended suffix, in the routine's workspace and skill", async () => {
 		const { runner, fake } = harness(fileWith(routinesPath()));
 		await runner.tick();
-		expect(fake.requests).toMatchObject([{ kind: "new", cwd: "/work/webapp", skill: "ship", subject: null }]);
-		const [request] = fake.requests;
-		expect(request?.kind === "new" && request.prompt).toBe(
-			"Summarize yesterday's commits. This session runs unattended from a routine. Do not ask questions. If something blocks you, say what and stop.",
-		);
+		expect(fake.requests).toEqual([
+			newSessionRequest(
+				"/work/webapp",
+				"Summarize yesterday's commits. This session runs unattended from a routine. Do not ask questions. If something blocks you, say what and stop.",
+				{ skill: "ship" },
+			),
+		]);
 	});
 
 	test("a start that fails records the error, and the next run tries again", async () => {

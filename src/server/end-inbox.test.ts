@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -55,5 +55,18 @@ describe("EndInbox", () => {
 		await inbox.drain();
 		expect(log).toEqual(["end later"]);
 		expect(readdirSync(dir).sort()).toEqual(["bad.json.invalid", "other.json.invalid", "s1.tmp"]);
+	});
+
+	test("a request of version 1, or of none from a tool installed before the field, ends its session; any other version is set aside", async () => {
+		const dir = inboxDir();
+		writeFileSync(join(dir, "s1.json"), JSON.stringify({ v: 1, sessionId: "s1" }));
+		writeFileSync(join(dir, "s2.json"), JSON.stringify({ sessionId: "s2" }));
+		writeFileSync(join(dir, "s3.json"), JSON.stringify({ v: 2, sessionId: "s3" }));
+		const logged = spyOn(console, "error").mockImplementation(() => {});
+		const { inbox, log } = inboxOf(dir, ["s1", "s2", "s3"]);
+		await inbox.drain();
+		expect(log.sort()).toEqual(["end s1", "end s2"]);
+		expect(readdirSync(dir)).toEqual(["s3.json.invalid"]);
+		logged.mockRestore();
 	});
 });

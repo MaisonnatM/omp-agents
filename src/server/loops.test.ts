@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, jest, spyOn, test } from "bun:test";
-import { repeat } from "./loops";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { type LoopHandlers, Loops, repeat } from "./loops";
 
 const stops: (() => void)[] = [];
 afterEach(() => {
@@ -88,5 +91,42 @@ describe("repeat", () => {
 		jest.advanceTimersByTime(1000);
 		await settle();
 		expect(runs).toBe(1);
+	});
+});
+
+describe("Loops", () => {
+	test("stop ends every loop, the watcher, and a pending re-read, and ignores what is reported after it", async () => {
+		jest.useFakeTimers();
+		const dir = mkdtempSync(join(tmpdir(), "omp-loops-"));
+		const calls: string[] = [];
+		const tick = (name: string) => async () => void calls.push(name);
+		const handlers: LoopHandlers = {
+			onRegistryTick: tick("registry"),
+			onFileChange: path => {
+				calls.push(`changed ${path}`);
+				return true;
+			},
+			onListRefresh: tick("list"),
+			onRescanTick: tick("rescan"),
+			onUsageTick: tick("usage"),
+			onMinuteTick: tick("minute"),
+			onNoticeTick: tick("notice"),
+			onActivityTick: tick("activity"),
+		};
+		const loops = new Loops(dir, handlers);
+		try {
+			loops.watch();
+			loops.start();
+			loops.fileChanged(join(dir, "a.jsonl"));
+			loops.stop();
+			loops.fileChanged(join(dir, "b.jsonl"));
+			await loops.listNow();
+			jest.advanceTimersByTime(24 * 60 * 60_000);
+			await settle();
+			expect(calls).toEqual([`changed ${join(dir, "a.jsonl")}`]);
+		} finally {
+			loops.stop();
+			rmSync(dir, { recursive: true, force: true });
+		}
 	});
 });

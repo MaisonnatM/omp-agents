@@ -9,6 +9,7 @@ test("closing a restored shell before its socket connects still exits the shell 
 	process.env.SHELL = "/bin/sh";
 	const terminals = new Terminals();
 	const terminal = terminals.open(import.meta.dir, { cols: 80, rows: 24 });
+	if (!terminal) throw new Error("The terminal was refused.");
 	const server = Bun.serve<TerminalSocketData>({
 		hostname: "127.0.0.1",
 		port: 0,

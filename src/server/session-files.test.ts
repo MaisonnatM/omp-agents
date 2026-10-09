@@ -99,4 +99,28 @@ describe("SessionFiles", () => {
 		expect(await files.scan()).toBe(true);
 		expect(titles(files)).toEqual(["second", "first"]);
 	});
+
+	test("a past row keeps its identity until its file or its interruption changes", async () => {
+		const { project, files } = setup();
+		const a = join(project, "a.jsonl");
+		writeSession(a, "a", "first", 1_000_000);
+		writeSession(join(project, "b.jsonl"), "b", "second", 2_000_000);
+		await files.scan();
+		const [b1, a1] = files.past(new Set(), () => false);
+		const [b2, a2] = files.past(new Set(), () => false);
+		expect(b2).toBe(b1!);
+		expect(a2).toBe(a1!);
+
+		const [b3, a3] = files.past(new Set(), id => id === "a");
+		expect(b3).toBe(b1!);
+		expect(a3).not.toBe(a1!);
+		expect(a3!.interrupted).toBe(true);
+
+		writeSession(a, "a", "first, renamed", 3_000_000);
+		files.touch(a);
+		await files.refresh();
+		const [a4, b4] = files.past(new Set(), id => id === "a");
+		expect(b4).toBe(b1!);
+		expect(a4!.title).toBe("first, renamed");
+	});
 });

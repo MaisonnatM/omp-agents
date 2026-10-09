@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -41,13 +41,10 @@ export const serverLockFile = join(configDir, "server.lock");
 export const displayPath = (path: string): string =>
 	path === HOME || path.startsWith(`${HOME}/`) ? `~${path.slice(HOME.length)}` : path;
 
-/** The directory `input` names (absolute, `~`-relative, or relative to the home directory), or `null` when it is not one. */
-export function directoryOf(input: string): string | null {
+/** The directory `input` names (absolute, `~`-relative, or relative to the home directory), or `null` when it is not one; stats without blocking the event loop. */
+export async function directoryOf(input: string): Promise<string | null> {
 	const raw = input.trim();
 	const cwd = raw === "~" || raw.startsWith("~/") ? join(HOME, raw.slice(1)) : resolve(HOME, raw);
-	try {
-		return statSync(cwd).isDirectory() ? cwd : null;
-	} catch {
-		return null;
-	}
+	const found = await stat(cwd).catch(() => null);
+	return found?.isDirectory() ? cwd : null;
 }

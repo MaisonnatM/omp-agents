@@ -8,7 +8,7 @@
 import { expandPrompt } from "./commands";
 import { errorText, isObject, nonEmptyStr } from "./json";
 import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
-import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp/collab";
+import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, listHosts, openRoom, type Room } from "./omp/collab";
 import { selectorOf } from "./shared/models";
 import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, PromptImage, UserAnswer, UserRequest, WithdrawnMessage } from "./shared/sessions";
 import { contextOf, type HostAgent, parseAgents, parseSubagentFrame, SubagentFiles } from "./subagents";
@@ -324,16 +324,20 @@ export class SessionGuest implements LiveSession {
 
 	/**
 	 * Stop the terminal session's omp as closing its terminal would; it leaves the registry on exit, and its file stays
-	 * resumable. A room shared read-only grants no control, ending it included.
+	 * resumable. A room shared read-only grants no control, ending it included. Collab has no frame that ends a host, so
+	 * this signals its process, once a fresh registry listing still shows the same omp process (its random `instanceId` at
+	 * this pid) hosting this session: the guest's snapshot can be a poll old, and its pid reused by another process since.
 	 */
 	async end(): Promise<void> {
-		const { pid } = this.#host;
+		const { instanceId, pid, sessionId } = this.#host;
 		// `kill` with 0, 1, or a negative pid signals process groups or every process; only one omp process is meant.
 		if (!this.canWrite || !Number.isInteger(pid) || pid <= 1 || pid === process.pid) return;
+		const listed = (await listHosts()).find(host => host.instanceId === instanceId);
+		if (listed?.pid !== pid || listed.sessionId !== sessionId) return;
 		try {
 			process.kill(pid, "SIGTERM");
 		} catch {
-			// The process already exited; the next registry poll drops it.
+			// The process exited since the listing; the next registry poll drops it.
 		}
 	}
 

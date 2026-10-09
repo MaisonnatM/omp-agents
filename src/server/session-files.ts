@@ -24,6 +24,18 @@ export function sessionFileOf(changedPath: string, root: string): string | null 
 const sameSession = (a: SavedSession, b: SavedSession): boolean =>
 	a.id === b.id && a.cwd === b.cwd && a.title === b.title && a.modifiedAt === b.modifiedAt && a.empty === b.empty;
 
+/** Whether two answers of `factsOf` are the same facts: each field keeps its identity until it changes. */
+const sameFacts = (a: SessionFacts, b: SessionFacts): boolean =>
+	a.pullRequests === b.pullRequests && a.tickets === b.tickets && a.ship === b.ship && a.worktree === b.worktree;
+
+/** A past-list row and what it was built from. */
+interface PastRow {
+	saved: SavedSession;
+	facts: SessionFacts;
+	interrupted: boolean;
+	row: PastSession;
+}
+
 export class SessionFiles {
 	#byPath = new Map<string, SavedSession>();
 	/** Newest first; rebuilt from {@link #byPath} when a refresh changed it. */
@@ -34,6 +46,8 @@ export class SessionFiles {
 	/** Scans and refreshes run one after another, so a slow full scan never overwrites a newer single-file read. */
 	#chain: Promise<unknown> = Promise.resolve();
 	readonly facts = new SessionFactsIndex(repoOf, worktreeAt, headHistory);
+	/** The last past-list row of each listed file, rebuilt only when what it shows changed. */
+	readonly #rows = new Map<string, PastRow>();
 	readonly #root: string;
 
 	/** `root`: omp's sessions directory, one directory per working directory. */
@@ -119,6 +133,7 @@ export class SessionFiles {
 		this.#byPath = byPath;
 		this.#files = [...byPath.values()].sort((a, b) => b.modifiedAt - a.modifiedAt || b.path.localeCompare(a.path));
 		this.#byId = new Map(this.#files.map(file => [file.id, file]));
+		for (const path of this.#rows.keys()) if (!byPath.has(path)) this.#rows.delete(path);
 	}
 
 	/** Read the transcripts for what they link to; whether any session's pull requests, Linear issues, or /ship stage changed. The first read covers every transcript. */
@@ -126,18 +141,29 @@ export class SessionFiles {
 		return this.facts.refresh(this.#files);
 	}
 
-	/** The saved sessions that no live session continues, newest first. `interrupted` names those that stopped without End session. */
+	/**
+	 * The saved sessions that no live session continues, newest first. `interrupted` names those that stopped without End session.
+	 * A row whose file, facts, and interruption did not change since the last call is the same object, so a caller can skip it by identity.
+	 */
 	past(liveSessionIds: ReadonlySet<string>, interrupted: (sessionId: string) => boolean): PastSession[] {
 		return this.#files
 			.filter(session => !session.empty && !liveSessionIds.has(session.id))
-			.map(session => ({
-				sessionId: session.id,
-				title: session.title,
-				cwd: session.cwd,
-				cwdDisplay: displayPath(session.cwd),
-				modifiedAt: session.modifiedAt,
-				...this.facts.factsOf(session.path),
-				interrupted: interrupted(session.id),
-			}));
+			.map(session => {
+				const facts = this.facts.factsOf(session.path);
+				const stopped = interrupted(session.id);
+				const kept = this.#rows.get(session.path);
+				if (kept && kept.saved === session && kept.interrupted === stopped && sameFacts(kept.facts, facts)) return kept.row;
+				const row: PastSession = {
+					sessionId: session.id,
+					title: session.title,
+					cwd: session.cwd,
+					cwdDisplay: displayPath(session.cwd),
+					modifiedAt: session.modifiedAt,
+					...facts,
+					interrupted: stopped,
+				};
+				this.#rows.set(session.path, { saved: session, facts, interrupted: stopped, row });
+				return row;
+			});
 	}
 }

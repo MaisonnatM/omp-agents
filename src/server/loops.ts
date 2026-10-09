@@ -5,7 +5,7 @@
  * finished, so ticks never overlap, and one that fails is logged and tried again at the next turn.
  * The routine tick runs whether or not a page is connected, since routines start sessions on their own.
  */
-import { mkdirSync, watch } from "node:fs";
+import { type FSWatcher, mkdirSync, watch } from "node:fs";
 import { join } from "node:path";
 import { errorText } from "../json";
 
@@ -69,6 +69,10 @@ export class Loops {
 	readonly #dir: string;
 	readonly #on: LoopHandlers;
 	#listTimer: NodeJS.Timeout | undefined;
+	#watcher: FSWatcher | undefined;
+	/** Stops each loop {@link start} started. */
+	#stops: (() => void)[] = [];
+	#stopped = false;
 
 	constructor(dir: string, handlers: LoopHandlers) {
 		this.#dir = dir;
@@ -78,23 +82,37 @@ export class Loops {
 	/** One recursive watcher on the directory drives every tail and the session list. */
 	watch(): void {
 		mkdirSync(this.#dir, { recursive: true });
-		watch(this.#dir, { recursive: true }, (_event, name) => {
+		this.#watcher = watch(this.#dir, { recursive: true }, (_event, name) => {
 			if (name) this.fileChanged(join(this.#dir, String(name)));
 		});
 	}
 
 	/** Start the registry poll, the rescans, the usage poll, the minute tick, the update check, and the activity check. */
 	start(): void {
-		repeat("registry", this.#on.onRegistryTick, POLL_MS);
-		repeat("rescan", this.#on.onRescanTick, RESCAN_MS);
-		repeat("usage", this.#on.onUsageTick, USAGE_POLL_MS, 0);
-		repeat("routine", this.#on.onMinuteTick, MINUTE_TICK_MS);
-		repeat("update check", this.#on.onNoticeTick, NOTICE_CHECK_MS, 0);
-		repeat("activity check", this.#on.onActivityTick, ACTIVITY_CHECK_MS);
+		this.#stops = [
+			repeat("registry", this.#on.onRegistryTick, POLL_MS),
+			repeat("rescan", this.#on.onRescanTick, RESCAN_MS),
+			repeat("usage", this.#on.onUsageTick, USAGE_POLL_MS, 0),
+			repeat("routine", this.#on.onMinuteTick, MINUTE_TICK_MS),
+			repeat("update check", this.#on.onNoticeTick, NOTICE_CHECK_MS, 0),
+			repeat("activity check", this.#on.onActivityTick, ACTIVITY_CHECK_MS),
+		];
+	}
+
+	/** Stops every loop, the watcher, and a pending re-read, as the server stops; a tick already running finishes but schedules no other. */
+	stop(): void {
+		this.#stopped = true;
+		for (const stop of this.#stops) stop();
+		this.#stops = [];
+		this.#watcher?.close();
+		this.#watcher = undefined;
+		clearTimeout(this.#listTimer);
+		this.#listTimer = undefined;
 	}
 
 	/** A file changed, reported by the watcher or by the session that wrote it. */
 	fileChanged(path: string): void {
+		if (this.#stopped) return;
 		if (this.#on.onFileChange(path)) {
 			this.#listTimer ??= setTimeout(() => void this.listNow().catch((err: unknown) => console.error(`omp-agents: listing the session files failed: ${errorText(err)}`)), LIST_THROTTLE_MS);
 		}
@@ -104,6 +122,6 @@ export class Loops {
 	async listNow(): Promise<void> {
 		clearTimeout(this.#listTimer);
 		this.#listTimer = undefined;
-		await this.#on.onListRefresh();
+		if (!this.#stopped) await this.#on.onListRefresh();
 	}
 }

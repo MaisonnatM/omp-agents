@@ -76,6 +76,7 @@ Every transcript comes from the session files on this machine, not from a networ
   The server looks up files by session id in this listing, so the page never sends a path.
   While no page is connected, it skips building the roster and the past list.
   The past list goes out whole when a page connects; after that the server compares each session with what it last sent and sends only the sessions that changed, joined, or left, so an untouched row keeps its object on the page and skips its render.
+  `SessionFiles.past` hands back the same row object while the session's listed file, its facts, and its interruption are the same objects as before, and the comparison skips serializing a row it already sent as that object, so a push while one session streams serializes only that session's row.
 - Whenever the list changes, the server also scans for pull requests in each session file whose modification time changed, plus the subagent files in its artifacts directory.
   Like an open transcript, each file reads only the bytes appended since its last scan.
   The first scan reads every session file, 16 sessions at a time.
@@ -112,6 +113,8 @@ Sessions started in a terminal are reached through their Collab room:
 - If a host starts a new room, for example after `/new` or `/resume`, the server sees the new generation and joins the new room.
   If the link request races the switch and fails with `stale_generation`, the server lists again and retries.
   A host that leaves the registry is marked as no longer running.
+- Collab has no frame that ends a host, so ending a terminal session sends `SIGTERM` to its omp process, through a writable room only.
+  The guest first lists the registry again and signals only when the same `instanceId` still runs at that pid and hosts the session, so a pid that a host freed and another process reused since the last poll is never signalled.
 
 Terminal sessions send their questions to writable guests as Collab `ui-request` frames, and the guest answers with `ui-response`.
 The host races every writable guest against its own terminal dialog, and the first answer wins.
@@ -240,18 +243,20 @@ It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching t
 ## Terminal panel
 
 The panel's shells run on the server, in pseudo-terminals from Bun's `terminal` spawn option, so the dashboard needs no native module.
-`src/terminals.ts` owns them: `Terminals.open` starts `$SHELL -l` (else `/bin/sh -l`) in a directory with `TERM=xterm-256color`, without the server's `PORT` and `OMP_AGENTS_PARENT`, and a shell lives until it exits, its tab hangs up on it, or the server's `shutdown()` calls `Terminals.dispose`.
+`src/terminals.ts` owns them: `Terminals.open` starts `$SHELL -l` (else `/bin/sh -l`) in a directory with `TERM=xterm-256color`, without the server's `PORT` and `OMP_AGENTS_PARENT`, and a shell lives until it exits, its tab hangs up on it, or the server's shutdown calls `Terminals.dispose`.
+At most `MAX_TERMINALS` (16) shells run at once; `Terminals.open` refuses another until one exits, so a page cannot fork shells without bound.
 Each shell keeps its last megabyte of output in `Scrollback`, which drops whole chunks from the front, and replays it to every socket that attaches, so a reloaded page shows what the shell printed.
 
 - `GET /api/terminals` answers the running shells as `TerminalInfo[]`, `{ id, cwd, cwdDisplay }`, from which a reloaded page reopens its tabs.
 - Each tab opens its own socket, `/ws/terminal?cwd=<dir>&cols=<n>&rows=<n>` for a new shell or `/ws/terminal?id=<id>` to attach to one; `terminalSocketPath` in `src/shared/terminals.ts` builds both.
-  `parseTerminalQuery` in `src/server/wire.ts` checks the query, holding the size to 1–1000; a directory `directoryOf` rejects falls back to the home directory, and an unknown `id` answers 404.
+  `parseTerminalQuery` in `src/server/wire.ts` checks the query, holding the size to 1–1000; `terminalFor` in `src/server/terminal-socket.ts` resolves `cwd` through `directoryOf` and answers 404 for one that is no directory, such as a removed worktree, 404 for an unknown `id`, and 429 past the cap, all before any shell starts.
+  A reloaded page reattaches to its shells by `id`, which starts none.
   The upgrade passes the same guards as `/ws`, and a shell opened for an upgrade that fails is killed.
 - Binary frames carry the shell's bytes both ways.
   Text frames carry JSON control messages: the server sends `TerminalServerMsg`, `opened` with the `TerminalInfo` once and `exit` with the shell's code, then closes the socket; the page sends `TerminalClientMsg`, `resize` or `kill`, which `parseTerminalMsg` checks.
   The page shows **Starting shell…** until `opened` and a close spinner until the socket closes.
   Closing the socket detaches without ending the shell.
-- `src/server.ts` serves both socket kinds from one `Bun.serve`, its data typed as the union of `SocketData` and `TerminalSocketData`, and `isTerminalSocket` routes each handler to `src/server/terminal-socket.ts` or the session socket.
+- `src/server.ts` serves both socket kinds from one `Bun.serve`, its data typed as the union of `SocketData` and `TerminalSocketData`, and `isTerminalSocket` routes each handler to `src/server/terminal-socket.ts` or the `Dashboard`'s session socket.
 
 ## Plan quota
 
@@ -429,6 +434,7 @@ Every endpoint needs the access token's cookie; see [SECURITY.md](../SECURITY.md
 `GET /api/file?path=<absolute path>` answers a text file for the page's file dialog: `{ path, text, size, truncated }`.
 The path is absolute or starts with `~/`; the page resolves a relative one against the session's directory first.
 The file's real path, after symlinks, must end in one of `TEXT_FILE_EXTENSIONS`, so a link named `notes.md` cannot reach a key file.
+It must also lie outside the directories that hold sign-ins and config, `DENIED_DIRS` in `src/text-file.ts`, compared by their real paths, or the route answers 403: omp-agents' own directory, which holds the access token, and omp's agent directory, but for its Markdown, such as `AGENTS.md` and skills.
 It reads the first `MAX_TEXT_FILE_BYTES` (1 MB) and answers 415 when those bytes are not UTF-8.
 It runs `git worktree list --porcelain -z`, `git for-each-ref`, and `git symbolic-ref` on each call, and reads `origin` through the inbox's cached lookup.
 Like a new session's `start`, `cwd` may name any directory.
@@ -516,11 +522,12 @@ It threads the comments by `parentId`, oldest first.
 An identifier that is not a team key, a dash, and a number answers 400.
 
 Linear hands out its files as `uploads.linear.app` addresses whose `signature` JWT expires five minutes after the read.
-`loadTicketDetail` reads the raw texts of `get_issue` and `list_comments`, and `rememberUploads` in `src/linear-uploads.ts` keeps the latest signed address of each upload path found in them, in memory.
+`loadTicketDetail` reads the raw texts of `get_issue` and `list_comments`, and `rememberUploads` in `src/linear-uploads.ts` keeps the latest signed address of each upload path found in them, in memory, under the issue they were read for.
+It drops an address once it expires, and the oldest past 256 addresses, since signing one anew costs one read of its issue.
 `linearMarkdown` is a pure text rewrite: it turns each upload address in the description and comments into `GET /api/ticket/media?issue=<identifier>&path=<upload path>`.
 That route fetches the kept address, passing the `Range` header on, and streams Linear's answer back with its type, length, range, and validators.
 When the kept address is within 30 seconds of expiring, missing after a restart, or refused by Linear, the route reads the issue again and remembers its uploads anew, which signs every file in it; requests for one issue within 10 seconds share that read.
-Only paths that a read of the issue named are fetched, so the route reaches nothing but Linear's own uploads.
+Only paths that a read of the issue named are fetched, so the route reaches nothing but Linear's own uploads, and a path that one issue names is not served under another's identifier.
 It serves each file with `Content-Security-Policy: sandbox` and `nosniff`, and anything other than an image, a video, or audio as an attachment, since a file that someone uploaded to Linear is served from the dashboard's origin.
 The page's CSP stays `'self'` for media.
 `message-markdown.tsx` lets Linear's text load images and play `<video>` only from that route.
@@ -656,12 +663,18 @@ A confirm is a question with **Yes** and **No** rows, and an input or an editor 
 The server lives in `src/`:
 
 - `src/server.ts`: the entry point.
-  Builds the page, loads the access token, starts the HTTP and WebSocket server, watches the sessions directory, and wires the modules below together.
+  Builds the page, loads the access token, builds the `Dashboard`, starts the HTTP and WebSocket server on its routes and socket handlers, then starts it.
   `PORT` sets the port, 4317 by default.
+  On `SIGINT`, `SIGTERM`, or the desktop shell's pipe ending, `shutdown()` awaits `Dashboard.stop` before it stops the server and exits; the process's `exit` handler calls `Dashboard.exited`, which writes what the stores have not and releases the owner lock, however the process exits.
+- `src/server/dashboard.ts`: `Dashboard`, the composition root: it builds the stores, `LiveSessions`, `Views`, `Notices`, `Broadcasts`, the inboxes, `Worktrees`, the starter, `RoutineRunner`, `Loops`, and the socket handler in dependency order, each handed the parts above it, and owns the live-update switch, the registry listing, the file rescans, the activity check, and the owner lock's takeover.
+  Two edges point down, closing the only cycles: a live session's update reaches the parts built after `LiveSessions`, and a notice change reaches the `Broadcasts` that reads the notices; no constructor calls either.
+  Nothing follows the registry, watches a directory, or publishes before `start(server)`; `stop()` first stops the loops and both inboxes, so no tick publishes while the rest shuts down, then ends the sessions started here, hangs up on the shells, stops omp-stats, flushes the stores, and aborts the routine commands still running.
 - `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie) and the JSON answer helpers.
+  `/api/` requests and sockets are admitted by the cookie alone, so a stray `?token=` on a signed-in request changes nothing; only `/` reads `?token=`, to set the cookie.
   `src/server/auth.ts` keeps the token file and parses the cookie, `src/server/address.ts` names the port, host, and listening line that the desktop shell shares, and `src/server/page.ts` bundles `web/index.html` in memory and serves it only to a signed-in browser.
-- `src/server/routes.ts`: the `/api/` endpoints.
-  `src/server/wire.ts` parses every socket message and request body into typed values.
+- `src/server/routes.ts`: the `/api/` endpoints, in four groups (sessions, integrations, pull requests, and files), each handed only its part of `RouteEnv`.
+  Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.
+  `src/server/wire.ts` parses every socket message and request body into typed values; every parser returns a `Parsed<T>`, `{ ok }` or `null`, and the two OAuth client parsers `{ error }` in place of `null`, a reason the page shows.
 - `src/terminals.ts`: the terminal panel's shells, each in a pseudo-terminal with its scrollback; `src/server/terminal-socket.ts` handles the `/ws/terminal` sockets that attach to them, and `src/shared/terminals.ts` holds the shapes and messages the page shares.
 - `src/server/socket.ts`: handles each socket message.
   A `ClientFrame` may carry a per-page `ack` counter, validated by `wire.ts`.
@@ -675,17 +688,19 @@ The server lives in `src/`:
   `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
   After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
 - `src/server/loops.ts`: the registry, rescan, usage, routine minute, notice, and activity loops, each started through `repeat`, which waits for a tick to finish before it schedules the next and logs a tick that throws, so no loop overlaps itself or dies on one failure.
+  `Loops.stop` stops every loop, closes the recursive watcher, and drops a pending re-read; a file change reported after it is ignored.
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle: a view nobody shows any more, or one whose file changes, has its tail and media tree closed, so a read still in flight and the tail's held-back updates publish nothing.
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
   `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and inbox shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations and their OAuth client setups, the Google calendars, and calendar events; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; `notices.ts` the bell's notices; and `analytics.ts` the Analytics section.
+  `newSessionRequest` in `sessions.ts` builds a new-session start with every option not given defaulted, for the socket's parser, the routine runner, and their tests.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
   `prompt-files.ts` holds the files a prompt carries as text: `withFiles` and `splitFiles`, which put them after the typed text and take them back off, `plainText`, which tells a text file, and the limits and body of `PUT /api/attachment/document`.
-- `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
+- `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
 - `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and projects, joining saved-session titles and working directories without reading transcripts.
-- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `projects.json`, `pins.json`, `calendars.json`, and `notices.json`; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `projects.json`, `pins.json`, `calendars.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
@@ -699,7 +714,8 @@ The server lives in `src/`:
 - `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, for the `media` message.
 - `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
   The worktree comes from the `cwd` arguments of the session's own bash calls, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.
-  `git.ts`'s `worktreeAt` answers each directory once per refresh.
+  `git.ts`'s `worktreeAt`, the repository's `git remote`, and the head history each answer a directory once per refresh, and every per-session step of a refresh, transcript scans and git probes alike, runs at most `PROBE_PARALLEL` (16, from `src/map-limit.ts`) at a time, so a first scan of hundreds of sessions starts no burst of git processes.
+  `factsOf` answers one shared empty `SessionFacts` for a session it does not know, and a known session's own arrays, so the facts of an unchanged session stay the same objects.
   A `gt submit` call's branch is the one its `--branch` names, else `branchAt` over `git.ts`'s `headHistory` of the directory it ran in: the branch that the first checkout after the call moved from, else the one checked out now.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
@@ -708,8 +724,9 @@ The server lives in `src/`:
 - `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), the branch a worktree had checked out at a given time (`headHistory`, `branchAt`), and the worktree a new session's branch runs in.
   It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, and `worktreesOf`, which parses `git worktree list --porcelain -z`.
 - `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `Worktrees.start` and `Worktrees.remove` order starts against removals; `removeCheckout` removes the linked worktree a directory is in, or returns `null` for a main checkout or a directory outside git, waiting up to 15 seconds for a session that just ended to leave it: it polls only which live sessions occupy the checkout, then runs the full preview once.
-  The inventory reads a repository's checkouts four at a time with one `git rev-parse` for their identity, and `previewAll` previews several targets from one snapshot of what uses them, four at a time; `src/map-limit.ts` holds `mapLimit`, the ordered, bounded `Promise.all` they share.
-- `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows.
+  The inventory and the snapshot of what uses the checkouts resolve each distinct directory once, and run those realpaths and the per-directory and per-repository git probes `PROBE_PARALLEL` (16) at a time.
+  The inventory then reads every repository's checkouts from one queue, four at a time, with one `git rev-parse` for their identity, and `previewAll` previews several targets from one snapshot of what uses them, four at a time; `src/map-limit.ts` holds `mapLimit`, the ordered, bounded `Promise.all` they share.
+- `src/text-file.ts`: reads a text file by absolute path for `GET /api/file`, within the extensions, size, and encoding that route allows, and outside the sign-in and config directories in `DENIED_DIRS`.
   `src/worktrees-shared.ts` holds the shapes the page and the routes share.
 - `src/changes.ts`: the changes page's reads for `GET /api/changes` and `GET /api/changes/file`, a session's checkout diff merged with its own changed files, the last scan of each place kept for three seconds so that reading a file does not list every change again, and each session transcript folded into its changed files once, by the lines it gained since; `src/shared/changes.ts` holds the shapes the page shares, `parseFullDiff`, which numbers the rows of a whole-file diff, and `patchRows`, which fills GitHub's patch out to the whole file.
 - `src/pull-request-files.ts`: the reads of a pull request's **Code** tab for `GET /api/pull-request/files` and `GET /api/pull-request/file`, from GitHub's REST API and one GraphQL blob read.
@@ -727,7 +744,7 @@ The server lives in `src/`:
   `templates/omp/agent/extensions/todos.ts` cannot import them, so it declares the shape it reads by hand.
 - `src/user-todos.ts`: the rules of the Todo page's list, `applyUserTodo`, which the server applies to its file and the page to what it shows before the server answers, and `addTodo`, which builds an `add` with every field filled.
   The list is `UserTodoList`: categories, top-level todos, and the archive that `clear-done` fills, latest first.
-  **Clear done** sends `clear-done` for the list it shows, and the server's minute tick in `src/server.ts` sends one with `before` for every todo closed over `DONE_KEPT_HOURS` ago; the socket and the todo inbox drop a `before` they receive.
+  **Clear done** sends `clear-done` for the list it shows, and the server's minute tick in `src/server/dashboard.ts` sends one with `before` for every todo closed over `DONE_KEPT_HOURS` ago; the socket and the todo inbox drop a `before` they receive.
   A todo has a title, markdown notes, a status, a priority, a close time (`doneAt`), a due day, and when it was added (`createdAt`, `null` for a todo from before that field); a top-level one also has a category or none, todos of its own, which share its category, links (`UserTodoLink`: a session, a pull request, or a Linear issue), and `addedBy`, the session whose agent added it.
   `doneAt` is set exactly while the status is `done` or `canceled`, which `applyUserTodo` and the parser keep true, so the desktop shell, the calendar, and the extension still read an open todo as one with no `doneAt`.
   `set-status` sets the status and, on closing, `doneAt` to its `at`; closing a top-level todo closes its open todos with the same status and time, and reopening one leaves its todos as they are.
@@ -737,7 +754,7 @@ The server lives in `src/`:
   `src/server/user-todos-file.ts` keeps the list in `todos.json` beside the access token.
   `src/user-todos-parse.ts` reads the list and its changes from JSON for the file, the socket, the todo inbox, and the desktop shell: a file from before any of those fields reads with none of them, a todo with no status as `done` when it has a `doneAt` and `todo` otherwise, and a change from a page or an agent is held to the length limits, a `restore` too.
   A `user-todo` socket message carries one change, and every socket hears the list after it as a `user-todos` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the list back to its own socket alone.
-  A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`, before it sends the first message, and `src/server.ts` applies the changes `startChanges` in `src/user-todos.ts` returns: the link, and `set-status` `in-progress` for a `backlog` or `todo` todo.
+  A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`, before it sends the first message, and `src/server/dashboard.ts` applies the changes `startChanges` in `src/user-todos.ts` returns: the link, and `set-status` `in-progress` for a `backlog` or `todo` todo.
 - `src/shared/projects.ts`: the Settings › Projects list, `ProjectList` of added and hidden directories, its `ProjectChange`, and `applyProject`, which the server applies to its file.
   `src/server/projects-file.ts` keeps the list in `projects.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `projects.json.invalid`.
 - `src/shared/pins.ts`: the sidebar's pins, their `PinChange`, and `applyPins`, which the server applies to its file and the page to the pins it shows before the server answers; see [Pins](#pins).
@@ -748,7 +765,8 @@ The server lives in `src/`:
 - `src/server/json-inbox.ts`: `JsonInboxDir<T>`, the directory of one-JSON-file requests that `todo-inbox.ts` and `end-inbox.ts` both read.
   Each inbox gives it a `parse` that turns a file into a request, or says why it is not one, and an `apply` that returns whether the file is done.
   A drain reads the files oldest name first, moves a file that does not parse, or whose `apply` throws, to `<name>.invalid` with a logged reason, deletes a file once `apply` returns true, and leaves one that returns false for the next drain.
-  Overlapping drains never apply a file twice, a drain never rejects, and `watch()` creates the directory and drains when it changes.
+  A drain lists and reads through `node:fs/promises`, so a burst of requests never blocks the event loop, reads the files it claimed at once, and applies them in name order.
+  Overlapping drains never apply a file twice, a drain never rejects, `watch()` creates the directory and drains when it changes, and `stop()` closes the watcher.
   An inbox may take an `active` check; while it is false every file stays untouched, invalid ones included.
 - `src/server/owner-lock.ts`: `OwnerLock`, the `server.lock` that picks the server that runs routines and the todo inbox; see [One server runs the unattended work](#one-server-runs-the-unattended-work).
 - `src/server/todo-inbox.ts`: applies the changes that omp's `user_todo` tool (`templates/omp/agent/extensions/todos.ts`) leaves in `todo-inbox/` beside `todos.json`, one JSON file each, written under a `.tmp` name then renamed, and drains only on the server that owns the lock.
@@ -759,6 +777,7 @@ The server lives in `src/`:
 - `src/server/end-inbox.ts`: ends the sessions that omp's `end_session` tool (`templates/omp/agent/extensions/end-session.ts`) asks to end, one `<session id>.json` each in `end-inbox/` beside `todos.json`.
   The tool writes its request at `agent_end`, after the turn that called it, and deletes it at the next `agent_start` or `session_shutdown`, so a request names a session that idles.
   The inbox drains when the directory changes and after each registry poll, finds the live session through `LiveSessions.bySessionId`, ends it through `endSession`, the path **End session** takes, so the session is not marked interrupted and its worktree goes too, then deletes the request.
+  A request is `{ v: 1, sessionId }`; `END_REQUEST_VERSION` is the version this server reads, a request without `v` reads as version 1, and one of any other version moves to `<name>.invalid`, so a later change to the request's shape has a version to key on.
   A request whose session this server does not host yet stays for a later drain, and so does one for a session started in a terminal while another server owns the lock, since every server follows those; a file that is not a request, or whose name is not its session id, moves to `<name>.invalid`.
 - `src/tickets.ts` also lists the workspace's Linear teams with their keys (`loadTeams`, `GET /api/linear/teams`) and opens an issue (`createTicket`, `PUT /api/ticket/new`), assigned to the viewer unless the draft names another assignee or `null`, with any fields the draft sets, from a todo or from the new-issue dialog (`web/components/tickets/new-ticket.tsx`), which `App` opens through `openNewTicket` in the dashboard context.
   The dialog's pills are the shared `FieldPicker` and `DuePicker` from `web/components/field-picker.tsx` with `look="chip"`, and `web/components/tickets/team-select.tsx` remembers the last team used, for the dialog and the todo's team select alike.

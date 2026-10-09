@@ -234,6 +234,22 @@ export type StartRequest =
 	  }
 	| { kind: "fork"; view: View; entryId: string }
 	| { kind: "resume"; sessionId: string };
+/** A `start` of a new session. */
+export type NewSessionRequest = Extract<StartRequest, { kind: "new" }>;
+/** A new session in `cwd` on `prompt`, with no images, branch, model, thinking level, skill, subject, or todo but those `options` name. */
+export const newSessionRequest = (cwd: string, prompt: string, options: Partial<Omit<NewSessionRequest, "kind" | "cwd" | "prompt">> = {}): NewSessionRequest => ({
+	kind: "new",
+	cwd,
+	prompt,
+	images: [],
+	branch: null,
+	model: null,
+	thinking: null,
+	skill: null,
+	subject: null,
+	todoId: null,
+	...options,
+});
 /** `GET /api/skills?cwd=<dir>`: one skill a session started in that directory can invoke as `/skill:<name>`. */
 export interface SkillOption {
 	name: string;

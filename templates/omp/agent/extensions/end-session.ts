@@ -2,6 +2,7 @@
 // End session does, which also removes the git worktree it ran in. The request waits for the turn to finish, so the
 // agent's last reply is saved, then goes to the dashboard's end inbox as `<session id>.json`; the dashboard server ends
 // the session and removes the worktree through the same checks as its Worktrees tab. A new turn or an exit withdraws it.
+// The request's `v` is the version of its shape, which the server checks.
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -47,7 +48,7 @@ export default function endSession(pi: ExtensionAPI) {
 		const sessionId = ctx.sessionManager.getSessionId();
 		mkdirSync(INBOX_DIR, { recursive: true });
 		const temp = join(INBOX_DIR, `${sessionId}.tmp`);
-		writeFileSync(temp, JSON.stringify({ sessionId }));
+		writeFileSync(temp, JSON.stringify({ v: 1, sessionId }));
 		sent = join(INBOX_DIR, `${sessionId}.json`);
 		renameSync(temp, sent);
 		asked = false;

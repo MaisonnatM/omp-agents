@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { ClientMsg } from "../shared/protocol";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
-import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
+import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { parseCalendarShown, parseClientMsg, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
 
-const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
+const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
 
 describe("parseClientMsg", () => {
@@ -18,7 +18,7 @@ describe("parseClientMsg", () => {
 	});
 
 	test("an ack rides along with any message, and one that is not a counter rejects the message", () => {
-		const frame = (ack: unknown) => parseClientMsg(JSON.stringify({ t: "end", instanceId: "i1", ack }));
+		const frame = (ack: unknown) => parseClientMsg(JSON.stringify({ t: "end", instanceId: "i1", ack }))?.ok ?? null;
 		expect(frame(7)).toEqual({ t: "end", instanceId: "i1", ack: 7 });
 		expect(frame(undefined)).toEqual({ t: "end", instanceId: "i1" });
 		expect(frame(1.5)).toBeNull();
@@ -203,20 +203,7 @@ describe("parseClientMsg", () => {
 	});
 
 	test("start parses each kind and drops what the kind does not name", () => {
-		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", extra: 1 })).toEqual({
-			t: "start",
-			reqId: 4,
-			kind: "new",
-			cwd: "~/code",
-			prompt: "hi",
-			images: [],
-			branch: null,
-			model: null,
-			thinking: null,
-			skill: null,
-			subject: null,
-			todoId: null,
-		});
+		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", extra: 1 })).toEqual({ t: "start", reqId: 4, ...newSessionRequest("~/code", "hi") });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", thinking: "high" })).toMatchObject({ thinking: "high" });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", skill: "poteto-mode" })).toMatchObject({ skill: "poteto-mode" });
 		expect(msg({ t: "start", reqId: 4, kind: "new", cwd: "~/code", prompt: "hi", model: { provider: "anthropic", id: "claude-opus-5-5", name: "Opus" } })).toMatchObject({
@@ -300,9 +287,9 @@ describe("parseClientMsg", () => {
 
 describe("parseProjectChange", () => {
 	test("adds a directory by any path the server then resolves, and hides or shows one by its absolute path", () => {
-		expect(parseProjectChange({ op: "add", cwd: "~/code/app" })).toEqual({ op: "add", cwd: "~/code/app" });
-		expect(parseProjectChange({ op: "hide", cwd: "/home/user/app" })).toEqual({ op: "hide", cwd: "/home/user/app" });
-		expect(parseProjectChange({ op: "show", cwd: "/home/user/app" })).toEqual({ op: "show", cwd: "/home/user/app" });
+		expect(parseProjectChange({ op: "add", cwd: "~/code/app" })?.ok).toEqual({ op: "add", cwd: "~/code/app" });
+		expect(parseProjectChange({ op: "hide", cwd: "/home/user/app" })?.ok).toEqual({ op: "hide", cwd: "/home/user/app" });
+		expect(parseProjectChange({ op: "show", cwd: "/home/user/app" })?.ok).toEqual({ op: "show", cwd: "/home/user/app" });
 	});
 
 	test("rejects hiding or showing a relative path, an unknown op, and an empty directory", () => {
@@ -316,7 +303,7 @@ describe("parsePullRequestQuery", () => {
 	const query = (qs: string) => parsePullRequestQuery(new URLSearchParams(qs));
 
 	test("names a pull request by owner, repository, and a positive number", () => {
-		expect(query("owner=anthropics&repo=omp.agents&number=12")).toEqual({ owner: "anthropics", repo: "omp.agents", number: 12 });
+		expect(query("owner=anthropics&repo=omp.agents&number=12")?.ok).toEqual({ owner: "anthropics", repo: "omp.agents", number: 12 });
 	});
 
 	test("rejects a missing, non-numeric, zero, or fractional number and names with a slash or space", () => {
@@ -334,9 +321,9 @@ describe("parsePullRequestEdit", () => {
 	const pr = { owner: "anthropics", repo: "omp-agents", number: 12 };
 
 	test("takes one label, reviewer, or state change to a pull request", () => {
-		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "good first issue", on: true } })).toEqual({ ...pr, change: { field: "label", name: "good first issue", on: true } });
-		expect(parsePullRequestEdit({ ...pr, change: { field: "reviewer", login: "octo-cat", on: false } })).toEqual({ ...pr, change: { field: "reviewer", login: "octo-cat", on: false } });
-		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "draft" } })).toEqual({ ...pr, change: { field: "state", state: "draft" } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "good first issue", on: true } })?.ok).toEqual({ ...pr, change: { field: "label", name: "good first issue", on: true } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "reviewer", login: "octo-cat", on: false } })?.ok).toEqual({ ...pr, change: { field: "reviewer", login: "octo-cat", on: false } });
+		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "draft" } })?.ok).toEqual({ ...pr, change: { field: "state", state: "draft" } });
 	});
 
 	test("rejects a merge, an empty label, a login with a slash, a change without its direction, and no pull request", () => {
@@ -351,7 +338,7 @@ describe("parsePullRequestEdit", () => {
 
 describe("parseRepoQuery", () => {
 	test("names a repository by owner and name, each without a slash or space", () => {
-		expect(parseRepoQuery(new URLSearchParams("owner=anthropics&repo=omp.agents"))).toEqual({ owner: "anthropics", repo: "omp.agents" });
+		expect(parseRepoQuery(new URLSearchParams("owner=anthropics&repo=omp.agents"))?.ok).toEqual({ owner: "anthropics", repo: "omp.agents" });
 		expect(parseRepoQuery(new URLSearchParams("owner=a/b&repo=c"))).toBeNull();
 		expect(parseRepoQuery(new URLSearchParams("owner=a"))).toBeNull();
 	});
@@ -359,9 +346,9 @@ describe("parseRepoQuery", () => {
 
 describe("parseIntegrationId", () => {
 	test("takes the id of an MCP integration and nothing else", () => {
-		expect(parseIntegrationId({ id: "linear" })).toBe("linear");
-		expect(parseIntegrationId({ id: "slack" })).toBe("slack");
-		expect(parseIntegrationId({ id: "google-calendar" })).toBe("google-calendar");
+		expect(parseIntegrationId({ id: "linear" })?.ok).toBe("linear");
+		expect(parseIntegrationId({ id: "slack" })?.ok).toBe("slack");
+		expect(parseIntegrationId({ id: "google-calendar" })?.ok).toBe("google-calendar");
 		expect(parseIntegrationId({ id: "Linear" })).toBeNull();
 		expect(parseIntegrationId({ id: "google" })).toBeNull();
 		expect(parseIntegrationId({})).toBeNull();
@@ -372,8 +359,8 @@ describe("parseIntegrationId", () => {
 
 describe("parseCalendarShown", () => {
 	test("takes a calendar id and a boolean, and refuses an empty id or another value for shown", () => {
-		expect(parseCalendarShown({ id: "team@group.calendar.google.com", shown: false })).toEqual({ id: "team@group.calendar.google.com", shown: false });
-		expect(parseCalendarShown({ id: "max@example.com", shown: true, extra: 1 })).toEqual({ id: "max@example.com", shown: true });
+		expect(parseCalendarShown({ id: "team@group.calendar.google.com", shown: false })?.ok).toEqual({ id: "team@group.calendar.google.com", shown: false });
+		expect(parseCalendarShown({ id: "max@example.com", shown: true, extra: 1 })?.ok).toEqual({ id: "max@example.com", shown: true });
 		expect(parseCalendarShown({ id: "", shown: true })).toBeNull();
 		expect(parseCalendarShown({ id: "max@example.com", shown: "false" })).toBeNull();
 		expect(parseCalendarShown({ id: "max@example.com" })).toBeNull();
@@ -417,14 +404,14 @@ describe("parseGoogleClient", () => {
 
 describe("parseTicketEdit", () => {
 	test("keeps each field given, null clearing the ones that clear, and the labels once each", () => {
-		expect(parseTicketEdit({ id: "ENG-1", state: "In Review", priority: 0, labels: ["Bug", "Front", "Bug"], dueDate: "2026-10-09", extra: true })).toEqual({
+		expect(parseTicketEdit({ id: "ENG-1", state: "In Review", priority: 0, labels: ["Bug", "Front", "Bug"], dueDate: "2026-10-09", extra: true })?.ok).toEqual({
 			id: "ENG-1",
 			state: "In Review",
 			priority: 0,
 			labels: ["Bug", "Front"],
 			dueDate: "2026-10-09",
 		});
-		expect(parseTicketEdit({ id: "ENG-1", assignee: null, project: null, dueDate: null, labels: [] })).toEqual({ id: "ENG-1", assignee: null, project: null, dueDate: null, labels: [] });
+		expect(parseTicketEdit({ id: "ENG-1", assignee: null, project: null, dueDate: null, labels: [] })?.ok).toEqual({ id: "ENG-1", assignee: null, project: null, dueDate: null, labels: [] });
 	});
 
 	test("rejects an edit that changes nothing, names no issue, or gives a field of the wrong kind", () => {
@@ -443,7 +430,7 @@ describe("parseTicketEdit", () => {
 
 describe("parseTicketDraft", () => {
 	test("keeps the trimmed title, the description as written, and the fields the pills set", () => {
-		expect(parseTicketDraft({ title: "  Fix login ", description: "", team: "t1", state: "Todo", priority: 2, assignee: null, labels: ["Bug", "Bug"], project: "Web", dueDate: "2026-10-09" })).toEqual({
+		expect(parseTicketDraft({ title: "  Fix login ", description: "", team: "t1", state: "Todo", priority: 2, assignee: null, labels: ["Bug", "Bug"], project: "Web", dueDate: "2026-10-09" })?.ok).toEqual({
 			title: "Fix login",
 			description: "",
 			team: "t1",
@@ -469,8 +456,8 @@ describe("parseTicketAttachment", () => {
 	const file = { issue: "ENG-1", name: "shot.png", type: "image/png", data: "aGVsbG8=" };
 
 	test("takes a named file in base64 for an issue, an empty file included", () => {
-		expect(parseTicketAttachment(file)).toEqual(file);
-		expect(parseTicketAttachment({ ...file, data: "" })).toEqual({ ...file, data: "" });
+		expect(parseTicketAttachment(file)?.ok).toEqual(file);
+		expect(parseTicketAttachment({ ...file, data: "" })?.ok).toEqual({ ...file, data: "" });
 	});
 
 	test("rejects a file for no issue, without a name or type, not in base64, or over the size limit", () => {
@@ -485,7 +472,7 @@ describe("parseTicketAttachment", () => {
 describe("parsePromptDocument", () => {
 	test("takes a named document in base64 within the size limit, and refuses one without a name, not in base64, or larger", () => {
 		const document = { name: "spec.pdf", data: "JVBERi0=" };
-		expect(parsePromptDocument({ ...document, extra: 1 })).toEqual(document);
+		expect(parsePromptDocument({ ...document, extra: 1 })?.ok).toEqual(document);
 		expect(parsePromptDocument({ ...document, name: "" })).toBeNull();
 		expect(parsePromptDocument({ ...document, data: "not base64!" })).toBeNull();
 		expect(parsePromptDocument({ ...document, data: "A".repeat(Math.ceil(MAX_PROMPT_DOCUMENT_BYTES / 3) * 4 + 4) })).toBeNull();

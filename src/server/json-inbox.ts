@@ -5,7 +5,8 @@
  * between the listing and the read is skipped, never an error. A file that is not a request moves to `<name>.invalid`
  * rather than staying to fail on every drain. Nothing a handler or the watcher does throws out of the drain.
  */
-import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, watch } from "node:fs";
+import { type FSWatcher, mkdirSync, watch } from "node:fs";
+import { readdir, readFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { errorText } from "../json";
 
@@ -30,8 +31,9 @@ export class JsonInboxDir<T> {
 	readonly #dir: string;
 	readonly #handler: InboxHandler<T>;
 	readonly #active: () => boolean;
-	/** Files whose request is being applied, so a drain that starts meanwhile does not apply it twice. */
+	/** Files a drain listed and has not finished with, so a drain that starts meanwhile does not apply one twice. */
 	readonly #busy = new Set<string>();
+	#watcher: FSWatcher | undefined;
 
 	constructor(dir: string, handler: InboxHandler<T>, options: InboxOptions = {}) {
 		this.#dir = dir;
@@ -44,55 +46,64 @@ export class JsonInboxDir<T> {
 		if (!this.#active()) return;
 		let names: string[];
 		try {
-			names = readdirSync(this.#dir).filter(name => name.endsWith(".json")).sort();
+			names = (await readdir(this.#dir)).filter(name => name.endsWith(".json")).sort();
 		} catch {
 			return;
 		}
+		const claimed = names.filter(name => !this.#busy.has(name));
+		for (const name of claimed) this.#busy.add(name);
+		const values = await Promise.all(claimed.map(name => this.#read(join(this.#dir, name))));
 		// Each `handle` runs up to its first await at once, so synchronous handlers apply in name order.
-		await Promise.all(names.map(name => this.#handle(name)));
+		await Promise.all(claimed.map((name, i) => this.#handle(name, values[i]!).finally(() => this.#busy.delete(name))));
 	}
 
 	/** Drains now and on every change to the directory, which it creates. */
 	watch(): void {
 		mkdirSync(this.#dir, { recursive: true });
-		watch(this.#dir, () => void this.drain());
+		this.#watcher = watch(this.#dir, () => void this.drain());
 		void this.drain();
 	}
 
-	async #handle(name: string): Promise<void> {
-		if (this.#busy.has(name)) return;
+	/** Stops following the directory, as the server stops. */
+	stop(): void {
+		this.#watcher?.close();
+		this.#watcher = undefined;
+	}
+
+	/** The JSON in the file at `path`, or `null` once it is gone or set aside. */
+	async #read(path: string): Promise<{ value: unknown } | null> {
+		try {
+			return { value: JSON.parse(await readFile(path, "utf8")) };
+		} catch (err) {
+			// Whoever wrote the file deleted it, or another server took it, between the listing and the read.
+			if (!isMissing(err)) await this.#setAside(path, errorText(err));
+			return null;
+		}
+	}
+
+	async #handle(name: string, read: { value: unknown } | null): Promise<void> {
+		if (!read) return;
 		const path = join(this.#dir, name);
 		try {
-			let value: unknown;
-			try {
-				value = JSON.parse(readFileSync(path, "utf8"));
-			} catch (err) {
-				// Whoever wrote the file deleted it, or another server took it, between the listing and the read.
-				if (!isMissing(err)) this.#setAside(path, errorText(err));
-				return;
-			}
-			const entry = this.#handler.parse(name, value);
+			const entry = this.#handler.parse(name, read.value);
 			if ("invalid" in entry) {
-				this.#setAside(path, entry.invalid);
+				await this.#setAside(path, entry.invalid);
 				return;
 			}
-			this.#busy.add(name);
 			try {
-				if (await this.#handler.apply(entry.item)) rmSync(path, { force: true });
+				if (await this.#handler.apply(entry.item)) await rm(path, { force: true });
 			} catch (err) {
-				this.#setAside(path, `applying it failed: ${errorText(err)}`);
-			} finally {
-				this.#busy.delete(name);
+				await this.#setAside(path, `applying it failed: ${errorText(err)}`);
 			}
 		} catch (err) {
 			console.error(`omp-agents: could not handle ${path}: ${errorText(err)}`);
 		}
 	}
 
-	#setAside(path: string, why: string): void {
+	async #setAside(path: string, why: string): Promise<void> {
 		console.error(`omp-agents: set aside ${path}: ${why}`);
 		try {
-			renameSync(path, `${path}.invalid`);
+			await rename(path, `${path}.invalid`);
 		} catch (err) {
 			if (!isMissing(err)) console.error(`omp-agents: could not set aside ${path}: ${errorText(err)}`);
 		}

@@ -53,21 +53,36 @@ interface JsonFileOptions<T> {
 	mode?: number;
 }
 
+/** Files with a value {@link JsonFile.save} has not written yet, by path. */
+const pending = new Map<string, JsonFile<unknown>>();
+
+/** Writes every value saved and not yet written, as the server stops: a value saved in its last tick still reaches its file. */
+export function flushJsonFiles(): void {
+	for (const file of pending.values()) file.flush();
+}
+
 /**
  * A file holding one JSON value, which the server reads when it starts and replaces whole on every change. A failure to
  * read or write is reported and never thrown: what the server keeps in memory stays right, and only the next start loses it.
+ * Saves within one tick write once, at the end of it, with the last value; {@link flushJsonFiles} writes them sooner.
  */
 export class JsonFile<T> {
 	readonly #path: string;
 	readonly #options: JsonFileOptions<T>;
+	/** The value saved and not yet written, in a box so that a saved `null` is one. */
+	#unwritten: { value: T } | null = null;
 
 	constructor(path: string, options: JsonFileOptions<T>) {
 		this.#path = path;
 		this.#options = options;
 	}
 
-	/** The value the file holds, or `null` when there is no file, it cannot be read, or it holds something else. */
+	/**
+	 * The value the file holds, or `null` when there is no file, it cannot be read, or it holds something else. A value any
+	 * `JsonFile` of this path saved and has not written yet is written first.
+	 */
 	load(): T | null {
+		pending.get(this.#path)?.flush();
 		const path = this.#path;
 		let text: string;
 		try {
@@ -95,12 +110,27 @@ export class JsonFile<T> {
 		return null;
 	}
 
-	/** Replaces the file with `value`; a crash mid-write leaves the last complete file. */
+	/** Replaces the file with `value` at the end of this tick, unless a later save replaces it first; a crash mid-write leaves the last complete file. */
 	save(value: T): void {
+		if (!this.#unwritten) {
+			// A second store of this path writes what the first saved before its own.
+			pending.get(this.#path)?.flush();
+			pending.set(this.#path, this);
+			setImmediate(() => this.flush());
+		}
+		this.#unwritten = { value };
+	}
+
+	/** Writes the value saved and not yet written, if any, now. */
+	flush(): void {
+		const unwritten = this.#unwritten;
+		if (!unwritten) return;
+		this.#unwritten = null;
+		if (pending.get(this.#path) === this) pending.delete(this.#path);
 		const { indent, mode } = this.#options;
 		try {
 			mkdirSync(dirname(this.#path), { recursive: true, mode: mode === undefined ? undefined : 0o700 });
-			atomicWriteTextSync(this.#path, `${JSON.stringify(value, null, indent)}\n`, mode);
+			atomicWriteTextSync(this.#path, `${JSON.stringify(unwritten.value, null, indent)}\n`, mode);
 		} catch (err) {
 			console.error(`omp-agents: cannot write ${this.#path}: ${errorText(err)}`);
 		}
