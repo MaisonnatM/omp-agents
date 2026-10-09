@@ -12,6 +12,7 @@ import type { BranchChoice } from "../shared/git";
 import { type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
 import type { ModelOption } from "../shared/models";
 import { NOTICE_OPS } from "../shared/notices";
+import type { PinChange } from "../shared/pins";
 import type { ProjectChange } from "../shared/projects";
 import type { ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
@@ -156,7 +157,7 @@ function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
 	if (!isObject(value)) return null;
 	switch (value.kind) {
 		case "prompt":
-			return isNonEmpty(value.prompt) ? { ok: { kind: "prompt", prompt: value.prompt } } : null;
+			return isNonEmpty(value.prompt) && typeof value.pin === "boolean" ? { ok: { kind: "prompt", prompt: value.prompt, pin: value.pin } } : null;
 		case "command":
 			return isNonEmpty(value.command) && value.command.length <= MAX_COMMAND_LENGTH ? { ok: { kind: "command", command: value.command } } : null;
 		default:
@@ -196,6 +197,14 @@ function parseRoutineChange(value: unknown): Parsed<RoutineChange> {
 		default:
 			return null;
 	}
+}
+
+/** One or more session ids to pin or unpin. */
+function parsePinChange(value: unknown): PinChange | null {
+	if (!isObject(value)) return null;
+	const { op, sessionIds } = value;
+	if (op !== "pin" && op !== "unpin") return null;
+	return Array.isArray(sessionIds) && sessionIds.length > 0 && sessionIds.every(isNonEmpty) ? { op, sessionIds } : null;
 }
 
 function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest> {
@@ -318,6 +327,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	routine(value) {
 		const change = parseRoutineChange(value.change);
 		return change ? { ok: { t: "routine", change: change.ok } } : null;
+	},
+	pin(value) {
+		const change = parsePinChange(value.change);
+		return change && { ok: { t: "pin", change } };
 	},
 	notice: ({ id, op }) => (isNonEmpty(id) && isNoticeOp(op) ? { ok: { t: "notice", id, op } } : null),
 };

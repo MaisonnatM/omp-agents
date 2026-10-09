@@ -184,6 +184,13 @@ export function RoutineEditor({ initial, isNew, workspaces, connected, onSave, o
 								onChange={event => set("prompt", event.target.value)}
 								className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							/>
+							<label className="flex items-center gap-2 text-sm">
+								<input type="checkbox" checked={draft.pin} aria-describedby={`${id}-pin-hint`} onChange={event => set("pin", event.target.checked)} className="size-4 accent-current" />
+								Pin the session when it finishes
+							</label>
+							<p id={`${id}-pin-hint`} className="ml-6 text-xs text-muted-foreground">
+								Replaces the pin of this routine's previous session.
+							</p>
 						</Choice>
 						<Choice name={`${id}-task`} checked={draft.task === "command"} label="Run a command" onCheck={() => set("task", "command")}>
 							<textarea

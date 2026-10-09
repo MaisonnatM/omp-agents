@@ -182,8 +182,7 @@ function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: Det
 		["Schedule", <ScheduleValue schedules={routine.schedules} />],
 		["Next run", nextRunWords(routine, now)],
 	];
-	// A command runs without a session, so it takes no skill.
-	if (task.kind !== "command") settings.push(["Skill", routine.skill ?? "None"]);
+	if (task.kind === "prompt") settings.push(["Skill", routine.skill ?? "None"], ["Pin", task.pin ? "When it finishes, in place of the previous session" : "No"]);
 	return (
 		<PageFrame
 			title={routine.name}

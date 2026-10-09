@@ -149,6 +149,8 @@ export interface RoutineDraft {
 	skill: string | null;
 	task: RoutineTask["kind"];
 	prompt: string;
+	/** Whether the prompt's session is pinned once it finishes. */
+	pin: boolean;
 	command: string;
 	schedules: ScheduleDraft[];
 }
@@ -163,6 +165,7 @@ export function newDraft(id: string, cwd: string, skill: string | null): Routine
 		skill,
 		task: "prompt",
 		prompt: "",
+		pin: false,
 		command: "",
 		schedules: [blankSchedule()],
 	};
@@ -189,6 +192,7 @@ export function draftOf(routine: Routine): RoutineDraft {
 		enabled: routine.enabled,
 		task: task.kind,
 		prompt: task.kind === "prompt" ? task.prompt : draft.prompt,
+		pin: task.kind === "prompt" ? task.pin : draft.pin,
 		command: task.kind === "command" ? task.command : draft.command,
 		schedules: routine.schedules.map(scheduleDraft),
 	};
@@ -204,7 +208,7 @@ export function specOf(draft: RoutineDraft): { ok: RoutineSpec } | { fix: string
 	switch (draft.task) {
 		case "prompt":
 			if (!draft.prompt.trim()) return { fix: "Write the prompt the session starts with." };
-			task = { kind: "prompt", prompt: draft.prompt.trim() };
+			task = { kind: "prompt", prompt: draft.prompt.trim(), pin: draft.pin };
 			break;
 		case "command": {
 			const command = draft.command.trim();

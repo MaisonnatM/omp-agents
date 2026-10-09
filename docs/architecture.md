@@ -266,8 +266,9 @@ The prompt ends with `UNATTENDED`, which tells the session not to ask questions.
 
 `src/server/routines-file.ts` keeps the routines in `routines.json` beside the access token, and saves every change at once.
 A file from before `schedules` reads its `schedule` as a one-element list, and drops a routine whose task was pull requests.
+A prompt task from before `pin` reads as unpinned.
 The rest of the file stays.
-The next save writes `schedules`.
+The next save writes `schedules` and `pin`.
 A file that is not a list of routines still moves aside.
 Each routine holds its last 10 runs, newest first.
 A run holds its slot time, its errors, and one `outcome`: `pending` from its claim, with whether it is still `queued`; a `session` with the instance and session ids it started; or a `command` with the command's result once it ran.
@@ -289,6 +290,8 @@ Each tick does three things, in order:
    When the command ends, the runner writes its exit code, output, and times to the run; a non-zero exit, a stop, or a failed spawn also goes to the run's errors.
    The runner keeps the routines whose command runs in memory, since a run holds one outcome and later `run-now` claims can push a running command's run out of the saved 10; a command routine whose last command still runs records an error instead of running a second one.
 3. It retires finished sessions: once a session that worked is idle, the runner ends it.
+   When the routine's prompt task sets `pin`, the runner first unpins the sessions of the routine's other runs and pins this one through `changePins`, then ends it, so its row moves from **Running** to **Pinned** without passing through **Past**; other pins stay.
+   A session ended at the start deadline, or one that is gone, is not pinned.
    A session counts as working from the first time its row shows it working or waiting on a question, at its start, at a tick, or at any change of its row, which the server passes to `observe`.
    `observe` also ends a session as soon as its row shows the turn over, so a finished session frees its slot at once rather than at the next tick.
    Its transcript stays a past session, and **Resume** continues it.
@@ -317,6 +320,17 @@ On a takeover the server logs it, reads `routines.json` and `todos.json` again, 
 A server that exits normally deletes its lock.
 The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, or **Run now**; only the minute tick, the todo inbox, and the end inbox's requests for sessions started in a terminal are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
+
+## Pins
+
+The sidebar's pins are a list of session ids that the server keeps, so the routine runner can pin with no page open and every window agrees.
+`src/server/pins-file.ts` keeps them in `pins.json` beside the access token, as `{ sessions }`, and moves a file that holds anything else to `pins.json.invalid`.
+A `pin` socket message carries a `PinChange`, `{ op, sessionIds }` with `op` one of `pin` and `unpin`, checked in `src/server/wire.ts`.
+`applyPins` in `src/shared/pins.ts` applies it, and never toggles, so the same change sent twice pins or unpins once.
+Every socket hears the pins after each change as a `pins` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the pins back to its own socket alone.
+The page shows a change before the server answers, and its **Pin** and **Unpin** send `pin` or `unpin` from the pins it holds.
+Pins an older page kept in the browser's localStorage, under `omp-agents.pinned-sessions`, go to the server as one `pin` the first time the page hears the pins, and the key is then removed.
+Each server keeps its own copy in memory, as with the projects, so a routine's pin shows at once on the pages of the server that owns routines.
 
 ## Updates
 
@@ -633,7 +647,7 @@ The server lives in `src/`:
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, and `prompts.ts` wrap one area each.
 - `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and projects, joining saved-session titles and working directories without reading transcripts.
-- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `projects.json`, `calendars.json`, and `notices.json`; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `projects.json`, `pins.json`, `calendars.json`, and `notices.json`; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
@@ -687,6 +701,8 @@ The server lives in `src/`:
   A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`, before it sends the first message, and `src/server.ts` applies the changes `startChanges` in `src/user-todos.ts` returns: the link, and `set-status` `in-progress` for a `backlog` or `todo` todo.
 - `src/shared/projects.ts`: the Settings › Projects list, `ProjectList` of added and hidden directories, its `ProjectChange`, and `applyProject`, which the server applies to its file.
   `src/server/projects-file.ts` keeps the list in `projects.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `projects.json.invalid`.
+- `src/shared/pins.ts`: the sidebar's pins, their `PinChange`, and `applyPins`, which the server applies to its file and the page to the pins it shows before the server answers; see [Pins](#pins).
+  `src/server/pins-file.ts` keeps them in `pins.json` beside the access token and moves a file it cannot read to `pins.json.invalid`.
 - `src/shared/notices.ts`: the bell's `Notice`, a newer omp or a `ModelUpdate`, with its seen flag and `NoticeStatus`, and the socket's `NOTICE_OPS`.
   `src/server/notices.ts` checks for them and runs their updates through `src/omp/release.ts` and `src/settings.ts`; `src/omp/model-updates.ts` finds the newer models and the routing edits that switch to them; see [Updates](#updates).
 - `src/server/json-inbox.ts`: `JsonInboxDir<T>`, the directory of one-JSON-file requests that `todo-inbox.ts` and `end-inbox.ts` both read.
@@ -724,7 +740,7 @@ The page lives in `web/`.
   It builds the two dashboard contexts and lays out the sidebars, the page, the command palette, and the dialogs, and leaves each slice of state to a hook of its own.
   `web/use-workspace.ts` holds the visible sessions, the projects, the selected project, and its inbox poll.
   `web/use-focused-session.ts` holds the focused pane's session, the document title, and the sidebar following a `/move`.
-  `web/use-session-lists.ts` holds the Sessions tab's lists, search, and pins, and `web/use-sidebar-tab.ts` the tab and `showTab`.
+  `web/use-session-lists.ts` holds the Sessions tab's lists and search, and pins and unpins through the server's pins, and `web/use-sidebar-tab.ts` the tab and `showTab`.
   `web/use-overlays.ts` holds the shortcuts dialog, the command palette, the file dialog, and the new-ticket dialog.
   `web/use-transcript-display.ts` holds how transcripts show tool calls and thinking, and `web/use-page-shortcuts.ts` the page-wide shortcuts and the commands the palette runs.
   `web/components/app-sidebar.tsx` wires the roster to the page, `web/components/page-switch.tsx` picks the page or the panes, and `web/components/pane-grid.tsx` lays out the panes.

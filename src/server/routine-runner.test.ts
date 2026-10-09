@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { applyPins } from "../shared/pins";
 import type { HostStatus, StartRequest, StartResult } from "../shared/sessions";
 import type { RoutineTask } from "../routines";
 import { RoutineRunner, SESSION_START_DEADLINE_MS } from "./routine-runner";
@@ -24,7 +25,7 @@ function routinesPath(): string {
 const everyHour = { kind: "every" as const, minutes: 60 };
 
 /** A file at `path` holding one hourly routine created at {@link T0}. */
-function fileWith(path: string, task: RoutineTask = { kind: "prompt", prompt: "Summarize yesterday's commits." }): RoutinesFile {
+function fileWith(path: string, task: RoutineTask = { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false }): RoutinesFile {
 	const file = new RoutinesFile(path);
 	file.apply({ op: "save", routine: { id: "r1", name: "Notes", cwd: "/work/webapp", schedules: [everyHour], task, skill: task.kind === "command" ? null : "ship", enabled: true } }, T0);
 	return file;
@@ -36,7 +37,7 @@ function addPrompts(file: RoutinesFile, count: number): void {
 		file.apply(
 			{
 				op: "save",
-				routine: { id: `r${index}`, name: `Notes ${index}`, cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: `Prompt ${index}` }, skill: null, enabled: true },
+				routine: { id: `r${index}`, name: `Notes ${index}`, cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: `Prompt ${index}`, pin: false }, skill: null, enabled: true },
 			},
 			T0,
 		);
@@ -51,7 +52,7 @@ interface FakeExec {
 	fail: (err: Error) => void;
 }
 
-/** A runner over `file` with a fake clock, starter, sessions, and commands. */
+/** A runner over `file` with a fake clock, starter, sessions, commands, and pins. */
 function harness(file: RoutinesFile) {
 	const sessions = new Map<string, { status: HostStatus; ended: boolean }>();
 	const fake = {
@@ -61,6 +62,9 @@ function harness(file: RoutinesFile) {
 		failWith: null as string | null,
 		sessions,
 		execs: [] as FakeExec[],
+		pins: [] as string[],
+		/** Each pin change and session end, in order. */
+		log: [] as string[],
 	};
 	const runner = new RoutineRunner({
 		file,
@@ -79,6 +83,7 @@ function harness(file: RoutinesFile) {
 				sessionId: `s-${instanceId}`,
 				end: async () => {
 					session.ended = true;
+					fake.log.push(`end s-${instanceId}`);
 				},
 			};
 		},
@@ -89,6 +94,10 @@ function harness(file: RoutinesFile) {
 			return promise;
 		},
 		onChange: () => {},
+		changePins(change) {
+			fake.pins = applyPins(fake.pins, change);
+			fake.log.push(`${change.op} ${change.sessionIds.join(",")}`);
+		},
 	});
 	return { runner, fake };
 }
@@ -203,7 +212,7 @@ describe("RoutineRunner", () => {
 	});
 
 	test("a prompt routine starts no second session while its last one still runs", async () => {
-		const file = fileWith(routinesPath(), { kind: "prompt", prompt: "Summarize yesterday's commits." });
+		const file = fileWith(routinesPath(), { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false });
 		const { runner, fake } = harness(file);
 		await runner.tick();
 		fake.sessions.get("i1")!.status = "working";
@@ -214,6 +223,42 @@ describe("RoutineRunner", () => {
 			["pending", ["The last run's session is still running."]],
 			["session", []],
 		]);
+	});
+
+	test("a routine that pins its session pins each finished one before it ends, in place of its earlier one, and leaves other pins alone", async () => {
+		const file = fileWith(routinesPath(), { kind: "prompt", prompt: "Write the daily retro.", pin: true });
+		const { runner, fake } = harness(file);
+		fake.pins = ["s-mine"];
+		await runner.tick();
+		fake.sessions.get("i1")!.status = "working";
+		await runner.tick();
+		fake.sessions.get("i1")!.status = "idle";
+		await runner.tick();
+		expect(fake.pins).toEqual(["s-mine", "s-i1"]);
+
+		fake.now += HOUR;
+		await runner.tick();
+		fake.sessions.get("i2")!.status = "working";
+		await runner.tick();
+		fake.sessions.get("i2")!.status = "idle";
+		await runner.tick();
+		expect(fake.pins).toEqual(["s-mine", "s-i2"]);
+		expect(fake.log).toEqual(["pin s-i1", "end s-i1", "unpin s-i1", "pin s-i2", "end s-i2"]);
+	});
+
+	test("a routine that does not pin, and a session ended at the start deadline, pin nothing", async () => {
+		const file = fileWith(routinesPath());
+		file.apply({ op: "save", routine: { id: "r2", name: "Retro", cwd: "/work/webapp", schedules: [everyHour], task: { kind: "prompt", prompt: "Write the daily retro.", pin: true }, skill: null, enabled: true } }, T0);
+		const { runner, fake } = harness(file);
+		await runner.tick();
+		fake.sessions.get("i1")!.status = "working";
+		await runner.tick();
+		fake.sessions.get("i1")!.status = "idle";
+		fake.sessions.get("i2")!.status = "idle";
+		fake.now += SESSION_START_DEADLINE_MS;
+		await runner.tick();
+		expect(fake.log).toEqual(["end s-i1", "end s-i2"]);
+		expect(fake.pins).toEqual([]);
 	});
 
 	describe("a command routine", () => {

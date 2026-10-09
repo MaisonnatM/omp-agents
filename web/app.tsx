@@ -45,14 +45,14 @@ const ALL_TODOS: TodoListView = { kind: "all" };
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo } = useDashboard();
+	const { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo, changePins } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
 	const workspace = useWorkspace(state);
 	const { visible, projects, project, pickProject, hiddenCwds } = workspace;
 	const focused = useFocusedSession(state, page, workspace);
-	const sessions = useSessionLists(workspace);
+	const sessions = useSessionLists(workspace, state.pins, changePins);
 	const overlays = useOverlays();
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();

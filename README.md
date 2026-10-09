@@ -25,7 +25,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 
 - **Live roster.**
   Every running and past session, with a status dot (running, idle, or waiting on a question), filtered by project.
-  Pin a session to keep it at the top.
+  Pin a session to keep it at the top in every window, and let a routine pin the session it just finished in place of its last one.
   Sessions that stopped when the dashboard went down wait in an **interrupted** group, and **Resume all** brings them back.
 - **Session details.**
   The focused conversation's todo list, the files its agent changed with each file's latest diff, the live session's subagents as a tree, and every screenshot and image its agents' tools returned; subagents also open from the `task` call that spawned them, and a back arrow returns to the session.

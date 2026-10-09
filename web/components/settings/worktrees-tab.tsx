@@ -5,7 +5,6 @@ import type { WorktreeEntry, WorktreeInventory, WorktreeMetrics, WorktreeRemoval
 import { Button } from "@/components/ui/button";
 import { changeWorktrees, errorText, readWorktreeMetrics, readWorktrees } from "../../api";
 import { age, formatBytes } from "../../labels";
-import { PINNED_SESSIONS_KEY, useStoredKeys } from "../../stored-state";
 
 type SortKey = "name" | "activity" | "size";
 
@@ -29,7 +28,7 @@ function statusText(entry: WorktreeEntry): string {
 }
 
 /** The settings tab for Git worktrees of repositories omp sessions ran in, plus a repository path entered here. */
-export function WorktreesTab({ cwd, active }: { cwd: string | null; active: boolean }) {
+export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active: boolean; pins: string[] }) {
 	const [refresh, setRefresh] = useState(0);
 	const [extras, setExtras] = useState<string[]>([]);
 	const [pathDraft, setPathDraft] = useState("");
@@ -41,7 +40,6 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 	const [dialog, setDialog] = useState<DialogState | null>(null);
 	const [acceptLoss, setAcceptLoss] = useState(false);
-	const [pinned] = useStoredKeys(PINNED_SESSIONS_KEY);
 
 	useEffect(() => {
 		if (!active) return;
@@ -273,7 +271,7 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 				<DialogPrimitive.Portal>
 					<DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
 					<DialogPrimitive.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[min(36rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-border bg-background p-5 text-foreground shadow-md">
-						{dialog && <RemovalBody dialog={dialog} acceptLoss={acceptLoss} pinned={pinned} onAcceptLoss={setAcceptLoss} onClose={() => setDialog(null)} onConfirm={confirm} />}
+						{dialog && <RemovalBody dialog={dialog} acceptLoss={acceptLoss} pins={pins} onAcceptLoss={setAcceptLoss} onClose={() => setDialog(null)} onConfirm={confirm} />}
 					</DialogPrimitive.Content>
 				</DialogPrimitive.Portal>
 			</DialogPrimitive.Root>
@@ -284,14 +282,14 @@ export function WorktreesTab({ cwd, active }: { cwd: string | null; active: bool
 function RemovalBody({
 	dialog,
 	acceptLoss,
-	pinned,
+	pins,
 	onAcceptLoss,
 	onClose,
 	onConfirm,
 }: {
 	dialog: DialogState;
 	acceptLoss: boolean;
-	pinned: ReadonlySet<string>;
+	pins: string[];
 	onAcceptLoss: (value: boolean) => void;
 	onClose: () => void;
 	onConfirm: (plans: WorktreeRemovalPlan[]) => void;
@@ -345,7 +343,7 @@ function RemovalBody({
 	const validPlans = dialog.plans.flatMap(plan => (plan.kind === "unreadable" ? [] : [plan]));
 	const blocked = dialog.plans.some(plan => plan.blockers.length > 0);
 	const loss = validPlans.some(plan => plan.ignored.length > 0 || plan.detachedCommitLoss);
-	const pinnedHere = validPlans.flatMap(plan => plan.savedSessionIds.filter(id => pinned.has(id)));
+	const pinnedHere = validPlans.flatMap(plan => plan.savedSessionIds.filter(id => pins.includes(id)));
 	return (
 		<>
 			<DialogPrimitive.Title className="text-base font-medium">
@@ -371,7 +369,7 @@ function RemovalBody({
 					</li>
 				))}
 			</ul>
-			{pinnedHere.length > 0 ? <p className="mt-3 text-sm">This browser has {pinnedHere.length} pinned session{pinnedHere.length === 1 ? "" : "s"} that ran here. The server cannot see pins in other browsers.</p> : null}
+			{pinnedHere.length > 0 ? <p className="mt-3 text-sm">{pinnedHere.length} pinned session{pinnedHere.length === 1 ? "" : "s"} ran here.</p> : null}
 			<p className="mt-3 text-sm text-muted-foreground">Shells and editors outside omp may still be using a checkout. Close them first. This page cannot see all of them.</p>
 			{loss ? (
 				<label className="mt-3 flex items-start gap-2 text-sm">

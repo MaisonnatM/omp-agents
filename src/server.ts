@@ -11,7 +11,7 @@ import { ompVersion } from "./omp/install";
 import { installedOmp, latestOmp, updateOmp } from "./omp/release";
 import { sessionsDir } from "./omp/sessions";
 import { stopStats } from "./omp/stats";
-import { calendarsFile, directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
+import { calendarsFile, directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, pinsFile, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, tokenFile, userTodoInboxDir, userTodosFile } from "./paths";
 import { runShell } from "./proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "./routines";
 import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address";
@@ -28,6 +28,7 @@ import { createRoutes } from "./server/routes";
 import { Notices } from "./server/notices";
 import { RoutineRunner } from "./server/routine-runner";
 import { CalendarsFile } from "./server/calendars-file";
+import { PinsFile } from "./server/pins-file";
 import { ProjectsFile } from "./server/projects-file";
 import { RoutinesFile } from "./server/routines-file";
 import { SessionFiles } from "./server/session-files";
@@ -40,6 +41,7 @@ import { terminalFor, type TerminalSocket, type TerminalSocketData, terminalSock
 import { type Socket, type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
 import { modelUpdates, upgradeModel } from "./settings";
+import type { PinChange } from "./shared/pins";
 import type { StartRequest, StartResult, View } from "./shared/sessions";
 import { DONE_KEPT_HOURS, startChanges } from "./user-todos";
 import type { UserTodoChange } from "./user-todos-shared";
@@ -71,6 +73,13 @@ const ownerLock = new OwnerLock(serverLockFile, PORT);
 const inbox = new TodoInbox(userTodoInboxDir, applyTodo, { active: () => ownerLock.held });
 const routines = new RoutinesFile(routinesFile);
 const projects = new ProjectsFile(projectsFile);
+const pins = new PinsFile(pinsFile);
+/** Applies `change` to the pins, and sends every socket the pins when they changed; whether they did. */
+function applyPinChange(change: PinChange): boolean {
+	const changed = pins.apply(change);
+	if (changed) broadcasts.pushPins();
+	return changed;
+}
 const notices = new Notices(noticesFile, { latestOmp, installedOmp, updateOmp, modelUpdates, upgradeModel }, () => broadcasts.pushNotices());
 // The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
 rmSync(oldGoogleFile, { force: true });
@@ -91,6 +100,7 @@ const broadcasts = new Broadcasts({
 		const [added, hidden] = [projects.list.added, projects.list.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
 		return { t: "projects", list: { added, hidden } };
 	},
+	pinsMsg: () => ({ t: "pins", sessionIds: pins.sessionIds }),
 	noticesMsg: () => ({ t: "notices", list: notices.list }),
 	publish: (topic, json) => void server.publish(topic, json),
 	subscriberCount: topic => server.subscriberCount(topic),
@@ -167,6 +177,7 @@ const runner = new RoutineRunner({
 		return runShell(command, dir, { timeoutMs: COMMAND_TIMEOUT_MS, maxOutput: MAX_COMMAND_OUTPUT, signal: stopping.signal });
 	},
 	onChange: () => broadcasts.pushRoutines(),
+	changePins: change => void applyPinChange(change),
 });
 const handleClientMsg = createClientHandler({
 	sessions,
@@ -186,6 +197,9 @@ const handleClientMsg = createClientHandler({
 	changeRoutine(ws, change) {
 		if (routines.apply(change, Date.now())) broadcasts.pushRoutines();
 		else send(ws, { t: "routines", routines: routines.routines });
+	},
+	changePins(ws, change) {
+		if (!applyPinChange(change)) send(ws, { t: "pins", sessionIds: pins.sessionIds });
 	},
 	runRoutine: id => runner.runNow(id),
 	changeNotice: (id, op) => notices.apply(id, op),

@@ -84,7 +84,7 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 }
 
 /** One section of the settings: omp's usage, the dashboard's own choices, or omp's routing and files for one workspace or for the user only, each editable in place. */
-export function SettingsPage({ route, workspaces, projectList }: { route: SettingsRoute; workspaces: Project[]; projectList: ProjectList<Project> }) {
+export function SettingsPage({ route, workspaces, projectList, pins }: { route: SettingsRoute; workspaces: Project[]; projectList: ProjectList<Project>; pins: string[] }) {
 	const { section, cwd } = route;
 	const models = useRead<{ models: CatalogModel[] }>("/api/models");
 	const catalog = useMemo(
@@ -107,7 +107,7 @@ export function SettingsPage({ route, workspaces, projectList }: { route: Settin
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
 		integrations: <IntegrationsTab active={section === "integrations"} />,
 		projects: <ProjectsTab projects={workspaces} list={projectList} />,
-		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} />,
+		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} pins={pins} />,
 	};
 	// Hidden panels stay mounted so an unsaved draft survives switching sections.
 	const body = SETTINGS_SECTIONS.map(({ value, label }) => (

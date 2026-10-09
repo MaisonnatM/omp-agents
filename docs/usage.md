@@ -51,7 +51,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The group lists pinned running sessions first, then pinned past ones, interrupted ones first, and shows only while it has a row.
   A pinned session stays pinned when it ends, is resumed, or is interrupted, and an interrupted one says `interrupted` after its title.
   The selected project applies to the group too.
-  The browser's localStorage keeps the pins, by session id.
+  The server keeps the pins in `pins.json` beside its access token, by session id, so every browser tab and the desktop app show the same ones.
+  Pins that a browser kept before then move to the server the first time its page connects.
 - A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group above it, and moves back when its next turn starts.
   A session waiting on a question stays under **Running**, and a pinned session stays under **Pinned** whatever its state.
   The group shows only while it has a row.
@@ -827,6 +828,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   In the desktop app, **Open at Login** keeps it running from the moment you log in.
 - **New routine** opens the editor: a name, the workspace it runs in, its task, its schedules, and its skill.
   The task is a prompt you write, or a shell command.
+  A prompt task can also **Pin the session when it finishes**.
   Each schedule repeats every so many minutes, hours, or days, counted from the last run, or runs at a time of day on the days you pick. **Weekdays** and **Every day** pick those days at once. **Add schedule** adds another. The routine runs at the earliest of them, and a missed time still starts one run.
   The skill starts as the one pinned in **Settings › Preferences**, and **None** starts the sessions without one.
 - A command routine runs its command with `sh` in its workspace, without an omp session, so it takes no skill and the editor hides that field.
@@ -845,7 +847,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A prompt routine whose last session still runs records an error instead of starting a second one.
 - A routine session runs unattended: its prompt tells it not to ask questions.
   Once its turn finishes, the dashboard ends it, so it moves to the past sessions with its transcript, and **Resume** continues it.
+  With **Pin the session when it finishes** on, the session is pinned as its turn finishes, before it ends, so it shows under **Pinned** rather than **Past**.
+  That pin replaces the one on the routine's previous session, and your other pins stay.
   A session that has not begun its turn 10 minutes after it started is ended, and its run records that as an error.
+  Such a session is not pinned.
 - Routines run only while the dashboard runs.
   A slot missed while the dashboard was closed runs once when it starts again, however many slots it missed.
   Quitting the dashboard stops a running command, and the next start does not run it again; its run reads **Stopped with the dashboard**.
@@ -1050,7 +1055,7 @@ Alt is Option on macOS.
 `bun run desktop` shows the dashboard in its own window; see the [README](../README.md#desktop-app) to start it.
 
 - The window is the same page as a browser tab, on the same address, `http://127.0.0.1:<port>`.
-  It keeps its own localStorage, so pins, folded sections, the sidebar widths, the theme, and the pinned skill start fresh in the window and stay apart from a browser's.
+  It keeps its own localStorage, so folded sections, the sidebar widths, the theme, and the pinned skill start fresh in the window and stay apart from a browser's.
 - At launch, the app asks the port for the dashboard's sign-in.
   When an omp-agents server answers, the window uses it, and quitting the app leaves it running.
   When nothing listens, the app starts the server from its checkout and stops it when you quit.

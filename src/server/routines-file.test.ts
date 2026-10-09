@@ -92,6 +92,32 @@ test("an older file keeps its other routines, reads one schedule as a list and a
 	expect(saved.routines[0]?.schedule).toBeUndefined();
 });
 
+test("a prompt task from before `pin` reads as unpinned, and the next save writes it", () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
+	dirs.push(dir);
+	const path = join(dir, "omp-agents", "routines.json");
+	mkdirSync(join(dir, "omp-agents"));
+	const routine = {
+		id: "r1",
+		name: "Daily retro",
+		cwd: "~/code",
+		schedules: [{ kind: "every", minutes: 60 }],
+		task: { kind: "prompt", prompt: "Write the daily retro." },
+		skill: null,
+		enabled: true,
+		createdAt: 1,
+		runs: [],
+	};
+	writeFileSync(path, JSON.stringify({ routines: [routine] }));
+	const file = new RoutinesFile(path);
+	expect(file.routines[0]?.task).toEqual({ kind: "prompt", prompt: "Write the daily retro.", pin: false });
+	expect(existsSync(`${path}.invalid`)).toBe(false);
+
+	file.apply({ op: "enable", id: "r1", enabled: false }, 2);
+	const saved = JSON.parse(readFileSync(path, "utf8")) as { routines: { task: unknown }[] };
+	expect(saved.routines[0]?.task).toEqual({ kind: "prompt", prompt: "Write the daily retro.", pin: false });
+});
+
 test("a file that is not a list of routines moves aside", () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-routines-"));
 	dirs.push(dir);

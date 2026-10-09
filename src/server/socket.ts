@@ -4,6 +4,7 @@ import { errorText } from "../json";
 import { directoryOf } from "../paths";
 import type { RoutineChange } from "../routines";
 import type { NoticeOp } from "../shared/notices";
+import type { PinChange } from "../shared/pins";
 import type { ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { UserTodoChange } from "../user-todos-shared";
@@ -27,6 +28,8 @@ export interface SocketEnv {
 	changeRoutine(ws: Socket, change: Exclude<RoutineChange, { op: "run-now" }>): void;
 	/** Run routine `id` now, whatever its schedule. */
 	runRoutine(id: string): Promise<void>;
+	/** Apply `change` to the pins; every socket then gets the pins as they are after, and `ws` gets them even when nothing changed. */
+	changePins(ws: Socket, change: PinChange): void;
 	/** Act on notice `id`; every socket then gets the notices as they are after. */
 	changeNotice(id: string, op: NoticeOp): Promise<void>;
 }
@@ -130,6 +133,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	answer: ({ sessions }, _ws, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
 	"user-todo": ({ changeTodo }, ws, { change }) => changeTodo(ws, change),
 	routine: ({ changeRoutine, runRoutine }, ws, { change }) => (change.op === "run-now" ? runRoutine(change.id) : changeRoutine(ws, change)),
+	pin: ({ changePins }, ws, { change }) => changePins(ws, change),
 	notice: ({ changeNotice }, _ws, { id, op }) => changeNotice(id, op),
 };
 

@@ -3,6 +3,7 @@ import type { Routine, RoutineChange } from "../routines";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { Notice, NoticeOp } from "./notices";
+import type { PinChange } from "./pins";
 import type { Project, ProjectList } from "./projects";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View } from "./sessions";
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
@@ -36,6 +37,8 @@ export type ServerMsg =
 	| { t: "routines"; routines: Routine[] }
 	/** The directories Settings → Projects added and hid, whole, sent when a socket opens and after every change. */
 	| { t: "projects"; list: ProjectList<Project> }
+	/** The pinned sessions' ids, whole, sent when a socket opens and after every change. */
+	| { t: "pins"; sessionIds: string[] }
 	/** Every notice the bell lists, whole, sent when a socket opens and after every change. */
 	| { t: "notices"; list: Notice[] };
 
@@ -80,5 +83,7 @@ export type ClientMsg =
 	| { t: "user-todo"; change: UserTodoChange }
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
 	| { t: "routine"; change: RoutineChange }
+	/** Pin or unpin sessions; every socket then gets the pins as they are after. */
+	| { t: "pin"; change: PinChange }
 	/** Update notice `id`, mark it seen, or clear it. */
 	| { t: "notice"; id: string; op: NoticeOp };

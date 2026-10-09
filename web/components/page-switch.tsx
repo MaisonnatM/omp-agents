@@ -100,7 +100,7 @@ export function PageSwitch({ page, state, workspace, defaultWorkspace, sectionTa
 			);
 		}
 		case "settings":
-			return <SettingsPage route={page} workspaces={projects} projectList={state.projectList} />;
+			return <SettingsPage route={page} workspaces={projects} projectList={state.projectList} pins={state.pins} />;
 		case "inbox":
 			return page.target === null ? (
 				<InboxPage project={project} hosts={visible.hosts} past={visible.past} section={sectionTarget} />

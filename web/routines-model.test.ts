@@ -12,7 +12,7 @@ const routine = (fields: Partial<Routine>): Routine => ({
 	name: "Morning notes",
 	cwd: "~/code/webapp",
 	schedules: [weekdays],
-	task: { kind: "prompt", prompt: "Summarize yesterday's commits." },
+	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
 	skill: null,
 	enabled: true,
 	createdAt: at(5, 10),
@@ -44,7 +44,7 @@ describe("schedule words", () => {
 
 describe("task words", () => {
 	test("a prompt task names its first line with text", () => {
-		expect(taskWords({ kind: "prompt", prompt: "\n  Summarize yesterday's commits.  \nThen list open questions." })).toBe("Summarize yesterday's commits.");
+		expect(taskWords({ kind: "prompt", prompt: "\n  Summarize yesterday's commits.  \nThen list open questions.", pin: false })).toBe("Summarize yesterday's commits.");
 	});
 
 	test("several schedules read in the order they were saved", () => {
@@ -125,9 +125,9 @@ describe("command runs", () => {
 
 describe("editor form", () => {
 	test("a saved routine's form saves the same routine back", () => {
-		const saved = routine({ schedules: [{ kind: "every", minutes: 360 }], task: { kind: "prompt", prompt: "Reply ok." }, skill: "poteto-mode", enabled: false });
+		const saved = routine({ schedules: [{ kind: "every", minutes: 360 }], task: { kind: "prompt", prompt: "Reply ok.", pin: true }, skill: "poteto-mode", enabled: false });
 		expect(draftOf(saved).schedules[0]).toMatchObject({ amount: "6", unit: "hours" });
-		expect(draftOf(saved)).toMatchObject({ task: "prompt", prompt: "Reply ok." });
+		expect(draftOf(saved)).toMatchObject({ task: "prompt", prompt: "Reply ok.", pin: true });
 		expect(specOf(draftOf(saved))).toEqual({
 			ok: {
 				id: "r1",
@@ -135,7 +135,7 @@ describe("editor form", () => {
 				cwd: "~/code/webapp",
 				enabled: false,
 				skill: "poteto-mode",
-				task: { kind: "prompt", prompt: "Reply ok." },
+				task: { kind: "prompt", prompt: "Reply ok.", pin: true },
 				schedules: [{ kind: "every", minutes: 360 }],
 			},
 		});
@@ -151,7 +151,7 @@ describe("editor form", () => {
 				cwd: "/tmp",
 				enabled: true,
 				skill: null,
-				task: { kind: "prompt", prompt: "Hi" },
+				task: { kind: "prompt", prompt: "Hi", pin: false },
 				schedules: [{ kind: "weekly", days: [1, 3], time: { hour: 18, minute: 30 } }],
 			},
 		});

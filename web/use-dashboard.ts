@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import type { PinChange } from "../src/shared/pins";
 import type { ClientMsg, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import type { UserTodoChange } from "../src/user-todos-shared";
@@ -19,6 +20,23 @@ import {
 import { messageOf, pendingStart, type StartKind, type StartOp } from "./starts";
 
 const NO_VIEWS: View[] = [];
+
+/** Where an older page kept the pins, in each browser's localStorage, before the server kept them. */
+const STORED_PINS_KEY = "omp-agents.pinned-sessions";
+
+/** Hands the server the pins this browser kept, then forgets them; pinning twice pins once, so two windows doing it at once agree. */
+function sendStoredPins(ws: WebSocket): void {
+	const raw = localStorage.getItem(STORED_PINS_KEY);
+	if (raw === null) return;
+	let stored: unknown = null;
+	try {
+		stored = JSON.parse(raw);
+	} catch {
+	}
+	const sessionIds = Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string" && id !== "") : [];
+	if (sessionIds.length > 0) ws.send(JSON.stringify({ t: "pin", change: { op: "pin", sessionIds } } satisfies ClientMsg));
+	localStorage.removeItem(STORED_PINS_KEY);
+}
 
 /** Dashboard state plus the ways the page talks back. */
 export interface Dashboard {
@@ -45,6 +63,8 @@ export interface Dashboard {
 	start: (op: StartOp) => void;
 	/** Change the Todo page's list, which shows at once and reaches the server and every other window. */
 	changeTodo: (change: UserTodoChange) => void;
+	/** Pin or unpin sessions, which shows at once and reaches the server and every other window. */
+	changePins: (change: PinChange) => void;
 }
 
 /** Live dashboard state over the server's WebSocket; the panes live in the URL hash. */
@@ -139,6 +159,10 @@ export function useDashboard(): Dashboard {
 					case "notices":
 						dispatch(msg);
 						return;
+					case "pins":
+						dispatch(msg);
+						sendStoredPins(ws);
+						return;
 					default: {
 						const never: never = msg;
 						return never;
@@ -203,6 +227,13 @@ export function useDashboard(): Dashboard {
 		},
 		[send],
 	);
+	const changePins = useCallback(
+		(change: PinChange) => {
+			dispatch({ t: "pin", change });
+			send({ t: "pin", change });
+		},
+		[send],
+	);
 
-	return { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo };
+	return { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo, changePins };
 }

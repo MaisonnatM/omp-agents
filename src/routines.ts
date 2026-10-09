@@ -12,8 +12,8 @@ export type Schedule =
 export type Schedules = [Schedule, ...Schedule[]];
 
 export type RoutineTask =
-	/** One session in `cwd` that takes `prompt`. */
-	| { kind: "prompt"; prompt: string }
+	/** One session in `cwd` that takes `prompt`; with `pin`, the session is pinned once its turn finishes, in place of the routine's earlier sessions. */
+	| { kind: "prompt"; prompt: string; pin: boolean }
 	/** `command` through `sh -c` in the routine's cwd, with no omp session. */
 	| { kind: "command"; command: string };
 

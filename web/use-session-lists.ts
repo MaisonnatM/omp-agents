@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { listedViews, searchSessions, type SidebarSessions, sidebarSessions, waitingCount } from "./sessions";
-import { PINNED_SESSIONS_KEY, useStoredKeys } from "./stored-state";
+import type { PinChange } from "../src/shared/pins";
 import type { View } from "../src/shared/sessions";
 import type { Workspace } from "./use-workspace";
 
@@ -21,9 +21,15 @@ export interface SessionLists {
 	waiting: number;
 }
 
-/** The sidebar's session lists for the selected project, its search, and its pins. */
-export function useSessionLists({ visible, project }: Pick<Workspace, "visible" | "project">): SessionLists {
-	const [pinned, togglePin] = useStoredKeys(PINNED_SESSIONS_KEY);
+/** The sidebar's session lists for the selected project, its search, and the server's pins, which `changePins` changes. */
+export function useSessionLists({ visible, project }: Pick<Workspace, "visible" | "project">, pins: string[], changePins: (change: PinChange) => void): SessionLists {
+	const pinned = useMemo<ReadonlySet<string>>(() => new Set(pins), [pins]);
+	const pinnedRef = useRef(pinned);
+	pinnedRef.current = pinned;
+	const togglePin = useCallback(
+		(sessionId: string) => changePins({ op: pinnedRef.current.has(sessionId) ? "unpin" : "pin", sessionIds: [sessionId] }),
+		[changePins],
+	);
 	const [query, setQuery] = useState("");
 	const projectLists = useMemo(() => sidebarSessions(visible.hosts, visible.past, project, pinned), [visible, project, pinned]);
 	const lists = useMemo(() => searchSessions(projectLists, query), [projectLists, query]);

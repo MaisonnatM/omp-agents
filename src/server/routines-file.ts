@@ -2,7 +2,7 @@
  * The routines, kept in a file so that the next server knows which slots ran.
  * Every change saves at once: a queued run is on disk before the runner starts anything from it.
  * A routine whose task was pull requests is dropped on load. The rest of the file stays.
- * A file from before `schedules`, or before a run's `outcome`, migrates here, so everything else sees the current shape.
+ * A file from before `schedules`, before a run's `outcome`, or before a prompt task's `pin` migrates here, so everything else sees the current shape.
  */
 import { JsonFile } from "../fs";
 import { isObject, isTexts } from "../json";
@@ -80,8 +80,12 @@ const isPullRequestRoutine = (value: unknown): boolean => isObject(value) && isO
 function parseRoutine(value: unknown): Routine | "drop" | null {
 	if (isPullRequestRoutine(value)) return "drop";
 	if (!isObject(value)) return null;
-	// Only files, never socket edits, accept the historical one-schedule shape.
-	const spec = parseRoutineSpec("schedules" in value ? value : { ...value, schedules: [value.schedule] });
+	const { task } = value;
+	const spec = parseRoutineSpec({
+		...value,
+		schedules: "schedules" in value ? value.schedules : [value.schedule],
+		task: isObject(task) && task.kind === "prompt" && !("pin" in task) ? { ...task, pin: false } : task,
+	});
 	if (!spec) return null;
 	const { createdAt } = value;
 	const runs = parseAll(value.runs, parseRun);

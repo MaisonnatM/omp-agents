@@ -5,6 +5,7 @@
  */
 import { errorText } from "../json";
 import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, type RoutineRun, type RoutineTask } from "../routines";
+import type { PinChange } from "../shared/pins";
 import type { HostStatus, StartRequest, StartResult } from "../shared/sessions";
 import type { RoutinesFile } from "./routines-file";
 
@@ -26,6 +27,8 @@ export interface RoutineRunnerDeps {
 	exec(command: string, cwd: string): Promise<{ exitCode: number | null; output: string }>;
 	/** The routines changed; every socket should hear them. */
 	onChange(): void;
+	/** Pins or unpins sidebar sessions, for every window, page open or not. */
+	changePins(change: PinChange): void;
 }
 
 /** A session a routine started: `starting` until its turn is seen running, `working` after; it leaves once it finished. */
@@ -195,7 +198,7 @@ export class RoutineRunner {
 		);
 	}
 
-	/** Ends each session that worked and went idle; the transcript stays, and Resume continues it. */
+	/** Ends each session that worked and went idle, pinned first when its routine asks; the transcript stays, and Resume continues it. */
 	async #retire(): Promise<void> {
 		for (const [instanceId, tracked] of this.#tracked) await this.#settle(instanceId, tracked);
 	}
@@ -212,6 +215,7 @@ export class RoutineRunner {
 			tracked.phase = "working";
 		} else if (session.status === "idle" && tracked.phase === "working") {
 			this.#tracked.delete(instanceId);
+			this.#pinFinished(tracked.routineId, session.sessionId);
 			await session.end();
 		} else if (tracked.phase === "starting" && this.#deps.now() - tracked.startedAt >= SESSION_START_DEADLINE_MS) {
 			this.#tracked.delete(instanceId);
@@ -219,6 +223,15 @@ export class RoutineRunner {
 			this.#deps.onChange();
 			await session.end();
 		}
+	}
+
+	/** Pins `sessionId` when its routine asks, and unpins the sessions of the routine's other runs, so the latest run alone stays pinned. */
+	#pinFinished(routineId: string, sessionId: string): void {
+		const routine = this.#deps.file.routines.find(r => r.id === routineId);
+		if (routine?.task.kind !== "prompt" || !routine.task.pin) return;
+		const earlier = routine.runs.flatMap(({ outcome }) => (outcome.kind === "session" && outcome.sessionId !== sessionId ? [outcome.sessionId] : []));
+		if (earlier.length > 0) this.#deps.changePins({ op: "unpin", sessionIds: earlier });
+		this.#deps.changePins({ op: "pin", sessionIds: [sessionId] });
 	}
 }
 

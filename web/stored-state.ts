@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export const PINNED_SESSIONS_KEY = "omp-agents.pinned-sessions";
-
 /** The setters of every mounted {@link useStoredState} by key, so a write in one component shows in the others. */
 const holders = new Map<string, Set<(value: unknown) => void>>();
 
@@ -55,7 +53,7 @@ function decodeKeys(raw: string | null): ReadonlySet<string> {
 	}
 }
 
-/** A set of keys that localStorage keeps under `storageKey`, such as folded sections or pinned sessions, with a toggle that flips each key it names. */
+/** A set of keys that localStorage keeps under `storageKey`, such as folded sections, with a toggle that flips each key it names. */
 export function useStoredKeys(storageKey: string): [ReadonlySet<string>, (...keys: string[]) => void] {
 	const [keys, store] = useStoredState(storageKey, decodeKeys, stored => JSON.stringify([...stored]));
 	const toggle = useCallback(

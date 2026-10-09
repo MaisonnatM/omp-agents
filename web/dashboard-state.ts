@@ -2,6 +2,7 @@
 import type { PlanUsage } from "../src/shared/models";
 import type { Notice } from "../src/shared/notices";
 import type { ServerMsg } from "../src/shared/protocol";
+import { applyPins, type PinChange } from "../src/shared/pins";
 import type { Project, ProjectList } from "../src/shared/projects";
 import { type LiveView, newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Routine } from "../src/routines";
@@ -45,12 +46,14 @@ export interface DashboardState {
 	routines: Routine[];
 	/** The directories Settings → Projects added and hid, empty until the server first sends them. */
 	projectList: ProjectList<Project>;
+	/** The pinned sessions' ids, empty until the server first sends them; a change shows here before the server answers. */
+	pins: string[];
 	/** What the bell lists, empty until the server first sends it. */
 	notices: Notice[];
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "projects" | "notices" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "projects" | "pins" | "notices" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -60,6 +63,7 @@ export type Action =
 	| { t: "dismiss-start"; kind: StartKind }
 	| { t: "new-session-completions"; completions: Completions }
 	| { t: "user-todo"; change: UserTodoChange }
+	| { t: "pin"; change: PinChange }
 	| ServerAction;
 
 const liveIds = (layout: Layout): string[] => layout.panes.flatMap(view => (view.kind === "live" ? [view.instanceId] : []));
@@ -148,10 +152,16 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, routines: action.routines };
 		case "projects":
 			return { ...state, projectList: action.list };
+		case "pins":
+			return { ...state, pins: action.sessionIds };
 		case "notices":
 			return { ...state, notices: action.list };
 		case "user-todo":
 			return state.userTodos ? { ...state, userTodos: applyUserTodo(state.userTodos, action.change) } : state;
+		case "pin": {
+			const pins = applyPins(state.pins, action.change);
+			return pins === state.pins ? state : { ...state, pins };
+		}
 		default: {
 			const never: never = action;
 			return never;
@@ -179,6 +189,7 @@ export function initialState(route: Route): DashboardState {
 		userTodos: null,
 		routines: [],
 		projectList: { added: [], hidden: [] },
+		pins: [],
 		notices: [],
 	};
 }

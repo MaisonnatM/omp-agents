@@ -73,4 +73,12 @@ describe("dashboard state", () => {
 		expect(closed.draft).toBeNull();
 		expect(reduce(blank(), { t: "started", reqId: 9, result: { ok: true, instanceId: "z", cwd: "/", prompt: null } })).toEqual(blank());
 	});
+
+	test("a pin shows before the server answers, one that changes nothing keeps the state, and the server's pins replace them", () => {
+		const listed = reduce(blank(), { t: "pins", sessionIds: ["s1"] });
+		const pinned = reduce(listed, { t: "pin", change: { op: "pin", sessionIds: ["s2"] } });
+		expect(pinned.pins).toEqual(["s1", "s2"]);
+		expect(reduce(pinned, { t: "pin", change: { op: "unpin", sessionIds: ["s3"] } })).toBe(pinned);
+		expect(reduce(pinned, { t: "pins", sessionIds: ["s2"] }).pins).toEqual(["s2"]);
+	});
 });

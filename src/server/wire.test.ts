@@ -89,7 +89,7 @@ describe("parseClientMsg", () => {
 			name: "Reviews",
 			cwd: "/work/webapp",
 			schedules: [weekdays],
-			task: { kind: "prompt", prompt: "Summarize" },
+			task: { kind: "prompt", prompt: "Summarize", pin: false },
 			skill: null,
 			enabled: true,
 		};
@@ -120,9 +120,12 @@ describe("parseClientMsg", () => {
 			expect(save({ schedules: [] })).toBeNull();
 		});
 
-		test("save refuses a pull request task, and a blank name, workspace, or prompt", () => {
+		test("save refuses a pull request task, and a blank name, workspace, or prompt, and a prompt task without its pin choice", () => {
 			expect(save({ task: { kind: "pull-requests", action: "review" } })).toBeNull();
-			expect(save({ task: { kind: "prompt", prompt: " " } })).toBeNull();
+			expect(save({ task: { kind: "prompt", prompt: " ", pin: false } })).toBeNull();
+			expect(save({ task: { kind: "prompt", prompt: "Summarize" } })).toBeNull();
+			expect(save({ task: { kind: "prompt", prompt: "Summarize", pin: "yes" } })).toBeNull();
+			expect(save({ task: { kind: "prompt", prompt: "Summarize", pin: true } })).toEqual({ t: "routine", change: { op: "save", routine: { ...routine, task: { kind: "prompt", prompt: "Summarize", pin: true } } } });
 			expect(save({ name: "" })).toBeNull();
 			expect(save({ cwd: "  " })).toBeNull();
 			expect(save({ enabled: "yes" })).toBeNull();
@@ -138,6 +141,17 @@ describe("parseClientMsg", () => {
 			expect(save({ task: longest })).toMatchObject({ change: { routine: { task: longest } } });
 			expect(save({ task: { kind: "command", command: "x".repeat(10_001) } })).toBeNull();
 		});
+	});
+
+	test("pin takes one or more session ids to pin or unpin, and refuses an empty list, an unknown op, or a blank id", () => {
+		const change = (value: unknown) => msg({ t: "pin", change: value });
+		expect(change({ op: "pin", sessionIds: ["s1", "s2"], extra: 1 })).toEqual({ t: "pin", change: { op: "pin", sessionIds: ["s1", "s2"] } });
+		expect(change({ op: "unpin", sessionIds: ["s1"] })).toEqual({ t: "pin", change: { op: "unpin", sessionIds: ["s1"] } });
+		expect(change({ op: "pin", sessionIds: [] })).toBeNull();
+		expect(change({ op: "toggle", sessionIds: ["s1"] })).toBeNull();
+		expect(change({ op: "pin", sessionIds: ["s1", ""] })).toBeNull();
+		expect(change({ op: "pin", sessionIds: [7] })).toBeNull();
+		expect(change({ op: "pin", sessionIds: "s1" })).toBeNull();
 	});
 
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {

@@ -20,7 +20,7 @@ const spec: Omit<Routine, "runs" | "createdAt"> = {
 	name: "Notes",
 	cwd: "/work/webapp",
 	schedules: [weekdays],
-	task: { kind: "prompt", prompt: "Summarize yesterday's commits." },
+	task: { kind: "prompt", prompt: "Summarize yesterday's commits.", pin: false },
 	skill: null,
 	enabled: true,
 };
