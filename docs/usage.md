@@ -19,7 +19,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - [Calendar](#calendar)
 - [Routines](#routines)
 - [Settings](#settings)
-- [Updates](#updates)
+- [Notifications](#notifications)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Desktop app](#desktop-app)
 - [Limitations](#limitations)
@@ -948,24 +948,38 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The page is in the URL hash, `#settings/<section>` or `#settings/<section>/<encoded directory>`, such as `#settings/integrations`; `#settings` opens **Analytics**.
   After each save the page shows the settings as omp loads them from disk.
 
-## Updates
+## Notifications
 
-- The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists the updates the server found, and its badge counts them.
-- The server checks at startup, every six hours, and after each update, for two kinds of update.
-  - A newer omp release than the one installed, on the channel that omp's `update.channel` setting picks.
-    Turning off omp's `startup.checkUpdate` setting turns this check off too.
-  - A newer Claude or OpenAI model than one that your model roles or fallback chains name, from the same provider and the same line, such as Claude Opus 5.5 to Claude Opus 5.6.
-    Only models that `omp models` lists on a connected provider count, and dated snapshots are left out.
-- An update that no page has shown yet shows as a toast at the bottom right, which stays until you dismiss it.
-  **Dismiss** marks it seen, so it does not show as a toast again in any tab or after a reload, and it stays in the bell.
+- The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists what waits on you, newest first, and its badge counts the notices you have not read, up to `9+`.
+- Three sources feed it.
+  - **GitHub**: a pull request in the inbox whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
+    A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
+    The server reads the inbox's workspaces every two minutes while a page is open, and as soon as a page opens after none was.
+  - **Slack**: a message from someone else in a direct or group conversation you have not answered since, one notice per conversation, and each mention of you in a channel, from the last three days.
+    It needs the Slack sign-in of **Settings › Integrations**, and the server checks it with the pull requests.
+  - **Updates**: a newer omp release or a newer model, checked at startup, every six hours, and after each update.
+    - A newer omp release than the one installed, on the channel that omp's `update.channel` setting picks.
+      Turning off omp's `startup.checkUpdate` setting turns this check off too.
+    - A newer Claude or OpenAI model than one that your model roles or fallback chains name, from the same provider and the same line, such as Claude Opus 5.5 to Claude Opus 5.6.
+      Only models that `omp models` lists on a connected provider count, and dated snapshots are left out.
+- **All**, **GitHub**, **Slack**, and **Updates** filter the list, each with its count of unread notices.
+  Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
+- A notice you open is read: a pull request's opens its page in the inbox, and a Slack message's opens it in Slack in a new tab.
+  Selecting an update's notice marks it read.
+  The check mark in the header marks every notice in the filter read.
+- Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge on GitHub** for one ready to merge.
+- A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
+  A pull request's or Slack message's toast shows only within 15 minutes of its news, closes after a few seconds, and **Open** opens what it is about.
+  An update's toast stays until you dismiss it.
 - **Update**, on the toast or in the bell, runs the update; the notice shows its progress, then what changed or why it failed, and a failed update can run again.
   - For omp, it runs `omp update`, which installs the newest release.
     Restart omp-agents to load it, since the running server keeps the omp it started with.
     An install that `omp update` leaves older than the notice's release, such as one that Nix manages, reports as failed with omp's last line of output.
   - For a model, it puts the new model in place of the old one in every role and fallback chain of `~/.omp/agent/config.yml` that names it, and keeps each role's thinking level, as **Settings › Models** would save it.
     A chain keyed by the old model keeps its key, and a workspace's `.omp/config.yml` stays as it was.
-- **×** clears a notice from the bell, until a newer version brings a new notice.
-- The server keeps which notices were seen and cleared in `notices.json` beside its access token.
+- **×** clears a notice from the bell.
+  A cleared update comes back with a newer version, a cleared pull request notice when the pull request comes back to the move after a while, and a cleared Slack notice with a newer message.
+- The server keeps which notices were seen, read, and cleared in `notices.json` beside its access token.
 
 ## Keyboard shortcuts
 

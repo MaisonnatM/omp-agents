@@ -336,7 +336,7 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const change = parsePinChange(value.change);
 		return change && { ok: { t: "pin", change } };
 	},
-	notice: ({ id, op }) => (isNonEmpty(id) && isNoticeOp(op) ? { ok: { t: "notice", id, op } } : null),
+	notice: ({ ids, op }) => (Array.isArray(ids) && ids.length > 0 && ids.every(isNonEmpty) && isNoticeOp(op) ? { ok: { t: "notice", ids, op } } : null),
 };
 
 const isClientMsgType = (t: unknown): t is ClientMsg["t"] => typeof t === "string" && Object.hasOwn(clientParsers, t);

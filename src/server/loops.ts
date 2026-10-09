@@ -1,8 +1,8 @@
 /**
  * Every recurring job of the server, with its cadence: the registry poll, the watcher on omp's sessions
- * directory and the throttled re-read it asks for, the full rescan, the `omp usage` poll, the routine tick, and the
- * update check. The handlers do the work. Every loop schedules its next tick once the last one finished, so ticks never
- * overlap, and one that fails is logged and tried again at the next turn.
+ * directory and the throttled re-read it asks for, the full rescan, the `omp usage` poll, the routine tick, the
+ * update check, and the activity check. The handlers do the work. Every loop schedules its next tick once the last one
+ * finished, so ticks never overlap, and one that fails is logged and tried again at the next turn.
  * The routine tick runs whether or not a page is connected, since routines start sessions on their own.
  */
 import { mkdirSync, watch } from "node:fs";
@@ -21,6 +21,8 @@ const USAGE_POLL_MS = 60_000;
 const MINUTE_TICK_MS = 60_000;
 /** omp and the model catalog release a few times a week; each check runs `omp models` and asks npm for omp's newest release. */
 const NOTICE_CHECK_MS = 6 * 60 * 60_000;
+/** Each activity check asks GitHub for every project's pull requests and searches Slack twice. */
+const ACTIVITY_CHECK_MS = 2 * 60_000;
 
 export interface LoopHandlers {
 	/** Every {@link POLL_MS}. */
@@ -37,6 +39,8 @@ export interface LoopHandlers {
 	onMinuteTick(): Promise<void>;
 	/** At once, then every {@link NOTICE_CHECK_MS}, listener or not. */
 	onNoticeTick(): Promise<void>;
+	/** Every {@link ACTIVITY_CHECK_MS}. */
+	onActivityTick(): Promise<void>;
 }
 
 /**
@@ -79,13 +83,14 @@ export class Loops {
 		});
 	}
 
-	/** Start the registry poll, the rescans, the usage poll, the minute tick, and the update check. */
+	/** Start the registry poll, the rescans, the usage poll, the minute tick, the update check, and the activity check. */
 	start(): void {
 		repeat("registry", this.#on.onRegistryTick, POLL_MS);
 		repeat("rescan", this.#on.onRescanTick, RESCAN_MS);
 		repeat("usage", this.#on.onUsageTick, USAGE_POLL_MS, 0);
 		repeat("routine", this.#on.onMinuteTick, MINUTE_TICK_MS);
 		repeat("update check", this.#on.onNoticeTick, NOTICE_CHECK_MS, 0);
+		repeat("activity check", this.#on.onActivityTick, ACTIVITY_CHECK_MS);
 	}
 
 	/** A file changed, reported by the watcher or by the session that wrote it. */

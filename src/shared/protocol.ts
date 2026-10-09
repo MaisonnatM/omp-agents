@@ -88,5 +88,5 @@ export type ClientMsg =
 	| { t: "routine"; change: RoutineChange }
 	/** Pin or unpin sessions; every socket then gets the pins as they are after. */
 	| { t: "pin"; change: PinChange }
-	/** Update notice `id`, mark it seen, or clear it. */
-	| { t: "notice"; id: string; op: NoticeOp };
+	/** Update notices `ids`, mark them seen or read, or clear them. */
+	| { t: "notice"; ids: string[]; op: NoticeOp };

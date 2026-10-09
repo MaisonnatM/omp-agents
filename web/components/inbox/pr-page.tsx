@@ -1,11 +1,12 @@
 import { ArrowLeft } from "lucide-react";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { type Inbox, type InboxPullRequest, type LinkedPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
+import { agentOn, moveOf } from "../../../src/shared/moves";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { agentOn, listedPullRequest, moveAction, moveOf, reason } from "../../inbox-model";
+import { listedPullRequest, moveAction, reason } from "../../inbox-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { actionOn, pendingOf, pullRequestStart } from "../../quick-actions";
 import { inboxStore } from "../../reads";

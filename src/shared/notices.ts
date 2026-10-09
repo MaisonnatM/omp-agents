@@ -1,4 +1,9 @@
-/** What the bell lists: a newer omp, or a newer version of a model omp's routing names. */
+/**
+ * What the bell lists: a newer omp or routed model, a pull request whose next move is yours, and a Slack message that
+ * waits on you.
+ */
+import type { InboxPullRequest } from "./github";
+import type { YourMove } from "./moves";
 
 export interface NamedModel {
 	id: string;
@@ -26,15 +31,38 @@ export type NoticeStatus =
 	| { state: "updated"; note: string }
 	| { state: "failed"; error: string };
 
-/** What a notice offers: an omp release newer than the one installed, or a newer version of a routed model. */
-export type NoticeSubject = { kind: "omp"; current: string; latest: string } | ({ kind: "model" } & ModelUpdate);
+/** An omp release newer than the one installed, or a newer version of a routed model. */
+export type UpdateSubject = { kind: "omp"; current: string; latest: string } | ({ kind: "model" } & ModelUpdate);
+
+/** A pull request of a project whose next move is yours, with the project directory a quick action on it starts in. */
+export interface PullRequestSubject {
+	kind: "pull-request";
+	pr: InboxPullRequest;
+	move: YourMove;
+	cwd: string;
+}
 
 /**
- * One update the user can take. The id names the versions, so a newer release is a new notice even after the last one was
- * cleared. `seen` is set once the user dismissed its toast or started its update, so it shows as a toast only once.
+ * A Slack message that waits on you: a mention of you in a channel, or the messages someone sent in a direct or group
+ * message since you last wrote there, of which it holds the newest.
  */
-export type Notice = { id: string; seen: boolean; status: NoticeStatus } & NoticeSubject;
+export type SlackSubject = { kind: "slack"; from: string; text: string; permalink: string } & (
+	| { type: "mention"; channel: string }
+	| { type: "dm" | "group-dm"; count: number }
+);
 
-/** `update` installs the release or rewrites the routing; `seen` stops its toast; `clear` hides it until a newer version. */
-export const NOTICE_OPS = ["update", "seen", "clear"] as const;
+export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject;
+
+export type NoticeKind = NoticeSubject["kind"];
+
+/**
+ * One notice. The id names what it is about in the state that made it, such as the versions of an update or a pull
+ * request's move, so a new state is a new notice even after the last one was cleared. `at` is when the news came, in
+ * ms since the epoch. `seen` is set once its toast showed or the user started its update, so it toasts once; `read`
+ * once the user opened it or marked it read, which takes it out of the bell's unread count.
+ */
+export type Notice = { id: string; at: number; seen: boolean; read: boolean } & ((UpdateSubject & { status: NoticeStatus }) | PullRequestSubject | SlackSubject);
+
+/** `update` installs the release or rewrites the routing; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */
+export const NOTICE_OPS = ["update", "seen", "read", "clear"] as const;
 export type NoticeOp = (typeof NOTICE_OPS)[number];

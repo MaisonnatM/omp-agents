@@ -1,9 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { InboxPullRequest, PullRequestCheck, PullRequestDetail, RepoInbox } from "../src/shared/github";
+import { type AgentOn, agentOn, moveOf } from "../src/shared/moves";
 import type { RosterHost } from "../src/shared/sessions";
 import {
-	type AgentOn,
-	agentOn,
 	DEFAULT_ORDER,
 	decodeOrder,
 	foldedByDefault,
@@ -12,7 +11,6 @@ import {
 	inboxSections,
 	moveAction,
 	moveKey,
-	moveOf,
 	movesSummary,
 	orderedRepos,
 	placedManual,

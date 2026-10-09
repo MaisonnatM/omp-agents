@@ -2,10 +2,11 @@
 import { rmSync } from "node:fs";
 import type { Server, ServerWebSocket } from "bun";
 import { GoogleCalendarReader } from "./google-calendar";
+import { loadInbox } from "./inbox";
 import { integrationServer } from "./integrations";
 import { errorText } from "./json";
 import type { LiveSession } from "./live-session";
-import { readWithMcpSignIn } from "./omp/mcp";
+import { findMcpServer, mcpSignedIn, readWithMcpSignIn } from "./omp/mcp";
 import { type HostSnapshot, listHosts } from "./omp/collab";
 import { ompVersion } from "./omp/install";
 import { installedOmp, latestOmp, updateOmp } from "./omp/release";
@@ -25,7 +26,7 @@ import { Loops } from "./server/loops";
 import { OwnerLock } from "./server/owner-lock";
 import { buildPage, servePage } from "./server/page";
 import { createRoutes } from "./server/routes";
-import { Notices } from "./server/notices";
+import { ACTIVITY_KINDS, Notices, UPDATE_KINDS } from "./server/notices";
 import { RoutineRunner } from "./server/routine-runner";
 import { CalendarsFile } from "./server/calendars-file";
 import { PinsFile } from "./server/pins-file";
@@ -41,8 +42,11 @@ import { terminalFor, type TerminalSocket, type TerminalSocketData, terminalSock
 import { type Socket, type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
 import { modelUpdates, upgradeModel } from "./settings";
+import { MCP_SERVICES } from "./shared/accounts";
+import { agentOn } from "./shared/moves";
 import type { PinChange } from "./shared/pins";
 import type { StartRequest, StartResult, View } from "./shared/sessions";
+import { waitingOnYou } from "./slack-messages";
 import { DONE_KEPT_HOURS, startChanges } from "./user-todos";
 import type { UserTodoChange } from "./user-todos-shared";
 import { Terminals } from "./terminals";
@@ -80,7 +84,23 @@ function applyPinChange(change: PinChange): boolean {
 	if (changed) broadcasts.pushPins();
 	return changed;
 }
-const notices = new Notices(noticesFile, { latestOmp, installedOmp, updateOmp, modelUpdates, upgradeModel }, () => broadcasts.pushNotices());
+const notices = new Notices(
+	noticesFile,
+	{
+		latestOmp,
+		installedOmp,
+		updateOmp,
+		modelUpdates,
+		upgradeModel,
+		inbox: async () => ({ inbox: await loadInbox(knownCwds(), false), agent: agentOn(sessions.rows(files.factsOf)) }),
+		async slack() {
+			const slack = await findMcpServer(MCP_SERVICES.slack.host);
+			return slack && (await mcpSignedIn(slack)) ? waitingOnYou(url => readWithMcpSignIn(slack, url), Date.now()) : [];
+		},
+		now: Date.now,
+	},
+	() => broadcasts.pushNotices(),
+);
 // The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
 rmSync(oldGoogleFile, { force: true });
 const calendars = new CalendarsFile(calendarsFile);
@@ -126,7 +146,11 @@ const loops = new Loops(sessionsDir, {
 		clearOldDone();
 		await runner.tick();
 	},
-	onNoticeTick: () => notices.check(),
+	onNoticeTick: () => notices.check(UPDATE_KINDS),
+	async onActivityTick() {
+		if (broadcasts.listening()) await checkActivity();
+		else activityFresh = false;
+	},
 });
 /** Directories sessions ran in: live ones first, then saved ones newest first. */
 const knownCwds = (): string[] => [...new Set([...sessions.cwds(), ...files.cwds()].filter(Boolean))];
@@ -202,7 +226,7 @@ const handleClientMsg = createClientHandler({
 		if (!applyPinChange(change)) send(ws, { t: "pins", sessionIds: pins.sessionIds });
 	},
 	runRoutine: id => runner.runNow(id),
-	changeNotice: (id, op) => notices.apply(id, op),
+	changeNotices: (ids, op) => notices.apply(ids, op),
 });
 
 /** Takes over routines and the todo inbox when the server that ran them is gone; whether this server runs them. */
@@ -226,6 +250,14 @@ function claimUnattendedWork(): boolean {
 let rosterError: string | null = null;
 /** Whether the registry was listed since the last poll tick found no listener. */
 let registryFresh = false;
+/** Whether the activity was checked since the last activity tick found no listener. */
+let activityFresh = false;
+
+/** Checks the pull requests and Slack for the bell. */
+function checkActivity(): Promise<void> {
+	activityFresh = true;
+	return notices.check(ACTIVITY_KINDS);
+}
 
 /** The session list changed: views may now find their file, and the past list is out of date. */
 function onFilesChanged(): void {
@@ -366,6 +398,7 @@ try {
 				broadcasts.open(ws as Socket);
 				// The registry was not polled while nobody listened; list it now rather than at the next tick.
 				if (!registryFresh) void listRegistry();
+				if (!activityFresh) void checkActivity();
 			},
 			message(ws, raw) {
 				if (isTerminalSocket(ws)) return terminalSocket.message(ws, raw);

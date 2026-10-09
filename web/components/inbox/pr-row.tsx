@@ -1,12 +1,13 @@
 import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
 import { memo, type MouseEvent, useState } from "react";
 import { type InboxPullRequest, type PullRequest, type PullRequestLink, repoKey, samePullRequest } from "../../../src/shared/github";
+import type { MoveId } from "../../../src/shared/moves";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { inboxAge, type InboxRow, MOVES, type MoveId, moveAction, reason, type StackPlace } from "../../inbox-model";
+import { inboxAge, type InboxRow, MOVES, moveAction, reason, type StackPlace } from "../../inbox-model";
 import { hashForInbox, type OpenMode, sameView } from "../../routing";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";

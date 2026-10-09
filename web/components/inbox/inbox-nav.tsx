@@ -1,13 +1,14 @@
 import { RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import { repoKey } from "../../../src/shared/github";
+import { agentOn } from "../../../src/shared/moves";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { agentOn, inboxSections, orderedRepos } from "../../inbox-model";
+import { inboxSections, orderedRepos } from "../../inbox-model";
 import { readTime } from "../../labels";
 import { inboxStore } from "../../reads";
 import { hashForInbox, type InboxRoute } from "../../routing";

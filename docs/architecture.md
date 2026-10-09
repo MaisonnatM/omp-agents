@@ -36,7 +36,7 @@ The main ones:
 - Paths: `pi-utils/src/dirs.ts`, which names omp's sessions directory.
 - Request usage: `omp-stats/src/aggregator.ts` (`getDashboardStats`, `getToolDashboardStats`, `getTimeRangeConfig`), `rollup.ts` (`getProviderTimeSeries`), `live.ts` (`statsLive`), and `db.ts` (`initDb`).
   `src/omp/stats.ts` reads omp-stats' database and starts its live sync only after the Settings page's Analytics section first reads it.
-- Updates: `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts`, the `startup.checkUpdate` and `update.channel` readers in `pi-coding-agent/src/modes/settings.ts`, and `classifyModel` in `pi-catalog/src/identity/index.ts`, which `src/omp/release.ts` and `src/omp/model-updates.ts` use; see [Updates](#updates).
+- Updates: `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts`, the `startup.checkUpdate` and `update.channel` readers in `pi-coding-agent/src/modes/settings.ts`, and `classifyModel` in `pi-catalog/src/identity/index.ts`, which `src/omp/release.ts` and `src/omp/model-updates.ts` use; see [Notifications](#notifications).
 
 ## Transcripts
 
@@ -343,22 +343,36 @@ The page shows a change before the server answers, and its **Pin** and **Unpin**
 Pins an older page kept in the browser's localStorage, under `omp-agents.pinned-sessions`, go to the server as one `pin` the first time the page hears the pins, and the key is then removed.
 Each server keeps its own copy in memory, as with the projects, so a routine's pin shows at once on the pages of the server that owns routines.
 
-## Updates
+## Notifications
 
-`src/server/notices.ts` owns the bell's notices: what the last checks found, the status of each update a page started, and which notices the user saw or cleared, which it keeps in `notices.json` beside the access token.
-It checks at startup and every six hours from `src/server/loops.ts`, whether or not a page is connected, and again after each update that succeeds.
+`src/server/notices.ts` owns the bell's notices: what the last checks found, the status of each update a page started, and which notices the user saw, read, or cleared, which it keeps in `notices.json` beside the access token.
+Each kind has its own check, and `src/server/loops.ts` runs two of them.
+The update check (`UPDATE_KINDS`) runs at startup and every six hours, whether or not a page is connected, and again after each update that succeeds.
+The activity check (`ACTIVITY_KINDS`) runs every two minutes while a socket listens, and when a socket opens unless it ran since the last tick that found none.
 
 - `latestOmp` in `src/omp/release.ts` asks `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts` for the newest release on omp's `update.channel`, unless `startup.checkUpdate` is off.
   `installedOmp` reads the version from the installed package's `package.json` on each check, so the check is right after an update, before a restart.
 - `findModelUpdates` in `src/omp/model-updates.ts` reads the global `modelRoles` and `retry.fallbackChains` with `parseRetryFallbackSelector`, and keeps the listed models that `classifyModel` in `pi-catalog/src/identity/index.ts` places in an Anthropic or OpenAI family with a revision.
   A model's line is its provider, its family, and its id with the version masked, so `claude-opus-5-5` and `claude-opus-5-6` share one.
   It offers the newest revision of each line that a connected provider lists, and leaves dated snapshots out.
+- The pull requests come from `loadInbox` in `src/inbox.ts` over the known workspaces, through the inbox's 30-second cache, so the page's polls and the check share one query.
+  `moveOf` in `src/shared/moves.ts` picks each one's move, with `agentOn` over the roster, and a move in `YOUR_MOVES` is a notice.
+- `waitingOnYou` in `src/slack-messages.ts` calls Slack's Web API with omp's Slack MCP sign-in through `readWithMcpSignIn`, since the MCP server's search answers in Markdown and Slack's `search.messages` needs a scope the sign-in lacks.
+  `auth.test` names the user, and two `assistant.search.context` searches over the last three days, newest first, read the direct and group messages (`im,mpim`) and the channel messages that mention them (`<@ID>`), each up to five pages of 20 through `next_cursor`.
+  A conversation gives one notice for the messages after the user's last one there; the user's own messages, bots, Slack's system messages, and empty ones count for nothing.
+  `slackText` turns Slack's markup into plain text.
+  Without a Slack sign-in the check finds nothing.
 
-A check that fails keeps what the last one found for its kind, and the seen and cleared marks for it.
+A check that fails keeps what the last one found for its kind, and the marks for it, and logs each distinct error once.
+A repository GitHub did not answer for keeps its pull requests' notices the same way.
 A notice whose update runs or ran stays after a check stops finding it, so the page shows how the update ended.
-A notice's id names its versions, `omp:<latest>` or `model:<provider>/<from>><to>`, so a newer version is a new notice even after the user cleared the last one.
+A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `pull-request:<owner>/<repo>#<number>:<move>`, or `slack:<channel>:<ts>` of the newest message.
+A Slack notice dates from its message.
+A pull request notice dates from the check that found it, since the pull request's last update on GitHub may predate the move, except on its repository's first answer since startup, which dates each from that update, so a workspace found later or a repository GitHub answers again does not bring old pull requests as news.
+The marks of a notice the checks stop finding last ten minutes, so a pull request whose checks run again, which leaves **Ready to merge** for a moment, keeps its marks, and one that comes back later is news again.
 
-A `notice` socket message carries `{ id, op }`, with `op` one of `update`, `seen`, and `clear`.
+A `notice` socket message carries `{ ids, op }`, with `op` one of `update`, `seen`, `read`, and `clear`.
+`update` runs on update notices and marks them seen and read.
 Every socket hears the list as a `notices` message on the roster topic after each change, also sent when a socket opens.
 `update` on omp runs `omp update` through `ompCommand` and succeeds when omp exits 0 and the version on disk is at least the notice's release; otherwise it fails with omp's last line of output, such as Nix's.
 The server keeps the omp modules it loaded until it restarts, and `src/omp/modules.ts` names any export the new release dropped at the next start.
@@ -648,7 +662,7 @@ The server lives in `src/`:
   The registry indexes its sessions by session id for `bySessionId`, and rebuilds the index when a session joins or leaves or a dashboard session reports `switched`.
   `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
   After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
-- `src/server/loops.ts`: the registry, rescan, usage, and routine minute loops, each started through `repeat`, which waits for a tick to finish before it schedules the next and logs a tick that throws, so no loop overlaps itself or dies on one failure.
+- `src/server/loops.ts`: the registry, rescan, usage, routine minute, notice, and activity loops, each started through `repeat`, which waits for a tick to finish before it schedules the next and logs a tick that throws, so no loop overlaps itself or dies on one failure.
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle: a view nobody shows any more, or one whose file changes, has its tail and media tree closed, so a read still in flight and the tail's held-back updates publish nothing.
@@ -676,7 +690,7 @@ The server lives in `src/`:
   `git.ts`'s `worktreeAt` answers each directory once per refresh.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
-  A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `MergeFacts` in `web/inbox-model.ts` takes either.
+  A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `readyToMerge` in `src/shared/moves.ts` takes either.
   The details also read the last 100 commits with the pull requests GitHub links each to, and keep a commit linked to none or to this one, since a branch that merged its trunk lists the trunk's commits too.
 - `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), and the worktree a new session's branch runs in.
   It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, and `worktreesOf`, which parses `git worktree list --porcelain -z`.
@@ -715,8 +729,9 @@ The server lives in `src/`:
   `src/server/projects-file.ts` keeps the list in `projects.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `projects.json.invalid`.
 - `src/shared/pins.ts`: the sidebar's pins, their `PinChange`, and `applyPins`, which the server applies to its file and the page to the pins it shows before the server answers; see [Pins](#pins).
   `src/server/pins-file.ts` keeps them in `pins.json` beside the access token and moves a file it cannot read to `pins.json.invalid`.
-- `src/shared/notices.ts`: the bell's `Notice`, a newer omp or a `ModelUpdate`, with its seen flag and `NoticeStatus`, and the socket's `NOTICE_OPS`.
-  `src/server/notices.ts` checks for them and runs their updates through `src/omp/release.ts` and `src/settings.ts`; `src/omp/model-updates.ts` finds the newer models and the routing edits that switch to them; see [Updates](#updates).
+- `src/shared/notices.ts`: the bell's `Notice`, an update (a newer omp or a `ModelUpdate`) with its `NoticeStatus`, a pull request with your move, or a Slack message, with its seen and read flags, and the socket's `NOTICE_OPS`.
+  `src/server/notices.ts` checks for them and runs the updates through `src/omp/release.ts` and `src/settings.ts`; `src/omp/model-updates.ts` finds the newer models and the routing edits that switch to them, and `src/slack-messages.ts` the Slack messages that wait on you; see [Notifications](#notifications).
+- `src/shared/moves.ts`: a pull request's moves, `moveOf`, which picks one from its facts and from where the running sessions on it stand (`agentOn`), and `YOUR_MOVES`, the ones that wait on you, which the inbox and the bell share.
 - `src/server/json-inbox.ts`: `JsonInboxDir<T>`, the directory of one-JSON-file requests that `todo-inbox.ts` and `end-inbox.ts` both read.
   Each inbox gives it a `parse` that turns a file into a request, or says why it is not one, and an `apply` that returns whether the file is done.
   A drain reads the files oldest name first, moves a file that does not parse, or whose `apply` throws, to `<name>.invalid` with a logged reason, deletes a file once `apply` returns true, and leaves one that returns false for the next drain.
@@ -771,7 +786,7 @@ The page lives in `web/`.
   `web/delimited.ts` parses a TSV or CSV file into rows.
   `web/components/file-link.tsx` holds the link that opens such a path, and `web/components/file-dialog.tsx` the dialog that shows the file.
   `sessionsOn` in `web/sessions.ts` picks the running sessions that work on a pull request or an issue, which the inbox and the tickets page show.
-  `web/inbox-model.ts` holds the inbox's moves in one table, `MOVES`, with each move's verb, its section, and the quick action that makes it; `moveOf` picks a pull request's move from its facts and from where the running sessions on it stand, through `agentOn`.
+  `web/inbox-model.ts` holds the inbox's moves in one table, `MOVES`, with each move's verb, its section, and the quick action that makes it, over `moveOf` in `src/shared/moves.ts`.
   It also holds which sections start folded, sorts rows by move and keeps each stack's rows together by the chain of base branches, and says what the details' Status shows.
   `InboxOrder` there is the order you chose, the repositories, the sections, the sort, and the manual order of pull requests, which `placedManual` updates after a drop; a stack moves as one `unit`.
   `web/routines-model.ts` words a routine's schedule, task, next run, and last run, and turns the routine editor's form into the routine it saves.
@@ -833,7 +848,7 @@ The page lives in `web/`.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed; the row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
   `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab: the calendar, the Google calendars under **My calendars** and **Other calendars**, each a checkbox that shows or hides its events, and then the routines by name.
 - `web/components/toaster.tsx`: `toasts`, the page's one Base UI toast manager, which shows a toast from anywhere without rendering its caller again, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
-  `web/components/notices.tsx` holds `NoticesBell`, the roster header's bell and its list, and `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once, even with the sidebar hidden.
+  `web/components/notices.tsx` holds `NoticesBell`, the roster header's bell, its source filters, and its list, and `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once, even with the sidebar hidden.
 - `web/components/todo/`: the Todo page.
   `page.tsx` is the page and its lists, **Archive** included, which `LIST_KINDS` marks read-only: its rows put a todo back or delete it for good, and its header offers **Empty** where the others offer **Clear done**.
   Every other list groups its top-level todos by status, in `STATUS_GROUPS` order, under fold headers whose folds `useFolds` keeps; `split.tsx` puts the list on the left and the open todo's `detail.tsx` on the right, at a list width stored in localStorage.

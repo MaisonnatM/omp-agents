@@ -30,8 +30,8 @@ export interface SocketEnv {
 	runRoutine(id: string): Promise<void>;
 	/** Apply `change` to the pins; every socket then gets the pins as they are after, and `ws` gets them even when nothing changed. */
 	changePins(ws: Socket, change: PinChange): void;
-	/** Act on notice `id`; every socket then gets the notices as they are after. */
-	changeNotice(id: string, op: NoticeOp): Promise<void>;
+	/** Act on notices `ids`; every socket then gets the notices as they are after. */
+	changeNotices(ids: string[], op: NoticeOp): Promise<void>;
 }
 
 /**
@@ -136,7 +136,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	"user-todo": ({ changeTodo }, ws, { change }) => changeTodo(ws, change),
 	routine: ({ changeRoutine, runRoutine }, ws, { change }) => (change.op === "run-now" ? runRoutine(change.id) : changeRoutine(ws, change)),
 	pin: ({ changePins }, ws, { change }) => changePins(ws, change),
-	notice: ({ changeNotice }, _ws, { id, op }) => changeNotice(id, op),
+	notice: ({ changeNotices }, _ws, { ids, op }) => changeNotices(ids, op),
 };
 
 /** `t` keys the handler that takes `msg`; spelled apart so TypeScript pairs them. */

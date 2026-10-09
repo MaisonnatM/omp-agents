@@ -3,13 +3,12 @@ import { ArrowDownUp, Unplug } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { type Inbox, type InboxPullRequest, type PullRequest, prKey, pullRequestUrl, type RepoInbox, repoKey, samePullRequest } from "../../../src/shared/github";
+import { type AgentOn, agentOn, moveOf } from "../../../src/shared/moves";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
-	type AgentOn,
-	agentOn,
 	DEFAULT_ORDER,
 	decodeOrder,
 	foldedByDefault,
@@ -22,7 +21,6 @@ import {
 	listedPullRequest,
 	moveAction,
 	moveKey,
-	moveOf,
 	movesSummary,
 	orderedRepos,
 	placedManual,

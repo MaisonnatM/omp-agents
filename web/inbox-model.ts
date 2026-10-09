@@ -1,13 +1,9 @@
 /** Pull request links, what each pull request waits on next, the inbox's sections and stacks, and what stands between a pull request and its merge. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
 import { type Inbox, type InboxPullRequest, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, prKey, repoKey, samePullRequest } from "../src/shared/github";
-import type { HostStatus, RosterHost } from "../src/shared/sessions";
-import { sessionsOn } from "./sessions";
+import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyToMerge } from "../src/shared/moves";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
-
-/** What a pull request waits on next. */
-export type MoveId = "review" | "merge" | "fix-ci" | "rebase" | "reply" | "answer" | "agent" | "in-review" | "checks-running" | "draft" | "merged";
 
 /** Whose move it is, or for your approved pull requests that need no fix, that they are approved; the inbox's sections, in page order. */
 export type MoveGroup = "Your move" | "Agent on it" | "Approved" | "Waiting on others" | "Drafts" | "Recently merged";
@@ -55,44 +51,6 @@ const APPROVED_MOVES: MoveId[] = ["merge", "checks-running", "draft"];
 
 /** The section `pr` goes in while it waits on `move`. */
 const groupOf = (pr: InboxPullRequest, move: MoveId): MoveGroup => (pr.review === "approved" && APPROVED_MOVES.includes(move) ? "Approved" : MOVES[move].group);
-
-/** A running session's turn on a pull request: it works, or it asks you something. */
-export type AgentState = Extract<HostStatus, "working" | "needs-input">;
-
-/** Where the running sessions linked to a pull request stand, `needs-input` before `working`; `null` when none works on it or asks. */
-export type AgentOn = (pr: PullRequest) => AgentState | null;
-
-/** Where the running sessions on each pull request stand. An idle session's turn ended, so the move is back with you; an unknown one counts as idle. */
-export const agentOn = (hosts: RosterHost[]): AgentOn => pr => {
-	const statuses = new Set(sessionsOn({ kind: "pull-request", pr }, hosts).map(host => host.status));
-	return statuses.has("needs-input") ? "needs-input" : statuses.has("working") ? "working" : null;
-};
-
-/** What decides whether a pull request can merge, as a list entry and the details both carry it. */
-type MergeFacts = Pick<InboxPullRequest, "review" | "checks" | "conflicts" | "unresolved"> & { state: PullRequestDetail["state"] };
-
-/** Some review thread waits for a resolution, or GitHub listed too few threads to tell. */
-const hasOpenThreads = ({ unresolved }: Pick<MergeFacts, "unresolved">): boolean => unresolved.count > 0 || !unresolved.exact;
-
-/** Open, approved or needing no review, its checks passed or absent, no conflicts, and no review thread left open. */
-const readyToMerge = (facts: MergeFacts): boolean =>
-	facts.state === "open" && (facts.review === "approved" || facts.review === "none") && !facts.conflicts && (facts.checks === "passing" || facts.checks === "none") && !hasOpenThreads(facts);
-
-/** What `pr` waits on next, given where the sessions on it stand. */
-export function moveOf(pr: InboxPullRequest, agent: AgentState | null): MoveId {
-	if (pr.state === "merged") return "merged";
-	if (agent === "needs-input") return "answer";
-	if (agent === "working") return "agent";
-	if (pr.role === "reviewer") return "review";
-	// What follows is your own open or draft pull request: a blocker you can fix comes before whether it is a draft.
-	if (pr.conflicts) return "rebase";
-	if (pr.checks === "failing") return "fix-ci";
-	if (pr.review === "changes-requested" || hasOpenThreads(pr)) return "reply";
-	if (pr.state === "draft") return "draft";
-	if (readyToMerge(pr)) return "merge";
-	if (pr.checks === "pending") return "checks-running";
-	return "in-review";
-}
 
 const AND = new Intl.ListFormat("en", { type: "conjunction" });
 
