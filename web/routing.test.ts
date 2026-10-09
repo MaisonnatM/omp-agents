@@ -19,6 +19,8 @@ import {
 	layoutAfterResumeAll,
 	layoutAfterStart,
 	openView,
+	type Page,
+	type Route,
 	routeFromHash,
 	swapView,
 	viewForSession,
@@ -178,6 +180,18 @@ describe("layout hash", () => {
 		expect(routeFromHash("#past/01a0f6a5-181e").kind).toBe("panes");
 		expect(viewForSession("01a0f6a5-181e", hosts)).toEqual(live("7c51f77b"));
 		expect(viewForSession("9d2e0000", hosts)).toEqual(past("9d2e0000"));
+	});
+
+	test("a malformed percent-escape names nothing instead of throwing: the page opens without its target, and its pane drops", () => {
+		const page = (page: Page): Route => ({ kind: "page", page });
+		expect(routeFromHash("#todo/%E0")).toEqual(page({ kind: "todo", list: { kind: "all" } }));
+		expect(routeFromHash("#routines/%zz")).toEqual(page({ kind: "routines", target: null }));
+		expect(routeFromHash("#settings/models/%E0")).toEqual(page({ kind: "settings", section: "models", cwd: null }));
+		expect(routeFromHash("#new/%E0?todo=t1")).toEqual(page({ kind: "new", cwd: null, todoId: "t1" }));
+		expect(routeFromHash("#inbox/acme/web/1/files/%E0")).toEqual(page({ kind: "inbox", target: { owner: "acme", repo: "web", number: 1 }, files: { path: null } }));
+		expect(routeFromHash("#changes/s1/%E0")).toEqual(page({ kind: "changes", sessionId: "s1", path: null }));
+		expect(routeFromHash("#session/%E0")).toEqual({ kind: "panes", layout: { panes: [], focus: 0, maximized: false } });
+		expect(routeFromHash("#a,past/%zz,b/%E0,c@1")).toEqual({ kind: "panes", layout: { panes: [live("a"), live("c")], focus: 1, maximized: false } });
 	});
 });
 

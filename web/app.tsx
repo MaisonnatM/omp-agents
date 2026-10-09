@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { callable, signedIn } from "../src/shared/accounts";
+import type { View } from "../src/shared/sessions";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "./api";
 import { AppSidebar } from "./components/app-sidebar";
@@ -15,6 +16,7 @@ import { FileDialog } from "./components/file-dialog";
 import { PageSwitch } from "./components/page-switch";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/notices";
+import { RenderBoundary } from "./components/render-boundary";
 import { SessionDetails } from "./components/session-details";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
@@ -24,13 +26,11 @@ import { NewTicketDialog } from "./components/tickets/new-ticket";
 import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
-import { localDay } from "./days";
 import { integrationsStore } from "./reads";
-import { endSession, hashForView, type TodoListView } from "./routing";
+import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, projectSession, projectSwitch } from "./sessions";
 import { startOf } from "./starts";
-import { quickAddTodo } from "./todo-quick-add";
 import { useDashboard } from "./use-dashboard";
 import { useFocusedSession } from "./use-focused-session";
 import { useOverlays } from "./use-overlays";
@@ -104,6 +104,15 @@ export function App() {
 			if (next) open(next, "replace");
 		},
 		[pickProject, open],
+	);
+	/** The palette opens a session from any project, so the sidebar switches to that project to keep it listed. */
+	const openFromPalette = useCallback(
+		(picked: View, cwd: string, mode: OpenMode): void => {
+			const next = projectSwitch(project, cwd, hiddenCwds);
+			if (next !== null) pickProject(next);
+			open(picked, mode);
+		},
+		[project, hiddenCwds, pickProject, open],
 	);
 
 	const { setShortcutsOpen, setFilePath, setNewTicket, dispatchPalette } = overlays;
@@ -195,22 +204,38 @@ export function App() {
 								<ActivityVisibility.Provider value={display.activityVisibility}>
 									<ToolsExpanded value={display.toolsExpanded}>
 										<MentionListsContext.Provider value={mentionLists}>
-											<PageSwitch
-												page={page}
-												state={state}
-												workspace={workspace}
-												defaultWorkspace={defaultWorkspace}
-												sectionTarget={sectionTarget}
-												todoView={todoView}
-												routinesTarget={routinesTarget}
-												linear={linear}
-												linearCallable={linearCallable}
-												maximized={maximized}
-												hasDetails={detailsView !== null}
-												rightOpen={sidebars.panels.right.open}
-												show={show}
-												toggleSidebar={toggleSidebar}
-											/>
+											<RenderBoundary resetKey={page ? hashForPage(page) : hashForLayout(layout)}>
+												<PageSwitch
+													page={page}
+													hosts={state.hosts}
+													past={state.past}
+													lastHosts={state.lastHosts}
+													layout={layout}
+													draft={state.draft}
+													models={state.models}
+													userTodos={state.userTodos}
+													routines={state.routines}
+													projectList={state.projectList}
+													pins={state.pins}
+													newSessionCompletions={state.newSessionCompletions}
+													connected={state.connected}
+													listed={state.listed}
+													rosterError={state.rosterError}
+													newStart={startOf(state.starts, "new")}
+													workspace={workspace}
+													defaultWorkspace={defaultWorkspace}
+													sectionTarget={sectionTarget}
+													todoView={todoView}
+													routinesTarget={routinesTarget}
+													linear={linear}
+													linearCallable={linearCallable}
+													maximized={maximized}
+													hasDetails={detailsView !== null}
+													rightOpen={sidebars.panels.right.open}
+													show={show}
+													toggleSidebar={toggleSidebar}
+												/>
+											</RenderBoundary>
 										</MentionListsContext.Provider>
 									</ToolsExpanded>
 								</ActivityVisibility.Provider>
@@ -239,24 +264,13 @@ export function App() {
 							past={visible.past}
 							projects={projects}
 							project={project}
-							onOpenSession={(picked, cwd, mode) => {
-								const next = projectSwitch(project, cwd, hiddenCwds);
-								if (next !== null) pickProject(next);
-								open(picked, mode);
-							}}
+							onOpenSession={openFromPalette}
 							onPickProject={switchProject}
 							pinned={sessions.pinned}
 							onTogglePin={sessions.togglePin}
 							handlers={handlers}
 							unavailable={unavailable}
-							onCreateTodo={
-								state.connected && state.userTodos
-									? text => {
-											const change = quickAddTodo(text, state.userTodos?.categories ?? [], localDay());
-											if (change) changeTodo(change);
-										}
-									: undefined
-							}
+							todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 							onCreateTicket={linearCallable ? setNewTicket : undefined}
 						/>
 					</SidebarProvider>

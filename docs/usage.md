@@ -217,6 +217,9 @@ An action that fails shows its error, and its control becomes available again.
   With one pane the hash is the single-view form above, so older links still open.
   **Settings** takes over the page and leaves the panes behind it.
   Select **Sessions** to return to them.
+- A part of the hash that does not decode, such as `#todo/%E0`, names nothing: the page opens without it, and a pane it names drops.
+- When a pane's view fails to render, that pane shows **This view failed to render.** with the error under it, and the other panes and the sidebar keep working; the pane's header buttons still close or maximize it.
+  A page that fails shows the same in its place, and opening another view clears it.
 
 ## Conversations
 
@@ -510,7 +513,7 @@ An action that fails shows its error, and its control becomes available again.
   A directory removed since its sessions ran, such as a deleted worktree, is no longer a workspace, so quick actions start in a workspace that still exists.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
   They sort by whose move it is: **Your move**, **Agent on it**, **Approved**, **Waiting on others**, **Drafts**, and **Recently merged**.
-  A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, and its checks.
+  A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, which counts up each minute without a reload, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, and its checks.
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
   The inbox page's table shows each section as a card, one row per pull request: the move's badge, the title with its author, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and quick actions at the far right.
   A narrow page drops the sessions, stack, and line columns.

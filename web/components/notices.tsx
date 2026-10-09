@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { inboxAge, moveAction } from "../inbox-model";
+import { moveAction } from "../inbox-model";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
 import { hashForInbox } from "../routing";
+import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { SLACK_LOGO } from "./integrations/brand-logos";
 import { toasts } from "./toaster";
@@ -311,7 +312,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 			<div className="pointer-events-none flex min-w-0 flex-1 flex-col gap-0.5">
 				<div className="flex items-baseline gap-2">
 					<span className={cn("min-w-0 flex-1 truncate text-[13px]", notice.read ? "text-muted-foreground" : "font-medium text-foreground")}>{headline}</span>
-					<span className="shrink-0 text-[11px] tabular-nums text-muted-foreground group-hover:invisible group-focus-within:invisible">{inboxAge(notice.at)}</span>
+					<Age at={notice.at} compact className="shrink-0 text-[11px] tabular-nums text-muted-foreground group-hover:invisible group-focus-within:invisible" />
 				</div>
 				<p role={failed ? "alert" : undefined} className={cn("line-clamp-2 text-xs leading-relaxed", failed ? "text-red-600 dark:text-red-400" : notice.read ? "text-muted-foreground" : "text-foreground/80")}>
 					{preview}

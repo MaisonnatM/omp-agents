@@ -85,15 +85,6 @@ export function moveAction(pr: InboxPullRequest, move: MoveId): PullRequestActio
 	return MOVES[move].actions.find(action => applying.includes(action)) ?? null;
 }
 
-/** How long ago `at` was, in its largest whole unit: `<1m`, `19m`, `17h`, `2d`, so the inbox's ages line up in a narrow column. */
-export function inboxAge(at: number, now = Date.now()): string {
-	const minutes = Math.floor((now - at) / 60_000);
-	if (minutes < 1) return "<1m";
-	if (minutes < 60) return `${minutes}m`;
-	if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h`;
-	return `${Math.floor(minutes / (60 * 24))}d`;
-}
-
 /** Where a pull request sits in a stack of two or more that the inbox lists: `position` 1 is the bottom, which merges first. */
 export interface StackPlace {
 	position: number;

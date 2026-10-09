@@ -111,11 +111,16 @@ export const modeOf = (event: MouseEvent): OpenMode => ((IS_MAC ? event.metaKey 
 /** The gesture {@link modeOf} reads as a split, as hints name it. */
 export const SPLIT_CLICK = IS_MAC ? "⌘-click" : "Ctrl-click";
 
-export function age(startedAt: number): string {
-	const minutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60_000));
+/**
+ * How long ago `at` was: `19m`, `17h 5m`, `2d`. `compact` keeps only the largest whole unit and reads under a minute as
+ * `<1m`, so the inbox's ages line up in a narrow column. A time ahead of `now` reads as no time ago.
+ */
+export function age(at: number, { compact = false, now = Date.now() }: { compact?: boolean; now?: number } = {}): string {
+	const minutes = Math.max(0, Math.floor((now - at) / 60_000));
+	if (compact && minutes < 1) return "<1m";
 	if (minutes < 60) return `${minutes}m`;
-	if (minutes < 60 * 24) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-	return `${Math.floor(minutes / 1440)}d`;
+	if (minutes < 60 * 24) return compact ? `${Math.floor(minutes / 60)}h` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+	return `${Math.floor(minutes / (60 * 24))}d`;
 }
 
 /** A sidebar row's pull requests: the first one's number, then `+N` for the rest, which the row's tooltip and menu list. */

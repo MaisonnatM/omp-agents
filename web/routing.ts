@@ -97,8 +97,21 @@ export type Route = { kind: "page"; page: Page } | { kind: "session"; sessionId:
 
 type PageOf<K extends Page["kind"]> = Extract<Page, { kind: K }>;
 
+/**
+ * A hash segment decoded, `null` for a malformed percent-escape (`%E0`, `%zz`), which a hand-edited or cut link may
+ * hold; each parser reads `null` as naming nothing, so such a link opens what the hash names without it instead of throwing.
+ */
+function decodeSegment(raw: string): string | null {
+	try {
+		return decodeURIComponent(raw);
+	} catch (error) {
+		if (error instanceof URIError) return null;
+		throw error;
+	}
+}
+
 /** The settings page and the new-session draft both name an optional directory, encoded so it keeps its slashes and tilde. */
-const decodeCwd = (rest: string | null): string | null => (rest === null ? null : decodeURIComponent(rest));
+const decodeCwd = (rest: string | null): string | null => (rest === null ? null : decodeSegment(rest));
 const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : encodeURIComponent(cwd));
 
 /** The Todo page's lists that are not a category, by the hash segment that names them. Category ids are random, so none reads as one. */
@@ -131,20 +144,21 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	inbox: rest => {
 		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)(\/files(?:\/(.+))?)?$/.exec(rest);
 		if (!match) return { kind: "inbox", target: null };
-		const files = match[4] ? { path: match[5] ? decodeURIComponent(match[5]) : null } : null;
+		const files = match[4] ? { path: match[5] ? decodeSegment(match[5]) : null } : null;
 		return { kind: "inbox", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
 	},
 	tickets: rest => ({ kind: "tickets", target: rest !== null && TICKET_ID.test(rest) ? rest : null }),
 	todo: rest => {
 		if (!rest) return { kind: "todo", list: { kind: "all" } };
 		const named = Object.hasOwn(TODO_LISTS, rest) ? TODO_LISTS[rest as keyof typeof TODO_LISTS] : null;
-		return { kind: "todo", list: named ?? { kind: "category", id: decodeURIComponent(rest) } };
+		const id = named ? null : decodeSegment(rest);
+		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }) };
 	},
-	routines: rest => ({ kind: "routines", target: rest ? decodeURIComponent(rest) : null }),
+	routines: rest => ({ kind: "routines", target: rest ? decodeSegment(rest) : null }),
 	calendar: () => ({ kind: "calendar" }),
 	changes: rest => {
 		const [sessionId = "", path] = (rest ?? "").split("/");
-		return { kind: "changes", sessionId: decodeURIComponent(sessionId), path: path ? decodeURIComponent(path) : null };
+		return { kind: "changes", sessionId: decodeSegment(sessionId) ?? "", path: path ? decodeSegment(path) : null };
 	},
 };
 
@@ -210,7 +224,10 @@ export function routeFromHash(hash: string): Route {
 	const head = slash < 0 ? raw : raw.slice(0, slash);
 	const rest = slash < 0 ? null : raw.slice(slash + 1);
 	if (isPageKind(head)) return { kind: "page", page: PAGES[head](rest, query) };
-	if (`${head}/` === SESSION_HASH_PREFIX && rest) return { kind: "session", sessionId: decodeURIComponent(rest) };
+	if (`${head}/` === SESSION_HASH_PREFIX && rest) {
+		const sessionId = decodeSegment(rest);
+		return sessionId === null ? { kind: "panes", layout: EMPTY_LAYOUT } : { kind: "session", sessionId };
+	}
 	return { kind: "panes", layout: layoutFromPanes(raw) };
 }
 
@@ -244,22 +261,26 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `todo`, `routines`, `session`, or `new`. */
-function viewFromPane(pane: string): View {
-	if (pane.startsWith(PAST_PREFIX)) return { kind: "past", sessionId: decodeURIComponent(pane.slice(PAST_PREFIX.length)) };
+/** Instance ids are hex, so none reads as `past`, `settings`, `inbox`, `tickets`, `todo`, `routines`, `session`, or `new`. `null` for a pane whose ids do not decode. */
+function viewFromPane(pane: string): View | null {
+	if (pane.startsWith(PAST_PREFIX)) {
+		const sessionId = decodeSegment(pane.slice(PAST_PREFIX.length));
+		return sessionId === null ? null : { kind: "past", sessionId };
+	}
 	const slash = pane.indexOf("/");
-	if (slash < 0) return { kind: "live", instanceId: decodeURIComponent(pane), agentId: null };
-	return {
-		kind: "live",
-		instanceId: decodeURIComponent(pane.slice(0, slash)),
-		agentId: decodeURIComponent(pane.slice(slash + 1)),
-	};
+	const instanceId = decodeSegment(slash < 0 ? pane : pane.slice(0, slash));
+	const agentId = slash < 0 ? null : decodeSegment(pane.slice(slash + 1));
+	if (instanceId === null || (slash >= 0 && agentId === null)) return null;
+	return { kind: "live", instanceId, agentId };
 }
 
 export const hashForView = (view: View): string => `#${paneForView(view)}`;
 
-export const sameView = (a: View | null, b: View | null): boolean =>
-	(a && paneForView(a)) === (b && paneForView(b));
+export const sameView = (a: View | null, b: View | null): boolean => {
+	if (a === null || b === null) return a === b;
+	if (a.kind === "past") return b.kind === "past" && a.sessionId === b.sessionId;
+	return b.kind === "live" && a.instanceId === b.instanceId && a.agentId === b.agentId;
+};
 
 const MAXIMIZED = ";max";
 
@@ -278,7 +299,11 @@ function layoutFromPanes(marked: string): Layout {
 	const maximized = marked.endsWith(MAXIMIZED);
 	const raw = maximized ? marked.slice(0, -MAXIMIZED.length) : marked;
 	const at = raw.lastIndexOf("@");
-	const named = (at < 0 ? raw : raw.slice(0, at)).split(",").filter(Boolean).map(viewFromPane);
+	const named = (at < 0 ? raw : raw.slice(0, at))
+		.split(",")
+		.filter(Boolean)
+		.map(viewFromPane)
+		.filter(view => view !== null);
 	const focused = named[at < 0 ? 0 : Number(raw.slice(at + 1))] ?? named[0];
 	const panes = named.filter((view, index) => named.findIndex(other => sameView(other, view)) === index).slice(0, MAX_PANES);
 	return {

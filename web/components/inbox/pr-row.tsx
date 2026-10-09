@@ -1,18 +1,19 @@
 import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
 import { memo, type MouseEvent, useState } from "react";
-import { type InboxPullRequest, type PullRequest, type PullRequestLink, repoKey, samePullRequest } from "../../../src/shared/github";
+import { type InboxPullRequest, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, repoKey } from "../../../src/shared/github";
 import type { MoveId } from "../../../src/shared/moves";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { inboxAge, type InboxRow, MOVES, moveAction, reason, type StackPlace } from "../../inbox-model";
+import { type InboxRow, MOVES, moveAction, reason, type StackPlace } from "../../inbox-model";
 import { hashForInbox, type OpenMode, sameView } from "../../routing";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { DROP_LINE, type DragItem } from "../../use-drag-order";
+import { Age } from "../age";
 import { BranchLabel } from "../git";
 import { QuickActionsMenu } from "../quick-actions";
 import { SessionChip } from "../session-chip";
@@ -134,21 +135,34 @@ interface SessionLink {
 	status: HostStatus | null;
 }
 
-/** The sessions linked to `pr`: running ones first, so the row's first chips show the work under way, then those that submitted it before those that worked on it. */
-export function sessionsFor(pr: InboxPullRequest, hosts: RosterHost[], past: PastSession[]): SessionLink[] {
-	const linked = [
-		...hosts.flatMap(host => {
-			const found = host.pullRequests.find(other => samePullRequest(other, pr));
-			const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
-			return found ? [{ view, sessionId: host.sessionId, label: hostLabel(host), link: found.link, status: host.status }] : [];
-		}),
-		...past.flatMap(session => {
-			const found = session.pullRequests.find(other => samePullRequest(other, pr));
-			const view: View = { kind: "past", sessionId: session.sessionId };
-			return found ? [{ view, sessionId: session.sessionId, label: pastLabel(session), link: found.link, status: null }] : [];
-		}),
-	];
-	return linked.toSorted((a, b) => Number(a.view.kind === "past") - Number(b.view.kind === "past") || Number(a.link === "worked") - Number(b.link === "worked"));
+/**
+ * The sessions linked to each pull request, by {@link prKey}, in one pass over the sessions: running ones first, so a
+ * row's first chips show the work under way, then those that submitted it before those that worked on it.
+ */
+export function sessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Map<string, SessionLink[]> {
+	const byKey = new Map<string, SessionLink[]>();
+	const add = (pullRequests: LinkedPullRequest[], link: (linked: LinkedPullRequest) => SessionLink): void => {
+		const seen = new Set<string>();
+		for (const pr of pullRequests) {
+			const key = prKey(pr);
+			// A session names a pull request once, by the first link it lists.
+			if (seen.has(key)) continue;
+			seen.add(key);
+			const links = byKey.get(key);
+			if (links) links.push(link(pr));
+			else byKey.set(key, [link(pr)]);
+		}
+	};
+	for (const host of hosts) {
+		const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
+		add(host.pullRequests, linked => ({ view, sessionId: host.sessionId, label: hostLabel(host), link: linked.link, status: host.status }));
+	}
+	for (const session of past) {
+		const view: View = { kind: "past", sessionId: session.sessionId };
+		add(session.pullRequests, linked => ({ view, sessionId: session.sessionId, label: pastLabel(session), link: linked.link, status: null }));
+	}
+	for (const links of byKey.values()) links.sort((a, b) => Number(a.view.kind === "past") - Number(b.view.kind === "past") || Number(a.link === "worked") - Number(b.link === "worked"));
+	return byKey;
 }
 
 /**
@@ -245,13 +259,18 @@ export interface RowProps {
 const sameStack = (a: StackPlace | null, b: StackPlace | null): boolean =>
 	a === b || (a !== null && b !== null && a.position === b.position && a.size === b.size && a.joinsAbove === b.joinsAbove && a.joinsBelow === b.joinsBelow);
 
-const sameSessions = (a: SessionLink[], b: SessionLink[]): boolean =>
+/** Two lists of a pull request's sessions that draw the same chips. */
+export const sameSessions = (a: SessionLink[], b: SessionLink[]): boolean =>
 	a.length === b.length && a.every((link, at) => link.sessionId === b[at]!.sessionId && link.label === b[at]!.label && link.link === b[at]!.link && link.status === b[at]!.status && sameView(link.view, b[at]!.view));
 
-/** How each prop of a row is compared. A row's data is rebuilt whenever the roster or the sort changes, so it is compared by what it holds; the drag item is its handlers, which stay the same, and where a drop would land. */
+/**
+ * How each prop of a row is compared. The inbox keeps each prop the same object while what it shows holds, `sessions`
+ * included, except two it rebuilds: the row's data, whenever the roster or the sort changes, compared by what it holds,
+ * and the drag item, whose handlers stay the same, compared by them and where a drop would land.
+ */
 const PROP_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => boolean } = {
 	row: (a, b) => a === b || (a.pr === b.pr && a.move === b.move && a.unit === b.unit && sameStack(a.stack, b.stack)),
-	sessions: sameSessions,
+	sessions: Object.is,
 	targeted: Object.is,
 	onOpen: Object.is,
 	pending: Object.is,
@@ -311,14 +330,6 @@ function TitleLink({ pr, targeted, className }: { pr: InboxPullRequest; targeted
 	);
 }
 
-function Age({ at, className }: { at: number; className?: string }) {
-	return (
-		<span className={cn("shrink-0 text-right text-xs tabular-nums text-muted-foreground", className)} title={new Date(at).toLocaleString()}>
-			{inboxAge(at)}
-		</span>
-	);
-}
-
 /**
  * A pull request in the sidebar's inbox: its title and age, then its move and why it waits on it, with its quick
  * actions on hover. A rail on the left joins the rows of a stack.
@@ -339,7 +350,7 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
 			<div className={cn("space-y-1 rounded-md py-1.5 pr-2 pl-3", targeted ? "bg-sidebar-accent" : "group-hover/row:bg-sidebar-accent/50")}>
 				<div className="flex min-w-0 items-start gap-2">
 					<TitleLink pr={pr} targeted={targeted} className="line-clamp-2 flex-1 leading-5" />
-					<Age at={pr.updatedAt} className="w-7 leading-5" />
+					<Age at={pr.updatedAt} compact exact className="w-7 shrink-0 text-right text-xs leading-5 tabular-nums text-muted-foreground" />
 				</div>
 				<p className="flex min-w-0 items-center gap-x-1.5 text-xs text-muted-foreground">
 					<RowMoveBadge pr={pr} move={move} {...actions} />
@@ -413,7 +424,7 @@ export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr
 			<span className={cn(WIDE, "justify-end")}>
 				<DiffSize pr={pr} />
 			</span>
-			<Age at={pr.updatedAt} />
+			<Age at={pr.updatedAt} compact exact className="shrink-0 text-right text-xs tabular-nums text-muted-foreground" />
 			<span className="flex justify-end">
 				<RowQuickActions pr={pr} {...actions} />
 			</span>

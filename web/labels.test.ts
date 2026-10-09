@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dayLabel, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
+import { age, dayLabel, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
 
 describe("model labels", () => {
 	test("a direct provider's model reads as its family and dotted version", () => {
@@ -51,5 +51,19 @@ describe("day labels", () => {
 		const now = new Date(2026, 0, 2, 9);
 		expect(dayLabel(new Date(2026, 0, 1, 23).toISOString(), now)).not.toContain("2026");
 		expect(dayLabel(new Date(2025, 11, 31, 23).toISOString(), now)).toContain("2025");
+	});
+});
+
+describe("ages", () => {
+	const now = Date.parse("2026-10-02T12:00:00Z");
+	const ago = (minutes: number, compact: boolean): string => age(now - minutes * 60_000, { compact, now });
+	const minutes = [0, 0.9, 1, 59, 60, 23 * 60 + 59, 24 * 60, -5];
+
+	test("a compact age shows its largest whole unit, rounding down at each boundary", () => {
+		expect(minutes.map(at => ago(at, true))).toEqual(["<1m", "<1m", "1m", "59m", "1h", "23h", "1d", "<1m"]);
+	});
+
+	test("a full age shows hours with their minutes", () => {
+		expect(minutes.map(at => ago(at, false))).toEqual(["0m", "0m", "1m", "59m", "1h 0m", "23h 59m", "1d", "0m"]);
 	});
 });

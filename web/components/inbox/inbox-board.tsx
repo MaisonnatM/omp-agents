@@ -14,6 +14,7 @@ import {
 	foldedByDefault,
 	INBOX_SORTS,
 	type InboxOrder,
+	type InboxRow,
 	type InboxSection,
 	type MoveGroup,
 	type InboxSort,
@@ -42,7 +43,7 @@ import { useStoredState } from "../../stored-state";
 import { type DragItem, useDragOrder } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { type Folds, useFolds, useReveal } from "../fold";
-import { type RowProps, rowElement, rowId, rowLink, sessionsFor } from "./pr-row";
+import { type RowProps, rowElement, rowId, rowLink, sameSessions, sessionsByPullRequest } from "./pr-row";
 
 /** The repositories and sections flipped from their default fold: `owner/repo`, and `owner/repo:<section title>`. */
 const FOLDS_KEY = "omp-agents.inbox-collapsed";
@@ -243,6 +244,48 @@ interface BoardProps {
 	route: InboxRoute;
 }
 
+/** What makes an item's drag: the arguments of `useDragOrder`'s function, which change with every drag and so are called in a pass of their own. */
+interface Dropped {
+	scope: string;
+	key: string;
+	onDrop: (dragged: string, where: Where) => void;
+}
+
+/** A row's place on the board, which changes only with the inbox, its order, and its folds. */
+interface RowLayout {
+	row: InboxRow;
+	key: string;
+	cwd: string;
+	moveId: string;
+	dropped: Dropped;
+	/** The units of the rows above and below it; a stack takes a drop as one, so the line shows above its top row or under its bottom one. */
+	above: string | null;
+	below: string | null;
+}
+
+type SectionLayout = Omit<SectionView, "drag" | "rows"> & { dropped: Dropped; rows: RowLayout[] };
+
+type RepoLayout = Omit<RepoView, "drag" | "sections"> & { dropped: Dropped; sections: SectionLayout[] };
+
+const NO_SESSIONS: RowProps["sessions"] = [];
+
+/**
+ * The sessions on each pull request, by `prKey`, keeping the list of one whose sessions draw the same chips as the same
+ * array, so a roster update redraws only the rows whose sessions changed.
+ */
+function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): ReadonlyMap<string, RowProps["sessions"]> {
+	const previous = useRef<ReadonlyMap<string, RowProps["sessions"]>>(new Map());
+	return useMemo(() => {
+		const next = sessionsByPullRequest(hosts, past);
+		for (const [key, links] of next) {
+			const before = previous.current.get(key);
+			if (before && sameSessions(before, links)) next.set(key, before);
+		}
+		previous.current = next;
+		return next;
+	}, [hosts, past]);
+}
+
 /**
  * The inbox of `project` as a board of repositories, sections, and rows, with the keys that move through it. Dragging
  * or Alt+Shift+↑ and ↓ reorder the repositories, the sections, and the pull requests in a section; the browser keeps
@@ -291,13 +334,13 @@ export function useInboxBoard({ project, hosts, past, route }: BoardProps): Inbo
 		() => (order.sort === "manual" && order.manual.length > 0 ? order.manual : sectionsOf.flatMap(sections => sections.flatMap(({ rows }) => rows.map(row => prKey(row.pr))))),
 		[order, sectionsOf],
 	);
-	const { views, moves } = useMemo(() => {
+	const layout = useMemo(() => {
 		const moves = new Map<string, Move>();
 		const repoKeys = repos.map(repoKey);
 		const moveRepo = (key: string, beside: string, where: Where): void => setOrder(withRepoMoved(order, repoKeys, key, beside, where));
 		const moveSection = (title: string, beside: string, where: Where): void => setOrder({ ...order, sections: moveKey(sectionTitles(order), title, beside, where) });
 
-		const repoView = (repo: RepoInbox, at: number): RepoView => {
+		const repoLayout = (repo: RepoInbox, at: number): RepoLayout => {
 			const key = repoKey(repo);
 			const moveId = `repo:${key}`;
 			moves.set(moveId, by => {
@@ -314,9 +357,9 @@ export function useInboxBoard({ project, hosts, past, route }: BoardProps): Inbo
 				bodyId: sectionId("inbox", key),
 				open: !folds.isFolded(key),
 				toggle: () => folds.toggle(key),
-				drag: drag("repos", key, (dragged, where) => moveRepo(dragged, key, where)),
+				dropped: { scope: "repos", key, onDrop: (dragged, where) => moveRepo(dragged, key, where) },
 				moveId,
-				sections: sections.map((section): SectionView => {
+				sections: sections.map((section): SectionLayout => {
 					const foldKey = sectionFoldKey(key, section.title);
 					const sectionOpen = !folds.isFolded(foldKey);
 					const sectionMoveId = `section:${foldKey}`;
@@ -335,13 +378,11 @@ export function useInboxBoard({ project, hosts, past, route }: BoardProps): Inbo
 						open: sectionOpen,
 						toggle: () => folds.toggle(foldKey),
 						summary: sectionOpen ? null : movesSummary(section),
-						drag: drag(`sections:${key}`, section.title, (dragged, where) => moveSection(dragged, section.title, where)),
+						dropped: { scope: `sections:${key}`, key: section.title, onDrop: (dragged, where) => moveSection(dragged, section.title, where) },
 						moveId: sectionMoveId,
-						rows: section.rows.map((row, at): RowProps => {
-							const rowItem = drag(`pull-requests:${foldKey}`, row.unit, (dragged, where) => placeUnit(dragged, row.unit, where));
-							// A stack takes a drop as one: the line shows above its top row or under its bottom one.
-							const edge = rowItem.dropAt === "before" ? section.rows[at - 1] : section.rows[at + 1];
-							const rowMoveId = `pull-request:${prKey(row.pr)}`;
+						rows: section.rows.map((row, at): RowLayout => {
+							const rowKey = prKey(row.pr);
+							const rowMoveId = `pull-request:${rowKey}`;
 							moves.set(rowMoveId, by => {
 								const step = stepTarget(units, row.unit, by);
 								if (step) placeUnit(row.unit, step.target, step.where);
@@ -349,25 +390,52 @@ export function useInboxBoard({ project, hosts, past, route }: BoardProps): Inbo
 							});
 							return {
 								row,
-								sessions: sessionsFor(row.pr, hosts, past),
-								targeted: targetKey !== null && prKey(row.pr) === targetKey,
-								onOpen: open,
-								pending: pendingOf(quick, { kind: "pull-request", pr: row.pr }),
+								key: rowKey,
 								cwd: repo.cwds[0]!,
-								onQuickAction,
-								actionsOpen: actionsOpen === rowId(row.pr),
-								onActionsOpenChange,
-								drag: { ...rowItem, dropAt: edge?.unit === row.unit ? null : rowItem.dropAt },
 								moveId: rowMoveId,
+								dropped: { scope: `pull-requests:${foldKey}`, key: row.unit, onDrop: (dragged, where) => placeUnit(dragged, row.unit, where) },
+								above: section.rows[at - 1]?.unit ?? null,
+								below: section.rows[at + 1]?.unit ?? null,
 							};
 						}),
 					};
 				}),
 			};
 		};
-		return { views: repos.map(repoView), moves };
-	}, [repos, sectionsOf, shownOrder, order, setOrder, folds, drag, hosts, past, targetKey, open, quick, actionsOpen, onQuickAction, onActionsOpenChange]);
-	useMoveKeys(moves);
+		return { repos: repos.map(repoLayout), moves };
+	}, [repos, sectionsOf, shownOrder, order, setOrder, folds]);
+	useMoveKeys(layout.moves);
+
+	const sessions = useSessionsByPullRequest(hosts, past);
+	// What changes with a drag, the roster, the target, a pending start, or an open menu: a cheap pass over the layout.
+	const views = useMemo(() => {
+		const place = ({ scope, key, onDrop }: Dropped): DragItem => drag(scope, key, onDrop);
+		return layout.repos.map(({ dropped, sections, ...repo }): RepoView => ({
+			...repo,
+			drag: place(dropped),
+			sections: sections.map(({ dropped, rows, ...section }): SectionView => ({
+				...section,
+				drag: place(dropped),
+				rows: rows.map(({ row, key, cwd, moveId, dropped, above, below }): RowProps => {
+					const item = place(dropped);
+					const edge = item.dropAt === "before" ? above : below;
+					return {
+						row,
+						sessions: sessions.get(key) ?? NO_SESSIONS,
+						targeted: key === targetKey,
+						onOpen: open,
+						pending: pendingOf(quick, { kind: "pull-request", pr: row.pr }),
+						cwd,
+						onQuickAction,
+						actionsOpen: actionsOpen === rowId(row.pr),
+						onActionsOpenChange,
+						drag: { ...item, dropAt: edge === row.unit ? null : item.dropAt },
+						moveId,
+					};
+				}),
+			})),
+		}));
+	}, [layout, drag, sessions, targetKey, open, quick, actionsOpen, onQuickAction, onActionsOpenChange]);
 
 	return {
 		poll,

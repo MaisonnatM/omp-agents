@@ -18,10 +18,10 @@ import {
 import { SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { PaletteAction } from "../command-palette";
-import { age, hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
+import { hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
-import { useMinute } from "../use-minute";
+import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ShipStep } from "./ship-step";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -32,12 +32,6 @@ function sessionFacts(parts: (string | false)[], pullRequests: PullRequest[]): {
 	if (!text) return null;
 	const title = pullRequests.map(pr => `${pr.repo}#${pr.number}`).join("\n");
 	return { text, title: title || undefined };
-}
-
-/** How long ago `when` was, counting up each minute on the page's one timer. */
-function Age({ when }: { when: number }) {
-	useMinute();
-	return <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{age(when)}</span>;
 }
 
 interface SessionButtonProps {
@@ -68,7 +62,7 @@ function SessionButton({ view, label, title, badge, ship, facts, when, dot, open
 							{facts.text}
 						</span>
 					)}
-					<Age when={when} />
+					<Age at={when} className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground" />
 				</span>
 			</SidebarMenuButton>
 		</Tooltip>

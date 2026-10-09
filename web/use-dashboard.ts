@@ -3,6 +3,7 @@ import type { PinChange } from "../src/shared/pins";
 import type { ClientFrame, ClientMsg, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import type { UserTodoChange } from "../src/user-todos-shared";
+import { socketUrl } from "./api";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyPaneMessage, retainPanes } from "./pane-store";
 import {
@@ -161,7 +162,7 @@ export function useDashboard(): Dashboard {
 		let timer: number | undefined;
 		let disposed = false;
 		const connect = (): void => {
-			const ws = new WebSocket(`ws://${location.host}/ws`);
+			const ws = new WebSocket(socketUrl("/ws"));
 			socketRef.current = ws;
 			ws.onopen = () => {
 				retryMs = 500;

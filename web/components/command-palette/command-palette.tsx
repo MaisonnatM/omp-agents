@@ -19,9 +19,10 @@ import {
 	SquareTerminal,
 	Wrench,
 } from "lucide-react";
-import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useMemo, useRef } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useMemo, useRef } from "react";
 import type { Project } from "../../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
+import type { UserTodoCategory } from "../../../src/user-todos-shared";
 import {
 	type Accessory,
 	bumpFrecency,
@@ -40,12 +41,14 @@ import {
 	primaryAction,
 	topFrame,
 } from "../../command-palette";
+import { localDay } from "../../days";
 import { age, hostLabel, pastLabel, projectName } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
 import type { OpenMode } from "../../routing";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
+import { quickAddTodo } from "../../todo-quick-add";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { StatusDot } from "../status-dot";
 import { ActionPanel } from "./action-panel";
@@ -90,18 +93,19 @@ interface CommandPaletteProps {
 	handlers: ShortcutHandlers;
 	/** Commands that do nothing now, which the palette leaves out. */
 	unavailable: ReadonlySet<ShortcutId>;
-	/** Add a top-level todo from a title, which may end in a due day or #category. Omitted while the list cannot be edited. */
-	onCreateTodo?: (text: string) => void;
+	/** The todo list's categories, which a typed `#category` files a new todo under; `null` while the list cannot be edited. */
+	todoCategories: readonly UserTodoCategory[] | null;
 	/** Open the new-ticket dialog with a title. Omitted while Linear cannot be called. */
 	onCreateTicket?: (title: string) => void;
 }
 
 /**
  * Searches running and past sessions in every project, the page's commands, and projects; Enter runs the highlighted
- * entry's first action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title.
+ * entry's first action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title. Its props
+ * hold no closure built per render, so a socket update that touches none of them skips it.
  */
-export function CommandPalette({ state, dispatch, hosts, past, projects, project, onOpenSession, onPickProject, pinned, onTogglePin, handlers, unavailable, onCreateTodo, onCreateTicket }: CommandPaletteProps) {
-	const { send, start, end } = useDashboardActions();
+export const CommandPalette = memo(function CommandPalette({ state, dispatch, hosts, past, projects, project, onOpenSession, onPickProject, pinned, onTogglePin, handlers, unavailable, todoCategories, onCreateTicket }: CommandPaletteProps) {
+	const { send, start, end, changeTodo } = useDashboardActions();
 	const { starts, ending } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -216,8 +220,12 @@ export function CommandPalette({ state, dispatch, hosts, past, projects, project
 	}, [open, projects, project, onPickProject]);
 
 	const items = useMemo((): PaletteItem[] => {
+		const createTodo = (): void => {
+			const change = todoCategories && quickAddTodo(search, todoCategories, localDay());
+			if (change) changeTodo(change);
+		};
 		const todoItem = (id: string, section: "fallback" | "createTodo", title: string, subtitle?: string): PaletteItem[] =>
-			onCreateTodo && search
+			todoCategories && search
 				? [
 						{
 							id,
@@ -228,7 +236,7 @@ export function CommandPalette({ state, dispatch, hosts, past, projects, project
 							icon: ListTodo,
 							accessories: [],
 							kind: "Todo",
-							actions: [[{ id: "create", title: "Create todo", icon: ListTodo, run: { kind: "do", fn: () => onCreateTodo(search) } }]],
+							actions: [[{ id: "create", title: "Create todo", icon: ListTodo, run: { kind: "do", fn: createTodo } }]],
 						},
 					]
 				: [];
@@ -254,13 +262,13 @@ export function CommandPalette({ state, dispatch, hosts, past, projects, project
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, commandItems, projectItems, search, onCreateTodo, onCreateTicket]);
+	}, [viewId, sessionItems, commandItems, projectItems, search, todoCategories, changeTodo, onCreateTicket]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	if (state === null || frame === null) return null;
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;
 	const empty =
-		frame.view !== "createTodo" ? "No results." : onCreateTodo ? "Type the todo’s title." : "Todos cannot be edited while the dashboard is disconnected.";
+		frame.view !== "createTodo" ? "No results." : todoCategories ? "Type the todo’s title." : "Todos cannot be edited while the dashboard is disconnected.";
 
 	const run = (item: PaletteItem, action: PaletteAction): void => {
 		if (action.disabled) return;
@@ -369,7 +377,7 @@ export function CommandPalette({ state, dispatch, hosts, past, projects, project
 			</DialogPrimitive.Portal>
 		</DialogPrimitive.Root>
 	);
-}
+});
 
 /** One entry: its icon tile, title, muted subtitle, then its accessories and type. */
 function Row({ item, onSelect }: { item: PaletteItem; onSelect: () => void }) {

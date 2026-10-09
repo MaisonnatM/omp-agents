@@ -84,6 +84,15 @@ test("a relative file path opens only where a session directory resolves it, and
 	expect(fileLinks("```\n/tmp/notes.md\n```", "/repo").count).toBe(0);
 });
 
+test("a file link whose escapes do not decode drops its address instead of throwing, and text from GitHub keeps no file path", () => {
+	const broken = fileLinks("[x](file:///%E0) and [plan](file:///tmp/plan.md)", "/repo");
+	expect(broken.count).toBe(1);
+	expect(broken.html).toContain(">x</a>");
+	expect(broken.html).not.toContain("%E0");
+	const github = renderToStaticMarkup(<MessageMarkdown github text="[passwd](file:///etc/passwd)" />);
+	expect(github).not.toContain("/etc/passwd");
+});
+
 test("a sent prompt draws its references as chips, a ticket still opens, and code stays code", () => {
 	const html = renderToStaticMarkup(
 		<MessageMarkdown

@@ -110,14 +110,20 @@ const REMARK_PLUGINS = [remarkGfm];
 const AGENT_REMARK_PLUGINS = [remarkGfm, remarkFilePaths];
 const PROMPT_REMARK_PLUGINS = [remarkGfm, remarkPromptChips, remarkFilePaths];
 
+/** react-markdown drops `data:` URLs; the images the page allows inline are the exception. */
+const urlTransform = (url: string, key: string): string => (key === "src" && inlineImage(url) ? url : defaultUrlTransform(url));
+
 /**
- * react-markdown drops `data:` URLs; the images the page allows inline are the exception. A `file://` link keeps its
- * path, which the file dialog opens.
+ * In agent text a `file://` link also keeps its path, which the file dialog opens. One whose escapes do not decode drops
+ * as any other unsafe scheme does, since agent text must not throw while the page renders.
  */
-const urlTransform = (url: string, key: string): string => {
-	if (key === "src" && inlineImage(url)) return url;
-	if (key === "href" && url.startsWith("file:///")) return decodeURI(url.slice("file://".length));
-	return defaultUrlTransform(url);
+const agentUrlTransform = (url: string, key: string): string => {
+	if (key !== "href" || !url.startsWith("file:///")) return urlTransform(url, key);
+	try {
+		return decodeURI(url.slice("file://".length));
+	} catch {
+		return defaultUrlTransform(url);
+	}
 };
 
 /**
@@ -137,7 +143,7 @@ export const MessageMarkdown = memo(function MessageMarkdown({ text, github = fa
 				remarkPlugins={github ? REMARK_PLUGINS : prompt ? PROMPT_REMARK_PLUGINS : AGENT_REMARK_PLUGINS}
 				rehypePlugins={github ? GITHUB_PLUGINS : AGENT_PLUGINS}
 				components={github ? GITHUB_COMPONENTS : prompt ? PROMPT_COMPONENTS : AGENT_COMPONENTS}
-				urlTransform={urlTransform}
+				urlTransform={github ? urlTransform : agentUrlTransform}
 			>
 				{text}
 			</ReactMarkdown>

@@ -15,6 +15,9 @@ export class ApiError extends Error {
 /** What a failure says to the person reading the page. */
 export const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
+/** The address of this server's socket at `path`, `wss:` when the page loaded over https, so a TLS proxy serves the sockets as it serves `fetch`. */
+export const socketUrl = (path: string): string => `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${path}`;
+
 /** The JSON body of a successful response. A body that is not JSON, from a proxy or an older server, reports its status and text. */
 export async function readJson<T>(response: Response): Promise<T> {
 	const text = await response.text();

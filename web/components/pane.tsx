@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ModelList } from "../reads";
+import { hashForView } from "../routing";
 import { shortcutLabels } from "../shortcuts";
 import type { ForkPoint } from "../transcript-view";
 import { Conversation } from "./conversation";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { FileBaseContext } from "./file-link";
 import { PastConversation } from "./past-conversation";
+import { RenderBoundary } from "./render-boundary";
 import { SidebarToggle } from "./sidebar-panel";
 import { SubagentLinks } from "./transcript";
 
@@ -110,7 +112,11 @@ export const Pane = memo(function Pane({
 			className={cn("relative flex min-h-0 min-w-0 flex-col bg-background outline-none", maximized && (focused ? "z-10" : "invisible"))}
 		>
 			<SubagentLinks.Provider value={links}>
-				<FileBaseContext.Provider value={(view.kind === "past" ? session : (host ?? lastHost))?.cwd ?? null}>{content}</FileBaseContext.Provider>
+				<FileBaseContext.Provider value={(view.kind === "past" ? session : (host ?? lastHost))?.cwd ?? null}>
+					<RenderBoundary resetKey={hashForView(view)} actions={actions}>
+						{content}
+					</RenderBoundary>
+				</FileBaseContext.Provider>
 			</SubagentLinks.Provider>
 		</section>
 	);

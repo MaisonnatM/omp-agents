@@ -6,7 +6,6 @@ import {
 	DEFAULT_ORDER,
 	decodeOrder,
 	foldedByDefault,
-	inboxAge,
 	type InboxOrder,
 	inboxSections,
 	moveAction,
@@ -123,12 +122,6 @@ describe("next move", () => {
 			moveAction(pr(4, { conflicts: true, state: "merged" }), "rebase"),
 			moveAction(pr(5, { review: "approved" }), "merge"),
 		]).toEqual(["fix-ci-and-conflicts", "resolve-conflicts", "fix-ci", null, null]);
-	});
-
-	test("an age shows its largest whole unit, rounding down at each boundary", () => {
-		const now = Date.parse("2026-10-02T12:00:00Z");
-		const ago = (minutes: number): string => inboxAge(now - minutes * 60_000, now);
-		expect([ago(0), ago(0.9), ago(1), ago(59), ago(60), ago(23 * 60 + 59), ago(24 * 60), ago(-5)]).toEqual(["<1m", "<1m", "1m", "59m", "1h", "23h", "1d", "<1m"]);
 	});
 });
 
