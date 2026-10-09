@@ -281,5 +281,5 @@ function Tooltip({
   );
 }
 
-export { Tooltip, TooltipKbd, TooltipPortalContainer, TooltipProvider };
+export { Tooltip, TooltipPortalContainer, TooltipProvider };
 export type { TooltipProps, TooltipProviderProps, TooltipSide };

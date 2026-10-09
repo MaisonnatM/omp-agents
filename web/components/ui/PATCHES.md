@@ -3,6 +3,7 @@
 Files in `web/components/ui/`, `web/lib/`, and `web/hooks/` come from the Fluid registry, and files in `web/components/kibo-ui/` from Kibo UI's.
 This list holds every change the dashboard makes to them, so an upgrade is a merge that checks each entry.
 Dashboard behavior that can live outside these files does: the composer's queued rows are `web/components/composer-queue.tsx`, and its suggested prompts are `web/components/composer-suggestions.tsx`.
+A session's question is `web/components/question-card.tsx`, a dashboard card in the look of Fluid's `ask-user-questions`, which the dashboard no longer vendors.
 
 ## `ui/input-message.tsx`
 
@@ -16,14 +17,16 @@ Dashboard behavior that can live outside these files does: the composer's queued
 - `accept` takes `*/*` as any file, as the browser's file picker does; the dashboard's composer reads or refuses each file itself.
 - `stopShortcut`: the keys that press Stop, shown in its tooltip.
 - `stopping`: the Stop button shows its spinner while the consumer's stop runs.
-- Send and queue buttons show their current action and Enter in a tooltip; Stop keeps its caller-provided shortcut.
+- The send button shows its current action and Enter in a tooltip; Stop keeps its caller-provided shortcut.
 - Send button mode: while `status` is `"streaming"`, the button is Stop only when the draft is empty, and a draft sends at once.
-  The dashboard steers a running turn with it, and has no queue inside this component.
+  The dashboard steers a running turn with it.
+- The built-in queue (`queue`, `onQueueChange`, `showQueue`, `QueuedRow`, the auto-dispatch on the streaming-to-idle edge, the Queue button mode, and `onSend`'s `meta`), history recall (`history`), the Tab-filled `placeholderSuggestion`, and the built-in `suggestions` list are removed.
+  The dashboard renders its own queue and suggestions in `beforeEditor` and `afterActions`.
+- `clickToFocus`, `maxFiles`, and `filePreviewSize` are removed, since the dashboard never set them: a click on the frame always focuses the text field, any number of files attach, and previews are 80px.
 - `sending`: keeps the send button loading and disabled until the consumer's send settles.
 - `beforeEditor`: a slot above the text field and below the attached files, where the dashboard renders its queued rows.
 - `afterActions`: a slot under the action bar, inside the composer's frame, where the dashboard renders its suggested prompts.
-- `useRegionHeight` and `useIsTouch`: exported, so the dashboard's rows in those slots animate and reveal their × as this component's own regions do.
-- The `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
+- `useRegionHeight` and `useIsTouch` move to `hooks/use-region-height.ts` and `hooks/use-is-touch.ts`, and `FilePreviewTile` to `ui/file-preview-tile.tsx`, so the dashboard's rows in the slots animate and reveal their × as the attachments do.
 - `InputMessage` is wrapped in `memo` around its `forwardRef`, so a parent's render that leaves its props unchanged skips the composer.
 - The default export and the `InputMessageProps`, `InputMessageSlotContext`, and `QueuedMessage` type exports are removed, since nothing imports them.
 
@@ -34,31 +37,32 @@ Dashboard behavior that can live outside these files does: the composer's queued
 - The hover group is named `group/message`, so a nested `group` inside a message does not reveal its actions.
 - The bubble is `max-w-full`, so wide code blocks stay inside it.
 
-## `ui/ask-user-questions.tsx`
-
-- `header`: replaces the `Question N of M` line.
-  The dashboard shows the question's status and **Dismiss** there.
-- `description` on a question: shows a confirm's message under its title.
-- The `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
-- The default export is removed, and `AskUserOption` and `AskUserQuestionsProps` are no longer exported, since nothing imports them.
-
 ## Others
 
 - `ui/button.tsx`: `loading` also sets `aria-busy`; otherwise the caller's `aria-busy` is preserved.
-- `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`, and the exported `TooltipKbd` chip.
+- `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`.
   Long labels wrap at 16rem.
-  `ui/sidebar-core.tsx` uses `TooltipKbd` for the sidebar rail's tooltip.
 - `ui/tabs.tsx`: `tooltip` names compact tabs without needing a shortcut; `shortcut` adds keys and keeps the tab's `data-state`, since the tooltip trigger stamps its own.
   `badge` on `TabItem` draws a count after the label, which the Sessions tab uses for the sessions waiting on you and the Inbox tab for the pull requests ready to merge.
 - `ui/thinking-steps.tsx`: `icon` takes a component as well as a name, and `iconClassName` styles it.
+  Its layout effect is React's `useLayoutEffect`, since the dashboard never renders on a server; the same goes for `hooks/use-merge-split.tsx`, `ui/sidebar-group.tsx`, and the sidebar menu files.
+- `hooks/use-fluid-hover.ts`: `remeasure` called again before its frame runs does nothing, so a list of rows registering drops readiness and queues one measurement instead of one per row.
 - `ui/sidebar.tsx`: `scroll-fade-once-scrolled` on the scroll areas, so the fade shows only once scrolled.
 - `ui/sidebar-menu.tsx`: `gap-0.5` between rows, and the `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
 - `ui/sidebar-menu.tsx`: `SidebarMenuActions`, `SidebarMenuSkeleton`, `SidebarMenuSub`, `SidebarMenuSubItem`, and `SidebarMenuSubButton` are removed, since nothing renders them.
   `sidebarMenuButtonVariants` and the `SidebarMenu*Props` types are no longer exported.
   `useMenuRow`'s `isSubRow` and `MenuActionsClusterContext` stay, and now always take their default.
-- `ui/sidebar-core.tsx`: `SidebarTrigger`, `SidebarFooter`, `SidebarSeparator`, and `SidebarGroupContent` are removed, since nothing renders them, along with the unused `Button` import.
-  `SidebarRail`, the `SIDEBAR_*` constants, and the prop types are no longer exported; `SidebarShell` still renders the rail.
+- `ui/sidebar-menu.tsx` is split: the scope, its overlays and the row helpers are `ui/sidebar-menu-scope.tsx`, and `useMenuRow`, the row contexts and the gutter math are `ui/sidebar-menu-row.ts`.
+  The scope batches row registration: rows only mark it dirty, and one flush per commit sorts the rows and registers with the fluid hover hook just the indexes whose element changed.
+  The scope's context is two: a stable registration context, and the rows' active state, which changes only when a row registers or turns active; `refreshVisibility`, which only `SidebarMenuSub` called, is removed.
+  Hover no longer re-renders the rows: a row's icon, dot and label light from the `data-fluid-hover-active` mark on its button through a `group/menu-button` variant, and `MenuRowLabel` takes `active` instead of `lit` and `emphasized`.
+- `ui/sidebar-core.tsx` keeps only `SidebarProvider`, `SidebarInset`, `SidebarInput`, and `SidebarHeader`.
+  `SidebarTrigger`, `SidebarFooter`, `SidebarSeparator`, `SidebarGroupContent`, the rail, the shell, the mobile drawer, the cookie, the peek, the `[`/`]` shortcut, drag resizing, `useSidebar`, and the `SIDEBAR_*` constants are removed, since the dashboard turns them off and sizes its sidebars in `web/components/sidebar-panel.tsx`.
+  `SidebarProvider` is a plain wrapper with no context and no props of its own, and `SidebarInset` drops its `inset`-variant classes.
+  The slot helpers are `ui/sidebar-slot.tsx`, and the `SidebarGroup` family is `ui/sidebar-group.tsx`.
 - `ui/sidebar.tsx`: re-exports only the parts the dashboard imports, and `SidebarProps` and `SidebarContentProps` are no longer exported.
+  `Sidebar` is always the bordered, non-collapsible panel, sized by its `style`; `variant`, `collapsible`, `bordered`, `rail`, and `railTooltipOpen` are removed.
+  `SidebarContent` always scrolls in a `ScrollArea`, since the native-scroll branch served only the mobile drawer.
 - `ui/file-thumbnail.tsx`: the PDF worker comes from the page bundle, not a CDN, which the page's Content-Security-Policy blocks.
   The generic glyph shows the file's extension under it, so attached `.md` and `.txt` files tell apart.
 - `lib/icon-context.tsx`: the `git-branch` and `file-text` icons.

@@ -643,8 +643,8 @@ The model's thinking text uses that same group.
 `InputMessage` takes `sending` and `stopping` for its send and Stop controls.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
 The model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern, and the Calendar page's day cards shadcn's `hover-card`.
-Fluid's built-in sidebar rail resizes by pointer only and collapses on click.
-The dashboard turns it off and uses `web/components/sidebar-panel.tsx`, which gives each sidebar its own width and open state, because Fluid's provider holds only one of each.
+Fluid's sidebar rail, mobile drawer, cookie, and toggle shortcut are removed from the vendored sidebar, which keeps only the bordered panel.
+The dashboard sizes and toggles each sidebar in `web/components/sidebar-panel.tsx`, which gives each its own width and open state, because Fluid's provider held only one of each.
 Sidebar widths and the split between panes share `web/components/drag-separator.tsx`: `useDragSeparator` owns the pointer capture, arrow keys, and double-click reset, and `Separator` is the element.
 Each call site still clamps its own domain, pixels for a sidebar and a ratio for a split.
 
@@ -654,9 +654,9 @@ The wrapper also opens the context menu on the context-menu key and Shift+F10 at
 
 Toasts use Base UI's `Toast` through one manager in `web/components/toaster.tsx`, since the page has no Fluid or shadcn toast; they stack at the bottom right in the `popover` look.
 
-Questions use Fluid's `ask-user-questions`, installed from `https://www.fluidfunctionalism.com/r/radix/ask-user-questions.json`, in `web/components/user-request.tsx`.
-Each question is one Fluid question with one row per omp option.
-A confirm is a question with **Yes** and **No** rows, and an input or an editor is a free-text question.
+Questions use `web/components/question-card.tsx`, the dashboard's own card in the look of Fluid's `ask-user-questions`, which `web/components/user-request.tsx` fills from omp's request.
+A select is one row per omp option, and a confirm is **Yes** and **No** rows, both in `question-options.tsx`, which reuses Fluid's hover highlight and merged selection backgrounds; an input or an editor is a free-text field.
+A select's checked rows come from the request, since omp sends a multi-select pick back as a new request with the row checked.
 
 ## Code layout
 
@@ -908,6 +908,7 @@ The page lives in `web/`.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` a session header's trail and pull request menu.
   `composer.tsx` holds `blockedShortcut`, `ComposerNote`, and `EmptyConversation`, which the new-session draft and the pages share, and `page-header.tsx` the `Header` every page uses.
   `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeEditor` and `afterActions` slots.
+  `user-request.tsx` shows the open question above the composer through `question-card.tsx`.
   `prompt-attachments.tsx` holds the composer's attached files, which the new-session draft shares: it reads each as an image, as text, or as a document omp converts, and sends a prompt's text files after its text and its images apart.
 - `web/components/dashboard-context.tsx`: two contexts that `App` provides and the sidebar, the panes, and the pages read instead of taking props: the actions (`send`, `open`, `start`, `end`, …), which keep one identity for the page's life, and the status, which holds the connection, the last start of each kind, and `inboxScope`; a component that reads only the actions never renders for a change of the status.
   `MentionListsContext` carries the lists of the composer's `@` menu apart from both.
@@ -922,8 +923,9 @@ The page lives in `web/`.
   It lays the board out only when the inbox, its order, or its folds change, and fills in each row's drag, sessions, pending start, and open menu in a second pass; the sessions come from one pass over the roster, `sessionsByPullRequest` in `pr-row.tsx`, and the board keeps a pull request's list the same array while its chips hold, so a memoized row draws again only when what it shows changes.
   Only one board mounts at a time, since its rows carry document ids and its keys are global, so the inbox page (`inbox-page.tsx`) shows the table while the sidebar shows `InboxIndex`, its sections as links, and `inbox-nav.tsx` lists the pull requests in the sidebar otherwise.
   `pr-page.tsx` shows one pull request's details in the main content, in a frame of its own that lets the **Code** tab fill the height under the header.
-  Its `PullRequestDetails` shows the same details, with the same quick actions, on the page and in the session details sidebar; its `placement` decides whether it says why the inbox does not list the pull request, and `PullRequestDetailContent` in `pr-details.tsx` takes it too, for the heading's level and size, whether it takes focus, whether the header and tab bar stick to the top of the sidebar's scroll, and whether **Code** shows the explorer or a list of files.
-  `PullRequestDetailContent` draws the header and the **Summary**, **Timeline**, and **Code** tabs; on the page, **Code** is the route's `files`, so choosing it changes the address and the inbox's keys leave J and K to the explorer.
+  Its `PullRequestDetails` shows the same details, with the same quick actions, on the page and in the session details sidebar; its `placement` decides whether it says why the inbox does not list the pull request, and `PullRequestDetailContent` in `pr-details/index.tsx` takes it too, for the heading's level and size, whether it takes focus, whether the header and tab bar stick to the top of the sidebar's scroll, and whether **Code** shows the explorer or a list of files.
+  `PullRequestDetailContent` reads the pull request and its stack, and lays out the header, the tab bar, and the **Summary**, **Timeline**, and **Code** tabs; on the page, **Code** is the route's `files`, so choosing it changes the address and the inbox's keys leave J and K to the explorer.
+  The rest of `pr-details/` holds one part each: `header.tsx` the header with the Next move's button, the `⋯` menu, and the checkout command; `summary.tsx` the **Summary**; `stack.tsx` its **Stack** and the session's other pull requests; `checks.tsx` the checks at a glance on the tab bar and their popover; `code.tsx` the **Code** tab; and `status-view.ts` how the **Summary**'s Status says each fact and which quick action each one offers.
   `pr-fields.tsx` holds the **Summary**'s state, reviewers, and labels pickers, and `pr-files-dialog.tsx` the dialog in which the sidebar's file list opens the explorer, whose `onPick` opens another file in place of changing the address.
   `pr-timeline.tsx` is the **Timeline**: commits, comments, reviews, and unresolved threads in one list by day, with the **New** line from the last visit it keeps in localStorage.
   `pr-row.tsx` draws the sidebar row and the table row, and exports the DOM lookups of a row and its link that the inbox's keys use.
@@ -934,6 +936,7 @@ The page lives in `web/`.
   `web/components/fold.tsx` holds the fold button that the inbox and tickets share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
   The inbox binds J, K, O, E, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/inbox-model.ts` lists in order, so a folded section's rows drop out, and binds Alt+Shift+↑ and ↓ to move the focused heading or row by its `data-move` attribute.
 - `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry, and `web/components/kibo-ui` from Kibo UI's; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
+  The sidebar's parts are split over `sidebar.tsx`, `sidebar-core.tsx`, `sidebar-group.tsx`, `sidebar-slot.tsx`, `sidebar-menu.tsx`, `sidebar-menu-scope.tsx`, and `sidebar-menu-row.ts`, and the composer's over `input-message.tsx`, `file-preview-tile.tsx`, `web/hooks/use-region-height.ts`, and `web/hooks/use-is-touch.ts`.
 
 `templates/omp/` holds the omp starter kit and its installer, `templates/omp/install.ts` (`bun run omp-template`).
 Its `agent/` files are the default kit.
@@ -952,9 +955,10 @@ The page's favicon, `web/favicon.svg`, is the bare mark.
 
 Changes the dashboard makes to Fluid's components are listed in `web/components/ui/PATCHES.md`, each with its reason, so an upgrade is a merge that checks each entry.
 The dashboard keeps them mechanical where it can.
-`InputMessage`'s text field is `PromptEditor` instead of a `<textarea>`, and gets an `onKeyDown` and `onPaste` passthrough, so the completion list and the composer shortcuts see a key before the submit and history handling and a pasted file attaches, and a `stopShortcut`.
+`InputMessage`'s text field is `PromptEditor` instead of a `<textarea>`, and gets an `onKeyDown` and `onPaste` passthrough, so the completion list and the composer shortcuts see a key before the submit handling and a pasted file attaches, and a `stopShortcut`.
 It also gets two slots, `beforeEditor` and `afterActions`: `composer-queue.tsx` renders the queued rows that omp or the server holds into the first, and `composer-suggestions.tsx` into the second the prompts that the last turn's reply ends on, which `splitSuggestions` in `src/transcript.ts` splits off the reply into the assistant item's `suggestions`.
-`ChatMessage` gets `files`, the names of the files a sent prompt carried as text, and `images`, the addresses of the images it carried, and `AskUserQuestions` a `header`, the question's status and **Dismiss**, and a `description` per question, a confirm's message.
+Its own queue, history recall, and suggested prompts are removed, since those slots replace them.
+`ChatMessage` gets `files`, the names of the files a sent prompt carried as text, and `images`, the addresses of the images it carried.
 
 Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight` (`web/components/message-markdown.tsx`).
 In agent text, raw HTML is escaped, unsafe link schemes are filtered, and an image renders as a link unless it is a `data:` URL.

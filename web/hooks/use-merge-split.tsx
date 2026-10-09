@@ -5,11 +5,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { spring } from "@/lib/springs";
 import type { ItemRect } from "@/hooks/use-fluid-hover";
 
-// Run the layout effect on the client (where it must fire before paint, so a
-// merge/split shows on the first frame) and a no-op-safe useEffect on the server.
-const useIsoLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
-
 // Edge spring for the selected-bg merge/split: spring.moderate (critically
 // damped) so converging edges meet exactly instead of overshooting. On a merge
 // the inner corners trail by `cornerDelay`, staying rounded until the halves meet.
@@ -129,7 +124,7 @@ export function useMergeSplitBlocks(
   // Detect merges/splits before paint (so the first frame already shows the
   // halves) and drop any boundary the latest selection invalidated (e.g. the
   // bridge row was toggled again mid-flight).
-  useIsoLayoutEffect(() => {
+  useLayoutEffect(() => {
     const prev = prevRunsRef.current;
     const cur = runs;
     const found: Boundary[] = [];

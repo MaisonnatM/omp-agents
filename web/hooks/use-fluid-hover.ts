@@ -248,6 +248,10 @@ export function useFluidHover<T extends HTMLElement>(
   const sessionRef = useRef(0);
   const rafIdRef = useRef<number | null>(null);
   const remeasureRafIdRef = useRef<number | null>(null);
+  // True from a remeasure until its frame runs: a burst of registrations (a
+  // list of rows mounting) drops readiness and queues the pass once, instead
+  // of a state write and a frame request per item.
+  const remeasurePendingRef = useRef(false);
 
   /**
    * Publishes a rect for every registered item. Returns false when the
@@ -339,6 +343,7 @@ export function useFluidHover<T extends HTMLElement>(
       }
       remeasureRafIdRef.current = requestAnimationFrame(() => {
         remeasureRafIdRef.current = null;
+        remeasurePendingRef.current = false;
         if (runMeasurement()) {
           setIsMeasured(true);
         } else if (attemptsLeft > 1) {
@@ -350,6 +355,8 @@ export function useFluidHover<T extends HTMLElement>(
   );
 
   const remeasure = useCallback(() => {
+    if (remeasurePendingRef.current) return;
+    remeasurePendingRef.current = true;
     // Readiness drops first: until the pass below settles, the published rects
     // may not describe what is on screen, and an overlay positioned from them
     // would be corrected after mounting — which animates as a slide.
@@ -508,7 +515,9 @@ export function useFluidHover<T extends HTMLElement>(
       }
       if (remeasureRafIdRef.current !== null) {
         cancelAnimationFrame(remeasureRafIdRef.current);
+        remeasureRafIdRef.current = null;
       }
+      remeasurePendingRef.current = false;
       itemRoRef.current?.disconnect();
       itemRoRef.current = null;
     };

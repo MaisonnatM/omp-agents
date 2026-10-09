@@ -172,7 +172,7 @@ export function App() {
 		<DashboardActionsContext.Provider value={actions}>
 			<DashboardStatusContext.Provider value={status}>
 				<div className="flex h-svh flex-col">
-					<SidebarProvider persist={false} shortcut={null} className="min-h-0 flex-1">
+					<SidebarProvider className="min-h-0 flex-1">
 						<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
 							<AppSidebar
 								workspace={workspace}

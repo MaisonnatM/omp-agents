@@ -179,7 +179,7 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ side, panel, onResize, onToggle, children }: DashboardSidebarProps) {
 	return (
 		<>
-			<Sidebar id={SIDEBARS[side].id} side={side} collapsible="none" hidden={!panel.open} className="relative h-full" style={{ width: panel.width }}>
+			<Sidebar id={SIDEBARS[side].id} side={side} hidden={!panel.open} className="relative h-full" style={{ width: panel.width }}>
 				{children}
 				<SidebarResizeHandle side={side} width={panel.width} onWidth={onResize} />
 			</Sidebar>

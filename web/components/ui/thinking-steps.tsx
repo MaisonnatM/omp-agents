@@ -14,10 +14,6 @@ import {
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import * as Collapsible from "@radix-ui/react-collapsible";
-
-// SSR-safe layout effect (client components still server-render in Next).
-const useIsoLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 import { cn } from "@/lib/utils";
 import { useIcon } from "@/lib/icon-context";
 import type { IconComponent, IconName } from "@/lib/icon-context";
@@ -181,7 +177,7 @@ function CollapsePanel({ open, children }: CollapsePanelProps) {
 
   // Re-measure synchronously (pre-paint) when opening, so the spring's
   // target is the fresh layout height from its first frame.
-  useIsoLayoutEffect(() => {
+  useLayoutEffect(() => {
     if (open && innerRef.current && innerRef.current.offsetHeight > 0) {
       setContentHeight(innerRef.current.offsetHeight);
     }

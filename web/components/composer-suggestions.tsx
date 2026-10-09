@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { type FocusEventHandler, type KeyboardEvent, type ReactNode, useEffect, useId, useRef } from "react";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
-import { useRegionHeight } from "@/components/ui/input-message";
 import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hover";
+import { useRegionHeight } from "@/hooks/use-region-height";
 import { fontWeights } from "@/lib/font-weight";
 import { useIcon } from "@/lib/icon-context";
 import { useShape } from "@/lib/shape-context";

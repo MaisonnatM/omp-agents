@@ -1,23 +1,19 @@
 import { useState } from "react";
-import { type AskUserAnswer, type AskUserQuestion, AskUserQuestions } from "@/components/ui/ask-user-questions";
+import { type Question, type QuestionAnswer, QuestionCard } from "@/components/question-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { UserAnswer, UserRequest } from "../../src/shared/sessions";
 
-const CONFIRM_ROWS = [
-	{ id: "yes", title: "Yes" },
-	{ id: "no", title: "No" },
-];
+const CONFIRM_ROWS = [{ title: "Yes" }, { title: "No" }];
 
-/** The request as one Fluid question. Row ids are row indices, so a pick maps back to omp's label. */
-function questionOf(request: UserRequest): AskUserQuestion {
+/** The request as one question. Row indices are omp's option indices, so a pick maps back to omp's label. */
+function questionOf(request: UserRequest): Question {
 	switch (request.kind) {
 		case "select":
 			return {
-				id: request.id,
+				kind: "options",
 				title: request.title,
-				options: request.options.map((option, index) => ({
-					id: String(index),
+				options: request.options.map(option => ({
 					// omp's own labels can carry Nerd Font glyphs that the page's fonts lack; the answer keeps the label.
 					title: option.label.replace(/\p{Co}/gu, "").trim(),
 					description: option.description ?? undefined,
@@ -25,15 +21,14 @@ function questionOf(request: UserRequest): AskUserQuestion {
 				layout: request.options.some(option => (option.description?.length ?? 0) > 48) ? "stacked" : "inline",
 			};
 		case "confirm":
-			return { id: request.id, title: request.title, description: request.message || undefined, options: CONFIRM_ROWS };
+			return { kind: "options", title: request.title, description: request.message || undefined, options: CONFIRM_ROWS, layout: "inline" };
 		case "text":
 			return {
-				id: request.id,
+				kind: "text",
 				title: request.title,
-				freeText: true,
-				freeTextMultiline: request.multiline,
-				freeTextPlaceholder: request.placeholder ?? undefined,
-				nextLabel: "Send",
+				multiline: request.multiline,
+				placeholder: request.placeholder ?? undefined,
+				submitLabel: "Send",
 			};
 		default: {
 			const unhandled: never = request;
@@ -42,17 +37,16 @@ function questionOf(request: UserRequest): AskUserQuestion {
 	}
 }
 
-function answerOf(request: UserRequest, answer: AskUserAnswer | undefined): UserAnswer | null {
-	const [picked] = answer?.selectedIds ?? [];
+function answerOf(request: UserRequest, answer: QuestionAnswer): UserAnswer | null {
 	switch (request.kind) {
 		case "select": {
-			const option = picked === undefined ? undefined : request.options[Number(picked)];
+			const option = answer.kind === "option" ? request.options[answer.index] : undefined;
 			return option ? { kind: "value", value: option.label } : null;
 		}
 		case "confirm":
-			return picked === undefined ? null : { kind: "confirm", confirmed: picked === "yes" };
+			return answer.kind === "option" ? { kind: "confirm", confirmed: answer.index === 0 } : null;
 		case "text":
-			return answer?.otherText === undefined ? null : { kind: "value", value: answer.otherText };
+			return answer.kind === "text" ? { kind: "value", value: answer.text } : null;
 		default: {
 			const unhandled: never = request;
 			return unhandled;
@@ -90,14 +84,12 @@ export function UserRequestCard({ request, queued, onAnswer }: UserRequestCardPr
 		.join(" · ");
 
 	return (
-		<AskUserQuestions
-			questions={[question]}
-			answers={request.kind === "select" ? { [request.id]: { questionId: request.id, selectedIds: request.checked.map(String) } } : undefined}
-			defaultAnswers={
-				request.kind === "text" ? { [request.id]: { questionId: request.id, selectedIds: [], otherText: request.prefill } } : undefined
-			}
-			onComplete={answers => {
-				const answer = answerOf(request, answers[request.id]);
+		<QuestionCard
+			question={question}
+			checked={request.kind === "select" ? request.checked : undefined}
+			defaultText={request.kind === "text" ? request.prefill : undefined}
+			onAnswer={picked => {
+				const answer = answerOf(request, picked);
 				if (answer) reply(answer);
 			}}
 			onKeyDown={event => {
