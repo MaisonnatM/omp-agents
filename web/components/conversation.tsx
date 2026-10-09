@@ -15,6 +15,7 @@ import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation } from "./composer";
 import { QueuedMessages, useQueue } from "./composer-queue";
 import { useSuggestions } from "./composer-suggestions";
+import type { PromptEditorHandle } from "./prompt-editor";
 import { ContextRing } from "./context-ring";
 import { ConversationHeader } from "./conversation-header";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
@@ -87,7 +88,7 @@ function LiveConversation({
 	workspaces,
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
-	const composerRef = useRef<HTMLDivElement>(null);
+	const editorRef = useRef<PromptEditorHandle>(null);
 	const { completions, dequeued } = useComposerData(view);
 	const changed = useChangedFiles(view) ?? NO_FILES;
 	const [draft, setDraft] = useState(initialDraft);
@@ -103,7 +104,7 @@ function LiveConversation({
 	const instanceId = view.instanceId;
 	const editPrompt = useCallback((entryId: string, text: string) => send({ t: "edit-prompt", instanceId, entryId, text }), [instanceId, send]);
 	const completion = useCompletion({
-		composerRef,
+		editorRef,
 		draft,
 		setDraft,
 		completions,
@@ -112,21 +113,20 @@ function LiveConversation({
 	});
 
 	const switchingModel = !!switchable && switchable.switching;
-	const textarea = () => composerRef.current?.querySelector("textarea");
 	const { queued, take } = useQueue({
 		waiting: subject.queue,
 		dequeued,
 		dequeue: (reqId, messages) => send({ t: "dequeue", reqId, view, messages }),
 		restore: text => {
 			setDraft(current => (current ? `${text}\n${current}` : text));
-			textarea()?.focus();
+			editorRef.current?.focus();
 		},
 	});
 	// The focused pane's composer takes the keyboard once it can be typed in: when the view opens, and when it goes live, not when focus moves.
 	const focusedNow = useRef(focused);
 	focusedNow.current = focused;
 	useEffect(() => {
-		if (focusedNow.current && writable) textarea()?.focus();
+		if (focusedNow.current && writable) editorRef.current?.focus();
 	}, [writable]);
 	// Queued messages come back into the composer instead of running after the interrupt.
 	const interrupt = (): void => {
@@ -155,12 +155,7 @@ function LiveConversation({
 		onSend: sendText,
 		onFill: text => {
 			completion.onValueChange(text);
-			requestAnimationFrame(() => {
-				const el = textarea();
-				if (!el) return;
-				el.focus();
-				el.setSelectionRange(el.value.length, el.value.length);
-			});
+			requestAnimationFrame(() => editorRef.current?.select(Number.POSITIVE_INFINITY));
 		},
 	});
 
@@ -174,7 +169,7 @@ function LiveConversation({
 	const movable = switchable?.status === "idle";
 
 	const onComposerKey = useShortcuts({
-		// The textarea's own keys, so they need no focused pane.
+		// The text field's own keys, so they need no focused pane.
 		steer: () => {
 			const text = draft.trim();
 			if (!writable || (!text && (!attachable || attachments.files.length === 0)) || directCommand) return false;
@@ -216,14 +211,14 @@ function LiveConversation({
 						setThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
 					},
 					focusComposer: () => {
-						const el = textarea();
-						if (!el || el.disabled) return false;
-						el.focus();
+						const editor = editorRef.current;
+						if (!editor?.editable()) return false;
+						editor.focus();
 					},
 				}
 			: {}),
 	});
-	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		if (completion.onMenuKeyDown(event)) return;
 		onComposerKey(event);
 		if (!event.defaultPrevented) suggestions.onKeyDown(event);
@@ -259,12 +254,12 @@ function LiveConversation({
 				)}
 				{completion.popup}
 				<InputMessage
-					ref={composerRef}
+					editorRef={editorRef}
 					value={draft}
 					onValueChange={completion.onValueChange}
-					textareaProps={{
-						...completion.textareaProps,
-						"aria-activedescendant": completion.textareaProps["aria-activedescendant"] ?? suggestions.activeId,
+					editorProps={{
+						...completion.editorProps,
+						"aria-activedescendant": completion.editorProps["aria-activedescendant"] ?? suggestions.activeId,
 						onKeyDown,
 						onBlur: suggestions.onBlur,
 					}}
@@ -310,7 +305,7 @@ function LiveConversation({
 					onStop={session ? interrupt : undefined}
 					stopShortcut={shortcutLabels("interrupt")}
 					sendLabel={working && subject.followUps ? "Queue a follow-up" : `${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
-					beforeTextarea={<QueuedMessages entries={queued} onEdit={entry => take([entry], true)} onRemove={entry => take([entry], false)} />}
+					beforeEditor={<QueuedMessages entries={queued} onEdit={entry => take([entry], true)} onRemove={entry => take([entry], false)} />}
 					afterActions={suggestions.list}
 				/>
 				{directCommand && <ComposerNote text={directCommand} />}

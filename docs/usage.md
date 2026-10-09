@@ -257,10 +257,13 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - Every prompt has a copy button.
   Among the agent's messages, only the reply that ends each turn has one, not the messages it writes between tool calls.
   A turn still running shows none until it ends.
-- A prompt that invoked a skill shows the skill as a pill with its name (`/skill:poteto-mode do X` reads **Poteto Mode** then `do X`), not the skill's text that omp sends the model.
+- A prompt that invoked a skill shows the skill as a chip with its name (`/skill:poteto-mode do X` reads **Poteto Mode** then `do X`), not the skill's text that omp sends the model.
   That covers skills sent from the dashboard, from omp's terminal, and to a subagent, in live and past sessions.
   Copy copies the prompt as typed.
   File commands show their expanded text, because omp records only that.
+- A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, and the todos, tickets, pull requests, and sessions the `@` menu inserted.
+  Hover a chip for the full path or title; a ticket or pull request chip opens it in a new tab.
+  The outline's **Request** shows the first prompt the same way.
 - A session's header is its trail: its project, the last segment of its working directory (`~/code/webapp` reads `webapp`), then its title, as in `webapp / Fix login`.
   A session without a title shows its project alone.
   Hover the project to see the full directory, and the worktree the session works in when that differs.
@@ -340,6 +343,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Done todos and the session you are typing in stay out of the list.
   Use arrow keys, Tab or Enter to insert a suggestion, and Esc to close the list.
   File suggestions follow Git ignore rules in Git repositories.
+- In the composer, a skill or command at the start of the prompt, an `@` file or folder, and an inserted todo, ticket, pull request, or session show as a chip, a single unit with an icon and a short name, such as the file's name or the ticket's ID and title.
+  A picked suggestion is a chip at once; a reference you type becomes one once you type past it or move the caret away, so `/mo` stays text while you type `/move`.
+  Typing right against a chip turns it back into text, so `/move` followed by `X` reads `/moveX`.
+  The arrow keys step over a chip as over one character, Backspace removes a chip whole, undo brings it back, and the prompt you send is still the text behind each chip.
 - Attach images to a session's prompt with the paperclip between the context ring and the send button, by dropping them on the composer, or by pasting them, such as a screenshot.
   They show as tiles above the text field until you send; hover a tile for its **×**.
   PNG, JPEG, GIF, and WebP are accepted, up to 32 MB per prompt; images past that stay out, and a note under the composer names them.

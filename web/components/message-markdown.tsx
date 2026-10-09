@@ -6,7 +6,9 @@ import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
 import { remarkFilePaths, textFilePath } from "../file-paths";
+import { remarkPromptChips } from "../prompt-tokens";
 import { FileLink } from "./file-link";
+import { isChipKind, PromptChip } from "./prompt-chip";
 
 /** Where text written on GitHub may load images from. The page's CSP allows the same hosts. */
 const GITHUB_IMAGE_PREFIXES = [
@@ -77,7 +79,22 @@ const agentLink: Components["a"] = ({ href, children, node: _node, ...props }) =
 	);
 };
 
+/** A reference in a sent prompt, which `remarkPromptChips` marks; a ticket or pull request still opens. Any other `span`, such as highlighted code's, stays one. */
+const promptChip: Components["span"] = ({ node, ...props }) => {
+	const { dataChip: kind, dataLabel: label, dataTarget: target } = node?.properties ?? {};
+	if (!isChipKind(kind) || typeof label !== "string" || typeof target !== "string") return <span {...props} />;
+	const chip = <PromptChip kind={kind} label={label} target={target} />;
+	return kind === "ticket" || kind === "pull-request" ? (
+		<a href={target} target="_blank" rel="noopener noreferrer" className="no-underline">
+			{chip}
+		</a>
+	) : (
+		chip
+	);
+};
+
 const AGENT_COMPONENTS: Components = { a: agentLink, img: imageFrom(inlineImage) };
+const PROMPT_COMPONENTS: Components = { ...AGENT_COMPONENTS, span: promptChip };
 const GITHUB_COMPONENTS: Components = { a: link, img: imageFrom(githubImage), video };
 
 /** GitHub's schema, plus the `<video>` a Linear issue's recording becomes. */
@@ -91,6 +108,7 @@ const AGENT_PLUGINS = [rehypeHighlight];
 const GITHUB_PLUGINS = [rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA], rehypeHighlight] satisfies ComponentProps<typeof ReactMarkdown>["rehypePlugins"];
 const REMARK_PLUGINS = [remarkGfm];
 const AGENT_REMARK_PLUGINS = [remarkGfm, remarkFilePaths];
+const PROMPT_REMARK_PLUGINS = [remarkGfm, remarkPromptChips, remarkFilePaths];
 
 /**
  * react-markdown drops `data:` URLs; the images the page allows inline are the exception. A `file://` link keeps its
@@ -107,17 +125,18 @@ const urlTransform = (url: string, key: string): string => {
  * (`data:`), or, for `github`, from GitHub's own hosts and from this server's route for a Linear issue's files, which
  * also plays its videos. `github`: text written on GitHub or Linear, whose raw HTML renders as GitHub renders it,
  * through rehype-sanitize's schema, which follows GitHub's; HTML comments drop out, as GitHub hides them. In agent
- * text, the path of a text file opens it in the file dialog, a relative one against `FileBaseContext`.
+ * text, the path of a text file opens it in the file dialog, a relative one against `FileBaseContext`. `prompt`: a
+ * user's prompt, read as agent text with its skill, command, file, ticket, pull request, todo, and session references as chips.
  *
  * Parsing and highlighting a long reply is the page's costliest render, so the same text never renders twice.
  */
-export const MessageMarkdown = memo(function MessageMarkdown({ text, github = false }: { text: string; github?: boolean }) {
+export const MessageMarkdown = memo(function MessageMarkdown({ text, github = false, prompt = false }: { text: string; github?: boolean; prompt?: boolean }) {
 	return (
 		<div className="message-markdown max-w-full whitespace-normal break-words">
 			<ReactMarkdown
-				remarkPlugins={github ? REMARK_PLUGINS : AGENT_REMARK_PLUGINS}
+				remarkPlugins={github ? REMARK_PLUGINS : prompt ? PROMPT_REMARK_PLUGINS : AGENT_REMARK_PLUGINS}
 				rehypePlugins={github ? GITHUB_PLUGINS : AGENT_PLUGINS}
-				components={github ? GITHUB_COMPONENTS : AGENT_COMPONENTS}
+				components={github ? GITHUB_COMPONENTS : prompt ? PROMPT_COMPONENTS : AGENT_COMPONENTS}
 				urlTransform={urlTransform}
 			>
 				{text}

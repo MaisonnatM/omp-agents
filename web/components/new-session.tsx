@@ -19,6 +19,7 @@ import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, targetOf } from "./git";
 import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
+import type { PromptEditorHandle } from "./prompt-editor";
 import { type ModelMenuOpen, ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
 import { SessionTrail } from "./session-meta";
@@ -50,7 +51,7 @@ interface NewSessionProps {
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
 export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, todo }: NewSessionProps) {
-	const composerRef = useRef<HTMLDivElement>(null);
+	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useState(todo?.prompt ?? "");
 	const attachments = useImageAttachments();
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
@@ -97,7 +98,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		if (open !== null && modelsOpen === null) setModelOpens(count => count + 1);
 		setModelsOpen(open);
 	};
-	const completion = useCompletion({ composerRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
+	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const onComposerKey = useShortcuts({
 		model: () => {
 			if (starting || !connected) return false;
@@ -112,12 +113,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			pickThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
 		},
 		focusComposer: () => {
-			const el = composerRef.current?.querySelector("textarea");
-			if (!el || el.disabled) return false;
-			el.focus();
+			const editor = editorRef.current;
+			if (!editor?.editable()) return false;
+			editor.focus();
 		},
 	});
-	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		if (completion.onMenuKeyDown(event)) return;
 		onComposerKey(event);
 		if (!event.defaultPrevented && event.key === "Escape") {
@@ -146,7 +147,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			<div className="relative mx-auto w-full max-w-3xl px-3 pb-5">
 				{completion.popup}
 				<InputMessage
-					ref={composerRef}
+					editorRef={editorRef}
 					value={draft}
 					onValueChange={completion.onValueChange}
 					onSend={text => {
@@ -189,7 +190,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					rightSlot={({ openFilePicker }) => <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
 					disabled={starting || !connected}
 					sendLabel="Start session"
-					textareaProps={{ ...completion.textareaProps, onKeyDown, autoFocus: true }}
+					editorProps={{ ...completion.editorProps, onKeyDown, autoFocus: true }}
 				/>
 				{directCommand && <ComposerNote text={directCommand} />}
 				{attachments.note && <ComposerNote text={attachments.note} />}

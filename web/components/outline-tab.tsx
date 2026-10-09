@@ -8,7 +8,6 @@ import { usePaneLoaded, useTranscript } from "../pane-store";
 import { hashForView } from "../routing";
 import { type OutlineTurn, outline } from "../transcript-view";
 import { MessageMarkdown } from "./message-markdown";
-import { SkillBadge } from "./transcript";
 
 /** The transcript's own top padding, kept above the message so it does not sit under the viewport's edge fade. */
 const SCROLL_GAP = 12;
@@ -213,10 +212,11 @@ function TurnRow({ turn, index, plan, last, current, onJump }: { turn: OutlineTu
 						<span className="sr-only">Turn 1: </span>
 						Request
 					</button>
-					<div className="mt-1.5 flex flex-col items-start gap-1.5 text-[13px] leading-5 text-foreground">
-						{turn.skill && <SkillBadge name={turn.skill} />}
-						{turn.prompt && <MessageMarkdown text={turn.prompt} />}
-					</div>
+					{(turn.prompt || turn.skill) && (
+						<div className="mt-1.5 text-[13px] leading-5 text-foreground">
+							<MessageMarkdown text={[turn.skill && `/skill:${turn.skill}`, turn.prompt].filter(Boolean).join(" ")} prompt />
+						</div>
+					)}
 				</div>
 			) : turn.nudge ? (
 				<Entry icon={NUDGES[turn.nudge].icon} tone={NUDGES[turn.nudge].tone} first={false} last={promptLast}>

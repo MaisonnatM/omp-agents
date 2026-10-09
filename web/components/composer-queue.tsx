@@ -150,7 +150,7 @@ interface QueuedMessagesProps {
 	onRemove: (entry: QueueEntry) => void;
 }
 
-/** The queued rows above the composer's textarea; the region's height collapses when the queue empties, and each row enters and exits on its own. */
+/** The queued rows above the composer's text field; the region's height collapses when the queue empties, and each row enters and exits on its own. */
 export function QueuedMessages({ entries, onEdit, onRemove }: QueuedMessagesProps) {
 	const reduceMotion = useReducedMotion() ?? false;
 	const isTouch = useIsTouch();
@@ -166,7 +166,7 @@ export function QueuedMessages({ entries, onEdit, onRemove }: QueuedMessagesProp
 					transition={{ ...spring.moderate, bounce: 0 }}
 					className="overflow-hidden"
 				>
-					{/* `data-im-queue` keeps a click on a row from refocusing the textarea. */}
+					{/* `data-im-queue` keeps a click on a row from refocusing the text field. */}
 					<ul ref={regionRef} aria-label="Queued messages" data-im-queue className="flex flex-col gap-1 pb-1">
 						<AnimatePresence initial={false}>
 							{entries.map((entry, index) => (

@@ -777,6 +777,8 @@ The page lives in `web/`.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.
 - `web/mentions.ts`: the composer's `@` menu as a pure function of the draft, the `@` token, the page's lists, and omp's file completions: its categories and their references, the query a token asks, and the rows and sections it shows.
   `web/completion-trigger.ts` reads the token and its prefix from the draft, and `useCompletion` in `web/components/completion-popup.tsx` builds the menu, asks the server only for files, and polls tickets and the inbox only while the menu needs them.
+- `web/prompt-tokens.ts`: the references a prompt carries as text, which the composer and the transcript draw as chips, read back from what the `/` completion and the `@` menu insert; `remarkPromptChips` marks them in a sent prompt for `MessageMarkdown`.
+  `web/components/prompt-chip.tsx` draws one chip, and `web/components/prompt-editor.tsx` is the composer's text field, a Lexical editor whose chips are atomic nodes over the prompt's text, so the draft stays a string.
 - `web/components/status-bar.tsx`: the window's bottom strip, with `PlanUsageList` from `web/components/plan-usage.tsx` on the left, and on the right the **Terminal** button and the machine's CPU, available memory, and free disk space from `GET /api/system`.
 - `web/components/terminal/terminal-panel.tsx`: the terminal panel under the panes, its tabs, height, and open state, `useTerminalPanel`, which saves the last two in localStorage, and the restore from `GET /api/terminals`.
   `terminal-view.tsx` draws one tab with xterm.js over its `/ws/terminal` socket, fits it to the panel, follows the page's theme, and passes the toggle chord, and every Cmd chord on macOS, to the page's shortcuts.
@@ -838,7 +840,7 @@ The page lives in `web/`.
   `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button, `past-conversation.tsx` a past session's view, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` a session header's trail and pull request menu.
   `composer.tsx` holds `blockedShortcut`, `ComposerNote`, and `EmptyConversation`, which the new-session draft and the pages share, and `page-header.tsx` the `Header` every page uses.
-  `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeTextarea` and `afterActions` slots.
+  `composer-queue.tsx` holds the queued rows and `useQueue`, and `composer-suggestions.tsx` the suggested prompts and their keys; `InputMessage` renders them through its `beforeEditor` and `afterActions` slots.
   `image-attachments.tsx` holds the composer's attached images, which the new-session draft shares, and reads them as base64 when the prompt is sent.
 - `web/components/dashboard-context.tsx`: two contexts that `App` provides and the sidebar, the panes, and the pages read instead of taking props: the actions (`send`, `open`, `start`, `end`, …), which keep one identity for the page's life, and the status, which holds the connection, the last start of each kind, and `inboxScope`; a component that reads only the actions never renders for a change of the status.
   `MentionListsContext` carries the lists of the composer's `@` menu apart from both.
@@ -882,8 +884,8 @@ The page's favicon, `web/favicon.svg`, is the bare mark.
 
 Changes the dashboard makes to Fluid's components are listed in `web/components/ui/PATCHES.md`, each with its reason, so an upgrade is a merge that checks each entry.
 The dashboard keeps them mechanical where it can.
-`InputMessage` gets an `onKeyDown` and `onPaste` passthrough for its textarea, so the completion list and the composer shortcuts see a key before the submit and history handling and a pasted image attaches, and a `stopShortcut`.
-It also gets two slots, `beforeTextarea` and `afterActions`: `composer-queue.tsx` renders the queued rows that omp or the server holds into the first, and `composer-suggestions.tsx` into the second the prompts that the last turn's reply ends on, which `splitSuggestions` in `src/transcript.ts` splits off the reply into the assistant item's `suggestions`.
+`InputMessage`'s text field is `PromptEditor` instead of a `<textarea>`, and gets an `onKeyDown` and `onPaste` passthrough, so the completion list and the composer shortcuts see a key before the submit and history handling and a pasted image attaches, and a `stopShortcut`.
+It also gets two slots, `beforeEditor` and `afterActions`: `composer-queue.tsx` renders the queued rows that omp or the server holds into the first, and `composer-suggestions.tsx` into the second the prompts that the last turn's reply ends on, which `splitSuggestions` in `src/transcript.ts` splits off the reply into the assistant item's `suggestions`.
 `ChatMessage` gets `images`, the addresses of the images a sent prompt carried, and `AskUserQuestions` a `header`, the question's status and **Dismiss**, and a `description` per question, a confirm's message.
 
 Markdown uses `react-markdown`, `remark-gfm`, and `rehype-highlight` (`web/components/message-markdown.tsx`).

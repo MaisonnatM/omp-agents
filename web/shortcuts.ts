@@ -51,7 +51,7 @@ export type ShortcutId =
 	| "terminal";
 
 /**
- * Where a binding fires. `composer`: from the composer's textarea, before any page-wide binding sees the key.
+ * Where a binding fires. `composer`: from the composer's text field, before any page-wide binding sees the key.
  * `outside-fields`: only while no text field has focus, because the key types text. `anywhere`: even while typing, so
  * only ⌘/Ctrl and Alt chords, and an Esc that nothing nearer took, belong there.
  */
@@ -350,7 +350,7 @@ function onKeyDown(event: KeyboardEvent): void {
 }
 
 /**
- * Runs `handlers` for page-wide shortcuts, and returns the key handler a composer's textarea attaches for `composer`
+ * Runs `handlers` for page-wide shortcuts, and returns the key handler a composer's text field attaches for `composer`
  * ones. That handler runs before the page-wide listener, so a composer binding wins over a page-wide one on the same key.
  * Page-wide handlers share one window listener and try in the order of {@link ShortcutStack}.
  */

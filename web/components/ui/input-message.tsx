@@ -6,7 +6,6 @@ import {
   useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -16,7 +15,7 @@ import {
   type HTMLAttributes,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
-  type TextareaHTMLAttributes,
+  type Ref,
 } from "react";
 import { AnimatePresence, motion, Reorder, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -32,9 +31,7 @@ import { FileThumbnail } from "@/components/ui/file-thumbnail";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
-
-const useIsoLayoutEffect =
-  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+import { PromptEditor, type PromptEditorHandle } from "@/components/prompt-editor";
 
 /**
  * Measured layout height for one of the composer's collapsible regions
@@ -117,9 +114,9 @@ interface InputMessageProps
   /** Step on the size ladder. Wins over the surrounding SizeProvider and
    *  propagates to the composer's rows, buttons and queued messages. */
   size?: SizeVariant;
-  /** Controlled textarea value. */
+  /** Controlled draft. */
   value: string;
-  /** Called with the new value on every textarea change. */
+  /** Called with the new value on every edit the user makes. */
   onValueChange: (value: string) => void;
   /** Fired when the user submits (Enter or the send button) and when a queued
    *  message auto-dispatches. Receives the trimmed value, the attached files,
@@ -139,13 +136,13 @@ interface InputMessageProps
   /** Content rendered in the bottom-right action area, before the built-in
    *  send button. Same render-fn shape as leftSlot. */
   rightSlot?: InputMessageSlot;
-  /** Disables the textarea, send button, drag-and-drop, and pasting files. */
+  /** Disables the text field, send button, drag-and-drop, and pasting files. */
   disabled?: boolean;
-  /** Minimum visible rows before the textarea grows. */
+  /** Minimum visible rows before the text field grows. */
   minRows?: number;
-  /** Maximum visible rows before the textarea starts to scroll. */
+  /** Maximum visible rows before the text field starts to scroll. */
   maxRows?: number;
-  /** When false, clicking the surrounding container won't refocus the textarea. */
+  /** When false, clicking the surrounding container won't refocus the text field. */
   clickToFocus?: boolean;
   /** Accessible label for the send button. */
   sendLabel?: string;
@@ -160,11 +157,14 @@ interface InputMessageProps
   maxFiles?: number;
   /** Side of each preview tile in pixels. Defaults to 80. */
   filePreviewSize?: number;
-  /** Extra props forwarded to the underlying textarea. */
-  textareaProps?: Omit<
-    TextareaHTMLAttributes<HTMLTextAreaElement>,
-    "value" | "onChange" | "disabled" | "placeholder"
+  /** Extra props forwarded to the text field's contenteditable element. Its
+   *  `onKeyDown` and `onPaste` run before the editor's own handling. */
+  editorProps?: Omit<
+    HTMLAttributes<HTMLDivElement>,
+    "onChange" | "onKeyDownCapture" | "onPasteCapture" | "placeholder"
   >;
+  /** The text field's caret and focus, for a consumer that moves either. */
+  editorRef?: Ref<PromptEditorHandle>;
   /** Assistant response state. When `"streaming"`, the send button becomes a
    *  Stop control (empty draft) or a Queue action (non-empty draft); on the
    *  `streaming → idle` edge the next queued message auto-dispatches via `onSend`.
@@ -180,11 +180,11 @@ interface InputMessageProps
   queue?: QueuedMessage[];
   /** Called when the queue changes (enqueue, edit, delete, reorder, dispatch). */
   onQueueChange?: (queue: QueuedMessage[]) => void;
-  /** Render the built-in reorderable queue rows above the textarea. Set to
+  /** Render the built-in reorderable queue rows above the text field. Set to
    *  `false` to suppress them and render the queue yourself (e.g. as full-width
    *  rows above the composer) — enqueue + auto-dispatch still run. */
   showQueue?: boolean;
-  /** Previously-sent messages, oldest first. When the textarea is focused,
+  /** Previously-sent messages, oldest first. When the text field is focused,
    *  ArrowUp (caret on the first line) recalls the previous one and walks
    *  backward through history; ArrowDown (caret on the last line) walks forward
    *  toward the in-progress draft. Editing or sending exits history mode. */
@@ -194,12 +194,12 @@ interface InputMessageProps
    *  send. Takes precedence over `placeholder`. */
   placeholderSuggestion?: string;
   /** Suggested prompts listed under the action bar while the draft is empty.
-   *  ArrowDown moves a highlight into the list (focus stays in the textarea),
+   *  ArrowDown moves a highlight into the list (focus stays in the text field),
    *  ArrowUp walks back up and out, Enter or click fills the highlighted
    *  prompt into the composer. Typing collapses the list. */
   suggestions?: string[];
-  /** Rendered above the textarea, below the attached files. */
-  beforeTextarea?: ReactNode;
+  /** Rendered above the text field, below the attached files. */
+  beforeEditor?: ReactNode;
   /** Rendered under the action bar, inside the composer's frame. */
   afterActions?: ReactNode;
 }
@@ -232,7 +232,7 @@ function FilePreviewTile({ file, onRemove, size }: FilePreviewTileProps) {
       exit={{ opacity: 0, scale: 0.9, transition: spring.fast.exit }}
       transition={spring.fast}
       // `cursor-default` opts out of the parent's `cursor-text` so hovering
-      // a preview tile doesn't look like it'll land in the textarea.
+      // a preview tile doesn't look like it'll land in the text field.
       className="relative shrink-0 cursor-default group/tile"
     >
       <FileThumbnail file={file} size={size} radius={radius} />
@@ -414,7 +414,7 @@ function SuggestionRow({
       onClick={onSelect}
       className={cn(
         "relative flex cursor-pointer items-center gap-2",
-        // Text size mirrors the composer's textarea/placeholder (the rows
+        // Text size mirrors the composer's text field/placeholder (the rows
         // read as prompt candidates, not metadata); heights follow the
         // QueuedRow step ladder.
         compactStep ? "h-7 px-2 text-[13px]" : "h-8 px-2.5 text-[14px]",
@@ -471,7 +471,8 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
       accept = DEFAULT_ACCEPT,
       maxFiles,
       filePreviewSize = 80,
-      textareaProps,
+      editorProps,
+      editorRef,
       status,
       onStop,
       stopShortcut,
@@ -481,7 +482,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
       history = [],
       placeholderSuggestion,
       suggestions,
-      beforeTextarea,
+      beforeEditor,
       afterActions,
       className,
       style,
@@ -495,22 +496,34 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
     const reduceMotion = useReducedMotion() ?? false;
     const isTouch = useIsTouch();
 
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const editorHandle = useRef<PromptEditorHandle | null>(null);
+    const setEditorHandle = useCallback(
+      (handle: PromptEditorHandle | null) => {
+        editorHandle.current = handle;
+        if (typeof editorRef === "function") editorRef(handle);
+        else if (editorRef) editorRef.current = handle;
+      },
+      [editorRef]
+    );
+    const focusEnd = useCallback(() => {
+      requestAnimationFrame(() => editorHandle.current?.select(Number.POSITIVE_INFINITY));
+    }, []);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [focusVisible, setFocusVisible] = useState(false);
     const [dragOver, setDragOver] = useState(false);
     const [hovered, setHovered] = useState(false);
 
-    // Split out onFocus/onBlur/onPaste so the rest-spread onto the textarea
-    // can't clobber the composed handlers below.
+    // Split out the handlers composed below, so the rest-spread onto the
+    // editor can't clobber them.
     const {
-      onFocus: _textareaOnFocus,
-      onBlur: _textareaOnBlur,
-      onKeyDown: _textareaOnKeyDown,
-      onPaste: textareaOnPaste,
-      "aria-describedby": textareaDescribedBy,
-      ...restTextareaProps
-    } = textareaProps ?? {};
+      onFocus: _editorOnFocus,
+      onBlur: _editorOnBlur,
+      onKeyDown: _editorOnKeyDown,
+      onPaste: editorOnPaste,
+      "aria-describedby": editorDescribedBy,
+      "aria-label": editorLabel,
+      ...restEditorProps
+    } = editorProps ?? {};
 
     const filesArr = useMemo(() => files ?? [], [files]);
     const supportsFiles = onFilesChange !== undefined;
@@ -535,7 +548,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
 
     // Suggested prompts. The list only shows while the draft is empty, and
     // `activeSuggestion` is the highlighted row — focus never leaves the
-    // textarea (aria-activedescendant points at the highlighted option).
+    // text field (aria-activedescendant points at the highlighted option).
     // Highlight state lives in the fluid-hover system so pointer and
     // keyboard drive the same sliding bg-hover overlay (Dropdown's pattern):
     // mouse movement resolves the nearest row, ↓/↑ set the index directly.
@@ -576,61 +589,10 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
         setActiveSuggestion(null);
         setHistoryIndex(null);
         onValueChange(text);
-        requestAnimationFrame(() => {
-          const el = textareaRef.current;
-          if (!el) return;
-          el.focus();
-          el.setSelectionRange(el.value.length, el.value.length);
-        });
+        focusEnd();
       },
-      [onValueChange, setActiveSuggestion]
+      [onValueChange, setActiveSuggestion, focusEnd]
     );
-
-    // Parsed line-height, cached per textarea element — getComputedStyle on
-    // every keystroke is needless work when the value only changes with font
-    // or zoom changes.
-    const lineHeightCache = useRef<{ el: HTMLTextAreaElement; value: number } | null>(null);
-
-    const resizeTextarea = useCallback(() => {
-      const el = textareaRef.current;
-      if (!el) return;
-      el.style.height = "auto";
-      let cache = lineHeightCache.current;
-      if (!cache || cache.el !== el) {
-        const lineHeight = parseFloat(getComputedStyle(el).lineHeight);
-        cache = { el, value: Number.isNaN(lineHeight) ? 20 : lineHeight };
-        lineHeightCache.current = cache;
-      }
-      const min = cache.value * minRows;
-      const max = cache.value * maxRows;
-      const next = Math.min(Math.max(el.scrollHeight, min), max);
-      el.style.height = `${next}px`;
-      el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
-    }, [minRows, maxRows]);
-
-    useIsoLayoutEffect(() => {
-      resizeTextarea();
-    }, [value, resizeTextarea]);
-
-    // Re-measure when the textarea's width changes. The mount-time pass can
-    // run while an ancestor is still laid out at (near-)zero width — the
-    // wrapped placeholder then reads as many lines and pins the height at
-    // maxRows until the next value change. Width-gated so the observer
-    // doesn't loop on its own height writes.
-    useEffect(() => {
-      const el = textareaRef.current;
-      if (!el || typeof ResizeObserver === "undefined") return;
-      let lastWidth = el.offsetWidth;
-      const ro = new ResizeObserver(() => {
-        const width = el.offsetWidth;
-        if (width === lastWidth) return;
-        lastWidth = width;
-        resizeTextarea();
-      });
-      ro.observe(el);
-      return () => ro.disconnect();
-    }, [resizeTextarea]);
-
     const trimmed = value.trim();
     const canSend = !disabled && (trimmed.length > 0 || filesArr.length > 0);
 
@@ -665,7 +627,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
         onQueueChange?.([...queueRef.current, item]);
         onValueChange("");
         if (supportsFiles) onFilesChange?.([]);
-        requestAnimationFrame(() => textareaRef.current?.focus());
+        requestAnimationFrame(() => editorHandle.current?.focus());
         return;
       }
       onSend?.(trimmed, filesArr);
@@ -717,12 +679,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
           );
         }
         onQueueChange?.(queueRef.current.filter((q) => q.id !== item.id));
-        requestAnimationFrame(() => {
-          const el = textareaRef.current;
-          if (!el) return;
-          el.focus();
-          el.setSelectionRange(el.value.length, el.value.length);
-        });
+        focusEnd();
       },
       [
         supportsQueue,
@@ -731,6 +688,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
         onFilesChange,
         maxFiles,
         onQueueChange,
+        focusEnd,
       ]
     );
 
@@ -769,23 +727,15 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
         : buttonMode === "queue"
           ? "Queue message"
           : sendLabel;
-
-    const setCaretEnd = useCallback(() => {
-      requestAnimationFrame(() => {
-        const el = textareaRef.current;
-        if (el) el.setSelectionRange(el.value.length, el.value.length);
-      });
-    }, []);
-
     const handleKeyDown = useCallback(
-      (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-        textareaProps?.onKeyDown?.(e);
+      (e: ReactKeyboardEvent<HTMLDivElement>) => {
+        editorProps?.onKeyDown?.(e);
         if (e.defaultPrevented) return;
         if (e.nativeEvent.isComposing) return;
 
         // Suggested prompts: plain ArrowDown moves the highlight into / down
         // the list, ArrowUp walks it back up (then out, returning to plain
-        // textarea behavior), Enter fills the highlighted prompt, Escape
+        // text-field behavior), Enter fills the highlighted prompt, Escape
         // drops the highlight. With no highlight, ArrowUp still falls through
         // to history recall below.
         if (
@@ -848,9 +798,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
           !e.metaKey &&
           !e.ctrlKey
         ) {
-          const el = e.currentTarget;
-          const caret = el.selectionStart ?? 0;
-          const end = el.selectionEnd ?? caret;
+          const { start: caret, end } = editorHandle.current?.selection() ?? { start: 0, end: 0 };
           if (e.key === "ArrowUp" && !value.slice(0, caret).includes("\n")) {
             const start = historyIndex == null ? history.length : historyIndex;
             if (start > 0) {
@@ -859,7 +807,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
               const ni = start - 1;
               setHistoryIndex(ni);
               onValueChange(history[ni]);
-              setCaretEnd();
+              focusEnd();
             }
             return;
           }
@@ -877,7 +825,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
               setHistoryIndex(ni);
               onValueChange(history[ni]);
             }
-            setCaretEnd();
+            focusEnd();
             return;
           }
         }
@@ -892,12 +840,12 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
         value,
         historyIndex,
         onValueChange,
-        setCaretEnd,
+        focusEnd,
         handleSend,
         suggestionsOpen,
         suggestionsArr,
         activeSuggestion,
-        textareaProps,
+        editorProps,
         setActiveSuggestion,
         acceptSuggestion,
         placeholderSuggestion,
@@ -908,7 +856,6 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
       (e: React.MouseEvent<HTMLDivElement>) => {
         if (!clickToFocus || disabled) return;
         const target = e.target as HTMLElement;
-        if (target === textareaRef.current) return;
         if (
           target.closest(
             'button, a, input, select, textarea, [contenteditable], [role="button"], [data-im-queue]'
@@ -917,7 +864,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
           return;
         }
         e.preventDefault();
-        textareaRef.current?.focus();
+        editorHandle.current?.focus();
       },
       [clickToFocus, disabled]
     );
@@ -1045,15 +992,15 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
     // A pasted file the composer accepts (a screenshot, a copied image file)
     // attaches instead of pasting its name as text.
     const handlePaste = useCallback(
-      (e: ReactClipboardEvent<HTMLTextAreaElement>) => {
-        textareaOnPaste?.(e);
+      (e: ReactClipboardEvent<HTMLDivElement>) => {
+        editorOnPaste?.(e);
         if (e.defaultPrevented || !supportsFiles || disabled) return;
         const pasted = Array.from(e.clipboardData.files);
         if (!pasted.some(matchesAccept)) return;
         e.preventDefault();
         addFiles(pasted);
       },
-      [textareaOnPaste, supportsFiles, disabled, matchesAccept, addFiles]
+      [editorOnPaste, supportsFiles, disabled, matchesAccept, addFiles]
     );
 
     const composer = (
@@ -1094,7 +1041,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
             />
           )}
 
-          {/* Attached files preview row — sits above the textarea.
+          {/* Attached files preview row — sits above the text field.
               The outer motion.div animates the row's height (collapsing the
               whole component height) when files appear / disappear.
               The inner `mode="popLayout"` AnimatePresence pulls a removing
@@ -1128,7 +1075,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
             )}
           </AnimatePresence>
 
-          {/* Queued messages — reorderable rows above the textarea. The outer
+          {/* Queued messages — reorderable rows above the text field. The outer
               motion.div collapses the region height when the queue empties;
               the Reorder.Group handles drag-reorder (top = next to dispatch)
               and AnimatePresence handles per-row enter/exit. */}
@@ -1172,46 +1119,41 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
             </AnimatePresence>
           )}
 
-          {beforeTextarea}
+          {beforeEditor}
 
           <div className="relative">
-            <textarea
-              ref={textareaRef}
+            <PromptEditor
+              handle={setEditorHandle}
               value={value}
-              onChange={(e) => {
+              onValueChange={(text) => {
                 // Real typing exits history mode (recall sets the value
-                // programmatically, which doesn't fire onChange) and drops
-                // any suggestion highlight.
+                // programmatically, which doesn't fire onValueChange) and
+                // drops any suggestion highlight.
                 setHistoryIndex(null);
                 setActiveSuggestion(null);
-                onValueChange(e.target.value);
+                onValueChange(text);
               }}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              // Compose the consumer's textareaProps handlers with the internal
+              disabled={disabled}
+              // Capture phase: these run before the editor's own key and
+              // paste handling, which leaves alone what they prevent.
+              onKeyDownCapture={handleKeyDown}
+              onPasteCapture={handlePaste}
+              // Compose the consumer's editorProps handlers with the internal
               // focus-visible tracking (the spread below would otherwise
               // overwrite these).
               onFocus={(e) => {
                 if (e.target.matches(":focus-visible")) setFocusVisible(true);
-                textareaProps?.onFocus?.(e);
+                editorProps?.onFocus?.(e);
               }}
               onBlur={(e) => {
                 setFocusVisible(false);
                 setActiveSuggestion(null);
-                textareaProps?.onBlur?.(e);
+                editorProps?.onBlur?.(e);
               }}
-              placeholder={
-                dragOver && supportsFiles
-                  ? "Drop files here to add to chat"
-                  : placeholderSuggestion
-                    ? undefined // the ghost overlay below renders it
-                    : placeholder
-              }
-              disabled={disabled}
-              rows={minRows}
-              aria-label={textareaProps?.["aria-label"] ?? "Message"}
+              aria-label={editorLabel ?? "Message"}
+              aria-multiline
               aria-describedby={
-                [showGhost ? ghostHintId : null, textareaDescribedBy]
+                [showGhost ? ghostHintId : null, editorDescribedBy]
                   .filter(Boolean)
                   .join(" ") || undefined
               }
@@ -1221,25 +1163,43 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
                   : undefined
               }
               className={cn(
-                "w-full resize-none rounded-none bg-transparent outline-none",
-                "text-foreground placeholder:text-muted-foreground",
+                "w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent outline-none",
+                "text-foreground",
                 compactStep
                   ? "text-[13px] leading-[18px] px-1.5 py-1.5"
                   : "text-[14px] leading-5 px-2 py-2"
               )}
-              style={{ fontVariationSettings: fontWeights.normal }}
-              {...restTextareaProps}
+              style={{
+                fontVariationSettings: fontWeights.normal,
+                minHeight: minRows * (compactStep ? 18 : 20) + (compactStep ? 12 : 16),
+                maxHeight: maxRows * (compactStep ? 18 : 20) + (compactStep ? 12 : 16),
+              }}
+              {...restEditorProps}
             />
+            {value === "" && (!showGhost || (dragOver && supportsFiles)) && (
+              <div
+                aria-hidden="true"
+                className={cn(
+                  "pointer-events-none absolute inset-0 truncate text-muted-foreground",
+                  compactStep
+                    ? "text-[13px] leading-[18px] px-1.5 py-1.5"
+                    : "text-[14px] leading-5 px-2 py-2"
+                )}
+                style={{ fontVariationSettings: fontWeights.normal }}
+              >
+                {dragOver && supportsFiles ? "Drop files here to add to chat" : placeholder}
+              </div>
+            )}
             {/* Ghost placeholder: the suggested prompt with a Tab keycap. A
                 real overlay (not the native placeholder) so the keycap can
-                render inline after the text; typography mirrors the textarea
-                exactly so it sits where typed text will. */}
+                render inline after the text; typography mirrors the text
+                field exactly so it sits where typed text will. */}
             {showGhost && (
               <div
                 aria-hidden="true"
                 className={cn(
                   "pointer-events-none absolute inset-0 overflow-hidden text-muted-foreground",
-                  // Mirror the textarea's step typography exactly so the ghost
+                  // Mirror the text field's step typography exactly so the ghost
                   // sits where typed text will.
                   compactStep
                     ? "text-[13px] leading-[18px] px-1.5 py-1.5"
@@ -1249,7 +1209,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
               >
                 {/* One flex line: a suggestion longer than the field truncates
                     with an ellipsis instead of wrapping into the clip (the
-                    overlay is inset-0 over a possibly single-row textarea),
+                    overlay is inset-0 over a possibly single-row text field),
                     and the Tab chip never gets cut. */}
                 <span className="flex max-w-full items-center gap-1.5">
                   <span className="min-w-0 truncate">{placeholderSuggestion}</span>
@@ -1340,7 +1300,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
 
           {/* Suggested prompts — a listbox under the action bar, shown while
               the draft is empty. ↓/↑ move the highlight without moving focus
-              (the textarea's aria-activedescendant tracks it); Enter or click
+              (the text field's aria-activedescendant tracks it); Enter or click
               fills the composer. The outer motion.div collapses the region's
               height once typing hides the list; -mx-2 cancels the container
               padding so the divider runs the composer's full width. Pointer

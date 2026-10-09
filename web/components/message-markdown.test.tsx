@@ -83,3 +83,16 @@ test("a relative file path opens only where a session directory resolves it, and
 	expect(fileLinks("`docs/usage.md` and ~/notes.md", null).count).toBe(1);
 	expect(fileLinks("```\n/tmp/notes.md\n```", "/repo").count).toBe(0);
 });
+
+test("a sent prompt draws its references as chips, a ticket still opens, and code stays code", () => {
+	const html = renderToStaticMarkup(
+		<MessageMarkdown
+			prompt
+			text={"/skill:ship check @web/app.tsx for [ENG-1 Fix it](https://linear.app/a/issue/ENG-1/fix), not `@web/x.ts`, then **todo \"Tidy\" (id t1)**"}
+		/>,
+	);
+	expect(html.match(/data-chip="(\w+)"/g)).toEqual(['data-chip="skill"', 'data-chip="file"', 'data-chip="ticket"', 'data-chip="todo"']);
+	expect(html).toContain('<a href="https://linear.app/a/issue/ENG-1/fix" target="_blank"');
+	expect(html).toContain("<code>@web/x.ts</code>");
+	expect(html).not.toContain("/skill:ship check");
+});

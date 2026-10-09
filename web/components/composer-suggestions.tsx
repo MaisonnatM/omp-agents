@@ -41,7 +41,7 @@ function SuggestionRow({ text, index, active, optionId, registerItem, onSelect }
 			className={cn(
 				"relative flex cursor-pointer items-center gap-2",
 				active ? "text-foreground" : "text-muted-foreground",
-				// Text size mirrors the composer's textarea: the rows read as prompt candidates, not metadata.
+				// Text size mirrors the composer's text field: the rows read as prompt candidates, not metadata.
 				compactStep ? "h-7 px-2 text-[13px]" : "h-8 px-2.5 text-[14px]",
 				"transition-colors duration-80",
 			)}
@@ -77,12 +77,12 @@ interface SuggestionOptions {
 interface Suggestions {
 	/** The list under the composer's action bar; nothing while there are no prompts. */
 	list: ReactNode;
-	/** The textarea's `aria-activedescendant` while a row is highlighted. */
+	/** The text field's `aria-activedescendant` while a row is highlighted. */
 	activeId: string | undefined;
-	/** Drops the highlight when the textarea loses focus. */
-	onBlur: FocusEventHandler<HTMLTextAreaElement>;
+	/** Drops the highlight when the text field loses focus. */
+	onBlur: FocusEventHandler<HTMLDivElement>;
 	/** The composer's keys for the list; call it for a key no shortcut took. */
-	onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
+	onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void;
 }
 
 /**
@@ -90,7 +90,7 @@ interface Suggestions {
  * Shift allowed since some layouts type digits with it. A digit sends even with no row highlighted, so a message of
  * your own that starts with one needs another character first: the user chose speed over that. ArrowDown moves a
  * highlight into the list, ArrowUp walks it back up and out, Enter or a click sends the highlighted prompt, Tab fills it
- * to edit first, and Esc drops the highlight. Focus stays in the textarea.
+ * to edit first, and Esc drops the highlight. Focus stays in the text field.
  */
 export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOptions): Suggestions {
 	const open = prompts.length > 0 && draft === "";
@@ -111,7 +111,7 @@ export function useSuggestions({ prompts, draft, onSend, onFill }: SuggestionOpt
 		setActiveIndex(null);
 		onSend(text);
 	};
-	const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+	const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
 		if (!open || event.altKey || event.metaKey || event.ctrlKey || event.nativeEvent.isComposing) return;
 		const numbered = /^[1-9]$/.test(event.key) ? prompts[Number(event.key) - 1] : undefined;
 		if (numbered !== undefined) {

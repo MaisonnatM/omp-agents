@@ -1,11 +1,12 @@
 import { ChevronRight } from "lucide-react";
-import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, type TextareaHTMLAttributes, useId, useRef, useState } from "react";
+import { type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { completionTrigger, type MentionToken } from "../completion-trigger";
 import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
 import type { Completions } from "../pane-store";
 import { inboxStore, ticketsStore } from "../reads";
 import { useDashboardStatus, useMentionLists } from "./dashboard-context";
+import type { PromptEditorHandle } from "./prompt-editor";
 
 export function CompletionPopup({ id, sections, active, onPick, error }: {
 	id: string;
@@ -61,8 +62,8 @@ export function CompletionPopup({ id, sections, active, onPick, error }: {
 }
 
 interface CompletionOptions {
-	/** The composer's `InputMessage` element, whose textarea the caret is read from; the caller owns it, so the keys it handles can reach it before this hook runs. */
-	composerRef: RefObject<HTMLDivElement | null>;
+	/** The composer's text field, whose caret the suggestions follow; the caller owns it, so the keys it handles can reach it before this hook runs. */
+	editorRef: RefObject<PromptEditorHandle | null>;
 	draft: string;
 	setDraft: (text: string) => void;
 	/** The server's last answer to this composer's `complete`. */
@@ -75,12 +76,12 @@ interface Completion {
 	/** The open list, placed just before the composer. */
 	popup: ReactNode;
 	onValueChange: (text: string) => void;
-	textareaProps: TextareaHTMLAttributes<HTMLTextAreaElement>;
+	editorProps: HTMLAttributes<HTMLDivElement>;
 	/**
 	 * Runs the open list's keys: Esc, the arrows, Tab, and Enter. Returns whether the list owns the key, so the composer's
 	 * own keys run only when it does not: while no list is open, during composition, and for Shift+Tab.
 	 */
-	onMenuKeyDown: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => boolean;
+	onMenuKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => boolean;
 	close: () => void;
 }
 
@@ -89,7 +90,7 @@ interface Completion {
  * arrows, Tab, and Enter. Live sessions and the new-session draft share it, so both offer the same commands and skills.
  * The `@` menu adds todos, tickets, pull requests, and sessions to omp's files; it asks the server only for files.
  */
-export function useCompletion({ composerRef, draft, setDraft, completions, onComplete, composer }: CompletionOptions): Completion {
+export function useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer }: CompletionOptions): Completion {
 	/** The `@` token the open list answers, `null` for `/`, and the `complete` request whose answer it shows, if it sent one. */
 	const [menu, setMenu] = useState<{ token: MentionToken | null; reqId: number | null } | null>(null);
 	const [active, setActive] = useState(0);
@@ -131,27 +132,25 @@ export function useCompletion({ composerRef, draft, setDraft, completions, onCom
 		setDraft(edit.text);
 		if (opens) suggest(edit.text, edit.cursor);
 		else setMenu(null);
-		requestAnimationFrame(() => {
-			const el = composerRef.current?.querySelector("textarea");
-			el?.focus();
-			el?.setSelectionRange(edit.cursor, edit.cursor);
-		});
+		requestAnimationFrame(() => editorRef.current?.select(edit.cursor));
 	};
 
+	const caret = (): number => editorRef.current?.selection().start ?? draft.length;
 	return {
 		popup: menu !== null && <CompletionPopup id={popupId} sections={sections} active={shown} error={answer?.error ?? null} onPick={pick} />,
 		onValueChange: text => {
 			setDraft(text);
-			suggest(text, composerRef.current?.querySelector("textarea")?.selectionStart ?? text.length);
+			suggest(text, editorRef.current?.selection().start ?? text.length);
 		},
-		textareaProps: {
+		editorProps: {
 			"aria-controls": menu !== null ? popupId : undefined,
 			"aria-expanded": menu !== null,
 			"aria-autocomplete": "list",
 			"aria-activedescendant": menu !== null && options.length ? `${popupId}-${shown}` : undefined,
-			onClick: event => suggest(draft, event.currentTarget.selectionStart),
+			// The editor takes a click's caret on the next frame.
+			onClick: () => requestAnimationFrame(() => suggest(draft, caret())),
 			onKeyUp: event => {
-				if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) suggest(draft, event.currentTarget.selectionStart);
+				if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) suggest(draft, caret());
 			},
 		},
 		onMenuKeyDown: event => {

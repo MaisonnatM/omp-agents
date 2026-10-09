@@ -57,7 +57,7 @@ import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader 
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
-import { modeOf, skillLabel, SPLIT_CLICK } from "../labels";
+import { modeOf, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { usePaneLoaded, useTranscript } from "../pane-store";
@@ -354,22 +354,6 @@ interface TranscriptProps {
 	empty?: ReactNode;
 }
 
-/** The skill a prompt invoked, as a pill ahead of the user's words. */
-export function SkillBadge({ name }: { name: string }) {
-	return (
-		<Tooltip content={`/skill:${name}`}>
-			<span
-				className="inline-flex items-center gap-1 rounded-full bg-background/70 px-2 py-0.5 text-xs font-medium text-foreground ring-1 ring-border"
-				data-skill={name}
-			>
-				<Sparkles aria-hidden className="size-3 text-violet-500 dark:text-violet-400" />
-				<span className="sr-only">Skill:</span>
-				{skillLabel(name)}
-			</span>
-		</Tooltip>
-	);
-}
-
 /** A prompt or a reply: the user's and the agent's words. */
 type MessageItem = Exclude<Item, ActivityItem | Extract<Item, { kind: "notice" }>>;
 
@@ -438,11 +422,8 @@ const MessageRow = memo(function MessageRow({
 						}}
 						onCancel={() => onEditing(null)}
 					/>
-				) : item.kind === "user" && item.skill ? (
-					<div className="flex flex-col items-start gap-1.5">
-						<SkillBadge name={item.skill} />
-						{item.text && <MessageMarkdown text={item.text} />}
-					</div>
+				) : item.kind === "user" && (item.text || item.skill) ? (
+					<MessageMarkdown text={copyText(item)} prompt />
 				) : item.text ? (
 					<MessageMarkdown text={item.text} />
 				) : null}

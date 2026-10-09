@@ -6,15 +6,18 @@ Dashboard behavior that can live outside these files does: the composer's queued
 
 ## `ui/input-message.tsx`
 
-- `textareaProps.onKeyDown`: runs first in the textarea's key handler, and a key it prevents goes no further.
+- The text field is `PromptEditor` (`web/components/prompt-editor.tsx`), a contenteditable that shows each skill, command, file, ticket, pull request, todo, and session reference as a chip, instead of a `<textarea>`.
+  Its height follows `minRows` and `maxRows` in CSS, so the JS autoresize is gone.
+  `textareaProps` is `editorProps`, and `editorRef` exposes the caret and focus that callers read from the textarea before.
+- `editorProps.onKeyDown`: runs first, in the capture phase, and a key it prevents goes no further, not even to the editor.
   The completion list and the dashboard's composer shortcuts need the key before the submit and history handling.
-- `textareaProps.onPaste`: runs first in the paste handler, and a pasted file that `accept` takes attaches instead of pasting its name as text.
+- `editorProps.onPaste`: runs first in the paste handler, and a pasted file that `accept` takes attaches instead of pasting its name as text.
   A screenshot or a copied image file is the common paste.
 - `stopShortcut`: the keys that press Stop, shown in its tooltip.
 - Send and queue buttons show their current action and Enter in a tooltip; Stop keeps its caller-provided shortcut.
 - Send button mode: while `status` is `"streaming"`, the button is Stop only when the draft is empty, and a draft sends at once.
   The dashboard steers a running turn with it, and has no queue inside this component.
-- `beforeTextarea`: a slot above the textarea and below the attached files, where the dashboard renders its queued rows.
+- `beforeEditor`: a slot above the text field and below the attached files, where the dashboard renders its queued rows.
 - `afterActions`: a slot under the action bar, inside the composer's frame, where the dashboard renders its suggested prompts.
 - `useRegionHeight` and `useIsTouch`: exported, so the dashboard's rows in those slots animate and reveal their × as this component's own regions do.
 - The `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
