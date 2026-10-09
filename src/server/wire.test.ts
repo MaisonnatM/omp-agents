@@ -173,12 +173,15 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "cancel-agent", view: { kind: "past", sessionId: "s1" } })).toBeNull();
 	});
 
-	test("dequeue and complete take counters and in-range cursors only", () => {
-		const messages = [{ queue: "followUp", text: "later" }];
-		expect(msg({ t: "dequeue", reqId: 0, view: live, messages })).toMatchObject({ t: "dequeue", reqId: 0 });
-		expect(msg({ t: "dequeue", reqId: -1, view: live, messages })).toBeNull();
-		expect(msg({ t: "dequeue", reqId: 1.5, view: live, messages })).toBeNull();
-		expect(msg({ t: "dequeue", reqId: 1, view: live, messages: [{ queue: "other", text: "x" }] })).toBeNull();
+	test("dequeue, promote, interrupt, and complete take counters, known queues, and in-range cursors only", () => {
+		expect(msg({ t: "dequeue", reqId: 0, view: live, queue: "followUp", text: "later" })).toMatchObject({ t: "dequeue", reqId: 0, queue: "followUp" });
+		expect(msg({ t: "dequeue", reqId: -1, view: live, queue: "followUp", text: "later" })).toBeNull();
+		expect(msg({ t: "dequeue", reqId: 1.5, view: live, queue: "followUp", text: "later" })).toBeNull();
+		expect(msg({ t: "dequeue", reqId: 1, view: live, queue: "other", text: "x" })).toBeNull();
+		expect(msg({ t: "promote", view: live, text: "later" })).toMatchObject({ t: "promote", text: "later" });
+		expect(msg({ t: "promote", view: { kind: "past", sessionId: "s1" }, text: "later" })).toBeNull();
+		expect(msg({ t: "interrupt", reqId: 2, view: live })).toMatchObject({ t: "interrupt", reqId: 2 });
+		expect(msg({ t: "interrupt", reqId: -2, view: live })).toBeNull();
 
 		const scope = { kind: "new", cwd: "~/code" };
 		expect(msg({ t: "complete", reqId: 1, scope, text: "/he", cursor: 3 })).toMatchObject({ t: "complete", cursor: 3 });

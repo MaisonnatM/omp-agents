@@ -162,12 +162,12 @@ describe("SessionGuest follow-ups", () => {
 		]);
 	});
 
-	test("an abort waits until a steer that is still being prepared is sent", async () => {
+	test("an interrupt waits until a steer that is still being prepared is sent", async () => {
 		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
 		const prepared = Promise.withResolvers<string>();
 		spyOn(commands, "expandPrompt").mockImplementation(() => prepared.promise);
 		const sending = guest.prompt(null, "now", [], "steer");
-		guest.abort();
+		void guest.interrupt();
 		await settle();
 		expect(socket.messages).toEqual([]);
 
@@ -202,13 +202,14 @@ describe("SessionGuest follow-ups", () => {
 		expect(socket.messages).toEqual([{ t: "prompt", text: "now" }]);
 	});
 
-	test("a follow-up held after the guest's own abort waits for the next turn to end", async () => {
+	test("an interrupt takes held follow-ups back, and one sent after it waits for the next turn to end", async () => {
 		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
-		guest.send(null, { text: "after", payload: "after" }, "followUp");
+		const png = { data: "aGVsbG8=", mimeType: "image/png" };
+		guest.send(null, { text: "before", payload: "before", images: [png] }, "followUp");
 
-		guest.abort();
-		await settle();
+		expect(await guest.interrupt()).toEqual([{ text: "before", images: [png] }]);
 		expect(socket.messages).toEqual([{ t: "abort" }]);
+		guest.send(null, { text: "after", payload: "after" }, "followUp");
 		socket.frame(state(false));
 		expect(socket.messages).toEqual([{ t: "abort" }]);
 		expect(guest.queue(null).followUp).toEqual(["after"]);
@@ -248,11 +249,22 @@ describe("SessionGuest follow-ups", () => {
 		guest.send(null, { text: "first", payload: "first" }, "followUp");
 		guest.send(null, { text: "second", payload: "second" }, "followUp");
 
-		expect(await guest.dequeue(null, "followUp", "first")).toBe(true);
-		expect(await guest.dequeue(null, "steering", "second")).toBe(false);
+		expect(await guest.dequeue(null, "followUp", "first")).toEqual({ text: "first", images: [] });
+		expect(await guest.dequeue(null, "steering", "second")).toBeNull();
 		socket.frame(state(false));
 		expect(socket.messages).toEqual([{ t: "prompt", text: "second" }]);
-		expect(await guest.dequeue(null, "followUp", "second")).toBe(false);
+		expect(await guest.dequeue(null, "followUp", "second")).toBeNull();
+	});
+
+	test("sending a held follow-up now steers the running turn with what the host would have received", async () => {
+		const { guest, socket } = await joinRoom({ welcome: { state: { isStreaming: true } } });
+		guest.send(null, { text: "/skill:x", payload: "expanded" }, "followUp");
+		guest.send(null, { text: "later", payload: "later" }, "followUp");
+
+		expect(await guest.promote(null, "/skill:x")).toBe(true);
+		expect(await guest.promote(null, "missing")).toBe(false);
+		expect(socket.messages).toEqual([{ t: "prompt", text: "expanded" }]);
+		expect(guest.queue(null).followUp).toEqual(["later"]);
 	});
 
 	test("the queue shows what the user typed while the host receives the expanded skill or file command", async () => {
@@ -296,7 +308,7 @@ describe("SessionGuest subagents", () => {
 	test("a subagent's turn ending is not affected by the main agent's own interrupt", async () => {
 		const { guest, socket } = await joinRoom({ welcome: { agents: [MAIN, agent("s1", "running")] } });
 		guest.send("s1", { text: "later", payload: "later" }, "followUp");
-		guest.abort();
+		void guest.interrupt();
 		await settle();
 		socket.frame({ t: "agents", agents: [MAIN, agent("s1", "idle")] });
 		expect(socket.messages).toEqual([{ t: "abort" }, { t: "agent-cmd", cmd: "chat", agentId: "s1", text: "later" }]);
@@ -382,7 +394,7 @@ describe("SessionGuest read-only rooms", () => {
 
 		guest.send(null, { text: "hi", payload: "hi" }, "steer");
 		guest.send("s1", { text: "hi", payload: "hi" }, "steer");
-		guest.abort();
+		void guest.interrupt();
 		guest.answer("1", { kind: "cancel" });
 		expect(socket.messages).toEqual([]);
 	});
@@ -409,7 +421,7 @@ describe("SessionGuest read-only rooms", () => {
 		const { guest } = start();
 		await socket.connected.promise;
 		guest.send(null, { text: "early", payload: "early" }, "steer");
-		guest.abort();
+		void guest.interrupt();
 		expect(socket.sent).toEqual([]);
 		expect(guest.control).toEqual({ phase: "connecting" });
 	});

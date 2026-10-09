@@ -158,6 +158,12 @@ export interface PromptImage {
 	mimeType: string;
 }
 
+/** A queued message taken back before the agent got it, as the composer restores it. */
+export interface WithdrawnMessage {
+	text: string;
+	images: PromptImage[];
+}
+
 /** The past list's order: newest first, ties by session id. */
 export const newestPastFirst = (a: PastSession, b: PastSession): number => b.modifiedAt - a.modifiedAt || b.sessionId.localeCompare(a.sessionId);
 

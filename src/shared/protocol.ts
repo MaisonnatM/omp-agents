@@ -5,7 +5,7 @@ import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
 import type { Project, ProjectList } from "./projects";
-import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View } from "./sessions";
+import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
 
 export type ServerMsg =
@@ -29,8 +29,8 @@ export type ServerMsg =
 	| { t: "usage"; plans: PlanUsage[]; error: string | null }
 	/** Answers `list-models`. `error` is set when the session cannot list or switch models. */
 	| { t: "models"; instanceId: string; models: ModelEntry[]; error: string | null }
-	/** Answers this socket's `dequeue` with the texts it took out of the queue, oldest first. Nothing answers when every message had gone. */
-	| { t: "dequeued"; view: LiveView; reqId: number; texts: string[] }
+	/** Answers this socket's `dequeue` or `interrupt` with the messages it took back, steers before follow-ups, each queue oldest first. Nothing answers when none was still waiting. */
+	| { t: "withdrawn"; view: LiveView; reqId: number; messages: WithdrawnMessage[] }
 	/** The Todo page's list, whole, sent when a socket opens and after every change. */
 	| { t: "user-todos"; list: UserTodoList }
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
@@ -50,9 +50,12 @@ export type ClientMsg =
 	 * runs. Only the session's own agent takes `images`.
 	 */
 	| { t: "prompt"; view: LiveView; text: string; images: PromptImage[]; delivery: Delivery }
-	/** Take `messages` out of the view's queue before the agent gets them. `reqId` counts per view. */
-	| { t: "dequeue"; reqId: number; view: LiveView; messages: { queue: keyof MessageQueue; text: string }[] }
-	| { t: "abort"; instanceId: string }
+	/** Take one message out of the view's queue before the agent gets it, answered with `withdrawn`. `reqId` counts per view. */
+	| { t: "dequeue"; reqId: number; view: LiveView; queue: keyof MessageQueue; text: string }
+	/** Turn the view's queued follow-up `text` into a steer, which the running turn takes at its next step. */
+	| { t: "promote"; view: LiveView; text: string }
+	/** Stop the running turn and take back every message waiting on it, answered with `withdrawn`. `reqId` counts per view, shared with `dequeue`. */
+	| { t: "interrupt"; reqId: number; view: LiveView }
 	/** Stop the running turn while the session still holds a steer, so omp runs that steer now, as an empty Enter does in its terminal. */
 	| { t: "flush"; instanceId: string }
 	/** Replace user prompt `entryId` of a session this dashboard started with `text`, stopping a running turn first; the session moves to a new file. */

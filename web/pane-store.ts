@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { ServerMsg } from "../src/shared/protocol";
-import type { CompletionItem, View } from "../src/shared/sessions";
+import type { CompletionItem, View, WithdrawnMessage } from "../src/shared/sessions";
 import { type AgentMedia, type ChangedFile, type Item, newestMediaFirst } from "../src/shared/transcript";
 import { applyDelta } from "./keyed-list";
 import { keyedStore } from "./keyed-store";
@@ -19,22 +19,22 @@ export interface PaneData {
 	/** Whether the server sent the view's transcript yet, so an empty `items` means an empty conversation. */
 	loaded: boolean;
 	completions: Completions | null;
-	/** The last texts the server took out of the view's queue, answering the composer's `dequeue` `reqId`. */
-	dequeued: { reqId: number; texts: string[] } | null;
+	/** The messages the server last took out of the view's queue, answering the composer's `reqId`. */
+	withdrawn: { reqId: number; messages: WithdrawnMessage[] } | null;
 	/** The files the view's agent changed, in first-touch order; `null` until the server sends them. */
 	files: ChangedFile[] | null;
 	/** The images its agent's and its subagents' tools returned, newest first; `null` until the server sends them. */
 	media: AgentMedia[] | null;
 }
 
-/** The part of a view's data its composer reads: the server's last answers to its `complete` and its `dequeue`. */
-export type ComposerData = Pick<PaneData, "completions" | "dequeued">;
+/** The part of a view's data its composer reads: the server's last answers to its `complete`, `dequeue`, and `interrupt`. */
+export type ComposerData = Pick<PaneData, "completions" | "withdrawn">;
 
-export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, dequeued: null, files: null, media: null };
+export const EMPTY_PANE: PaneData = { items: [], loaded: false, completions: null, withdrawn: null, files: null, media: null };
 
-/** The server messages that belong to one open view: its transcript, its changed files, its images, its composer's suggestions, and its dequeued texts. */
+/** The server messages that belong to one open view: its transcript, its changed files, its images, its composer's suggestions, and the queued messages it took back. */
 export type PaneMsg =
-	| Extract<ServerMsg, { t: "items" | "work" | "media" | "dequeued" }>
+	| Extract<ServerMsg, { t: "items" | "work" | "media" | "withdrawn" }>
 	| (Extract<ServerMsg, { t: "completions" }> & { scope: { kind: "live" } });
 
 /**
@@ -70,8 +70,8 @@ export function applyPaneMessage(msg: PaneMsg): void {
 		case "completions":
 			panes.set(key, { ...pane, completions: { reqId: msg.reqId, items: msg.items, error: msg.error } });
 			break;
-		case "dequeued":
-			panes.set(key, { ...pane, dequeued: { reqId: msg.reqId, texts: msg.texts } });
+		case "withdrawn":
+			panes.set(key, { ...pane, withdrawn: { reqId: msg.reqId, messages: msg.messages } });
 			break;
 		default: {
 			const never: never = msg;
@@ -93,8 +93,8 @@ const loadedOf = (pane: PaneData): boolean => pane.loaded;
 const filesOf = (pane: PaneData): ChangedFile[] | null => pane.files;
 const mediaOf = (pane: PaneData): AgentMedia[] | null => pane.media;
 const turnCountOf = (pane: PaneData): number => turnCount(pane.items);
-const composerOf = ({ completions, dequeued }: PaneData): ComposerData => ({ completions, dequeued });
-const sameComposer = (a: ComposerData, b: ComposerData): boolean => a.completions === b.completions && a.dequeued === b.dequeued;
+const composerOf = ({ completions, withdrawn }: PaneData): ComposerData => ({ completions, withdrawn });
+const sameComposer = (a: ComposerData, b: ComposerData): boolean => a.completions === b.completions && a.withdrawn === b.withdrawn;
 const sameStrings = (a: string[], b: string[]): boolean => a.length === b.length && a.every((text, index) => text === b[index]);
 
 /** `view`'s transcript: the one field a streamed token changes, so only the components that draw it read it. */

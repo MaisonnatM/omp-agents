@@ -21,8 +21,10 @@ class FakeClient implements RpcClient {
 		this.calls.push(`prompt ${text}`);
 		return "";
 	};
-	removeQueuedMessage = async () => ({ removed: true });
+	removeQueuedMessage: RpcClient["removeQueuedMessage"] = async () => ({ removed: true });
+	promoteQueuedMessage = async () => ({ promoted: true });
 	abort = async (): Promise<void> => {};
+	abortAndRestoreQueue: RpcClient["abortAndRestoreQueue"] = async () => ({ steering: [], followUp: [] });
 	getAvailableModels = async () => [];
 	setModel: RpcClient["setModel"] = async (provider, id) => ({ provider, id });
 	getAvailableThinkingLevels = async () => ["off", "low"];
@@ -216,7 +218,7 @@ describe("DashboardSession prompts", () => {
 		expect(client.calls).toEqual([]);
 	});
 
-	test("an abort waits until a steer omp has not admitted yet is admitted", async () => {
+	test("an interrupt waits until a steer omp has not admitted yet is admitted, then takes it back", async () => {
 		const { session, client } = await startSession();
 		const admitted = Promise.withResolvers<string>();
 		const order: string[] = [];
@@ -224,33 +226,49 @@ describe("DashboardSession prompts", () => {
 			order.push(`prompt ${text}`);
 			return admitted.promise;
 		};
-		client.abort = async () => {
+		client.abortAndRestoreQueue = async () => {
 			order.push("abort");
+			return { steering: [{ text: "now" }], followUp: [] };
 		};
 
 		const sent = session.prompt(null, "now", [], "steer");
-		session.abort();
+		const interrupted = session.interrupt();
 		await settle();
 		expect(order).toEqual(["prompt now"]);
 
 		admitted.resolve("");
 		await sent;
-		await settle();
+		expect(await interrupted).toEqual([{ text: "now", images: [] }]);
 		expect(order).toEqual(["prompt now", "abort"]);
 	});
 
-	test("an abort does not wait for a message to a subagent, which omp does not queue on the turn", async () => {
+	test("an interrupt does not wait for a message to a subagent, which omp does not queue on the turn", async () => {
 		const { session, client } = await startSession();
 		let aborted = false;
 		client.steerSubagent = () => Promise.withResolvers<void>().promise;
-		client.abort = async () => {
+		client.abortAndRestoreQueue = async () => {
 			aborted = true;
+			return { steering: [], followUp: [] };
 		};
 
 		void session.prompt("s1", "look at b", [], "steer");
-		session.abort();
+		void session.interrupt();
 		await settle();
 		expect(aborted).toBe(true);
+	});
+
+	test("messages taken back from omp's queue keep their images, steers first", async () => {
+		const { session, client } = await startSession();
+		const png = { type: "image" as const, data: "aGVsbG8=", mimeType: "image/png" };
+		client.removeQueuedMessage = async text => ({ removed: text === "look", images: [png] });
+		client.abortAndRestoreQueue = async () => ({ steering: [{ text: "stop" }], followUp: [{ text: "then", images: [png] }] });
+
+		expect(await session.dequeue(null, "followUp", "look")).toEqual({ text: "look", images: [{ data: "aGVsbG8=", mimeType: "image/png" }] });
+		expect(await session.dequeue(null, "followUp", "gone")).toBeNull();
+		expect(await session.interrupt()).toEqual([
+			{ text: "stop", images: [] },
+			{ text: "then", images: [{ data: "aGVsbG8=", mimeType: "image/png" }] },
+		]);
 	});
 
 	test("an empty Enter stops the turn only while omp still holds a steer, read after the steer it follows is admitted", async () => {

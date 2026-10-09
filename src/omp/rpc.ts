@@ -38,15 +38,30 @@ export interface RpcSubagent {
 	description?: string;
 	sessionFile?: string;
 }
+/** omp's `ImageContent`. */
+export interface RpcImage {
+	type: "image";
+	data: string;
+	mimeType: string;
+}
+/** omp's `RestoredQueuedMessage`; `images` is missing when there are none or they exceeded omp's frame limit. */
+export interface RpcRestoredMessage {
+	text: string;
+	images?: RpcImage[];
+}
 /** Subset of omp's `RpcClient` (src/modes/rpc/rpc-client.ts). */
 export interface RpcClient {
 	start(): Promise<void>;
 	stop(): Promise<void>;
 	getState(): Promise<RpcState>;
-	prompt(message: string, images?: { type: "image"; data: string; mimeType: string }[], streamingBehavior?: "steer" | "followUp"): Promise<string>;
+	prompt(message: string, images?: RpcImage[], streamingBehavior?: "steer" | "followUp"): Promise<string>;
 	/** Takes the first queued message with this text out of `queue`; `removed` is false once omp has delivered it. */
-	removeQueuedMessage(message: string, queue: "steering" | "followUp"): Promise<{ removed: boolean }>;
+	removeQueuedMessage(message: string, queue: "steering" | "followUp"): Promise<{ removed: boolean; images?: RpcImage[] }>;
+	/** Moves the first queued follow-up with this text to the end of the steering queue; `promoted` is false once it has gone. */
+	promoteQueuedMessage(message: string): Promise<{ promoted: boolean }>;
 	abort(): Promise<void>;
+	/** Takes back the queued user messages, oldest first, then aborts, as Esc does in omp's terminal. */
+	abortAndRestoreQueue(): Promise<{ steering: RpcRestoredMessage[]; followUp: RpcRestoredMessage[] }>;
 	getAvailableModels(): Promise<RpcModel[]>;
 	setModel(provider: string, modelId: string): Promise<{ provider: string; id: string }>;
 	/** Levels the live model accepts, `off` first. */

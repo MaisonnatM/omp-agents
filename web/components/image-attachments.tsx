@@ -21,6 +21,8 @@ export interface ImageAttachments {
 	take: (deliver: (images: PromptImage[]) => void, undo: () => void) => void;
 	/** Hand the composer's images to `deliver` as a prompt sends them, keeping them attached; a note says when they cannot be read. */
 	read: (deliver: (images: PromptImage[]) => void) => void;
+	/** Attach images a queued message carried, after the ones already attached. */
+	restore: (images: PromptImage[]) => void;
 }
 
 /** `file`'s bytes in base64, as the server's JSON bodies carry a file. */
@@ -71,7 +73,14 @@ export function useImageAttachments(): ImageAttachments {
 			undo();
 		});
 	};
-	return { files, onFilesChange, note, take, read: deliver => send(files, deliver) };
+	const restore = (images: PromptImage[]): void => {
+		if (images.length === 0) return;
+		const restored = images.map(
+			({ data, mimeType }, index) => new File([Uint8Array.from(atob(data), char => char.charCodeAt(0))], `queued-${index + 1}.${mimeType.split("/")[1]}`, { type: mimeType }),
+		);
+		onFilesChange([...files, ...restored]);
+	};
+	return { files, onFilesChange, note, take, read: deliver => send(files, deliver), restore };
 }
 
 /** Opens the file picker for images. Dropping or pasting an image into the composer attaches it too. */

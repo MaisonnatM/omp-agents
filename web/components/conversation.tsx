@@ -2,8 +2,10 @@ import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, us
 import type { Project } from "../../src/shared/projects";
 import type { Delivery, LiveView, PromptImage, RosterHost } from "../../src/shared/sessions";
 import type { ChangedFile } from "../../src/shared/transcript";
+import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
 import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
+import { Tooltip } from "@/components/ui/tooltip";
 import { projectName } from "../labels";
 import { useChangedFiles, useComposerData, useNextSuggestions } from "../pane-store";
 import type { ModelList } from "../reads";
@@ -89,7 +91,7 @@ function LiveConversation({
 }: ConversationProps) {
 	const { scrollToEnd } = useMessageScroller();
 	const editorRef = useRef<PromptEditorHandle>(null);
-	const { completions, dequeued } = useComposerData(view);
+	const { completions, withdrawn } = useComposerData(view);
 	const changed = useChangedFiles(view) ?? NO_FILES;
 	const [draft, setDraft] = useState(initialDraft);
 	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
@@ -113,12 +115,15 @@ function LiveConversation({
 	});
 
 	const switchingModel = !!switchable && switchable.switching;
-	const { queued, take } = useQueue({
+	const { queued, take, interrupt } = useQueue({
 		waiting: subject.queue,
-		dequeued,
-		dequeue: (reqId, messages) => send({ t: "dequeue", reqId, view, messages }),
-		restore: text => {
+		withdrawn,
+		dequeue: (reqId, queue, text) => send({ t: "dequeue", reqId, view, queue, text }),
+		interrupt: reqId => send({ t: "interrupt", reqId, view }),
+		restore: messages => {
+			const text = messages.map(message => message.text).join("\n");
 			setDraft(current => (current ? `${text}\n${current}` : text));
+			attachments.restore(messages.flatMap(message => message.images));
 			editorRef.current?.focus();
 		},
 	});
@@ -128,11 +133,6 @@ function LiveConversation({
 	useEffect(() => {
 		if (focusedNow.current && writable) editorRef.current?.focus();
 	}, [writable]);
-	// Queued messages come back into the composer instead of running after the interrupt.
-	const interrupt = (): void => {
-		take(queued, true);
-		send({ t: "abort", instanceId: view.instanceId });
-	};
 
 	const submit = (text: string, delivery: Delivery): void => {
 		const prompt = (images: PromptImage[]): void => send({ t: "prompt", view, text, images, delivery });
@@ -147,6 +147,8 @@ function LiveConversation({
 	};
 
 	const directCommand = blockedShortcut(draft, shell);
+	const steerable = writable && (draft.trim() !== "" || (attachable && attachments.files.length > 0)) && !directCommand;
+	const steerDraft = (): void => submit(draft.trim(), "steer");
 	// What the finished turn suggests sending next, offered once nothing else waits on the user. Filtered to none the composer would hold back.
 	const turnSuggestions = useNextSuggestions(view, working);
 	const suggestions = useSuggestions({
@@ -171,9 +173,8 @@ function LiveConversation({
 	const onComposerKey = useShortcuts({
 		// The text field's own keys, so they need no focused pane.
 		steer: () => {
-			const text = draft.trim();
-			if (!writable || (!text && (!attachable || attachments.files.length === 0)) || directCommand) return false;
-			submit(text, "steer");
+			if (!steerable) return false;
+			steerDraft();
 		},
 		// On the empty composer, the server stops the turn if omp still holds a steer, so omp runs it now.
 		deliverSteer: () => {
@@ -194,8 +195,7 @@ function LiveConversation({
 					dequeue: () => {
 						if (draft !== "") return false;
 						// omp takes back its last steer before its last follow-up.
-						const last = queued.findLast(entry => entry.queue === "steering") ?? queued.at(-1);
-						return take(last ? [last] : [], true);
+						return take(queued.findLast(entry => entry.queue === "steering") ?? queued.at(-1), true);
 					},
 					model: () => {
 						if (!switchable) return false;
@@ -295,6 +295,13 @@ function LiveConversation({
 					accept={IMAGE_ACCEPT}
 					rightSlot={({ openFilePicker }) => (
 						<>
+							{working && subject.followUps && steerable && (
+								<Tooltip content={`Steer ${agent ? "the subagent" : "the running turn"} now instead of queueing`} shortcut={shortcutLabels("steer")} side="top">
+									<Button variant="ghost" size="sm" onClick={steerDraft}>
+										Send now
+									</Button>
+								</Tooltip>
+							)}
 							{session && shown?.context && <ContextRing context={shown.context} />}
 							{attachable && <AttachButton onClick={() => openFilePicker()} />}
 						</>
@@ -305,7 +312,16 @@ function LiveConversation({
 					onStop={session ? interrupt : undefined}
 					stopShortcut={shortcutLabels("interrupt")}
 					sendLabel={working && subject.followUps ? "Queue a follow-up" : `${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
-					beforeEditor={<QueuedMessages entries={queued} onEdit={entry => take([entry], true)} onRemove={entry => take([entry], false)} />}
+					beforeEditor={
+						<QueuedMessages
+							entries={queued}
+							onSendNow={entry =>
+								send(entry.queue === "followUp" ? { t: "promote", view, text: entry.item.text } : { t: "flush", instanceId: view.instanceId })
+							}
+							onEdit={entry => take(entry, true)}
+							onRemove={entry => take(entry, false)}
+						/>
+					}
 					afterActions={suggestions.list}
 				/>
 				{directCommand && <ComposerNote text={directCommand} />}

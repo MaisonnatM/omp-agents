@@ -285,15 +285,19 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 ## Composer
 
 - While a turn runs, Enter or the send button queues a follow-up until the turn finishes.
-  Cmd+Enter (Ctrl+Enter on Linux and Windows) steers the running turn immediately.
+  Cmd+Enter (Ctrl+Enter on Linux and Windows), or the **Send now** button that shows beside the attach button while a draft would queue, steers the running turn immediately.
   Cmd+Enter again on the empty composer stops that turn and delivers a pending steer now, instead of leaving it behind a long reply or tool call.
   It does nothing once the agent has already taken the steer, and a follow-up still waits.
   When omp cannot hold a follow-up for a subagent, Enter steers instead.
   An idle session takes either key as a new prompt.
-- Messages that wait on the turn show above the text field, each tagged **Steer** or **Follow-up**.
-  Double-click a row, or press Enter on it, to move it back into the composer.
-  Its **×** removes it. ↑ in the empty composer moves the last one back, the last steer before the last follow-up, as omp does.
-  **Stop** and Cmd+Shift+Backspace interrupt the turn and move every waiting message back into the composer, so nothing runs after an interrupt.
+- Messages that wait on the turn show above the text field, each tagged **Steer** or **Follow-up**, as Cursor lists its queue.
+  Hovering a row, or focusing it, shows three buttons; a touch screen shows them always.
+  **Send now** (↑ icon, or Cmd+Enter on the focused row) turns a follow-up into a steer, which the running turn takes at its next step; on a steer it stops the turn so omp runs its held steers at once.
+  **Edit** (pencil, or a double-click, Enter, or F2 on the row) moves the message back into the composer, with its images.
+  **Remove** (**×**, or Delete on the row) drops it.
+  ↑ in the empty composer moves the last one back, the last steer before the last follow-up, as omp does.
+  **Stop** and Cmd+Shift+Backspace interrupt the turn and move every waiting message back into the composer, images included, so nothing runs after an interrupt.
+  In a terminal session, Stop moves back only the follow-ups the dashboard holds; a steer already sent waits in the host's queue.
 - When a turn ends, its reply can suggest what to send next: a `Suggestions:` line followed by numbered prompts, as its last lines.
   The starter kit's `APPEND_SYSTEM.md` asks omp to write one when the next moves are clear, up to three.
   The transcript leaves the block out of the reply, and so does its copy button; the composer lists the prompts under its buttons, numbered, while it is empty and nothing else waits on you: no turn runs and no question is open.
@@ -1014,7 +1018,7 @@ Alt is Option on macOS.
 | J / K | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop button, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.
 - Cmd+1 through Cmd+5 select the dashboard's tabs, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers stay fixed when Tickets is hidden without a Linear connection; Cmd+2 then keeps its browser behavior.
   Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or another digit keeps its browser behavior.
@@ -1023,6 +1027,7 @@ Alt is Option on macOS.
 - In the composer, Enter queues a follow-up while a turn runs, and Cmd+Enter steers it immediately.
   Esc leaves the composer; Cmd+Shift+Backspace interrupts the turn.
   ↑ moves the last queued message back only while the composer is empty, as ↑ edits your last message in Slack.
+  On a focused queued row, Cmd+Enter sends it now, Enter or F2 edits it, and Delete removes it.
   With a draft, ↑ moves the caret as usual.
 - Cmd+K opens the command menu, which searches every running and past session, in every project, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to inbox** or **Toggle sessions sidebar**.
   The search button in the sidebar header, immediately before the keyboard button, opens it too.

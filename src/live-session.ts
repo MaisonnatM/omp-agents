@@ -1,6 +1,6 @@
 /** What the server asks of a running session, whether it is a terminal session it joined or one it started itself. */
 import type { HostSnapshot } from "./omp/collab";
-import type { Delivery, MessageQueue, PromptImage, RosterHost, SessionFacts, UserAnswer } from "./shared/sessions";
+import type { Delivery, MessageQueue, PromptImage, RosterHost, SessionFacts, UserAnswer, WithdrawnMessage } from "./shared/sessions";
 
 type WithoutKeys<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
@@ -33,9 +33,12 @@ export interface LiveSession {
 	 * Rejects when the text cannot be prepared, and a subagent's message with images, which omp gives no subagent.
 	 */
 	prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void>;
-	/** Take a queued message back; whether the session still held it. */
-	dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean>;
-	abort(): void;
+	/** Take a queued message back with its images; `null` when the session no longer holds it. */
+	dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<WithdrawnMessage | null>;
+	/** Turn a queued follow-up into a steer, which the running turn takes at its next step; whether it was still queued. */
+	promote(agentId: string | null, text: string): Promise<boolean>;
+	/** Stop the running turn and take back every message waiting on it, oldest steer first, so none runs after the stop. */
+	interrupt(): Promise<WithdrawnMessage[]>;
 	/**
 	 * Stop the running turn only while the session still holds a steer, which omp then runs as its next turn, as an empty
 	 * Enter does in omp's terminal. A turn that already took the steer runs on.

@@ -12,7 +12,7 @@ import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
 import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
-import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest } from "./shared/sessions";
+import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { isUserPrompt } from "./transcript";
 import { TurnGate } from "./turn-gate";
@@ -98,7 +98,7 @@ export class DashboardSession implements LiveSession {
 	#ended = false;
 	/** Whether the process exited, however it came to. */
 	#exited = false;
-	/** Prompt, dequeue, abort, flush, and edit, so an abort cannot land before the steer it should deliver. */
+	/** Prompt, dequeue, promote, interrupt, flush, and edit, so an abort cannot land before the steer it should deliver. */
 	readonly #turn = new TurnGate();
 	/** Model setters and state reads share a lane, separate from ordered turn commands. */
 	readonly #modelGate = new TurnGate();
@@ -334,21 +334,41 @@ export class DashboardSession implements LiveSession {
 		);
 	}
 
-	/** Whether omp still held the message; it may have delivered it since the page saw the queue. */
-	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean> {
+	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<WithdrawnMessage | null> {
+		return this.#turn.run(async () => {
+			if (agentId !== null) return null;
+			try {
+				const { removed, images = [] } = await this.#child.client.removeQueuedMessage(text, queue);
+				return removed ? { text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) } : null;
+			} catch (err) {
+				this.#fail("Dequeue failed", err);
+				return null;
+			}
+		});
+	}
+
+	async promote(agentId: string | null, text: string): Promise<boolean> {
 		return this.#turn.run(async () => {
 			if (agentId !== null) return false;
 			try {
-				return (await this.#child.client.removeQueuedMessage(text, queue)).removed;
+				return (await this.#child.client.promoteQueuedMessage(text)).promoted;
 			} catch (err) {
-				this.#fail("Dequeue failed", err);
+				this.#fail("Send now failed", err);
 				return false;
 			}
 		});
 	}
 
-	abort(): void {
-		void this.#turn.run(() => this.#child.client.abort().catch((err: unknown) => this.#fail("Stop failed", err)));
+	async interrupt(): Promise<WithdrawnMessage[]> {
+		return this.#turn.run(async () => {
+			try {
+				const { steering, followUp } = await this.#child.client.abortAndRestoreQueue();
+				return [...steering, ...followUp].map(({ text, images = [] }) => ({ text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) }));
+			} catch (err) {
+				this.#fail("Stop failed", err);
+				return [];
+			}
+		});
 	}
 
 	/** omp's queue as it stands now, not as the page last saw it: the turn may already have taken the steer. */

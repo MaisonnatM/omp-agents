@@ -145,12 +145,16 @@ A new session's first message rides on the `start` request: the server spawns om
 **Resume** spawns the same child in the directory that the session file's header records and opens the file with omp's `switch_session` command.
 Prompts, Stop, live events, subagent progress, and questions stay on the pipe.
 A prompt carries omp's `streamingBehavior`, `steer` or `followUp`, so omp queues it during a turn the way its terminal does.
-The composer's queue is omp's `queue_update` event, and taking a message back is `remove_queued_message`.
-A session runs its prompts, aborts, and `flush` requests one at a time, in the order the page sent them (`TurnGate` in `src/turn-gate.ts`), because the socket handlers do not wait for each other.
+The composer's queue is omp's `queue_update` event.
+A `dequeue` message takes one message back with `remove_queued_message`, and the server answers with `withdrawn`, carrying its text and images so the composer can restore both.
+A `promote` message, a queued row's **Send now**, is `promote_queued_message`, which moves a follow-up into the steering queue.
+An `interrupt` message, Stop, is `abort_and_restore_queue`, which aborts the turn and hands back both queues, steers first, in one `withdrawn` answer; omp's terminal Esc does the same.
+A session runs its prompts, interrupts, promotes, and `flush` requests one at a time, in the order the page sent them (`TurnGate` in `src/turn-gate.ts`), because the socket handlers do not wait for each other.
 When an abort follows, omp drops a prompt it has read but not yet run, so an abort that got ahead of a steer would lose it.
 Enter on the empty composer sends `flush`, and the session aborts only if omp's queue, read with `get_state` at that moment, still holds a steer; omp then runs that steer as its next turn.
 A steer that has left the queue is already in the turn, recorded or streamed into the response, and an abort then would cut off the reply to it, so neither the page's lagging copy of the queue nor omp's terminal rule, which also counts such a steer, decides.
 A guest keeps the same order for its `prompt`, `abort`, and `flush` frames, because it expands a prompt before it sends it.
+Collab has no queue frames, so a guest answers `promote` by sending the follow-up it holds as a steer, and `interrupt` by taking back the follow-ups it holds before it sends `abort`.
 It flushes while the host's `state` frame counts a queued message (`queuedMessageCount`), or while this guest sent a steer that no `state` frame has counted yet.
 Plain `--mode rpc` gives the session no `ask` tool.
 `rpc-ui` gives it one, and omp sends the `ask` steps and extension dialogs as `extension_ui_request` frames.

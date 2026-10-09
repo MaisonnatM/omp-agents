@@ -259,14 +259,18 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	},
 	dequeue(value) {
 		const view = parseLiveView(value.view);
-		const { reqId, messages } = value;
-		return view &&
-			isCounter(reqId) &&
-			Array.isArray(messages) &&
-			messages.every((m): m is { queue: "steering" | "followUp"; text: string } =>
-				isObject(m) && (m.queue === "steering" || m.queue === "followUp") && typeof m.text === "string")
-			? { ok: { t: "dequeue", reqId, view: view.ok, messages } }
+		const { reqId, queue, text } = value;
+		return view && isCounter(reqId) && (queue === "steering" || queue === "followUp") && typeof text === "string"
+			? { ok: { t: "dequeue", reqId, view: view.ok, queue, text } }
 			: null;
+	},
+	promote(value) {
+		const view = parseLiveView(value.view);
+		return view && typeof value.text === "string" ? { ok: { t: "promote", view: view.ok, text: value.text } } : null;
+	},
+	interrupt(value) {
+		const view = parseLiveView(value.view);
+		return view && isCounter(value.reqId) ? { ok: { t: "interrupt", reqId: value.reqId, view: view.ok } } : null;
 	},
 	complete(value) {
 		const scope = parseCompletionScope(value.scope);
@@ -282,7 +286,6 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 			? { ok: { t: "complete", reqId, scope: scope.ok, text, cursor } }
 			: null;
 	},
-	abort: ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "abort", instanceId } } : null),
 	flush: ({ instanceId }) => (typeof instanceId === "string" ? { ok: { t: "flush", instanceId } } : null),
 	"edit-prompt": ({ instanceId, entryId, text }) =>
 		typeof instanceId === "string" && isNonEmpty(entryId) && typeof text === "string" && text.trim()

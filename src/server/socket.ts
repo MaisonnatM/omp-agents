@@ -57,13 +57,16 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 			});
 		}
 	},
-	async dequeue({ sessions }, ws, { view, messages, reqId }) {
-		const session = sessions.get(view.instanceId);
-		if (!session) return;
-		// Each removal enters the session's turn gate now, ahead of an abort sent right after this, so none of them runs after the interrupt.
-		const taken = await Promise.all(messages.map(({ queue, text }) => session.dequeue(view.agentId, queue, text)));
-		const texts = messages.filter((_, index) => taken[index]).map(({ text }) => text);
-		if (texts.length > 0) reply(ws, view.instanceId, { t: "dequeued", view, reqId, texts });
+	async dequeue({ sessions }, ws, { view, reqId, queue, text }) {
+		const message = await sessions.get(view.instanceId)?.dequeue(view.agentId, queue, text);
+		if (message) reply(ws, view.instanceId, { t: "withdrawn", view, reqId, messages: [message] });
+	},
+	async promote({ sessions }, _ws, { view, text }) {
+		await sessions.get(view.instanceId)?.promote(view.agentId, text);
+	},
+	async interrupt({ sessions }, ws, { view, reqId }) {
+		const messages = (await sessions.get(view.instanceId)?.interrupt()) ?? [];
+		if (messages.length > 0) reply(ws, view.instanceId, { t: "withdrawn", view, reqId, messages });
 	},
 	async complete({ sessions }, ws, { scope, reqId, text, cursor }) {
 		// A live view completes as its session; a draft as a session not started yet in its cwd.
@@ -88,7 +91,6 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 			deliver({ t: "completions", scope, reqId, items: [], error: errorText(error) });
 		}
 	},
-	abort: ({ sessions }, _ws, { instanceId }) => sessions.get(instanceId)?.abort(),
 	flush: ({ sessions }, _ws, { instanceId }) => sessions.get(instanceId)?.flush(),
 	"edit-prompt": ({ sessions }, _ws, { instanceId, entryId, text }) => sessions.started(instanceId)?.editPrompt(entryId, text),
 	"cancel-agent": ({ sessions }, _ws, { view }) => sessions.get(view.instanceId)?.cancelAgent(view.agentId),

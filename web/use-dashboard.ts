@@ -134,7 +134,7 @@ export function useDashboard(): Dashboard {
 					case "items":
 					case "work":
 					case "media":
-					case "dequeued":
+					case "withdrawn":
 						applyPaneMessage(msg);
 						return;
 					case "completions":

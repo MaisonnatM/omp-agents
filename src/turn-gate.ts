@@ -1,5 +1,5 @@
 /**
- * Runs one session's prompts, aborts, and flushes one at a time, in the order the page sent them.
+ * Runs one session's prompts, promotes, interrupts, and flushes one at a time, in the order the page sent them.
  * A call that fails does not hold back the next one.
  *
  * Socket handlers do not wait for each other.

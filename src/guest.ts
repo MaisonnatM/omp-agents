@@ -10,7 +10,7 @@ import { errorText, isObject, nonEmptyStr } from "./json";
 import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, openRoom, type Room } from "./omp/collab";
 import { selectorOf } from "./shared/models";
-import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, PromptImage, UserAnswer, UserRequest } from "./shared/sessions";
+import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, PromptImage, UserAnswer, UserRequest, WithdrawnMessage } from "./shared/sessions";
 import { contextOf, type HostAgent, parseAgents, parseSubagentFrame, SubagentFiles } from "./subagents";
 import { TurnGate } from "./turn-gate";
 import { PendingRequests, parseCollabRequest } from "./user-requests";
@@ -110,7 +110,7 @@ export class SessionGuest implements LiveSession {
 	 * its queue back in the editor rather than run it after an interrupt, so held follow-ups wait for the next turn.
 	 */
 	#interrupted = false;
-	/** Prompt, abort, and flush, so their frames follow a steer that is still being prepared. */
+	/** Prompt, promote, interrupt, and flush, so their frames follow a steer that is still being prepared. */
 	readonly #turn = new TurnGate();
 	/** Whether this guest steered the running turn since the host last reported its queue; the host's state lags the steer. */
 	#steered = false;
@@ -237,26 +237,41 @@ export class SessionGuest implements LiveSession {
 		}
 	}
 
-	/**
-	 * Take a held follow-up back. False when it is no longer held: its turn ended and the guest sent it. Collab shows no
-	 * guest the host's queue, so a terminal session's queue holds only this guest's own follow-ups.
-	 */
-	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<boolean> {
-		if (queue !== "followUp") return false;
-		const key = agentId ?? "";
-		const held = this.#followUps.get(key) ?? [];
-		const index = held.findIndex(message => message.text === text);
-		if (index < 0) return false;
-		this.#followUps.set(key, held.toSpliced(index, 1));
-		this.#emit({ kind: "roster" });
-		return true;
+	/** Collab shows no guest the host's queue, so a terminal session's queue holds only this guest's own follow-ups. */
+	async dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<WithdrawnMessage | null> {
+		if (queue !== "followUp") return null;
+		const message = this.#withdraw(agentId ?? "", text);
+		return message && { text: message.text, images: message.images ?? [] };
 	}
 
-	abort(): void {
-		if (!this.canWrite) return;
+	promote(agentId: string | null, text: string): Promise<boolean> {
+		return this.#turn.run(() => {
+			const message = this.#withdraw(agentId ?? "", text);
+			if (message) this.send(agentId, message, "steer");
+			return message !== null;
+		});
+	}
+
+	#withdraw(key: string, text: string): Outgoing | null {
+		const held = this.#followUps.get(key) ?? [];
+		const index = held.findIndex(message => message.text === text);
+		if (index < 0) return null;
+		this.#followUps.set(key, held.toSpliced(index, 1));
+		this.#emit({ kind: "roster" });
+		return held[index];
+	}
+
+	interrupt(): Promise<WithdrawnMessage[]> {
+		if (!this.canWrite) return Promise.resolve([]);
 		this.#interrupted = true;
-		void this.#turn.run(() => {
+		return this.#turn.run(() => {
+			const held = this.#followUps.get("") ?? [];
+			if (held.length > 0) {
+				this.#followUps.delete("");
+				this.#emit({ kind: "roster" });
+			}
 			this.#socket?.send({ t: "abort" });
+			return held.map(({ text, images = [] }) => ({ text, images }));
 		});
 	}
 
