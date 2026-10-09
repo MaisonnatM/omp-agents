@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Item } from "../src/shared/transcript";
-import { editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnCount, turnReplies } from "./transcript-view";
+import { editablePrompt, forkPoints, nextSuggestions, outline, toBlocks, turnCount, turnReplies, withEditedPrompt } from "./transcript-view";
 
 describe("transcript rendering", () => {
 	const user: Item = { id: "u", kind: "user", text: "go", skill: null, from: null, entryId: "e-u" };
@@ -29,6 +29,40 @@ describe("transcript rendering", () => {
 		const grown = toBlocks([user, t1, t2, tool("t3", "running"), reply("hel")], next);
 		expect(grown[0]).toBe(first[0]);
 		expect(grown[1]).not.toBe(next[1]);
+	});
+
+	test("an edited prompt survives a reset and a new last prompt until the edit is settled", () => {
+		const original: Extract<Item, { kind: "user" }> = { id: "old", kind: "user", text: "original", skill: null, from: null, entryId: "e-old" };
+		const edit = { item: original, position: 1, submitted: null };
+		const replacement: Item = { id: "new", kind: "user", text: "resent", skill: null, from: null, entryId: "e-new" };
+		const empty = withEditedPrompt(toBlocks([]), edit);
+		expect(empty).toEqual([{ kind: "item", item: { id: "old", kind: "user", text: "original", skill: null, from: null, entryId: "e-old" } }]);
+		const afterReset = toBlocks([user, replacement]);
+		const retained = withEditedPrompt(afterReset, edit);
+		expect(retained.map(block => block.kind === "item" ? block.item.id : block.id)).toEqual(["u", "old", "new"]);
+		expect(editablePrompt([user, replacement])).toEqual({ itemId: "new", entryId: "e-new" });
+		expect(withEditedPrompt(afterReset, null).map(block => block.kind === "item" ? block.item.id : block.id)).toEqual(["u", "new"]);
+		const replacedInPlace = withEditedPrompt(toBlocks([{ ...original, text: "changed on server" }]), edit);
+		expect(replacedInPlace).toEqual([{ kind: "item", item: { id: "old", kind: "user", text: "original", skill: null, from: null, entryId: "e-old" } }]);
+	});
+
+	test("a submitted plain prompt at the edit's position is replaced by its editor exactly once until acknowledgment", () => {
+		const original: Extract<Item, { kind: "user" }> = { id: "old", kind: "user", text: "original", skill: null, from: null, entryId: "e-old" };
+		const replacement: Extract<Item, { kind: "user" }> = { id: "new", kind: "user", text: "resent", skill: null, from: null, entryId: "e-new" };
+		const edit = { item: original, position: 1, submitted: "resent" };
+		const replaced = toBlocks([user, replacement]);
+		expect(withEditedPrompt(replaced, edit).map(block => block.kind === "item" ? block.item.id : block.id)).toEqual(["u", "old"]);
+		expect(withEditedPrompt(replaced, null).map(block => block.kind === "item" ? block.item.id : block.id)).toEqual(["u", "new"]);
+		for (const unrelated of [
+			{ ...replacement, text: "unrelated prompt" },
+			{ ...replacement, skill: "review" },
+			{ ...replacement, images: ["image"] },
+			{ ...replacement, files: ["file.txt"] },
+		]) {
+			expect(withEditedPrompt(toBlocks([user, unrelated]), edit).map(block => block.kind === "item" ? block.item.id : block.id)).toEqual(["u", "old", "new"]);
+		}
+		expect(withEditedPrompt(replaced, { ...edit, submitted: null }).map(block => block.kind === "item" ? block.item.id : block.id)).toEqual(["u", "old", "new"]);
+		expect(withEditedPrompt(toBlocks([replacement, user]), edit).map(block => block.kind === "item" ? block.item.id : block.id)).toEqual(["new", "old", "u"]);
 	});
 
 	test("turnCount counts the prompts", () => {

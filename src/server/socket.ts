@@ -5,7 +5,7 @@ import { directoryOf } from "../paths";
 import type { RoutineChange } from "../routines";
 import type { NoticeOp } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
-import type { ClientMsg, ServerMsg } from "../shared/protocol";
+import type { ClientFrame, ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { UserTodoChange } from "../user-todos-shared";
 import type { LiveSessions } from "./live-sessions";
@@ -144,6 +144,17 @@ async function dispatch<T extends ClientMsg["t"]>(env: SocketEnv, ws: Socket, t:
 	await clientHandlers[t](env, ws, msg);
 }
 
-export function createClientHandler(env: SocketEnv): (ws: Socket, msg: ClientMsg) => Promise<void> {
-	return (ws, msg) => dispatch(env, ws, msg.t, msg);
+/** Handles one message; one tagged `ack` then gets `done`, with the error when its handler threw, which it still throws for the server to log. */
+export function createClientHandler(env: SocketEnv): (ws: Socket, frame: ClientFrame) => Promise<void> {
+	return async (ws, frame) => {
+		const { ack } = frame;
+		if (ack === undefined) return dispatch(env, ws, frame.t, frame);
+		try {
+			await dispatch(env, ws, frame.t, frame);
+		} catch (error) {
+			send(ws, { t: "done", ack, error: errorText(error) });
+			throw error;
+		}
+		send(ws, { t: "done", ack, error: null });
+	};
 }

@@ -249,22 +249,33 @@ describe("opening and closing panes", () => {
 
 	test("ending a session shows the next listed session in its pane, else the previous, skipping open ones", () => {
 		const listed = ["a", "b", "c", "d"];
-		expect(endSession(split([b], 0), "b", listed)).toEqual(split([c], 0));
-		expect(endSession(split([d], 0), "d", listed)).toEqual(split([c], 0));
-		expect(endSession(maximized([b, c], 0), "b", listed)).toEqual(maximized([d, c], 0));
-		expect(endSession(split([a, d, c], 1), "d", listed)).toEqual(split([a, b, c], 1));
+		const eligible = new Set(listed);
+		expect(endSession(split([b], 0), "b", listed, eligible)).toEqual(split([c], 0));
+		expect(endSession(split([d], 0), "d", listed, eligible)).toEqual(split([c], 0));
+		expect(endSession(maximized([b, c], 0), "b", listed, eligible)).toEqual(maximized([d, c], 0));
+		expect(endSession(split([a, d, c], 1), "d", listed, eligible)).toEqual(split([a, b, c], 1));
 	});
 
-	test("each pane of the ended session, its subagents included, takes its own neighbor while any are left", () => {
+	test("each pane of the ended session, its subagents included, takes its own neighbor while any are left, and the rest close", () => {
 		const subagent: View = { kind: "live", instanceId: "b", agentId: "x" };
-		expect(endSession(split([b, subagent], 1), "b", ["a", "b", "c"])).toEqual(split([c, a], 1));
-		expect(endSession(split([b, subagent], 1), "b", ["b", "c"])).toEqual(split([c, subagent], 1));
+		expect(endSession(split([b, subagent], 1), "b", ["a", "b", "c"], new Set(["a", "c"]))).toEqual(split([c, a], 1));
+		expect(endSession(split([b, subagent], 1), "b", ["b", "c"], new Set(["c"]))).toEqual(split([c], 0));
+		expect(endSession(maximized([subagent, a, b], 0), "b", ["a", "b"], new Set(["a"]))).toEqual(split([a], 0));
 	});
 
-	test("ending a session with no other listed session, or one the sidebar leaves out, keeps its pane", () => {
-		expect(endSession(split([a], 0), "a", ["a"])).toEqual(split([a], 0));
-		expect(endSession(split([a, b], 0), "a", ["a", "b"])).toEqual(split([a, b], 0));
-		expect(endSession(split([a], 0), "a", ["b", "c"])).toEqual(split([a], 0));
+	test("ending a session with no other listed session, or one the sidebar leaves out, closes its panes", () => {
+		expect(endSession(split([a], 0), "a", ["a"], new Set())).toEqual(split([], 0));
+		expect(endSession(split([a, b], 0), "a", ["a", "b"], new Set(["b"]))).toEqual(split([b], 0));
+		expect(endSession(split([c, a], 0), "a", ["b", "c"], new Set(["b", "c"]))).toEqual(split([c], 0));
+	});
+
+	test("ending keeps its original anchor but skips neighbors that exited or are also ending", () => {
+		const listedBeforeEnd = ["a", "b", "c", "d"];
+		expect(endSession(split([a], 0), "a", listedBeforeEnd, new Set(["c", "d"]))).toEqual(split([c], 0));
+		expect(endSession(split([d], 0), "d", listedBeforeEnd, new Set(["a", "b"]))).toEqual(split([b], 0));
+		const afterB = endSession(split([a], 0), "b", listedBeforeEnd, new Set(["c", "d"]));
+		expect(endSession(afterB, "a", listedBeforeEnd, new Set(["c", "d"]))).toEqual(split([c], 0));
+		expect(endSession(split([a], 0), "a", listedBeforeEnd, new Set())).toEqual(split([], 0));
 	});
 });
 

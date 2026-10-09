@@ -40,7 +40,7 @@ import {
 	TextSearch,
 	Wrench,
 } from "lucide-react";
-import { createContext, type KeyboardEvent, memo, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, type KeyboardEvent, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentRow, LiveView, View } from "../../src/shared/sessions";
 import type { Item } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
@@ -57,11 +57,13 @@ import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader 
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIcon } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
+import { errorText } from "../api";
 import { modeOf, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { usePaneLoaded, useTranscript } from "../pane-store";
-import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies } from "../transcript-view";
+import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies, withEditedPrompt } from "../transcript-view";
+import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { MessageMarkdown } from "./message-markdown";
 import { StatusDot, statusLabel } from "./status-dot";
@@ -140,15 +142,36 @@ export const HIDE_THINKING_KEY = "omp-agents.hide-thinking";
 
 /**
  * Where a `task` row's subagents open: the live session the transcript belongs to, its registered subagents for their
- * status, and the page's open. `onCancel` stops a running subagent for good; `null` in a room the dashboard cannot
- * write to. The context is `null` in a past session, whose subagents have no view of their own.
+ * status, and the page's open. `onCancel` stops a running subagent for good, settling once the server has asked omp to;
+ * `null` in a room the dashboard cannot write to. The context is `null` in a past session, whose subagents have no view of their own.
  */
 export const SubagentLinks = createContext<{
 	instanceId: string;
 	agents: AgentRow[];
 	onOpen: (view: View, mode: OpenMode) => void;
-	onCancel: ((view: LiveView & { agentId: string }) => void) | null;
+	onCancel: ((view: LiveView & { agentId: string }) => Promise<void>) | null;
 } | null>(null);
+
+function CancelAgentButton({ view, onCancel, running }: { view: LiveView & { agentId: string }; onCancel: (view: LiveView & { agentId: string }) => Promise<void>; running: boolean }) {
+	const LoaderIcon = useIcon("loader");
+	const cancel = useAction(() => onCancel(view), "Could not cancel the subagent");
+	if (!running && !cancel.pending) return null;
+	return (
+		<Tooltip content={cancel.pending ? "Cancelling…" : "Cancel subagent: stop it for good, leaving the session's turn running"}>
+			<Button
+				variant="ghost"
+				size="icon"
+				className="size-6 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+				aria-label={cancel.pending ? `Cancelling subagent ${view.agentId}` : `Cancel subagent ${view.agentId}`}
+				aria-busy={cancel.pending || undefined}
+				disabled={cancel.pending}
+				onClick={() => cancel.run()}
+			>
+				{cancel.pending ? <LoaderIcon className="size-3.5 animate-spin" /> : <CircleStop className="size-3.5" />}
+			</Button>
+		</Tooltip>
+	);
+}
 
 /** The subagents a `task` call spawned, each a link to its own view with its status. */
 function SpawnedAgents({ ids }: { ids: string[] }) {
@@ -184,19 +207,7 @@ function SpawnedAgents({ ids }: { ids: string[] }) {
 								<span className="truncate">{id}</span>
 							</a>
 						</Tooltip>
-						{links.onCancel && agent?.status === "running" && (
-							<Tooltip content="Cancel subagent: stop it for good, leaving the session's turn running">
-								<Button
-									variant="ghost"
-									size="icon"
-									className="size-6 text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
-									aria-label={`Cancel subagent ${id}`}
-									onClick={() => links.onCancel?.(view)}
-								>
-									<CircleStop className="size-3.5" />
-								</Button>
-							</Tooltip>
-						)}
+						{links.onCancel && <CancelAgentButton view={view} onCancel={links.onCancel} running={agent?.status === "running"} />}
 					</span>
 				);
 			})}
@@ -307,10 +318,20 @@ function EditButton({ onEdit }: { onEdit: () => void }) {
 	);
 }
 
-/** The last prompt, rewritten in place. Enter resends it, Shift+Enter breaks the line, and Esc or leaving the field cancels. */
-function PromptEditor({ initial, onSave, onCancel }: { initial: string; onSave: (text: string) => void; onCancel: () => void }) {
-	const [text, setText] = useState(initial);
+interface PromptEditorProps {
+	initial: string;
+	text: string;
+	pending: boolean;
+	working: boolean;
+	error: string | null;
+	onChange: (text: string) => void;
+	onSave: () => void;
+	onCancel: () => void;
+}
+
+function PromptEditor({ initial, text, pending, working, error, onChange, onSave, onCancel }: PromptEditorProps) {
 	const ref = useRef<HTMLTextAreaElement>(null);
+	const LoaderIcon = useIcon("loader");
 	useEffect(() => {
 		const el = ref.current;
 		if (!el) return;
@@ -321,25 +342,38 @@ function PromptEditor({ initial, onSave, onCancel }: { initial: string; onSave: 
 		if (event.nativeEvent.isComposing) return;
 		if (event.key === "Escape") {
 			event.preventDefault();
-			onCancel();
+			if (!pending) onCancel();
 		} else if (event.key === "Enter" && !event.shiftKey) {
 			event.preventDefault();
+			if (pending) return;
 			const next = text.trim();
-			if (next && next !== initial.trim()) onSave(next);
+			if (next && next !== initial.trim()) onSave();
 			else onCancel();
 		}
 	};
 	return (
-		<textarea
-			ref={ref}
-			aria-label="Edit message"
-			value={text}
-			rows={1}
-			onChange={event => setText(event.target.value)}
-			onKeyDown={onKeyDown}
-			onBlur={onCancel}
-			className="block w-[36rem] max-w-full resize-none bg-transparent [field-sizing:content] outline-none"
-		/>
+		<>
+			<textarea
+				ref={ref}
+				aria-label="Edit message"
+				aria-busy={pending || undefined}
+				readOnly={pending}
+				value={text}
+				rows={1}
+				onChange={event => onChange(event.target.value)}
+				onKeyDown={onKeyDown}
+				onBlur={pending ? undefined : onCancel}
+				className={cn("block w-[36rem] max-w-full resize-none bg-transparent [field-sizing:content] outline-none", pending && "text-muted-foreground")}
+			/>
+			{pending && (
+				<span role="status" className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+					<LoaderIcon className="size-3 animate-spin" />
+					Resending…
+				</span>
+			)}
+			{!pending && <span className="mt-1 block text-xs text-muted-foreground">{working ? "Enter stops the turn and resends · Esc cancels" : "Enter resends from here · Esc cancels"}</span>}
+			{error && <p role="alert" className="mt-1 text-xs text-destructive">{error}</p>}
+		</>
 	);
 }
 
@@ -349,7 +383,7 @@ interface TranscriptProps {
 	fork: StartOf<"fork"> | null;
 	onFork: (itemId: string, point: ForkPoint) => void;
 	/** Replaces the last prompt with `text` and runs it again; omitted where the session cannot rewind. */
-	onEdit?: (entryId: string, text: string) => void;
+	onEdit?: (entryId: string, text: string) => Promise<void>;
 	/** Shown in place of the transcript, once it loaded, until its first item or turn. */
 	empty?: ReactNode;
 }
@@ -374,23 +408,18 @@ interface MessageRowProps {
 	failed: string | null;
 	/** The entry an edit of this message replaces, or `null` where it cannot be edited. */
 	editAt: string | null;
-	editing: boolean;
-	/** The turn is running, which an edit of this message stops; read only while `editing`. */
-	working: boolean;
+	editor?: ReactNode;
 	onFork: (itemId: string, point: ForkPoint) => void;
-	onEdit?: (entryId: string, text: string) => void;
-	/** Start editing message `id`, or stop editing with `null`. */
-	onEditing: (id: string | null) => void;
+	onEditing: (item: Extract<Item, { kind: "user" }>, entryId: string) => void;
 }
 
 /** One message with its actions. Every prop keeps its identity while the message is unchanged, so a streamed token renders only the row it extends. */
 const MessageRow = memo(function MessageRow({
-	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editing, working, onFork, onEdit, onEditing,
+	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, onFork, onEditing,
 }: MessageRowProps) {
 	const copied = copyText(item);
 	const point = forkAt === null ? null : { entryId: forkAt, prefill };
-	const edit = editAt !== null && onEdit ? { entryId: editAt, run: onEdit } : null;
-	const inEdit = edit !== null && editing;
+	const edit = editAt !== null && item.kind === "user" ? () => onEditing(item, editAt) : undefined;
 	return (
 		<MessageScrollerItem messageId={item.id} className="flex flex-col">
 			<ChatMessage
@@ -399,35 +428,24 @@ const MessageRow = memo(function MessageRow({
 				files={item.kind === "user" ? item.files : undefined}
 				images={item.kind === "user" ? item.images : undefined}
 				actions={
-					inEdit ? (
-						<span>{working ? "Enter stops the turn and resends · Esc cancels" : "Enter resends from here · Esc cancels"}</span>
-					) : copyable || point || edit ? (
+					editor ? undefined : copyable || point || edit ? (
 						<>
 							{copyable && <CopyButton text={copied} />}
-							{edit && <EditButton onEdit={() => onEditing(item.id)} />}
+							{edit && <EditButton onEdit={edit} />}
 							{point && <ForkButton point={point} forking={forking} disabled={forkDisabled} onFork={() => onFork(item.id, point)} />}
 						</>
 					) : undefined
 				}
-				onDoubleClick={edit && !inEdit ? () => onEditing(item.id) : undefined}
+				onDoubleClick={editor ? undefined : edit}
 				data-item={item.kind}
-				data-editing={inEdit || undefined}
+				data-editing={editor ? true : undefined}
 				data-streaming={item.kind === "assistant" ? item.streaming : undefined}
 			>
-				{inEdit ? (
-					<PromptEditor
-						initial={item.text}
-						onSave={text => {
-							onEditing(null);
-							edit.run(edit.entryId, text);
-						}}
-						onCancel={() => onEditing(null)}
-					/>
-				) : item.kind === "user" && (item.text || item.skill) ? (
+				{editor ?? (item.kind === "user" && (item.text || item.skill) ? (
 					<MessageMarkdown text={copyText(item)} prompt />
 				) : item.text ? (
 					<MessageMarkdown text={item.text} />
-				) : null}
+				) : null)}
 			</ChatMessage>
 			{failed && (
 				<p role="alert" className={cn(item.kind === "user" ? "self-end" : "self-start", "text-xs", NOTICE_TONE.error)}>
@@ -453,7 +471,40 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const shown = useRef<Block[]>([]);
 	const blocks = useMemo(() => (shown.current = toBlocks(items, shown.current)), [items]);
 	const editable = useMemo(() => (onEdit ? editablePrompt(items) : null), [items, onEdit]);
-	const [editing, setEditing] = useState<string | null>(null);
+	const [editing, setEditing] = useState<{
+		item: Extract<Item, { kind: "user" }>;
+		position: number;
+		entryId: string;
+		text: string;
+		submitted: string | null;
+		error: string | null;
+		save: NonNullable<TranscriptProps["onEdit"]>;
+	} | null>(null);
+	const resend = useAction(async (edit: NonNullable<typeof editing>) => {
+		const sending = { ...edit, submitted: edit.text.trim() };
+		setEditing(sending);
+		try {
+			await sending.save(sending.entryId, sending.submitted);
+			setEditing(null);
+		} catch (error) {
+			setEditing(current => current === sending ? { ...sending, error: errorText(error) } : current);
+			throw error;
+		}
+	}, "Could not resend the message");
+	const beginEditing = useCallback((item: Extract<Item, { kind: "user" }>, entryId: string) => {
+		const save = onEdit;
+		if (!save) return;
+		setEditing(current => current ?? {
+			item,
+			position: blocks.findIndex(block => block.kind === "item" && block.item.id === item.id),
+			entryId,
+			text: item.text,
+			submitted: null,
+			error: null,
+			save,
+		});
+	}, [blocks, onEdit]);
+	const visibleBlocks = useMemo(() => withEditedPrompt(blocks, editing), [blocks, editing]);
 	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
 	const here = fork && sameView(fork.op.view, view) ? fork : null;
 
@@ -461,7 +512,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 		<MessageScroller className="flex-1">
 			<MessageScrollerViewport>
 				<MessageScrollerContent className="mx-auto max-w-3xl gap-3 p-3" aria-relevant="additions text" data-transcript>
-					{blocks.map(block => {
+					{visibleBlocks.map(block => {
 						if (block.kind === "activity") {
 							return (
 								<MessageScrollerItem key={block.id} messageId={block.id} className="flex flex-col">
@@ -480,7 +531,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 							);
 						}
 						const point = forks.get(item.id);
-						const isEditing = editing === item.id;
+						const edit = editing?.item.id === item.id ? editing : null;
 						return (
 							<MessageRow
 								key={item.id}
@@ -491,16 +542,25 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 								forking={here?.phase === "starting" && here.op.itemId === item.id}
 								forkDisabled={fork?.phase === "starting"}
 								failed={here?.phase === "failed" && here.op.itemId === item.id ? here.error : null}
-								editAt={editable?.itemId === item.id ? editable.entryId : null}
-								editing={isEditing}
-								working={isEditing && working}
+								editAt={!editing && editable?.itemId === item.id ? editable.entryId : null}
+								editor={edit ? (
+									<PromptEditor
+										initial={edit.item.text}
+										text={edit.text}
+										pending={resend.pending}
+										working={working}
+										error={edit.error}
+										onChange={text => setEditing(current => current ? { ...current, text, error: null } : current)}
+										onSave={() => resend.run(edit)}
+										onCancel={() => setEditing(null)}
+									/>
+								) : undefined}
 								onFork={onFork}
-								onEdit={onEdit}
-								onEditing={setEditing}
+								onEditing={beginEditing}
 							/>
 						);
 					})}
-					{loaded && items.length === 0 && !working && empty}
+					{loaded && items.length === 0 && !working && !editing && empty}
 					{working && !streaming && (
 						<MessageScrollerItem messageId="thinking" className="flex flex-col">
 							<ThinkingIndicator className="self-start" />

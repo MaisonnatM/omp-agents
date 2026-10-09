@@ -9,13 +9,14 @@ import type { Dashboard } from "../use-dashboard";
  */
 export interface DashboardActions {
 	send: Dashboard["send"];
+	request: Dashboard["request"];
 	open: Dashboard["open"];
 	focus: Dashboard["focus"];
 	start: Dashboard["start"];
 	dismissStart: Dashboard["dismissStart"];
 	openNewSession: Dashboard["openNewSession"];
 	changeTodo: Dashboard["changeTodo"];
-	/** End running session `instanceId`, then move its panes along. */
+	/** End running session `instanceId`, then move its panes along once the server ended it; a failure shows as a toast. */
 	end: (instanceId: string) => void;
 	/** Open the text file at an absolute or `~/` path in the file dialog. */
 	openFile: (path: string) => void;
@@ -31,7 +32,7 @@ export function useDashboardActions(): DashboardActions {
 	return value;
 }
 
-/** What changes while the page runs: the socket's state, the sessions it is starting, and the inbox entry it polls. */
+/** What changes while the page runs: the socket's state, the sessions it is starting or ending, and the inbox entry it polls. */
 export interface DashboardStatus {
 	connected: boolean;
 	/** The last start of each kind, under way or failed. */
@@ -41,6 +42,8 @@ export interface DashboardStatus {
 		quick: StartOf<"quick"> | null;
 		resumeAll: StartOf<"resume-all"> | null;
 	};
+	/** The live sessions the page asked the server to end, by instance id, until it answers. */
+	ending: ReadonlySet<string>;
 	/**
 	 * The project `cwd` whose inbox entry `App` polls, `null` for all projects. A component that wants the pull requests
 	 * reads that entry, never another scope's: the all-projects entry asks GitHub about every repository.

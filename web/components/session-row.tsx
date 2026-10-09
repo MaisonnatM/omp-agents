@@ -1,4 +1,4 @@
-import { Ellipsis } from "lucide-react";
+import { Ellipsis, Loader } from "lucide-react";
 import { Fragment, memo, type ReactElement, type ReactNode, useState } from "react";
 import type { PullRequest } from "../../src/shared/github";
 import type { PastSession, RosterHost, ShipProgress, View } from "../../src/shared/sessions";
@@ -99,11 +99,12 @@ interface RowMenuProps {
  */
 function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProps, "label" | "children">) {
 	const { open, send, start, end } = useDashboardActions();
-	const { resume } = useDashboardStatus().starts;
+	const { starts: { resume }, ending } = useDashboardStatus();
 	const actions = sessionActions(entry, {
 		onScreen,
 		pinned,
 		resuming: resume?.phase === "starting" ? resume.op.sessionId : null,
+		ending: entry.kind === "live" && ending.has(entry.host.instanceId),
 		open,
 		togglePin: onTogglePin,
 		resume: sessionId => start({ kind: "resume", sessionId }),
@@ -158,7 +159,7 @@ function ActionItem({ action }: { action: PaletteAction<SessionRun> }) {
 		);
 	}
 	return (
-		<MenuItem variant={action.tone} disabled={action.disabled} onClick={run.fn}>
+		<MenuItem variant={action.tone} disabled={action.disabled} aria-busy={(action.id === "end" && action.disabled) || undefined} onClick={run.fn}>
 			<Icon />
 			{title}
 			{action.id === "split" && <MenuShortcut>{SPLIT_CLICK}</MenuShortcut>}
@@ -204,6 +205,13 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showProjec
 	);
 });
 
+function HostStatus({ host }: { host: RosterHost }) {
+	const ending = useDashboardStatus().ending.has(host.instanceId);
+	return ending
+		? <span role="img" aria-label="Ending session" aria-busy className="flex h-4 w-1.5 shrink-0 items-center justify-center"><Loader className="size-3 shrink-0 animate-spin" /></span>
+		: <StatusDot status={host.status} />;
+}
+
 /** A running session's row, with its status dot, and End session where the server controls it. */
 export const HostRow = memo(function HostRow({ session: host, pinned, open, showProject, onTogglePin }: RowProps<RosterHost>) {
 	const { open: onOpen } = useDashboardActions();
@@ -219,7 +227,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 				ship={host.ship}
 				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline", host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests)], host.pullRequests)}
 				when={host.startedAt}
-				dot={<StatusDot status={host.status} />}
+				dot={<HostStatus host={host} />}
 				open={open}
 				onOpen={onOpen}
 			/>

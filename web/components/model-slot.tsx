@@ -16,7 +16,7 @@ interface ModelSlotProps {
 	onSetModel: (model: ModelOption, thinking: string | null) => void;
 	onSetThinking: (level: string) => void;
 	onSetFast: (enabled: boolean) => void;
-	/** A model switch is in flight, so thinking changes wait. */
+	/** A switch of the model, thinking level, or fast mode is in flight, so the menu shows it and other changes wait. */
 	switching: boolean;
 }
 

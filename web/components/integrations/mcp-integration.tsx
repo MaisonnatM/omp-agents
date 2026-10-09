@@ -137,25 +137,33 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 			);
 		} else if (signedIn(connection)) {
 			actions = (
-				<MoreActionsMenu name={label} disabled={starting}>
-					{!needsSetup && (
-						<MenuItem onClick={() => void connect()}>
-							<RefreshCw />
-							Reconnect
-						</MenuItem>
+				<>
+					{starting && (
+						<span role="status" aria-busy className="flex items-center gap-1.5 text-xs text-muted-foreground">
+							<LoaderCircle aria-hidden className="size-3.5 animate-spin" />
+							Reconnecting…
+						</span>
 					)}
-					{setup !== null && (
-						<MenuItem onClick={() => setFormOpen(true)}>
-							<KeyRound />
-							{setup.configured ? `Replace ${settingsLabel}` : "Set up"}
+					<MoreActionsMenu name={label} disabled={starting}>
+						{!needsSetup && (
+							<MenuItem onClick={() => void connect()}>
+								<RefreshCw />
+								Reconnect
+							</MenuItem>
+						)}
+						{setup !== null && (
+							<MenuItem onClick={() => setFormOpen(true)}>
+								<KeyRound />
+								{setup.configured ? `Replace ${settingsLabel}` : "Set up"}
+							</MenuItem>
+						)}
+						<MenuSeparator />
+						<MenuItem variant="destructive" onClick={() => setConfirming(true)}>
+							<LogOut />
+							Sign out
 						</MenuItem>
-					)}
-					<MenuSeparator />
-					<MenuItem variant="destructive" onClick={() => setConfirming(true)}>
-						<LogOut />
-						Sign out
-					</MenuItem>
-				</MoreActionsMenu>
+					</MoreActionsMenu>
+				</>
 			);
 		} else {
 			actions = (

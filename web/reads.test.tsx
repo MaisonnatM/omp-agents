@@ -184,3 +184,56 @@ test.each([
 	expect(result.persisted["24h"].data.totals.requests).toBe(42);
 	expect(result.persisted["7d"].data.totals.requests).toBe(31);
 });
+
+const refreshScenario = String.raw`
+import { act, createElement } from "react";
+
+// React DOM mounts a component that renders nothing with only these parts of a document.
+const noop = () => {};
+const document = { addEventListener: noop, removeEventListener: noop };
+const container = { nodeType: 1, nodeName: "DIV", tagName: "DIV", namespaceURI: "http://www.w3.org/1999/xhtml", ownerDocument: document, addEventListener: noop, removeEventListener: noop };
+document.documentElement = container;
+Object.assign(globalThis, { window: globalThis, document, HTMLIFrameElement: class {}, IS_REACT_ACT_ENVIRONMENT: true });
+const answers = [];
+globalThis.fetch = () => {
+	const { promise, resolve } = Promise.withResolvers();
+	answers.push(resolve);
+	return promise;
+};
+const { createRoot } = await import("react-dom/client");
+const { useRead } = await import("./reads.ts");
+
+const seen = [];
+function Probe({ url, version }) {
+	const { data, error, refreshing } = useRead(url, version);
+	const state = JSON.stringify({ n: data?.n ?? null, error, refreshing });
+	if (seen.at(-1) !== state) seen.push(state);
+	return null;
+}
+const root = createRoot(container);
+const render = (url, version) => act(async () => root.render(createElement(Probe, { url, version })));
+const answer = (status, body) => act(async () => answers.shift()(new Response(JSON.stringify(body), { status })));
+await render("/api/a", 0);
+await answer(200, { n: 1 });
+await render("/api/a", 1);
+await answer(200, { n: 2 });
+await render("/api/a", 2);
+await answer(500, { error: "stats offline" });
+await render("/api/b", 2);
+console.log(JSON.stringify(seen.map(state => JSON.parse(state))));
+`;
+
+test("useRead is refreshing while a new version reads over the last answer, until that read answers or fails", async () => {
+	const child = Bun.spawn([process.execPath, "--eval", refreshScenario], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" });
+	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
+	expect(JSON.parse(stdout)).toEqual([
+		{ n: null, error: null, refreshing: false },
+		{ n: 1, error: null, refreshing: false },
+		{ n: 1, error: null, refreshing: true },
+		{ n: 2, error: null, refreshing: false },
+		{ n: 2, error: null, refreshing: true },
+		{ n: 2, error: "stats offline", refreshing: false },
+		{ n: null, error: null, refreshing: false },
+	]);
+});

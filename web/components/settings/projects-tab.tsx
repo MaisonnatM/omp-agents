@@ -32,11 +32,11 @@ interface ProjectsTabProps {
 export function ProjectsTab({ projects, list: { added, hidden } }: ProjectsTabProps) {
 	const addedCwds = new Set(added.map(entry => entry.cwd));
 	const [path, setPath] = useState("");
-	const [busy, setBusy] = useState(false);
+	const [pending, setPending] = useState<ProjectChange | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	/** Whether the server took `change`; every page then hears the projects after it over its socket. */
 	const change = async (next: ProjectChange): Promise<boolean> => {
-		setBusy(true);
+		setPending(next);
 		setError(null);
 		try {
 			await putJson("/api/projects", next);
@@ -45,7 +45,7 @@ export function ProjectsTab({ projects, list: { added, hidden } }: ProjectsTabPr
 			setError(errorText(err));
 			return false;
 		} finally {
-			setBusy(false);
+			setPending(null);
 		}
 	};
 	const add = async (event: FormEvent): Promise<void> => {
@@ -65,7 +65,7 @@ export function ProjectsTab({ projects, list: { added, hidden } }: ProjectsTabPr
 							className="block h-7 w-80 max-w-full rounded-md border border-border bg-transparent px-2"
 						/>
 					</label>
-					<Button type="submit" variant="secondary" size="compact" leadingIcon={FolderPlus} disabled={busy || path.trim() === ""}>
+					<Button type="submit" variant="secondary" size="compact" leadingIcon={FolderPlus} loading={pending?.op === "add"} disabled={pending !== null || path.trim() === ""}>
 						Add project
 					</Button>
 				</form>
@@ -84,7 +84,7 @@ export function ProjectsTab({ projects, list: { added, hidden } }: ProjectsTabPr
 								project={project}
 								note={addedCwds.has(project.cwd) ? "Added" : null}
 								action={
-									<Button variant="ghost" size="compact" leadingIcon={EyeOff} disabled={busy} onClick={() => void change({ op: "hide", cwd: project.cwd })}>
+									<Button variant="ghost" size="compact" leadingIcon={EyeOff} loading={pending?.op === "hide" && pending.cwd === project.cwd} disabled={pending !== null} onClick={() => void change({ op: "hide", cwd: project.cwd })}>
 										Hide
 									</Button>
 								}
@@ -102,7 +102,7 @@ export function ProjectsTab({ projects, list: { added, hidden } }: ProjectsTabPr
 								project={project}
 								note={null}
 								action={
-									<Button variant="ghost" size="compact" leadingIcon={Eye} disabled={busy} onClick={() => void change({ op: "show", cwd: project.cwd })}>
+									<Button variant="ghost" size="compact" leadingIcon={Eye} loading={pending?.op === "show" && pending.cwd === project.cwd} disabled={pending !== null} onClick={() => void change({ op: "show", cwd: project.cwd })}>
 										Show
 									</Button>
 								}

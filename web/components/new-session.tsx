@@ -189,7 +189,8 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					}
 					rightSlot={({ openFilePicker }) => <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
 					disabled={starting || !connected}
-					sendLabel="Start session"
+					sendLabel={starting ? "Starting session" : "Start session"}
+					sending={starting}
 					editorProps={{ ...completion.editorProps, onKeyDown, autoFocus: true }}
 				/>
 				{directCommand && <ComposerNote text={directCommand} />}

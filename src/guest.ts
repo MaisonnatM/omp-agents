@@ -285,8 +285,8 @@ export class SessionGuest implements LiveSession {
 		});
 	}
 
-	/** omp's Agent Hub kill over Collab: the host aborts a running subagent and tombstones it. */
-	cancelAgent(agentId: string): void {
+	/** omp's Agent Hub kill over Collab: settles once sent to the host, which aborts a running subagent and tombstones it. */
+	async cancelAgent(agentId: string): Promise<void> {
 		if (!this.canWrite || !this.#running(agentId)) return;
 		this.#socket?.send({ t: "agent-cmd", cmd: "kill", agentId });
 	}

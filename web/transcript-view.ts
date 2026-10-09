@@ -33,6 +33,21 @@ export function toBlocks(items: Item[], previous: readonly Block[] = []): Block[
 	});
 }
 
+/** Keeps the prompt being edited at its original position until its resend settles, even after a transcript reset. */
+export function withEditedPrompt(blocks: readonly Block[], edit: { item: Extract<Item, { kind: "user" }>; position: number; submitted: string | null } | null): readonly Block[] {
+	if (!edit) return blocks;
+	const at = blocks.findIndex(block => block.kind === "item" && block.item.id === edit.item.id);
+	const prompt: Block = { kind: "item", item: edit.item };
+	if (at >= 0) return blocks.with(at, prompt);
+	const replacement = blocks[edit.position];
+	if (edit.submitted !== null && replacement?.kind === "item" && replacement.item.kind === "user" &&
+		replacement.item.text === edit.submitted && replacement.item.skill === null &&
+		!replacement.item.images?.length && !replacement.item.files?.length) {
+		return blocks.with(edit.position, prompt);
+	}
+	return blocks.toSpliced(Math.min(edit.position, blocks.length), 0, prompt);
+}
+
 /** How many turns the transcript holds: one per prompt, as {@link outline} counts them. */
 export const turnCount = (items: Item[]): number => items.reduce((count, item) => count + (item.kind === "user" ? 1 : 0), 0);
 

@@ -42,7 +42,7 @@ const paneArea = (index: number, count: number): string =>
 export const Pane = memo(function Pane({
 	view, index, count, focused, maximized, topRight, host, lastHost, session, initialDraft, models, workspaces, onLayout, toggleRight, rightOpen,
 }: PaneProps) {
-	const { send, start, focus, open, end } = useDashboardActions();
+	const { send, request, start, focus, open, end } = useDashboardActions();
 	const { fork, resume } = useDashboardStatus().starts;
 	const instanceId = view.kind === "live" ? view.instanceId : null;
 	const agents = host?.agents;
@@ -50,9 +50,9 @@ export const Pane = memo(function Pane({
 	const links = useMemo(
 		() =>
 			instanceId
-				? { instanceId, agents: agents ?? [], onOpen: open, onCancel: writable ? (agent: LiveView & { agentId: string }) => send({ t: "cancel-agent", view: agent }) : null }
+				? { instanceId, agents: agents ?? [], onOpen: open, onCancel: writable ? (agent: LiveView & { agentId: string }) => request({ t: "cancel-agent", view: agent }) : null }
 				: null,
-		[instanceId, agents, open, writable, send],
+		[instanceId, agents, open, writable, request],
 	);
 	const onFork = useCallback((itemId: string, point: ForkPoint) => start({ kind: "fork", view, itemId, point }), [start, view]);
 	const onResume = useCallback(() => view.kind === "past" && start({ kind: "resume", sessionId: view.sessionId }), [start, view]);

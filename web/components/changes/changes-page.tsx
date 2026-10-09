@@ -70,7 +70,7 @@ export function ChangesPage({ sessionId, path, host, past }: ChangesPageProps) {
 					</Tabs>
 				</SizeProvider>
 				<Tooltip content="Read the changes again" side="bottom">
-					<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Read the changes again" onClick={() => setReads(count => count + 1)}>
+					<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Read the changes again" loading={list.refreshing} onClick={() => setReads(count => count + 1)}>
 						<RotateCw />
 					</Button>
 				</Tooltip>

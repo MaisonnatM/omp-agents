@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
-import { useDashboardActions } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
 import { PullRequestMenu, SessionTrail } from "./session-meta";
 import type { Subject } from "./subject";
@@ -28,13 +28,21 @@ interface ConversationHeaderProps {
 
 /**
  * A live session's or subagent's trail, `project / title`, or `project / title / subagent` with the way back to its session;
- * the connection status; a session's pull requests, its directory in Cursor, and End session.
+ * the connection status; a session's pull requests, its directory in Cursor, and End session, which shows it is
+ * ending until the server answers, though the session may leave the roster before then.
  */
 export function ConversationHeader({ view, subject, onEnd, actions }: ConversationHeaderProps) {
 	const { host, shown, agent, phase, live } = subject;
 	const { open } = useDashboardActions();
-	const status =
-		phase.phase === "live" ? undefined : phase.phase === "connecting" ? CONTROL_LABEL.connecting : `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
+	const ending = useDashboardStatus().ending.has(view.instanceId);
+	const status = ending
+		? "Ending…"
+		: phase.phase === "live"
+			? undefined
+			: phase.phase === "connecting"
+				? CONTROL_LABEL.connecting
+				: `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
+	const endable = live && host ? host : ending ? shown : null;
 	const path = [shown?.sessionName, agent?.id].filter((name): name is string => !!name);
 	const title = shown ? <SessionTrail cwdDisplay={shown.cwdDisplay} worktree={shown.worktree} path={path} /> : (agent?.id ?? view.instanceId);
 	const session = shown ? hostLabel(shown) : "the session";
@@ -52,19 +60,19 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 		</Tooltip>
 	);
 	return (
-		<Header title={title} status={status} alert={phase.phase === "ended"} leading={back}>
+		<Header title={title} status={status} alert={!ending && phase.phase === "ended"} leading={back}>
 			{subject.kind === "session" && shown && <PullRequestMenu pullRequests={shown.pullRequests} />}
-			{subject.kind === "session" && live && host && (
+			{subject.kind === "session" && endable && (
 				<Tooltip
 					content={
-						host.source === "dashboard"
+						endable.source === "dashboard"
 							? "Stop the omp process this dashboard started. Its transcript moves to Past sessions, where Resume continues it."
-							: `Stop the omp process running in its terminal (pid ${host.pid}). Its transcript moves to Past sessions, where Resume continues it.`
+							: `Stop the omp process running in its terminal (pid ${endable.pid}). Its transcript moves to Past sessions, where Resume continues it.`
 					}
 					shortcut={shortcutLabels("endSession")}
 					side="bottom"
 				>
-					<Button variant="primary" size="compact" leadingIcon={CircleStop} onClick={() => onEnd(view.instanceId)}>
+					<Button variant="primary" size="compact" leadingIcon={CircleStop} loading={ending} onClick={() => onEnd(view.instanceId)}>
 						End session
 					</Button>
 				</Tooltip>

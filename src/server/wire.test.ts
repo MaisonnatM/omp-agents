@@ -17,6 +17,16 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "no-such-message" })).toBeNull();
 	});
 
+	test("an ack rides along with any message, and one that is not a counter rejects the message", () => {
+		const frame = (ack: unknown) => parseClientMsg(JSON.stringify({ t: "end", instanceId: "i1", ack }));
+		expect(frame(7)).toEqual({ t: "end", instanceId: "i1", ack: 7 });
+		expect(frame(undefined)).toEqual({ t: "end", instanceId: "i1" });
+		expect(frame(1.5)).toBeNull();
+		expect(frame(-1)).toBeNull();
+		expect(frame("7")).toBeNull();
+		expect(frame(null)).toBeNull();
+	});
+
 	test("watch takes only well-formed views, and one bad view rejects the whole set", () => {
 		expect(msg({ t: "watch", views: [live, { kind: "past", sessionId: "s1" }] })).toEqual({
 			t: "watch",

@@ -172,12 +172,13 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 		<DropdownMenu open={open !== null} onOpenChange={next => onOpenChange(next ? "menu" : null)} onOpenChangeComplete={setMenuShown}>
 			<Tooltip content={current ?? unset} shortcut={shortcutLabels("model")} side="top" forceOpen={open !== null ? false : undefined} disabled={disabled}>
 				<DropdownMenuTrigger
-					disabled={disabled}
+					disabled={disabled || pending}
 					render={
 						<Button
 							variant="ghost"
 							size="compact"
 							trailingIcon={ChevronDown}
+							loading={pending}
 							aria-label={`Choose model and effort: ${current ? modelDescription(current) : unset}, effort ${effort.current ? levelLabel(effort.current) : "Default"}`}
 							active={open !== null}
 						/>

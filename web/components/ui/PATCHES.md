@@ -15,9 +15,11 @@ Dashboard behavior that can live outside these files does: the composer's queued
   A screenshot or a copied file is the common paste.
 - `accept` takes `*/*` as any file, as the browser's file picker does; the dashboard's composer reads or refuses each file itself.
 - `stopShortcut`: the keys that press Stop, shown in its tooltip.
+- `stopping`: the Stop button shows its spinner while the consumer's stop runs.
 - Send and queue buttons show their current action and Enter in a tooltip; Stop keeps its caller-provided shortcut.
 - Send button mode: while `status` is `"streaming"`, the button is Stop only when the draft is empty, and a draft sends at once.
   The dashboard steers a running turn with it, and has no queue inside this component.
+- `sending`: keeps the send button loading and disabled until the consumer's send settles.
 - `beforeEditor`: a slot above the text field and below the attached files, where the dashboard renders its queued rows.
 - `afterActions`: a slot under the action bar, inside the composer's frame, where the dashboard renders its suggested prompts.
 - `useRegionHeight` and `useIsTouch`: exported, so the dashboard's rows in those slots animate and reveal their × as this component's own regions do.
@@ -42,6 +44,7 @@ Dashboard behavior that can live outside these files does: the composer's queued
 
 ## Others
 
+- `ui/button.tsx`: `loading` also sets `aria-busy`; otherwise the caller's `aria-busy` is preserved.
 - `ui/tooltip.tsx`: `shortcut`, the keys that run the trigger's action, drawn as chips after `content`, and the exported `TooltipKbd` chip.
   Long labels wrap at 16rem.
   `ui/sidebar-core.tsx` uses `TooltipKbd` for the sidebar rail's tooltip.

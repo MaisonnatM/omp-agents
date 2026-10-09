@@ -102,7 +102,7 @@ interface CommandPaletteProps {
  */
 export function CommandPalette({ state, dispatch, hosts, past, projects, project, onOpenSession, onPickProject, pinned, onTogglePin, handlers, unavailable, onCreateTodo, onCreateTicket }: CommandPaletteProps) {
 	const { send, start, end } = useDashboardActions();
-	const { starts } = useDashboardStatus();
+	const { starts, ending } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const focusInput = useCallback(() => inputRef.current?.focus(), []);
@@ -125,6 +125,7 @@ export function CommandPalette({ state, dispatch, hosts, past, projects, project
 				onScreen: false,
 				pinned: pinned.has(row.sessionId),
 				resuming,
+				ending: entry.kind === "live" && ending.has(entry.host.instanceId),
 				open: (picked, mode) => onOpenSession(picked, row.cwd, mode),
 				togglePin: onTogglePin,
 				resume: sessionId => start({ kind: "resume", sessionId }),
@@ -160,7 +161,7 @@ export function CommandPalette({ state, dispatch, hosts, past, projects, project
 					};
 		};
 		return [...hosts.map(host => sessionItem({ kind: "live", host })), ...past.map(session => sessionItem({ kind: "past", session }))];
-	}, [open, hosts, past, pinned, resuming, onOpenSession, onTogglePin, start, send, end]);
+	}, [open, hosts, past, pinned, resuming, ending, onOpenSession, onTogglePin, start, send, end]);
 
 	const commandItems = useMemo((): PaletteItem[] => {
 		if (!open) return [];

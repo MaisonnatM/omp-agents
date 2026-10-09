@@ -286,6 +286,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={asChildElement ? undefined : disabled || loading}
         style={style}
         {...props}
+        aria-busy={loading || props["aria-busy"]}
         data-pressed={active ? "" : undefined}
       >
         {asChildElement

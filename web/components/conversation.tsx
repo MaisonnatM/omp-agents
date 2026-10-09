@@ -12,6 +12,7 @@ import type { ModelList } from "../reads";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../shortcuts";
 import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
+import { useAction } from "../use-action";
 import type { Dashboard } from "../use-dashboard";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation } from "./composer";
@@ -20,6 +21,7 @@ import { useSuggestions } from "./composer-suggestions";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ContextRing } from "./context-ring";
 import { ConversationHeader } from "./conversation-header";
+import { useDashboardActions } from "./dashboard-context";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import type { ModelMenuOpen } from "./model-picker";
 import { ModelSlot } from "./model-slot";
@@ -104,7 +106,8 @@ function LiveConversation({
 	const switchable = subject.kind === "session" ? subject.switchable : null;
 	const thinking = shown?.thinkingLevel ?? null;
 	const instanceId = view.instanceId;
-	const editPrompt = useCallback((entryId: string, text: string) => send({ t: "edit-prompt", instanceId, entryId, text }), [instanceId, send]);
+	const { request } = useDashboardActions();
+	const editPrompt = useCallback((entryId: string, text: string) => request({ t: "edit-prompt", instanceId, entryId, text }), [instanceId, request]);
 	const completion = useCompletion({
 		editorRef,
 		draft,
@@ -114,12 +117,15 @@ function LiveConversation({
 		composer: { sessionId: shown?.sessionId ?? null, changed },
 	});
 
-	const switchingModel = !!switchable && switchable.switching;
+	const stop = useAction((reqId: number) => request({ t: "interrupt", reqId, view }), "Could not stop the turn");
+	const thinkingChange = useAction((level: string) => request({ t: "set-thinking", instanceId, level }), "Could not change the thinking level");
+	const fastChange = useAction((enabled: boolean) => request({ t: "set-fast", instanceId, enabled }), "Could not switch fast mode");
+	const switching = (!!switchable && switchable.switching) || thinkingChange.pending || fastChange.pending;
 	const { queued, take, interrupt } = useQueue({
 		waiting: subject.queue,
 		withdrawn,
 		dequeue: (reqId, queue, text) => send({ t: "dequeue", reqId, view, queue, text }),
-		interrupt: reqId => send({ t: "interrupt", reqId, view }),
+		interrupt: stop.run,
 		restore: messages => {
 			const text = messages.map(message => message.text).join("\n");
 			setDraft(current => (current ? `${text}\n${current}` : text));
@@ -164,7 +170,6 @@ function LiveConversation({
 		if (open !== null && modelsOpen === null) send({ t: "list-models", instanceId: view.instanceId });
 		setModelsOpen(open);
 	};
-	const setThinking = (level: string): void => send({ t: "set-thinking", instanceId: view.instanceId, level });
 	// omp's `/move` refuses while a turn runs, a turn waiting on a question included.
 	const movable = switchable?.status === "idle";
 
@@ -182,7 +187,7 @@ function LiveConversation({
 		...(focused
 			? {
 					interrupt: () => {
-						if (!session || !writable || !working) return false;
+						if (!session || !writable || !working || stop.pending) return false;
 						interrupt();
 					},
 					endSession: () => {
@@ -204,9 +209,9 @@ function LiveConversation({
 						setDirectoriesOpen(open => !open);
 					},
 					thinking: () => {
-						const levels = switchingModel ? [] : switchable?.thinkingLevels ?? [];
+						const levels = switching ? [] : switchable?.thinkingLevels ?? [];
 						if (levels.length === 0) return false;
-						setThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
+						thinkingChange.run(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
 					},
 					focusComposer: () => {
 						const editor = editorRef.current;
@@ -269,10 +274,10 @@ function LiveConversation({
 								models={models}
 								open={modelsOpen}
 								onOpenChange={openModels}
-								switching={switchingModel}
+								switching={switching}
 								onSetModel={(model, level) => send({ t: "set-model", instanceId: view.instanceId, model, thinking: level })}
-								onSetThinking={setThinking}
-								onSetFast={enabled => send({ t: "set-fast", instanceId: view.instanceId, enabled })}
+								onSetThinking={thinkingChange.run}
+								onSetFast={fastChange.run}
 							/>
 							{switchable && shown && (
 								<DirectoryPicker
@@ -308,6 +313,7 @@ function LiveConversation({
 					disabled={!writable}
 					status={working ? "streaming" : "idle"}
 					onStop={session ? interrupt : undefined}
+					stopping={stop.pending}
 					stopShortcut={shortcutLabels("interrupt")}
 					sendLabel={working && subject.followUps ? "Queue a follow-up" : `${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
 					beforeEditor={

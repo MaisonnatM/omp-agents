@@ -50,6 +50,8 @@ export interface DashboardState {
 	pins: string[];
 	/** What the bell lists, empty until the server first sends it. */
 	notices: Notice[];
+	/** The live sessions this page asked the server to end, by instance id, until it answers. */
+	ending: ReadonlySet<string>;
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
@@ -61,6 +63,10 @@ export type Action =
 	| { t: "start"; reqId: number; op: StartOp }
 	/** A failed start's error goes away; a start under way keeps waiting for its answer. */
 	| { t: "dismiss-start"; kind: StartKind }
+	/** The page asked the server to end live session `instanceId`. */
+	| { t: "end"; instanceId: string }
+	/** The server answered the page's end of `instanceId`, whether it ended or failed to. */
+	| { t: "ended"; instanceId: string }
 	| { t: "new-session-completions"; completions: Completions }
 	| { t: "user-todo"; change: UserTodoChange }
 	| { t: "pin"; change: PinChange }
@@ -116,6 +122,14 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, starts: beginStart(state.starts, action.reqId, action.op) };
 		case "dismiss-start":
 			return { ...state, starts: dismissSettled(state.starts, action.kind) };
+		case "end":
+			return state.ending.has(action.instanceId) ? state : { ...state, ending: new Set(state.ending).add(action.instanceId) };
+		case "ended": {
+			if (!state.ending.has(action.instanceId)) return state;
+			const ending = new Set(state.ending);
+			ending.delete(action.instanceId);
+			return { ...state, ending };
+		}
 		case "new-session-completions":
 			return { ...state, newSessionCompletions: action.completions };
 		case "roster": {
@@ -191,5 +205,6 @@ export function initialState(route: Route): DashboardState {
 		projectList: { added: [], hidden: [] },
 		pins: [],
 		notices: [],
+		ending: new Set(),
 	};
 }

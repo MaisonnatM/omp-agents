@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ANALYTICS_RANGES, type Analytics, type AnalyticsRange, type AnalyticsSession } from "../../../src/shared/analytics";
 import { hashForSession } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { modelLabel, modelOrg, projectName, providerLabel, readTime } from "../../labels";
 import { analyticsStore } from "../../reads";
 import { OrgIcon } from "../org-icon";
@@ -168,8 +169,12 @@ function UsageBody({ data }: { data: Analytics }) {
 export function AnalyticsTab({ active }: { active: boolean }) {
 	const [range, setRange] = useState<AnalyticsRange>("24h");
 	const entry = analyticsStore.use(range);
-	const data = entry.read?.data ?? null;
+	const answer = entry.read?.data ?? null;
+	const [last, setLast] = useState<Analytics | null>(null);
+	if (answer !== null && answer !== last) setLast(answer);
 	const { error } = entry;
+	const data = answer ?? (error === null ? last : null);
+	const switching = data !== null && data.range !== range;
 	useEffect(() => {
 		if (active) void analyticsStore.refresh(range);
 	}, [active, range]);
@@ -190,9 +195,11 @@ export function AnalyticsTab({ active }: { active: boolean }) {
 			{data?.sync.phase === "syncing" && <p role="status" className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">Indexing sessions… {data.sync.total > 0 && `${full.format(data.sync.current)} of ${full.format(data.sync.total)}`}</p>}
 			{data?.sync.phase === "error" && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Indexing failed. omp will retry: {data.sync.error ?? "Unknown error"}</p>}
 			{error && data && <p role="alert" className="text-sm text-red-600 dark:text-red-400">Cannot refresh analytics: {error}</p>}
-			{!data ? <LoadNote loading="Reading omp's usage…" error={error} /> : data.totals.requests === 0 ? (
-				<div className="py-12 text-center text-sm text-muted-foreground">{data.sync.phase === "syncing" ? "Your session history is still being indexed." : "No requests in this time range."}</div>
-			) : <UsageBody data={data} />}
+			<div aria-busy={switching || undefined} className={cn("transition-opacity duration-150", switching && "opacity-50")}>
+				{!data ? <LoadNote loading="Reading omp's usage…" error={error} /> : data.totals.requests === 0 ? (
+					<div className="py-12 text-center text-sm text-muted-foreground">{data.sync.phase === "syncing" ? "Your session history is still being indexed." : "No requests in this time range."}</div>
+				) : <UsageBody data={data} />}
+			</div>
 		</div>
 	);
 }

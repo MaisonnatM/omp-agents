@@ -146,6 +146,8 @@ interface InputMessageProps
   clickToFocus?: boolean;
   /** Accessible label for the send button. */
   sendLabel?: string;
+  /** Shows the send button's spinner while the consumer's send runs. */
+  sending?: boolean;
   /** Controlled list of attached files. When undefined, attachment behavior
    *  is disabled (no drag-drop, no paste, no file input). */
   files?: File[];
@@ -174,6 +176,8 @@ interface InputMessageProps
    *  consumer should halt the current response and flip `status` to `"idle"`,
    *  which immediately dispatches the next queued message. */
   onStop?: () => void;
+  /** Shows the Stop button's spinner while the consumer's stop runs. */
+  stopping?: boolean;
   /** Keys that press Stop, shown in its tooltip; no tooltip when omitted. */
   stopShortcut?: readonly string[];
   /** Controlled queue of pending messages. Requires `status` to be controlled. */
@@ -466,6 +470,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
       maxRows = 8,
       clickToFocus = true,
       sendLabel = "Send",
+      sending = false,
       files,
       onFilesChange,
       accept = DEFAULT_ACCEPT,
@@ -475,6 +480,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
       editorRef,
       status,
       onStop,
+      stopping = false,
       stopShortcut,
       queue,
       onQueueChange,
@@ -1257,6 +1263,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
                   size="icon-sm"
                   onClick={buttonMode === "stop" ? handleStop : handleSend}
                   disabled={buttonMode === "stop" ? disabled : !canSend}
+                  loading={buttonMode === "stop" ? stopping : sending}
                   aria-label={buttonLabel}
                 >
                   <AnimatePresence mode="wait" initial={false}>

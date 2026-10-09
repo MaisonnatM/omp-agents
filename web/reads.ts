@@ -1,5 +1,5 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { isObject } from "../src/json";
 import { type CalendarEventsAnswer, type GoogleStatus, type IntegrationsAnswer, MCP_INTEGRATIONS } from "../src/shared/accounts";
 import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
@@ -19,25 +19,32 @@ export const UNREAD: ReadState<never> = { data: null, error: null };
 /** The models that omp lists, as the server answers a read or sends them to a session. */
 export type ModelList = ReadState<{ models: ModelEntry[] }>;
 
+type Refreshable<T> = ReadState<T> & { refreshing: boolean };
+
+const UNREAD_IDLE: Refreshable<never> = { ...UNREAD, refreshing: false };
+
 /**
  * The server's answer at `url`, nothing while `url` is `null` or until it first answers for `url`, so an answer for a
- * previous `url` never shows. A change of `version` reads it again, keeping the last answer meanwhile and when that read fails.
+ * previous `url` never shows. A change of `version` reads it again, keeping the last answer meanwhile and when that read
+ * fails; `refreshing` holds until that read settles.
  */
-export function useRead<T>(url: string | null, version?: unknown): ReadState<T> {
-	const [read, setRead] = useState<(ReadState<T> & { url: string }) | null>(null);
+export function useRead<T>(url: string | null, version?: unknown): Refreshable<T> {
+	const [read, setRead] = useState<(ReadState<T> & { url: string; version: unknown }) | null>(null);
 	useEffect(() => {
 		if (url === null) return;
 		const controller = new AbortController();
 		// An abort makes `getJson` reject, so only the failure needs to tell it apart.
 		getJson<T>(url, controller.signal).then(
-			data => setRead({ url, data, error: null }),
+			data => setRead({ url, version, data, error: null }),
 			(err: unknown) => {
-				if (!controller.signal.aborted) setRead(last => ({ url, data: last?.url === url ? last.data : null, error: errorText(err) }));
+				if (!controller.signal.aborted) setRead(last => ({ url, version, data: last?.url === url ? last.data : null, error: errorText(err) }));
 			},
 		);
 		return () => controller.abort();
 	}, [url, version]);
-	return read?.url === url ? read : UNREAD;
+	const current = read?.url === url ? read : null;
+	const refreshing = current !== null && !Object.is(current.version, version);
+	return useMemo(() => (current ? { data: current.data, error: current.error, refreshing } : UNREAD_IDLE), [current, refreshing]);
 }
 
 /**

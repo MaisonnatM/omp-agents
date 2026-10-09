@@ -353,11 +353,11 @@ describe("SessionGuest subagents", () => {
 
 	test("cancel kills only a running subagent, and a read-only room kills nothing", async () => {
 		const { guest, socket } = await joinRoom({ welcome: { agents: [MAIN, agent("s1", "running"), agent("s2", "idle"), agent("s3", "parked")] } });
-		for (const id of ["s1", "s2", "s3", "ghost"]) guest.cancelAgent(id);
+		for (const id of ["s1", "s2", "s3", "ghost"]) await guest.cancelAgent(id);
 		expect(socket.messages).toEqual([{ t: "agent-cmd", cmd: "kill", agentId: "s1" }]);
 
 		const readOnly = await joinRoom({ welcome: { readOnly: true, agents: [MAIN, agent("s1", "running")] } });
-		readOnly.guest.cancelAgent("s1");
+		await readOnly.guest.cancelAgent("s1");
 		expect(readOnly.socket.messages).toEqual([]);
 	});
 

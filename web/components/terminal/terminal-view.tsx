@@ -3,6 +3,7 @@ import { type ITheme, Terminal } from "@xterm/xterm";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 import { type TerminalClientMsg, type TerminalInfo, type TerminalServerMsg, terminalSocketPath } from "../../../src/shared/terminals";
 import { IS_MAC, pressesChord, SHORTCUTS } from "../../shortcuts";
+import { terminalSender } from "./terminal-socket";
 
 /** VS Code's ANSI colors, light and dark: xterm's own suit only a dark background. */
 const ANSI: Record<"light" | "dark", ITheme> = {
@@ -94,9 +95,7 @@ export function TerminalView({ target, active, onOpened, onClosed, ref }: Termin
 		const encoder = new TextEncoder();
 		const ws = new WebSocket(`ws://${location.host}${terminalSocketPath("id" in target ? target : { cwd: target.cwd, cols: terminal.cols, rows: terminal.rows })}`);
 		ws.binaryType = "arraybuffer";
-		const send = (msg: TerminalClientMsg): void => {
-			if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
-		};
+		const send = terminalSender(ws);
 		xterm.current = { terminal, fit, send };
 		let exited = false;
 		ws.onmessage = ({ data }: MessageEvent<string | ArrayBuffer>) => {

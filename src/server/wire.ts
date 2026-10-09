@@ -15,7 +15,7 @@ import type { ModelOption } from "../shared/models";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import type { ProjectChange } from "../shared/projects";
-import type { ClientMsg } from "../shared/protocol";
+import type { ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues } from "../shared/tickets";
@@ -341,8 +341,8 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 
 const isClientMsgType = (t: unknown): t is ClientMsg["t"] => typeof t === "string" && Object.hasOwn(clientParsers, t);
 
-/** A socket message from the page, or `null` when it is not valid JSON or not one of {@link ClientMsg}. */
-export function parseClientMsg(raw: string | Buffer): ClientMsg | null {
+/** A socket message from the page, or `null` when it is not valid JSON, not one of {@link ClientMsg}, or tagged with an `ack` that is not a counter. */
+export function parseClientMsg(raw: string | Buffer): ClientFrame | null {
 	let value: unknown;
 	try {
 		value = JSON.parse(String(raw));
@@ -350,7 +350,11 @@ export function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 		return null;
 	}
 	if (!isObject(value) || !isClientMsgType(value.t)) return null;
-	return clientParsers[value.t](value)?.ok ?? null;
+	const { ack } = value;
+	if (ack !== undefined && !isCounter(ack)) return null;
+	const msg = clientParsers[value.t](value)?.ok;
+	if (!msg) return null;
+	return ack === undefined ? msg : { ...msg, ack };
 }
 
 /** A terminal's columns or rows: xterm's own bounds. */

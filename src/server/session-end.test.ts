@@ -30,7 +30,20 @@ describe("endSession", () => {
 		const { log, run } = harness(async () => {
 			throw new Error("gone");
 		});
-		await run();
+		await expect(run()).rejects.toThrow("gone");
 		expect(log).toEqual([]);
+	});
+
+	test("worktree cleanup failure remains nonfatal after successful termination", async () => {
+		const log: string[] = [];
+		await endSession({
+			sessionId: "s1",
+			workDir: "/work/s1",
+			end: async () => { log.push("ended"); },
+		}, async dir => {
+			log.push(`cleanup ${dir}`);
+			throw new Error("dirty worktree");
+		});
+		expect(log).toEqual(["ended", "cleanup /work/s1"]);
 	});
 });

@@ -6,6 +6,11 @@ import { DashboardSession, type DashboardUpdate } from "./dashboard-session";
 import type { Frame } from "./omp/collab";
 import * as rpc from "./omp/rpc";
 import type { RpcChild, RpcClient, RpcState } from "./omp/rpc";
+import { LiveSessions } from "./server/live-sessions";
+import { endSession } from "./server/session-end";
+import { createClientHandler, type SocketEnv } from "./server/socket";
+import type { Socket } from "./server/views";
+import type { ServerMsg } from "./shared/protocol";
 
 const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastModeActive: false, queuedMessages: { steering: [], followUp: [] } };
 
@@ -42,7 +47,7 @@ class FakeClient implements RpcClient {
 		this.#listeners.push(listener);
 		return () => {};
 	};
-	onSubagentLifecycle = () => () => {};
+	onSubagentLifecycle: RpcClient["onSubagentLifecycle"] = () => () => {};
 	onSubagentProgress = () => () => {};
 	steerSubagent = async (): Promise<void> => {};
 	cancelSubagent = async () => true;
@@ -331,9 +336,81 @@ describe("DashboardSession prompts", () => {
 	test("an edit an omp extension cancels keeps the session and sends nothing", async () => {
 		const { session, client } = await startSession();
 		client.branch = async () => ({ text: "old", cancelled: true });
-		await session.editPrompt("e1", "new");
+		await expect(session.editPrompt("e1", "new")).rejects.toThrow("an omp extension cancelled the branch");
 		expect(session.sessionId).toBe("session-1");
 		expect(client.calls).toEqual([]);
+	});
+});
+
+describe("DashboardSession action failures", () => {
+	test("socket acknowledgments report failed interruption and termination through the real session paths", async () => {
+		const client = new FakeClient();
+		fakeOmp(client);
+		const updates: DashboardUpdate[] = [];
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => updates.push(update));
+		client.abortAndRestoreQueue = async () => { throw new Error("abort unavailable"); };
+		client.stop = async () => { throw new Error("stop unavailable"); };
+		const sessions = new LiveSessions(() => {});
+		sessions.add(session, null);
+		const sent: ServerMsg[] = [];
+		const ws = { data: { views: new Map() }, send: (raw: string) => void sent.push(JSON.parse(raw)) } as unknown as Socket;
+		let removed = false;
+		const handle = createClientHandler({
+			sessions,
+			end: async (instanceId: string) => {
+				const target = sessions.get(instanceId);
+				if (target) await endSession({ sessionId: target.sessionId, workDir: target.cwd, end: () => target.end() }, async () => {
+					removed = true;
+					return null;
+				});
+			},
+		} as SocketEnv);
+		await expect(handle(ws, { t: "interrupt", reqId: 1, ack: 1, view: { kind: "live", instanceId: "inst-1", agentId: null } })).rejects.toThrow("abort unavailable");
+		await expect(handle(ws, { t: "end", instanceId: "inst-1", ack: 2 })).rejects.toThrow("stop unavailable");
+		expect(sent).toEqual([
+			{ t: "done", ack: 1, error: "abort unavailable" },
+			{ t: "done", ack: 2, error: "stop unavailable" },
+		]);
+		expect(updates.filter(update => update.kind === "note").map(update => update.text)).toEqual(["Stop failed: abort unavailable"]);
+		expect(removed).toBe(false);
+	});
+
+	test("thinking and fast failures reject for the caller and still emit their transcript notes", async () => {
+		const client = new FakeClient();
+		fakeOmp(client);
+		const updates: DashboardUpdate[] = [];
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => updates.push(update));
+		client.setThinkingLevel = async () => { throw new Error("thinking unavailable"); };
+		client.setFastMode = async () => { throw new Error("fast unavailable"); };
+		await expect(session.setThinking("low")).rejects.toThrow("thinking unavailable");
+		await expect(session.setFast(true)).rejects.toThrow("fast unavailable");
+		expect(updates.filter(update => update.kind === "note").map(update => update.text)).toEqual([
+			"Thinking level switch failed: thinking unavailable",
+			"Fast mode switch failed: fast unavailable",
+		]);
+	});
+
+	test("cancellation waits for omp and propagates its error with the transcript note", async () => {
+		const client = new FakeClient();
+		let lifecycle: (payload: unknown) => void = () => {};
+		client.onSubagentLifecycle = listener => {
+			lifecycle = listener;
+			return () => {};
+		};
+		fakeOmp(client);
+		const updates: DashboardUpdate[] = [];
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => updates.push(update));
+		lifecycle({ id: "a1", status: "started" });
+		const response = Promise.withResolvers<boolean>();
+		client.cancelSubagent = () => response.promise;
+		let settled = false;
+		const cancelling = session.cancelAgent("a1");
+		void cancelling.then(() => { settled = true; }, () => { settled = true; });
+		await settle();
+		expect(settled).toBe(false);
+		response.reject(new Error("cancel unavailable"));
+		await expect(cancelling).rejects.toThrow("cancel unavailable");
+		expect(updates.filter(update => update.kind === "note").map(update => update.text)).toEqual(["Cancel failed: cancel unavailable"]);
 	});
 });
 

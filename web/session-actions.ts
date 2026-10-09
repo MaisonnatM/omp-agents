@@ -17,6 +17,8 @@ export interface SessionActionContext {
 	pinned: boolean;
 	/** The session a resume is starting for, or `null`. One resume runs at a time, as the pane's Resume button allows. */
 	resuming: string | null;
+	/** This live session is waiting for the server to finish ending it. */
+	ending: boolean;
 	open: (view: View, mode: OpenMode) => void;
 	togglePin: (sessionId: string) => void;
 	/** Start resuming past session `sessionId`. */
@@ -91,6 +93,6 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 		opening,
 		links,
 		copies,
-		[{ id: "end", title: "End session", icon: CircleStop, tone: "destructive", chord: { key: "x", mod: true, shift: true }, run: { kind: "do", fn: () => context.end(instanceId) } }],
+		[{ id: "end", title: context.ending ? "Ending…" : "End session", icon: CircleStop, disabled: context.ending, tone: "destructive", chord: { key: "x", mod: true, shift: true }, run: { kind: "do", fn: () => context.end(instanceId) } }],
 	];
 }

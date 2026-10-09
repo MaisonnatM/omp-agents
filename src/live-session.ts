@@ -44,8 +44,8 @@ export interface LiveSession {
 	 * Enter does in omp's terminal. A turn that already took the steer runs on.
 	 */
 	flush(): void;
-	/** Hard-stop a running subagent, as omp's Agent Hub kill does; the session's own turn goes on. */
-	cancelAgent(agentId: string): void;
+	/** Hard-stop a running subagent, as omp's Agent Hub kill does; settles once cancellation is handled, and the session's own turn goes on. */
+	cancelAgent(agentId: string): Promise<void>;
 	/** Stop the session as closing its terminal would; a terminal session's file stays resumable. */
 	end(): Promise<void>;
 	/** Reply to one of the session's pending questions; a reply to a question already gone is dropped. */

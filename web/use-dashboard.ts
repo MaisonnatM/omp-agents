@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { PinChange } from "../src/shared/pins";
-import type { ClientMsg, ServerMsg } from "../src/shared/protocol";
+import type { ClientFrame, ClientMsg, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import type { UserTodoChange } from "../src/user-todos-shared";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
@@ -20,6 +20,8 @@ import {
 import { messageOf, pendingStart, type StartKind, type StartOp } from "./starts";
 
 const NO_VIEWS: View[] = [];
+
+const CONNECTION_LOST = "Lost the connection to the server before it answered.";
 
 /** Where an older page kept the pins, in each browser's localStorage, before the server kept them. */
 const STORED_PINS_KEY = "omp-agents.pinned-sessions";
@@ -44,6 +46,10 @@ export interface Dashboard {
 	/** The page covering the panes; `null` while the panes show. */
 	page: Page | null;
 	send: (msg: ClientMsg) => void;
+	/** Send `msg` and settle once the server has handled it: rejects with the server's error, or at once while disconnected. */
+	request: (msg: ClientMsg) => Promise<void>;
+	/** End live session `instanceId`, which counts as ending until the server answers; rejects with why it could not. */
+	end: (instanceId: string) => Promise<void>;
 	/** Show `view` in the focused pane, or in a new pane for `split`. */
 	open: (view: View, mode: OpenMode) => void;
 	focus: (index: number) => void;
@@ -92,9 +98,38 @@ export function useDashboard(): Dashboard {
 		if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 	}, []);
 
-	// The hash is the source of truth; its `hashchange` dispatches the route.
+	const acks = useRef(new Map<number, { resolve: () => void; reject: (error: Error) => void }>());
+	const nextAck = useRef(0);
+	const request = useCallback(
+		(msg: ClientMsg) =>
+			new Promise<void>((resolve, reject) => {
+				const ws = socketRef.current;
+				if (ws?.readyState !== WebSocket.OPEN) {
+					reject(new Error("Not connected to the server."));
+					return;
+				}
+				const ack = nextAck.current++;
+				acks.current.set(ack, { resolve, reject });
+				ws.send(JSON.stringify({ ...msg, ack } satisfies ClientFrame));
+			}),
+		[],
+	);
+
+	const end = useCallback(
+		async (instanceId: string) => {
+			dispatch({ t: "end", instanceId });
+			try {
+				await request({ t: "end", instanceId });
+			} finally {
+				dispatch({ t: "ended", instanceId });
+			}
+		},
+		[request],
+	);
+
 	const show = useCallback((layout: Layout) => {
 		location.hash = hashForLayout(layout);
+		dispatch({ t: "route", route: { kind: "panes", layout } });
 	}, []);
 
 	const navigate = useCallback((next: Page) => {
@@ -112,6 +147,11 @@ export function useDashboard(): Dashboard {
 	const focus = useCallback((index: number) => replace({ ...layoutRef.current, focus: index }), [replace]);
 
 	useEffect(() => {
+		const pending = acks.current;
+		const abandon = (): void => {
+			for (const { reject } of pending.values()) reject(new Error(CONNECTION_LOST));
+			pending.clear();
+		};
 		// A start's answer settles it, then the panes follow the start as it was before.
 		const answer = (msg: ServerAction, layout: Layout | null): void => {
 			dispatch(msg);
@@ -159,6 +199,13 @@ export function useDashboard(): Dashboard {
 					case "notices":
 						dispatch(msg);
 						return;
+					case "done": {
+						const waiting = pending.get(msg.ack);
+						pending.delete(msg.ack);
+						if (msg.error === null) waiting?.resolve();
+						else waiting?.reject(new Error(msg.error));
+						return;
+					}
 					case "pins":
 						dispatch(msg);
 						sendStoredPins(ws);
@@ -171,6 +218,7 @@ export function useDashboard(): Dashboard {
 			};
 			ws.onclose = () => {
 				if (disposed) return;
+				abandon();
 				dispatch({ t: "connected", connected: false });
 				timer = window.setTimeout(connect, retryMs);
 				retryMs = Math.min(retryMs * 2, 5000);
@@ -181,6 +229,7 @@ export function useDashboard(): Dashboard {
 			disposed = true;
 			clearTimeout(timer);
 			socketRef.current?.close();
+			abandon();
 		};
 	}, [show]);
 
@@ -235,5 +284,5 @@ export function useDashboard(): Dashboard {
 		[send],
 	);
 
-	return { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo, changePins };
+	return { state, page, send, request, end, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo, changePins };
 }

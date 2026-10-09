@@ -366,7 +366,7 @@ export class DashboardSession implements LiveSession {
 				return [...steering, ...followUp].map(({ text, images = [] }) => ({ text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) }));
 			} catch (err) {
 				this.#fail("Stop failed", err);
-				return [];
+				throw err;
 			}
 		});
 	}
@@ -403,12 +403,18 @@ export class DashboardSession implements LiveSession {
 				this.#userCommand = text.startsWith("/");
 				await client.prompt(text);
 			})
-			.catch((err: unknown) => this.#fail("Edit failed", err));
+			.catch((err: unknown) => {
+				this.#fail("Edit failed", err);
+				throw err;
+			});
 	}
 
-	cancelAgent(agentId: string): void {
+	async cancelAgent(agentId: string): Promise<void> {
 		if (this.#agents.get(agentId)?.status !== "running") return;
-		this.#child.client.cancelSubagent(agentId).catch((err: unknown) => this.#fail("Cancel failed", err, agentId));
+		await this.#child.client.cancelSubagent(agentId).catch((err: unknown) => {
+			this.#fail("Cancel failed", err, agentId);
+			throw err;
+		});
 	}
 
 	/** The models omp offers this session, from the providers you are connected to. */
@@ -442,15 +448,14 @@ export class DashboardSession implements LiveSession {
 			if (!this.thinkingLevels.includes(level)) return;
 			try {
 				const levels = await this.#child.client.getAvailableThinkingLevels();
-				if (!levels.includes(level)) {
-					await this.#readModelState("Model state refresh failed");
-					return;
-				}
+				if (!levels.includes(level)) return;
 				await this.#child.client.setThinkingLevel(level);
 			} catch (err) {
 				this.#fail("Thinking level switch failed", err);
+				throw err;
+			} finally {
+				await this.#readModelState("Model state refresh failed");
 			}
-			await this.#readModelState("Model state refresh failed");
 		});
 	}
 
@@ -460,8 +465,10 @@ export class DashboardSession implements LiveSession {
 				await this.#child.client.setFastMode(enabled);
 			} catch (err) {
 				this.#fail("Fast mode switch failed", err);
+				throw err;
+			} finally {
+				await this.#readModelState("Model state refresh failed");
 			}
-			await this.#readModelState("Model state refresh failed");
 		});
 	}
 

@@ -8,6 +8,7 @@ const context = (change: Partial<SessionActionContext> = {}): SessionActionConte
 	onScreen: false,
 	pinned: false,
 	resuming: null,
+	ending: false,
 	open: noop,
 	togglePin: noop,
 	resume: noop,
@@ -41,6 +42,11 @@ describe("sessionActions", () => {
 
 	test("a session already in a pane offers no split", () => {
 		expect(ids(past(), { onScreen: true })[0]).toEqual(["open", "resume", "pin"]);
+	});
+
+	test("End reads Ending… and is disabled while the server ends that session", () => {
+		const action = sessionActions(live({ phase: "live", readOnly: false }), context({ ending: true })).flat().find(({ id }) => id === "end");
+		expect([action?.title, action?.disabled]).toEqual(["Ending…", true]);
 	});
 
 	test("one resume runs at a time, and only the starting one reads Resuming…", () => {

@@ -36,6 +36,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 	const [sort, setSort] = useState<SortKey>("size");
 	const [inventory, setInventory] = useState<WorktreeInventory | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [reading, setReading] = useState(false);
 	const [metrics, setMetrics] = useState<Record<string, WorktreeMetrics>>({});
 	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 	const [dialog, setDialog] = useState<DialogState | null>(null);
@@ -44,6 +45,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 	useEffect(() => {
 		if (!active) return;
 		const controller = new AbortController();
+		setReading(true);
 		const scopes = cwd === null ? [null, ...extras] : [cwd, ...extras];
 		Promise.all(scopes.map(scope => readWorktrees(scope, controller.signal))).then(
 			parts => {
@@ -60,10 +62,13 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 				}
 				setInventory(next);
 				setError(null);
+				setReading(false);
 				setSelected(current => new Set([...current].filter(key => next.repositories.some(repo => repo.worktrees.some(entry => keyOf(entry) === key)))));
 			},
 			(err: unknown) => {
-				if (!controller.signal.aborted) setError(errorText(err));
+				if (controller.signal.aborted) return;
+				setError(errorText(err));
+				setReading(false);
 			},
 		);
 		return () => controller.abort();
@@ -165,7 +170,7 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 						<option value="name">Name</option>
 					</select>
 				</label>
-				<Button type="button" variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={() => setRefresh(count => count + 1)}>
+				<Button type="button" variant="ghost" size="compact" leadingIcon={RefreshCw} loading={reading} onClick={() => setRefresh(count => count + 1)}>
 					Refresh
 				</Button>
 			</div>

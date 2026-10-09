@@ -5,6 +5,10 @@ For installation, see the [README](../README.md).
 
 A filled button marks the main action of its surface: Send, Finish, Resume on a past session, and Run now on a routine.
 Suggested prompts, quick actions, forking, and menu items stay quiet, so they never compete with it.
+Actions that wait for the server show a spinner or a progress label and block repeated activation until the work finishes.
+Starting a session, stopping a turn, switching model settings, resending a prompt, canceling a subagent, and running a routine use this state.
+Refresh controls and project saves do too.
+An action that fails shows its error, and its control becomes available again.
 
 - [Sessions sidebar](#sessions-sidebar)
 - [Session details sidebar](#session-details-sidebar)
@@ -101,8 +105,10 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - Each tab runs your login shell (`$SHELL -l`) on the dashboard server, in the focused session's worktree, else its directory, else the sidebar's project, else your home directory.
   The tab is named by that directory; hover it for the full path.
   `+` opens another tab in the same place, and the shell gets neither the server's `PORT` nor `OMP_AGENTS_PARENT`, so a dev server it starts does not reach for the dashboard's port.
+  A new tab shows **Starting shell…** until the server opens its shell.
 - A shell keeps running while the panel is hidden and across a page reload: the reloaded page reopens a tab for each shell with its last megabyte of output.
   It ends when you type `exit`, when the tab's × hangs up on it, or when the server stops; the last tab closing hides the panel.
+  The close button spins until the tab closes.
   A tab whose server stopped reads **(disconnected)** until you close it.
 - Drag the panel's top edge, or focus it and press ↑ or ↓, to change its height; double-click the edge to reset it.
   Its height, and whether it shows, is saved in the browser's localStorage.
@@ -328,7 +334,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A login made in a terminal shows the next time the menu opens.
   Each row shows the logo of the org that makes the model, its label (`Opus 5.5`), and its id, muted, to tell apart models that share a label.
   Choosing a model, a context, or an effort closes the menu.
-  While a model switch runs, Fast, Context, and Effort wait until omp reports the new model and its levels.
+  While a model, Fast, or Effort change runs, the picker spins and its settings wait until the server answers.
   Terminal sessions show their model and thinking level in the same place, but Collab has no frame that changes them, so make those changes in the terminal.
   Subagents have no pickers.
 - The ring before the paperclip and the send button shows how full the session's context window is.
@@ -435,8 +441,9 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   omp records the exit in the session file, and the session moves to the past sessions, where **Resume** continues it.
   The dashboard then removes the git worktree the session works in, the one its header names the branch of, with the checks of **Settings → Worktrees**, and keeps its branch; **Resume** then reports that the directory no longer exists until you check the branch out there again.
   A worktree that those checks keep, such as one with uncommitted changes or one another session uses, stays in **Settings → Worktrees**, whose **Delete** applies the same checks; a session in a main checkout or outside git leaves its directory as it is.
+  The header shows **Ending…** until the process stops and the worktree check finishes.
   Each pane that showed the session, or one of its subagents, moves to the next running session the sidebar lists, else the previous one, skipping sessions already open in a pane.
-  With none left, the pane stays on the ended session.
+  With none left, the pane closes and the dashboard shows its empty state.
 - An agent ends its own session through the `end_session` tool, when you ask it to, for example "Merge on main, then end the session".
   It comes from `~/.omp/agent/extensions/end-session.ts`, which `bun run omp-template` installs.
   The session ends once the agent's turn is over, so its last reply stays in the transcript, and it moves to the past sessions as with **End session**, not as interrupted, its worktree removed the same way.
@@ -451,6 +458,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A session whose omp process exited mid-turn cannot be forked until you resume it once, with **Resume** or in omp, because opening it would make omp append an abort record to the original.
 - In a session started from the dashboard, double-click your last message, or click its pencil, to edit it in place.
   Enter resends it and Esc, or clicking away, cancels; Shift+Enter starts a new line.
+  While the server rewinds and resends, the editor keeps your text and shows **Resending…**; it closes only after the server answers, and a failure leaves the text and error in place.
   The session then rewinds to just before that message and runs the edited one, in the same pane and omp process, stopping a running turn first.
   omp moves the session to a new file, as `/branch` does, so the conversation before the edit stays under the past sessions.
   Only a plain text message that omp has saved can be edited: not a skill prompt, one with images or files, or a message in a terminal session.
@@ -833,6 +841,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - To show Google events, connect Google Calendar in **Settings › Integrations**; see [Integrations](#integrations).
   The sidebar lists the calendars checked in Google Calendar's own list, the ones you own under **My calendars** and the ones you subscribed to or others share under **Other calendars**, as Google Calendar groups them.
   Each has a checkbox in its color: uncheck one to hide its events on this page, and check it to show them again; the month updates at once.
+  The checkbox flips immediately and waits for the save and event refresh before taking another click.
+  A failed save restores its previous value and shows the error.
   The server keeps the choice in `calendars.json` beside its access token, so every browser tab and the desktop app show the same calendars.
   A calendar unchecked in Google Calendar's own list is not listed; check it there first.
   The page leaves out canceled events, the ones you declined, and working locations, repeats multi-day events on each day, and refreshes the open month every minute.
@@ -856,6 +866,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Its runs read **Running…**, **Succeeded**, **Failed (exit n)**, **Stopped at the time limit**, **Stopped with the dashboard**, or **Could not start**, and anything but a success also counts as an error.
 - Each row shows the routine's schedules and task, when it runs next or **Paused**, and what its last run did: how many sessions it started, how many errors it had, and **Queued** while its session waits for a free slot.
   Its **⋯** menu has **Run now**, which runs it at once whatever its schedules, **Pause** or **Resume**, **Edit**, and **Delete**, which asks first.
+  **Run now** shows progress until the server starts or queues the run, not until its prompt or command finishes.
 - A routine's page shows its settings and its last 10 runs, newest first, each with the sessions it started, its command's output, and its errors.
   Output longer than 20 lines folds behind **Show output**.
   Click a session to open it, live while it runs, else its transcript (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
@@ -892,6 +903,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Each range's last result is cached in your browser, so switching back, reopening the page, or reloading shows it while a fresh read runs.
   A failed refresh keeps the cached result and shows the error.
   Refreshes run only while **Analytics** is open, every two seconds during indexing and every 30 seconds otherwise.
+  While a range with no cached result loads, the previous range's numbers remain visible but dimmed.
   It shows tokens, estimated cost, requests, cache hit rate, and a chart of token usage over time.
   The cost is omp's API-equivalent list price, not what your subscription bills.
   The chart stacks token usage by the provider that handled each request, with a fixed color and a legend entry for each provider.

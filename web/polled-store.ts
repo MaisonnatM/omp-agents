@@ -91,6 +91,19 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 		}
 	}
 
+	/** Applies a saved change to the current answer, superseding any read begun before it. */
+	function changeAnswer(change: (data: T) => T, scope: string | null = null): void {
+		const key = scope ?? "";
+		const current = entries.get(key).read;
+		if (!current) return;
+		inflight.get(key)?.abort();
+		inflight.delete(key);
+		const read = { data: change(current.data), at: Date.now() };
+		update(key, { read, error: null, refreshing: false });
+		cached.set(key, read);
+		persist();
+	}
+
 	/**
 	 * Reads `scope` now and every {@link POLL_MS} until the returned function is called. Callers of the same scope share
 	 * one timer: the first starts it, and the last to stop clears it.
@@ -124,5 +137,6 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 		usePolling: (scope: string | null = null, enabled = true): PolledEntry<T> => useEntry(scope, enabled),
 		poll,
 		refresh,
+		update: changeAnswer,
 	};
 }

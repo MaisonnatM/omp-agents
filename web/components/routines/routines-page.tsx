@@ -9,6 +9,7 @@ import { modeOf, readTime, SPLIT_CLICK } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { hashForRoutines } from "../../routing";
 import { draftOf, lastRunWords, newDraft, nextRunWords, type RoutineDraft, runWords, scheduleWords, schedulesWords, taskWords } from "../../routines-model";
+import { useAction } from "../../use-action";
 import { useMinute } from "../../use-minute";
 import { useDashboardActions } from "../dashboard-context";
 import { PageFrame } from "../list-page";
@@ -21,15 +22,20 @@ interface RoutineActionsProps {
 	routine: Routine;
 	disabled: boolean;
 	onChange: (change: RoutineChange) => void;
+	onRun?: () => void;
+	running?: boolean;
 	onEdit: () => void;
 	/** After **Delete** is confirmed and sent. */
 	onDeleted?: () => void;
 }
 
 /** A routine's menu, **Run now**, **Pause** or **Resume**, **Edit**, and **Delete**, which asks first in its place. */
-function RoutineActions({ routine, disabled, onChange, onEdit, onDeleted }: RoutineActionsProps) {
+function RoutineActions({ routine, disabled, onChange, onEdit, onDeleted, onRun, running = false }: RoutineActionsProps) {
 	const [confirming, setConfirming] = useState(false);
 	const { id, name, enabled } = routine;
+	const { request } = useDashboardActions();
+	const run = useAction(() => request({ t: "routine", change: { op: "run-now", id } }), "Could not run the routine");
+	const pending = running || run.pending;
 	if (confirming) {
 		return (
 			<div role="group" aria-label={`Delete ${name}?`} className="flex shrink-0 items-center gap-2 text-xs">
@@ -51,24 +57,27 @@ function RoutineActions({ routine, disabled, onChange, onEdit, onDeleted }: Rout
 		);
 	}
 	return (
-		<MoreActionsMenu name={name} disabled={disabled}>
-			<MenuItem onClick={() => onChange({ op: "run-now", id })}>
-				<Play />
-				Run now
-			</MenuItem>
-			<MenuItem onClick={() => onChange({ op: "enable", id, enabled: !enabled })}>
-				{enabled ? <Pause /> : <Play />}
-				{enabled ? "Pause" : "Resume"}
-			</MenuItem>
-			<MenuItem onClick={onEdit}>
-				<Pencil />
-				Edit
-			</MenuItem>
-			<MenuItem variant="destructive" onClick={() => setConfirming(true)}>
-				<Trash2 />
-				Delete
-			</MenuItem>
-		</MoreActionsMenu>
+		<>
+			{pending && !onRun && <Button size="compact" aria-label="Starting routine" loading>Starting…</Button>}
+			<MoreActionsMenu name={name} disabled={disabled || pending}>
+				<MenuItem disabled={pending} aria-busy={pending || undefined} onClick={onRun ?? run.run}>
+					<Play />
+					{pending ? "Starting…" : "Run now"}
+				</MenuItem>
+				<MenuItem onClick={() => onChange({ op: "enable", id, enabled: !enabled })}>
+					{enabled ? <Pause /> : <Play />}
+					{enabled ? "Pause" : "Resume"}
+				</MenuItem>
+				<MenuItem onClick={onEdit}>
+					<Pencil />
+					Edit
+				</MenuItem>
+				<MenuItem variant="destructive" onClick={() => setConfirming(true)}>
+					<Trash2 />
+					Delete
+				</MenuItem>
+			</MoreActionsMenu>
+		</>
 	);
 }
 
@@ -176,6 +185,8 @@ function ScheduleValue({ schedules }: { schedules: Routine["schedules"] }) {
 /** One routine's settings, then its runs, newest first. */
 function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: DetailProps) {
 	const { task } = routine;
+	const { request } = useDashboardActions();
+	const run = useAction(() => request({ t: "routine", change: { op: "run-now", id: routine.id } }), "Could not run the routine");
 	const settings: [string, ReactNode][] = [
 		["Task", <TaskValue task={task} />],
 		["Workspace", <span className="font-mono text-xs">{routine.cwd}</span>],
@@ -192,13 +203,15 @@ function RoutineDetail({ routine, hosts, now, connected, onChange, onEdit }: Det
 					<Button asChild variant="ghost" size="compact" leadingIcon={ArrowLeft}>
 						<a href={hashForRoutines(null)}>All routines</a>
 					</Button>
-					<Button size="compact" leadingIcon={Play} disabled={!connected} onClick={() => onChange({ op: "run-now", id: routine.id })}>
+					<Button size="compact" leadingIcon={Play} disabled={!connected} loading={run.pending} onClick={() => run.run()}>
 						Run now
 					</Button>
 					<RoutineActions
 						routine={routine}
 						disabled={!connected}
 						onChange={onChange}
+						onRun={run.run}
+						running={run.pending}
 						onEdit={onEdit}
 						onDeleted={() => {
 							location.hash = hashForRoutines(null);

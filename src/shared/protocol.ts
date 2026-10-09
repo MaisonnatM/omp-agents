@@ -40,7 +40,9 @@ export type ServerMsg =
 	/** The pinned sessions' ids, whole, sent when a socket opens and after every change. */
 	| { t: "pins"; sessionIds: string[] }
 	/** Every notice the bell lists, whole, sent when a socket opens and after every change. */
-	| { t: "notices"; list: Notice[] };
+	| { t: "notices"; list: Notice[] }
+	/** Answers this socket's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
+	| { t: "done"; ack: number; error: string | null };
 
 export type ClientMsg =
 	/** The views this socket shows, replacing the last set: each new one gets its transcript, dropped ones stop streaming. */
@@ -90,3 +92,6 @@ export type ClientMsg =
 	| { t: "pin"; change: PinChange }
 	/** Update notices `ids`, mark them seen or read, or clear them. */
 	| { t: "notice"; ids: string[]; op: NoticeOp };
+
+/** A {@link ClientMsg} as it crosses the socket: `ack`, counted per page, asks for a `done` once the server has handled it. */
+export type ClientFrame = ClientMsg & { ack?: number };

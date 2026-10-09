@@ -1,7 +1,7 @@
 import { Check } from "lucide-react";
 import { useState } from "react";
 import type { Routine } from "../../../src/routines";
-import { type CalendarShownInput, callable, type GoogleCalendar } from "../../../src/shared/accounts";
+import { type CalendarShownInput, callable, type GoogleCalendar, type GoogleStatus } from "../../../src/shared/accounts";
 import { useCalendarMonth, useCalendarYear } from "@/components/kibo-ui/calendar";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { errorText, putJson } from "../../api";
@@ -28,17 +28,32 @@ function GoogleCalendarGroups() {
 	const [month] = useCalendarMonth();
 	const [year] = useCalendarYear();
 	const [failure, setFailure] = useState<string | null>(null);
+	const [pending, setPending] = useState<ReadonlyMap<string, boolean>>(new Map());
 	if (!connected || !calendars) return null;
 
+	const settle = (id: string): void =>
+		setPending(current => {
+			const next = new Map(current);
+			next.delete(id);
+			return next;
+		});
 	const toggle = async ({ id, name, shown }: GoogleCalendar): Promise<void> => {
 		setFailure(null);
+		setPending(current => new Map(current).set(id, !shown));
 		try {
-			await putJson("/api/google/calendars", { id, shown: !shown } satisfies CalendarShownInput);
+			const answer = await putJson<GoogleStatus>("/api/google/calendars", { id, shown: !shown } satisfies CalendarShownInput);
+			const saved = answer.calendars.find(calendar => calendar.id === id);
+			googleStore.update(status => ({
+				...status,
+				calendars: status.calendars.flatMap(calendar => calendar.id !== id ? [calendar] : saved ? [{ ...calendar, shown: saved.shown }] : []),
+			}));
 		} catch (err) {
 			setFailure(`Cannot ${shown ? "hide" : "show"} ${name}: ${errorText(err)}`);
+			settle(id);
 			return;
 		}
 		await Promise.all([googleStore.refresh(), calendarEventsStore.refresh(monthSpan(year, month))]);
+		settle(id);
 	};
 
 	return (
@@ -49,20 +64,32 @@ function GoogleCalendarGroups() {
 					<SidebarGroup key={group}>
 						<SidebarGroupLabel>{label}</SidebarGroupLabel>
 						<SidebarMenu aria-label={label}>
-							{listed.map(calendar => (
-								<SidebarMenuItem key={calendar.id}>
-									<SidebarMenuButton role="checkbox" aria-checked={calendar.shown} title={calendar.name} onClick={() => void toggle(calendar)}>
-										<span
-											aria-hidden
-											className="flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border-2"
-											style={{ borderColor: calendar.color, backgroundColor: calendar.shown ? calendar.color : undefined }}
+							{listed.map(calendar => {
+								const busy = pending.has(calendar.id);
+								const shown = pending.get(calendar.id) ?? calendar.shown;
+								return (
+									<SidebarMenuItem key={calendar.id} aria-busy={busy || undefined}>
+										<SidebarMenuButton
+											role="checkbox"
+											aria-checked={shown}
+											aria-disabled={busy || undefined}
+											title={calendar.name}
+											onClick={() => {
+												if (!busy) void toggle({ ...calendar, shown });
+											}}
 										>
-											{calendar.shown && <Check className="size-2.5 text-white" strokeWidth={3.5} />}
-										</span>
-										<span className="truncate">{calendar.name}</span>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
+											<span
+												aria-hidden
+												className="flex size-3.5 shrink-0 items-center justify-center rounded-[3px] border-2"
+												style={{ borderColor: calendar.color, backgroundColor: shown ? calendar.color : undefined }}
+											>
+												{shown && <Check className="size-2.5 text-white" strokeWidth={3.5} />}
+											</span>
+											<span className="truncate">{calendar.name}</span>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								);
+							})}
 						</SidebarMenu>
 					</SidebarGroup>
 				);

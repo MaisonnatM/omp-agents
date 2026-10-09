@@ -67,6 +67,50 @@ describe("polled store", () => {
 		expect(text(polled, "a")).toBe("<span>2:still:</span>");
 	});
 
+	test("a saved answer supersedes an old read and survives a failed refresh in memory and storage", async () => {
+		const polled = store();
+		const older = Promise.withResolvers<Response>();
+		let calls = 0;
+		const fetch = jest.spyOn(globalThis, "fetch").mockImplementation(Object.assign(async () => {
+			calls += 1;
+			if (calls === 1) return new Response(JSON.stringify({ n: 1 }));
+			if (calls === 2) return older.promise;
+			return new Response(JSON.stringify({ error: "offline" }), { status: 500 });
+		}, { preconnect: globalThis.fetch.preconnect }));
+		try {
+			await polled.refresh("a");
+			const stale = polled.refresh("a");
+			polled.update(data => ({ n: data.n + 1 }), "a");
+			expect(text(polled, "a")).toBe("<span>2:still:</span>");
+			older.resolve(new Response(JSON.stringify({ n: 1 })));
+			await stale;
+			expect(text(polled, "a")).toBe("<span>2:still:</span>");
+			await polled.refresh("a");
+			expect(text(polled, "a")).toBe("<span>2:still:offline</span>");
+			const stored = JSON.parse(memory.get(keys.at(-1)!)!);
+			expect(stored.a.data).toEqual({ n: 2 });
+		} finally {
+			fetch.mockRestore();
+		}
+	});
+
+	test("independent saved changes compose over the current answer without changing other scopes", async () => {
+		const polled = store();
+		const fetch = jest.spyOn(globalThis, "fetch").mockImplementation(Object.assign(
+			async () => new Response(JSON.stringify({ n: 1 })),
+			{ preconnect: globalThis.fetch.preconnect },
+		));
+		try {
+			await Promise.all([polled.refresh("a"), polled.refresh("b")]);
+			polled.update(data => ({ n: data.n + 2 }), "a");
+			polled.update(data => ({ n: data.n + 3 }), "a");
+			expect(text(polled, "a")).toBe("<span>6:still:</span>");
+			expect(text(polled, "b")).toBe("<span>1:still:</span>");
+		} finally {
+			fetch.mockRestore();
+		}
+	});
+
 	test("reads of two scopes in flight at once both complete, and each refresh aborts only a read of its own scope", async () => {
 		const polled = store();
 		const pending = new Map<string, { signal: AbortSignal; finish: (n: number) => void }>();

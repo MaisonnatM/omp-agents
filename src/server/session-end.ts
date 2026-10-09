@@ -22,7 +22,7 @@ export async function endSession(session: EndingSession, removeCheckout: RemoveC
 		await session.end();
 	} catch (err) {
 		console.error(`omp-agents: could not end session ${session.sessionId}: ${errorText(err)}`);
-		return;
+		throw err;
 	}
 	let why: string | null;
 	try {

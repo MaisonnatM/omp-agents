@@ -249,6 +249,7 @@ Each shell keeps its last megabyte of output in `Scrollback`, which drops whole 
   The upgrade passes the same guards as `/ws`, and a shell opened for an upgrade that fails is killed.
 - Binary frames carry the shell's bytes both ways.
   Text frames carry JSON control messages: the server sends `TerminalServerMsg`, `opened` with the `TerminalInfo` once and `exit` with the shell's code, then closes the socket; the page sends `TerminalClientMsg`, `resize` or `kill`, which `parseTerminalMsg` checks.
+  The page shows **Starting shell…** until `opened` and a close spinner until the socket closes.
   Closing the socket detaches without ending the shell.
 - `src/server.ts` serves both socket kinds from one `Bun.serve`, its data typed as the union of `SocketData` and `TerminalSocketData`, and `isTerminalSocket` routes each handler to `src/server/terminal-socket.ts` or the session socket.
 
@@ -621,6 +622,7 @@ An event's id is its calendar's id and Google's event id, and it links to the ev
 One calendar that cannot be read keeps its error for the Integrations row while the others still answer; only when none can is the answer an error.
 The Calendar page reads the open month's events through `calendarEventsStore` in `web/reads.ts` every minute while Google Calendar's connection is `ready` or `failing`, and puts a multi-day event on each day it covers.
 The Calendar tab's sidebar reads the calendars through `googleStore`, and a checkbox's `PUT` reads both stores again, so the open month changes at once.
+Each successful calendar save merges that calendar's confirmed visibility into `googleStore` before rereading, so an aborted or failed refresh cannot undo it.
 The server deletes the `google.json` that an older version kept the calendars' secret iCal addresses in when it starts.
 
 ## Front-end components
@@ -630,6 +632,8 @@ The roster uses `sidebar`, and its **Inbox**, **Tickets**, **Sessions**, **Todo*
 User and assistant turns use `chat-message`, tool calls use `thinking-steps`, and the composer uses `input-message`.
 The model's thinking text uses that same group.
 `thinking-indicator` shows while the agent works.
+`Button`'s `loading` prop preserves its label's width, shows a spinner, disables the control, and sets `aria-busy`.
+`InputMessage` takes `sending` and `stopping` for its send and Stop controls.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
 The model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern, and the Calendar page's day cards shadcn's `hover-card`.
 Fluid's built-in sidebar rail resizes by pointer only and collapses on click.
@@ -660,6 +664,9 @@ The server lives in `src/`:
   `src/server/wire.ts` parses every socket message and request body into typed values.
 - `src/terminals.ts`: the terminal panel's shells, each in a pseudo-terminal with its scrollback; `src/server/terminal-socket.ts` handles the `/ws/terminal` sockets that attach to them, and `src/shared/terminals.ts` holds the shapes and messages the page shares.
 - `src/server/socket.ts`: handles each socket message.
+  A `ClientFrame` may carry a per-page `ack` counter, validated by `wire.ts`.
+  Once its handler settles, the server sends `done` with that counter and a nullable error.
+  Untagged messages retain their existing replies.
   `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
   `src/server/session-end.ts` ends a session for the page's `end` message and for the end inbox: `endSession` stops it, then calls `Worktrees.removeCheckout` on its worktree from `SessionFacts`, else its cwd, and logs the blockers of a checkout that stays, which **Settings → Worktrees** still lists.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`.
@@ -781,6 +788,9 @@ The page lives in `web/`.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which runs in the background.
+  `request` resolves or rejects on `done`, and rejects every outstanding request when the socket closes without replaying it.
+  Ending sessions stay in a separate set until their requests settle, even if they have already left the roster.
+- `web/use-action.ts`: guards a control against repeated activation, exposes its pending state, and shows failures through the toast manager.
 - `web/pane-store.ts`: each open view's transcript, changed files, images, and completions, outside the page state.
   A component reads one field through a selector hook (`useTranscript`, `useChangedFiles`, `useMedia`, `useComposerData`, `useTurnCount`, …), built on `useSelect` in `web/keyed-store.ts`, which `web/polled-store.ts` shares, one snapshot and subscription per key, and renders again only when that field changes, so a streamed token renders the transcript and what reads `items`, and not the pane, the composer, or the details.
   `toBlocks` in `web/transcript-view.ts` keeps the blocks that a token leaves alone as the same objects, and the transcript's rows are memoized on them.
@@ -815,6 +825,7 @@ The page lives in `web/`.
 - `web/components/status-bar.tsx`: the window's bottom strip, with `PlanUsageList` from `web/components/plan-usage.tsx` on the left, and on the right the **Terminal** button and the machine's CPU, available memory, and free disk space from `GET /api/system`.
 - `web/components/terminal/terminal-panel.tsx`: the terminal panel under the panes, its tabs, height, and open state, `useTerminalPanel`, which saves the last two in localStorage, and the restore from `GET /api/terminals`.
   `terminal-view.tsx` draws one tab with xterm.js over its `/ws/terminal` socket, fits it to the panel, follows the page's theme, and passes the toggle chord, and every Cmd chord on macOS, to the page's shortcuts.
+  `terminal-socket.ts` sends its commands and retains a kill requested while the socket connects, sending it when the socket opens.
 - `web/quick-actions.ts`: the quick actions of the inbox and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
   `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's or an issue's details, and the note that says why a start failed.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
@@ -822,9 +833,12 @@ The page lives in `web/`.
   `settingsUrl` names a settings route for one workspace, or for the user's own files.
 - `web/reads.ts`: the server reads that components hold.
   `useRead` reads one URL, such as the pull request or the Linear issue the main content shows, the settings page's model catalog, or the new-session draft's model list.
+  A version change retains the last answer and exposes `refreshing` until the new read settles, including a failed read.
+  A URL change never returns the previous URL's answer.
   `useReplaceableRead` shows the version a save answered until that URL is read again.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the inbox, with one entry per project, one for the tickets, with one entry, since Linear is not per project, one for the MCP integrations, one for the Google calendars shown, and one for the Calendar page's Google events, with one entry per month.
   A read in flight belongs to its entry: a new read of an entry replaces only the read of that entry in flight, and the components that poll one entry share one timer, which starts with the first and stops with the last.
+  Its `update` applies a saved change to the current answer and aborts older reads before they can replace that answer.
   `web/app.tsx` polls the inbox instead, on every page once the sessions are listed, for the Inbox tab's count, and the sidebar's inbox reads that entry.
   The composer's `@` menu reads the inbox entry that `inboxScope` in the status context names, the one `web/app.tsx` polls, so it starts no poll of its own and never reads the all-projects entry, which asks GitHub about every repository, in place of the selected project's.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes through `useQueuedSave` from `web/use-queued-save.ts`, which shows a change at once and sends each after the ones before it; the picker button and its searchable list, and the due date's, live in `web/components/field-picker.tsx`, which the Todo page and a pull request's details share, with an open state its owner can hold so a key opens it, and digits that pick a choice.

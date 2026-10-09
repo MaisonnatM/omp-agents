@@ -1,4 +1,4 @@
-import { ChevronDown, Plus, X } from "lucide-react";
+import { ChevronDown, LoaderIcon, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TerminalInfo } from "../../../src/shared/terminals";
 import { Button } from "@/components/ui/button";
@@ -44,9 +44,10 @@ interface Tab {
 	terminal: TerminalInfo | null;
 	/** The server hung up on the tab without its shell exiting, so only closing the tab is left. */
 	lost: boolean;
+	closing: boolean;
 }
 
-const newTab = (cwd: string): Tab => ({ key: crypto.randomUUID(), target: { cwd }, terminal: null, lost: false });
+const newTab = (cwd: string): Tab => ({ key: crypto.randomUUID(), target: { cwd }, terminal: null, lost: false, closing: false });
 
 interface TerminalPanelProps {
 	panel: TerminalPanelState;
@@ -79,7 +80,7 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 			.catch((): TerminalInfo[] => [])
 			.then(running => {
 				if (cancelled) return;
-				const restored = running.length ? running.map((terminal): Tab => ({ key: terminal.id, target: { id: terminal.id }, terminal, lost: false })) : [newTab(latestCwd.current)];
+				const restored = running.length ? running.map((terminal): Tab => ({ key: terminal.id, target: { id: terminal.id }, terminal, lost: false, closing: false })) : [newTab(latestCwd.current)];
 				setTabs(restored);
 				setActive(restored.at(-1)!.key);
 			});
@@ -103,8 +104,9 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 		});
 	};
 	const close = (tab: Tab): void => {
-		if (tab.terminal && !tab.lost) views.current.get(tab.key)?.kill();
-		else remove(tab.key);
+		if (!tab.terminal || tab.lost) return remove(tab.key);
+		views.current.get(tab.key)?.kill();
+		update(tab.key, { closing: true });
 	};
 	const update = (key: string, change: Partial<Tab>): void => setTabs(current => current?.map(tab => (tab.key === key ? { ...tab, ...change } : tab)) ?? null);
 
@@ -126,6 +128,7 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 	});
 
 	if (tabs === null) return null;
+	const shown = tabs.find(tab => tab.key === active);
 	return (
 		<section ref={section} aria-label="Terminal" hidden={!open} style={{ height: clamp(height) }} className="relative flex shrink-0 flex-col border-t border-border bg-background">
 			<Separator {...events} axis="horizontal" label="Resize the terminal" min={MIN_HEIGHT} max={room()} now={height} className="top-0 left-0 h-3 w-full -translate-y-1/2 cursor-row-resize flex-col select-none" />
@@ -141,9 +144,16 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 									{name}
 									{tab.lost && " (disconnected)"}
 								</button>
-								<Tooltip content="Close the terminal, ending its shell">
-									<button type="button" aria-label={`Close ${name}`} onClick={() => close(tab)} className="mr-1 rounded-sm p-0.5 opacity-60 outline-none hover:bg-foreground/10 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring">
-										<X aria-hidden className="size-3" />
+								<Tooltip content={tab.closing ? "Ending its shell…" : "Close the terminal, ending its shell"}>
+									<button
+										type="button"
+										aria-label={tab.closing ? `Closing ${name}` : `Close ${name}`}
+										aria-busy={tab.closing || undefined}
+										disabled={tab.closing}
+										onClick={() => close(tab)}
+										className="mr-1 rounded-sm p-0.5 opacity-60 outline-none hover:bg-foreground/10 hover:opacity-100 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
+									>
+										{tab.closing ? <LoaderIcon aria-hidden className="size-3 animate-spin" /> : <X aria-hidden className="size-3" />}
 									</button>
 								</Tooltip>
 							</div>
@@ -171,9 +181,14 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 					target={tab.target}
 					active={open && tab.key === active}
 					onOpened={terminal => update(tab.key, { terminal })}
-					onClosed={exited => (exited ? remove(tab.key) : update(tab.key, { lost: true }))}
+					onClosed={exited => (exited || tab.closing ? remove(tab.key) : update(tab.key, { lost: true }))}
 				/>
 			))}
+			{shown && shown.terminal === null && !shown.lost && (
+				<p role="status" aria-busy className="pointer-events-none absolute inset-x-0 top-8 bg-background px-2 pt-1 font-mono text-xs text-muted-foreground">
+					Starting shell…
+				</p>
+			)}
 		</section>
 	);
 }

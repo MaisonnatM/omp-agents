@@ -359,17 +359,17 @@ export function layoutAfterResumeAll(layout: Layout, started: { sessionId: strin
 
 /**
  * The layout once live session `instanceId` ends. Each pane showing it, or one of its subagents, shows the next
- * session in `listed` (the sidebar's live sessions, in order), else the previous, skipping sessions already open.
- * A pane left without one keeps the ended session.
+ * session in `listed` (the sidebar's live sessions before ending, in order), else the previous, skipping sessions
+ * already open or absent from `eligible`, the latest live sessions not currently ending. A pane left without one closes.
  */
-export function endSession(layout: Layout, instanceId: string, listed: string[]): Layout {
+export function endSession(layout: Layout, instanceId: string, listed: string[], eligible: ReadonlySet<string>): Layout {
 	const at = listed.indexOf(instanceId);
-	if (at < 0) return layout;
-	const neighbors = [...listed.slice(at + 1), ...listed.slice(0, at).reverse()]
+	const neighbors = (at < 0 ? [] : [...listed.slice(at + 1), ...listed.slice(0, at).reverse()])
+		.filter(id => eligible.has(id))
 		.map((id): View => ({ kind: "live", instanceId: id, agentId: null }))
 		.filter(view => !layout.panes.some(pane => sameView(pane, view)));
 	const panes = layout.panes.map(pane => (pane.kind === "live" && pane.instanceId === instanceId ? (neighbors.shift() ?? pane) : pane));
-	return { ...layout, panes };
+	return panes.reduceRight((next, pane, index) => (pane.kind === "live" && pane.instanceId === instanceId ? closePane(next, index) : next), { ...layout, panes });
 }
 
 /**

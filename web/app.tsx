@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { callable, signedIn } from "../src/shared/accounts";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
+import { errorText } from "./api";
 import { AppSidebar } from "./components/app-sidebar";
 import { CommandPalette } from "./components/command-palette/command-palette";
 import {
@@ -22,6 +23,7 @@ import { subjectOf } from "./components/subject";
 import { NewTicketDialog } from "./components/tickets/new-ticket";
 import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
+import { toasts } from "./components/toaster";
 import { localDay } from "./days";
 import { integrationsStore } from "./reads";
 import { endSession, hashForView, type TodoListView } from "./routing";
@@ -45,7 +47,7 @@ const ALL_TODOS: TodoListView = { kind: "all" };
  * slice, and the two dashboard contexts split what is stable, the actions, from what changes, the connection and the starts.
  */
 export function App() {
-	const { state, page, send, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo, changePins } = useDashboard();
+	const { state, page, send, request, end, open, focus, show, navigate, openNewSession, dismissStart, start, changeTodo, changePins } = useDashboard();
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
@@ -71,15 +73,23 @@ export function App() {
 	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, project);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
-	const latest = useRef({ layout, listedHosts, sidebars, page, hosts: visible.hosts, cwd: focused.cwd });
-	latest.current = { layout, listedHosts, sidebars, page, hosts: visible.hosts, cwd: focused.cwd };
+	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, liveHosts: state.hosts, cwd: focused.cwd });
+	latest.current = { layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, liveHosts: state.hosts, cwd: focused.cwd };
 
 	const endHost = useCallback(
 		(instanceId: string): void => {
-			send({ t: "end", instanceId });
-			show(endSession(latest.current.layout, instanceId, latest.current.listedHosts));
+			if (latest.current.ending.has(instanceId)) return;
+			const listedBeforeEnd = latest.current.listedHosts;
+			end(instanceId).then(
+				() => {
+					const { layout, liveHosts, ending } = latest.current;
+					const eligible = new Set(liveHosts.filter(host => !ending.has(host.instanceId)).map(host => host.instanceId));
+					show(endSession(layout, instanceId, listedBeforeEnd, eligible));
+				},
+				(error: unknown) => toasts.add({ title: "Could not end the session", description: errorText(error) }),
+			);
 		},
-		[send, show],
+		[end, show],
 	);
 	const toggleSidebar = useCallback((side: SidebarSide): void => {
 		const { sidebars } = latest.current;
@@ -125,15 +135,18 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket }),
-		[send, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, setFilePath, setNewTicket],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, setFilePath, setNewTicket],
 	);
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
 	const quick = startOf(state.starts, "quick");
 	const resumeAll = startOf(state.starts, "resume-all");
 	// The project that `useWorkspace` polls the inbox of, so the `@` menu reads the entry the page keeps current.
-	const status = useMemo((): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, inboxScope: project }), [state.connected, fork, resume, quick, resumeAll, project]);
+	const status = useMemo(
+		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, inboxScope: project }),
+		[state.connected, fork, resume, quick, resumeAll, state.ending, project],
+	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
 
 	const routedTodoList = page?.kind === "todo" ? page.list : null;

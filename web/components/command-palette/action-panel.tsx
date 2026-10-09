@@ -74,6 +74,7 @@ function Panel({ item, query, onToggle, onQuery, onRun, returnFocus }: ActionPan
 											value={action.id}
 											keywords={[action.title]}
 											disabled={action.disabled}
+											aria-busy={(action.id === "end" && action.disabled) || undefined}
 											onSelect={() => onRun(action)}
 											className={cn(
 												"flex h-8 cursor-default items-center gap-2 rounded-md px-2 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[selected=true]:bg-accent [&_svg]:size-4 [&_svg]:shrink-0",
