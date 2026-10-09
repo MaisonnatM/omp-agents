@@ -8,5 +8,6 @@ Install rather than symlink the main checkout's `node_modules`: when the worktre
 ## Read before you act
 
 - Before you edit or finish, read [CODING_STANDARDS.md](CODING_STANDARDS.md): the checks and docs every change needs, plus omp imports and internals, where a session field, socket message, or shortcut goes, Markdown, and template sync.
-- Before you list files or change behavior, read [docs/usage.md](docs/usage.md) (the interface) and [docs/architecture.md](docs/architecture.md) (the server; its [Code layout](docs/architecture.md#code-layout) names each file's job).
+- Before you list files or change behavior, read [Code layout](docs/architecture.md#code-layout), which names each file's job.
+  Then read only the sections of [docs/usage.md](docs/usage.md) (the interface) and [docs/architecture.md](docs/architecture.md) (the server) for the feature you change: both run past 100KB, so list their `## ` headings with `grep` and read by range.
 - Before you run a server or verify in a browser or the desktop window, read [docs/agent-smoke.md](docs/agent-smoke.md).

@@ -15,7 +15,7 @@ After merging or committing into local `main`, immediately run `git push origin 
 Force-pushes and rewriting `main` still require explicit approval.
 
 Ending a session, from the dashboard's **End session** or the `end_session` tool, removes its worktree, so end yours only once its work is merged or pushed; the dashboard's **Settings → Worktrees** tab removes others, and both keep dirty, locked, and in-use checkouts.
-To learn where uncommitted or unmerged changes came from, read the omp session files in `~/.omp/agent/sessions/`, one directory per working directory, before guessing from git history.
+To learn where uncommitted or unmerged changes came from, search past sessions with eval's `archive` (`xd://eval/archive`: recaps and prompts by project) before guessing from git history; open a raw file under `~/.omp/agent/sessions/` only for the session it names.
 
 ## Test servers
 

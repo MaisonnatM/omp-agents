@@ -54,6 +54,7 @@ Files, in `agent/`:
   Set `OMP_CACHE_TAIL_TTL=1h` to turn it off.
 - `extensions/end-session.ts`: the `end_session` tool, with which an agent ends its own session once its turn is over, and the omp-agents dashboard removes its worktree as **End session** does, so a prompt such as "Merge on main, then end the session" runs to the end.
 - `extensions/worktree-guard.ts`: holds back a session's first `edit` or `write` in a repository's main checkout and tells the agent to work in a linked worktree; trying the same call again goes through, for when you asked it to work in place.
+  The clones omp makes for `isolated: true` subagents are not main checkouts, so their edits pass.
 - `extensions/todos.ts`: `user_todo` reads the dashboard list and queues add/check changes.
   An omitted or empty `due` value means no due date; a nonempty value must use `YYYY-MM-DD`.
 - `skills/`: `apple-design`, `emil-design-eng`, and `beautiful-shadows` for interface work; `thermo-nuclear-code-quality-review` for the reviewer; and `poteto-mode`, a typeable alias for pstack's `Poteto Mode` skill.

@@ -227,6 +227,12 @@ export default function ship(pi: ExtensionAPI) {
 		return polling;
 	}
 
+	/** A poll that starts after this call, so it reads a PR body edited just before; `refresh` can hand back a poll already under way. */
+	async function refreshNow(ctx: ExtensionContext): Promise<void> {
+		await polling?.catch(() => undefined);
+		return refresh(ctx);
+	}
+
 	async function pollPr(ctx: ExtensionContext) {
 		lastRefresh = Date.now();
 		if (!state?.pr || !state.repo || state.stage === "merged") return render(ctx);
@@ -343,7 +349,14 @@ export default function ship(pi: ExtensionAPI) {
 			const parsed = toolParamsSchema.safeParse(params);
 			if (!parsed.success) return { content: [{ type: "text", text: "Invalid ship stage input." }], isError: true };
 			const { stage, issue, pr, repo, note } = parsed.data;
-			await refresh(ctx);
+			const base: ShipState = state ?? { stage: "ticket", updatedAt: "" };
+			const newPr = pr !== undefined && pr !== base.pr;
+			if (newPr || (repo !== undefined && repo !== base.repo)) {
+				// Record the PR before polling, so the gates below read this PR's body rather than none or another PR's.
+				const prRepo = repo ?? base.repo ?? (pr ? await resolveRepo(ctx.cwd) : undefined);
+				save(ctx, { ...base, pr: pr ?? base.pr, repo: prRepo, prStatus: newPr ? undefined : base.prStatus });
+			}
+			await refreshNow(ctx);
 			if (stage || issue || pr || repo || note !== undefined) {
 				if (stage === "ready_gate" && state?.prStatus?.reviewed !== true) {
 					return { content: [{ type: "text", text: "The PR must have the thermonuclear checkbox after the review fixes are pushed." }], isError: true };
@@ -354,20 +367,16 @@ export default function ship(pi: ExtensionAPI) {
 				if (stage === "merged" && state?.prStatus?.state !== "MERGED") {
 					return { content: [{ type: "text", text: "GitHub has not reported this PR merged." }], isError: true };
 				}
-				const base: ShipState = state ?? { stage: "ticket", updatedAt: "" };
+				const current = state ?? base;
 				const isWork = stage === "rebase" || stage === "fix_comments" || stage === "fix_ci";
-				const next: ShipState = {
-					...base,
-					stage: stage ? (isWork ? "live" : stage) : base.stage,
-					work: stage ? (isWork ? stage : undefined) : base.work,
-					issue: issue ?? base.issue,
-					pr: pr ?? base.pr,
-					repo: repo ?? base.repo ?? (pr ? await resolveRepo(ctx.cwd) : undefined),
-					note: note === undefined ? base.note : note || undefined,
-				};
-				save(ctx, next);
+				save(ctx, {
+					...current,
+					stage: stage ? (isWork ? "live" : stage) : current.stage,
+					work: stage ? (isWork ? stage : undefined) : current.work,
+					issue: issue ?? current.issue,
+					note: note === undefined ? current.note : note || undefined,
+				});
 			}
-			await refresh(ctx);
 			return { content: [{ type: "text", text: report(state) }], details: { state } };
 		},
 	});

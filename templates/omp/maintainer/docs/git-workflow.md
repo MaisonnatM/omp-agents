@@ -14,6 +14,21 @@ In a linked worktree, `.git` is a file pointing to worktree-specific metadata; G
 `--path-format=absolute` makes the result independent of the current subdirectory.
 If Graphite is configured, prefer `gt create` and `gt submit`; `git worktree add` alone does not register a branch with Graphite.
 
+## Create a worktree in a Graphite repository
+
+Create the branch on its parent, then track it before the first commit:
+
+```sh
+git worktree add -b <branch> ../<repo>-<topic> <parent>
+gt track <branch> -p <parent> --cwd ../<repo>-<topic> --no-interactive -q
+```
+
+A branch Graphite does not track fails `gt modify`, `gt restack`, and `gt submit` with "Cannot perform this operation on untracked branch"; run the `gt track` above, never fall back to `git commit --amend`.
+When the parent is itself untracked, track it first, from the bottom of the stack up.
+"<parent> is not in the history of <branch>" means the branch was not cut from that parent: run `git rebase <parent>` in the branch's worktree, then `gt track`.
+A warning that branches "diverged from Graphite's tracking" concerns the branches it names; ignore it unless it names your stack.
+Read the stack with `gt log short --stack`; `gt log` and `gt state` print every tracked branch in the repository.
+
 ## Create drafts before publishing
 
 Create the PR as a draft with `gt submit --draft` when Graphite is configured, or `gh pr create --draft` otherwise.
