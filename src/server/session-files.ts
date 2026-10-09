@@ -1,6 +1,6 @@
 /** Every session file on disk, newest first, with the pull requests each session worked on. */
 import { basename, dirname, join } from "node:path";
-import { worktreeAt } from "../git";
+import { headHistory, worktreeAt } from "../git";
 import { repoOf } from "../github";
 import { listSessionFiles, readSessionFile, type SavedSession, sessionsDir } from "../omp/sessions";
 import { displayPath } from "../paths";
@@ -33,7 +33,7 @@ export class SessionFiles {
 	#touched = new Set<string>();
 	/** Scans and refreshes run one after another, so a slow full scan never overwrites a newer single-file read. */
 	#chain: Promise<unknown> = Promise.resolve();
-	readonly facts = new SessionFactsIndex(repoOf, worktreeAt);
+	readonly facts = new SessionFactsIndex(repoOf, worktreeAt, headHistory);
 	readonly #root: string;
 
 	/** `root`: omp's sessions directory, one directory per working directory. */

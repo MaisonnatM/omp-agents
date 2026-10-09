@@ -1,6 +1,7 @@
 /**
  * The pull requests each session submitted or worked on, read from its own tool calls and its subagents'.
- * A submission is a per-branch line `gt submit` prints, or the URL a `gh pr create` call prints. Work is a
+ * A submission is a per-branch line `gt submit` prints, the URL a `gh pr create` call prints, or the branch a
+ * `gt submit` call submitted, which links even when the call printed nothing (`-q`). Work is a
  * `gh pr checkout|edit|comment|review|merge|ready` call that names a PR, a `git push` that updated a PR's head
  * branch, an omp `pr://` read, or the branch checked out in the linked worktree the session works in, when a PR
  * heads it. A PR a session only quoted, listed, or was handed is not linked to it; nor is the main checkout's
@@ -15,7 +16,7 @@
  */
 import { access } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { WorktreeAt } from "./git";
+import { branchAt, type HeadHistory, type WorktreeAt } from "./git";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
 import { LineReader } from "./line-reader";
@@ -34,6 +35,10 @@ const GH_PR_CREATE = /\bgh\s+pr\s+create\b/;
 /** A `gh pr` call that acts on one PR, with its arguments up to the end of that shell command; not one quoted in another command. */
 const GH_PR_ACTION = /(?:^|[;&|(\n])\s*gh\s+pr\s+(?:checkout|co|edit|comment|review|merge|ready)\b([^\n;&|)]*)/g;
 const GIT_PUSH = /\bgit\s+(?:-C\s+\S+\s+)?push\b/;
+/** A `gt submit` call, or `gt ss`, with its arguments up to the end of that shell command. */
+const GT_SUBMIT = /(?:^|[;&|(\n])\s*gt\s+(?:submit|ss)\b([^\n;&|)]*)/g;
+/** A `cd` in a shell command, which moves where the commands after it run. */
+const CD = /(?:^|[;&|(\n])\s*cd\s+([^\s;&|)]+)/g;
 const OWNER_REPO = /^([\w.-]+)\/([\w.-]+)$/;
 /** omp's `pr://<n>` or `pr://<owner>/<repo>/<n>`, with or without `/diff/…` or `?comments=1` after it. */
 const PR_URI = /^pr:\/\/(?:([\w.-]+)\/([\w.-]+)\/)?(\d+)(?:[/?#]|$)/;
@@ -42,7 +47,7 @@ const PUSH_REMOTE = /^To (\S+)\s*$/;
 /** `   1a2b..3c4d  HEAD -> me/b`, ` * [new branch]  me/b -> me/b`, or ` + 1a2b...3c4d … (forced update)`; rejected and deleted refs do not match. */
 const PUSHED_REF = /^\s*[+*]?\s*(?:\[new branch\]|[0-9a-f]{4,}\.\.\.?[0-9a-f]{4,})\s+\S+\s+->\s+(\S+)/;
 /** Lines that can matter hold one of these; skipping the rest before `JSON.parse` is most of the startup scan. */
-const MARKERS = ["github", "gh pr", "push", "pr://", "omp-ship.state", "mcp__linear_", '"cwd"'];
+const MARKERS = ["github", "gh pr", "push", "gt submit", "gt ss", "pr://", "omp-ship.state", "mcp__linear_", '"cwd"'];
 /** A Linear MCP tool called directly (`mcp__linear_get_issue`, or `xd_mcp__linear_get_issue`), or written to as an omp device. */
 const LINEAR_TOOL = /^(?:xd_)?mcp__linear_(\w+)$/;
 const LINEAR_DEVICE = /^xd:\/\/mcp__linear_(\w+)$/;
@@ -58,12 +63,25 @@ const isShipWork = oneOf(SHIP_WORK);
 
 /**
  * One pull request a transcript links to. `number` is a PR in the session's own repository, the one `origin`
- * names in its working directory. `branch` is a branch a push updated; it links to the PR whose head it is.
+ * names in its working directory. `branch` is a branch a push updated or a submit submitted; it links to the PR whose head it is.
  */
 export type PullRequestRef =
 	| ({ kind: "pr"; link: PullRequestLink } & PullRequest)
 	| { kind: "number"; number: number }
-	| ({ kind: "branch"; branch: string } & Repo);
+	| ({ kind: "branch"; branch: string; link: PullRequestLink } & Repo);
+
+/**
+ * A `gt submit` call: the branch it names with `--branch`, else the one checked out at `at`, in ms, in the directory
+ * `dirs` lead to from the session's, each relative to the one before. The index resolves it into a `branch` ref.
+ */
+interface SubmitRef {
+	kind: "submit";
+	dirs: string[];
+	branch: string | null;
+	at: number;
+}
+
+type FoundRef = PullRequestRef | SubmitRef;
 
 /** What a bash call's output can prove: the URL `gh pr create` prints, and the branches `git push` updated. */
 interface Expected {
@@ -71,14 +89,33 @@ interface Expected {
 	pushed: boolean;
 }
 
-function refKey(ref: PullRequestRef): string {
+function refKey(ref: FoundRef): string {
 	if (ref.kind === "pr") return prKey(ref);
+	if (ref.kind === "submit") return `submit:${ref.at}:${ref.dirs.join("\0")}:${ref.branch ?? ""}`;
 	return ref.kind === "number" ? `#${ref.number}` : headKey(ref, ref.branch);
+}
+
+const unquoted = (token: string): string => token.replace(/^["']|["']$/g, "");
+
+/** The `gt submit` calls in a bash `command` run in `cwd` at `at`, other than a `--dry-run`. */
+function* submits(command: string, cwd: string | null, at: number): Generator<SubmitRef> {
+	for (const match of command.matchAll(GT_SUBMIT)) {
+		const tokens = match[1]!.trim().split(/\s+/).map(unquoted);
+		if (tokens.includes("--dry-run")) continue;
+		const option = (name: string): string | null => {
+			const i = tokens.indexOf(name);
+			if (i >= 0) return tokens[i + 1] ?? null;
+			return tokens.find(token => token.startsWith(`${name}=`))?.slice(name.length + 1) ?? null;
+		};
+		const cd = [...command.slice(0, match.index).matchAll(CD)].at(-1)?.[1];
+		const dirs = [cwd, cd === undefined ? null : unquoted(cd), option("--cwd")].filter((dir): dir is string => Boolean(dir));
+		yield { kind: "submit", dirs, branch: option("--branch"), at };
+	}
 }
 
 /** The PR a `gh pr` action names by number or URL, in its `-R`/`--repo` repository or else the session's. */
 function actedOn(args: string): PullRequestRef | null {
-	const tokens = args.trim().split(/\s+/).map(token => token.replace(/^["']|["']$/g, ""));
+	const tokens = args.trim().split(/\s+/).map(unquoted);
 	let repoText = "";
 	let target = "";
 	for (let i = 0; i < tokens.length; i++) {
@@ -103,7 +140,7 @@ function* pushedBranches(text: string): Generator<PullRequestRef> {
 		const remote = PUSH_REMOTE.exec(line);
 		if (remote) repo = parseRemote(remote[1]!);
 		const ref = repo && PUSHED_REF.exec(line);
-		if (repo && ref) yield { kind: "branch", ...repo, branch: ref[1]!.replace(/^refs\/heads\//, "") };
+		if (repo && ref) yield { kind: "branch", ...repo, branch: ref[1]!.replace(/^refs\/heads\//, ""), link: "worked" };
 	}
 }
 
@@ -140,7 +177,7 @@ export class SessionFactsScan {
 	readonly #pending = new Map<string, Expected>();
 	/** `save_issue` calls that open an issue, whose result names it. */
 	readonly #opening = new Set<string>();
-	readonly found = new Map<string, PullRequestRef>();
+	readonly found = new Map<string, FoundRef>();
 	/** Linear issue identifiers, `ENG-123`, in the order the transcript first named them. */
 	readonly tickets = new Set<string>();
 	ship: ShipProgress | null = null;
@@ -176,10 +213,11 @@ export class SessionFactsScan {
 		}
 		if (entry.type !== "message" || !isObject(entry.message)) return;
 		for (const call of toolCallsOf(entry.message)) {
-			if (call.name === "bash" && typeof call.args.command === "string") this.#command(call.id, call.args.command);
-			if (call.name === "bash" && typeof call.args.cwd === "string" && call.args.cwd) {
-				this.workDirs.delete(call.args.cwd);
-				this.workDirs.add(call.args.cwd);
+			const cwd = call.name === "bash" && typeof call.args.cwd === "string" && call.args.cwd ? call.args.cwd : null;
+			if (call.name === "bash" && typeof call.args.command === "string") this.#command(call.id, call.args.command, cwd, Date.parse(String(entry.timestamp)));
+			if (cwd) {
+				this.workDirs.delete(cwd);
+				this.workDirs.add(cwd);
 			}
 			if (call.name === "read" && typeof call.args.path === "string") this.#read(call.args.path);
 			const linear = linearCall(call.name, call.args);
@@ -213,11 +251,13 @@ export class SessionFactsScan {
 		return expected;
 	}
 
-	#command(id: string, command: string): void {
+	/** `cwd`: the bash call's own, raw. `at`: when it ran, `NaN` when the entry has no time, which leaves its `gt submit` out. */
+	#command(id: string, command: string, cwd: string | null, at: number): void {
 		for (const [, args] of command.matchAll(GH_PR_ACTION)) {
 			const ref = actedOn(args!);
 			if (ref) this.#add(ref);
 		}
+		if (!Number.isNaN(at)) for (const ref of submits(command, cwd, at)) this.#add(ref);
 		const expected = { created: GH_PR_CREATE.test(command), pushed: GIT_PUSH.test(command) };
 		if (expected.created || expected.pushed) this.#pending.set(id, expected);
 	}
@@ -263,7 +303,7 @@ export class SessionFactsScan {
 	}
 
 	/** A submission outranks work on the same PR, and keeps the place the work had. */
-	#add(ref: PullRequestRef): void {
+	#add(ref: FoundRef): void {
 		const key = refKey(ref);
 		const known = this.found.get(key);
 		if (!known || (ref.kind === "pr" && ref.link === "submitted" && known.kind === "pr" && known.link === "worked")) this.found.set(key, ref);
@@ -272,7 +312,7 @@ export class SessionFactsScan {
 
 /**
  * The pull requests `refs` name, each once, in order; a submission outranks work on the same PR. A bare number
- * needs the session's `repo`, and a pushed branch needs `heads`, the PRs the inbox listed by `owner/repo:branch`.
+ * needs the session's `repo`, and a branch needs `heads`, the PRs the inbox listed by `owner/repo:branch`.
  */
 export function resolveLinks(refs: Iterable<PullRequestRef>, repo: Repo | null, heads: ReadonlyMap<string, PullRequest>): LinkedPullRequest[] {
 	const linked = new Map<string, LinkedPullRequest>();
@@ -282,7 +322,7 @@ export function resolveLinks(refs: Iterable<PullRequestRef>, repo: Repo | null, 
 		else if (ref.kind === "number") pr = repo && { ...repo, number: ref.number, link: "worked" };
 		else {
 			const head = heads.get(headKey(ref, ref.branch));
-			pr = head ? { owner: head.owner, repo: head.repo, number: head.number, link: "worked" } : null;
+			pr = head ? { owner: head.owner, repo: head.repo, number: head.number, link: ref.link } : null;
 		}
 		if (!pr) continue;
 		const key = prKey(pr);
@@ -316,7 +356,9 @@ interface SessionScan {
 	/** The session file first, then its subagents' files. */
 	transcripts: Map<string, TranscriptScan>;
 	/** Every transcript's refs, in transcript order. */
-	refs: PullRequestRef[];
+	refs: FoundRef[];
+	/** The branch each of `refs`' `gt submit` calls submitted, by its `refKey`, once found. */
+	submitted: Map<string, PullRequestRef>;
 	/** The repository `origin` names in `cwd`, looked up once a bare PR number or `branch` needs it; `null` until found. */
 	repo: Repo | null;
 	pullRequests: LinkedPullRequest[];
@@ -331,6 +373,32 @@ interface SessionScan {
 }
 
 const exists = (path: string): Promise<boolean> => access(path).then(() => true, () => false);
+
+/** `dir` as omp resolves a bash `cwd`: from the home directory after `~`, else from `base`. */
+const absolute = (base: string, dir: string): string => (dir === "~" || dir.startsWith("~/") ? HOME + dir.slice(1) : resolve(base, dir));
+
+/** `ask`, asking about each directory once. */
+function once<T>(ask: (dir: string) => Promise<T>): (dir: string) => Promise<T> {
+	const asked = new Map<string, Promise<T>>();
+	return dir => {
+		let answer = asked.get(dir);
+		if (!answer) asked.set(dir, (answer = ask(dir)));
+		return answer;
+	};
+}
+
+/** The branch a `gt submit` from session directory `cwd` submitted, in the repository `origin` names where it ran; `null` once that directory is gone. */
+async function submittedBranch(
+	ref: SubmitRef,
+	cwd: string,
+	repoOf: (dir: string) => Promise<Repo | null>,
+	historyOf: (dir: string) => Promise<HeadHistory | null>,
+): Promise<PullRequestRef | null> {
+	const dir = ref.dirs.reduce(absolute, cwd);
+	if (!(await exists(dir))) return null;
+	const [repo, branch] = await Promise.all([repoOf(dir), ref.branch ?? historyOf(dir).then(history => history && branchAt(history, ref.at))]);
+	return repo && branch ? { kind: "branch", ...repo, branch, link: "submitted" } : null;
+}
 
 /**
  * The linked worktree of `cwd`'s repository, other than the one `cwd` is in, that the most recent of `workDirs` in
@@ -364,12 +432,21 @@ export class SessionFactsIndex {
 	readonly #heads = new Map<string, PullRequest>();
 	readonly #repoOf: (cwd: string) => Promise<Repo | null>;
 	readonly #worktreeAt: (dir: string) => Promise<WorktreeAt | null>;
+	readonly #headHistory: (dir: string) => Promise<HeadHistory | null>;
 	#chain: Promise<unknown> = Promise.resolve();
 
-	/** `repoOf`: the GitHub repository `origin` names in a working directory. `worktreeAt`: the git worktree a directory is in. */
-	constructor(repoOf: (cwd: string) => Promise<Repo | null>, worktreeAt: (dir: string) => Promise<WorktreeAt | null>) {
+	/**
+	 * `repoOf`: the GitHub repository `origin` names in a working directory. `worktreeAt`: the git worktree a directory is in.
+	 * `headHistory`: the branch and HEAD reflog checkouts of the worktree a directory is in.
+	 */
+	constructor(
+		repoOf: (cwd: string) => Promise<Repo | null>,
+		worktreeAt: (dir: string) => Promise<WorktreeAt | null>,
+		headHistory: (dir: string) => Promise<HeadHistory | null>,
+	) {
 		this.#repoOf = repoOf;
 		this.#worktreeAt = worktreeAt;
+		this.#headHistory = headHistory;
 	}
 
 	/**
@@ -412,8 +489,13 @@ export class SessionFactsIndex {
 
 	/** Recompute a session's pull requests, from its transcripts' refs and then its linked worktree's branch; returns whether they changed. */
 	#resolve(session: SessionScan): boolean {
-		const { refs, repo, branch } = session;
-		const pullRequests = resolveLinks(repo && branch !== null ? [...refs, { kind: "branch", ...repo, branch }] : refs, repo, this.#heads);
+		const { repo, branch } = session;
+		const refs = session.refs.flatMap((ref): PullRequestRef[] => {
+			if (ref.kind !== "submit") return [ref];
+			const submitted = session.submitted.get(refKey(ref));
+			return submitted ? [submitted] : [];
+		});
+		const pullRequests = resolveLinks(repo && branch !== null ? [...refs, { kind: "branch", ...repo, branch, link: "worked" }] : refs, repo, this.#heads);
 		const before = session.pullRequests;
 		const same = pullRequests.length === before.length && pullRequests.every((pr, i) => prKey(pr) === prKey(before[i]!) && pr.link === before[i]!.link);
 		if (same) return false;
@@ -449,12 +531,7 @@ export class SessionFactsIndex {
 		/** Sessions whose bash calls named a new `cwd`, or whose worktree is gone: the others keep theirs without asking git. */
 		const moved = scans.filter(scan => scan.moved).map(scan => scan.session);
 		// Sessions share directories, so each is asked about once per refresh.
-		const asked = new Map<string, Promise<WorktreeAt | null>>();
-		const worktreeAt = (dir: string): Promise<WorktreeAt | null> => {
-			let at = asked.get(dir);
-			if (!at) asked.set(dir, (at = this.#worktreeAt(dir)));
-			return at;
-		};
+		const worktreeAt = once(this.#worktreeAt);
 		const worktrees = await Promise.all(moved.map(session => workingWorktree(session.cwd, session.workDirs, worktreeAt)));
 		moved.forEach((session, i) => {
 			if (worktrees[i] === session.worktree) return;
@@ -480,6 +557,18 @@ export class SessionFactsIndex {
 					session.repo = await this.#repoOf(session.cwd);
 				}),
 		);
+		// A submit's branch stays what it was at its time, so each is looked up once: one `git` call for its repository and two for its HEAD reflog per directory.
+		const repoOf = once(this.#repoOf);
+		const historyOf = once(this.#headHistory);
+		await Promise.all(
+			touched.flatMap(session =>
+				session.refs.map(async ref => {
+					if (ref.kind !== "submit" || session.submitted.has(refKey(ref))) return;
+					const submitted = await submittedBranch(ref, session.cwd, repoOf, historyOf);
+					if (submitted) session.submitted.set(refKey(ref), submitted);
+				}),
+			),
+		);
 		for (const session of touched) if (this.#resolve(session)) changed = true;
 		return changed;
 	}
@@ -488,7 +577,10 @@ export class SessionFactsIndex {
 	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; moved: boolean }> {
 		let session = this.#sessions.get(path);
 		const previousShip = session?.transcripts.get(path)?.scan.ship;
-		session ??= { modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path)]]), refs: [], repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null, branch: null };
+		session ??= {
+			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path)]]), refs: [], submitted: new Map(),
+			repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null, branch: null,
+		};
 		this.#sessions.set(path, session);
 		for (const file of await subagentFiles(path)) {
 			if (!session.transcripts.has(file)) session.transcripts.set(file, new TranscriptScan(file));
@@ -497,8 +589,7 @@ export class SessionFactsIndex {
 		if (!reads.includes(false)) session.modifiedAt = modifiedAt;
 		const own = session.transcripts.get(path)!.scan;
 		const shipChanged = JSON.stringify(previousShip ?? null) !== JSON.stringify(own.ship ?? null);
-		// omp resolves a bash `cwd` from the home directory after `~`, else from the session's directory.
-		const workDirs = [...own.workDirs].reverse().map(dir => (dir === "~" || dir.startsWith("~/") ? HOME + dir.slice(1) : resolve(cwd, dir)));
+		const workDirs = [...own.workDirs].reverse().map(dir => absolute(cwd, dir));
 		const before = session.workDirs;
 		const same = workDirs.length === before.length && workDirs.every((dir, i) => dir === before[i]);
 		const moved = !same || (session.worktree !== null && !(await exists(session.worktree)));

@@ -82,6 +82,43 @@ export async function worktreeAt(dir: string): Promise<WorktreeAt | null> {
 	return { top, common, linked: own !== common, branch: head.code === 0 && ref.startsWith(HEADS) ? ref.slice(HEADS.length) : null };
 }
 
+/** What a worktree has checked out now, and the checkouts its HEAD reflog records, newest first. */
+export interface HeadHistory {
+	/** `null` when HEAD is detached. */
+	branch: string | null;
+	/** When each checkout ran, in ms, and the branch or commit it moved from. */
+	moves: { at: number; from: string }[];
+}
+
+/** `HEAD@{1791534798}\tcheckout: moving from me/a to main`, as `--date=unix` names an entry. */
+const CHECKOUT_ENTRY = /^HEAD@\{(\d+)\}\tcheckout: moving from (\S+) to \S+$/;
+const COMMIT_ID = /^[0-9a-f]{40,64}$/;
+
+/** The branch and the HEAD reflog's checkouts of the worktree `dir` is in, `null` when it is in none. */
+export async function headHistory(dir: string): Promise<HeadHistory | null> {
+	const [log, head] = await Promise.all([
+		run(["git", "-C", dir, "reflog", "show", "--date=unix", "--format=%gd%x09%gs", "HEAD"]),
+		run(["git", "-C", dir, "symbolic-ref", "--quiet", "HEAD"]),
+	]);
+	if (log.code !== 0) return null;
+	const moves = log.stdout.split("\n").flatMap(line => {
+		const entry = CHECKOUT_ENTRY.exec(line);
+		return entry ? [{ at: Number(entry[1]) * 1000, from: entry[2]! }] : [];
+	});
+	const ref = head.stdout.trim();
+	return { branch: head.code === 0 && ref.startsWith(HEADS) ? ref.slice(HEADS.length) : null, moves };
+}
+
+/** The branch checked out at `at`: the one the first checkout after it moved from, else the one checked out now; `null` on a detached HEAD. */
+export function branchAt(history: HeadHistory, at: number): string | null {
+	let branch = history.branch;
+	for (const move of history.moves) {
+		if (move.at <= at) break;
+		branch = COMMIT_ID.test(move.from) ? null : move.from;
+	}
+	return branch;
+}
+
 /** The checkout `cwd` is in, `null` when it is in none. */
 export async function gitCheckout(cwd: string): Promise<GitCheckout | null> {
 	const at = await worktreeAt(cwd);

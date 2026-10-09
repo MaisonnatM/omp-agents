@@ -81,6 +81,7 @@ Every transcript comes from the session files on this machine, not from a networ
   The first scan reads every session file, 16 sessions at a time.
   On 641 MB across 464 sessions it takes under a second, and the sidebar shows before it finishes.
   A session that names a PR by number alone costs one `git remote get-url origin` in its working directory.
+  A `gt submit` call costs, once per directory it ran in, one `git remote get-url origin` and a `git reflog show HEAD` with a `git symbolic-ref HEAD`, which place the branch checked out at the call's time; the server keeps each call's branch for as long as it lists the session.
   A subagent's appends do not change the session file, so its pull requests show once the session writes again, at the latest when it receives the subagent's result.
 - The same scan collects the Linear issues each session worked on, by identifier, from the arguments of its Linear MCP calls: a direct `mcp__linear_<tool>` call or a `write` to `xd://mcp__linear_<tool>`, whose `content` holds the arguments as JSON.
   `get_issue` and `save_issue` name the issue in `id`, `list_comments` and `save_comment` in `issueId`; a `save_issue` with no `id` opens one, whose identifier its result's JSON `id` names.
@@ -88,7 +89,7 @@ Every transcript comes from the session files on this machine, not from a networ
   The `/ship` state's `issue` counts too.
   Session rows carry them as `tickets`, the session's own first.
 - Each inbox answer tells the server which branch heads which pull request in that repository.
-  The server then links each session whose `git push` updated one of those branches, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
+  The server then links each session whose `git push` updated one of those branches, whose `gt submit` submitted one, or whose linked worktree has one of them checked out, to that PR, and sends the sidebar the new links.
 
 ## Terminal sessions
 
@@ -688,11 +689,12 @@ The server lives in `src/`:
 - `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
   The worktree comes from the `cwd` arguments of the session's own bash calls, not its subagents', newest first: the first one in a linked worktree of the session directory's repository, other than the checkout that directory is in, passing over directories outside that repository and stopping with none at a directory that is gone.
   `git.ts`'s `worktreeAt` answers each directory once per refresh.
+  A `gt submit` call's branch is the one its `--branch` names, else `branchAt` over `git.ts`'s `headHistory` of the directory it ran in: the branch that the first checkout after the call moved from, else the one checked out now.
 - `src/inbox.ts`: maps each workspace to its GitHub repository, reads the inbox's pull requests with one `gh api graphql` call per repository, and reads one pull request's details with one more.
   A row's `conflicts` is true when GraphQL's `mergeable` is `CONFLICTING`.
   A row and the details read `checks`, `conflicts`, and `unresolved` from the same GraphQL fields, so `readyToMerge` in `src/shared/moves.ts` takes either.
   The details also read the last 100 commits with the pull requests GitHub links each to, and keep a commit linked to none or to this one, since a branch that merged its trunk lists the trunk's commits too.
-- `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), and the worktree a new session's branch runs in.
+- `src/git.ts`: the git checkout of a directory, the worktree a directory is in (`worktreeAt`), the branch a worktree had checked out at a given time (`headHistory`, `branchAt`), and the worktree a new session's branch runs in.
   It also holds the git helpers that `src/worktrees.ts` shares: `git`, `canonical`, `commonDir`, and `worktreesOf`, which parses `git worktree list --porcelain -z`.
 - `src/worktrees.ts`: the worktree inventory and the checks before a checkout is removed; `Worktrees.start` and `Worktrees.remove` order starts against removals; `removeCheckout` removes the linked worktree a directory is in, or returns `null` for a main checkout or a directory outside git, waiting up to 15 seconds for a session that just ended to leave it: it polls only which live sessions occupy the checkout, then runs the full preview once.
   The inventory reads a repository's checkouts four at a time with one `git rev-parse` for their identity, and `previewAll` previews several targets from one snapshot of what uses them, four at a time; `src/map-limit.ts` holds `mapLimit`, the ordered, bounded `Promise.all` they share.

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { worktreeAt } from "./git";
+import { headHistory, worktreeAt } from "./git";
 import { runChecked } from "./proc";
 import { parseShipProgress, resolveLinks, SessionFactsIndex, SessionFactsScan } from "./session-facts";
 
@@ -119,8 +119,8 @@ describe("SessionFactsScan", () => {
 				result("cat", pushed("me/quoted")),
 			]),
 		).toEqual([
-			{ kind: "branch", owner: "acme", repo: "webapp", branch: "me/feature" },
-			{ kind: "branch", owner: "acme", repo: "webapp", branch: "me/forced" },
+			{ kind: "branch", owner: "acme", repo: "webapp", branch: "me/feature", link: "worked" },
+			{ kind: "branch", owner: "acme", repo: "webapp", branch: "me/forced", link: "worked" },
 		]);
 	});
 
@@ -164,8 +164,8 @@ describe("resolveLinks", () => {
 			resolveLinks(
 				[
 					{ kind: "number", number: 6609 },
-					{ kind: "branch", owner: "Acme", repo: "WebApp", branch: "me/feature" },
-					{ kind: "branch", owner: "acme", repo: "webapp", branch: "me/no-pr" },
+					{ kind: "branch", owner: "Acme", repo: "WebApp", branch: "me/feature", link: "worked" },
+					{ kind: "branch", owner: "acme", repo: "webapp", branch: "me/no-pr", link: "worked" },
 				],
 				{ owner: "acme", repo: "webapp" },
 				heads,
@@ -179,7 +179,7 @@ describe("resolveLinks", () => {
 	test("without a repository a bare number links nowhere, and one PR found twice keeps the submission", () => {
 		expect(
 			resolveLinks(
-				[{ kind: "number", number: 1 }, { kind: "branch", owner: "acme", repo: "webapp", branch: "me/feature" }, submitted("ACME", "webapp", 6610)],
+				[{ kind: "number", number: 1 }, { kind: "branch", owner: "acme", repo: "webapp", branch: "me/feature", link: "worked" }, submitted("ACME", "webapp", 6610)],
 				null,
 				heads,
 			),
@@ -221,7 +221,7 @@ describe("SessionFactsIndex", () => {
 		mkdirSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child"), { recursive: true });
 		writeFileSync(join(dir, "2026-10-01T00-00-00-000Z_s1", "Child", "Grandchild.jsonl"), `${line(2)}\n`);
 
-		const index = new SessionFactsIndex(async () => null, async () => null);
+		const index = new SessionFactsIndex(async () => null, async () => null, async () => null);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 		expect(await index.refresh(listed(1))).toBe(true);
 		expect(index.factsOf(session).pullRequests.map(pr => pr.number)).toEqual([1, 2]);
@@ -246,7 +246,7 @@ describe("SessionFactsIndex", () => {
 		const child = join(dir, "2026-10-01T00-00-00-000Z_ship", "Child");
 		mkdirSync(child, { recursive: true });
 		writeFileSync(join(child, "sub.jsonl"), `${state("merged")}\n`);
-		const index = new SessionFactsIndex(async () => null, async () => null);
+		const index = new SessionFactsIndex(async () => null, async () => null, async () => null);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
@@ -267,7 +267,7 @@ describe("SessionFactsIndex", () => {
 		const child = join(dir, "2026-10-01T00-00-00-000Z_tickets");
 		mkdirSync(child, { recursive: true });
 		writeFileSync(join(child, "Sub.jsonl"), `${read("ENG-2")}\n${read("ENG-1")}\n`);
-		const index = new SessionFactsIndex(async () => null, async () => null);
+		const index = new SessionFactsIndex(async () => null, async () => null, async () => null);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: dir, modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
@@ -291,6 +291,7 @@ describe("SessionFactsIndex", () => {
 				asked.push(cwd);
 				return { owner: "acme", repo: "webapp" };
 			},
+			async () => null,
 			async () => null,
 		);
 
@@ -327,7 +328,7 @@ describe("SessionFactsIndex", () => {
 		mkdirSync(child, { recursive: true });
 		writeFileSync(join(child, "sub.jsonl"), `${ran(join(parent, "app-done"))}\n`);
 		writeFileSync(session, `${ran("../../app-done")}\n${ran("../../app-wip")}\n`);
-		const index = new SessionFactsIndex(async () => null, worktreeAt);
+		const index = new SessionFactsIndex(async () => null, worktreeAt, headHistory);
 		const listed = (modifiedAt: number) => [{ path: session, cwd: join(main, "src"), modifiedAt }];
 
 		expect(await index.refresh(listed(1))).toBe(true);
@@ -362,7 +363,7 @@ describe("SessionFactsIndex", () => {
 		];
 		const heads = ["wip", "done", "main", "next"].map((head, i) => ({ ...repo, number: i + 1, head }));
 		const linked = (number: number) => [{ ...repo, number, link: "worked" as const }];
-		const index = new SessionFactsIndex(async () => repo, worktreeAt);
+		const index = new SessionFactsIndex(async () => repo, worktreeAt, headHistory);
 
 		await index.refresh(listed(1));
 		expect(index.learnHeads(repo, heads)).toBe(true);
@@ -378,10 +379,42 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(inWorktree).pullRequests).toEqual(linked(4));
 		expect(index.factsOf(intoWorktree).pullRequests).toEqual([]);
 
-		const offGitHub = new SessionFactsIndex(async () => null, worktreeAt);
+		const offGitHub = new SessionFactsIndex(async () => null, worktreeAt, headHistory);
 		await offGitHub.refresh(listed(1));
 		offGitHub.learnHeads(repo, heads);
 		expect(offGitHub.factsOf(inWorktree).pullRequests).toEqual([]);
+	});
+
+	test("links the PR of the branch each gt submit submitted, printed or not, as checked out where and when it ran, and no dry run", async () => {
+		const parent = realpathSync(sessionDir());
+		const main = await repoWithWorktrees(parent);
+		const start = Math.floor(Date.now() / 1000);
+		const switchAt = (seconds: number, ...args: string[]) =>
+			runChecked(["git", "-C", main, "switch", "-q", ...args], { env: { ...IDENTITY, GIT_COMMITTER_DATE: `${start + seconds} +0000` } });
+		const submit = (id: string, seconds: number, command: string) =>
+			JSON.stringify({
+				type: "message",
+				timestamp: new Date((start + seconds) * 1000).toISOString(),
+				message: { role: "assistant", content: [{ type: "toolCall", id, name: "bash", arguments: { command } }] },
+			});
+		await switchAt(10, "-c", "feature");
+		await switchAt(30, "main");
+		const session = join(parent, "2026-10-01T00-00-00-000Z_s1.jsonl");
+		writeFileSync(
+			session,
+			`${[
+				submit("quiet", 20, "gt submit --no-edit --no-stack -q 2>&1 | grep -v WARNING"),
+				submit("elsewhere", 20, "cd ../app-wip && gt submit -q"),
+				submit("dry", 40, "gt submit --dry-run"),
+				submit("named", 40, "gt ss --branch done"),
+			].join("\n")}\n`,
+		);
+		const repo = { owner: "acme", repo: "webapp" };
+		const index = new SessionFactsIndex(async () => repo, worktreeAt, headHistory);
+
+		await index.refresh([{ path: session, cwd: main, modifiedAt: 1 }]);
+		index.learnHeads(repo, ["feature", "wip", "main", "done"].map((head, i) => ({ ...repo, number: i + 1, head })));
+		expect(index.factsOf(session).pullRequests).toEqual([1, 2, 4].map(number => ({ ...repo, number, link: "submitted" })));
 	});
 });
 

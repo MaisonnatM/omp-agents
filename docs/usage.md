@@ -462,11 +462,14 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Its subagents' pull requests count as its own.
   A submission is a `gt submit` line (`<branch>: https://app.graphite.com/github/pr/<owner>/<repo>/<number> (created)` or `(updated)`) or the URL a `gh pr create` call printed, both from bash output, including bash run as a background job.
   A stack submit lists every PR it created or updated.
+  A `gt submit` or `gt ss` call is a submission too, even when it printed nothing, as with `-q`: of the branch it names with `--branch`, else of the branch checked out where it ran, at the time it ran, in the main checkout too, but not of a `--dry-run`.
+  Where it ran follows the bash call's `cwd`, a `cd` earlier in the same command, and `--cwd`; when it ran picks the branch from that worktree's HEAD reflog, so a later switch leaves the link alone.
   Work is one of the session's own tool calls: `gh pr checkout`, `edit`, `comment`, `review`, `merge`, or `ready` with a PR number or URL; a `git push` whose output shows that it updated a PR's head branch; or an omp `pr://` read.
   Work is also the branch checked out in the linked worktree the session works in, its own directory or the worktree its bash calls last ran in, when a PR heads that branch; a switch to another branch links that branch's PR at the session's next write.
   A repository's main checkout links no PR by its branch, since every session started there shares it.
   A bare number belongs to the repository that `origin` names in the session's working directory, unless the command passes `-R` or `--repo`.
-  A push or a worktree's branch links once the inbox has listed the PR that the branch heads, because only the inbox knows which branch heads which PR.
+  A push, a submit, or a worktree's branch links once the inbox has listed the PR that the branch heads, because only the inbox knows which branch heads which PR.
+  A submit links only while the directory it ran in exists.
   A PR the session only quoted, listed with `gh pr list`, or looked up with `gh pr view` does not count, unless it heads the session's worktree branch.
   A PR that a session submitted counts as submitted, even when it also worked on it.
 - In a session's header, the pull request button's menu opens each pull request on GitHub, on Graphite, or in the inbox's details.
