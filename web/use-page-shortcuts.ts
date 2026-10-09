@@ -34,6 +34,7 @@ export interface PageShortcutInput {
 	toggleTools: () => void;
 	toggleHideTools: () => void;
 	toggleHideThinking: () => void;
+	toggleTerminal: () => void;
 }
 
 /**
@@ -110,6 +111,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (!maximized) return false;
 				show({ ...layout, maximized: false });
 			},
+			terminal: () => latest.current.toggleTerminal(),
 		};
 	}, []);
 	useShortcuts(handlers);

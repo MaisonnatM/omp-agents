@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
 import { Header } from "./page-header";
-import { OpenInCursor, PullRequestMenu, SessionTrail } from "./session-meta";
+import { PullRequestMenu, SessionTrail } from "./session-meta";
 import { NOTICE_TONE, Transcript } from "./transcript";
 
 interface PastConversationProps {
@@ -35,7 +35,6 @@ export function PastConversation({ sessionId, session, fork, onFork, resume, onR
 					{session && (
 						<>
 							<PullRequestMenu pullRequests={session.pullRequests} />
-							<OpenInCursor dir={session.worktree ?? session.cwd} />
 							<Tooltip content="Start omp on this session's file from this dashboard, as omp --resume does, and continue it here.">
 								<Button
 									size="compact"

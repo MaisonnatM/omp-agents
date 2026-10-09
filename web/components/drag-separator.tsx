@@ -12,7 +12,7 @@ interface DragSeparatorOptions {
 	read: (event: PointerEvent<HTMLDivElement>, start: Drag) => number;
 	keyStep: number;
 	shiftSteps: number;
-	/** Sidebar width decreases toward the right for a right-hand sidebar. */
+	/** The value decreases toward the right or the bottom: a right-hand sidebar's width, a bottom panel's height. */
 	direction?: 1 | -1;
 	min: number;
 	max: number;
@@ -54,7 +54,7 @@ export function useDragSeparator({ value, onValue, axis, read, keyStep, shiftSte
 			const step = keyStep * (event.shiftKey ? shiftSteps : 1);
 			const next: Record<string, number> = axis === "vertical"
 				? { ArrowLeft: value - direction * step, ArrowRight: value + direction * step, Home: min, End: max }
-				: { ArrowUp: value - step, ArrowDown: value + step, Home: min, End: max };
+				: { ArrowUp: value - direction * step, ArrowDown: value + direction * step, Home: min, End: max };
 			const target = next[event.key];
 			if (target === undefined) return;
 			event.preventDefault();

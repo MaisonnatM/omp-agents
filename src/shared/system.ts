@@ -6,4 +6,8 @@ export interface SystemLoad {
 	memoryAvailable: number;
 	/** Bytes of physical memory. */
 	memoryTotal: number;
+	/** Bytes free to the user on the volume that holds the home directory. */
+	diskAvailable: number;
+	/** Bytes the volume that holds the home directory holds in all. */
+	diskTotal: number;
 }

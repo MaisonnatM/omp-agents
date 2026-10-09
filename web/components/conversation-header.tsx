@@ -7,7 +7,7 @@ import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions } from "./dashboard-context";
 import { Header } from "./page-header";
-import { OpenInCursor, PullRequestMenu, SessionTrail } from "./session-meta";
+import { PullRequestMenu, SessionTrail } from "./session-meta";
 import type { Subject } from "./subject";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
@@ -53,12 +53,7 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 	);
 	return (
 		<Header title={title} status={status} alert={phase.phase === "ended"} leading={back}>
-			{subject.kind === "session" && shown && (
-				<>
-					<PullRequestMenu pullRequests={shown.pullRequests} />
-					<OpenInCursor dir={shown.worktree ?? shown.cwd} />
-				</>
-			)}
+			{subject.kind === "session" && shown && <PullRequestMenu pullRequests={shown.pullRequests} />}
 			{subject.kind === "session" && live && host && (
 				<Tooltip
 					content={

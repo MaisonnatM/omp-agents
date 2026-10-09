@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, the inbox, pull requests, git checkouts, worktrees,
- * the projects Settings adds and hides, the machine's load, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
+ * the projects Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
  */
 import { join } from "node:path";
 import { buildAnalytics, type SessionFacts as AnalyticsSessionFacts } from "../analytics";
@@ -31,6 +31,7 @@ import { PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
+import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
 import { parseCalendarShown, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
@@ -58,6 +59,7 @@ export interface RouteEnv {
 	setCalendarShown(id: string, shown: boolean): void;
 	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
 	placeOf(sessionId: string): SessionPlace | null;
+	terminals: Terminals;
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -291,8 +293,10 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 	});
 
 	const systemLoad = new SystemLoadReader();
-	/** `GET /api/system`: the CPU percent since the previous read and the memory available, for the status bar. */
+	/** `GET /api/system`: the CPU percent since the previous read, the memory available, and the disk space free, for the status bar. */
 	const system = get(() => answer(() => systemLoad.read()));
+	/** `GET /api/terminals`: the shells the terminal panel runs, oldest first, so a reloaded page reopens their tabs. */
+	const terminals = get(() => Response.json(env.terminals.list()));
 
 	/**
 	 * `GET /api/image?hash=<sha256>&type=<image type>`: an image of a prompt that omp moved from its session file to its
@@ -423,6 +427,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/projects": { PUT: projectChange },
 		"/api/git": { GET: git },
 		"/api/system": { GET: system },
+		"/api/terminals": { GET: terminals },
 		"/api/image": { GET: image },
 		"/api/file": { GET: textFile },
 		"/api/changes": { GET: changes },

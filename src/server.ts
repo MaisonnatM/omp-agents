@@ -1,6 +1,6 @@
 /** The dashboard server: wires the registries, the HTTP API, and the socket together, then follows omp's files and registry. */
 import { rmSync } from "node:fs";
-import type { Server } from "bun";
+import type { Server, ServerWebSocket } from "bun";
 import { GoogleCalendarReader } from "./google-calendar";
 import { integrationServer } from "./integrations";
 import { errorText } from "./json";
@@ -36,12 +36,14 @@ import { createClientHandler } from "./server/socket";
 import { createStarter } from "./server/start";
 import { TodoInbox } from "./server/todo-inbox";
 import { UserTodosFile } from "./server/user-todos-file";
-import { type SocketData, send, Views } from "./server/views";
+import { terminalFor, type TerminalSocket, type TerminalSocketData, terminalSocket } from "./server/terminal-socket";
+import { type Socket, type SocketData, send, Views } from "./server/views";
 import { parseClientMsg } from "./server/wire";
 import { modelUpdates, upgradeModel } from "./settings";
 import type { StartRequest, StartResult, View } from "./shared/sessions";
 import { DONE_KEPT_HOURS, startChanges } from "./user-todos";
 import type { UserTodoChange } from "./user-todos-shared";
+import { Terminals } from "./terminals";
 import { Worktrees } from "./worktrees";
 
 const PORT = portFromEnv();
@@ -59,6 +61,7 @@ function applyTodo(change: UserTodoChange): boolean {
 	if (changed) broadcasts.pushUserTodos();
 	return changed;
 }
+const terminals = new Terminals();
 /** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */
 function clearOldDone(): void {
 	applyTodo({ op: "clear-done", categoryId: null, before: new Date(Date.now() - DONE_KEPT_HOURS * 3_600_000).toISOString() });
@@ -280,16 +283,33 @@ async function listRegistry(): Promise<void> {
 	if (joinedOrLeft) broadcasts.pushPast();
 }
 
-function upgrade(req: Request, srv: Server<SocketData>): Response | undefined {
+/** A socket is the dashboard's own, which watches views, or a terminal tab's, which carries one shell. */
+type AnySocketData = SocketData | TerminalSocketData;
+const isTerminalSocket = (ws: ServerWebSocket<AnySocketData>): ws is TerminalSocket => "terminal" in ws.data;
+
+const NOT_A_WEBSOCKET = (): Response => new Response("expected a websocket", { status: 426 });
+
+function upgrade(req: Request, srv: Server<AnySocketData>): Response | undefined {
 	const refused = guards.admitSocket(req);
 	if (refused) return refused;
-	if (srv.upgrade(req, { data: { views: new Map() } })) return undefined;
-	return new Response("expected a websocket", { status: 426 });
+	return srv.upgrade(req, { data: { views: new Map() } }) ? undefined : NOT_A_WEBSOCKET();
 }
 
-let server: Server<SocketData>;
+function upgradeTerminal(req: Request, srv: Server<AnySocketData>): Response | undefined {
+	const refused = guards.admitSocket(req);
+	if (refused) return refused;
+	const params = new URL(req.url).searchParams;
+	const terminal = terminalFor(terminals, params);
+	if (terminal instanceof Response) return terminal;
+	if (srv.upgrade(req, { data: { terminal, detach: null } })) return undefined;
+	// A shell this request opened, which no page would ever show.
+	if (!params.has("id")) terminal.kill();
+	return NOT_A_WEBSOCKET();
+}
+
+let server: Server<AnySocketData>;
 try {
-	server = Bun.serve<SocketData>({
+	server = Bun.serve<AnySocketData>({
 		hostname: HOSTNAME,
 		port: PORT,
 		development: false,
@@ -314,11 +334,13 @@ try {
 					if (!file || !saved) return null;
 					return { file, dir: files.factsOf(sessionId).worktree ?? sessions.bySessionId(sessionId)?.cwd ?? saved.cwd };
 				},
+				terminals,
 			}),
 		},
 		fetch(req, srv) {
 			const { pathname } = new URL(req.url);
 			if (pathname === "/ws") return upgrade(req, srv);
+			if (pathname === "/ws/terminal") return upgradeTerminal(req, srv);
 			if (pathname.startsWith("/api/")) return guards.admit(req) ?? fail(404, `No ${req.method} ${pathname}`);
 			return servePage(req, guards, token, page);
 		},
@@ -326,16 +348,19 @@ try {
 			// A prompt's images travel as base64 in one message: MAX_PROMPT_IMAGE_BYTES of them, a third more as base64.
 			maxPayloadLength: 64 * 1024 * 1024,
 			open(ws) {
-				broadcasts.open(ws);
+				if (isTerminalSocket(ws)) return terminalSocket.open(ws);
+				broadcasts.open(ws as Socket);
 				// The registry was not polled while nobody listened; list it now rather than at the next tick.
 				if (!registryFresh) void listRegistry();
 			},
 			message(ws, raw) {
+				if (isTerminalSocket(ws)) return terminalSocket.message(ws, raw);
 				const msg = parseClientMsg(raw);
-				if (msg) handleClientMsg(ws, msg).catch((err: unknown) => console.error(`omp-agents: ${msg.t} failed: ${errorText(err)}`));
+				if (msg) handleClientMsg(ws as Socket, msg).catch((err: unknown) => console.error(`omp-agents: ${msg.t} failed: ${errorText(err)}`));
 			},
 			close(ws) {
-				views.watch(ws, []);
+				if (isTerminalSocket(ws)) return terminalSocket.close(ws);
+				views.watch(ws as Socket, []);
 			},
 		},
 	});
@@ -369,6 +394,7 @@ let shuttingDown: Promise<void> | undefined;
 function shutdown(): Promise<void> {
 	shuttingDown ??= (async () => {
 		await sessions.dispose();
+		terminals.dispose();
 		stopStats();
 		// Last, right before exit, so a stopped command's result is not saved as one stopped at its time limit.
 		stopping.abort();

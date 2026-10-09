@@ -19,7 +19,7 @@ export interface FocusedSession {
 	row: RosterHost | PastSession | undefined;
 	/** The directory the view's session runs or ran in. */
 	cwd: string | undefined;
-	/** Where its status bar points: its worktree, else its directory; `null` without a session. */
+	/** Where a new terminal opens: the session's worktree, else its directory; `null` without a session. */
 	workspace: string | null;
 }
 

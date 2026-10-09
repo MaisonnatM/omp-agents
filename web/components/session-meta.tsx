@@ -71,19 +71,3 @@ export function PullRequestMenu({ pullRequests }: { pullRequests: LinkedPullRequ
 		</DropdownMenu>
 	);
 }
-
-/** Cursor's link that opens `dir` as a folder, which macOS hands to Cursor. */
-export const cursorUrl = (dir: string): string => `cursor://file${encodeURI(dir)}`;
-
-const CursorLogo = ({ size }: { size?: number | string }) => <OrgIcon org="cursor" className={size === 16 ? "size-4" : "size-3.5"} />;
-
-/** Opens the directory a session works in as a Cursor window. */
-export function OpenInCursor({ dir }: { dir: string }) {
-	return (
-		<Tooltip content={`Open ${dir} in Cursor`} side="bottom">
-			<Button variant="secondary" size="compact" leadingIcon={CursorLogo} render={<a href={cursorUrl(dir)} />}>
-				Cursor
-			</Button>
-		</Tooltip>
-	);
-}

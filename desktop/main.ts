@@ -165,10 +165,10 @@ async function connect(win: BrowserWindow): Promise<void> {
 	win.loadURL(`${ORIGIN}/?token=${token}`).catch(() => {});
 }
 
-/** Schemes the default browser or app may open: the web, and Cursor's links that open a session's directory. */
-const OUTSIDE_PROTOCOLS: Record<string, true> = { "http:": true, "https:": true, "cursor:": true };
+/** Schemes the default browser may open. */
+const OUTSIDE_PROTOCOLS: Record<string, true> = { "http:": true, "https:": true };
 
-/** Opens a web address in the default browser and a `cursor:` link in Cursor; any other scheme goes nowhere. */
+/** Opens a web address in the default browser; any other scheme goes nowhere. */
 function openOutside(url: string): void {
 	const protocol = URL.parse(url)?.protocol;
 	if (protocol && OUTSIDE_PROTOCOLS[protocol]) void shell.openExternal(url);

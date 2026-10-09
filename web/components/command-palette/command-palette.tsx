@@ -16,6 +16,7 @@ import {
 	Plus,
 	Repeat,
 	Search,
+	SquareTerminal,
 	Wrench,
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useMemo, useRef } from "react";
@@ -66,6 +67,7 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	todo: PAGE_ICON.todo,
 	calendar: PAGE_ICON.calendar,
 	routines: Repeat,
+	terminal: SquareTerminal,
 };
 
 interface CommandPaletteProps {

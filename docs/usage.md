@@ -88,9 +88,23 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Amber means less than 20% is left, and red means none.
   Hover or focus a window to see omp's full limit name and when it resets.
   The server runs `omp usage --json` at startup and every minute after that.
-- The strip's right side shows the worktree of the focused pane's session, else its directory, by name; hover it for the full path, and it hides while no session is focused.
-  After it come the machine's CPU, the percent of every core's time spent busy since the last read, and the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory; hover either for its full reading.
-  The strip reads the CPU and memory again every five seconds while the page is visible.
+- The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory; hover any of them for its full reading.
+  The strip reads them again every five seconds while the page is visible.
+- **Terminal**, at the start of the strip's right side, shows or hides the [terminal](#terminal).
+
+## Terminal
+
+- The terminal is a panel under the panes, between the two sidebars, with a tab for each shell.
+  **Terminal** in the bottom strip, Ctrl+\` on every platform, or **Toggle terminal** in the command menu shows or hides it.
+  Ctrl+\` works from inside the terminal too, and on macOS so does every Cmd shortcut, since a shell reads no Cmd key; on Linux and Windows every other Ctrl key goes to the shell.
+- Each tab runs your login shell (`$SHELL -l`) on the dashboard server, in the focused session's worktree, else its directory, else the sidebar's project, else your home directory.
+  The tab is named by that directory; hover it for the full path.
+  `+` opens another tab in the same place, and the shell gets neither the server's `PORT` nor `OMP_AGENTS_PARENT`, so a dev server it starts does not reach for the dashboard's port.
+- A shell keeps running while the panel is hidden and across a page reload: the reloaded page reopens a tab for each shell with its last megabyte of output.
+  It ends when you type `exit`, when the tab's × hangs up on it, or when the server stops; the last tab closing hides the panel.
+  A tab whose server stopped reads **(disconnected)** until you close it.
+- Drag the panel's top edge, or focus it and press ↑ or ↓, to change its height; double-click the edge to reset it.
+  Its height, and whether it shows, is saved in the browser's localStorage.
 
 ## Session details sidebar
 
@@ -253,9 +267,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A bash `cwd` in the session's own checkout, outside git, or in another repository leaves the worktree as it was, and one in a directory that is gone falls back to the session's directory.
 - On the right of a session's header, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
   Its menu opens each one on GitHub, on Graphite, or in the inbox's details; the button shows only for a session with a pull request.
-  **Cursor** opens the directory the session works in, its worktree or else its own directory, as a Cursor window through Cursor's `cursor://file/<path>` link.
-  A browser asks before it hands the link to Cursor; the desktop app hands it to macOS directly.
-  Past sessions show both buttons before **Resume**.
+  Past sessions show it before **Resume**.
 - The composer names a session's model by its label, next to the logo of the org that makes it (`anthropic/claude-opus-5-5` reads `Opus 5.5` with the Anthropic logo).
   The label leaves out the provider, the vendor prefix, and a release date, joins version parts with dots, and puts a `:` suffix such as a thinking level in parentheses (`Sonnet 5.5 (high)`).
   For a router model such as `openrouter/moonshotai/kimi-k3`, the org is the one the id names.
@@ -960,6 +972,7 @@ Alt is Option on macOS.
 | Alt+T | Anywhere | Show or hide thinking |
 | Cmd+B | Anywhere | Show or hide the sessions sidebar |
 | Cmd+Alt+B | Anywhere | Show or hide the session details sidebar |
+| Ctrl+\` | Anywhere, the terminal too, on every platform | Show or hide the terminal |
 | Esc | Maximized pane | Restore the split |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |

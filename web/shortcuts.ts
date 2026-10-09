@@ -47,7 +47,8 @@ export type ShortcutId =
 	| "nextChangedFile"
 	| "previousChangedFile"
 	| "moveUp"
-	| "moveDown";
+	| "moveDown"
+	| "terminal";
 
 /**
  * Where a binding fires. `composer`: from the composer's textarea, before any page-wide binding sees the key.
@@ -56,11 +57,15 @@ export type ShortcutId =
  */
 export type Scope = "composer" | "outside-fields" | "anywhere";
 
-/** A key plus the modifiers it needs. `mod` is ⌘ on macOS and Ctrl elsewhere, as web apps bind it. */
+/**
+ * A key plus the modifiers it needs. `mod` is ⌘ on macOS and Ctrl elsewhere, as web apps bind it; `ctrl` is Ctrl on
+ * every platform, as editors bind their terminal.
+ */
 export interface Chord {
 	/** A lowercase letter, a printable symbol, or a `KeyboardEvent.key` name such as `Escape`. */
 	key: string;
 	mod?: true;
+	ctrl?: true;
 	alt?: true;
 	/** For letters, digits, and named keys only: which symbols need Shift depends on the layout. */
 	shift?: true;
@@ -166,6 +171,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "previousChangedFile", label: "Changes: open the previous changed file", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
 	{ id: "moveUp", label: "Move the focused todo, or the inbox's focused repository, section, or pull request, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "moveDown", label: "Move the focused todo, or the inbox's focused repository, section, or pull request, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "terminal", label: "Show or hide the terminal", command: "Toggle terminal", keys: [{ chord: { key: "`", ctrl: true }, scope: "anywhere" }] },
 ];
 
 const GO = "g";
@@ -208,7 +214,7 @@ export function pressesChord(event: KeyEvent, chord: Chord, mac = IS_MAC): boole
 	return (
 		chord.key === key &&
 		event.metaKey === (mac && !!chord.mod) &&
-		event.ctrlKey === (!mac && !!chord.mod) &&
+		event.ctrlKey === (!!chord.ctrl || (!mac && !!chord.mod)) &&
 		event.altKey === !!chord.alt &&
 		(symbol || event.shiftKey === !!chord.shift)
 	);
@@ -238,10 +244,10 @@ const KEY_LABEL: Record<string, string> = {
 };
 
 /** `⇧⌘O` on macOS, `Ctrl+Shift+O` elsewhere. */
-export function chordLabel({ key, mod, alt, shift }: Chord): string {
+export function chordLabel({ key, mod, ctrl, alt, shift }: Chord): string {
 	const name = KEY_LABEL[key] ?? key.toUpperCase();
-	if (IS_MAC) return `${alt ? "⌥" : ""}${shift ? "⇧" : ""}${mod ? "⌘" : ""}${name}`;
-	return [mod && "Ctrl", alt && "Alt", shift && "Shift", name].filter(Boolean).join("+");
+	if (IS_MAC) return `${ctrl ? "⌃" : ""}${alt ? "⌥" : ""}${shift ? "⇧" : ""}${mod ? "⌘" : ""}${name}`;
+	return [(mod || ctrl) && "Ctrl", alt && "Alt", shift && "Shift", name].filter(Boolean).join("+");
 }
 
 /** {@link chordLabel}, or `G then P` for a pair. */

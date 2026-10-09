@@ -1,4 +1,5 @@
-import { cpus, freemem, platform, totalmem } from "node:os";
+import { statfs } from "node:fs/promises";
+import { cpus, freemem, homedir, platform, totalmem } from "node:os";
 import { run } from "./proc";
 import type { SystemLoad } from "./shared/system";
 
@@ -46,6 +47,13 @@ export class SystemLoadReader {
 		// Two reads within the same clock tick measure nothing, so the previous percent stands.
 		this.#lastPercent = busyPercent(this.#last, now) ?? this.#lastPercent;
 		this.#last = now;
-		return { cpuPercent: this.#lastPercent, memoryAvailable: await availableMemory(), memoryTotal: totalmem() };
+		const [memoryAvailable, disk] = await Promise.all([availableMemory(), statfs(homedir())]);
+		return {
+			cpuPercent: this.#lastPercent,
+			memoryAvailable,
+			memoryTotal: totalmem(),
+			diskAvailable: disk.bavail * disk.bsize,
+			diskTotal: disk.blocks * disk.bsize,
+		};
 	}
 }

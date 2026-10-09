@@ -14,6 +14,7 @@ import type { ModelOption } from "../shared/models";
 import { NOTICE_OPS } from "../shared/notices";
 import type { ProjectChange } from "../shared/projects";
 import type { ClientMsg } from "../shared/protocol";
+import type { TerminalClientMsg } from "../shared/terminals";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues } from "../shared/tickets";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
@@ -333,6 +334,33 @@ export function parseClientMsg(raw: string | Buffer): ClientMsg | null {
 	}
 	if (!isObject(value) || !isClientMsgType(value.t)) return null;
 	return clientParsers[value.t](value)?.ok ?? null;
+}
+
+/** A terminal's columns or rows: xterm's own bounds. */
+const isTerminalSide = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 1000;
+
+/** A text frame on a terminal socket, or `null` when it is not one of {@link TerminalClientMsg}. */
+export function parseTerminalMsg(raw: string): TerminalClientMsg | null {
+	let value: unknown;
+	try {
+		value = JSON.parse(raw);
+	} catch {
+		return null;
+	}
+	if (!isObject(value)) return null;
+	if (value.t === "kill") return { t: "kill" };
+	if (value.t === "resize" && isTerminalSide(value.cols) && isTerminalSide(value.rows)) return { t: "resize", cols: value.cols, rows: value.rows };
+	return null;
+}
+
+/** `?id=<id>` of `/ws/terminal`, which attaches to a shell, or `?cwd=<dir>&cols=<n>&rows=<n>`, which opens one. */
+export function parseTerminalQuery(params: URLSearchParams): { id: string } | { cwd: string; cols: number; rows: number } | null {
+	const id = params.get("id");
+	if (id !== null) return isNonEmpty(id) ? { id } : null;
+	const cwd = params.get("cwd");
+	const cols = Number(params.get("cols"));
+	const rows = Number(params.get("rows"));
+	return isNonEmpty(cwd) && isTerminalSide(cols) && isTerminalSide(rows) ? { cwd, cols, rows } : null;
 }
 
 /** A pull request named by an owner, repository, and number, as the routes that take one receive them. */

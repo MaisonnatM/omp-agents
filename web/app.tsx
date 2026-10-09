@@ -20,6 +20,7 @@ import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
 import { StatusBar } from "./components/status-bar";
 import { subjectOf } from "./components/subject";
 import { NewTicketDialog } from "./components/tickets/new-ticket";
+import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-panel";
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { localDay } from "./days";
 import { integrationsStore } from "./reads";
@@ -54,6 +55,7 @@ export function App() {
 	const sessions = useSessionLists(workspace);
 	const overlays = useOverlays();
 	const display = useTranscriptDisplay();
+	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const linear = integrationsStore.usePolling().read?.data.integrations.linear ?? null;
@@ -119,6 +121,7 @@ export function App() {
 		toggleTools: display.toggleTools,
 		toggleHideTools: display.toggleHideTools,
 		toggleHideThinking: display.toggleHideThinking,
+		toggleTerminal: terminal.toggle,
 	});
 
 	const actions = useMemo(
@@ -199,6 +202,7 @@ export function App() {
 									</ToolsExpanded>
 								</ActivityVisibility.Provider>
 							</Plans>
+							<TerminalPanel panel={terminal} cwd={focused.workspace ?? project ?? "~"} />
 						</SidebarInset>
 						{detailsView && (
 							<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
@@ -243,7 +247,7 @@ export function App() {
 							onCreateTicket={linearCallable ? setNewTicket : undefined}
 						/>
 					</SidebarProvider>
-					<StatusBar usage={state.usage} workspace={focused.workspace} />
+					<StatusBar usage={state.usage} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
 				</div>
 			</DashboardStatusContext.Provider>
 		</DashboardActionsContext.Provider>

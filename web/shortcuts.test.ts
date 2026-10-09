@@ -34,6 +34,13 @@ test("mod is ⌘ on macOS and Ctrl elsewhere, and a chord needs exactly its modi
 	expect(press("b", "KeyB")).toEqual([]);
 });
 
+test("Ctrl+` toggles the terminal on every platform, and ⌘` stays macOS's window switch", () => {
+	expect(press("`", "Backquote", { ctrl: true })).toEqual(["terminal"]);
+	expect(pressOn(true, "`", "Backquote", { ctrl: true })).toEqual(["terminal"]);
+	expect(pressOn(true, "`", "Backquote", { meta: true })).toEqual([]);
+	expect(pressOn(true, "`", "Backquote", { ctrl: true, meta: true })).toEqual([]);
+});
+
 test("browser-reserved chords stay the browser's", () => {
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
