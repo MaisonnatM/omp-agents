@@ -18,6 +18,7 @@ import { readStats } from "../omp/stats";
 import { directoryOf } from "../paths";
 import { loadPullRequestOptions, savePullRequest } from "../pull-request-edit";
 import { listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
+import { loadPullRequestStack } from "../pull-request-stack";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
@@ -249,6 +250,12 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return pr ? answer(() => loadPullRequestDetail(pr)) : fail(400, "Expected ?owner=&repo=&number=");
 	});
 
+	/** `GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>`: the open pull requests stacked with that one, top first, for its details' Stack. */
+	const pullRequestStack = get(params => {
+		const pr = parsePullRequestQuery(params);
+		return pr ? answer(() => loadPullRequestStack(pr)) : fail(400, "Expected ?owner=&repo=&number=");
+	});
+
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = put(parsePullRequestEdit, savePullRequest, "Expected { owner, repo, number, change } with a label or reviewer to add or remove, or a state of open, draft, or closed");
 
@@ -407,6 +414,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/ticket/media": { GET: ticketMedia },
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
 		"/api/pull-request/options": { GET: pullRequestOptions },
+		"/api/pull-request/stack": { GET: pullRequestStack },
 		"/api/pull-request/files": { GET: pullRequestFiles },
 		"/api/pull-request/file": { GET: pullRequestFile },
 		"/api/worktrees": { GET: worktreeInventory },

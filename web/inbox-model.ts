@@ -348,39 +348,6 @@ export function listedPullRequest(inbox: Inbox, pr: PullRequest): { pr: InboxPul
 	return null;
 }
 
-/**
- * The open and draft pull requests stacked with `pr`, by the chain of base branches, top first; empty unless the inbox
- * lists two or more. Pull requests stacked on the same branch follow each other above it, lowest number first.
- */
-export function pullRequestStack({ repos }: Inbox, pr: PullRequest): InboxPullRequest[] {
-	const repo = repos.find(other => repoKey(other) === repoKey(pr));
-	if (!repo || "error" in repo) return [];
-	const live = repo.pullRequests.filter(other => other.state !== "merged");
-	const self = live.find(other => samePullRequest(other, pr));
-	if (!self) return [];
-	const byHead = new Map(live.map(other => [other.head, other]));
-	const byBase = Map.groupBy(live.toSorted((a, b) => a.number - b.number), other => other.stackedOn ?? "");
-	// GitHub cannot report a cycle of bases, but one must not hang the page.
-	const seen = new Set([self]);
-	const below: InboxPullRequest[] = [];
-	for (let next = byHead.get(self.stackedOn ?? ""); next && !seen.has(next); next = byHead.get(next.stackedOn ?? "")) {
-		seen.add(next);
-		below.push(next);
-	}
-	const above: InboxPullRequest[] = [];
-	const climb = (from: InboxPullRequest): void => {
-		for (const next of byBase.get(from.head) ?? []) {
-			if (seen.has(next)) continue;
-			seen.add(next);
-			above.push(next);
-			climb(next);
-		}
-	};
-	climb(self);
-	if (seen.size < 2) return [];
-	return [...above.toReversed(), self, ...below];
-}
-
 /** How many pull requests in `inbox` wait on your move. */
 export const yourMoveCount = ({ repos }: Inbox, agentOn: AgentOn): number =>
 	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => groupOf(pr, moveOf(pr, agentOn(pr))) === "Your move").length;

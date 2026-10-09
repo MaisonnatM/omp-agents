@@ -125,8 +125,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   **Open agent** opens the live agent that took it, unless the pane already shows that agent, and the external-link button opens the image in a new tab.
   New images show up while the agents run.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
-  The first one shows until you pick another: click another pull request of its **Stack** to show it in place.
-  The session's pull requests that the stack does not show are listed above the details, each with whether the session submitted or worked on it.
+  The first one shows until you pick another: click another pull request of its **Stack**, or of **Other pull requests of the session** under it, to show it in place.
+  **Other pull requests of the session** lists the session's pull requests that the stack does not show, each with whether the session submitted or worked on it.
   The pull request then shows as its details in the inbox do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
   The header and the tab bar stay pinned to the top of the sidebar while the details scroll, with no fade over them.
   The quick actions apply only when the inbox of the sidebar's project lists the pull request.
@@ -536,7 +536,8 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   The lists of reviewers and labels come from GitHub on the first click, and the server keeps them for 5 minutes.
   A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details say why and read the pull request again.
   **Sessions** shows the running sessions on the pull request.
-  When the inbox lists another pull request of its stack, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, marks this one, and links to the others; in the session details sidebar, a click shows the other one there instead.
+  When another open pull request of its repository stacks with it by base branch, whoever opened it, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, as Graphite does, marks this one, and links to the others; in the session details sidebar, a click shows the other one there instead.
+  The server reads the repository's open pull requests for it and keeps them for 30 seconds.
   Then comes the description in full.
 - **Timeline** lists what happened on the pull request as a chat does, newest first, with a line for each day that stays on top while you scroll its entries.
   Each entry shows its author's avatar, name, and time: a push lists its commits, one author's commits within an hour as one entry, with each commit's short hash and lines added and removed; a review shows its verdict and words; a comment shows its words.

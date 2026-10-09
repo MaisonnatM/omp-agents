@@ -1,11 +1,11 @@
 import { ArrowLeft } from "lucide-react";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
-import { type Inbox, type InboxPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
+import { type Inbox, type InboxPullRequest, type LinkedPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { agentOn, listedPullRequest, moveAction, moveOf, pullRequestStack, reason } from "../../inbox-model";
+import { agentOn, listedPullRequest, moveAction, moveOf, reason } from "../../inbox-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { actionOn, pendingOf, pullRequestStart } from "../../quick-actions";
 import { inboxStore } from "../../reads";
@@ -45,8 +45,10 @@ interface PullRequestDetailsProps {
 	version?: unknown;
 	/** The changed file the Code tab opens. */
 	files?: { path: string | null } | null;
-	/** Shows another pull request of its stack in place; without it, each links to its page. */
+	/** Shows another pull request of its stack or of the session in place; without it, each of its stack links to its page. */
 	onPick?: (pr: PullRequest) => void;
+	/** The session's pull requests, in the session details sidebar. */
+	session?: LinkedPullRequest[];
 }
 
 /**
@@ -54,7 +56,7 @@ interface PullRequestDetailsProps {
  * became of a quick start on it. The page also says why the inbox does not list it; the sidebar does not, since most
  * past sessions' merged pull requests would carry that note.
  */
-export function PullRequestDetails({ project, hosts, target, placement, version, files, onPick }: PullRequestDetailsProps) {
+export function PullRequestDetails({ project, hosts, target, placement, version, files, onPick, session }: PullRequestDetailsProps) {
 	const { open, start, dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
 	const { read } = inboxStore.use(project);
@@ -86,7 +88,7 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 				sessions={sessions}
 				onOpen={open}
 				next={listed ? nextMove(listed.pr, hosts, sessions) : null}
-				stack={read ? pullRequestStack(read.data, target) : []}
+				session={session}
 				placement={placement}
 				version={version}
 				files={files}

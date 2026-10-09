@@ -65,10 +65,13 @@ export function repoOf(cwd: string): Promise<Repo | null> {
 	return entry.repo;
 }
 
-/** `gh api graphql`'s answer to `query`: a string variable goes as `-f`, a number as `-F`. Read it with {@link dataOf}. */
-export function ghGraphql(query: string, vars: Record<string, string | number>): Promise<unknown> {
+/**
+ * `gh api graphql`'s answer to `query`: a string variable goes as `-f`, a number as `-F`. Read it with {@link dataOf}.
+ * `paginate` follows the query's `$endCursor` through every page, answering an array of the pages.
+ */
+export function ghGraphql(query: string, vars: Record<string, string | number>, paginate = false): Promise<unknown> {
 	const fields = Object.entries(vars).flatMap(([name, value]) => [typeof value === "number" ? "-F" : "-f", `${name}=${value}`]);
-	return runJson(["gh", "api", "graphql", "-f", `query=${query}`, ...fields], { timeoutMs: GH_TIMEOUT_MS });
+	return runJson(["gh", "api", "graphql", ...(paginate ? ["--paginate", "--slurp"] : []), "-f", `query=${query}`, ...fields], { timeoutMs: GH_TIMEOUT_MS });
 }
 
 /** `gh api`'s answer for REST `path`; `paginate` reads every page, answering an array of the pages. */
@@ -95,6 +98,12 @@ export function parsePerson(value: unknown): Person | null {
 	const login = str(value.login) ?? str(value.slug);
 	return login === undefined ? null : { login, avatarUrl: str(value.avatarUrl) ?? null };
 }
+
+/** The avatar field every query asks for a person. */
+export const AVATAR = "avatarUrl(size: 48)";
+
+/** A deleted account leaves no author; GitHub shows it as `ghost`. */
+export const authorOf = (author: unknown): Person => parsePerson(author) ?? { login: "ghost", avatarUrl: null };
 
 /** A pull request's review decision. */
 export const REVIEW: Record<string, ReviewDecision> = {

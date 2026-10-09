@@ -13,6 +13,7 @@ import {
 	Eye,
 	FileDiff,
 	GitMerge,
+	GitPullRequest,
 	GitPullRequestDraft,
 	Layers,
 	type LucideIcon,
@@ -24,15 +25,17 @@ import {
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
 	type CheckRunState,
-	type InboxPullRequest,
+	type LinkedPullRequest,
 	type PullRequest,
 	type PullRequestChange,
 	type PullRequestChanges,
 	type PullRequestCheck,
 	type PullRequestDetail,
+	prKey,
 	pullRequestUrl,
 	type Reviewer,
 	type ReviewerState,
+	type StackedPullRequest,
 	samePullRequest,
 } from "../../../src/shared/github";
 import type { RosterHost, View } from "../../../src/shared/sessions";
@@ -45,7 +48,7 @@ import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { graphiteUrl, inboxAge, type MoveId, pullRequestStatus, type StatusItem } from "../../inbox-model";
 import { putJson } from "../../api";
-import { age, modeOf } from "../../labels";
+import { age, LINK_VERB, modeOf } from "../../labels";
 import type { PullRequestActionId } from "../../../src/pull-request-actions";
 import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
 import { hashForInbox, hashForPullRequestFiles, type OpenMode } from "../../routing";
@@ -226,7 +229,7 @@ const RAIL = "absolute left-3.5 w-px bg-muted-foreground/30";
 const RAIL_DOT = "absolute top-1/2 left-[10.5px] size-2 -translate-y-1/2 rounded-full ring-2 ring-background";
 
 /** The pull requests stacked with this one, top first, on a rail down to the branch the bottom one merges into; each other one links to its details, or `onPick` shows it in place. */
-function StackSection({ stack, current, onPick }: { stack: InboxPullRequest[]; current: PullRequest; onPick?: (pr: PullRequest) => void }) {
+function StackSection({ stack, current, onPick }: { stack: StackedPullRequest[]; current: PullRequest; onPick?: (pr: PullRequest) => void }) {
 	const at = stack.findIndex(pr => samePullRequest(pr, current));
 	const bottom = stack[stack.length - 1];
 	return (
@@ -268,9 +271,30 @@ function StackSection({ stack, current, onPick }: { stack: InboxPullRequest[]; c
 				<li className="relative py-1.5 pr-3 pl-8 font-mono text-xs text-muted-foreground">
 					<span aria-hidden className={cn(RAIL, "top-0 bottom-1/2")} />
 					<span aria-hidden className={cn(RAIL_DOT, "bg-background ring-muted-foreground/60")} />
-					{bottom.stackedOn ?? "trunk"}
+					{bottom.base}
 				</li>
 			</ol>
+		</DetailSection>
+	);
+}
+
+/** The session's pull requests outside the stack, each shown in place on click. */
+function OtherPullRequests({ others, onPick }: { others: LinkedPullRequest[]; onPick: (pr: PullRequest) => void }) {
+	return (
+		<DetailSection title="Other pull requests of the session">
+			<ul className="rounded-md border border-border py-1">
+				{others.map(pr => (
+					<li key={prKey(pr)}>
+						<button type="button" onClick={() => onPick(pr)} className="flex w-full min-w-0 items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted">
+							<GitPullRequest aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+							<span className="min-w-0 flex-1 truncate tabular-nums">
+								{pr.repo} #{pr.number}
+							</span>
+							<span className="shrink-0 text-xs text-muted-foreground">{LINK_VERB[pr.link]}</span>
+						</button>
+					</li>
+				))}
+			</ul>
 		</DetailSection>
 	);
 }
@@ -284,15 +308,15 @@ interface DetailContentProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** Its move; `null` when the inbox does not list it. */
 	next: NextMove | null;
-	/** The pull requests stacked with it that the inbox lists, top first; empty when it is in no stack. */
-	stack: InboxPullRequest[];
+	/** The session's pull requests, in the session details sidebar; those outside the stack list under it. */
+	session?: LinkedPullRequest[];
 	/** Where the details show: the main area's page, whose heading takes focus, or the session details sidebar, under its own heading. */
 	placement: Placement;
 	/** A change reads the pull request from GitHub again. */
 	version?: unknown;
 	/** The changed file the route opens in the Code tab; `null` shows the Summary. */
 	files?: { path: string | null } | null;
-	/** Shows another pull request of its stack in place; without it, each links to its page. */
+	/** Shows another pull request of its stack or of the session in place; without it, each of its stack links to its page. */
 	onPick?: (pr: PullRequest) => void;
 	/** GitHub took a change made here. */
 	onSaved?: () => void;
@@ -466,7 +490,9 @@ interface SummaryProps {
 	detail: PullRequestDetail;
 	placed: PlacedItem[];
 	quick: QuickActionsProps;
-	stack: InboxPullRequest[];
+	stack: StackedPullRequest[];
+	/** The session's pull requests outside the stack. */
+	others: LinkedPullRequest[];
 	sessions: RosterHost[];
 	onOpen: DetailContentProps["onOpen"];
 	onPick: DetailContentProps["onPick"];
@@ -475,7 +501,7 @@ interface SummaryProps {
 	saveError: string | null;
 }
 
-function Summary({ pr, detail, placed, quick, stack, sessions, onOpen, onPick, save, saveError }: SummaryProps) {
+function Summary({ pr, detail, placed, quick, stack, others, sessions, onOpen, onPick, save, saveError }: SummaryProps) {
 	const options = usePullRequestOptions(detail);
 	// The state picker says it is a draft already.
 	const blockers = placed.filter(({ item, fix }) => item.kind !== "draft" || fix);
@@ -510,6 +536,7 @@ function Summary({ pr, detail, placed, quick, stack, sessions, onOpen, onPick, s
 				)}
 			</dl>
 			{stack.length > 0 && <StackSection stack={stack} current={pr} onPick={onPick} />}
+			{others.length > 0 && onPick && <OtherPullRequests others={others} onPick={onPick} />}
 			<DetailSection title="Description">{detail.body.trim() ? <Markdown text={detail.body} /> : <p className="text-sm text-muted-foreground">No description.</p>}</DetailSection>
 		</div>
 	);
@@ -562,10 +589,15 @@ function Code({ pr, detail, placement, path, version }: { pr: PullRequest; detai
  * A pull request read from GitHub: a header that names it, its branches and size, with the Next move's button and a menu
  * of the other actions; then Summary, Timeline, and Code tabs, with the checks at a glance on the tab bar.
  */
-export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: listedNext, stack, placement, version, files = null, onPick, onSaved }: DetailContentProps) {
+export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: listedNext, session = [], placement, version, files = null, onPick, onSaved }: DetailContentProps) {
 	const [reads, setReads] = useState(0);
 	const readVersion = useMemo(() => [version, reads], [version, reads]);
-	const { data: detail, error, replace } = useReplaceableRead<PullRequestDetail>(`/api/pull-request?${new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) })}`, readVersion);
+	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
+	const { data: detail, error, replace } = useReplaceableRead<PullRequestDetail>(`/api/pull-request?${query}`, readVersion);
+	const stackRead = useRead<StackedPullRequest[]>(`/api/pull-request/stack?${query}`, version);
+	const stack = stackRead.data ?? [];
+	// Until the stack is read, its members would flash in the list of the others.
+	const others = stackRead.data || stackRead.error ? session.filter(other => !samePullRequest(other, pr) && !stack.some(member => samePullRequest(member, other))) : [];
 	const queued = useQueuedSave({ replace, reload: () => setReads(count => count + 1), onSaved });
 	const save = (change: PullRequestChange, shown: Partial<PullRequestDetail>): void => {
 		if (detail) queued.save({ ...detail, ...shown }, () => putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change }));
@@ -678,7 +710,7 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: li
 			) : (
 				<div className={cn("min-h-0 flex-1 overflow-y-auto", page && "px-6")}>
 					<div className="py-4">
-						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} saveError={queued.error} /> : <Timeline detail={detail} />}
+						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} saveError={queued.error} /> : <Timeline detail={detail} />}
 					</div>
 				</div>
 			)}

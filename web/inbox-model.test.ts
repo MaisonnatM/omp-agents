@@ -16,7 +16,6 @@ import {
 	movesSummary,
 	orderedRepos,
 	placedManual,
-	pullRequestStack,
 	pullRequestStatus,
 	reason,
 	sectionTitles,
@@ -256,21 +255,6 @@ test("the shown pull requests follow page order and leave out folded repositorie
 	};
 	const folded = new Set(["acme/folded", "acme/webapp:Recently merged"]);
 	expect(shownPullRequests(inbox, key => folded.has(key), DEFAULT_ORDER, noAgent).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
-});
-
-test("a pull request's stack runs top first along the chain of bases, and a pull request alone in it has none", () => {
-	const stacked = (number: number, below: number | null, fields: Partial<InboxPullRequest> = {}) => pr(number, { stackedOn: below === null ? null : `me/branch-${below}`, ...fields });
-	const inbox = {
-		repos: [
-			{ owner: "acme", repo: "webapp", cwds: [], pullRequests: [stacked(1, null), stacked(3, 2), stacked(2, 1), stacked(5, null, { state: "merged" }), stacked(6, 5), stacked(7, null)] },
-		],
-		unmatched: [],
-	};
-	const numbers = (number: number) => pullRequestStack(inbox, { owner: "acme", repo: "webapp", number }).map(({ number }) => number);
-	expect(numbers(2)).toEqual([3, 2, 1]);
-	expect(numbers(1)).toEqual([3, 2, 1]);
-	expect(numbers(6)).toEqual([]);
-	expect(numbers(7)).toEqual([]);
 });
 
 describe("inbox order", () => {

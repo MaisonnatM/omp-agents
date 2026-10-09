@@ -3,7 +3,7 @@
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
 import { createCache } from "./cache";
-import { CHANGE, CHECK_RUN, dataOf, ghGraphql, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
+import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
 import { type CheckRunState, type Inbox, type InboxPullRequest, type InboxRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, type Repo, type RepoInbox, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
 
@@ -11,7 +11,6 @@ export { parseRemote, repoOf } from "./github";
 
 const MERGED_DAYS = 7;
 
-const AVATAR = "avatarUrl(size: 48)";
 /** The most review threads one page lists; a PR with more counts its unresolved threads as a floor. */
 const THREADS = 100;
 
@@ -79,9 +78,6 @@ function parseUnresolved(threads: unknown): InboxPullRequest["unresolved"] {
 
 /** GitHub reports an open or draft pull request as `CONFLICTING` with its base branch; `UNKNOWN` means not computed yet. */
 const conflictsOf = (node: Record<string, unknown>): boolean => node.state !== "MERGED" && node.state !== "CLOSED" && node.mergeable === "CONFLICTING";
-
-/** A deleted account leaves no author; GitHub shows it as `ghost`. */
-const authorOf = (author: unknown): Person => parsePerson(author) ?? { login: "ghost", avatarUrl: null };
 
 /** What a pull request's inbox entry and its details share, or `null` when GitHub left out its title or branches. */
 function parsePullRequestHead(node: Record<string, unknown>) {

@@ -100,6 +100,19 @@ export interface Inbox {
 	unmatched: string[];
 }
 
+/** An open or draft pull request of a stack, as a pull request's details list its stack. */
+export interface StackedPullRequest extends PullRequest {
+	title: string;
+	author: Person;
+	state: "open" | "draft";
+	checks: CheckState;
+	head: string;
+	/** The branch it merges into: the head of the pull request below it, or the trunk under the bottom one. */
+	base: string;
+	/** In ms since the epoch. */
+	updatedAt: number;
+}
+
 /** How one check on a pull request's head commit went; `skipped` covers neutral and skipped runs. */
 export type CheckRunState = "passing" | "failing" | "pending" | "skipped";
 
