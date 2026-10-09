@@ -39,6 +39,7 @@ import {
   Globe,
   User,
   ImageIcon,
+  FileText,
   Link,
   Check,
   RotateCcw,
@@ -82,7 +83,7 @@ export type IconName =
   | "users" | "lock" | "mail" | "bell" | "shield" | "palette"
   | "lightbulb" | "rocket" | "heart" | "paintbrush" | "brain"
   | "globe" | "user"
-  | "image" | "link" | "check" | "rotate-ccw"
+  | "image" | "file-text" | "link" | "check" | "rotate-ccw"
   | "play" | "pause" | "pipette"
   | "home" | "message-circle" | "inbox"
   | "pencil" | "scaling" | "skip-forward" | "corner-down-right" | "corner-down-left"
@@ -127,6 +128,7 @@ export const defaultIcons: Record<IconName, IconComponent> = {
   "globe": Globe,
   "user": User,
   "image": ImageIcon,
+  "file-text": FileText,
   "link": Link,
   "check": Check,
   "rotate-ccw": RotateCcw,

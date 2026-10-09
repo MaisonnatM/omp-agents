@@ -89,8 +89,9 @@ export function outline(items: Item[], working: boolean): OutlineTurn[] {
 		if (item.kind === "user") {
 			const text = item.text.trim();
 			const images = item.images?.length ?? 0;
-			const prompt = text || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
-			const match = turns.length > 0 && !item.skill && images === 0 ? NUDGE.exec(text) : null;
+			const files = item.files ?? [];
+			const prompt = text || files.join(", ") || (images > 0 ? `${images} ${images === 1 ? "image" : "images"}` : "");
+			const match = turns.length > 0 && !item.skill && images === 0 && files.length === 0 ? NUDGE.exec(text) : null;
 			const nudge = match ? (match[1] ? "resume" : "approve") : null;
 			turns.push({ id: item.id, prompt, skill: item.skill, nudge, reply: null, tools: 0, failed: 0, running: false });
 			continue;
@@ -147,10 +148,10 @@ export function forkPoints(items: Item[]): Map<string, ForkPoint> {
 
 /**
  * The prompt a double-click edits: the last one, once omp has saved it. omp resends an edit as text alone, so a skill
- * prompt or one that carried images is not editable.
+ * prompt or one that carried images or files is not editable.
  */
 export function editablePrompt(items: Item[]): { itemId: string; entryId: string } | null {
 	const last = items.findLast(item => item.kind === "user");
-	if (last?.kind !== "user" || !last.entryId || last.skill || last.images?.length) return null;
+	if (last?.kind !== "user" || !last.entryId || last.skill || last.images?.length || last.files?.length) return null;
 	return { itemId: last.id, entryId: last.entryId };
 }

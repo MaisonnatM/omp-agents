@@ -3,6 +3,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildSkillPromptMessage } from "./omp/prompts";
+import { withFiles } from "./shared/prompt-files";
 import { splitSuggestions, Transcript } from "./transcript";
 
 const assistant = (timestamp: number, content: unknown[], extra: Record<string, unknown> = {}) => ({
@@ -65,6 +66,18 @@ describe("Transcript", () => {
 		expect(t.applyEvent({ type: "message_end", message: prompt("aGVsbG8=") })).toMatchObject([{ text: "like this", images: ["data:image/png;base64,aGVsbG8="] }]);
 		t.applyEntry({ type: "message", id: "e7", message: prompt(`blob:sha256:${hash}`) });
 		expect(t.items()).toMatchObject([{ id: "m700", images: [`/api/image?hash=${hash}&type=image%2Fpng`] }]);
+	});
+
+	test("a prompt's attached files show by name, apart from its text, a skill prompt's arguments included", () => {
+		const t = new Transcript();
+		const files = withFiles("sum these up", [{ name: "notes.md", text: "# Notes" }, { name: "spec.pdf", text: "Spec" }]);
+		t.applyEntry({ type: "message", id: "e1", message: { role: "user", timestamp: 100, content: files } });
+		const details = { name: "mma-mode", path: "/s/SKILL.md", args: withFiles("", [{ name: "log.txt", text: "boom" }]) };
+		t.applyEntry({ type: "custom_message", id: "e2", customType: "skill-prompt", content: "[IMPORTANT: …]", display: true, attribution: "user", details });
+		expect(t.items()).toMatchObject([
+			{ id: "m100", text: "sum these up", files: ["notes.md", "spec.pdf"] },
+			{ id: "e2", text: "", skill: "mma-mode", files: ["log.txt"] },
+		]);
 	});
 
 	test("a fresh session's first prompt shows at once and stays ahead of its reply when the file catches up", () => {

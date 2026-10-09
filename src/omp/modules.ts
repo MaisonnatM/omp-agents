@@ -228,6 +228,10 @@ export interface AgentDiscoveryModule {
 export interface ConfigFilesModule {
 	findConfigFile(subpath: string, options: { user?: boolean; project?: boolean; cwd?: string }): string | undefined;
 }
+/** omp's document conversion (src/utils/markit.ts), the one its read tool and `@file` arguments use. */
+export interface MarkitModule {
+	convertBufferWithMarkit(buffer: Uint8Array, extension: string): Promise<{ content: string; ok: boolean; error?: string }>;
+}
 
 /** Subset of omp's `JsonRpcResponse` (src/mcp/types.ts). */
 export interface McpResponse {
@@ -512,6 +516,7 @@ export const modelIdentity = await load<ModelIdentityModule>(join(dirname(packag
 export const discovery = await load<DiscoveryModule>(join(srcDir, "discovery", "index.ts"), { loadCapability: "function" });
 export const agentDiscovery = await load<AgentDiscoveryModule>(join(srcDir, "task", "discovery.ts"), { discoverAgents: "function" });
 export const configFiles = await load<ConfigFilesModule>(join(srcDir, "config.ts"), { findConfigFile: "function" });
+export const markit = await load<MarkitModule>(join(srcDir, "utils", "markit.ts"), { convertBufferWithMarkit: "function" });
 export const mcpRpc = await load<McpRpcModule>(join(srcDir, "mcp", "json-rpc.ts"), { callMCP: "function" });
 export const mcpConfig = await load<McpConfigModule>(join(srcDir, "mcp", "config.ts"), { loadAllMCPConfigs: "function" });
 export const mcpCredentials = await load<McpCredentialsModule>(join(srcDir, "mcp", "oauth-credentials.ts"), {

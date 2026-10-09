@@ -18,7 +18,7 @@ import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, targetOf } from "./git";
-import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
+import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { type ModelMenuOpen, ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
@@ -53,7 +53,7 @@ interface NewSessionProps {
 export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, todo }: NewSessionProps) {
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useState(todo?.prompt ?? "");
-	const attachments = useImageAttachments();
+	const attachments = usePromptAttachments(true);
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
 	/** `null` leaves omp's default model unchanged. */
 	const [model, setModel] = useState<ModelOption | null>(null);
@@ -153,12 +153,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					onSend={text => {
 						if (directCommand) return;
 						completion.close();
-						attachments.read(images => onStart({ prompt: text, images, branch: choice, model, thinking, skill: skipSkill ? null : pinnedSkill }));
+						attachments.read(text, (prompt, images) => onStart({ prompt, images, branch: choice, model, thinking, skill: skipSkill ? null : pinnedSkill }));
 					}}
 					placeholder="Message this session…"
 					files={attachments.files}
 					onFilesChange={attachments.onFilesChange}
-					accept={IMAGE_ACCEPT}
+					accept={ATTACH_ACCEPT}
 					leftSlot={
 						<>
 							<ModelPicker

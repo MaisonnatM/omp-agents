@@ -7,6 +7,7 @@ import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
 import { type CalendarShownInput, GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
 import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES } from "../shared/sessions";
+import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
 import type { BranchChoice } from "../shared/git";
 import { type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
@@ -518,6 +519,14 @@ export function parseTicketAttachment(body: unknown): TicketAttachmentUpload | n
 	if (typeof issue !== "string" || !TICKET_ID.test(issue) || !isNonEmpty(name) || !isNonEmpty(type) || typeof data !== "string") return null;
 	if (data.length > Math.ceil(MAX_TICKET_ATTACHMENT_BYTES / 3) * 4 || (data !== "" && !BASE64.test(data))) return null;
 	return { issue, name, type, data };
+}
+
+/** The body of `PUT /api/attachment/document`: a file name, and the file's bytes in base64 within the size limit. */
+export function parsePromptDocument(body: unknown): PromptDocument | null {
+	if (!isObject(body)) return null;
+	const { name, data } = body;
+	if (!isNonEmpty(name) || typeof data !== "string" || data.length > Math.ceil(MAX_PROMPT_DOCUMENT_BYTES / 3) * 4) return null;
+	return data === "" || BASE64.test(data) ? { name, data } : null;
 }
 
 export const SHA256 = /^[0-9a-f]{64}$/;

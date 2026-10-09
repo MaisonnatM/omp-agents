@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef } from "react";
+import { promptLabel } from "../../src/shared/prompt-files";
 import type { MessageQueue, WithdrawnMessage } from "../../src/shared/sessions";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useIsTouch, useRegionHeight } from "@/components/ui/input-message";
@@ -115,6 +116,7 @@ interface QueuedRowProps {
 function QueuedRow({ item, index, total, reduceMotion, isTouch, onSendNow, onEdit, onRemove }: QueuedRowProps) {
 	const compactStep = useSize().variant === "compact";
 	const kind = `${item.tag.toLowerCase()} `;
+	const label = promptLabel(item.text);
 	const actions: RowAction[] = [
 		{ icon: "arrow-up", label: "Send now", shortcut: shortcutLabels("steer"), run: onSendNow },
 		{ icon: "pencil", label: "Edit", shortcut: ["Enter"], run: onEdit },
@@ -129,7 +131,7 @@ function QueuedRow({ item, index, total, reduceMotion, isTouch, onSendNow, onEdi
 			animate={{ opacity: 1, scale: 1 }}
 			exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.97, transition: spring.fast.exit }}
 			transition={spring.fast}
-			aria-label={`Queued ${kind}message ${index + 1} of ${total}: ${item.text}`}
+			aria-label={`Queued ${kind}message ${index + 1} of ${total}: ${label}`}
 			tabIndex={0}
 			onDoubleClick={onEdit}
 			onKeyDown={event => {
@@ -158,10 +160,10 @@ function QueuedRow({ item, index, total, reduceMotion, isTouch, onSendNow, onEdi
 				{item.tag}
 			</span>
 			{/* py-1/-my-1 keeps truncate's overflow:hidden from clipping ascenders/descenders outside the trimmed box. */}
-			<span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{item.text}</span>
+			<span className="min-w-0 flex-1 truncate [text-box:trim-both_cap_alphabetic] py-1 -my-1">{label}</span>
 			<span className="flex shrink-0 items-center gap-0.5">
 				{actions.map(action => (
-					<RowActionButton key={action.icon} action={action} text={item.text} isTouch={isTouch} />
+					<RowActionButton key={action.icon} action={action} text={label} isTouch={isTouch} />
 				))}
 			</span>
 		</motion.li>

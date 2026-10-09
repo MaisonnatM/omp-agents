@@ -396,6 +396,7 @@ const MessageRow = memo(function MessageRow({
 			<ChatMessage
 				from={item.kind}
 				time={item.kind === "user" ? (item.from ?? undefined) : undefined}
+				files={item.kind === "user" ? item.files : undefined}
 				images={item.kind === "user" ? item.images : undefined}
 				actions={
 					inEdit ? (

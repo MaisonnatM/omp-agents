@@ -11,7 +11,7 @@ import { ticketsStore, useRead } from "../../reads";
 import { hashForTickets } from "../../routing";
 import { chordLabel } from "../../shortcuts";
 import { PRIORITY_LABEL, statusOrder } from "../../tickets-model";
-import { fileBase64 } from "../image-attachments";
+import { fileBase64 } from "../prompt-attachments";
 import { DuePicker, FieldPicker } from "../field-picker";
 import { PRIORITIES } from "./ticket-fields";
 import { LabelDot, PRIORITY_ICON, statusIcon } from "./ticket-row";

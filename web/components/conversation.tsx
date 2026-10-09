@@ -1,6 +1,6 @@
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Project } from "../../src/shared/projects";
-import type { Delivery, LiveView, PromptImage, RosterHost } from "../../src/shared/sessions";
+import type { Delivery, LiveView, RosterHost } from "../../src/shared/sessions";
 import type { ChangedFile } from "../../src/shared/transcript";
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
@@ -20,7 +20,7 @@ import { useSuggestions } from "./composer-suggestions";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ContextRing } from "./context-ring";
 import { ConversationHeader } from "./conversation-header";
-import { AttachButton, IMAGE_ACCEPT, useImageAttachments } from "./image-attachments";
+import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import type { ModelMenuOpen } from "./model-picker";
 import { ModelSlot } from "./model-slot";
 import { type Subject, subjectOf } from "./subject";
@@ -96,10 +96,10 @@ function LiveConversation({
 	const [draft, setDraft] = useState(initialDraft);
 	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
-	const attachments = useImageAttachments();
-
 	const subject = subjectOf(view, host, lastHost);
-	const { shown, agent, writable, attachable, working, requests, shell } = subject;
+	const { shown, agent, writable, working, requests, shell } = subject;
+	const attachments = usePromptAttachments(subject.images);
+
 	const session = subject.kind === "session";
 	const switchable = subject.kind === "session" ? subject.switchable : null;
 	const thinking = shown?.thinkingLevel ?? null;
@@ -135,19 +135,17 @@ function LiveConversation({
 	}, [writable]);
 
 	const submit = (text: string, delivery: Delivery): void => {
-		const prompt = (images: PromptImage[]): void => send({ t: "prompt", view, text, images, delivery });
 		completion.close();
 		setDraft("");
 		scrollToEnd();
-		if (!attachable) return prompt([]);
-		attachments.take(prompt, () => setDraft(current => current || text));
+		attachments.take(text, (prompt, images) => send({ t: "prompt", view, text: prompt, images, delivery }), () => setDraft(current => current || text));
 	};
 	const sendText = (text: string): void => {
 		if (blockedShortcut(text, shell) === null) submit(text, working && subject.followUps ? "followUp" : "steer");
 	};
 
 	const directCommand = blockedShortcut(draft, shell);
-	const steerable = writable && (draft.trim() !== "" || (attachable && attachments.files.length > 0)) && !directCommand;
+	const steerable = writable && (draft.trim() !== "" || attachments.files.length > 0) && !directCommand;
 	const steerDraft = (): void => submit(draft.trim(), "steer");
 	// What the finished turn suggests sending next, offered once nothing else waits on the user. Filtered to none the composer would hold back.
 	const turnSuggestions = useNextSuggestions(view, working);
@@ -178,7 +176,7 @@ function LiveConversation({
 		},
 		// On the empty composer, the server stops the turn if omp still holds a steer, so omp runs it now.
 		deliverSteer: () => {
-			if (!session || !writable || !working || draft.trim() !== "" || (attachable && attachments.files.length > 0)) return false;
+			if (!session || !writable || !working || draft.trim() !== "" || attachments.files.length > 0) return false;
 			send({ t: "flush", instanceId: view.instanceId });
 		},
 		...(focused
@@ -290,9 +288,9 @@ function LiveConversation({
 							)}
 						</>
 					}
-					files={attachable ? attachments.files : undefined}
-					onFilesChange={attachable ? attachments.onFilesChange : undefined}
-					accept={IMAGE_ACCEPT}
+					files={writable ? attachments.files : undefined}
+					onFilesChange={writable ? attachments.onFilesChange : undefined}
+					accept={ATTACH_ACCEPT}
 					rightSlot={({ openFilePicker }) => (
 						<>
 							{working && subject.followUps && steerable && (
@@ -303,7 +301,7 @@ function LiveConversation({
 								</Tooltip>
 							)}
 							{session && shown?.context && <ContextRing context={shown.context} />}
-							{attachable && <AttachButton onClick={() => openFilePicker()} />}
+							{writable && <AttachButton onClick={() => openFilePicker()} />}
 						</>
 					)}
 					placeholder={placeholderOf(subject)}
@@ -325,7 +323,7 @@ function LiveConversation({
 					afterActions={suggestions.list}
 				/>
 				{directCommand && <ComposerNote text={directCommand} />}
-				{attachable && attachments.note && <ComposerNote text={attachments.note} />}
+				{writable && attachments.note && <ComposerNote text={attachments.note} />}
 			</div>
 		</div>
 	);

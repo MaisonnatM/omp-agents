@@ -34,8 +34,10 @@ import { readTextFile } from "../text-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { parseCalendarShown, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { parseCalendarShown, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
+import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
+import { documentText, UnreadableDocument } from "../omp/documents";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
@@ -312,6 +314,14 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		return new Response(file, { headers: { "Content-Type": type, "Cache-Control": "private, max-age=31536000, immutable", "X-Content-Type-Options": "nosniff" } });
 	});
 
+	/** `PUT /api/attachment/document`: `PromptDocument`, a file the composer attaches, as omp converts it; answers `{ text }`, or a 422 when omp cannot read it. */
+	const promptDocument = put(
+		parsePromptDocument,
+		async ({ name, data }) => ({ text: await documentText(name, Buffer.from(data, "base64")) }),
+		`Expected { name, data } with a file of at most ${MAX_PROMPT_DOCUMENT_BYTES / 1024 / 1024} MB in base64`,
+		err => (err instanceof UnreadableDocument ? fail(422, err.message) : null),
+	);
+
 	/** `GET /api/file?path=<path>`: a text file that agent text names, by an absolute or `~/` path, for the page's file dialog. */
 	const textFile = get(async params => {
 		const read = await readTextFile(params.get("path") ?? "");
@@ -429,6 +439,7 @@ export function createRoutes(env: RouteEnv): Record<string, Partial<Record<"GET"
 		"/api/system": { GET: system },
 		"/api/terminals": { GET: terminals },
 		"/api/image": { GET: image },
+		"/api/attachment/document": { PUT: promptDocument },
 		"/api/file": { GET: textFile },
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },

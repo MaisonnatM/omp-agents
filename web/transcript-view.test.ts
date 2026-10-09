@@ -90,9 +90,10 @@ describe("editablePrompt", () => {
 		expect(editablePrompt([prompt("p1", "e1"), reply, prompt("p2", null)])).toBeNull();
 	});
 
-	test("a skill prompt or one with images is not editable, since the edit resends text alone", () => {
+	test("a skill prompt or one with images or files is not editable, since the edit resends text alone", () => {
 		expect(editablePrompt([prompt("p1", "e1", { skill: "review" })])).toBeNull();
 		expect(editablePrompt([prompt("p1", "e1", { images: ["data:image/png;base64,AA=="] })])).toBeNull();
+		expect(editablePrompt([prompt("p1", "e1", { files: ["notes.md"] })])).toBeNull();
 	});
 });
 

@@ -9,6 +9,7 @@
  */
 import { isObject, str } from "./json";
 import { imagesOf, oneLine, textOf, toolSummary } from "./session-entries";
+import { splitFiles } from "./shared/prompt-files";
 import type { Item } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
@@ -33,10 +34,19 @@ const messageKey = (message: Json): string | undefined =>
 export const isUserPrompt = (value: Json): boolean =>
 	value.role === "user" || (value.customType === SKILL_PROMPT && value.attribution === "user");
 
-/** A prompt as the user typed it: an expanded skill reads as the skill's name and the user's words, not the skill's text. */
-function userPrompt(text: string): { text: string; skill: string | null } {
-	const match = SKILL_INVOCATION.exec(text);
-	return match ? { text: match[2]?.trim() ?? "", skill: match[1] } : { text, skill: null };
+/**
+ * A prompt as the user typed it: an expanded skill reads as the skill's name and the user's words, not the skill's
+ * text, and attached files as their names, not their text.
+ */
+function userPrompt(prompt: string): { text: string; skill: string | null; files?: string[] } {
+	const match = SKILL_INVOCATION.exec(prompt);
+	return { ...typed(match ? (match[2]?.trim() ?? "") : prompt), skill: match ? match[1] : null };
+}
+
+/** `prompt` without the files the composer attached after it, which `files` names when there are any. */
+function typed(prompt: string): { text: string; files?: string[] } {
+	const { text, files } = splitFiles(prompt);
+	return files.length > 0 ? { text, files } : { text };
 }
 
 /** A `!` command the user ran, as omp's terminal shows it: the command and its output, then how it ended when it failed. */
@@ -234,7 +244,7 @@ export class Transcript {
 					const skill = str(details.name);
 					// Subagents get skills as hidden context the user never typed.
 					if (message.attribution !== "user" || !skill) return [];
-					return this.#upsert({ id: key, kind: "user", text: str(details.args) ?? "", skill, from: null, entryId: null });
+					return this.#upsert({ id: key, kind: "user", ...typed(str(details.args) ?? ""), skill, from: null, entryId: null });
 				}
 				if (message.customType !== COLLAB_PROMPT) return [];
 				return this.#upsert({

@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { ClientMsg } from "../shared/protocol";
+import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseCalendarShown, parseClientMsg, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
+import { parseCalendarShown, parseClientMsg, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value));
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -468,5 +469,15 @@ describe("parseTicketAttachment", () => {
 		expect(parseTicketAttachment({ ...file, type: "" })).toBeNull();
 		expect(parseTicketAttachment({ ...file, data: "not base64!" })).toBeNull();
 		expect(parseTicketAttachment({ ...file, data: "A".repeat((MAX_TICKET_ATTACHMENT_BYTES / 3) * 4 + 4) })).toBeNull();
+	});
+});
+
+describe("parsePromptDocument", () => {
+	test("takes a named document in base64 within the size limit, and refuses one without a name, not in base64, or larger", () => {
+		const document = { name: "spec.pdf", data: "JVBERi0=" };
+		expect(parsePromptDocument({ ...document, extra: 1 })).toEqual(document);
+		expect(parsePromptDocument({ ...document, name: "" })).toBeNull();
+		expect(parsePromptDocument({ ...document, data: "not base64!" })).toBeNull();
+		expect(parsePromptDocument({ ...document, data: "A".repeat(Math.ceil(MAX_PROMPT_DOCUMENT_BYTES / 3) * 4 + 4) })).toBeNull();
 	});
 });

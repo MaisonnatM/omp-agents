@@ -125,7 +125,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A prompt of `continue` alone reads as **Continued**, and the reply before it stays a reply, since it reports work in progress rather than a plan.
   `ok` with more words, and `push` or `ship it` alone, read as prompts.
   A line under a reply counts the turn's tool calls and, in red, those that failed, such as `14 tools · 2 failed`.
-  A later prompt that invoked a skill shows the skill's name in an outlined chip first, and a prompt of images alone reads as how many it holds, such as `2 images`.
+  A later prompt that invoked a skill shows the skill's name in an outlined chip first, a prompt of files alone reads as their names, and a prompt of images alone reads as how many it holds, such as `2 images`.
   The turn still running shows **Working…** where its reply will go.
   Click a prompt, a reply, **Request**, or **Plan** to scroll the pane's transcript to that message; the page stays where it is.
   The turn you are reading carries a shaded background, and moves as you scroll the transcript; the outline scrolls to keep it in view.
@@ -293,7 +293,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
 - Messages that wait on the turn show above the text field, each tagged **Steer** or **Follow-up**, as Cursor lists its queue.
   Hovering a row, or focusing it, shows three buttons; a touch screen shows them always.
   **Send now** (↑ icon, or Cmd+Enter on the focused row) turns a follow-up into a steer, which the running turn takes at its next step; on a steer it stops the turn so omp runs its held steers at once.
-  **Edit** (pencil, or a double-click, Enter, or F2 on the row) moves the message back into the composer, with its images.
+  **Edit** (pencil, or a double-click, Enter, or F2 on the row) moves the message back into the composer, with its images; its files come back as their `<file>` blocks in the text.
   **Remove** (**×**, or Delete on the row) drops it.
   ↑ in the empty composer moves the last one back, the last steer before the last follow-up, as omp does.
   **Stop** and Cmd+Shift+Backspace interrupt the turn and move every waiting message back into the composer, images included, so nothing runs after an interrupt.
@@ -351,14 +351,17 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   A picked suggestion is a chip at once; a reference you type becomes one once you type past it or move the caret away, so `/mo` stays text while you type `/move`.
   Typing right against a chip turns it back into text, so `/move` followed by `X` reads `/moveX`.
   The arrow keys step over a chip as over one character, Backspace removes a chip whole, undo brings it back, and the prompt you send is still the text behind each chip.
-- Attach images to a session's prompt with the paperclip between the context ring and the send button, by dropping them on the composer, or by pasting them, such as a screenshot.
+- Attach files to a prompt with the paperclip between the context ring and the send button, by dropping them on the composer, or by pasting them, such as a screenshot.
   They show as tiles above the text field until you send; hover a tile for its **×**.
-  PNG, JPEG, GIF, and WebP are accepted, up to 32 MB per prompt; images past that stay out, and a note under the composer names them.
-  A prompt can be images alone.
-  Steers and follow-ups carry their images too.
-  The new-session draft takes images for its first message.
-  omp gives a subagent text only, so a subagent's composer has no paperclip.
-- A prompt's images show above it in the transcript, in live and past sessions, including images sent from omp's terminal.
+  PNG, JPEG, GIF, and WebP files go to the model as images, up to 32 MB per prompt.
+  A text file, such as `.md`, `.txt`, `.json`, or source code, goes as its text, after what you typed, in the `<file name="…">` block that omp's `@file` writes.
+  A PDF, Word, PowerPoint, Excel, or EPUB file goes as the Markdown that omp's own converter reads from it.
+  Each file takes up to 32 MB, and the files' text up to a million characters per prompt; a file past that, or one omp cannot read, such as a `.zip`, stays out, and a note under the composer names it and says why.
+  A prompt can be files alone.
+  Steers and follow-ups carry their files too, and a queued row shows the files' names when you typed nothing.
+  The new-session draft takes files for its first message.
+  omp gives a subagent text only, so a subagent's composer takes text, documents included, but no image.
+- A prompt's images show above it in the transcript, in live and past sessions, including images sent from omp's terminal, and its files show by name in chips above the text.
 - In a session that the dashboard started, omp's built-in `/` commands run as they do in its terminal, for example `/compact` or `/usage`, and what a command prints shows as a line in the conversation.
   `!<command>` runs a shell command in the session's directory, as in omp's terminal: the command and its output show as your message, and the agent sees them in its next turn.
   omp saves a new session only with its first reply, so a new session cannot start with a `!` command.
@@ -450,7 +453,7 @@ Suggested prompts, quick actions, forking, and menu items stay quiet, so they ne
   Enter resends it and Esc, or clicking away, cancels; Shift+Enter starts a new line.
   The session then rewinds to just before that message and runs the edited one, in the same pane and omp process, stopping a running turn first.
   omp moves the session to a new file, as `/branch` does, so the conversation before the edit stays under the past sessions.
-  Only a plain text message that omp has saved can be edited: not a skill prompt, one with images, or a message in a terminal session.
+  Only a plain text message that omp has saved can be edited: not a skill prompt, one with images or files, or a message in a terminal session.
 
 ## Pull requests and the inbox
 

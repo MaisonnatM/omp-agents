@@ -35,7 +35,7 @@ describe("subjectOf a session", () => {
 	test("a session this dashboard started takes text and images, runs ! over RPC, and switches its model", () => {
 		const row = host("dashboard", { status: "working" });
 		const subject = subjectOf(session, row, null);
-		expect(subject).toMatchObject({ kind: "session", writable: true, attachable: true, working: true, shell: "rpc", followUps: true });
+		expect(subject).toMatchObject({ kind: "session", writable: true, images: true, working: true, shell: "rpc", followUps: true });
 		expect(subject.kind === "session" && subject.switchable?.thinkingLevels).toEqual(["off", "high"]);
 	});
 
@@ -47,7 +47,7 @@ describe("subjectOf a session", () => {
 
 	test("a read-only room is not writable and leaves its questions unanswerable", () => {
 		const row = host("terminal", { control: { phase: "live", readOnly: true }, requests: [{ id: "q" }] as RosterHost["requests"] });
-		expect(subjectOf(session, row, null)).toMatchObject({ live: false, writable: false, attachable: false, requests: [] });
+		expect(subjectOf(session, row, null)).toMatchObject({ live: false, writable: false, images: false, requests: [] });
 	});
 
 	test("a session that left the roster is ended, and the header keeps its last row", () => {
@@ -59,10 +59,10 @@ describe("subjectOf a session", () => {
 });
 
 describe("subjectOf a subagent", () => {
-	test("is messaged as text only, and works while it runs", () => {
+	test("is messaged and attached files as text only, and works while it runs", () => {
 		const row = host("dashboard", { status: "working", agents: [agent()] });
 		const subject = subjectOf(subagent, row, null);
-		expect(subject).toMatchObject({ kind: "subagent", writable: true, attachable: false, working: true, shell: "none" });
+		expect(subject).toMatchObject({ kind: "subagent", writable: true, images: false, working: true, shell: "none" });
 		expect(subject.queue).toEqual({ steering: ["x"], followUp: [] });
 	});
 

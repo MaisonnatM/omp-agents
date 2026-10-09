@@ -16,8 +16,8 @@ interface Facts {
 	live: boolean;
 	/** The composer takes a message. */
 	writable: boolean;
-	/** The composer takes images; omp sends a subagent text only. */
-	attachable: boolean;
+	/** The composer attaches images as well as files of text; omp sends a subagent text only. */
+	images: boolean;
 	working: boolean;
 	/** What waits on the running turn, or `undefined` while there is no row. */
 	queue: MessageQueue | undefined;
@@ -51,7 +51,7 @@ export function subjectOf(view: LiveView, host: RosterHost | null, lastHost: Ros
 			phase,
 			live,
 			writable: live,
-			attachable: live,
+			images: live,
 			working: host?.status === "working",
 			queue: host?.queue,
 			requests: live && host ? host.requests : [],
@@ -71,7 +71,7 @@ export function subjectOf(view: LiveView, host: RosterHost | null, lastHost: Ros
 		phase,
 		live,
 		writable: live && agent?.canMessage === true,
-		attachable: false,
+		images: false,
 		working: agent?.status === "running",
 		queue: agent?.queue,
 		requests: [],

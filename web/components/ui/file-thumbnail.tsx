@@ -56,6 +56,8 @@ function FileThumbnail({ file, size, radius, className }: FileThumbnailProps) {
   const shape = useShape();
   const isImage = file.type.startsWith("image/");
   const isPdf = file.type === "application/pdf";
+  const dot = file.name.lastIndexOf(".");
+  const extension = dot > 0 ? file.name.slice(dot + 1) : "";
 
   // Create blob URL inside an effect (NOT useMemo) so the cleanup-revoke
   // and the URL-creation stay in sync. In React 18 StrictMode dev, a
@@ -146,11 +148,11 @@ function FileThumbnail({ file, size, radius, className }: FileThumbnailProps) {
           />
         </div>
       ) : (
-        // Generic document glyph for files with no renderable preview.
-        // Inline SVG (not the icon system) so the thumbnail stays
-        // self-contained for registry consumers.
+        // Generic document glyph, labeled with the file's extension, for files
+        // with no renderable preview. Inline SVG (not the icon system) so the
+        // thumbnail stays self-contained for registry consumers.
         <div
-          className="absolute inset-0 flex items-center justify-center text-muted-foreground"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-muted-foreground"
           role="img"
           aria-label={file.name}
         >
@@ -168,6 +170,7 @@ function FileThumbnail({ file, size, radius, className }: FileThumbnailProps) {
             <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
             <path d="M14 3v5h5" />
           </svg>
+          {extension && <span className="max-w-full truncate px-1 text-[9px] font-medium uppercase leading-none">{extension}</span>}
         </div>
       )}
     </div>

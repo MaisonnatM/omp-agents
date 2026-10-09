@@ -19,9 +19,9 @@ export type Item =
 	 * `skill`: the skill a `/skill:<name>` prompt invoked, with `text` holding only what the user typed after it; `null` for
 	 * any other prompt. `entryId`: the session-file entry omp can branch at; `null` for Collab and skill prompts and prompts
 	 * not yet in the file. `images`: the addresses of the images the prompt carried, a `data:` URL or `/api/image`; absent
-	 * when it carried none.
+	 * when it carried none. `files`: the names of the files attached to it as text, which `text` leaves out; absent when none.
 	 */
-	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null; images?: string[] }
+	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null; images?: string[]; files?: string[] }
 	| { id: string; kind: "assistant"; text: string; streaming: boolean; suggestions: string[] }
 	/** The model's reasoning text. `streaming` while that reply is still arriving. A redacted block has no text and is left out. */
 	| { id: string; kind: "thinking"; text: string; streaming: boolean }

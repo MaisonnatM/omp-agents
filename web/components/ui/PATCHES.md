@@ -12,7 +12,8 @@ Dashboard behavior that can live outside these files does: the composer's queued
 - `editorProps.onKeyDown`: runs first, in the capture phase, and a key it prevents goes no further, not even to the editor.
   The completion list and the dashboard's composer shortcuts need the key before the submit and history handling.
 - `editorProps.onPaste`: runs first in the paste handler, and a pasted file that `accept` takes attaches instead of pasting its name as text.
-  A screenshot or a copied image file is the common paste.
+  A screenshot or a copied file is the common paste.
+- `accept` takes `*/*` as any file, as the browser's file picker does; the dashboard's composer reads or refuses each file itself.
 - `stopShortcut`: the keys that press Stop, shown in its tooltip.
 - Send and queue buttons show their current action and Enter in a tooltip; Stop keeps its caller-provided shortcut.
 - Send button mode: while `status` is `"streaming"`, the button is Stop only when the draft is empty, and a draft sends at once.
@@ -26,7 +27,8 @@ Dashboard behavior that can live outside these files does: the composer's queued
 
 ## `ui/chat-message.tsx`
 
-- `images`: the addresses of the images a sent prompt carried, shown above the bubble, since `files` takes only `File`s held in the browser.
+- `files`: the names of the files a sent prompt carried as text, shown as chips above the bubble, in place of the registry's `File`s held in the browser and its `thumbnailSize`.
+- `images`: the addresses of the images a sent prompt carried, shown above the bubble.
 - The hover group is named `group/message`, so a nested `group` inside a message does not reveal its actions.
 - The bubble is `max-w-full`, so wide code blocks stay inside it.
 
@@ -55,7 +57,8 @@ Dashboard behavior that can live outside these files does: the composer's queued
   `SidebarRail`, the `SIDEBAR_*` constants, and the prop types are no longer exported; `SidebarShell` still renders the rail.
 - `ui/sidebar.tsx`: re-exports only the parts the dashboard imports, and `SidebarProps` and `SidebarContentProps` are no longer exported.
 - `ui/file-thumbnail.tsx`: the PDF worker comes from the page bundle, not a CDN, which the page's Content-Security-Policy blocks.
-- `lib/icon-context.tsx`: the `git-branch` icon.
+  The generic glyph shows the file's extension under it, so attached `.md` and `.txt` files tell apart.
+- `lib/icon-context.tsx`: the `git-branch` and `file-text` icons.
 - `ui/fluid-hover-highlight.tsx` is the registry file unchanged, moved from `web/components/` into `ui/`.
 
 ## `kibo-ui/calendar/index.tsx`
