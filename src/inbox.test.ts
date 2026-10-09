@@ -2,7 +2,7 @@ import { describe, expect, setSystemTime, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseDetailAnswer, parseInboxAnswer, parseRemote, repoOf } from "./inbox";
+import { loadInbox, parseDetailAnswer, parseInboxAnswer, parseRemote, repoOf } from "./inbox";
 import { runChecked } from "./proc";
 
 const repo = { owner: "acme", repo: "webapp" };
@@ -50,6 +50,15 @@ test("a workspace without a GitHub origin is retried after its negative cache ex
 		setSystemTime();
 		rmSync(dir, { recursive: true, force: true });
 	}
+});
+
+test("a workspace removed after its origin was read leaves the inbox, as does one never found", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-inbox-"));
+	await runChecked(["git", "init", "-q", dir]);
+	await runChecked(["git", "-C", dir, "remote", "add", "origin", "git@github.com:acme/webapp.git"]);
+	expect(await repoOf(dir)).toEqual({ owner: "acme", repo: "webapp" });
+	rmSync(dir, { recursive: true, force: true });
+	expect(await loadInbox([dir, `${dir}-never`], false)).toEqual({ repos: [], unmatched: [] });
 });
 
 describe("parseInboxAnswer", () => {

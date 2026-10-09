@@ -356,7 +356,7 @@ The activity check (`ACTIVITY_KINDS`) runs every two minutes while a socket list
 - `findModelUpdates` in `src/omp/model-updates.ts` reads the global `modelRoles` and `retry.fallbackChains` with `parseRetryFallbackSelector`, and keeps the listed models that `classifyModel` in `pi-catalog/src/identity/index.ts` places in an Anthropic or OpenAI family with a revision.
   A model's line is its provider, its family, and its id with the version masked, so `claude-opus-5-5` and `claude-opus-5-6` share one.
   It offers the newest revision of each line that a connected provider lists, and leaves dated snapshots out.
-- The pull requests come from `loadInbox` in `src/inbox.ts` over the known workspaces, through the inbox's 30-second cache, so the page's polls and the check share one query.
+- The pull requests come from `loadInbox` in `src/inbox.ts` over the known workspaces that still exist, through the inbox's 30-second cache, so the page's polls and the check share one query.
   `moveOf` in `src/shared/moves.ts` picks each one's move, with `agentOn` over the roster, and a move in `YOUR_MOVES` is a notice.
 - `waitingOnYou` in `src/slack-messages.ts` calls Slack's Web API with omp's Slack MCP sign-in through `readWithMcpSignIn`, since the MCP server's search answers in Markdown and Slack's `search.messages` needs a scope the sign-in lacks.
   `auth.test` names the user, and two `assistant.search.context` searches over the last three days, newest first, read the direct and group messages (`im,mpim`) and the channel messages that mention them (`<@ID>`), each up to five pages of 20 through `next_cursor`.

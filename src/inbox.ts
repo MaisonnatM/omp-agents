@@ -5,6 +5,7 @@
 import { createCache } from "./cache";
 import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
+import { directoryOf } from "./paths";
 import { type CheckRunState, type Inbox, type InboxPullRequest, type InboxRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, type Repo, type RepoInbox, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
 
 export { parseRemote, repoOf } from "./github";
@@ -269,11 +270,14 @@ export function loadPullRequestDetail(pr: PullRequest, fresh = false): Promise<P
 	return details.get(prKey(pr), async () => parseDetailAnswer(await ghGraphql(DETAIL_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }), pr), fresh);
 }
 
-/** The inbox for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache. */
+/**
+ * The inbox for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
+ * A workspace removed since a session ran there is left out, as a quick action starts its session in a repository's first workspace.
+ */
 export async function loadInbox(cwds: string[], fresh: boolean): Promise<Inbox> {
 	const byRepo = new Map<string, Repo & { cwds: string[] }>();
 	const unmatched: string[] = [];
-	const resolved = await Promise.all(cwds.map(async cwd => [cwd, await repoOf(cwd)] as const));
+	const resolved = await Promise.all(cwds.filter(cwd => directoryOf(cwd) !== null).map(async cwd => [cwd, await repoOf(cwd)] as const));
 	for (const [cwd, repo] of resolved) {
 		if (!repo) {
 			unmatched.push(cwd);
