@@ -139,7 +139,7 @@ describe("paletteSections", () => {
 		expect(listed(paletteSections(items, "launch", {}, NOW))).toEqual([["projects", ["project:p"]]]);
 	});
 
-	test("todos, tickets, and pull requests list only for a search, each under its own heading, and only when they hold every word", () => {
+	test("todos, tickets, and pull requests list for a search or under Suggestions, each under its own heading, and only when they hold every word", () => {
 		const items = [
 			item("session:r", "running", "Large old gardens in north"),
 			item("todo:t", "todos", "Fix login"),
@@ -148,6 +148,10 @@ describe("paletteSections", () => {
 			item("pr:o/r#4", "pullRequests", "Ship login"),
 		];
 		expect(listed(paletteSections(items, "", {}, NOW))).toEqual([["running", ["session:r"]]]);
+		expect(listed(paletteSections(items, "", { "todo:t": { count: 3, last: NOW } }, NOW, 5))).toEqual([
+			["suggestions", ["todo:t"]],
+			["running", ["session:r"]],
+		]);
 		const found = paletteSections(items, "login", {}, NOW);
 		expect(found.map(section => [section.heading, section.items.map(entry => entry.id)]).toSorted()).toEqual([
 			["Pull requests", ["pr:o/r#4"]],

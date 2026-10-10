@@ -150,7 +150,7 @@ An action that fails shows its error, and its control becomes available again.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
   **Open the session's changes**, under the list, opens the session's [changes page](#session-changes); a subagent's Files tab has no such link.
   The search field above the list keeps the files whose path holds every word typed, in any order and any case, and the heading then counts and totals those, as in `2 of 9 files changed`; Esc clears it.
-  Each view keeps its own search, so opening another session starts with every file listed.
+  Opening another session clears the search.
 - Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
 - **Media** shows the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
   On a session that is every image of the session; on a subagent it is that subagent's and its own subagents'.
@@ -1153,7 +1153,8 @@ Alt is Option on macOS.
   On a focused queued row, Cmd+Enter sends it now, Enter or F2 edits it, and Delete removes it.
   With a draft, ↑ moves the caret as usual.
 - Cmd+K opens the command menu, which searches every running and past session, in every workspace, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
-  What you type also searches your todos, the Linear tickets assigned to you once Linear is connected, and the open pull requests of the sidebar's workspace, each under its own heading; each must hold every word typed, in any order, and with nothing typed they stay out of the list.
+  What you type also searches your todos, closed ones too, the Linear tickets assigned to you once Linear is connected, and the open pull requests of the sidebar's workspace, each under its own heading; each must hold every word typed, in any order.
+  With nothing typed they list only under **Suggestions**, once you use one often enough.
   A todo opens beside its list on the Todo page, a ticket opens its details, and a pull request opens its details on the Pull requests page; Cmd+Enter opens a ticket in Linear and a pull request on GitHub.
   The search button in the sidebar header, immediately before the keyboard button, opens it too.
   With nothing typed, **Suggestions** lists the five entries you use most, by how often and how lately, then **Running**, **Commands**, and **Past**.

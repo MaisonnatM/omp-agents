@@ -1,9 +1,10 @@
 /** The todos, Linear tickets, and pull requests the command palette searches, each opening where the dashboard shows it. */
-import { pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
+import { prKey, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo } from "../src/user-todos-shared";
 import type { PaletteItem } from "./command-palette";
 import { PAGE_ICON } from "./page-icons";
+import { listedPullRequests } from "./pull-requests-model";
 import { hashForOpenTodo, hashForPullRequests, hashForTickets } from "./routing";
 import { TODO_STATUS } from "./todo-views";
 
@@ -16,7 +17,7 @@ export interface PaletteRecords {
 	pullRequestRepos: readonly RepoPullRequests[];
 }
 
-/** One palette item for every todo, ticket, and pull request; a todo under another names its parent below its title. */
+/** One palette item for every todo, closed ones too, ticket, and pull request; a todo under another names its parent below its title. */
 export function recordItems({ todos, tickets, pullRequestRepos }: PaletteRecords): PaletteItem[] {
 	const todoItems = todos.flatMap(todo =>
 		[todo, ...todo.children].map(
@@ -51,27 +52,24 @@ export function recordItems({ todos, tickets, pullRequestRepos }: PaletteRecords
 			],
 		}),
 	);
-	const pullRequestItems = pullRequestRepos.flatMap(repo =>
-		("pullRequests" in repo ? repo.pullRequests : []).map((pr): PaletteItem => {
-			const name = `${pr.owner}/${pr.repo}#${pr.number}`;
-			const icon = PAGE_ICON["pull-requests"];
-			return {
-				id: `pr:${name}`,
-				section: "pullRequests",
-				title: pr.title,
-				subtitle: name,
-				keywords: [pr.head, pr.author.login],
-				icon,
-				accessories: [{ kind: "age", at: pr.updatedAt }],
-				kind: "Pull request",
-				actions: [
-					[
-						{ id: "open", title: "Open pull request", icon, run: { kind: "link", href: hashForPullRequests(pr) } },
-						{ id: "github", title: "Open on GitHub", icon, run: { kind: "link", href: pullRequestUrl(pr), external: true } },
-					],
+	const pullRequestItems = listedPullRequests(pullRequestRepos).map((pr): PaletteItem => {
+		const icon = PAGE_ICON["pull-requests"];
+		return {
+			id: `pr:${prKey(pr)}`,
+			section: "pullRequests",
+			title: pr.title,
+			subtitle: pullRequestName(pr),
+			keywords: [pr.head, pr.author.login],
+			icon,
+			accessories: [{ kind: "age", at: pr.updatedAt }],
+			kind: "PR",
+			actions: [
+				[
+					{ id: "open", title: "Open pull request", icon, run: { kind: "link", href: hashForPullRequests(pr) } },
+					{ id: "github", title: "Open on GitHub", icon, run: { kind: "link", href: pullRequestUrl(pr), external: true } },
 				],
-			};
-		}),
-	);
+			],
+		};
+	});
 	return [...todoItems, ...ticketItems, ...pullRequestItems];
 }

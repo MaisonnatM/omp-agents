@@ -2,7 +2,7 @@
 import { type Project, type Worker, type WorkerPhase, workerPhase } from "../src/shared/projects";
 import { type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import type { Workspace } from "../src/shared/workspaces";
-import { hasEveryWord } from "./every-word";
+import { everyWord } from "./every-word";
 
 const HIDDEN_ROOTS = ["/tmp", "/private/tmp"];
 
@@ -160,7 +160,8 @@ export function sidebarSessions(hosts: RosterHost[], past: PastSession[], worksp
 /** `lists` with only the rows whose title or directory holds every word of `query`, ignoring case; a project whose name matches keeps every row. */
 export function searchSessions(lists: SidebarSessions, query: string): SidebarSessions {
 	if (!query.trim()) return lists;
-	const matches = (title: string | null, cwdDisplay: string): boolean => hasEveryWord(`${title ?? ""}\n${cwdDisplay}`, query);
+	const holds = everyWord(query);
+	const matches = (title: string | null, cwdDisplay: string): boolean => holds(`${title ?? ""}\n${cwdDisplay}`);
 	const hosts = (rows: RosterHost[]): RosterHost[] => rows.filter(host => matches(host.sessionName, host.cwdDisplay));
 	const past = (rows: PastSession[]): PastSession[] => rows.filter(session => matches(session.title, session.cwdDisplay));
 	// A worker's row reads as the title the coordinator gave it.

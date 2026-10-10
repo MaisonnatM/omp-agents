@@ -279,7 +279,7 @@ export function App() {
 							todos={mentionLists.todos}
 							linearConnected={linearCallable}
 							projects={state.projects}
-							onCreateTicket={linearCallable ? setNewTicket : undefined}
+							onCreateTicket={setNewTicket}
 						/>
 					</SidebarProvider>
 					<StatusBar usage={state.usage} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />

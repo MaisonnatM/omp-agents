@@ -21,6 +21,9 @@ export const prKey = (pr: PullRequest): string => `${repoKey(pr)}#${pr.number}`;
 
 export const pullRequestUrl = (pr: PullRequest): string => `https://github.com/${pr.owner}/${pr.repo}/pull/${pr.number}`;
 
+/** A pull request's name as GitHub writes it: `owner/repo#number`. */
+export const pullRequestName = (pr: PullRequest): string => `${pr.owner}/${pr.repo}#${pr.number}`;
+
 const PULL_REQUEST_URL = /^https:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/pull\/(\d+)(?:[/?#]|$)/;
 
 /** The pull request a GitHub address points at, its `/files` or `#discussion` pages too; `null` for any other address. */

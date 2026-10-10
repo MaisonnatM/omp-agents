@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { completionTrigger, type MentionToken } from "../completion-trigger";
 import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
 import type { Completions } from "../pane-store";
-import { pullRequestsStore, ticketsStore } from "../reads";
+import { useSearchSources } from "../reads";
 import { useDashboardStatus, useMentionLists } from "./dashboard-context";
 import type { PromptEditorHandle } from "./prompt-editor";
 
@@ -100,9 +100,7 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 
 	const token = menu?.token ?? null;
 	const query = token && mentionQuery(token);
-	const tickets = ticketsStore.usePolling(null, query !== null && wants(query, "ticket")).read?.data.tickets ?? [];
-	// The pull requests are the workspace's entry that `App` polls; the unscoped read would ask GitHub about every repository.
-	const pullRequestRepos = pullRequestsStore.use(useDashboardStatus().pullRequestsScope).read?.data.repos ?? [];
+	const { tickets, pullRequestRepos } = useSearchSources(query !== null && wants(query, "ticket"), useDashboardStatus().pullRequestsScope);
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	const sections: MenuSection[] =
 		menu === null

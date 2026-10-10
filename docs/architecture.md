@@ -889,7 +889,7 @@ The page lives in `web/`.
   It and the page state apply the server's list updates, the roster's and the past sessions', through `applyDelta` in `web/keyed-list.ts`, which keeps every entry an update leaves alone as the same object.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/pull-requests-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, `web/calendar-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
-  `web/every-word.ts` holds `hasEveryWord`, the one search rule the sidebar's sessions, the Files tab, the Todo page, the model search, and the `@` menu share: every word typed, in any order and any case.
+  `web/every-word.ts` holds `everyWord`, the one search rule the sidebar's sessions, the Files tab, the Todo page, the model search, the `@` menu, and the command palette's todos, tickets, and pull requests share: every word typed, in any order and any case.
 - `web/changes-model.ts`: the changes page's explorer tree, the diff's folded runs, and the file view's gutter marks; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines.
 - `web/file-paths.ts`: which paths in agent text name a text file, and the absolute path each resolves to.
   `web/delimited.ts` parses a TSV or CSV file into rows.
@@ -913,7 +913,8 @@ The page lives in `web/`.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
   The menu itself is `web/components/model-picker.tsx`, built on the submenu, switch, and radio rows of `web/components/ui/menu.tsx`; `Plans` in `web/components/plan-usage.tsx` hands it the last `omp usage` run.
 - `web/mentions.ts`: the composer's `@` menu as a pure function of the draft, the `@` token, the page's lists, and omp's file completions: its categories and their references, the query a token asks, and the rows and sections it shows.
-  `web/completion-trigger.ts` reads the token and its prefix from the draft, and `useCompletion` in `web/components/completion-popup.tsx` builds the menu, asks the server only for files, and polls tickets and the pull requests only while the menu needs them.
+  `web/completion-trigger.ts` reads the token and its prefix from the draft, and `useCompletion` in `web/components/completion-popup.tsx` builds the menu and asks the server only for files.
+  `useSearchSources` in `web/reads.ts` gives the menu and the command palette the tickets, polled only while asked for, and the sidebar workspace's pull requests.
 - `web/prompt-tokens.ts`: the references a prompt carries as text, which the composer and the transcript draw as chips, read back from what the `/` completion and the `@` menu insert; `remarkPromptChips` marks them in a sent prompt for `MessageMarkdown`.
   `web/components/prompt-chip.tsx` draws one chip, and `web/components/prompt-editor.tsx` is the composer's text field, a Lexical editor whose chips are atomic nodes over the prompt's text, so the draft stays a string.
 - `web/components/status-bar.tsx`: the window's bottom strip, with `PlanUsageList` from `web/components/plan-usage.tsx` on the left, and on the right the **Terminal** button and the machine's CPU, available memory, and free disk space from `GET /api/system`.
@@ -949,9 +950,9 @@ The page lives in `web/`.
   One `keydown` listener on the window serves every `useShortcuts` registration, which `createShortcutStack` orders: the registration that mounted last tries a key first, and the first handler that takes it ends the press, so a page's own bindings come before `web/use-page-shortcuts.ts`'s, which `web/app.tsx` mounts first, and a handler that returns `false` lets the key fall to the one below.
   Shortcuts with a `command` title are also the command palette's commands, and `web/app.tsx` hands the palette the same handlers it registers.
 - `web/command-palette.ts`: the command palette's model, which renders nothing: its items and their actions, the reducer over its stack of views and its action panel, and the ranking, which multiplies cmdk's match score by a frecency boost kept in localStorage.
-  Its todos, tickets, and pull requests sections list only for a search; `web/palette-records.ts` builds their items, each opening the page that shows it, a todo through the `?open=` of its list's hash.
+  `SECTIONS` there says how each section lists: always, only for a search or under Suggestions with every word required, as the todos, tickets, and pull requests do, or after every match, as what the search becomes; `web/palette-records.ts` builds the records' items, each opening the page that shows it, a todo through the `?open=` of its list's hash.
   `web/components/command-palette/` draws it, opened from the sidebar header or with Cmd+K: the dialog and its list, the action panel that Cmd+K opens on the highlighted entry, and the footer.
-  It polls the Linear tickets only while open, and reads the pull requests from the workspace's entry that `App` already polls.
+  It mounts only while open, so a closed palette builds no list and polls nothing; it asks for the Linear tickets while Linear answers.
   `web/session-actions.ts` lists what can be done to a session, which both a sidebar row's menu and the palette offer.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.

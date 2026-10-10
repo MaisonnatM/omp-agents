@@ -7,7 +7,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { DONE_KEPT_HOURS } from "../../../src/user-todos";
 import { localDay } from "../../days";
 import { hashForTodo, type TodoListView } from "../../routing";
-import { byStatus, LIST_KINDS, lastOf, leftIn, matches, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todosOf } from "../../todo-views";
+import { byStatus, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
 import { useTodoDrag } from "../../use-todo-drag";
 import { type OpenPicker, type TodoField, useTodoKeys } from "../../use-todo-keys";
 import { FoldButton, useFolds } from "../fold";
@@ -65,7 +65,7 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 	const canAdd = !disabled && kind.add !== null;
 	const sessions: KnownSessions = { hosts, past };
 	const listed = todosOf(list, view, day, sessions);
-	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todo => matches(todo, query)) };
+	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todoMatcher(query)) };
 	// Looked up before the search filters the list, so typing a search keeps the open todo on screen.
 	const open = openId === null ? null : (placeIn([listed], openId)?.entry ?? null);
 	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd });

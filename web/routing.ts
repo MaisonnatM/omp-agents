@@ -213,16 +213,32 @@ function restOfPage(page: Page): string | null {
 	}
 }
 
-/** What follows `?` in `page`'s hash: the todo a new session works on, or the todo the Todo page opens. */
-function queryOfPage(page: Page): string {
-	if (page.kind === "new" && page.todoId !== null) return `?todo=${encodeURIComponent(page.todoId)}`;
-	if (page.kind === "todo" && page.open !== null) return `?open=${encodeURIComponent(page.open)}`;
-	return "";
+/** The `?name=value` that follows `page`'s path: the todo a new session works on, or the todo the Todo page opens; `null` for none. */
+function queryOfPage(page: Page): string | null {
+	switch (page.kind) {
+		case "new":
+			return page.todoId === null ? null : `todo=${encodeURIComponent(page.todoId)}`;
+		case "todo":
+			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
+		case "settings":
+		case "pull-requests":
+		case "tickets":
+		case "routines":
+		case "projects":
+		case "calendar":
+		case "changes":
+			return null;
+		default: {
+			const never: never = page;
+			return never;
+		}
+	}
 }
 
 export function hashForPage(page: Page): string {
 	const rest = restOfPage(page);
-	return `#${page.kind}${rest === null ? "" : `/${rest}`}${queryOfPage(page)}`;
+	const query = queryOfPage(page);
+	return `#${page.kind}${rest === null ? "" : `/${rest}`}${query === null ? "" : `?${query}`}`;
 }
 
 export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });

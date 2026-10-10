@@ -1,6 +1,6 @@
 /** Pull request links, what each pull request waits on next, the list's sections and stacks, and what stands between a pull request and its merge. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, prKey, repoKey, samePullRequest } from "../src/shared/github";
+import { type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, type RepoPullRequests, prKey, repoKey, samePullRequest } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyToMerge } from "../src/shared/moves";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
@@ -297,9 +297,11 @@ export function listedPullRequest(list: PullRequestList, pr: PullRequest): { pr:
 	return null;
 }
 
+/** Every pull request `repos` lists, leaving out the repositories GitHub could not read. */
+export const listedPullRequests = (repos: readonly RepoPullRequests[]): PullRequestSummary[] => repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests));
+
 /** How many pull requests in the list wait on your move. */
-export const yourMoveCount = ({ repos }: PullRequestList, agentOn: AgentOn): number =>
-	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => groupOf(pr, moveOf(pr, agentOn(pr))) === "Your move").length;
+export const yourMoveCount = ({ repos }: PullRequestList, agentOn: AgentOn): number => listedPullRequests(repos).filter(pr => groupOf(pr, moveOf(pr, agentOn(pr))) === "Your move").length;
 
 /** One fact about where a pull request stands, as its details' Status lists it. */
 export type StatusItem =

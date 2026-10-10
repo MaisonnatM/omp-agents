@@ -5,7 +5,7 @@ import { type CalendarEventsAnswer, type GoogleStatus, type IntegrationsAnswer, 
 import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
 import type { PullRequestList, RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
-import type { TicketsAnswer } from "../src/shared/tickets";
+import type { Ticket, TicketsAnswer } from "../src/shared/tickets";
 import { errorText, getJson } from "./api";
 import { createPolledStore } from "./polled-store";
 
@@ -86,6 +86,20 @@ export const ticketsStore = createPolledStore<TicketsAnswer>({
 		return Array.isArray(answer?.tickets) && answer.tickets.every(ticket => typeof ticket.createdAt === "string");
 	},
 });
+
+const NO_TICKETS: Ticket[] = [];
+const NO_REPOS: RepoPullRequests[] = [];
+
+/**
+ * What the `@` menu and the command palette search besides the page's lists: the Linear issues assigned to you, read
+ * only while `ticketsWanted`, and the pull requests of workspace `scope`. That is the entry `App` polls; the unscoped
+ * read would ask GitHub about every repository.
+ */
+export function useSearchSources(ticketsWanted: boolean, scope: string | null): { tickets: Ticket[]; pullRequestRepos: RepoPullRequests[] } {
+	const tickets = ticketsStore.usePolling(null, ticketsWanted).read?.data.tickets;
+	const pullRequestRepos = pullRequestsStore.use(scope).read?.data.repos ?? NO_REPOS;
+	return { tickets: (ticketsWanted && tickets) || NO_TICKETS, pullRequestRepos };
+}
 
 export const analyticsStore = createPolledStore<Analytics>({
 	cacheKey: "omp-agents.analytics-cache",

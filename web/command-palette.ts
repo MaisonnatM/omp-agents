@@ -1,7 +1,7 @@
 import { defaultFilter } from "cmdk";
 import { Command, Folder, ListTodo, type LucideIcon } from "lucide-react";
 import type { HostStatus } from "../src/shared/sessions";
-import { hasEveryWord } from "./every-word";
+import { everyWord } from "./every-word";
 import { type Chord, type KeyEvent, pressesChord, SHORTCUTS, type Shortcut, type ShortcutHandlers, type ShortcutId } from "./shortcuts";
 
 /** A list the command palette shows: the root search, or a view an action pushed onto it. */
@@ -56,7 +56,7 @@ export type HomeSection = "running" | "projects" | "past" | "todos" | "tickets" 
 export type SectionId = "suggestions" | HomeSection;
 
 export interface PaletteItem {
-	/** Stable across reloads, since frecency keys on it: `session:<id>`, `project:<id>`, `todo:<id>`, `ticket:<identifier>`, `pr:<owner>/<repo>#<number>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`. */
+	/** Stable across reloads, since frecency keys on it: `session:<id>`, `project:<id>`, `todo:<id>`, `ticket:<identifier>`, `pr:<prKey>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`. */
 	id: string;
 	section: HomeSection;
 	title: string;
@@ -65,7 +65,7 @@ export interface PaletteItem {
 	keywords: readonly string[];
 	icon: LucideIcon;
 	accessories: readonly Accessory[];
-	/** The type label at the row's end: `Session`, `Project`, `Todo`, `Ticket`, `Pull request`, `Command`, `Workspace`. */
+	/** The type label at the row's end: `Session`, `Project`, `Todo`, `Ticket`, `PR`, `Command`, `Workspace`. */
 	kind: string;
 	/** Every action, as the action panel groups them. The first group's first action runs on Enter, so it is never empty. */
 	actions: readonly [ActionGroup, ...ActionGroup[]];
@@ -226,36 +226,42 @@ export interface Section {
 }
 
 /**
- * Sections a search alone lists, too long to browse, which match only an item holding every word typed: cmdk's loose
- * match would find most of hundreds of todos for any word.
+ * How a section lists. A `browsed` section lists with nothing typed too. A `searched` one lists only for a search, and
+ * matches only an item holding every word typed, since cmdk's loose match would find most of hundreds of todos for any
+ * word; its most used items still lead an empty search under Suggestions. A `typed` one holds what the search itself
+ * becomes: it matches anything and lists after every match.
  */
-const SEARCH_ONLY: readonly HomeSection[] = ["todos", "tickets", "pullRequests"];
-/** Sections in the order an empty search lists them; {@link SEARCH_ONLY} ones are left out. */
-const BROWSE_ORDER: readonly SectionId[] = ["suggestions", "running", "projects", "commands", "past", "workspaces", "createTodo", "fallback"];
-/** Sections a search ranks by their best match; equal ones keep this order. */
-const RANKED_ORDER: readonly HomeSection[] = ["running", "projects", "past", "todos", "tickets", "pullRequests", "commands", "workspaces"];
-/** Sections that hold what the search itself becomes: they match anything, and list after every match. */
-const UNRANKED_ORDER: readonly HomeSection[] = ["createTodo", "fallback"];
+type Listing = "browsed" | "searched" | "typed";
 
-const HEADINGS: Record<Exclude<SectionId, "fallback">, string | null> = {
-	suggestions: "Suggestions",
-	running: "Running",
-	projects: "Projects",
-	past: "Past",
-	todos: "Todos",
-	tickets: "Tickets",
-	pullRequests: "Pull requests",
-	commands: "Commands",
-	workspaces: "Workspaces",
-	createTodo: null,
+/** Each section's heading, `null` for none or for the fallback's, which names the search, and how it lists. */
+const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }> = {
+	running: { heading: "Running", listing: "browsed" },
+	projects: { heading: "Projects", listing: "browsed" },
+	past: { heading: "Past", listing: "browsed" },
+	todos: { heading: "Todos", listing: "searched" },
+	tickets: { heading: "Tickets", listing: "searched" },
+	pullRequests: { heading: "Pull requests", listing: "searched" },
+	commands: { heading: "Commands", listing: "browsed" },
+	workspaces: { heading: "Workspaces", listing: "browsed" },
+	createTodo: { heading: null, listing: "typed" },
+	fallback: { heading: null, listing: "typed" },
 };
 
-const headingOf = (id: SectionId, search: string): string | null => (id === "fallback" ? `Use “${search}”` : HEADINGS[id]);
+const listingOf = (section: HomeSection): Listing => SECTIONS[section].listing;
 
-/** cmdk's match of `search` against the item's words, times its frecency boost; 0 when it does not match. */
-function matchScore(item: PaletteItem, search: string, frecency: Frecency, now: number): number {
+/** The `browsed` sections in the order an empty search lists them, after Suggestions. */
+const BROWSE_ORDER: readonly HomeSection[] = ["running", "projects", "commands", "past", "workspaces"];
+/** The `browsed` and `searched` sections, which a search ranks by their best match; equal ones keep this order. */
+const RANKED_ORDER: readonly HomeSection[] = ["running", "projects", "past", "todos", "tickets", "pullRequests", "commands", "workspaces"];
+/** The `typed` sections, in the order they list after every match. */
+const TYPED_ORDER = (Object.keys(SECTIONS) as HomeSection[]).filter(section => listingOf(section) === "typed");
+
+const headingOf = (id: SectionId, search: string): string | null => (id === "suggestions" ? "Suggestions" : id === "fallback" ? `Use “${search}”` : SECTIONS[id].heading);
+
+/** cmdk's match of `search` against the item's words, times its frecency boost; 0 when it does not match. `holds` tests a `searched` item's words. */
+function matchScore(item: PaletteItem, search: string, holds: (text: string) => boolean, frecency: Frecency, now: number): number {
 	const words = item.subtitle ? [item.subtitle, ...item.keywords] : [...item.keywords];
-	if (SEARCH_ONLY.includes(item.section) && !hasEveryWord([item.title, ...words].join("\n"), search)) return 0;
+	if (listingOf(item.section) === "searched" && !holds([item.title, ...words].join("\n"))) return 0;
 	return defaultFilter(item.title, search, words) * frecencyBoost(frecency[item.id], now);
 }
 
@@ -270,15 +276,17 @@ export function paletteSections(items: readonly PaletteItem[], query: string, fr
 	const filled = (section: Section): boolean => section.items.length > 0;
 	if (!search) {
 		const suggested = items
-			.filter(item => !UNRANKED_ORDER.includes(item.section) && frecency[item.id])
+			.filter(item => listingOf(item.section) !== "typed" && frecency[item.id])
 			.toSorted((a, b) => frecencyBoost(frecency[b.id], now) - frecencyBoost(frecency[a.id], now))
 			.slice(0, suggestions);
 		const taken = new Set(suggested.map(item => item.id));
 		const rest = items.filter(item => !taken.has(item.id));
-		return BROWSE_ORDER.map(id => (id === "suggestions" ? { id, heading: headingOf(id, search), items: suggested } : inSection(rest, id))).filter(filled);
+		const suggestionsSection: Section = { id: "suggestions", heading: headingOf("suggestions", search), items: suggested };
+		return [suggestionsSection, ...[...BROWSE_ORDER, ...TYPED_ORDER].map(id => inSection(rest, id))].filter(filled);
 	}
+	const holds = everyWord(search);
 	const scores = new Map<string, number>();
-	for (const item of items) if (!UNRANKED_ORDER.includes(item.section)) scores.set(item.id, matchScore(item, search, frecency, now));
+	for (const item of items) if (listingOf(item.section) !== "typed") scores.set(item.id, matchScore(item, search, holds, frecency, now));
 	const score = (item: PaletteItem): number => scores.get(item.id) ?? 0;
 	const ranked = RANKED_ORDER.map(id => {
 		const hits = items.filter(item => item.section === id && score(item) > 0).toSorted((a, b) => score(b) - score(a));
@@ -286,7 +294,7 @@ export function paletteSections(items: readonly PaletteItem[], query: string, fr
 	})
 		.filter(filled)
 		.toSorted((a, b) => score(b.items[0]!) - score(a.items[0]!));
-	return [...ranked, ...UNRANKED_ORDER.map(id => inSection(items, id)).filter(filled)];
+	return [...ranked, ...TYPED_ORDER.map(id => inSection(items, id)).filter(filled)];
 }
 
 export type PaletteCommand = Shortcut & { command: string };

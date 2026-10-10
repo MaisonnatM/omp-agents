@@ -1,6 +1,6 @@
 import { ArrowLeft, Check, Copy, Ellipsis, ExternalLink, FileDiff, GitMerge, Layers, Zap } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
-import { type PullRequest, type PullRequestDetail, pullRequestUrl, type StackedPullRequest } from "../../../../src/shared/github";
+import { type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, type StackedPullRequest } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -124,7 +124,7 @@ export function DetailHeader({ pr, detail, stack, next, actions, quick, onOpen, 
 				</span>
 			</div>
 			<Heading ref={headingRef} tabIndex={-1} className={cn(page ? "text-xl" : "text-base", "leading-snug font-semibold outline-none")}>
-				{detail?.title ?? `${pr.owner}/${pr.repo}#${pr.number}`}
+				{detail?.title ?? pullRequestName(pr)}
 			</Heading>
 			{detail && (
 				<>

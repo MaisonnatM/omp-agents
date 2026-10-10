@@ -5,7 +5,6 @@ import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { useChangedFiles, useMedia, useTurnCount } from "../pane-store";
-import { hashForView } from "../routing";
 import { useStoredState } from "../stored-state";
 import { FilesTab } from "./files-tab";
 import { MediaTab } from "./media-tab";
@@ -74,8 +73,7 @@ export function SessionDetails({ view, working, sessionId, pullRequests, workspa
 			</TabPanel>
 			<TabPanel value="files" asChild>
 				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-					{/* Keyed by the view, so its search and open file do not carry over to another session's files. */}
-					<FilesTab key={hashForView(view)} files={files} sessionId={sessionId} />
+					<FilesTab files={files} sessionId={sessionId} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="media" asChild>

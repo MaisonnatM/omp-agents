@@ -19,7 +19,7 @@ import {
 	SquareTerminal,
 	Wrench,
 } from "lucide-react";
-import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useMemo, useRef } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useMemo, useRef, useState } from "react";
 import type { Project } from "../../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -46,7 +46,7 @@ import { localDay } from "../../days";
 import { age, folderName, hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
 import { recordItems } from "../../palette-records";
-import { pullRequestsStore, ticketsStore } from "../../reads";
+import { useSearchSources } from "../../reads";
 import { hashForProjects, type OpenMode } from "../../routing";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
@@ -105,38 +105,37 @@ interface CommandPaletteProps {
 	linearConnected: boolean;
 	/** Every project; the ones not archived list as items that open their page. */
 	projects: readonly Project[];
-	/** Open the new-ticket dialog with a title. Omitted while Linear cannot be called. */
-	onCreateTicket?: (title: string) => void;
+	/** Open the new-ticket dialog with a title, which a search offers while Linear answers. */
+	onCreateTicket: (title: string) => void;
 }
 
 /**
  * Searches running and past sessions in every workspace, projects, the page's commands, and workspaces, and for a search
  * also the todos, your Linear tickets, and the sidebar workspace's pull requests; Enter runs the highlighted entry's first
  * action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title. Its props hold no closure
- * built per render, so a socket update that touches none of them skips it.
+ * built per render, so a socket update that touches none of them skips it, and a closed palette renders and reads nothing.
  */
-export const CommandPalette = memo(function CommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, todoCategories, todos, linearConnected, projects, onCreateTicket }: CommandPaletteProps) {
+export const CommandPalette = memo(function CommandPalette({ state, ...props }: CommandPaletteProps) {
+	return state && <OpenCommandPalette state={state} {...props} />;
+});
+
+function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, todoCategories, todos, linearConnected, projects, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
 	const { send, start, end, changeTodo } = useDashboardActions();
 	const { starts, ending, pullRequestsScope } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const focusInput = useCallback(() => inputRef.current?.focus(), []);
-	const open = state !== null;
-	// Linear is read only while the palette is open; the pull requests are the workspace's entry that `App` polls.
-	const tickets = ticketsStore.usePolling(null, open && linearConnected).read?.data.tickets;
-	const pullRequestRepos = pullRequestsStore.use(pullRequestsScope).read?.data.repos;
+	const { tickets, pullRequestRepos } = useSearchSources(linearConnected, pullRequestsScope);
 	// One clock for as long as the palette is open, so a row's frecency does not decay and reorder the list under the pointer.
-	const now = useMemo(() => Date.now(), [open]);
-	const frame = state ? topFrame(state) : null;
-	const viewId = frame?.view ?? "root";
+	const [now] = useState(() => Date.now());
+	const frame = topFrame(state);
+	const viewId = frame.view;
 	const view = PALETTE_VIEWS[viewId];
-	const query = frame?.query ?? "";
+	const query = frame.query;
 	const search = query.trim();
 	const resuming = starts.resume?.phase === "starting" ? starts.resume.op.sessionId : null;
 
-	// While the palette is closed a roster push builds nothing, so each list below is empty then.
 	const sessionItems = useMemo((): PaletteItem[] => {
-		if (!open) return [];
 		const sessionItem = (entry: SessionEntry): PaletteItem => {
 			const row = entry.kind === "live" ? entry.host : entry.session;
 			const actions = sessionActions(entry, {
@@ -179,30 +178,27 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 					};
 		};
 		return [...hosts.map(host => sessionItem({ kind: "live", host })), ...past.map(session => sessionItem({ kind: "past", session }))];
-	}, [open, hosts, past, pinned, resuming, ending, onOpenSession, onTogglePin, start, send, end]);
+	}, [hosts, past, pinned, resuming, ending, onOpenSession, onTogglePin, start, send, end]);
 
 	const projectItems = useMemo(
 		(): PaletteItem[] =>
-			open
-				? projects
-						.filter(project => !project.archived)
-						.map(project => ({
-							id: `project:${project.id}`,
-							section: "projects",
-							title: project.name,
-							subtitle: project.cwd,
-							keywords: project.workers.map(worker => worker.title),
-							icon: PAGE_ICON.projects,
-							accessories: [],
-							kind: "Project",
-							actions: [[{ id: "open", title: "Open project", icon: PAGE_ICON.projects, run: { kind: "link", href: hashForProjects({ kind: "project", id: project.id }) } }]],
-						}))
-				: [],
-		[open, projects],
+			projects
+				.filter(project => !project.archived)
+				.map(project => ({
+					id: `project:${project.id}`,
+					section: "projects",
+					title: project.name,
+					subtitle: project.cwd,
+					keywords: project.workers.map(worker => worker.title),
+					icon: PAGE_ICON.projects,
+					accessories: [],
+					kind: "Project",
+					actions: [[{ id: "open", title: "Open project", icon: PAGE_ICON.projects, run: { kind: "link", href: hashForProjects({ kind: "project", id: project.id }) } }]],
+				})),
+		[projects],
 	);
 
 	const commandItems = useMemo((): PaletteItem[] => {
-		if (!open) return [];
 		const pushItem = (id: string, title: string, icon: LucideIcon, target: PaletteViewId, keywords: string[], keys: readonly string[]): PaletteItem => ({
 			id,
 			section: "commands",
@@ -229,10 +225,9 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 			pushItem("command:workspace", "Choose workspace…", Folder, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),
 			pushItem("command:create-todo", "Create todo", ListTodo, "createTodo", ["add todo", "task"], []),
 		];
-	}, [open, handlers, unavailable]);
+	}, [handlers, unavailable]);
 
 	const workspaceItems = useMemo((): PaletteItem[] => {
-		if (!open) return [];
 		const pickWorkspace = (cwd: string | null): void => {
 			if (cwd !== workspace) onPickWorkspace(cwd);
 		};
@@ -251,12 +246,9 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 			workspaceItem("workspace:all", "All workspaces", undefined, Layers, null),
 			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, folderName(cwdDisplay) ?? cwdDisplay, cwdDisplay, Folder, cwd)),
 		];
-	}, [open, workspaces, workspace, onPickWorkspace]);
+	}, [workspaces, workspace, onPickWorkspace]);
 
-	const records = useMemo(
-		(): PaletteItem[] => (open ? recordItems({ todos, tickets: linearConnected ? (tickets ?? []) : [], pullRequestRepos: pullRequestRepos ?? [] }) : []),
-		[open, todos, linearConnected, tickets, pullRequestRepos],
-	);
+	const records = useMemo((): PaletteItem[] => recordItems({ todos, tickets, pullRequestRepos }), [todos, tickets, pullRequestRepos]);
 
 	const items = useMemo((): PaletteItem[] => {
 		const createTodo = (): void => {
@@ -281,7 +273,7 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 				: [];
 		/** What you typed, as the title of a new Linear issue in the dialog that opens it. */
 		const ticketItem = (): PaletteItem[] =>
-			onCreateTicket && search
+			linearConnected && search
 				? [
 						{
 							id: "fallback:create-ticket",
@@ -301,9 +293,8 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, projectItems, records, commandItems, workspaceItems, search, todoCategories, changeTodo, onCreateTicket]);
+	}, [viewId, sessionItems, projectItems, records, commandItems, workspaceItems, search, todoCategories, changeTodo, linearConnected, onCreateTicket]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
-	if (state === null || frame === null) return null;
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;
 	const empty =
@@ -416,7 +407,7 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 			</DialogPrimitive.Portal>
 		</DialogPrimitive.Root>
 	);
-});
+}
 
 /** One entry: its icon tile, title, muted subtitle, then its accessories and type. */
 function Row({ item, onSelect }: { item: PaletteItem; onSelect: () => void }) {

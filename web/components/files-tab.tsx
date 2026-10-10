@@ -4,7 +4,7 @@ import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { hasEveryWord } from "../every-word";
+import { everyWord } from "../every-word";
 import { age, readTime } from "../labels";
 import { hashForChanges } from "../routing";
 import { LineCounts } from "./line-counts";
@@ -135,41 +135,42 @@ function FileChangesDialog({ file, onClose }: { file: ChangedFile; onClose: () =
 	);
 }
 
-/**
- * The files the view's agent changed, in first-touch order, each opening its changes in a dialog, then a link to the
- * session's changes page. A search keeps the files whose path holds every word typed.
- */
+/** The changed files, with a search that keeps those whose path holds every word typed; the heading counts and totals what it shows. */
+function ChangedFiles({ files, onOpen }: { files: ChangedFile[]; onOpen: (path: string) => void }) {
+	const [query, setQuery] = useState("");
+	const holds = everyWord(query);
+	const matched = files.filter(file => holds(file.path));
+	const count = matched.length === files.length ? plural(files.length, "file") : `${matched.length} of ${plural(files.length, "file")}`;
+	return (
+		<SidebarGroup>
+			<SidebarSearch label="Filter the changed files" placeholder="Search files" query={query} onQuery={setQuery} />
+			{matched.length === 0 ? (
+				<p className="px-2 py-2 text-xs text-muted-foreground">{`No files match “${query.trim()}”`}</p>
+			) : (
+				<>
+					<SidebarGroupLabel>
+						<span className="min-w-0 flex-1 truncate">{count} changed</span>
+						<LineCounts {...lineTotals(matched.flatMap(file => file.changes))} />
+					</SidebarGroupLabel>
+					<SidebarMenu aria-label="Files changed">
+						{matched.map(file => (
+							<FileRow key={file.path} file={file} onOpen={() => onOpen(file.path)} />
+						))}
+					</SidebarMenu>
+				</>
+			)}
+		</SidebarGroup>
+	);
+}
+
+/** The files the view's agent changed, in first-touch order, each opening its changes in a dialog, then a link to the session's changes page. */
 export function FilesTab({ files, sessionId }: { files: ChangedFile[] | null; sessionId: string | null }) {
 	const [shownPath, setShownPath] = useState<string | null>(null);
-	const [query, setQuery] = useState("");
 	const shown = shownPath === null ? undefined : files?.find(file => file.path === shownPath);
-	const matched = files?.filter(file => hasEveryWord(file.path, query)) ?? [];
-	const count = matched.length === files?.length ? plural(matched.length, "file") : `${matched.length} of ${plural(files?.length ?? 0, "file")}`;
 	return (
 		<>
 			{files &&
-				(files.length === 0 ? (
-					<p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p>
-				) : (
-					<SidebarGroup>
-						<SidebarSearch label="Filter the changed files" placeholder="Search files" query={query} onQuery={setQuery} />
-						{matched.length === 0 ? (
-							<p className="px-2 py-2 text-xs text-muted-foreground">{`No files match “${query.trim()}”`}</p>
-						) : (
-							<>
-								<SidebarGroupLabel>
-									<span className="min-w-0 flex-1 truncate">{count} changed</span>
-									<LineCounts {...lineTotals(matched.flatMap(file => file.changes))} />
-								</SidebarGroupLabel>
-								<SidebarMenu aria-label="Files changed">
-									{matched.map(file => (
-										<FileRow key={file.path} file={file} onOpen={() => setShownPath(file.path)} />
-									))}
-								</SidebarMenu>
-							</>
-						)}
-					</SidebarGroup>
-				))}
+				(files.length === 0 ? <p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p> : <ChangedFiles files={files} onOpen={setShownPath} />)}
 			{shown && <FileChangesDialog file={shown} onClose={() => setShownPath(null)} />}
 			{sessionId !== null && (
 				<SidebarGroup>
