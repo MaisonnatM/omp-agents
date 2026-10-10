@@ -72,10 +72,10 @@ export const AppSidebar = memo(function AppSidebar({
 	setShortcutsOpen,
 	toggleSidebar,
 }: AppSidebarProps) {
-	const inbox = useMemo(() => {
+	const pullRequests = useMemo(() => {
 		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
 		if (!listed) return <p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>;
-		// The inbox page lists the pull requests itself, so the sidebar's inbox tab shows its sections then.
+		// The Pull requests page lists the pull requests itself, so the sidebar's Pull requests tab shows its sections then.
 		if (page?.kind === "pull-requests" && !page.target) return <PullRequestIndex project={project} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
 		return <PullRequestNav project={project} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
 	}, [listed, page, project, visible, sectionTarget, onSectionTarget]);
@@ -109,7 +109,7 @@ export const AppSidebar = memo(function AppSidebar({
 			settingsRoute={settings}
 			sectionTarget={sectionTarget}
 			onSectionTarget={onSectionTarget}
-			inbox={inbox}
+			pullRequests={pullRequests}
 			hosts={visible.hosts}
 			project={project}
 			onPickProject={onPickProject}

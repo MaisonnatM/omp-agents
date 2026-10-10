@@ -1,4 +1,4 @@
-/** The inbox page: every pull request in a table, by repository, in a card per section named after whose move it is. */
+/** The Pull requests page: every pull request in a table, by repository, in a card per section named after whose move it is. */
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
@@ -52,7 +52,7 @@ function RepoTable({ view }: { view: RepoView }) {
 	const { repo, key, name, bodyId, open, toggle, drag, moveId, sections } = view;
 	const workspaces = workspacesLabel(repo);
 	return (
-		<section aria-label={name} {...drag.target} data-move={moveId} className={cn("@container/inbox relative space-y-3", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}>
+		<section aria-label={name} {...drag.target} data-move={moveId} className={cn("@container/pull-requests relative space-y-3", drag.dragging && "opacity-50", drag.dropAt && DROP_LINE[drag.dropAt])}>
 			<h2 {...drag.handle} className="flex items-baseline gap-2 text-sm" style={{ fontVariationSettings: fontWeights.semibold }}>
 				<FoldButton open={open} onToggle={toggle} controls={bodyId}>
 					<span className="truncate" title={repo.cwds.join("\n")}>
@@ -92,7 +92,7 @@ interface PullRequestsPageProps {
 }
 
 /**
- * The inbox in the main area, as a table: the pull requests of the sidebar's project, or of every project, read from
+ * The pull requests in the main area, as a table: those of the sidebar's project, or of every project, read from
  * GitHub. It keeps the sidebar list's order, folds, and keys.
  */
 export function PullRequestsPage({ project, hosts, past, section }: PullRequestsPageProps) {
@@ -103,9 +103,9 @@ export function PullRequestsPage({ project, hosts, past, section }: PullRequests
 	const unmatched = board.poll.read?.data.unmatched ?? [];
 	return (
 		<ListPage
-			title="Inbox"
+			title="Pull requests"
 			meta="Pull requests by whose move it is"
-			noun="the inbox"
+			noun="pull requests"
 			loading="Asking GitHub for pull requests…"
 			poll={board.poll}
 			onRefresh={board.refresh}

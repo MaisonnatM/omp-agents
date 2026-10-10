@@ -279,7 +279,7 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(session).tickets).toEqual(["ENG-1", "ENG-3", "ENG-2"]);
 	});
 
-	test("asks for the repository only of sessions that name a bare number, and links pushes once the inbox names their PR", async () => {
+	test("asks for the repository only of sessions that name a bare number, and links pushes once the pull request list names their PR", async () => {
 		const dir = sessionDir();
 		const reader = join(dir, "2026-10-01T00-00-00-000Z_s1.jsonl");
 		const pusher = join(dir, "2026-10-01T00-00-00-000Z_s2.jsonl");
@@ -305,10 +305,10 @@ describe("SessionFactsIndex", () => {
 		expect(index.factsOf(reader).pullRequests).toEqual([{ owner: "acme", repo: "webapp", number: 6611, link: "worked" }]);
 		expect(index.factsOf(pusher).pullRequests).toEqual([]);
 
-		const inbox = [{ owner: "acme", repo: "webapp", number: 6612, head: "me/feature" }];
-		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, inbox)).toBe(true);
+		const pullRequests = [{ owner: "acme", repo: "webapp", number: 6612, head: "me/feature" }];
+		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, pullRequests)).toBe(true);
 		expect(index.factsOf(pusher).pullRequests).toEqual([{ owner: "acme", repo: "webapp", number: 6612, link: "worked" }]);
-		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, inbox)).toBe(false);
+		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, pullRequests)).toBe(false);
 		expect(index.learnHeads({ owner: "acme", repo: "webapp" }, [])).toBe(true);
 		expect(index.factsOf(pusher).pullRequests).toEqual([]);
 	});

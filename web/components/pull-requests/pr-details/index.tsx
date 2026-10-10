@@ -20,7 +20,7 @@ import { DetailHeader } from "./header";
 import { placeFixes } from "./status-view";
 import { Summary } from "./summary";
 
-/** What the pull request waits on next, as the inbox lists it. */
+/** What the pull request waits on next, as the pull request list has it. */
 export interface NextMove {
 	move: MoveId;
 	reason: string;
@@ -32,12 +32,12 @@ export interface NextMove {
 
 export interface DetailContentProps {
 	pr: PullRequest;
-	/** The quick actions on it; none apply when the inbox does not list it, since a start needs the workspace the inbox names. */
+	/** The quick actions on it; none apply when the pull request list does not hold it, since a start needs the workspace the list names. */
 	quick: QuickActionsProps;
 	/** The running sessions that work on it. */
 	sessions: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
-	/** Its move; `null` when the inbox does not list it. */
+	/** Its move; `null` when the pull request list does not hold it. */
 	next: NextMove | null;
 	/** The session's pull requests, in the session details sidebar; those outside the stack list under it. */
 	session?: LinkedPullRequest[];
@@ -89,7 +89,7 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: li
 		if (value === "code" && !files) location.hash = hashForPullRequestFiles(pr);
 		else if (value !== "code" && files) location.hash = hashForPullRequests(pr);
 	};
-	// GitHub's search, which the inbox reads, can list a pull request for a while after it closes.
+	// GitHub's search, which the pull request list reads, can list a pull request for a while after it closes.
 	const next = detail?.state === "closed" ? null : listedNext;
 	const offered = quick.actions.filter(action => action !== next?.action);
 	const placed = detail ? placeFixes(pullRequestStatus(detail), offered) : [];

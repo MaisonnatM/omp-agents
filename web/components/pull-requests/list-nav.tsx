@@ -106,7 +106,7 @@ interface PullRequestNavProps {
 }
 
 /**
- * The sidebar's inbox beside the panes or a pull request's details: the pull requests of its project, or of every
+ * The sidebar's pull request list beside the panes or a pull request's details: the pull requests of its project, or of every
  * project, by repository in sections named after whose move it is, read from GitHub.
  */
 export function PullRequestNav({ project, hosts, past, route }: PullRequestNavProps) {
@@ -120,15 +120,15 @@ export function PullRequestNav({ project, hosts, past, route }: PullRequestNavPr
 				<span className="min-w-0 flex-1 truncate">{read ? `Updated ${readTime(read.at)}` : "Asking GitHub for pull requests…"}</span>
 				{read && <UnmatchedTip unmatched={read.data.unmatched} />}
 				<SortMenu order={board.order} onSort={board.onSort} onReset={board.onReset} />
-				<Tooltip content="Refresh the inbox">
-					<Button variant="ghost" size="icon-compact" aria-label="Refresh the inbox" loading={refreshing} onClick={board.refresh}>
+				<Tooltip content="Refresh pull requests">
+					<Button variant="ghost" size="icon-compact" aria-label="Refresh pull requests" loading={refreshing} onClick={board.refresh}>
 						<RefreshCw />
 					</Button>
 				</Tooltip>
 			</div>
 			{error && (
 				<p role="alert" className="px-3 text-xs text-red-600 dark:text-red-400">
-					Cannot {read ? "refresh" : "load"} the inbox: {error}
+					Cannot {read ? "refresh" : "load"} pull requests: {error}
 				</p>
 			)}
 			{quick && (
@@ -152,12 +152,12 @@ interface PullRequestIndexProps {
 	onTarget: (target: SectionTarget) => void;
 }
 
-/** The sidebar beside the inbox page: each repository's sections with their pull request counts, each a link to its card on the page. Drag a repository's name to reorder them, as on the page. */
+/** The sidebar beside the Pull requests page: each repository's sections with their pull request counts, each a link to its card on the page. Drag a repository's name to reorder them, as on the page. */
 export function PullRequestIndex({ project, hosts, target, onTarget }: PullRequestIndexProps) {
 	const { read, error } = pullRequestStore.use(project);
 	const [order, setOrder] = usePullRequestOrder();
 	const drag = useDragOrder();
-	if (!read) return note(error ? `Cannot load the inbox: ${error}` : "Asking GitHub for pull requests…");
+	if (!read) return note(error ? `Cannot load pull requests: ${error}` : "Asking GitHub for pull requests…");
 	const agent = agentOn(hosts);
 	const repos = orderedRepos(read.data.repos, order);
 	if (repos.length === 0) return note("No session ran in a GitHub repository.");

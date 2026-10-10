@@ -73,7 +73,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			},
 			"pull-requests": () => {
 				const { page } = latest.current;
-				// The inbox page lists the pull requests itself; its shortcut then has nothing to open.
+				// The Pull requests page lists the pull requests itself; its shortcut then has nothing to open.
 				if (page?.kind === "pull-requests" && !page.target) return;
 				latest.current.showTab("pull-requests");
 			},

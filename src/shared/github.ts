@@ -1,4 +1,4 @@
-/** GitHub repositories and pull requests: keys, links, the inbox, one pull request in full, and its changed files. */
+/** GitHub repositories and pull requests: keys, links, the pull request list, one pull request in full, and its changed files. */
 
 import type { ChangedEntry } from "./changes";
 
@@ -45,7 +45,7 @@ export interface LinkedPullRequest extends PullRequest {
 	link: PullRequestLink;
 }
 
-/** Where the viewer stands on a pull request in the inbox: they wrote it, or someone asked them to review it. */
+/** Where the viewer stands on a listed pull request: they wrote it, or someone asked them to review it. */
 export type PullRequestRole = "author" | "reviewer";
 
 /** GitHub's review decision, plus `none` for a repository that requires no review. */
@@ -67,7 +67,7 @@ export interface Reviewer extends Person {
 	state: ReviewerState;
 }
 
-/** A pull request on the inbox page, as GitHub reports it now. */
+/** A pull request on the Pull requests page, as GitHub reports it now. */
 export interface PullRequestSummary extends PullRequest {
 	title: string;
 	author: Person;
@@ -91,12 +91,12 @@ export interface PullRequestSummary extends PullRequest {
 	updatedAt: number;
 }
 
-/** One GitHub repository's inbox, for the workspaces whose `origin` it is. */
+/** One GitHub repository's pull requests, for the workspaces whose `origin` it is. */
 export type RepoPullRequests = Repo & { cwds: string[] } & ({ pullRequests: PullRequestSummary[] } | { error: string });
 
 export interface PullRequestList {
 	repos: RepoPullRequests[];
-	/** Workspaces with no GitHub `origin`, which the inbox cannot show. */
+	/** Workspaces with no GitHub `origin`, which the Pull requests page cannot show. */
 	unmatched: string[];
 }
 
@@ -177,7 +177,7 @@ export interface PullRequestLabel {
 	color: string;
 }
 
-/** One pull request in full, as the inbox's details show it in place of opening GitHub. */
+/** One pull request in full, as a pull request's details show it in place of opening GitHub. */
 export interface PullRequestDetail extends PullRequest {
 	title: string;
 	body: string;

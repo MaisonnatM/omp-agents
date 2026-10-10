@@ -114,7 +114,7 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 /**
  * How the sidebar tabs fit its width, by container query: labels while they fit, then icons alone sharing the row.
  * Icons alone keep each name in the tooltip and for screen readers.
- * Each switch sits where the labels fit with counts on Inbox and Sessions and the list's margins; labels never fit beside their icons once both carry counts.
+ * Each switch sits where the labels fit with counts on Pull requests and Sessions and the list's margins; labels never fit beside their icons once both carry counts.
  */
 const SIDEBAR_TAB_FIT = {
 	five: {
@@ -165,8 +165,8 @@ interface RosterProps {
 	/** The tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
-	/** The Inbox tab's content. */
-	inbox: ReactNode;
+	/** The Pull requests tab's content. */
+	pullRequests: ReactNode;
 	/** The live sessions, which take a pull request's move while they work on it or ask about it. */
 	hosts: RosterHost[];
 	/** The selected project's `cwd`, or `null` for all projects. */
@@ -200,7 +200,7 @@ export function Roster({
 	settingsRoute,
 	sectionTarget,
 	onSectionTarget,
-	inbox,
+	pullRequests,
 	hosts,
 	project,
 	onPickProject,
@@ -278,7 +278,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="pull-requests" asChild>
 				<SidebarContent>
-					{inbox}
+					{pullRequests}
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="tickets" asChild>

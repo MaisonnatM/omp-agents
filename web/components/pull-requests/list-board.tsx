@@ -1,4 +1,4 @@
-/** What the inbox's two lists share, the sidebar's and the page's: their state, their keys, and the board they render. */
+/** What the two lists of pull requests share, the sidebar's and the page's: their state, their keys, and the board they render. */
 import { ArrowDownUp, Unplug } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
@@ -45,16 +45,17 @@ import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { type Folds, useFolds, useReveal } from "../fold";
 import { type RowProps, rowElement, rowId, rowLink, sameSessions, sessionsByPullRequest } from "./pr-row";
 
+// Both keys keep their names from before the page was called Pull requests, so the browser's saved folds and order survive.
 /** The repositories and sections flipped from their default fold: `owner/repo`, and `owner/repo:<section title>`. */
 const FOLDS_KEY = "omp-agents.inbox-collapsed";
 const ORDER_KEY = "omp-agents.inbox-order";
 
 const SORTS = Object.keys(PULL_REQUEST_SORTS) as PullRequestSort[];
 
-/** The inbox's order, which every list of it shares and the browser keeps. */
+/** The pull request list's order, which every list of it shares and the browser keeps. */
 export const usePullRequestOrder = () => useStoredState(ORDER_KEY, decodeOrder, JSON.stringify);
 
-/** The inbox's folds, which the page and the sidebar share and the browser keeps. */
+/** The pull request list's folds, which the page and the sidebar share and the browser keeps. */
 export const usePullRequestFolds = (): Folds => useFolds(FOLDS_KEY, foldedByDefault);
 
 /** `order` with the repository `key` put on the `where` side of `beside`; the repositories a list does not show, `shown` being those it does, keep their place behind them. */
@@ -66,9 +67,9 @@ export const withRepoMoved = (order: PullRequestOrder, shown: string[], key: str
 /** Moves a focused heading or row one place; `false` at the edge. */
 type Move = (by: 1 | -1) => boolean;
 
-/** The fold keys of the repository and the section that list `pr`, or `null` when the inbox does not list it. */
-function placeOf(inbox: PullRequestList, pr: PullRequest, agent: AgentOn): { repo: string; section: string } | null {
-	for (const repo of inbox.repos) {
+/** The fold keys of the repository and the section that list `pr`, or `null` when `list` leaves it out. */
+function placeOf(list: PullRequestList, pr: PullRequest, agent: AgentOn): { repo: string; section: string } | null {
+	for (const repo of list.repos) {
 		if ("error" in repo) continue;
 		const section = pullRequestSections(repo.pullRequests, DEFAULT_ORDER, agent).find(({ rows }) => rows.some(row => samePullRequest(row.pr, pr)));
 		const key = repoKey(repo);
@@ -150,7 +151,7 @@ export function SortMenu({ order, onSort, onReset }: { order: PullRequestOrder; 
 	return (
 		<DropdownMenu open={open} onOpenChange={setOpen}>
 			<Tooltip content={label} forceOpen={open ? false : undefined}>
-				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={`${label}. Change the inbox's order`} />}>
+				<DropdownMenuTrigger render={<Button variant="ghost" size="icon-compact" aria-label={`${label}. Change the pull requests' order`} />}>
 					<ArrowDownUp />
 				</DropdownMenuTrigger>
 			</Tooltip>
@@ -178,7 +179,7 @@ export function workspacesLabel({ repo, cwds }: RepoPullRequests): string | null
 	return folder && folder.toLowerCase() !== repo.toLowerCase() ? folder : null;
 }
 
-/** The workspaces the inbox leaves out, having no GitHub `origin`, as an icon that lists them on hover; nothing when it leaves none out. */
+/** The workspaces the pull request list leaves out, having no GitHub `origin`, as an icon that lists them on hover; nothing when it leaves none out. */
 export function UnmatchedTip({ unmatched }: { unmatched: string[] }) {
 	if (unmatched.length === 0) return null;
 	const label = `${unmatched.length === 1 ? "1 workspace has no GitHub origin and is" : `${unmatched.length} workspaces have no GitHub origin and are`} left out`;
@@ -198,7 +199,7 @@ interface Placed {
 	moveId: string;
 }
 
-/** The inbox page's card for the section `title` of the repository `repo`, which a sidebar link scrolls to. */
+/** The Pull requests page's card for the section `title` of the repository `repo`, which a sidebar link scrolls to. */
 export const pullRequestSectionTarget = (repo: string, title: MoveGroup): SectionTarget => ({ id: sectionId("pull-requests-section", repo, title), folds: [repo, sectionFoldKey(repo, title)] });
 
 export interface SectionView extends Placed {
@@ -251,7 +252,7 @@ interface Dropped {
 	onDrop: (dragged: string, where: Where) => void;
 }
 
-/** A row's place on the board, which changes only with the inbox, its order, and its folds. */
+/** A row's place on the board, which changes only with the pull request list, its order, and its folds. */
 interface RowLayout {
 	row: SectionRow;
 	key: string;
@@ -287,7 +288,7 @@ function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Rea
 }
 
 /**
- * The inbox of `project` as a board of repositories, sections, and rows, with the keys that move through it. Dragging
+ * The pull requests of `project` as a board of repositories, sections, and rows, with the keys that move through it. Dragging
  * or Alt+Shift+↑ and ↓ reorder the repositories, the sections, and the pull requests in a section; the browser keeps
  * the order. Mount it once per screen, since its keys act on the rows it lists.
  */
@@ -298,17 +299,17 @@ export function usePullRequestBoard({ project, hosts, past, route }: BoardProps)
 	const { starts: { quick } } = useDashboardStatus();
 	const poll = pullRequestStore.use(project);
 	const { read } = poll;
-	const inbox = read?.data ?? null;
+	const list = read?.data ?? null;
 	const folds = usePullRequestFolds();
 	const [order, setOrder] = usePullRequestOrder();
 	const drag = useDragOrder();
 	const agent = useMemo(() => agentOn(hosts), [hosts]);
-	const place = useMemo(() => (inbox && target ? placeOf(inbox, target, agent) : null), [inbox, targetKey, agent]);
+	const place = useMemo(() => (list && target ? placeOf(list, target, agent) : null), [list, targetKey, agent]);
 	const reveal = target && place ? { id: rowId(target), folds: [place.repo, place.section] } : null;
 	useReveal(reveal, folds, { token: reveal?.id, block: "nearest", focus: false });
 	/** Starts the quick action that makes `pr`'s move, the one its row's menu would; `false` when no action makes it. */
 	const giveToAgent = (pr: PullRequest): boolean => {
-		const listed = inbox && listedPullRequest(inbox, pr);
+		const listed = list && listedPullRequest(list, pr);
 		const action = listed && moveAction(listed.pr, moveOf(listed.pr, agent(listed.pr)));
 		if (!listed || !action) return false;
 		start(pullRequestStart(listed.pr, action, listed.cwd, readPinnedSkill()));
@@ -324,10 +325,10 @@ export function usePullRequestBoard({ project, hosts, past, route }: BoardProps)
 	// The functions every row shares, so a row's props change only with what the row shows.
 	const onQuickAction = useCallback((pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => start(pullRequestStart(pr, action, cwd, readPinnedSkill())), [start]);
 	const onActionsOpenChange = useCallback((pr: PullRequest, next: boolean) => setActionsOpen(next ? rowId(pr) : null), []);
-	const shown = useMemo(() => (inbox ? shownPullRequests(inbox, folds.isFolded, order, agent) : []), [inbox, folds.isFolded, order, agent]);
+	const shown = useMemo(() => (list ? shownPullRequests(list, folds.isFolded, order, agent) : []), [list, folds.isFolded, order, agent]);
 	useTriageKeys(shown, route, giveToAgent, openActions);
 
-	const repos = useMemo(() => (inbox ? orderedRepos(inbox.repos, order) : []), [inbox, order]);
+	const repos = useMemo(() => (list ? orderedRepos(list.repos, order) : []), [list, order]);
 	const sectionsOf = useMemo(() => repos.map(repo => ("error" in repo ? [] : pullRequestSections(repo.pullRequests, order, agent))), [repos, order, agent]);
 	// The page shows its pull requests in this order now; placing one by hand starts the manual sort from it.
 	const shownOrder = useMemo(

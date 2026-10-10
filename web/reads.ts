@@ -58,8 +58,9 @@ export function useReplaceableRead<T>(url: string | null, version?: unknown): Re
 	return { data: shown ?? read.data, error: shown ? null : read.error, replace: answer => setReplaced({ url, answered: read.data, answer }) };
 }
 
-/** The open pull requests by project `cwd`, which the sidebar and the inbox page share; `null` reads every project. */
+/** The open pull requests by project `cwd`, which the sidebar and the Pull requests page share; `null` reads every project. */
 export const pullRequestStore = createPolledStore<PullRequestList>({
+	// Keeps its name from before the page was called Pull requests, so the browser's cached list survives.
 	cacheKey: "omp-agents.inbox-cache",
 	url: (cwd, fresh) => {
 		const params = new URLSearchParams();
@@ -68,10 +69,10 @@ export const pullRequestStore = createPolledStore<PullRequestList>({
 		return `/api/pull-requests${params.size ? `?${params}` : ""}`;
 	},
 	isValid: (value): value is PullRequestList => {
-		const inbox = value as Partial<PullRequestList> | null;
-		// A read saved before the inbox carried each PR's diff size reads GitHub again.
+		const list = value as Partial<PullRequestList> | null;
+		// A read saved before the list carried each PR's diff size reads GitHub again.
 		const current = (repo: RepoPullRequests): boolean => "error" in repo || repo.pullRequests.every(pr => typeof pr.additions === "number");
-		return Array.isArray(inbox?.repos) && Array.isArray(inbox.unmatched) && inbox.repos.every(current);
+		return Array.isArray(list?.repos) && Array.isArray(list.unmatched) && list.repos.every(current);
 	},
 });
 

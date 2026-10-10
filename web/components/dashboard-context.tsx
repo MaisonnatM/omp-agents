@@ -32,7 +32,7 @@ export function useDashboardActions(): DashboardActions {
 	return value;
 }
 
-/** What changes while the page runs: the socket's state, the sessions it is starting or ending, and the inbox entry it polls. */
+/** What changes while the page runs: the socket's state, the sessions it is starting or ending, and the pull request entry it polls. */
 export interface DashboardStatus {
 	connected: boolean;
 	/** The last start of each kind, under way or failed. */
@@ -45,7 +45,7 @@ export interface DashboardStatus {
 	/** The live sessions the page asked the server to end, by instance id, until it answers. */
 	ending: ReadonlySet<string>;
 	/**
-	 * The project `cwd` whose inbox entry `App` polls, `null` for all projects. A component that wants the pull requests
+	 * The project `cwd` whose pull request entry `App` polls, `null` for all projects. A component that wants the pull requests
 	 * reads that entry, never another scope's: the all-projects entry asks GitHub about every repository.
 	 */
 	pullRequestScope: string | null;

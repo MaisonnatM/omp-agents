@@ -17,7 +17,7 @@ An action that fails shows its error, and its control becomes available again.
 - [Composer](#composer)
 - [Questions](#questions)
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
-- [Pull requests and the inbox](#pull-requests-and-the-inbox)
+- [Pull requests](#pull-requests)
 - [Integrations](#integrations)
 - [Todo list](#todo-list)
 - [Calendar](#calendar)
@@ -149,9 +149,9 @@ An action that fails shows its error, and its control becomes available again.
 - **PRs** shows the pull requests the session and its subagents submitted or worked on, as its header lists them, the session's own first; a subagent's view shows its session's.
   The first one shows until you pick another: click another pull request of its **Stack**, or of **Other pull requests of the session** under it, to show it in place.
   **Other pull requests of the session** lists the session's pull requests that the stack does not show, each with whether the session submitted or worked on it.
-  The pull request then shows as its details in the inbox do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
+  The pull request then shows as its details on the Pull requests page do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
   The header and the tab bar stay pinned to the top of the sidebar while the details scroll, with no fade over them.
-  The quick actions apply only when the inbox of the sidebar's project lists the pull request.
+  The quick actions apply only when the pull request list of the sidebar's project includes the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
 
@@ -280,7 +280,7 @@ An action that fails shows its error, and its control becomes available again.
   That is the linked worktree of the same repository that the session's own bash calls last named as their `cwd`, as when a session started in the main checkout adds a worktree and works there.
   A bash `cwd` in the session's own checkout, outside git, or in another repository leaves the worktree as it was, and one in a directory that is gone falls back to the session's directory.
 - On the right of a session's header, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
-  Its menu opens each one on GitHub, on Graphite, or in the inbox's details; the button shows only for a session with a pull request.
+  Its menu opens each one on GitHub, on Graphite, or in its details on the Pull requests page; the button shows only for a session with a pull request.
   Past sessions show it before **Resume**.
 - The composer names a session's model by its label, next to the logo of the org that makes it (`anthropic/claude-opus-5-5` reads `Opus 5.5` with the Anthropic logo).
   The label leaves out the provider, the vendor prefix, and a release date, joins version parts with dots, and puts a `:` suffix such as a thinking level in parentheses (`Sonnet 5.5 (high)`).
@@ -471,7 +471,7 @@ An action that fails shows its error, and its control becomes available again.
   omp moves the session to a new file, as `/branch` does, so the conversation before the edit stays under the past sessions.
   Only a plain text message that omp has saved can be edited: not a skill prompt, one with images or files, or a message in a terminal session.
 
-## Pull requests and the inbox
+## Pull requests
 
 - A session lists the pull requests it submitted or worked on as `#<number>` after its title in the sidebar, and on the pull request button in its header.
   In the sidebar, a session with several shows the first number and `+N` for the rest, for example `#6535 +2`; hover it to read them all, or find each in the row's menu.
@@ -484,11 +484,11 @@ An action that fails shows its error, and its control becomes available again.
   Work is also the branch checked out in the linked worktree the session works in, its own directory or the worktree its bash calls last ran in, when a PR heads that branch; a switch to another branch links that branch's PR at the session's next write.
   A repository's main checkout links no PR by its branch, since every session started there shares it.
   A bare number belongs to the repository that `origin` names in the session's working directory, unless the command passes `-R` or `--repo`.
-  A push, a submit, or a worktree's branch links once the inbox has listed the PR that the branch heads, because only the inbox knows which branch heads which PR.
+  A push, a submit, or a worktree's branch links once the Pull requests page has listed the PR that the branch heads, because only that list knows which branch heads which PR.
   A submit links only while the directory it ran in exists.
   A PR the session only quoted, listed with `gh pr list`, or looked up with `gh pr view` does not count, unless it heads the session's worktree branch.
   A PR that a session submitted counts as submitted, even when it also worked on it.
-- In a session's header, the pull request button's menu opens each pull request on GitHub, on Graphite, or in the inbox's details.
+- In a session's header, the pull request button's menu opens each pull request on GitHub, on Graphite, or in its details on the Pull requests page.
 - A session's row menu has **Open ENG-2368** for each Linear issue the session worked on, by identifier.
   It opens the issue's details in the tickets page's main content (`#tickets/<identifier>`), and shows the **Tickets** tab's icon.
   An issue counts when the session or one of its subagents read it with omp's Linear tools (`get_issue`, `list_comments`), changed or opened it (`save_issue`), commented on it (`save_comment`), or names it in its `/ship` step.
@@ -499,7 +499,7 @@ An action that fails shows its error, and its control becomes available again.
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.
-- Six tabs under the sidebar header, **Inbox**, **Tickets**, **Sessions**, **Todo**, **Calendar**, and **Settings**, switch pages and what the sidebar lists.
+- Six tabs under the sidebar header, **Pull requests**, **Tickets**, **Sessions**, **Todo**, **Calendar**, and **Settings**, switch pages and what the sidebar lists.
   Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
@@ -507,20 +507,20 @@ An action that fails shows its error, and its control becomes available again.
   **Calendar** opens a month of Google events, routine runs, and due todos and tickets, with your routines listed under it; see [Calendar](#calendar) and [Routines](#routines).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone across the sidebar's width; hover an icon for its name.
   The tabs never spill past the sidebar.
-  **Inbox** opens the inbox page, a table of your pull requests like Graphite's inbox, and lists its sections in the sidebar, each with its count; click one to unfold its card on the page and scroll to it.
-  Once you open a pull request or a session from the inbox, the sidebar lists the pull requests instead, beside the details or the session panes.
-  The tab stays on the inbox while you open sessions from it, until you choose **Sessions**.
+  **Pull requests** opens the Pull requests page, a table of your pull requests like Graphite's inbox, and lists its sections in the sidebar, each with its count; click one to unfold its card on the page and scroll to it.
+  Once you open a pull request or a session from the Pull requests page, the sidebar lists the pull requests instead, beside the details or the session panes.
+  The tab stays on **Pull requests** while you open sessions from it, until you choose **Sessions**.
   The **Your move** count stands out in bold.
-  The **Inbox** tab counts the pull requests that wait on your move, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
-  An `#inbox` address opens the inbox page.
-  The inbox covers the GitHub repository of the project that the sidebar's picker shows, or under **All projects** every repository that a session ran in, one section per repository.
+  The **Pull requests** tab counts the pull requests that wait on your move, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
+  A `#pull-requests` address opens the Pull requests page.
+  The pull request list covers the GitHub repository of the project that the sidebar's picker shows, or under **All projects** every repository that a session ran in, one section per repository.
   A workspace's repository is the one its `origin` remote names.
   A directory removed since its sessions ran, such as a deleted worktree, is no longer a workspace, so quick actions start in a workspace that still exists.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
   They sort by whose move it is: **Your move**, **Agent on it**, **Approved**, **Waiting on others**, **Drafts**, and **Recently merged**.
   A sidebar row shows the title on up to two lines with its age beside it, such as `<1m`, `19m`, `17h`, or `2d`, which counts up each minute without a reload, then a badge that names its move, its number, the reason for the move, its place in a stack, its sessions, and its checks.
   A badge is coloured only for your moves, each with its own icon and colour, such as red for **Fix CI** and orange for **Rebase**; every other move is grey.
-  The inbox page's table shows each section as a card, one row per pull request: the move's badge, the title with its author, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and quick actions at the far right.
+  The Pull requests page's table shows each section as a card, one row per pull request: the move's badge, the title with its author, number, and reason under it, the sessions on it, its place in a stack, its checks, its reviewers or review state, the lines added and removed, its age, and quick actions at the far right.
   A narrow page drops the sessions, stack, and line columns.
   Each pull request takes the first move that applies, in this order.
   A merge from the last seven days is **Merged**.
@@ -536,7 +536,7 @@ An action that fails shows its error, and its control becomes available again.
   **Answer** and **Working** are the agent's, **In review** and **CI running** wait on others, and **Draft** has its own section, **Drafts**.
   Your approved pull request that is **Merge**, **CI running**, or **Draft** goes in **Approved** instead, so it leaves the **Your move** count; one that needs a rebase, a CI fix, or a reply stays in **Your move**.
   Within a section, the pull requests of each move are most recently updated first.
-  When the inbox lists another pull request of its stack, the row shows its place from the bottom, such as `2/4`, and its tooltip names the branch it is stacked on; otherwise a row stacked on another branch names it, as in `on fix/base`.
+  When the list holds another pull request of its stack, the row shows its place from the bottom, such as `2/4`, and its tooltip names the branch it is stacked on; otherwise a row stacked on another branch names it, as in `on fix/base`.
   Within a section, a stack's pull requests sit together, top first, where its first one would, and a line joins each to the one below it.
   A row shows one session chip: a running session first, since one may be working on the pull request now, then one that submitted it, then one that worked on it.
   A submitter's chip is filled and a worker's chip is outlined, and a chip's tooltip says which it is.
@@ -549,16 +549,16 @@ An action that fails shows its error, and its control becomes available again.
   Click a **Review**, **Fix CI**, **Rebase**, or **Reply** badge to start its quick action when available, such as **Resolve conflicts** for **Rebase**.
   Click a repository or a section heading to fold it; the browser's localStorage keeps your choice across reloads.
   A folded section's heading shows its count, and its tooltip sums up its moves, such as `2 in review · 1 CI running`.
-  A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository the inbox could not read.
+  A repository's heading names its workspaces only when their folder differs from the repository's name, and an unplugged icon in the header lists the workspaces whose repository could not be read.
   **Waiting on others** and **Recently merged** start folded, since they hold nothing to do now, and stay unfolded once you unfold them.
   Click the row to show the pull request's details in the main area; session chips, move badges, and quick actions keep their own clicks.
   The title remains a link for keyboard and modifier-click navigation.
-  The back arrow at the start of the page header, **Back to the inbox**, brings the inbox page back.
+  The back arrow at the start of the page header, **Back to Pull requests**, brings the Pull requests page back.
   Click a session to open it.
-  The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Inbox** tab's count stays current.
-  Reopening the inbox, even after a reload, shows the last inbox read for the chosen project at once; the top of the list says when that inbox was read, and the browser's localStorage keeps the last one of each project.
+  The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Pull requests** tab's count stays current.
+  Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen project at once; the top of the list says when that list was read, and the browser's localStorage keeps the last one of each project.
   The server keeps each repository's answer for 30 seconds, and the refresh button asks GitHub again at once.
-- The sort button at the top of the inbox orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
+- The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
   Any sort but **Manual** keeps your moves in their order and sorts within each move.
   Drag a pull request within its section to place it by hand, which switches the sort to **Manual** and keeps the order the section showed until then.
   In **Manual**, a pull request you never placed comes first, most recently updated first.
@@ -598,17 +598,17 @@ An action that fails shows its error, and its control becomes available again.
   Opening the tab reads the list from GitHub again, and the files you open within 30 seconds read from that list.
   In the session details sidebar's **PRs** tab, **Code** lists the files instead; a click on one opens the explorer in a dialog at that file, where the others open in place.
 - Each opening reads the pull request again; the server keeps its answer for 30 seconds.
-- The inbox works from the keyboard, outside text fields, while its tab shows.
+- The Pull requests page works from the keyboard, outside text fields, while its tab shows.
   J and K move to the next and previous row, and Enter shows the focused row's details.
   While the details show, J and K show the next and previous pull request; while the **Code** tab shows, they open the next and previous file.
   O opens the focused row's pull request, or the one whose details show, on GitHub, and `.` opens the focused row's quick actions.
   E gives the focused row's move, or the move of the pull request whose details show, to an agent, when a quick action makes that move.
-- `#inbox/<owner>/<repo>/<number>` shows one pull request's details.
+- `#pull-requests/<owner>/<repo>/<number>` shows one pull request's details.
   The sidebar unfolds its row's repository and section, scrolls the row into view, and highlights it.
-  When the inbox does not list that pull request, a note says why, and the details still show.
-  `#inbox/<owner>/<repo>/<number>/files` opens the details on the **Code** tab at the first file, and `#inbox/<owner>/<repo>/<number>/files/<path>` at the file at that path, encoded; choosing **Code** puts that address in the location bar, and another tab takes it out.
-- A lightning button on an inbox row, and buttons in the pull request's details, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
-  The inbox stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
+  When the list does not include that pull request, a note says why, and the details still show.
+  `#pull-requests/<owner>/<repo>/<number>/files` opens the details on the **Code** tab at the first file, and `#pull-requests/<owner>/<repo>/<number>/files/<path>` at the file at that path, encoded; choosing **Code** puts that address in the location bar, and another tab takes it out.
+- A lightning button on a row of the Pull requests page, and buttons in the pull request's details, start a new dashboard session in the background, in the repository's most recently used workspace, with a prompt that names the pull request and its branch.
+  The page stays on screen, and the session shows at once as a chip with its status dot on the row and in the details of that pull request, before it has touched the pull request; click the chip to open the session (Cmd-click, or Ctrl-click off macOS, opens it in a new pane).
   The chip stays while the session runs, after a reload too, so the row says whether an agent still works on the pull request.
   The session also shows in the sessions sidebar.
   Which actions show depends on the pull request: **Fix CI and conflicts** on your own open pull request with merge conflicts and failed checks, **Fix CI** on your own open pull request whose checks failed, **Resolve conflicts** on your own open pull request with merge conflicts, **Address comments** on your own open pull request with unresolved review threads or requested changes, **Review** on an open pull request that waits for your review, and **Thermonuclear review** on every open or draft pull request.
@@ -617,7 +617,7 @@ An action that fails shows its error, and its control becomes available again.
   On your own pull request, the session then applies the valid findings on its branch, pushes them, and only after the push adds `- [x] Thermo-nuclear code quality review` to its description; on a pull request you review, it reports the findings in the session and changes nothing on GitHub.
   A merged pull request has none.
   The button waits while the session starts.
-  When the start fails, a note at the top of the inbox, and in the details of that pull request, gives the reason until you dismiss it.
+  When the start fails, a note at the top of the Pull requests page, and in the details of that pull request, gives the reason until you dismiss it.
 
 ## Linear tickets
 
@@ -627,7 +627,7 @@ An action that fails shows its error, and its control becomes available again.
   **In Review** comes first, in the sidebar and on the page, with a green circle-dot icon.
   The other states follow Linear's order: triage, started (such as **In Progress**), unstarted (**Todo**), backlog, completed, and canceled.
   Duplicates count as canceled.
-  Completed and canceled issues show only when they changed in the last seven days, like the inbox's recent merges.
+  Completed and canceled issues show only when they changed in the last seven days, like the recent merges on the Pull requests page.
   Within a state, issues sort by priority, urgent first and no priority last, then by the latest update.
 - The list spans the page's width, like Linear's, and each state's heading stays at the top of the page while its issues scroll under it.
 - A row shows the priority, the identifier, the state, and the title, then the due date when there is one, the labels, and the project as chips, then the day Linear opened the issue and the day it last changed.
@@ -675,7 +675,7 @@ An action that fails shows its error, and its control becomes available again.
   A completed or canceled issue has none.
   The button waits while the session starts.
   When the start fails, a note above the issue's details or at the top of the list gives the reason, even when the issue itself cannot load, until you dismiss it.
-  The inbox and the tickets page share that note: either page shows the last failed quick action, whether it ran on a pull request or an issue.
+  The Pull requests page and the tickets page share that note: either page shows the last failed quick action, whether it ran on a pull request or an issue.
 - The list of tickets is not tied to the sidebar's project.
   The page reads Linear when it opens and every minute after, and shows the last read at once on a reopen, even after a reload.
   A saved tickets list without each issue's opening date is discarded, and the page reads Linear again.
@@ -809,7 +809,7 @@ An action that fails shows its error, and its control becomes available again.
   A card then shows its latest linked session's work state and, when that live session has a question open, its title and **Reply in session**, which opens that session, beside **Start session**; with no linked session, only **Start session** shows.
   At the bottom, it shows the day it was added and the session that added it.
 - A top-level todo shows what it links to: a session, a pull request, or a Linear issue, as an icon in the list and a chip under **Links** in the open todo, each opening it here.
-  Each shows the icon of the sidebar tab it opens: **Sessions**, **Inbox**, or **Tickets**.
+  Each shows the icon of the sidebar tab it opens: **Sessions**, **Pull requests**, or **Tickets**.
   A running session shows its status dot; an open todo's **×** on a chip unlinks it.
 - An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.
   The session links to the todo once omp starts, which moves a **Backlog** or **Todo** todo to **In Progress**, and its agent marks the todo **Done** once it finishes the work; see [Todos from agents](#todos-from-agents).
@@ -985,9 +985,9 @@ An action that fails shows its error, and its control becomes available again.
 
 - The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists what waits on you, newest first, and its badge counts the notices you have not read, up to `9+`.
 - Three sources feed it.
-  - **GitHub**: a pull request in the inbox whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
+  - **GitHub**: a pull request whose move is yours on the Pull requests page, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
-    The server reads the inbox's workspaces every two minutes while a page is open, and as soon as a page opens after none was.
+    Every two minutes while a page is open, and as soon as a page opens after none was, the server reads the pull requests of the workspaces that the Pull requests page covers.
   - **Slack**: a message from someone else in a direct or group conversation you have not answered since, one notice per conversation, and each mention of you in a channel, from the last three days.
     It needs the Slack sign-in of **Settings › Integrations**, and the server checks it with the pull requests.
   - **Updates**: a newer omp release or a newer model, checked at startup, every six hours, and after each update.
@@ -997,7 +997,7 @@ An action that fails shows its error, and its control becomes available again.
       Only models that `omp models` lists on a connected provider count, and dated snapshots are left out.
 - **All**, **GitHub**, **Slack**, and **Updates** filter the list, each with its count of unread notices.
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
-- A notice you open is read: a pull request's opens its page in the inbox, and a Slack message's opens it in Slack in a new tab.
+- A notice you open is read: a pull request's opens its details on the Pull requests page, and a Slack message's opens it in Slack in a new tab.
   Selecting an update's notice marks it read.
   The check mark in the header marks every notice in the filter read.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge on GitHub** for one ready to merge.
@@ -1016,7 +1016,7 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Keyboard shortcuts
 
-The shortcuts follow Cursor where the browser allows it, with web-app navigation keys for the inbox, todo list, and other dashboard pages.
+The shortcuts follow Cursor where the browser allows it, with web-app navigation keys for the Pull requests page, the todo list, and other dashboard pages.
 Cmd stands for Command on macOS and Ctrl on Linux and Windows.
 Alt is Option on macOS.
 
@@ -1042,7 +1042,7 @@ Alt is Option on macOS.
 | Esc | Maximized pane | Restore the split |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
-| Cmd+1 | Anywhere | Go to the pull request inbox |
+| Cmd+1 | Anywhere | Go to Pull requests |
 | Cmd+2 | Anywhere | Go to your Linear tickets, when connected |
 | C | Outside text fields, except on the Todo page | Create a Linear ticket, when connected |
 | Cmd+3 | Anywhere | Go to the sessions |
@@ -1051,11 +1051,11 @@ Alt is Option on macOS.
 | Cmd+6 | Anywhere | Open or close settings |
 | G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Choose the sidebar's project |
-| J | Inbox, outside text fields | Move to the next pull request, or show its details while one shows |
-| K | Inbox, outside text fields | Move to the previous pull request, or show its details while one shows |
-| O | Inbox, outside text fields | Open the pull request on GitHub |
-| . | Inbox, outside text fields | Open the pull request's quick actions |
-| E | Inbox, outside text fields | Give the pull request's next move to an agent |
+| J | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
+| K | Pull requests page, outside text fields | Move to the previous pull request, or show its details while one shows |
+| O | Pull requests page, outside text fields | Open the pull request on GitHub |
+| . | Pull requests page, outside text fields | Open the pull request's quick actions |
+| E | Pull requests page, outside text fields | Give the pull request's next move to an agent |
 | / | Todo page, outside text fields | Search the todos |
 | J / K, ↓ / ↑ | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |
 | X | Todo page, outside text fields | Mark the focused or open todo Done, or a closed one Todo again |
@@ -1065,7 +1065,7 @@ Alt is Option on macOS.
 | Shift+D | Todo page, outside text fields | Change the focused or open todo's due day |
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |
-| Alt+Shift+↑ / Alt+Shift+↓ | Todo page or inbox | Move the focused todo, or the inbox's focused pull request, section, or repository, up or down |
+| Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
 | J / K | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
@@ -1080,7 +1080,7 @@ Alt is Option on macOS.
   ↑ moves the last queued message back only while the composer is empty, as ↑ edits your last message in Slack.
   On a focused queued row, Cmd+Enter sends it now, Enter or F2 edits it, and Delete removes it.
   With a draft, ↑ moves the caret as usual.
-- Cmd+K opens the command menu, which searches every running and past session, in every project, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to inbox** or **Toggle sessions sidebar**.
+- Cmd+K opens the command menu, which searches every running and past session, in every project, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
   The search button in the sidebar header, immediately before the keyboard button, opens it too.
   With nothing typed, **Suggestions** lists the five entries you use most, by how often and how lately, then **Running**, **Commands**, and **Past**.
   What you type ranks every match by how well it matches and how much you use it, and the menu remembers that in this browser.
@@ -1105,8 +1105,8 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in this browser.
-- Cmd+1 opens the Inbox tab, and Cmd+2 opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page.
-  Cmd+3 goes back from the inbox, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
+- Cmd+1 opens the Pull requests page, and Cmd+2 opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page.
+  Cmd+3 goes back from the Pull requests page, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
   Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, and G then R the **Routines** page.
   Cmd+6 opens Settings, where the model roles and the integrations live, and closes it again.
   G then P opens the project picker with its search field focused.
@@ -1137,7 +1137,7 @@ Alt is Option on macOS.
   The menu takes none of the dashboard's own shortcuts.
   Right-click in a text field for cut, copy, paste, and spelling suggestions.
 - The window remembers its size and position.
-- The window title follows what the page shows, and a browser tab's title does too: the focused session's name, a subagent's name ahead of its session's, `Inbox`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, or `New session`, then `omp agents`.
+- The window title follows what the page shows, and a browser tab's title does too: the focused session's name, a subagent's name ahead of its session's, `Pull requests`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, or `New session`, then `omp agents`.
   A session without a name reads as its project, and nothing open reads `omp agents`.
 - The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
 - Alt+Shift+Cmd+T, from any app, brings the window up with the command menu's **Create todo** open, so you can type a title and press Enter to create a todo.

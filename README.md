@@ -39,8 +39,8 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   Start a session in any project, on any branch or a new one in its own git worktree, resume a past one, or fork a conversation from any prompt or reply.
   Ending a session removes the git worktree it worked in, and keeps its branch and any worktree with uncommitted changes.
   An agent can end its own session through the starter kit's `end_session` tool, so "Merge on main, then end the session" needs no follow-up.
-- **Pull request inbox.**
-  A Graphite-style inbox of your GitHub pull requests, linked to the sessions that submitted or worked on them.
+- **Pull requests.**
+  A Graphite-style list of your GitHub pull requests, sorted by whose move it is and linked to the sessions that submitted or worked on them.
 - **Linear tickets.**
   The Linear issues assigned to you, grouped by workflow state like Linear's My issues, read through omp's Linear MCP sign-in.
   Click one to read it in full, and start a session that works on it or plans it.
@@ -73,7 +73,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
   bun install -g @oh-my-pi/pi-coding-agent
   ```
 
-- Optional, for the pull request inbox: the [GitHub CLI](https://cli.github.com) (`gh`), signed in with `gh auth login`.
+- Optional, for the pull request list: the [GitHub CLI](https://cli.github.com) (`gh`), signed in with `gh auth login`.
 - Optional, for the Linear tickets: Linear's MCP server added to omp (`/mcp add` with `https://mcp.linear.app/mcp`) and signed in.
 - Optional, for Slack in omp sessions: a dedicated internal Slack app, with the MCP server and token rotation turned on, an HTTPS redirect, and the user scopes you choose, saved from **Settings › Integrations**.
 - Optional, for Google Calendar: a Google OAuth client of type Web application, with the Google Calendar API turned on, saved from **Settings › Integrations**.
@@ -163,7 +163,7 @@ See the [kit's README](templates/omp/README.md) for what it contains.
 Select a session in the left sidebar to read its conversation and message it.
 Cmd-click (Ctrl-click on Linux and Windows) opens it in a split pane.
 Click **+** to start a session, **Resume** to continue a past one, and **Fork from here** under a prompt or a reply to branch a conversation.
-The **Inbox** tab shows your pull requests, the **Tickets** tab your Linear issues, and the **Settings** tab opens Settings.
+The **Pull requests** tab shows your pull requests, the **Tickets** tab your Linear issues, and the **Settings** tab opens Settings.
 
 While a turn runs, Enter steers it and Cmd+Enter (Ctrl+Enter on Linux and Windows) queues a follow-up, as in omp's terminal.
 Esc interrupts the turn.

@@ -8,7 +8,7 @@ const holders = new Map<string, Set<(value: unknown) => void>>();
  * function across renders. `decode` turns what is stored into a value; what it makes of `null`, when nothing is stored,
  * is the default. The default is removed rather than stored, so a value reset to it follows the default if it changes.
  * The setter also takes an update of the value it last set, so two in one event both apply. Every component that holds
- * the same key sees the write, such as the inbox's sidebar and its page.
+ * the same key sees the write, such as the sidebar's pull request list and the Pull requests page.
  * `key` stays the same for as long as the component is mounted: the value is read when it mounts, not when `key` changes.
  */
 export function useStoredState<T>(key: string, decode: (raw: string | null) => T, encode: (value: T) => string = String): [T, (next: T | ((prev: T) => T)) => void] {

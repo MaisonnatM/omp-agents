@@ -102,13 +102,13 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 	const query = token && mentionQuery(token);
 	const tickets = ticketsStore.usePolling(null, query !== null && wants(query, "ticket")).read?.data.tickets ?? [];
 	// The pull requests are the project's entry that `App` polls; the unscoped read would ask GitHub about every repository.
-	const inbox = pullRequestStore.use(useDashboardStatus().pullRequestScope).read?.data.repos ?? [];
+	const pullRequests = pullRequestStore.use(useDashboardStatus().pullRequestScope).read?.data.repos ?? [];
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	const sections: MenuSection[] =
 		menu === null
 			? []
 			: token
-				? mentionMenu({ text: draft, token, data: { ...lists, tickets, inbox }, composer, files: answer?.items ?? null })
+				? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequests }, composer, files: answer?.items ?? null })
 				: answer?.items.length
 					? [{ title: null, options: answer.items.map(completionOption) }]
 					: [];

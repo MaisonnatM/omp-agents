@@ -12,7 +12,7 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 		case "settings":
 			return "Settings";
 		case "pull-requests":
-			return page.target ? `${page.target.owner}/${page.target.repo}#${page.target.number}` : "Inbox";
+			return page.target ? `${page.target.owner}/${page.target.repo}#${page.target.number}` : "Pull requests";
 		case "tickets":
 			return page.target ?? "Tickets";
 		case "todo":

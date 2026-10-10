@@ -25,15 +25,15 @@ function nextMove(pr: PullRequestSummary, hosts: RosterHost[], sessions: RosterH
 	return { move, reason: reason(pr, move), action: moveAction(pr, move), session: sessions.find(host => host.status === holder) ?? null };
 }
 
-/** Why the inbox does not list the PR a link named. `allProjects`: the sidebar shows every project. */
-function whyMissing(target: PullRequest, inbox: PullRequestList, allProjects: boolean): string {
+/** Why the pull request list does not hold the PR a link named. `allProjects`: the sidebar shows every project. */
+function whyMissing(target: PullRequest, list: PullRequestList, allProjects: boolean): string {
 	const repo = `${target.owner}/${target.repo}`;
-	const covered = inbox.repos.some(other => repoKey(other) === repoKey(target));
+	const covered = list.repos.some(other => repoKey(other) === repoKey(target));
 	if (covered) {
-		return `${repo}#${target.number} is not in this inbox. The inbox lists your open pull requests, your merges from the last seven days, and the pull requests that wait for your review.`;
+		return `${repo}#${target.number} is not among these pull requests. The Pull requests page lists your open pull requests, your merges from the last seven days, and the pull requests that wait for your review.`;
 	}
-	if (allProjects) return `${repo}#${target.number} is not in this inbox, because no session ran in ${repo}.`;
-	return `${repo}#${target.number} is not in this inbox, which covers only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}.`;
+	if (allProjects) return `${repo}#${target.number} is not among these pull requests, because no session ran in ${repo}.`;
+	return `${repo}#${target.number} is not among these pull requests, which cover only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}.`;
 }
 
 interface PullRequestDetailsProps {
@@ -53,8 +53,8 @@ interface PullRequestDetailsProps {
 }
 
 /**
- * `target`'s details with the quick actions that start a session on it, as the inbox of `project` lists it, after what
- * became of a quick start on it. The page also says why the inbox does not list it; the sidebar does not, since most
+ * `target`'s details with the quick actions that start a session on it, as the pull request list of `project` holds it, after what
+ * became of a quick start on it. The page also says why the list does not hold it; the sidebar does not, since most
  * past sessions' merged pull requests would carry that note.
  */
 export function PullRequestDetails({ project, hosts, target, placement, version, files, onPick, session }: PullRequestDetailsProps) {
@@ -100,18 +100,18 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 	);
 }
 
-/** A pull request from the inbox in the main area, with the quick actions that start a session on it. */
+/** A pull request from the Pull requests page in the main area, with the quick actions that start a session on it. */
 export function PullRequestPage(props: Omit<PullRequestDetailsProps, "placement" | "version">) {
 	const back = (
-		<Tooltip content="Back to the inbox" side="bottom">
-			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to the inbox" render={<a href={hashForPullRequests(null)} />}>
+		<Tooltip content="Back to Pull requests" side="bottom">
+			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to Pull requests" render={<a href={hashForPullRequests(null)} />}>
 				<ArrowLeft />
 			</Button>
 		</Tooltip>
 	);
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<Header title="Inbox" meta="Your pull requests and review requests on GitHub" leading={back} />
+			<Header title="Pull requests" meta="Your pull requests and review requests on GitHub" leading={back} />
 			<TooltipProvider>
 				<div className="flex min-h-0 flex-1 flex-col">
 					<PullRequestDetails {...props} placement="page" />

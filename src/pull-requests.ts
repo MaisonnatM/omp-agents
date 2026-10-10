@@ -1,5 +1,5 @@
 /**
- * The inbox page's pull requests, per GitHub repository, live from `gh`: as Graphite's inbox gathers them, the
+ * The Pull requests page's pull requests, per GitHub repository, live from `gh`: as Graphite's inbox gathers them, the
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
 import { createCache } from "./cache";
@@ -15,7 +15,7 @@ const MERGED_DAYS = 7;
 /** The most review threads one page lists; a PR with more counts its unresolved threads as a floor. */
 const THREADS = 100;
 
-/** The pull request's author, its requested reviewers, and its latest reviews, which the inbox's entry and its details both show. */
+/** The pull request's author, its requested reviewers, and its latest reviews, which its row in the list and its details both show. */
 const REVIEW_FIELDS = `author { login ${AVATAR} }
 	reviewRequests(first: 10) { nodes { requestedReviewer {
 		... on User { login ${AVATAR} } ... on Bot { login ${AVATAR} } ... on Mannequin { login ${AVATAR} } ... on Team { slug ${AVATAR} }
@@ -80,7 +80,7 @@ function parseUnresolved(threads: unknown): PullRequestSummary["unresolved"] {
 /** GitHub reports an open or draft pull request as `CONFLICTING` with its base branch; `UNKNOWN` means not computed yet. */
 const conflictsOf = (node: Record<string, unknown>): boolean => node.state !== "MERGED" && node.state !== "CLOSED" && node.mergeable === "CONFLICTING";
 
-/** What a pull request's inbox entry and its details share, or `null` when GitHub left out its title or branches. */
+/** What a pull request's row in the list and its details share, or `null` when GitHub left out its title or branches. */
 function parsePullRequestHead(node: Record<string, unknown>) {
 	const title = str(node.title);
 	const head = str(node.headRefName);
@@ -271,7 +271,7 @@ export function loadPullRequestDetail(pr: PullRequest, fresh = false): Promise<P
 }
 
 /**
- * The inbox for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
+ * The pull request list for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
  * A workspace removed since a session ran there is left out, as a quick action starts its session in a repository's first workspace.
  */
 export async function loadPullRequests(cwds: string[], fresh: boolean): Promise<PullRequestList> {

@@ -125,7 +125,7 @@ describe("next move", () => {
 	});
 });
 
-describe("inbox sections", () => {
+describe("pull request sections", () => {
 	test("pull requests group by whose move it is, approved ones with nothing to fix apart, by move then most recently updated, and empty sections drop out", () => {
 		const agent: AgentOn = ({ number }) => (number === 9 ? "working" : number === 10 ? "needs-input" : null);
 		const sections = pullRequestSections(
@@ -186,7 +186,7 @@ describe("inbox sections", () => {
 		]);
 	});
 
-	test("a PR stacked on a branch the inbox does not list, or on a merged PR, is in no stack", () => {
+	test("a PR stacked on a branch the list leaves out, or on a merged PR, is in no stack", () => {
 		const sections = pullRequestSections([pr(1, { state: "merged" }), pr(2, { stackedOn: "me/branch-1" }), pr(3, { stackedOn: "someone/else" })], DEFAULT_ORDER, noAgent);
 		expect(sections.flatMap(({ rows }) => rows.map(({ pr: { number }, stack }) => [number, stack]))).toEqual([
 			[3, null],
@@ -223,7 +223,7 @@ test("only the sections with nothing to do now start folded", () => {
 
 test("your move counts what waits on you across repositories, leaving out what an agent holds, approved pull requests with nothing to fix, what waits on others, and unreadable repositories", () => {
 	const repo = (pullRequests: PullRequestSummary[]): RepoPullRequests => ({ owner: "acme", repo: "webapp", cwds: [], pullRequests });
-	const inbox = {
+	const list = {
 		repos: [
 			repo([pr(1, { review: "approved" }), pr(2, { review: "none" }), pr(3, { role: "reviewer", author: teammate }), pr(4, { review: "changes-requested" })]),
 			repo([pr(5, { review: "approved", unresolved: { count: 1, exact: true } }), pr(6, { state: "merged" }), pr(7, { review: "approved" }), pr(8)]),
@@ -231,12 +231,12 @@ test("your move counts what waits on you across repositories, leaving out what a
 		],
 		unmatched: [],
 	};
-	expect(yourMoveCount(inbox, ({ number }) => (number === 7 ? "working" : null))).toBe(4);
+	expect(yourMoveCount(list, ({ number }) => (number === 7 ? "working" : null))).toBe(4);
 });
 
 test("the shown pull requests follow page order and leave out folded repositories, folded sections, and unreadable repositories", () => {
 	const repo = (name: string, pullRequests: PullRequestSummary[]): RepoPullRequests => ({ owner: "acme", repo: name, cwds: [], pullRequests });
-	const inbox = {
+	const list = {
 		repos: [
 			repo("webapp", [pr(1), pr(2, { role: "reviewer", author: teammate }), pr(3, { state: "merged" }), pr(4, { state: "draft" })]),
 			repo("folded", [pr(5)]),
@@ -245,10 +245,10 @@ test("the shown pull requests follow page order and leave out folded repositorie
 		unmatched: [],
 	};
 	const folded = new Set(["acme/folded", "acme/webapp:Recently merged"]);
-	expect(shownPullRequests(inbox, key => folded.has(key), DEFAULT_ORDER, noAgent).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
+	expect(shownPullRequests(list, key => folded.has(key), DEFAULT_ORDER, noAgent).map(({ repo, number }) => `${repo}#${number}`)).toEqual(["webapp#2", "webapp#1", "webapp#4"]);
 });
 
-describe("inbox order", () => {
+describe("pull request order", () => {
 	const order = (fields: Partial<PullRequestOrder>): PullRequestOrder => ({ ...DEFAULT_ORDER, ...fields });
 	const numbers = (prs: { rows: { pr: { number: number } }[] }[]) => prs.map(section => section.rows.map(row => row.pr.number));
 
@@ -294,8 +294,8 @@ describe("inbox order", () => {
 
 	test("the shown pull requests follow the custom order", () => {
 		const repo = (name: string, pullRequests: PullRequestSummary[]): RepoPullRequests => ({ owner: "acme", repo: name, cwds: [], pullRequests });
-		const inbox = { repos: [repo("webapp", [pr(1), pr(2, { role: "reviewer", author: teammate })]), repo("api", [pr(3, { repo: "api" })])], unmatched: [] };
-		const shown = shownPullRequests(inbox, () => false, order({ repos: ["acme/api"], sections: ["Waiting on others"] }), noAgent);
+		const list = { repos: [repo("webapp", [pr(1), pr(2, { role: "reviewer", author: teammate })]), repo("api", [pr(3, { repo: "api" })])], unmatched: [] };
+		const shown = shownPullRequests(list, () => false, order({ repos: ["acme/api"], sections: ["Waiting on others"] }), noAgent);
 		expect(shown.map(({ repo, number }) => `${repo}#${number}`)).toEqual(["api#3", "webapp#1", "webapp#2"]);
 	});
 

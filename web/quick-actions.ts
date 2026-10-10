@@ -1,5 +1,5 @@
 /**
- * The quick actions of the inbox and the tickets page: which pull request or Linear issue each applies to, and the
+ * The quick actions of the Pull requests page and the tickets page: which pull request or Linear issue each applies to, and the
  * prompt that starts its session. The pull request actions live in `src/pull-request-actions.ts`, which routines share.
  */
 import { PULL_REQUEST_ACTIONS, type PullRequestActionId, type QuickAction } from "../src/pull-request-actions";

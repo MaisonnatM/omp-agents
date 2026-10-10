@@ -151,7 +151,7 @@ export function App() {
 	const resume = startOf(state.starts, "resume");
 	const quick = startOf(state.starts, "quick");
 	const resumeAll = startOf(state.starts, "resume-all");
-	// The project that `useWorkspace` polls the inbox of, so the `@` menu reads the entry the page keeps current.
+	// The project whose pull requests `useWorkspace` polls, so the `@` menu reads the entry the page keeps current.
 	const status = useMemo(
 		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestScope: project }),
 		[state.connected, fork, resume, quick, resumeAll, state.ending, project],

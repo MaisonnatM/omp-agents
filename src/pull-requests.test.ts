@@ -37,7 +37,7 @@ describe("parseRemote", () => {
 });
 
 test("a workspace without a GitHub origin is retried after its negative cache expires", async () => {
-	const dir = mkdtempSync(join(tmpdir(), "omp-agents-inbox-"));
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-pull-requests-"));
 	try {
 		await runChecked(["git", "init", "-q", dir]);
 		setSystemTime(new Date("2026-10-02T12:00:00Z"));
@@ -52,8 +52,8 @@ test("a workspace without a GitHub origin is retried after its negative cache ex
 	}
 });
 
-test("a workspace removed after its origin was read leaves the inbox, as does one never found", async () => {
-	const dir = mkdtempSync(join(tmpdir(), "omp-agents-inbox-"));
+test("a workspace removed after its origin was read leaves the pull request list, as does one never found", async () => {
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-pull-requests-"));
 	await runChecked(["git", "init", "-q", dir]);
 	await runChecked(["git", "-C", dir, "remote", "add", "origin", "git@github.com:acme/webapp.git"]);
 	expect(await repoOf(dir)).toEqual({ owner: "acme", repo: "webapp" });

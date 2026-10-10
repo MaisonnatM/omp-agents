@@ -18,10 +18,10 @@ export interface MentionLists {
 	past: PastSession[];
 }
 
-/** What the sources list: the page's lists, then the tickets the menu polls while it needs them and the selected project's inbox. */
+/** What the sources list: the page's lists, then the tickets the menu polls while it needs them and the selected project's pull requests. */
 export interface MentionData extends MentionLists {
 	tickets: LinearTicket[];
-	inbox: RepoPullRequests[];
+	pullRequests: RepoPullRequests[];
 }
 
 /** The composer the menu opens in. */
@@ -136,8 +136,8 @@ const CATEGORIES: readonly Category[] = [
 		prefix: "pr",
 		title: "Pull requests",
 		icon: GitPullRequest,
-		list: ({ inbox }) =>
-			inbox
+		list: ({ pullRequests }) =>
+			pullRequests
 				.flatMap(repo => ("pullRequests" in repo ? repo.pullRequests : []))
 				.map(pr => {
 					const name = `${pr.owner}/${pr.repo}#${pr.number}`;

@@ -44,7 +44,7 @@ The page routes through the URL hash; `web/routing.ts` parses it.
 Besides a live session's own hash, the routes are:
 
 - `#past/<session id>`, `#session/<session id>`;
-- `#inbox`, `#inbox/<owner>/<repo>/<number>`, `#inbox/<owner>/<repo>/<number>/files`, `#inbox/<owner>/<repo>/<number>/files/<encoded path>`;
+- `#pull-requests`, `#pull-requests/<owner>/<repo>/<number>`, `#pull-requests/<owner>/<repo>/<number>/files`, `#pull-requests/<owner>/<repo>/<number>/files/<encoded path>`;
 - `#tickets`, `#tickets/<identifier>`;
 - `#todo`, `#todo/today`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`;
 - `#calendar`, `#routines`, `#routines/<id>`;

@@ -13,14 +13,14 @@ export interface Workspace {
 	hiddenCwds: ReadonlySet<string>;
 	/** The projects, as {@link workspaces} lists them. */
 	projects: Project[];
-	/** The project `cwd` the sidebar and the inbox show, `null` for all projects. */
+	/** The project `cwd` the sidebar and the Pull requests page show, `null` for all projects. */
 	project: string | null;
 	pickProject: (cwd: string | null) => void;
 }
 
 /**
- * The visible sessions, the projects they form, and the selected project. It polls that project's inbox, which keeps the
- * Inbox tab's count current on every page, and follows a session this page starts into its project.
+ * The visible sessions, the projects they form, and the selected project. It polls that project's pull requests, which keeps the
+ * Pull requests tab's count current on every page, and follows a session this page starts into its project.
  */
 export function useWorkspace(state: DashboardState): Workspace {
 	// Temporary and hidden workspaces remain in the raw sessions; only discoverable sessions enter the project and sidebar view.

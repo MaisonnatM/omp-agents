@@ -214,7 +214,7 @@ function SessionChips({ sessions, onOpen, compact }: { sessions: SessionLink[]; 
 	);
 }
 
-/** Where the row sits in its stack, with the branch it stacks on in its tooltip; a PR on a branch the inbox does not list names that branch. */
+/** Where the row sits in its stack, with the branch it stacks on in its tooltip; a PR on a branch the list leaves out names that branch. */
 function StackInfo({ stack, base }: { stack: StackPlace | null; base: string | null }) {
 	if (!stack && !base) return null;
 	const label = stack ? `Pull request ${stack.position} of ${stack.size} in a stack, on ${base ?? "the default branch"}` : `Stacked on ${base}`;
@@ -228,10 +228,10 @@ function StackInfo({ stack, base }: { stack: StackPlace | null; base: string | n
 	);
 }
 
-/** The DOM id of a pull request's row, which an inbox link to that PR scrolls to. */
-export const rowId = (pr: PullRequest): string => `inbox-pr-${repoKey(pr)}/${pr.number}`;
+/** The DOM id of a pull request's row, which a link to that PR on the Pull requests page scrolls to. */
+export const rowId = (pr: PullRequest): string => `pull-request-${repoKey(pr)}/${pr.number}`;
 
-/** The row's element and its link: what the inbox's keys reach by id, so the markup below is their contract. */
+/** The row's element and its link: what the list's keys reach by id, so the markup below is their contract. */
 export const rowElement = (pr: PullRequest): HTMLElement | null => document.getElementById(rowId(pr));
 export const rowLink = (pr: PullRequest): HTMLAnchorElement | null => rowElement(pr)?.querySelector("a") ?? null;
 
@@ -264,7 +264,7 @@ export const sameSessions = (a: SessionLink[], b: SessionLink[]): boolean =>
 	a.length === b.length && a.every((link, at) => link.sessionId === b[at]!.sessionId && link.label === b[at]!.label && link.link === b[at]!.link && link.status === b[at]!.status && sameView(link.view, b[at]!.view));
 
 /**
- * How each prop of a row is compared. The inbox keeps each prop the same object while what it shows holds, `sessions`
+ * How each prop of a row is compared. The board keeps each prop the same object while what it shows holds, `sessions`
  * included, except two it rebuilds: the row's data, whenever the roster or the sort changes, compared by what it holds,
  * and the drag item, whose handlers stay the same, compared by them and where a drop would land.
  */
@@ -331,7 +331,7 @@ function TitleLink({ pr, targeted, className }: { pr: PullRequestSummary; target
 }
 
 /**
- * A pull request in the sidebar's inbox: its title and age, then its move and why it waits on it, with its quick
+ * A pull request in the sidebar's list: its title and age, then its move and why it waits on it, with its quick
  * actions on hover. A rail on the left joins the rows of a stack.
  */
 export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
@@ -381,11 +381,11 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
  * and size columns drop out when the page is too narrow for them.
  */
 const TABLE_COLUMNS =
-	"grid grid-cols-[4rem_minmax(0,1fr)_1.25rem_3.5rem_2rem_1.75rem] items-center gap-x-3 @3xl/inbox:grid-cols-[4rem_minmax(0,1fr)_10rem_3.5rem_1.25rem_3.5rem_6rem_2rem_1.75rem]";
+	"grid grid-cols-[4rem_minmax(0,1fr)_1.25rem_3.5rem_2rem_1.75rem] items-center gap-x-3 @3xl/pull-requests:grid-cols-[4rem_minmax(0,1fr)_10rem_3.5rem_1.25rem_3.5rem_6rem_2rem_1.75rem]";
 
-const WIDE = "hidden @3xl/inbox:flex";
+const WIDE = "hidden @3xl/pull-requests:flex";
 
-/** A pull request in the inbox page's table: one line per column, with the author, number, and reason under its title. */
+/** A pull request in the Pull requests page's table: one line per column, with the author, number, and reason under its title. */
 export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
 	// A review's reason names its author, which this row shows already.
 	const why = move === "review" ? null : reason(pr, move);

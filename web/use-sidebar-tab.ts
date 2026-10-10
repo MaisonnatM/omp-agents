@@ -28,7 +28,7 @@ interface SidebarTabInput {
 }
 
 /**
- * The tab the sidebar shows, and the way to show another: a page selects its tab, and `#pull-requests` picks the inbox, which
+ * The tab the sidebar shows, and the way to show another: a page selects its tab, and `#pull-requests` picks the Pull requests tab, which
  * stays while you work in the panes until you choose Sessions. `showTab` keeps its identity across renders.
  */
 export function useSidebarTab({ page, ticketsShown, layout, settings, navigate, show }: SidebarTabInput): { tab: SidebarTab; showTab: (tab: SidebarTab) => void } {

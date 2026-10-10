@@ -101,7 +101,7 @@ describe("layout hash", () => {
 		expect(routeFromHash("#new?todo=t1")).toEqual({ kind: "page", page: { kind: "new", cwd: null, todoId: "t1" } });
 	});
 
-	test("the inbox hash opens the page alone or at one pull request's row, and no inbox hash is read as a layout", () => {
+	test("the pull requests hash opens the page alone or at one pull request's row, and no pull requests hash is read as a layout", () => {
 		const target = { owner: "acme", repo: "web.app", number: 6596 };
 		expect(hashForPullRequests(null)).toBe("#pull-requests");
 		expect(hashForPullRequests(target)).toBe("#pull-requests/acme/web.app/6596");
@@ -112,7 +112,7 @@ describe("layout hash", () => {
 		for (const hash of ["#pull-requests", "#pull-requests/acme/web.app/6596", "#pull-requests/acme"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
-	test("the inbox files hash opens a pull request's first changed file or one by path, slashes, spaces, and brackets kept", () => {
+	test("the pull request files hash opens a pull request's first changed file or one by path, slashes, spaces, and brackets kept", () => {
 		const target = { owner: "acme", repo: "web.app", number: 6596 };
 		expect(hashForPullRequestFiles(target)).toBe("#pull-requests/acme/web.app/6596/files");
 		expect(routeFromHash("#pull-requests/acme/web.app/6596/files")).toEqual({ kind: "page", page: { kind: "pull-requests", target, files: { path: null } } });

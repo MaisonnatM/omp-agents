@@ -6,7 +6,7 @@ import { PullRequestDetails } from "./pull-requests/pr-page";
 interface PullRequestsTabProps {
 	/** What the session and its subagents submitted or worked on, the session's own first. */
 	pullRequests: LinkedPullRequest[];
-	/** The sidebar's project `cwd`, or `null` for every project, whose inbox offers the quick actions. */
+	/** The sidebar's project `cwd`, or `null` for every project, whose pull request list offers the quick actions. */
 	project: string | null;
 	hosts: RosterHost[];
 	/** A change reads the shown pull request from GitHub again. */
@@ -14,7 +14,7 @@ interface PullRequestsTabProps {
 }
 
 /**
- * The session's pull requests in the right sidebar: one's details as the inbox page shows them, the first until another
+ * The session's pull requests in the right sidebar: one's details as the Pull requests page shows them, the first until another
  * is picked from its stack or from the session's other pull requests, which its Summary lists.
  */
 export function PullRequestsTab({ pullRequests, project, hosts, version }: PullRequestsTabProps) {

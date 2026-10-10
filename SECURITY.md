@@ -32,7 +32,7 @@ The dashboard treats it that way:
   To rotate the token, delete the file and restart the server.
 - On top of the token, every request must name `127.0.0.1:<port>` or `localhost:<port>` as its `Host`, so DNS rebinding does not get around the checks.
   The WebSocket and the writes also need an `Origin` that matches it, and the writes require a `Content-Type: application/json` body, which a cross-site form cannot send.
-  Every `/api/` request, reads included, is refused when its `Sec-Fetch-Site` header is present and not `same-origin`, so a page on another site cannot make your browser start an inbox or model lookup.
+  Every `/api/` request, reads included, is refused when its `Sec-Fetch-Site` header is present and not `same-origin`, so a page on another site cannot make your browser start a pull request or model lookup.
 - Session addresses such as `http://127.0.0.1:<port>/#session/<session id>` carry no token.
   Clicking one in a browser that has signed in opens the session: the cross-site click arrives without the `Strict` cookie, so `/` answers a small page, with no data, that sends the browser on to `/` from the dashboard's own origin, with the cookie and the `#session` hash.
   In a browser that never signed in, it shows the 401 page.

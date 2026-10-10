@@ -82,10 +82,10 @@ function sources(state: State): NoticeSources {
 		upgradeModel: async update => {
 			state.models = state.models.filter(model => model !== update);
 		},
-		inbox: async () => {
+		pullRequests: async () => {
 			const repo = { owner: "acme", repo: "webapp", cwds: ["/code/webapp"] };
-			const inbox: PullRequestList = { repos: [state.githubError ? { ...repo, error: state.githubError } : { ...repo, pullRequests: state.pullRequests ?? [] }], unmatched: [] };
-			return { inbox, agent: ({ number }) => state.agents?.[number] ?? null };
+			const list: PullRequestList = { repos: [state.githubError ? { ...repo, error: state.githubError } : { ...repo, pullRequests: state.pullRequests ?? [] }], unmatched: [] };
+			return { list, agent: ({ number }) => state.agents?.[number] ?? null };
 		},
 		slack: async () => state.slack ?? [],
 		now: () => state.now ?? 0,

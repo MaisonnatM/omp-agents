@@ -37,7 +37,7 @@ const TOAST_FRESH_MS = 15 * 60_000;
 /** How long a pull request toast or Slack toast stays; an update's stays until dismissed. */
 const TOAST_MS = 6_000;
 
-/** Each of your moves as the bell words it, with the icon and colours of the inbox's badge for it. */
+/** Each of your moves as the bell words it, with the icon and colours of the Pull requests page's badge for it. */
 const MOVE_NOTICE: Record<YourMove, { headline: string; icon: LucideIcon; tone: string }> = {
 	review: { headline: "Review requested", icon: Eye, tone: "bg-blue-500 text-white" },
 	merge: { headline: "Ready to merge", icon: GitMerge, tone: "bg-emerald-500 text-white" },
@@ -89,7 +89,7 @@ function previewOf(notice: Notice): string {
 	}
 }
 
-/** Opens what a pull request notice or Slack notice is about: the pull request in the inbox, or the message in Slack. */
+/** Opens what a pull request notice or Slack notice is about: the pull request on the Pull requests page, or the message in Slack. */
 function follow(notice: Notice): void {
 	if (notice.kind === "pull-request") location.hash = hashForPullRequests(notice.pr);
 	else if (notice.kind === "slack") window.open(notice.permalink, "_blank", "noopener,noreferrer");

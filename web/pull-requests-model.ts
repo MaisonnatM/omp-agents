@@ -1,11 +1,11 @@
-/** Pull request links, what each pull request waits on next, the inbox's sections and stacks, and what stands between a pull request and its merge. */
+/** Pull request links, what each pull request waits on next, the list's sections and stacks, and what stands between a pull request and its merge. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
 import { type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, prKey, repoKey, samePullRequest } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyToMerge } from "../src/shared/moves";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
 
-/** Whose move it is, or for your approved pull requests that need no fix, that they are approved; the inbox's sections, in page order. */
+/** Whose move it is, or for your approved pull requests that need no fix, that they are approved; the list's sections, in page order. */
 export type MoveGroup = "Your move" | "Agent on it" | "Approved" | "Waiting on others" | "Drafts" | "Recently merged";
 
 interface Move {
@@ -34,7 +34,7 @@ export const MOVES: Record<MoveId, Move> = {
 
 const MOVE_IDS = Object.keys(MOVES) as MoveId[];
 
-/** The inbox's sections in page order, and whether each starts folded: those that hold nothing for you or an agent to do now. Drafts stay open, since they are your work in progress. */
+/** The list's sections in page order, and whether each starts folded: those that hold nothing for you or an agent to do now. Drafts stay open, since they are your work in progress. */
 const GROUPS: Record<MoveGroup, { folded: boolean }> = {
 	"Your move": { folded: false },
 	"Agent on it": { folded: false },
@@ -85,7 +85,7 @@ export function moveAction(pr: PullRequestSummary, move: MoveId): PullRequestAct
 	return MOVES[move].actions.find(action => applying.includes(action)) ?? null;
 }
 
-/** Where a pull request sits in a stack of two or more that the inbox lists: `position` 1 is the bottom, which merges first. */
+/** Where a pull request sits in a stack of two or more that the list holds: `position` 1 is the bottom, which merges first. */
 export interface StackPlace {
 	position: number;
 	/** The longest chain in the stack. */
@@ -106,7 +106,7 @@ export interface SectionRow {
 
 export interface PullRequestSection {
 	title: MoveGroup;
-	/** By move in rank order, then in the inbox's sort; the manual sort keeps your order alone. Either way, except that a stack's members in the section sit together, top first, where its first member in the sort would. */
+	/** By move in rank order, then in the list's sort; the manual sort keeps your order alone. Either way, except that a stack's members in the section sit together, top first, where its first member in the sort would. */
 	rows: SectionRow[];
 }
 
@@ -117,7 +117,7 @@ interface StackMember {
 	size: number;
 }
 
-/** Each open or draft pull request in a stack of two or more that the inbox lists, by the chain of base branches. */
+/** Each open or draft pull request in a stack of two or more that the list holds, by the chain of base branches. */
 function stackMembers(pullRequests: PullRequestSummary[]): Map<PullRequestSummary, StackMember> {
 	const live = pullRequests.filter(pr => pr.state !== "merged");
 	const byHead = new Map(live.map(pr => [pr.head, pr]));
@@ -140,12 +140,12 @@ function stackMembers(pullRequests: PullRequestSummary[]): Map<PullRequestSummar
 	return members;
 }
 
-/** How the inbox orders a section's pull requests; a stack's members sit together, top first, in every sort. */
+/** How the list orders a section's pull requests; a stack's members sit together, top first, in every sort. */
 export type PullRequestSort = "updated" | "newest" | "oldest" | "manual";
 
 export const PULL_REQUEST_SORTS: Record<PullRequestSort, string> = { updated: "Recently updated", newest: "Newest first", oldest: "Oldest first", manual: "Manual" };
 
-/** The order you gave the inbox, which the browser keeps. Keys you never placed follow their default order. */
+/** The order you gave the pull request list, which the browser keeps. Keys you never placed follow their default order. */
 export interface PullRequestOrder {
 	/** `repoKey`s; a repository you never moved follows them, in the order GitHub was asked. */
 	repos: string[];
@@ -198,7 +198,7 @@ function sorted(moved: Moved[], { sort, manual }: PullRequestOrder): Moved[] {
 /** The section titles in page order. */
 export const sectionTitles = (order: PullRequestOrder): MoveGroup[] => inOrder(GROUP_TITLES, title => title, order.sections);
 
-/** The inbox's repositories in page order. */
+/** The list's repositories in page order. */
 export const orderedRepos = <R extends Repo>(repos: readonly R[], order: PullRequestOrder): R[] => inOrder(repos, repoKey, order.repos);
 
 /** A repository's pull requests by whose move it is, leaving out the empty sections, each row with its move and its place in a stack. */
@@ -260,7 +260,7 @@ export function stepTarget(keys: readonly string[], key: string, by: 1 | -1): { 
 /**
  * The manual order after moving `unit` beside `target` in `section`: every pull request of the repository placed as the
  * page shows it now, so switching to the manual sort keeps the order you see. Keys of the repository's pull requests
- * that left the inbox drop out; other repositories' keys stay.
+ * that left the list drop out; other repositories' keys stay.
  */
 export function placedManual(manual: readonly string[], repo: Repo, sections: PullRequestSection[], section: MoveGroup, unit: string, target: string, where: Where): string[] {
 	const placed = sections.flatMap(({ title, rows }) => {
@@ -272,13 +272,13 @@ export function placedManual(manual: readonly string[], repo: Repo, sections: Pu
 	return [...placed, ...manual.filter(key => !key.startsWith(prefix))];
 }
 
-/** A repository's fold key, or one of its sections'; the inbox keeps them in localStorage. A repository's name holds no `:`. */
+/** A repository's fold key, or one of its sections'; the browser keeps them in localStorage. A repository's name holds no `:`. */
 export const sectionFoldKey = (repo: string, title: string): string => `${repo}:${title}`;
 
-/** Whether the inbox folds the repository or section that `key` names until you unfold it. */
+/** Whether the list folds the repository or section that `key` names until you unfold it. */
 export const foldedByDefault = (key: string): boolean => GROUP_TITLES.some(title => GROUPS[title].folded && key.endsWith(`:${title}`));
 
-/** The pull requests the inbox shows, in its order: those of readable repositories and sections that `isFolded` leaves open. */
+/** The pull requests the list shows, in its order: those of readable repositories and sections that `isFolded` leaves open. */
 export function shownPullRequests({ repos }: PullRequestList, isFolded: (key: string) => boolean, order: PullRequestOrder, agentOn: AgentOn): PullRequestSummary[] {
 	return orderedRepos(repos, order).flatMap(repo => {
 		const key = repoKey(repo);
@@ -287,9 +287,9 @@ export function shownPullRequests({ repos }: PullRequestList, isFolded: (key: st
 	});
 }
 
-/** The pull request as the inbox lists it, with the workspace a session on it starts in; `null` when the inbox does not list it. */
-export function listedPullRequest(inbox: PullRequestList, pr: PullRequest): { pr: PullRequestSummary; cwd: string } | null {
-	for (const repo of inbox.repos) {
+/** The pull request as `list` holds it, with the workspace a session on it starts in; `null` when `list` leaves it out. */
+export function listedPullRequest(list: PullRequestList, pr: PullRequest): { pr: PullRequestSummary; cwd: string } | null {
+	for (const repo of list.repos) {
 		if ("error" in repo) continue;
 		const listed = repo.pullRequests.find(other => samePullRequest(other, pr));
 		if (listed && repo.cwds[0] !== undefined) return { pr: listed, cwd: repo.cwds[0] };
@@ -297,7 +297,7 @@ export function listedPullRequest(inbox: PullRequestList, pr: PullRequest): { pr
 	return null;
 }
 
-/** How many pull requests in `inbox` wait on your move. */
+/** How many pull requests in the list wait on your move. */
 export const yourMoveCount = ({ repos }: PullRequestList, agentOn: AgentOn): number =>
 	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => groupOf(pr, moveOf(pr, agentOn(pr))) === "Your move").length;
 

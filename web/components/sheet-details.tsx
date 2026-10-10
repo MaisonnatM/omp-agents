@@ -1,4 +1,4 @@
-/** The parts shared by the inbox's pull request details and the tickets page's issue details. */
+/** The parts shared by a pull request's details and the tickets page's issue details. */
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import type { PullRequestComment } from "../../src/shared/github";

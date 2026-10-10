@@ -1,6 +1,6 @@
 /**
- * The pull request actions: which inbox pull request each applies to, and the prompt that starts its session.
- * The inbox's quick actions and the routines both read them, so the server and the page share one prompt.
+ * The pull request actions: which listed pull request each applies to, and the prompt that starts its session.
+ * The Pull requests page's quick actions and the routines both read them, so the server and the page share one prompt.
  */
 import { type PullRequestSummary, pullRequestUrl } from "./shared/github";
 
@@ -33,7 +33,7 @@ const checkLogs = (pr: PullRequestSummary): string => `(\`gh pr checks ${pr.numb
 const thermonuclear = (pr: PullRequestSummary): string =>
 	`Run a thermo-nuclear code quality review of its diff: spawn \`task\` with \`agent: "thermonuclear-reviewer"\` on \`pr://${pr.owner}/${pr.repo}/${pr.number}/diff\` (run the \`thermo-nuclear-code-quality-review\` skill yourself when that agent is missing).`;
 
-/** The inbox's quick actions by id, in the order they are offered. */
+/** The Pull requests page's quick actions by id, in the order they are offered. */
 export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullRequestSummary>> = {
 	"fix-ci-and-conflicts": {
 		label: "Fix CI and conflicts",

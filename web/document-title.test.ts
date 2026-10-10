@@ -18,7 +18,7 @@ describe("documentTitle", () => {
 
 	test("a page covers the conversation behind it", () => {
 		const view = { kind: "live", instanceId: "a", agentId: null } as const;
-		expect(documentTitle({ kind: "pull-requests", target: null }, view, host("Fix login"), null)).toBe("Inbox · omp agents");
+		expect(documentTitle({ kind: "pull-requests", target: null }, view, host("Fix login"), null)).toBe("Pull requests · omp agents");
 	});
 
 	test("a live session reads as its name, else its project", () => {

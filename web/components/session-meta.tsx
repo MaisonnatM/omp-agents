@@ -35,7 +35,7 @@ export function SessionTrail({ cwdDisplay, worktree, path }: { cwdDisplay: strin
 	);
 }
 
-/** The PRs a session submitted or worked on, behind one button: each opens on GitHub, on Graphite, or in the inbox's details. */
+/** The PRs a session submitted or worked on, behind one button: each opens on GitHub, on Graphite, or in its details on the Pull requests page. */
 export function PullRequestMenu({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {
 	const [open, setOpen] = useState(false);
 	const [first] = pullRequests;

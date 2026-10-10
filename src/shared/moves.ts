@@ -1,4 +1,4 @@
-/** What a pull request waits on next, which the inbox ranks its rows by and the bell notifies of when the move is yours. */
+/** What a pull request waits on next, which the Pull requests page ranks its rows by and the bell notifies of when the move is yours. */
 import type { PullRequestSummary, PullRequest, PullRequestDetail } from "./github";
 import { type HostStatus, type RosterHost, worksOn } from "./sessions";
 
