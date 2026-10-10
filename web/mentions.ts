@@ -6,6 +6,7 @@ import type { Ticket as LinearTicket } from "../src/shared/tickets";
 import { type ChangedFile, fileStatus } from "../src/shared/transcript";
 import type { UserTodo } from "../src/user-todos-shared";
 import type { MentionToken } from "./completion-trigger";
+import { hasEveryWord } from "./every-word";
 import { isAbsolutePath } from "./file-paths";
 import { hostLabel, pastLabel } from "./labels";
 
@@ -84,8 +85,7 @@ interface Mention {
 
 /** Every word of `words` is in the mention's label or detail, in any order and any case. */
 function matches(mention: Mention, words: string): boolean {
-	const text = `${mention.label}\n${mention.detail ?? ""}`.toLowerCase();
-	return words.toLowerCase().split(/\s+/).every(word => text.includes(word));
+	return hasEveryWord(`${mention.label}\n${mention.detail ?? ""}`, words);
 }
 
 /** A category the page answers, filtering what `list` gives. */

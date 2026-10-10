@@ -1,7 +1,7 @@
-import { ListRestart, Loader, Plus, Search } from "lucide-react";
+import { ListRestart, Loader, Plus } from "lucide-react";
 import { useState } from "react";
 import type { View } from "../../src/shared/sessions";
-import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { hashForProjects, sameView } from "../routing";
 import { projectHosts, type SidebarSessions } from "../sessions";
@@ -10,6 +10,7 @@ import { useStoredKeys } from "../stored-state";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ProjectSessions } from "./project-group";
 import { HostRow, PastRow } from "./session-row";
+import { SidebarSearch } from "./sidebar-search";
 
 const COLLAPSED_GROUPS_KEY = "omp-agents.sidebar-collapsed-groups";
 /** Past sessions the list shows at first, and how many more each "Show more" adds; the rest stay out of the page until asked for. */
@@ -64,22 +65,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 						</Tooltip>
 					</SidebarMenuItem>
 				</SidebarMenu>
-				<label className="relative block">
-					<Search aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-					<SidebarInput
-						type="search"
-						aria-label="Filter the sidebar's sessions"
-						placeholder="Search sessions"
-						value={query}
-						onChange={event => onQuery(event.target.value)}
-						onKeyDown={event => {
-							if (event.key !== "Escape") return;
-							onQuery("");
-							event.currentTarget.blur();
-						}}
-						className="pl-8"
-					/>
-				</label>
+				<SidebarSearch label="Filter the sidebar's sessions" placeholder="Search sessions" query={query} onQuery={onQuery} />
 			</SidebarGroup>
 			<SidebarContent>
 				{filtering && projects.length + pinned.hosts.length + pinned.past.length + idle.length + running.length + interrupted.length + ended.length === 0 && (
