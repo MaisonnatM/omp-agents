@@ -422,11 +422,24 @@
 .message-markdown a:hover, .message-markdown .file-link:hover { color: var(--muted-foreground); }
 .message-markdown .file-link { cursor: pointer; text-align: inherit; text-decoration-style: dotted; }
 .message-markdown code { border-radius: .25rem; background: var(--muted); padding: .1em .25em; font-size: .9em; }
-.message-markdown pre { overflow-x: auto; border: 1px solid var(--border); border-radius: .65rem; background: var(--muted); padding: .85em 1em; }
+.message-markdown pre, .message-markdown .notes-code { overflow-x: auto; border: 1px solid var(--border); border-radius: .65rem; background: var(--muted); padding: .85em 1em; }
 .message-markdown pre code { background: none; padding: 0; font-size: .9em; }
 .message-markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
 .message-markdown th, .message-markdown td { border: 1px solid var(--border); padding: .35em .65em; text-align: left; }
 .message-markdown th { background: var(--muted); font-weight: 600; }
+/* The notes editor keeps each line a block and each blank line an empty paragraph, which already spaces the blocks. */
+.message-markdown.notes-editor > * { margin-block: 0; }
+.message-markdown .notes-code { display: block; white-space: pre; }
+.message-markdown .notes-checklist { list-style: none; padding-left: 0; }
+/* Lexical toggles a check item on a click within its `::before` width from the item's left edge. */
+.notes-editor :is(.notes-checked, .notes-unchecked) { position: relative; padding-left: 1.6em; outline: none; }
+.notes-editor :is(.notes-checked, .notes-unchecked)::before { content: ""; position: absolute; left: 0; top: .3em; box-sizing: border-box; width: 1.05em; height: 1.05em; border: 1px solid var(--muted-foreground); border-radius: .25rem; cursor: pointer; }
+.notes-editor .notes-checked { color: var(--muted-foreground); text-decoration: line-through; }
+.notes-editor .notes-checked::before { border-color: var(--primary); background: var(--primary); }
+.notes-editor .notes-checked::after { content: ""; position: absolute; left: .38em; top: .5em; width: .3em; height: .55em; border: solid var(--primary-foreground); border-width: 0 2px 2px 0; transform: rotate(45deg); pointer-events: none; }
+.notes-editor .notes-nested { list-style: none; padding-left: 0; color: inherit; text-decoration: none; }
+.notes-editor .notes-nested::before, .notes-editor .notes-nested::after { display: none; }
+.notes-editor .notes-nested > .notes-checklist { padding-left: 1.6em; }
 :is(.message-markdown, .code-lines) :is(.hljs-keyword, .hljs-selector-tag) { color: #a92764; }
 :is(.message-markdown, .code-lines) :is(.hljs-string, .hljs-attr) { color: #12673f; }
 :is(.message-markdown, .code-lines) :is(.hljs-number, .hljs-literal) { color: #935713; }
