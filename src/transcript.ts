@@ -108,6 +108,18 @@ export function splitSuggestions(text: string): { body: string; suggestions: str
 	return { body: text, suggestions: [] };
 }
 
+/** A prompt or a reply as the transcript shows it. */
+export type MessageItem = Extract<Item, { kind: "user" | "assistant" }>;
+
+/**
+ * The prompts and replies one session-file entry holds, as a fold of the whole file shows them. Their ids and text
+ * come from the entry alone (its message's timestamp, else its own id), so one entry folded by itself names them the
+ * same, without the thinking, tool calls, and order a whole fold keeps.
+ */
+export function messageItemsOf(entry: unknown): MessageItem[] {
+	return new Transcript().applyEntry(entry).filter((item): item is MessageItem => item.kind === "user" || item.kind === "assistant");
+}
+
 export class Transcript {
 	/** Display order: by message time, then first seen. */
 	#items = new Map<string, Item>();

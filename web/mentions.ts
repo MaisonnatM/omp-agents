@@ -1,12 +1,12 @@
 /** The composer's `@` menu: the categories it offers, the query a token asks, and the rows it shows. */
 import { File, Folder, GitPullRequest, ListTodo, type LucideIcon, MessageSquare, Slash, Sparkles, Ticket } from "lucide-react";
+import { everyWord } from "../src/shared/every-word";
 import { pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import type { Ticket as LinearTicket } from "../src/shared/tickets";
 import { type ChangedFile, fileStatus } from "../src/shared/transcript";
 import type { UserTodo } from "../src/user-todos-shared";
 import type { MentionToken } from "./completion-trigger";
-import { everyWord } from "./every-word";
 import { isAbsolutePath } from "./file-paths";
 import { hostLabel, pastLabel } from "./labels";
 import { listedPullRequests } from "./pull-requests-model";

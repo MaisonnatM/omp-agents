@@ -1,11 +1,15 @@
-/** The todos, Linear tickets, and pull requests the command palette searches, each opening where the dashboard shows it. */
+/** The todos, Linear tickets, pull requests, and conversation matches the command palette searches, each opening where the dashboard shows it. */
+import { AppWindow, Bot, Columns2, User } from "lucide-react";
 import { prKey, pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
+import type { ConversationHit, PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo } from "../src/user-todos-shared";
-import type { PaletteItem } from "./command-palette";
+import type { Accessory, PaletteItem } from "./command-palette";
+import { hostLabel, pastLabel } from "./labels";
 import { PAGE_ICON } from "./page-icons";
 import { listedPullRequests } from "./pull-requests-model";
-import { hashForOpenTodo, hashForPullRequests, hashForTickets } from "./routing";
+import { hashForOpenTodo, hashForPullRequests, hashForTickets, type OpenMode } from "./routing";
+import { type SessionEntry, viewOf } from "./session-actions";
 import { TODO_STATUS } from "./todo-views";
 
 export interface PaletteRecords {
@@ -72,4 +76,48 @@ export function recordItems({ todos, tickets, pullRequestRepos }: PaletteRecords
 		};
 	});
 	return [...todoItems, ...ticketItems, ...pullRequestItems];
+}
+
+/** Open `view`, whose session ran in `cwd`, in the focused pane or a split, scrolled to message `messageId`. */
+export type OpenAt = (view: View, cwd: string, mode: OpenMode, messageId: string) => void;
+
+/** The most conversation matches the palette lists. */
+const MAX_CONVERSATION_ITEMS = 30;
+
+/**
+ * One palette item for each conversation match of a session the sidebar lists, the server's order kept, opening it at
+ * the matching message, up to {@link MAX_CONVERSATION_ITEMS}; a match in a session the sidebar hides, such as one in `/tmp`, is left out.
+ */
+export function conversationItems(hits: readonly ConversationHit[], hosts: readonly RosterHost[], past: readonly PastSession[], openAt: OpenAt): PaletteItem[] {
+	// A session that runs is listed live, so its live entry is set last and wins.
+	const entries = new Map<string, SessionEntry>([
+		...past.map(session => [session.sessionId, { kind: "past", session }] as const),
+		...hosts.map(host => [host.sessionId, { kind: "live", host }] as const),
+	]);
+	return hits.flatMap((hit): PaletteItem[] => {
+		const entry = entries.get(hit.sessionId);
+		if (!entry) return [];
+		const view = viewOf(entry);
+		const { cwd } = entry.kind === "live" ? entry.host : entry.session;
+		const matches: Accessory = { kind: "text", text: hit.matches === 1 ? "1 match" : `${hit.matches} matches` };
+		const state: Accessory = entry.kind === "live" ? { kind: "status", status: entry.host.status } : { kind: "age", at: entry.session.modifiedAt };
+		return [
+			{
+				id: `conversation:${hit.sessionId}`,
+				section: "conversations",
+				title: hit.snippet,
+				subtitle: entry.kind === "live" ? hostLabel(entry.host) : pastLabel(entry.session),
+				keywords: [],
+				icon: hit.role === "user" ? User : Bot,
+				accessories: [matches, state],
+				kind: "Message",
+				actions: [
+					[
+						{ id: "open", title: "Open at this message", icon: AppWindow, run: { kind: "do", fn: () => openAt(view, cwd, "replace", hit.messageId) } },
+						{ id: "split", title: "Open in split at this message", icon: Columns2, run: { kind: "do", fn: () => openAt(view, cwd, "split", hit.messageId) } },
+					],
+				],
+			},
+		];
+	}).slice(0, MAX_CONVERSATION_ITEMS);
 }

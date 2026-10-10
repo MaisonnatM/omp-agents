@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Folder } from "lucide-react";
 import {
 	chordAction,
+	highlightOnFound,
 	type Frecency,
 	type HomeSection,
 	type PaletteAction,
@@ -159,6 +160,29 @@ describe("paletteSections", () => {
 			["Tickets", ["ticket:ENG-1"]],
 			["Todos", ["todo:t"]],
 		]);
+	});
+
+	test("conversation matches list for a search only, in the server's order whatever cmdk scores, after the ranked sections and before what the search becomes", () => {
+		const items = [
+			item("fallback:create-todo", "fallback", "Create todo"),
+			item("conversation:b", "conversations", "unrelated words"),
+			item("conversation:a", "conversations", "deploy deploy deploy"),
+			item("session:r", "running", "Deploy web"),
+		];
+		expect(listed(paletteSections(items, "", { "conversation:a": { count: 9, last: NOW } }, NOW, 5))).toEqual([["running", ["session:r"]]]);
+		expect(listed(paletteSections(items, "deploy", {}, NOW))).toEqual([
+			["running", ["session:r"]],
+			["conversations", ["conversation:b", "conversation:a"]],
+			["fallback", ["fallback:create-todo"]],
+		]);
+	});
+
+	test("arriving matches take the highlight from what the search becomes, and leave a highlight on a match where it is", () => {
+		const items = [item("fallback:create-todo", "fallback", "Create todo"), item("conversation:a", "conversations", "deploy"), item("session:r", "running", "Deploy web")];
+		const sections = paletteSections(items, "deploy", {}, NOW);
+		expect(highlightOnFound(sections, "fallback:create-todo")).toBe("session:r");
+		expect(highlightOnFound(sections, "conversation:a")).toBeNull();
+		expect(highlightOnFound(paletteSections([items[0]!], "deploy", {}, NOW), "fallback:create-todo")).toBeNull();
 	});
 });
 

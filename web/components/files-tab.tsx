@@ -4,7 +4,7 @@ import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { everyWord } from "../every-word";
+import { everyWord } from "../../src/shared/every-word";
 import { age, readTime } from "../labels";
 import { hashForChanges } from "../routing";
 import { LineCounts } from "./line-counts";

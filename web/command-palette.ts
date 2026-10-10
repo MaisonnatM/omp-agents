@@ -1,7 +1,7 @@
 import { defaultFilter } from "cmdk";
 import { Command, Folder, ListTodo, type LucideIcon } from "lucide-react";
+import { everyWord } from "../src/shared/every-word";
 import type { HostStatus } from "../src/shared/sessions";
-import { everyWord } from "./every-word";
 import { type Chord, type KeyEvent, pressesChord, SHORTCUTS, type Shortcut, type ShortcutHandlers, type ShortcutId } from "./shortcuts";
 
 /** A list the command palette shows: the root search, or a view an action pushed onto it. */
@@ -51,12 +51,12 @@ export type Accessory =
 	| { kind: "text"; text: string };
 
 /** The section an item belongs to; **Suggestions** borrows items from the others. */
-export type HomeSection = "running" | "projects" | "past" | "todos" | "tickets" | "pullRequests" | "commands" | "workspaces" | "createTodo" | "fallback";
+export type HomeSection = "running" | "projects" | "past" | "todos" | "tickets" | "pullRequests" | "conversations" | "commands" | "workspaces" | "createTodo" | "fallback";
 
 export type SectionId = "suggestions" | HomeSection;
 
 export interface PaletteItem {
-	/** Stable across reloads, since frecency keys on it: `session:<id>`, `project:<id>`, `todo:<id>`, `ticket:<identifier>`, `pr:<prKey>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`. */
+	/** Stable across reloads, since frecency keys on it: `session:<id>`, `project:<id>`, `todo:<id>`, `ticket:<identifier>`, `pr:<prKey>`, `conversation:<session id>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`. */
 	id: string;
 	section: HomeSection;
 	title: string;
@@ -228,10 +228,11 @@ export interface Section {
 /**
  * How a section lists. A `browsed` section lists with nothing typed too. A `searched` one lists only for a search, and
  * matches only an item holding every word typed, since cmdk's loose match would find most of hundreds of todos for any
- * word; its most used items still lead an empty search under Suggestions. A `typed` one holds what the search itself
+ * word; its most used items still lead an empty search under Suggestions. A `found` one holds what the server found
+ * for the search: it lists in the order given, after the ranked sections. A `typed` one holds what the search itself
  * becomes: it matches anything and lists after every match.
  */
-type Listing = "browsed" | "searched" | "typed";
+type Listing = "browsed" | "searched" | "found" | "typed";
 
 /** Each section's heading, `null` for none or for the fallback's, which names the search, and how it lists. */
 const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }> = {
@@ -241,6 +242,7 @@ const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }
 	todos: { heading: "Todos", listing: "searched" },
 	tickets: { heading: "Tickets", listing: "searched" },
 	pullRequests: { heading: "Pull requests", listing: "searched" },
+	conversations: { heading: "In conversations", listing: "found" },
 	commands: { heading: "Commands", listing: "browsed" },
 	workspaces: { heading: "Workspaces", listing: "browsed" },
 	createTodo: { heading: null, listing: "typed" },
@@ -249,12 +251,16 @@ const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }
 
 const listingOf = (section: HomeSection): Listing => SECTIONS[section].listing;
 
+/** Whether a search scores a section's items: `found` and `typed` ones list without a score. */
+const ranks = (section: HomeSection): boolean => listingOf(section) === "browsed" || listingOf(section) === "searched";
+
 /** The `browsed` sections in the order an empty search lists them, after Suggestions. */
 const BROWSE_ORDER: readonly HomeSection[] = ["running", "projects", "commands", "past", "workspaces"];
-/** The `browsed` and `searched` sections, which a search ranks by their best match; equal ones keep this order. */
-const RANKED_ORDER: readonly HomeSection[] = ["running", "projects", "past", "todos", "tickets", "pullRequests", "commands", "workspaces"];
-/** The `typed` sections, in the order they list after every match. */
-const TYPED_ORDER = (Object.keys(SECTIONS) as HomeSection[]).filter(section => listingOf(section) === "typed");
+const SECTION_ORDER = Object.keys(SECTIONS) as HomeSection[];
+/** The sections a search ranks by their best match; equal ones keep {@link SECTIONS}' order. */
+const RANKED_ORDER = SECTION_ORDER.filter(ranks);
+/** The `found` sections, then the `typed` ones, which list in {@link SECTIONS}' order after the ranked ones. */
+const UNRANKED_ORDER = SECTION_ORDER.filter(section => !ranks(section));
 
 const headingOf = (id: SectionId, search: string): string | null => (id === "suggestions" ? "Suggestions" : id === "fallback" ? `Use “${search}”` : SECTIONS[id].heading);
 
@@ -276,17 +282,17 @@ export function paletteSections(items: readonly PaletteItem[], query: string, fr
 	const filled = (section: Section): boolean => section.items.length > 0;
 	if (!search) {
 		const suggested = items
-			.filter(item => listingOf(item.section) !== "typed" && frecency[item.id])
+			.filter(item => ranks(item.section) && frecency[item.id])
 			.toSorted((a, b) => frecencyBoost(frecency[b.id], now) - frecencyBoost(frecency[a.id], now))
 			.slice(0, suggestions);
 		const taken = new Set(suggested.map(item => item.id));
 		const rest = items.filter(item => !taken.has(item.id));
 		const suggestionsSection: Section = { id: "suggestions", heading: headingOf("suggestions", search), items: suggested };
-		return [suggestionsSection, ...[...BROWSE_ORDER, ...TYPED_ORDER].map(id => inSection(rest, id))].filter(filled);
+		return [suggestionsSection, ...BROWSE_ORDER.map(id => inSection(rest, id))].filter(filled);
 	}
 	const holds = everyWord(search);
 	const scores = new Map<string, number>();
-	for (const item of items) if (listingOf(item.section) !== "typed") scores.set(item.id, matchScore(item, search, holds, frecency, now));
+	for (const item of items) if (ranks(item.section)) scores.set(item.id, matchScore(item, search, holds, frecency, now));
 	const score = (item: PaletteItem): number => scores.get(item.id) ?? 0;
 	const ranked = RANKED_ORDER.map(id => {
 		const hits = items.filter(item => item.section === id && score(item) > 0).toSorted((a, b) => score(b) - score(a));
@@ -294,7 +300,17 @@ export function paletteSections(items: readonly PaletteItem[], query: string, fr
 	})
 		.filter(filled)
 		.toSorted((a, b) => score(b.items[0]!) - score(a.items[0]!));
-	return [...ranked, ...TYPED_ORDER.map(id => inSection(items, id)).filter(filled)];
+	return [...ranked, ...UNRANKED_ORDER.map(id => inSection(items, id)).filter(filled)];
+}
+
+/**
+ * The item to highlight once `found` matches arrive, after the rest of a search listed: the first item, when the
+ * highlight sits on what the search becomes, where cmdk leaves it while nothing else matched; `null` to leave it.
+ */
+export function highlightOnFound(sections: readonly Section[], selectedId: string): string | null {
+	const selected = sections.flatMap(section => section.items).find(item => item.id === selectedId);
+	const first = sections[0]?.items[0];
+	return first && selected && first !== selected && listingOf(selected.section) === "typed" ? first.id : null;
 }
 
 export type PaletteCommand = Shortcut & { command: string };

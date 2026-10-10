@@ -19,7 +19,7 @@ import {
 	SquareTerminal,
 	Wrench,
 } from "lucide-react";
-import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Project } from "../../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -30,6 +30,7 @@ import {
 	chordAction,
 	decodeFrecency,
 	FRECENCY_KEY,
+	highlightOnFound,
 	PALETTE_VIEWS,
 	PANEL_CHORD,
 	type PaletteAction,
@@ -45,9 +46,10 @@ import {
 import { localDay } from "../../days";
 import { age, folderName, hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
-import { recordItems } from "../../palette-records";
-import { useSearchSources } from "../../reads";
+import { conversationItems, recordItems } from "../../palette-records";
+import { useConversationHits, useSearchSources } from "../../reads";
 import { hashForProjects, type OpenMode } from "../../routing";
+import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
@@ -134,6 +136,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	const query = frame.query;
 	const search = query.trim();
 	const resuming = starts.resume?.phase === "starting" ? starts.resume.op.sessionId : null;
+	const hits = useConversationHits(viewId === "root" ? search : "");
 
 	const sessionItems = useMemo((): PaletteItem[] => {
 		const sessionItem = (entry: SessionEntry): PaletteItem => {
@@ -249,6 +252,14 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	}, [workspaces, workspace, onPickWorkspace]);
 
 	const records = useMemo((): PaletteItem[] => recordItems({ todos, tickets, pullRequestRepos }), [todos, tickets, pullRequestRepos]);
+	const conversations = useMemo(
+		(): PaletteItem[] =>
+			conversationItems(hits, hosts, past, (opened, cwd, mode, messageId) => {
+				onOpenSession(opened, cwd, mode);
+				revealMessage(opened, messageId);
+			}),
+		[hits, hosts, past, onOpenSession],
+	);
 
 	const items = useMemo((): PaletteItem[] => {
 		const createTodo = (): void => {
@@ -288,15 +299,20 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 					]
 				: [];
 		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
-			root: () => [...sessionItems, ...projectItems, ...records, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
+			root: () => [...sessionItems, ...projectItems, ...records, ...conversations, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
 			workspaces: () => workspaceItems,
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, projectItems, records, commandItems, workspaceItems, search, todoCategories, changeTodo, linearConnected, onCreateTicket]);
+	}, [viewId, sessionItems, projectItems, records, conversations, commandItems, workspaceItems, search, todoCategories, changeTodo, linearConnected, onCreateTicket]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;
+	// Runs as the conversation matches arrive, with the sections that list them.
+	useEffect(() => {
+		const id = hits.length > 0 ? highlightOnFound(sections, frame.selected) : null;
+		if (id !== null) dispatch({ type: "select", itemId: id });
+	}, [hits]);
 	const empty =
 		frame.view !== "createTodo" ? "No results." : todoCategories ? "Type the todo’s title." : "Todos cannot be edited while the dashboard is disconnected.";
 

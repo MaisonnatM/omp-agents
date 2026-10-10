@@ -1,9 +1,9 @@
 /** Which todos each of the Todo page's lists holds and what it lets you do, shared by the page and the sidebar. */
 import { Archive, Bot, CalendarClock, ListTodo, type LucideIcon, MessageCircleQuestionMark } from "lucide-react";
 import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
+import { everyWord } from "../src/shared/every-word";
 import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "./days";
-import { everyWord } from "./every-word";
 import { DAY_FORMAT } from "./labels";
 import type { TodoListView } from "./routing";
 import type { StatusKind } from "./tickets-model";

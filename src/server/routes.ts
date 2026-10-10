@@ -27,7 +27,7 @@ import { ClientConfigError } from "../mcp-clients";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
-import { PROMPT_IMAGE_TYPES } from "../shared/sessions";
+import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { SystemLoadReader } from "../system-load";
@@ -61,6 +61,8 @@ export interface SessionRoutesEnv {
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
 	/** The notes directory of project `id`, or `null` when there is no such project. */
 	projectNotesDir(id: string): string | null;
+	/** The saved conversations whose prompts or replies hold every word of `query`, the file changed last first. */
+	searchConversations(query: string): Promise<ConversationHit[]>;
 }
 
 /** What the integration routes read beyond omp's own config: Google Calendar and the calendars it shows. */
@@ -242,6 +244,12 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		return dir === null ? fail(404, `No project ${id}`) : answer(async () => ({ dir, notes: await listNotes(dir) }));
 	});
 
+	/** `GET /api/conversations?q=<words>`: the saved conversations whose prompts or replies hold every word, each by its latest such message. */
+	const conversations = get(params => {
+		const query = params.get("q")?.trim() ?? "";
+		return query ? answer(async (): Promise<ConversationSearchAnswer> => ({ hits: await env.searchConversations(query) })) : fail(400, "Expected ?q= with a word to search");
+	});
+
 	return {
 		"/api/settings": { GET: settings },
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
@@ -256,6 +264,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },
 		"/api/project-notes": { GET: projectNotes },
+		"/api/conversations": { GET: conversations },
 	};
 }
 
