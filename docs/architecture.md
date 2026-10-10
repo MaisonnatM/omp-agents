@@ -173,6 +173,7 @@ A question with a timeout ends with no frame, so the server drops it at its dead
 omp's RPC mode does not title a session from its first prompt, as its terminal does.
 While a session has no title, each user message's `message_end` event makes the server send a bare `/rename` prompt, which omp runs as its own command: it titles the session from the conversation in the background and announces the title with a `session_info_update` frame.
 `RpcClient` drops that frame too, so the same stdout copy reads it, and the server then reads omp's state again for the new `sessionName`.
+An `agent_end` that ends the run, not one that hands over to a queued follow-up (`isTerminal: false`), makes the session report `turn-ended` with its last reply: the text of the last assistant message that has any, without the suggested prompts `splitSuggestions` takes off, or `null` when none has text; the project runner reads it ([Projects](#projects)).
 Stopping the dashboard stops every session that it started.
 The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one.
 
@@ -341,10 +342,72 @@ Routines, the todo inbox, and the daily clean-up of checked todos write that dir
 A server creates it whole through a draft file and a hard link, so a reader never sees half of it, and it takes over a lock whose process is gone or whose content is not a lock.
 A process id that another program reused keeps the lock held; delete `server.lock` to release it.
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
-On a takeover the server logs it, reads `routines.json` and `todos.json` again, since the previous owner kept saving them, fails the runs that were running, and drains the todo inbox.
+On a takeover the server logs it, reads `routines.json`, `todos.json`, and `projects.json` again, since the previous owner kept saving them, fails the runs that were running, and drains the todo inbox.
 A server that exits normally deletes its lock.
 The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, or **Run now**; only the minute tick, the todo inbox, and the end inbox's requests for sessions started in a terminal are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
+`projects.json` is the exception: every server runs its own project runner, which writes on every worker turn, so `ProjectsFile.apply` reads the file again before it applies a change, and a change made on one server keeps what another saved.
+
+## Projects
+
+A project is a coordinator session that plans the work and starts worker sessions, which all share one notes directory; see [Projects](usage.md#projects) for what the user sees.
+`src/shared/projects.ts` holds what the page reads and sends: `Project`, `Worker`, `ProjectUpdate`, `ProjectEdit`, `DEFAULT_PROJECT_NAME`, and `workerPhase`, which turns a worker's live status, or its absence and whether it was interrupted, into `working`, `asking`, `idle`, `interrupted`, or `ended`.
+The rules only the server applies live in `src/server/projects-file.ts`: `ProjectChange`, the page's `ProjectEdit` plus the runner's changes, `applyProject`, which returns the same array for a change that changes nothing, `ProjectRole`, and `ProjectsFile.roleOf`, which finds a session's project and role by its session id.
+
+`ProjectsFile` keeps the projects in `projects.json` beside the access token, as `{ projects }`, and moves a file that holds anything else to `projects.json.invalid`.
+A project holds its `id`, `name`, workspace `cwd`, `createdAt`, `archived`, `coordinator.sessionId`, `workers`, in id order, `updates`, the ones not yet delivered, oldest first, and `nextWorker`, the number the next worker's id takes.
+A worker holds its id (`w1`, `w2`, …), `title`, `sessionId`, `cwd`, `startedAt`, and `lastReply`, `{ at, text }`, with empty text for a turn that ended on none, or `null` before its first turn ends.
+An update holds its id, worker id, time, and one `kind`: `finished`, whose reply is the worker's `lastReply`, `asked` with the request id and the question, or `stopped`.
+The `update` change keeps one `finished` per worker: a later one replaces the earlier, since both would quote the same last reply.
+The servers are the file's only writers.
+The page sends `rename` and `archive` in a `project` socket message (`ProjectEdit`), and creates a project with `project-create`, `{ reqId, name, cwd, prompt, model, thinking }`, which the server answers with the same `started` reply a `start` gets; `ProjectRunner` in `src/server/project-runner.ts` makes every other change.
+Every socket hears the projects after each change as a `projects` message on the roster topic, also sent when a socket opens; an edit that changes nothing sends them back to its own socket alone.
+An older version kept the workspace list under the same name, so the `Dashboard` constructor first calls `adoptOldWorkspaces` from `src/server/workspaces-file.ts`, which moves a `projects.json` in that shape to `workspaces.json`, and only then builds `ProjectsFile`.
+omp's `projects` extension reads the file too, and cannot import `src/`, so it declares the fields it reads by hand.
+
+A session belongs to a project by its session id, which the file keeps, so a resume finds its role again.
+The runner tracks each live project session by instance id, with its role and its current session id.
+When a dashboard session reports `switched`, after a `/move` or an edited prompt, the runner applies `relink`, which points every reference to the old session id at the new one.
+
+The starter from `src/server/start.ts` takes a `StartRequest`, which is what the page sends, and a server-only `ProjectLaunch`, which only the runner passes: `create` for a new project's coordinator, `new-worker` for a worker with its title, or `rejoin` with a role; a page's start passes `null`.
+It asks the runner's `launchFor(request, launch)` how to start, which for `null` finds a `resume`'s role by its session id (`rejoin`), and none for a `new` or a `fork`.
+`launchFor` answers a `ProjectJoin`: the `RpcLaunch` to spawn omp with, `PLAIN_LAUNCH` for no project, and `attach`, which the starter calls once the session is in the registry and before its first prompt.
+A project session's `RpcLaunch` holds `projectsExtensionArgs()` and, for a coordinator, the four host tools of `src/server/project-tools.ts`, bound to its project.
+`projectsExtensionArgs()`, in `project-runner.ts`, is `-e` with this repository's `templates/omp/agent/extensions/projects.ts` while `~/.omp/agent/extensions/projects.ts` does not exist, and nothing once it does, since omp would load the same extension at two paths twice.
+Every spawn of a coordinator gets its tools, a resume included, since the process that serves host tools hands them to omp as it starts; a coordinator resumed in a terminal has none.
+`attach` saves what the launch makes: `create` saves the project, its workspace the session's directory, and seeds its notes, and `new-worker` applies `add-worker`, which gives the worker the project's next id and bumps `nextWorker`.
+It then flushes the file, because `JsonFile.save` writes at the end of the event-loop turn and the extension reads the file at the first prompt, and tracks the session by the role the file now gives it.
+So a coordinator that fails to start saves no project, a worker that fails to start takes no id, and workers take their ids in the order their sessions start; `startWorker` reads the id back from the tracked session.
+A worker starts in the directory `start_worker` names, resolved against the project's workspace when relative and kept for the starter when it starts with `~`, else in the workspace, on omp's default model, with no branch of its own.
+
+The coordinator's tools are strict host tools, every property required, loaded as `essential`: `start_worker` (`title`, `prompt`, `cwd`), `list_workers`, `read_worker` (`worker`), and `message_worker` (`worker`, `text`).
+An error a tool throws reaches the coordinator as the tool's error, and every tool throws once the project is archived.
+`message_worker` prompts the worker as a follow-up, and resumes it first through the same starter when it does not run.
+
+A worker's session reports three kinds of news, which the runner saves as updates:
+
+1. Its `turn-ended` update saves the reply as the worker's `lastReply`, empty when it had none, and becomes `finished`.
+2. Each roster change, which the server passes to `observe`, reports every question the worker waits on whose request id the runner has not reported for that live session, as `asked`, so a question is reported once.
+3. Its process's exit becomes `stopped`, unless the dashboard is stopping: `Dashboard.stop` calls the runner's `stop` before it ends the sessions, since they exit with the dashboard, which is no news.
+
+The runner saves each update in `projects.json` at once and then delivers.
+When the coordinator's session runs and its status is `idle`, the runner sends every waiting update, in order, as one prompt that `updateText` builds, starting `[omp-agents] Project update.`, quoting at most `REPLY_QUOTE_CHARS` (2,000) of each finished worker's `lastReply`, and telling the coordinator that only the user answers an `asked` question, in the dashboard.
+It sends it through `LiveSession.followUp`, which, unlike `prompt`, rejects when omp does not take the message.
+Once omp takes it, `delivered` removes those updates, and delivery runs again for the ones that came meanwhile; one delivery per project is in flight at a time.
+When omp refuses it, the updates stay and nothing retries at once: delivery runs again when the coordinator's row changes, when its turn ends, and when it attaches, which is also how what waited while it worked, or while it was stopped, reaches it once it is idle.
+Only sessions that attached through the starter are tracked, so a project's session resumed in a terminal reports nothing.
+
+`src/server/project-notes.ts` seeds a new project's notes in `projectNotesDir(id)` from `src/paths.ts`, `$XDG_DATA_HOME/omp-agents/projects/<id>/`, else `~/.local/share/omp-agents/projects/<id>/`: `README.md` with the project's name, its goal (the coordinator's first message), and links to `testing.md`, `preferences.md`, and `research.md`, which it seeds too, and it never overwrites a file already there.
+The notes live outside every repository, so every worktree shares them, and outside the access token's directory, which the file dialog refuses.
+
+`templates/omp/agent/extensions/projects.ts` reads `projects.json` at each prompt and each `edit` or `write` call.
+Both of its handlers find the role by the session id, with no rule of their own for subagents: a subagent that runs in the project session's own session, such as an advisor or a `/tan` clone, acts in its role, and a `task` subagent, which has a session of its own, has none.
+Its `before_agent_start` handler adds the session's role and the notes' place to the system prompt of every prompt, so they survive compaction.
+Its `tool_call` handler blocks a coordinator's `edit` and `write` calls whose `path`, or a hashline edit's `[path#TAG]` header, resolves outside the notes directory, and fails closed: a call that names no file it can read is blocked too.
+Only `local://` and `artifact://` paths, the session's scratch space, pass without a check.
+
+On a takeover, the server reads `projects.json` again, since the previous owner kept saving it; see [One server runs the unattended work](#one-server-runs-the-unattended-work).
+Each server's runner follows only the sessions that server started.
 
 ## Pins
 
@@ -448,6 +511,7 @@ It folds the session's transcript with `Work` for the files its own `edit` and `
 `GET /api/changes/file?session=<session id>&path=<path>` answers one file of that list in full, `ChangedFileText`, with every line of `git diff --histogram` as numbered rows, or a note for a binary file or one over `MAX_CHANGED_FILE_BYTES` (1 MB).
 It computes the list again and answers 404 for a path the list does not hold, so it reads no file the session and its checkout did not change, and passes the path with `--literal-pathspecs`, so a name such as `app/[id]/page.tsx` is not a glob.
 While the changes page of a live session shows, the page watches that session's view, so its `work` messages reach the page, which reads both routes again whenever the session's changes grow.
+`GET /api/project-notes?id=<project id>` answers a project's notes, `{ dir, notes }`, each note a `ProjectNote` (`{ name, path, modifiedAt }`) for a Markdown file in the directory, `README.md` first and then by name, or 404 for a project the server does not know; the page opens a note through `GET /api/file`.
 `GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>` answers the list on a pull request's **Code** tab, `PullRequestChanges` in `src/shared/github.ts`: its title and branches from `gh api repos/<o>/<r>/pulls/<n>`, and its files from `gh api --paginate --slurp repos/<o>/<r>/pulls/<n>/files`, which lists up to GitHub's 3000 where GraphQL's `files` stops at 100.
 It reads GitHub again on each call and keeps the answer, with each file's `patch` and blob id, for the file reads for 30 seconds.
 `GET /api/pull-request/file?owner=<o>&repo=<r>&number=<n>&path=<path>` answers one file of that list in full, `ChangedFileText`, and 404 for a path the list does not hold.
@@ -669,7 +733,7 @@ The server lives in `src/`:
   Builds the page, loads the access token, builds the `Dashboard`, starts the HTTP and WebSocket server on its routes and socket handlers, then starts it.
   `PORT` sets the port, 4317 by default.
   On `SIGINT`, `SIGTERM`, or the desktop shell's pipe ending, `shutdown()` awaits `Dashboard.stop` before it stops the server and exits; the process's `exit` handler calls `Dashboard.exited`, which writes what the stores have not and releases the owner lock, however the process exits.
-- `src/server/dashboard.ts`: `Dashboard`, the composition root: it builds the stores, `LiveSessions`, `Views`, `Notices`, `Broadcasts`, the inboxes, `Worktrees`, the starter, `RoutineRunner`, `Loops`, and the socket handler in dependency order, each handed the parts above it, and owns the live-update switch, the registry listing, the file rescans, the activity check, and the owner lock's takeover.
+- `src/server/dashboard.ts`: `Dashboard`, the composition root: it builds the stores, `LiveSessions`, `Views`, `Notices`, `Broadcasts`, the inboxes, `Worktrees`, the starter, `RoutineRunner`, `ProjectRunner`, `Loops`, and the socket handler in dependency order, each handed the parts above it, and owns the live-update switch, the registry listing, the file rescans, the activity check, and the owner lock's takeover.
   Two edges point down, closing the only cycles: a live session's update reaches the parts built after `LiveSessions`, and a notice change reaches the `Broadcasts` that reads the notices; no constructor calls either.
   Nothing follows the registry, watches a directory, or publishes before `start(server)`; `stop()` first stops the loops and both inboxes, so no tick publishes while the rest shuts down, then ends the sessions started here, hangs up on the shells, stops omp-stats, flushes the stores, and aborts the routine commands still running.
 - `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie) and the JSON answer helpers.
@@ -703,7 +767,7 @@ The server lives in `src/`:
   `prompt-files.ts` holds the files a prompt carries as text: `withFiles` and `splitFiles`, which put them after the typed text and take them back off, `plainText`, which tells a text file, and the limits and body of `PUT /api/attachment/document`.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
 - `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and workspaces, joining saved-session titles and working directories without reading transcripts.
-- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `workspaces.json`, `pins.json`, `calendars.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `workspaces.json`, `pins.json`, `calendars.json`, `projects.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
@@ -761,7 +825,7 @@ The server lives in `src/`:
   A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`, before it sends the first message, and `src/server/dashboard.ts` applies the changes `startChanges` in `src/user-todos.ts` returns: the link, and `set-status` `in-progress` for a `backlog` or `todo` todo.
 - `src/shared/workspaces.ts`: the Settings › Workspaces list, `WorkspaceList` of added and hidden directories, its `WorkspaceChange`, and `applyWorkspace`, which the server applies to its file.
   `src/server/workspaces-file.ts` keeps the list in `workspaces.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `workspaces.json.invalid`.
-  At startup, before the list loads, it moves `projects.json`, where an older version kept the list, to `workspaces.json` when it holds a workspace list and `workspaces.json` does not exist; a `projects.json` in any other shape stays where it is.
+  At startup, before either file loads, the `Dashboard` constructor calls its `adoptOldWorkspaces`, which moves `projects.json`, where an older version kept the list, to `workspaces.json` when it holds a workspace list and `workspaces.json` does not exist; a `projects.json` in any other shape stays where it is.
   The move links the new name, then unlinks the old one, so it never replaces a `workspaces.json` that a server beside it wrote, and any other failure is logged rather than stopping the server.
 - `src/shared/pins.ts`: the sidebar's pins, their `PinChange`, and `applyPins`, which the server applies to its file and the page to the pins it shows before the server answers; see [Pins](#pins).
   `src/server/pins-file.ts` keeps them in `pins.json` beside the access token and moves a file it cannot read to `pins.json.invalid`.
@@ -790,6 +854,9 @@ The server lives in `src/`:
   `attachToTicket` (`PUT /api/ticket/attachment`) attaches a file in base64 to an existing issue: Linear's `prepare_attachment_upload` signs a storage URL, the server sends the bytes there with the signed headers, then `create_attachment_from_upload` links the file to the issue.
 - `src/routines.ts`: the routine types and the rules of routines: `nextRunAt`, `nextDueAt`, `isDue`, `applyRoutine`, which applies an edit, and a command's length, time, and output limits; see [Routines](#routines).
   `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.
+- `src/shared/projects.ts`: the project shapes the page reads, `ProjectEdit`, and `workerPhase`; see [Projects](#projects).
+  `src/server/projects-file.ts` holds the server's rules, `ProjectChange` and `applyProject`, and keeps the projects in `projects.json`, `src/server/project-runner.ts` starts the coordinators and workers through `ProjectLaunch`, follows their sessions, and delivers the workers' updates, `src/server/project-tools.ts` holds the coordinator's host tools and the update message, and `src/server/project-notes.ts` seeds and lists a project's notes for `GET /api/project-notes`.
+  `templates/omp/agent/extensions/projects.ts` is the omp extension that tells a project's session its role and keeps the coordinator's edits to the notes.
 - `src/pull-request-actions.ts`: the pull request actions, which pull requests each applies to and its prompt, which the Pull requests page's quick actions use.
 - `src/usage.ts`: runs `omp usage --json` and parses it into plan windows.
 - `src/system-load.ts`: reads the machine's CPU percent, available memory, and free disk space for `GET /api/system`; `src/shared/system.ts` holds the shape the page shares.
@@ -888,10 +955,11 @@ The page lives in `web/`.
 - `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the session details tab, the sidebar's workspace, the pinned skill, the pull request list's order, and how often and how lately each command palette entry ran; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the Pull requests and tickets pages' folded sections.
   Every component that holds the same key sees a change at once, so the Pull requests page and its sidebar index share their folds and order.
   A component keeps one key for as long as it is mounted.
-  `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
+  `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's project groups and its pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys; a project's sessions leave the other lists, and it lists them even under `/tmp`.
+  `projectSession` there finds a project's session in the live or past list with its view, phase, and directory, for the sidebar's groups and the Projects page alike, and `waitsOnYou` tells a live session that waits on you, for the waiting count and each project's group.
   `discoverableSessions` leaves sessions under `/tmp` out of those lists and the workspace picker, and `workspaceSwitch` keeps a started session's workspace only when that directory is discoverable.
 - `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the workspace picker; `web/components/pull-requests/pull-requests-nav.tsx` is its Pull requests tab, and `web/components/section-link.tsx` the section link that the tickets list and the Pull requests page's section index share.
-  `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more.
+  `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more, and `web/components/project-group.tsx` the group of one project in it, each worker's row named by the title its coordinator gave it.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed; the row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
   `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab: the calendar, the Google calendars under **My calendars** and **Other calendars**, each a checkbox that shows or hides its events, and then the routines by name.
 - `web/components/toaster.tsx`: `toasts`, the page's one Base UI toast manager, which shows a toast from anywhere without rendering its caller again, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
@@ -912,6 +980,7 @@ The page lives in `web/`.
   It, the Calendar page, and the session rows read the time through `web/use-minute.ts`, one timer renewed each minute for every component that reads it.
   The session rows, the pull request rows, and the bell's notices show how long ago something was with `Age` from `web/components/age.tsx`, which words it with `age` from `web/labels.ts` and counts up on that timer.
   `web/components/routines/routine-editor.tsx` is the form that makes or edits a routine, with the new-session draft's `DirectoryPicker` for its workspace.
+- `web/components/projects/projects-page.tsx`: the Projects page, its list, its **New project** form at `#projects/new`, which sends `project-create` with the model and effort, and one project's page: its coordinator, its workers with their phases and last replies, its waiting updates, and its notes from `GET /api/project-notes`, which open in the file dialog, with **Rename** and **Archive**.
 - `web/components/calendar/calendar-page.tsx`: the Calendar page, a month of `web/calendar-model.ts` entries and the chosen day's list beside it, including Google events read with `web/reads.ts`.
   It draws the month's grid and each day's hover card itself, and takes the month and year menus and arrows from Kibo UI's calendar, `web/components/kibo-ui/calendar/index.tsx`, whose month and year live in jotai atoms, so the page keeps its month while you leave and come back.
 - `web/components/pane.tsx`: a pane, whose view renders inside a `RenderBoundary` from `web/components/render-boundary.tsx`, so a view that throws shows its error in that pane and the rest of the page stays; `web/app.tsx` puts one around the page too, and both clear when the hash names another view.
