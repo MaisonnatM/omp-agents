@@ -2,7 +2,7 @@ import { describe, expect, setSystemTime, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadInbox, parseDetailAnswer, parseInboxAnswer, parseRemote, repoOf } from "./inbox";
+import { loadPullRequests, parseDetailAnswer, parseListAnswer, parseRemote, repoOf } from "./pull-requests";
 import { runChecked } from "./proc";
 
 const repo = { owner: "acme", repo: "webapp" };
@@ -58,12 +58,12 @@ test("a workspace removed after its origin was read leaves the inbox, as does on
 	await runChecked(["git", "-C", dir, "remote", "add", "origin", "git@github.com:acme/webapp.git"]);
 	expect(await repoOf(dir)).toEqual({ owner: "acme", repo: "webapp" });
 	rmSync(dir, { recursive: true, force: true });
-	expect(await loadInbox([dir, `${dir}-never`], false)).toEqual({ repos: [], unmatched: [] });
+	expect(await loadPullRequests([dir, `${dir}-never`], false)).toEqual({ repos: [], unmatched: [] });
 });
 
-describe("parseInboxAnswer", () => {
+describe("parseListAnswer", () => {
 	test("maps GitHub's states, keeps a PR once, and names the base of a stacked PR", () => {
-		const prs = parseInboxAnswer(
+		const prs = parseListAnswer(
 			{
 				data: {
 					authored: {
@@ -162,7 +162,7 @@ describe("parseInboxAnswer", () => {
 	});
 
 	test("lists each reviewer once: a pending request over an older review, and neither the author nor a dismissed review", () => {
-		const [pr] = parseInboxAnswer(
+		const [pr] = parseListAnswer(
 			{
 				data: {
 					authored: {
@@ -201,7 +201,7 @@ describe("parseInboxAnswer", () => {
 		const bsaintot = { login: "bsaintot", avatarUrl: null };
 		const changes = (...authors: (typeof lencshu)[]) => ({ nodes: authors.map(author => ({ state: "CHANGES_REQUESTED", author })) });
 		const requested = (...reviewers: (typeof lencshu)[]) => ({ nodes: reviewers.map(requestedReviewer => ({ requestedReviewer })) });
-		const prs = parseInboxAnswer(
+		const prs = parseListAnswer(
 			{
 				data: {
 					authored: {
@@ -224,7 +224,7 @@ describe("parseInboxAnswer", () => {
 
 	test("counts unresolved review threads, as a floor when GitHub lists only the first page", () => {
 		const threads = (resolved: boolean[], totalCount = resolved.length) => ({ totalCount, nodes: resolved.map(isResolved => ({ isResolved })) });
-		const prs = parseInboxAnswer(
+		const prs = parseListAnswer(
 			{
 				data: {
 					authored: {
@@ -248,7 +248,7 @@ describe("parseInboxAnswer", () => {
 	});
 
 	test("an answer without data reports GitHub's errors", () => {
-		expect(() => parseInboxAnswer({ errors: [{ message: "Could not resolve to a Repository" }] }, repo)).toThrow("Could not resolve to a Repository");
+		expect(() => parseListAnswer({ errors: [{ message: "Could not resolve to a Repository" }] }, repo)).toThrow("Could not resolve to a Repository");
 	});
 });
 

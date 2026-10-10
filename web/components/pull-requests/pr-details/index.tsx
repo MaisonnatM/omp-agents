@@ -4,11 +4,11 @@ import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
-import { pullRequestStatus } from "../../../inbox-model";
+import { pullRequestStatus } from "../../../pull-requests-model";
 import { putJson } from "../../../api";
 import type { PullRequestActionId } from "../../../../src/pull-request-actions";
 import type { MoveId } from "../../../../src/shared/moves";
-import { hashForInbox, hashForPullRequestFiles, type OpenMode } from "../../../routing";
+import { hashForPullRequests, hashForPullRequestFiles, type OpenMode } from "../../../routing";
 import { useRead, useReplaceableRead } from "../../../reads";
 import { useQueuedSave } from "../../../use-queued-save";
 import type { QuickActionsProps } from "../../quick-actions";
@@ -87,7 +87,7 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: li
 		setTab(value);
 		if (placement !== "page") return;
 		if (value === "code" && !files) location.hash = hashForPullRequestFiles(pr);
-		else if (value !== "code" && files) location.hash = hashForInbox(pr);
+		else if (value !== "code" && files) location.hash = hashForPullRequests(pr);
 	};
 	// GitHub's search, which the inbox reads, can list a pull request for a while after it closes.
 	const next = detail?.state === "closed" ? null : listedNext;

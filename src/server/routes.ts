@@ -10,7 +10,7 @@ import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import { gitCheckout } from "../git";
 import type { GoogleCalendarReader } from "../google-calendar";
-import { loadInbox, loadPullRequestDetail } from "../inbox";
+import { loadPullRequests, loadPullRequestDetail } from "../pull-requests";
 import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
@@ -182,7 +182,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	});
 
 	/**
-	 * `GET /api/inbox[?cwd=<dir>][&fresh]`: the pull requests of that workspace's repository, else of every workspace's.
+	 * `GET /api/pull-requests[?cwd=<dir>][&fresh]`: the pull requests of that workspace's repository, else of every workspace's.
 	 * Each answer also tells the pull-request index which branch heads which PR, which links the sessions that pushed them.
 	 */
 	const inbox = get(params => {
@@ -190,7 +190,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		if (cwd instanceof Response) return cwd;
 		const fresh = params.has("fresh");
 		return answer(async () => {
-			const loaded = await loadInbox(cwd === null ? env.knownCwds() : [cwd], fresh);
+			const loaded = await loadPullRequests(cwd === null ? env.knownCwds() : [cwd], fresh);
 			for (const repo of loaded.repos) if ("pullRequests" in repo) env.learnHeads(repo, repo.pullRequests);
 			return loaded;
 		});
@@ -241,7 +241,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/models/roles": { GET: roles },
 		"/api/analytics": { GET: analytics },
 		"/api/skills": { GET: skills },
-		"/api/inbox": { GET: inbox },
+		"/api/pull-requests": { GET: inbox },
 		"/api/projects": { PUT: projectChange },
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },

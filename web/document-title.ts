@@ -11,7 +11,7 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return "New session";
 		case "settings":
 			return "Settings";
-		case "inbox":
+		case "pull-requests":
 			return page.target ? `${page.target.owner}/${page.target.repo}#${page.target.number}` : "Inbox";
 		case "tickets":
 			return page.target ?? "Tickets";

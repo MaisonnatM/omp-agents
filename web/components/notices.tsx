@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { moveAction } from "../inbox-model";
+import { moveAction } from "../pull-requests-model";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
-import { hashForInbox } from "../routing";
+import { hashForPullRequests } from "../routing";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { SLACK_LOGO } from "./integrations/brand-logos";
@@ -91,7 +91,7 @@ function previewOf(notice: Notice): string {
 
 /** Opens what a pull request notice or Slack notice is about: the pull request in the inbox, or the message in Slack. */
 function follow(notice: Notice): void {
-	if (notice.kind === "pull-request") location.hash = hashForInbox(notice.pr);
+	if (notice.kind === "pull-request") location.hash = hashForPullRequests(notice.pr);
 	else if (notice.kind === "slack") window.open(notice.permalink, "_blank", "noopener,noreferrer");
 }
 
@@ -272,7 +272,7 @@ function NoticeAction({ notice, send, onDone }: { notice: Notice; send: Send; on
 				start(pullRequestStart(pr, action, cwd, readPinnedSkill()));
 				read();
 				onDone();
-				location.hash = hashForInbox(pr);
+				location.hash = hashForPullRequests(pr);
 			}}
 		>
 			{QUICK_ACTIONS[action].label}
@@ -288,7 +288,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 	const read = () => {
 		if (!notice.read) send({ t: "notice", ids: [notice.id], op: "read" });
 	};
-	const href = notice.kind === "pull-request" ? hashForInbox(notice.pr) : notice.kind === "slack" ? notice.permalink : null;
+	const href = notice.kind === "pull-request" ? hashForPullRequests(notice.pr) : notice.kind === "slack" ? notice.permalink : null;
 	const label = `${notice.read ? "" : "Unread: "}${headline}`;
 	return (
 		<li className="group relative flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/70 has-[>a:focus-visible]:bg-muted/70">

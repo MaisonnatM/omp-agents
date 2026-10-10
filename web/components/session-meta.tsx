@@ -4,13 +4,14 @@ import { type LinkedPullRequest, pullRequestUrl } from "../../src/shared/github"
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
-import { graphiteUrl } from "../inbox-model";
+import { graphiteUrl } from "../pull-requests-model";
 import { projectName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
-import { hashForInbox } from "../routing";
+import { hashForPullRequests } from "../routing";
 import { OrgIcon } from "./org-icon";
 
 const PARENT_CRUMB = "font-normal text-muted-foreground";
+const PullRequestsIcon = PAGE_ICON["pull-requests"];
 
 /**
  * `webapp / Fix login`: the project a session runs in, then `path`, each name below the one before it. Hover the project
@@ -62,8 +63,8 @@ export function PullRequestMenu({ pullRequests }: { pullRequests: LinkedPullRequ
 						<MenuLinkItem href={graphiteUrl(pr)} target="_blank" rel="noreferrer">
 							<OrgIcon org="graphite" className="size-4" />#{pr.number} on Graphite
 						</MenuLinkItem>
-						<MenuLinkItem href={hashForInbox(pr)}>
-							<PAGE_ICON.inbox />#{pr.number} in the inbox
+						<MenuLinkItem href={hashForPullRequests(pr)}>
+							<PullRequestsIcon />#{pr.number} in Pull requests
 						</MenuLinkItem>
 					</Fragment>
 				))}

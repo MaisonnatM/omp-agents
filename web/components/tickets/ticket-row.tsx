@@ -23,7 +23,7 @@ import { dateLabel, dayLabel } from "../../labels";
 import { type QuickActionId, type TicketActionId, ticketActions } from "../../quick-actions";
 import { hashForTickets, type OpenMode } from "../../routing";
 import { PRIORITY_LABEL, type StatusKind, statusKind } from "../../tickets-model";
-import { IconTip } from "../inbox/avatars";
+import { IconTip } from "../pull-requests/avatars";
 import { AddToTodo } from "../todo/add-button";
 import { QuickActionsMenu } from "../quick-actions";
 import { LiveSessionChips } from "../session-chip";

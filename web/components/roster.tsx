@@ -10,10 +10,10 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { agentOn } from "../../src/shared/moves";
-import { yourMoveCount } from "../inbox-model";
+import { yourMoveCount } from "../pull-requests-model";
 import { projectName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
-import { inboxStore, ticketsStore } from "../reads";
+import { pullRequestStore, ticketsStore } from "../reads";
 import { hashForTickets, type SettingsRoute, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
@@ -211,11 +211,11 @@ export function Roster({
 }: RosterProps) {
 	const { changeTodo: onTodoChange } = useDashboardActions();
 	const { connected } = useDashboardStatus();
-	const inboxRead = inboxStore.use(project).read;
+	const pullRequestRead = pullRequestStore.use(project).read;
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
-		inbox: { count: inboxRead ? yourMoveCount(inboxRead.data, agentOn(hosts)) : 0, meaning: "your move" },
+		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
 	const selectedProject = projects.find(({ cwd }) => cwd === project);
 	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
@@ -276,7 +276,7 @@ export function Roster({
 					newSessionLabel={newSessionLabel}
 				/>
 			</TabPanel>
-			<TabPanel value="inbox" asChild>
+			<TabPanel value="pull-requests" asChild>
 				<SidebarContent>
 					{inbox}
 				</SidebarContent>

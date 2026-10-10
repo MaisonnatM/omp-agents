@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { isObject } from "../src/json";
 import { type CalendarEventsAnswer, type GoogleStatus, type IntegrationsAnswer, MCP_INTEGRATIONS } from "../src/shared/accounts";
 import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
-import type { Inbox, RepoInbox } from "../src/shared/github";
+import type { PullRequestList, RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
 import type { TicketsAnswer } from "../src/shared/tickets";
 import { errorText, getJson } from "./api";
@@ -59,18 +59,18 @@ export function useReplaceableRead<T>(url: string | null, version?: unknown): Re
 }
 
 /** The open pull requests by project `cwd`, which the sidebar and the inbox page share; `null` reads every project. */
-export const inboxStore = createPolledStore<Inbox>({
+export const pullRequestStore = createPolledStore<PullRequestList>({
 	cacheKey: "omp-agents.inbox-cache",
 	url: (cwd, fresh) => {
 		const params = new URLSearchParams();
 		if (cwd !== null) params.set("cwd", cwd);
 		if (fresh) params.set("fresh", "");
-		return `/api/inbox${params.size ? `?${params}` : ""}`;
+		return `/api/pull-requests${params.size ? `?${params}` : ""}`;
 	},
-	isValid: (value): value is Inbox => {
-		const inbox = value as Partial<Inbox> | null;
+	isValid: (value): value is PullRequestList => {
+		const inbox = value as Partial<PullRequestList> | null;
 		// A read saved before the inbox carried each PR's diff size reads GitHub again.
-		const current = (repo: RepoInbox): boolean => "error" in repo || repo.pullRequests.every(pr => typeof pr.additions === "number");
+		const current = (repo: RepoPullRequests): boolean => "error" in repo || repo.pullRequests.every(pr => typeof pr.additions === "number");
 		return Array.isArray(inbox?.repos) && Array.isArray(inbox.unmatched) && inbox.repos.every(current);
 	},
 });

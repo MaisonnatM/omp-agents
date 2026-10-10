@@ -4,7 +4,7 @@
  */
 import { JsonFile } from "../fs";
 import { errorText, isObject } from "../json";
-import { type Inbox, prKey, repoKey } from "../shared/github";
+import { type PullRequestList, prKey, repoKey } from "../shared/github";
 import { type AgentOn, moveOf, YOUR_MOVES, type YourMove } from "../shared/moves";
 import type { ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject } from "../shared/notices";
 import { usesClause } from "../shared/notices";
@@ -20,7 +20,7 @@ export interface NoticeSources {
 	modelUpdates(): Promise<ModelUpdate[]>;
 	upgradeModel(update: ModelUpdate): Promise<void>;
 	/** Every project's inbox, and where the running sessions on each pull request stand. */
-	inbox(): Promise<{ inbox: Inbox; agent: AgentOn }>;
+	inbox(): Promise<{ inbox: PullRequestList; agent: AgentOn }>;
 	/** The Slack messages that wait on you; none while Slack is not connected. */
 	slack(): Promise<SlackFound[]>;
 	now(): number;
@@ -75,7 +75,7 @@ const isYourMove = (move: string): move is YourMove => (YOUR_MOVES as readonly s
 const repoOf = (id: string): string => id.slice("pull-request:".length, id.lastIndexOf("#"));
 
 /** The pull requests of `inbox` whose next move is yours, each a notice per move; the repositories GitHub did not answer for stay unchecked. */
-function pullRequestNotices(inbox: Inbox, agent: AgentOn): Checked {
+function pullRequestNotices(inbox: PullRequestList, agent: AgentOn): Checked {
 	const failed = new Set(inbox.repos.flatMap(repo => ("error" in repo ? [repoKey(repo)] : [])));
 	const found = inbox.repos.flatMap(repo =>
 		"error" in repo

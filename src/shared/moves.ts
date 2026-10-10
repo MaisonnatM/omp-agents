@@ -1,5 +1,5 @@
 /** What a pull request waits on next, which the inbox ranks its rows by and the bell notifies of when the move is yours. */
-import type { InboxPullRequest, PullRequest, PullRequestDetail } from "./github";
+import type { PullRequestSummary, PullRequest, PullRequestDetail } from "./github";
 import { type HostStatus, type RosterHost, worksOn } from "./sessions";
 
 export type MoveId = "review" | "merge" | "fix-ci" | "rebase" | "reply" | "answer" | "agent" | "in-review" | "checks-running" | "draft" | "merged";
@@ -21,7 +21,7 @@ export const agentOn = (hosts: RosterHost[]): AgentOn => pr => {
 };
 
 /** What decides whether a pull request can merge, as a list entry and the details both carry it. */
-type MergeFacts = Pick<InboxPullRequest, "review" | "checks" | "conflicts" | "unresolved"> & { state: PullRequestDetail["state"] };
+type MergeFacts = Pick<PullRequestSummary, "review" | "checks" | "conflicts" | "unresolved"> & { state: PullRequestDetail["state"] };
 
 /** Some review thread waits for a resolution, or GitHub listed too few threads to tell. */
 export const hasOpenThreads = ({ unresolved }: Pick<MergeFacts, "unresolved">): boolean => unresolved.count > 0 || !unresolved.exact;
@@ -31,7 +31,7 @@ export const readyToMerge = (facts: MergeFacts): boolean =>
 	facts.state === "open" && (facts.review === "approved" || facts.review === "none") && !facts.conflicts && (facts.checks === "passing" || facts.checks === "none") && !hasOpenThreads(facts);
 
 /** What `pr` waits on next, given where the sessions on it stand. */
-export function moveOf(pr: InboxPullRequest, agent: AgentState | null): MoveId {
+export function moveOf(pr: PullRequestSummary, agent: AgentState | null): MoveId {
 	if (pr.state === "merged") return "merged";
 	if (agent === "needs-input") return "answer";
 	if (agent === "working") return "agent";

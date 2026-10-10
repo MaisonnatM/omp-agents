@@ -7,7 +7,7 @@ import type { StartOp } from "./starts";
 import { PAGE_ICON } from "./page-icons";
 
 export const SIDEBAR_TABS = [
-	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox },
+	{ value: "pull-requests", label: "Inbox", icon: PAGE_ICON["pull-requests"] },
 	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
@@ -24,7 +24,7 @@ const PAST_PREFIX = "past/";
  * The sidebar's inbox, and the pull request the main content shows: its details, or with `files` its changes page open
  * on the file at `path`, `null` for the first. A `null` target keeps the panes.
  */
-export type InboxRoute = { target: null } | { target: PullRequest; files: { path: string | null } | null };
+export type PullRequestsRoute = { target: null } | { target: PullRequest; files: { path: string | null } | null };
 
 /** The tickets list, or the Linear issue whose details replace it when `target` is non-null. */
 export interface TicketsRoute {
@@ -84,7 +84,7 @@ export interface ChangesRoute {
 /** A page that covers the panes. */
 export type Page =
 	| ({ kind: "settings" } & SettingsRoute)
-	| ({ kind: "inbox" } & InboxRoute)
+	| ({ kind: "pull-requests" } & PullRequestsRoute)
 	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "routines" } & RoutinesRoute)
@@ -124,10 +124,10 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   project files and config. `#settings` and an unknown section open Analytics.
  * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, and `?todo=<id>` with that todo's
  *   title and notes as its first message. No omp runs until its first message.
- * - `#inbox` shows the sidebar's Inbox tab, which lists the pull requests of the sidebar's project, beside the panes,
- *   and `#inbox/<owner>/<repo>/<number>` shows that pull request's details in the main content.
- *   `#inbox/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
- *   at that encoded path. Any other `#inbox/…` shows the tab alone.
+ * - `#pull-requests` shows the sidebar's Inbox tab, which lists the pull requests of the sidebar's project, beside the panes,
+ *   and `#pull-requests/<owner>/<repo>/<number>` shows that pull request's details in the main content.
+ *   `#pull-requests/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
+ *   at that encoded path. Any other `#pull-requests/…` shows the tab alone.
  * - `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
  *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
@@ -141,11 +141,11 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "settings", section: isSettingsSection(section) ? section : "analytics", cwd: decodeCwd(cwd ?? null) };
 	},
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
-	inbox: rest => {
+	"pull-requests": rest => {
 		const match = rest === null ? null : /^([\w.-]+)\/([\w.-]+)\/(\d+)(\/files(?:\/(.+))?)?$/.exec(rest);
-		if (!match) return { kind: "inbox", target: null };
+		if (!match) return { kind: "pull-requests", target: null };
 		const files = match[4] ? { path: match[5] ? decodeSegment(match[5]) : null } : null;
-		return { kind: "inbox", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
+		return { kind: "pull-requests", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
 	},
 	tickets: rest => ({ kind: "tickets", target: rest !== null && TICKET_ID.test(rest) ? rest : null }),
 	todo: rest => {
@@ -171,7 +171,7 @@ function restOfPage(page: Page): string | null {
 			return `${page.section}${page.cwd === null ? "" : `/${encodeCwd(page.cwd)}`}`;
 		case "new":
 			return encodeCwd(page.cwd);
-		case "inbox": {
+		case "pull-requests": {
 			if (page.target === null) return null;
 			const pr = `${page.target.owner}/${page.target.repo}/${page.target.number}`;
 			if (page.files === null) return pr;
@@ -200,8 +200,8 @@ export function hashForPage(page: Page): string {
 	return `#${page.kind}${rest === null ? "" : `/${rest}`}${query}`;
 }
 
-export const hashForInbox = (target: PullRequest | null): string => hashForPage(target ? { kind: "inbox", target, files: null } : { kind: "inbox", target: null });
-export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "inbox", target: pr, files: { path } });
+export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
+export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
 export const hashForTodo = (list: TodoListView): string => hashForPage({ kind: "todo", list });
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });

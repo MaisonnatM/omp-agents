@@ -8,17 +8,17 @@ import { SidebarGroup, SidebarGroupLabel, SidebarMenu } from "@/components/ui/si
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { inboxSections, orderedRepos } from "../../inbox-model";
+import { pullRequestSections, orderedRepos } from "../../pull-requests-model";
 import { readTime } from "../../labels";
-import { inboxStore } from "../../reads";
-import { hashForInbox, type InboxRoute } from "../../routing";
+import { pullRequestStore } from "../../reads";
+import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import type { SectionTarget } from "../../section";
 import { DROP_LINE, useDragOrder } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton } from "../fold";
 import { QuickStartNotice } from "../quick-actions";
 import { SectionLink } from "../section-link";
-import { inboxSection, type RepoView, type SectionView, SortMenu, UnmatchedTip, useInboxBoard, useInboxOrder, withRepoMoved, workspacesLabel } from "./inbox-board";
+import { pullRequestSectionTarget, type RepoView, type SectionView, SortMenu, UnmatchedTip, usePullRequestBoard, usePullRequestOrder, withRepoMoved, workspacesLabel } from "./list-board";
 import { PullRequestRow } from "./pr-row";
 
 const note = (text: string) => <p className="px-3 py-1 text-xs text-muted-foreground">{text}</p>;
@@ -96,23 +96,23 @@ function RepoBlock({ view }: { view: RepoView }) {
 	);
 }
 
-interface InboxNavProps {
+interface PullRequestNavProps {
 	/** The sidebar's project `cwd`, or `null` for every project. */
 	project: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** What the main area shows: a pull request's row unfolds, scrolls into view, and stays highlighted while its details or changes show. */
-	route: InboxRoute;
+	route: PullRequestsRoute;
 }
 
 /**
  * The sidebar's inbox beside the panes or a pull request's details: the pull requests of its project, or of every
  * project, by repository in sections named after whose move it is, read from GitHub.
  */
-export function InboxNav({ project, hosts, past, route }: InboxNavProps) {
+export function PullRequestNav({ project, hosts, past, route }: PullRequestNavProps) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const board = useInboxBoard({ project, hosts, past, route });
+	const board = usePullRequestBoard({ project, hosts, past, route });
 	const { read, error, refreshing } = board.poll;
 	return (
 		<div className="space-y-2">
@@ -144,7 +144,7 @@ export function InboxNav({ project, hosts, past, route }: InboxNavProps) {
 	);
 }
 
-interface InboxIndexProps {
+interface PullRequestIndexProps {
 	/** The sidebar's project `cwd`, or `null` for every project. */
 	project: string | null;
 	hosts: RosterHost[];
@@ -153,9 +153,9 @@ interface InboxIndexProps {
 }
 
 /** The sidebar beside the inbox page: each repository's sections with their pull request counts, each a link to its card on the page. Drag a repository's name to reorder them, as on the page. */
-export function InboxIndex({ project, hosts, target, onTarget }: InboxIndexProps) {
-	const { read, error } = inboxStore.use(project);
-	const [order, setOrder] = useInboxOrder();
+export function PullRequestIndex({ project, hosts, target, onTarget }: PullRequestIndexProps) {
+	const { read, error } = pullRequestStore.use(project);
+	const [order, setOrder] = usePullRequestOrder();
 	const drag = useDragOrder();
 	if (!read) return note(error ? `Cannot load the inbox: ${error}` : "Asking GitHub for pull requests…");
 	const agent = agentOn(hosts);
@@ -165,7 +165,7 @@ export function InboxIndex({ project, hosts, target, onTarget }: InboxIndexProps
 	return repos.map(repo => {
 		const key = repoKey(repo);
 		const name = `${repo.owner}/${repo.repo}`;
-		const sections = "error" in repo ? [] : inboxSections(repo.pullRequests, order, agent);
+		const sections = "error" in repo ? [] : pullRequestSections(repo.pullRequests, order, agent);
 		const item = drag("repos", key, (dragged, where) => setOrder(withRepoMoved(order, repoKeys, dragged, key, where)));
 		return (
 			<SidebarGroup key={key} {...item.target} className={cn(item.dragging && "opacity-50", item.dropAt && DROP_LINE[item.dropAt])}>
@@ -176,8 +176,8 @@ export function InboxIndex({ project, hosts, target, onTarget }: InboxIndexProps
 						{sections.map(({ title, rows: { length } }) => (
 							<SectionLink
 								key={title}
-								href={hashForInbox(null)}
-								section={inboxSection(key, title)}
+								href={hashForPullRequests(null)}
+								section={pullRequestSectionTarget(key, title)}
 								chosen={target}
 								title={title}
 								label={`${title}, ${length} pull request${length === 1 ? "" : "s"}`}

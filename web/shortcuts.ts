@@ -22,7 +22,7 @@ export type ShortcutId =
 	| "help"
 	| "restore"
 	| "focusComposer"
-	| "inbox"
+	| "pull-requests"
 	| "tickets"
 	| "newTicket"
 	| "sessions"
@@ -146,7 +146,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "i", mod: true }, scope: "anywhere" },
 		],
 	},
-	{ id: "inbox", label: "Go to the pull request inbox", command: "Go to inbox", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
+	{ id: "pull-requests", label: "Go to the pull request inbox", command: "Go to inbox", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
 	{ id: "tickets", label: "Go to your Linear tickets", command: "Go to tickets", keys: [{ chord: { key: "2", mod: true }, scope: "anywhere" }] },
 	{ id: "newTicket", label: "Create a Linear ticket, except on the Todo page", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "sessions", label: "Go to the sessions", command: "Go to sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },

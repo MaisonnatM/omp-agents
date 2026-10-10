@@ -46,7 +46,7 @@ export interface LinkedPullRequest extends PullRequest {
 }
 
 /** Where the viewer stands on a pull request in the inbox: they wrote it, or someone asked them to review it. */
-export type InboxRole = "author" | "reviewer";
+export type PullRequestRole = "author" | "reviewer";
 
 /** GitHub's review decision, plus `none` for a repository that requires no review. */
 export type ReviewDecision = "approved" | "changes-requested" | "review-required" | "none";
@@ -68,12 +68,12 @@ export interface Reviewer extends Person {
 }
 
 /** A pull request on the inbox page, as GitHub reports it now. */
-export interface InboxPullRequest extends PullRequest {
+export interface PullRequestSummary extends PullRequest {
 	title: string;
 	author: Person;
 	/** Requested reviewers first, then the others in GitHub's order of their latest reviews. */
 	reviewers: Reviewer[];
-	role: InboxRole;
+	role: PullRequestRole;
 	state: "open" | "draft" | "merged";
 	review: ReviewDecision;
 	checks: CheckState;
@@ -92,10 +92,10 @@ export interface InboxPullRequest extends PullRequest {
 }
 
 /** One GitHub repository's inbox, for the workspaces whose `origin` it is. */
-export type RepoInbox = Repo & { cwds: string[] } & ({ pullRequests: InboxPullRequest[] } | { error: string });
+export type RepoPullRequests = Repo & { cwds: string[] } & ({ pullRequests: PullRequestSummary[] } | { error: string });
 
-export interface Inbox {
-	repos: RepoInbox[];
+export interface PullRequestList {
+	repos: RepoPullRequests[];
 	/** Workspaces with no GitHub `origin`, which the inbox cannot show. */
 	unmatched: string[];
 }
@@ -187,19 +187,19 @@ export interface PullRequestDetail extends PullRequest {
 	review: ReviewDecision;
 	head: string;
 	base: string;
-	/** True when GitHub reports the PR as `CONFLICTING` with its base branch, as on {@link InboxPullRequest}. */
+	/** True when GitHub reports the PR as `CONFLICTING` with its base branch, as on {@link PullRequestSummary}. */
 	conflicts: boolean;
 	additions: number;
 	deletions: number;
 	/** All files the PR changes; `files` lists at most the first 100. */
 	changedFiles: number;
 	files: PullRequestFile[];
-	/** GitHub's rollup of the head commit's checks, as on {@link InboxPullRequest}; `checkRuns` lists at most the first 100. */
+	/** GitHub's rollup of the head commit's checks, as on {@link PullRequestSummary}; `checkRuns` lists at most the first 100. */
 	checks: CheckState;
 	/** The head commit's checks, failing first, then pending, passing, and skipped. */
 	checkRuns: PullRequestCheck[];
-	/** Review threads not yet resolved, as on {@link InboxPullRequest}. */
-	unresolved: InboxPullRequest["unresolved"];
+	/** Review threads not yet resolved, as on {@link PullRequestSummary}. */
+	unresolved: PullRequestSummary["unresolved"];
 	/** The unresolved threads in full: those among the first 100 that GitHub lists. */
 	threads: PullRequestThread[];
 	/** Comments and reviews, oldest first: the latest 50 of each. */

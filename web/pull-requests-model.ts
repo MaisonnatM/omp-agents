@@ -1,6 +1,6 @@
 /** Pull request links, what each pull request waits on next, the inbox's sections and stacks, and what stands between a pull request and its merge. */
 import { type PullRequestActionId, pullRequestActions } from "../src/pull-request-actions";
-import { type Inbox, type InboxPullRequest, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, prKey, repoKey, samePullRequest } from "../src/shared/github";
+import { type PullRequestList, type PullRequestSummary, type PullRequest, type PullRequestCheck, type PullRequestDetail, type Repo, prKey, repoKey, samePullRequest } from "../src/shared/github";
 import { type AgentOn, hasOpenThreads, type MoveId, moveOf, readyToMerge } from "../src/shared/moves";
 
 export const graphiteUrl = (pr: PullRequest): string => `https://app.graphite.com/github/pr/${pr.owner}/${pr.repo}/${pr.number}`;
@@ -50,11 +50,11 @@ const GROUP_TITLES = Object.keys(GROUPS) as MoveGroup[];
 const APPROVED_MOVES: MoveId[] = ["merge", "checks-running", "draft"];
 
 /** The section `pr` goes in while it waits on `move`. */
-const groupOf = (pr: InboxPullRequest, move: MoveId): MoveGroup => (pr.review === "approved" && APPROVED_MOVES.includes(move) ? "Approved" : MOVES[move].group);
+const groupOf = (pr: PullRequestSummary, move: MoveId): MoveGroup => (pr.review === "approved" && APPROVED_MOVES.includes(move) ? "Approved" : MOVES[move].group);
 
 const AND = new Intl.ListFormat("en", { type: "conjunction" });
 
-const REASON: Record<MoveId, (pr: InboxPullRequest) => string> = {
+const REASON: Record<MoveId, (pr: PullRequestSummary) => string> = {
 	review: pr => `@${pr.author.login}`,
 	merge: pr => `${pr.review === "none" ? "no review needed" : "approved"} · ${pr.checks === "none" ? "no checks" : "checks green"}`,
 	"fix-ci": () => "checks failing",
@@ -77,10 +77,10 @@ const REASON: Record<MoveId, (pr: InboxPullRequest) => string> = {
 };
 
 /** Why `pr` waits on `move`, as its row's second line says after its number. */
-export const reason = (pr: InboxPullRequest, move: MoveId): string => REASON[move](pr);
+export const reason = (pr: PullRequestSummary, move: MoveId): string => REASON[move](pr);
 
 /** The first quick action that hands `move` on `pr` to an agent and applies to `pr`, if any. */
-export function moveAction(pr: InboxPullRequest, move: MoveId): PullRequestActionId | null {
+export function moveAction(pr: PullRequestSummary, move: MoveId): PullRequestActionId | null {
 	const applying = pullRequestActions(pr);
 	return MOVES[move].actions.find(action => applying.includes(action)) ?? null;
 }
@@ -96,18 +96,18 @@ export interface StackPlace {
 	joinsBelow: boolean;
 }
 
-export interface InboxRow {
-	pr: InboxPullRequest;
+export interface SectionRow {
+	pr: PullRequestSummary;
 	move: MoveId;
 	stack: StackPlace | null;
 	/** The rows that move together: a stack's members share it, and a pull request in no stack has its own. */
 	unit: string;
 }
 
-export interface InboxSection {
+export interface PullRequestSection {
 	title: MoveGroup;
 	/** By move in rank order, then in the inbox's sort; the manual sort keeps your order alone. Either way, except that a stack's members in the section sit together, top first, where its first member in the sort would. */
-	rows: InboxRow[];
+	rows: SectionRow[];
 }
 
 interface StackMember {
@@ -118,7 +118,7 @@ interface StackMember {
 }
 
 /** Each open or draft pull request in a stack of two or more that the inbox lists, by the chain of base branches. */
-function stackMembers(pullRequests: InboxPullRequest[]): Map<InboxPullRequest, StackMember> {
+function stackMembers(pullRequests: PullRequestSummary[]): Map<PullRequestSummary, StackMember> {
 	const live = pullRequests.filter(pr => pr.state !== "merged");
 	const byHead = new Map(live.map(pr => [pr.head, pr]));
 	const places = live.map(pr => {
@@ -131,7 +131,7 @@ function stackMembers(pullRequests: InboxPullRequest[]): Map<InboxPullRequest, S
 		}
 		return { pr, root: bottom.head, position: seen.size };
 	});
-	const members = new Map<InboxPullRequest, StackMember>();
+	const members = new Map<PullRequestSummary, StackMember>();
 	for (const stack of Map.groupBy(places, place => place.root).values()) {
 		if (stack.length < 2) continue;
 		const size = Math.max(...stack.map(place => place.position));
@@ -141,27 +141,27 @@ function stackMembers(pullRequests: InboxPullRequest[]): Map<InboxPullRequest, S
 }
 
 /** How the inbox orders a section's pull requests; a stack's members sit together, top first, in every sort. */
-export type InboxSort = "updated" | "newest" | "oldest" | "manual";
+export type PullRequestSort = "updated" | "newest" | "oldest" | "manual";
 
-export const INBOX_SORTS: Record<InboxSort, string> = { updated: "Recently updated", newest: "Newest first", oldest: "Oldest first", manual: "Manual" };
+export const PULL_REQUEST_SORTS: Record<PullRequestSort, string> = { updated: "Recently updated", newest: "Newest first", oldest: "Oldest first", manual: "Manual" };
 
 /** The order you gave the inbox, which the browser keeps. Keys you never placed follow their default order. */
-export interface InboxOrder {
+export interface PullRequestOrder {
 	/** `repoKey`s; a repository you never moved follows them, in the order GitHub was asked. */
 	repos: string[];
 	/** Section titles; one you never moved follows them, in {@link MoveGroup}'s order. */
 	sections: string[];
-	sort: InboxSort;
+	sort: PullRequestSort;
 	/** `prKey`s, for the manual sort; a pull request you never placed goes first, most recently updated first, since it is new to you. */
 	manual: string[];
 }
 
-export const DEFAULT_ORDER: InboxOrder = { repos: [], sections: [], sort: "updated", manual: [] };
+export const DEFAULT_ORDER: PullRequestOrder = { repos: [], sections: [], sort: "updated", manual: [] };
 
 const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filter(item => typeof item === "string") : []);
 
 /** The stored order, or {@link DEFAULT_ORDER} for what is missing or unreadable. */
-export function decodeOrder(raw: string | null): InboxOrder {
+export function decodeOrder(raw: string | null): PullRequestOrder {
 	let stored: unknown;
 	try {
 		stored = JSON.parse(raw ?? "null");
@@ -170,7 +170,7 @@ export function decodeOrder(raw: string | null): InboxOrder {
 	}
 	if (typeof stored !== "object" || stored === null) return DEFAULT_ORDER;
 	const { repos, sections, sort, manual } = stored as Record<string, unknown>;
-	return { repos: strings(repos), sections: strings(sections), sort: typeof sort === "string" && sort in INBOX_SORTS ? (sort as InboxSort) : "updated", manual: strings(manual) };
+	return { repos: strings(repos), sections: strings(sections), sort: typeof sort === "string" && sort in PULL_REQUEST_SORTS ? (sort as PullRequestSort) : "updated", manual: strings(manual) };
 }
 
 /** `items` in `order` by `keyOf`, then the items `order` does not name, as they came. */
@@ -179,34 +179,34 @@ function inOrder<T>(items: readonly T[], keyOf: (item: T) => string, order: read
 	return items.toSorted((a, b) => (at.get(keyOf(a)) ?? order.length) - (at.get(keyOf(b)) ?? order.length));
 }
 
-const BY_SORT: Record<Exclude<InboxSort, "manual">, (a: InboxPullRequest, b: InboxPullRequest) => number> = {
+const BY_SORT: Record<Exclude<PullRequestSort, "manual">, (a: PullRequestSummary, b: PullRequestSummary) => number> = {
 	updated: (a, b) => b.updatedAt - a.updatedAt,
 	newest: (a, b) => b.number - a.number,
 	oldest: (a, b) => a.number - b.number,
 };
 
-type Moved = Pick<InboxRow, "pr" | "move">;
+type Moved = Pick<SectionRow, "pr" | "move">;
 
 const rank = (move: MoveId): number => MOVE_IDS.indexOf(move);
 
-function sorted(moved: Moved[], { sort, manual }: InboxOrder): Moved[] {
+function sorted(moved: Moved[], { sort, manual }: PullRequestOrder): Moved[] {
 	if (sort !== "manual") return moved.toSorted((a, b) => rank(a.move) - rank(b.move) || BY_SORT[sort](a.pr, b.pr));
 	const at = new Map(manual.map((key, index) => [key, index]));
 	return moved.toSorted((a, b) => (at.get(prKey(a.pr)) ?? -1) - (at.get(prKey(b.pr)) ?? -1) || BY_SORT.updated(a.pr, b.pr));
 }
 
 /** The section titles in page order. */
-export const sectionTitles = (order: InboxOrder): MoveGroup[] => inOrder(GROUP_TITLES, title => title, order.sections);
+export const sectionTitles = (order: PullRequestOrder): MoveGroup[] => inOrder(GROUP_TITLES, title => title, order.sections);
 
 /** The inbox's repositories in page order. */
-export const orderedRepos = <R extends Repo>(repos: readonly R[], order: InboxOrder): R[] => inOrder(repos, repoKey, order.repos);
+export const orderedRepos = <R extends Repo>(repos: readonly R[], order: PullRequestOrder): R[] => inOrder(repos, repoKey, order.repos);
 
 /** A repository's pull requests by whose move it is, leaving out the empty sections, each row with its move and its place in a stack. */
-export function inboxSections(pullRequests: InboxPullRequest[], order: InboxOrder, agentOn: AgentOn): InboxSection[] {
+export function pullRequestSections(pullRequests: PullRequestSummary[], order: PullRequestOrder, agentOn: AgentOn): PullRequestSection[] {
 	const members = stackMembers(pullRequests);
 	const moved = pullRequests.map((pr): Moved => ({ pr, move: moveOf(pr, agentOn(pr)) }));
 	const taken = Map.groupBy(sorted(moved, order), ({ pr, move }) => groupOf(pr, move));
-	return sectionTitles(order).flatMap((title): InboxSection[] => {
+	return sectionTitles(order).flatMap((title): PullRequestSection[] => {
 		const prs = taken.get(title);
 		if (!prs) return [];
 		const unitOf = ({ pr }: Moved): string => {
@@ -216,7 +216,7 @@ export function inboxSections(pullRequests: InboxPullRequest[], order: InboxOrde
 		// A group keeps its first member's place, so a stack sits where its first member in the sort would.
 		const groups = Map.groupBy(prs, unitOf);
 		const ordered = [...groups.values()].flatMap(group => group.toSorted((a, b) => (members.get(b.pr)?.position ?? 0) - (members.get(a.pr)?.position ?? 0)));
-		const rows = ordered.map((row, at): InboxRow => {
+		const rows = ordered.map((row, at): SectionRow => {
 			const member = members.get(row.pr);
 			if (!member) return { ...row, stack: null, unit: unitOf(row) };
 			const joins = (other: Moved | undefined, step: number): boolean => {
@@ -230,7 +230,7 @@ export function inboxSections(pullRequests: InboxPullRequest[], order: InboxOrde
 }
 
 /** What a section holds by move, in rank order, such as `2 in review · 1 CI running`; `null` for a section only one move goes in, whose count says it all. */
-export function movesSummary({ title, rows }: InboxSection): string | null {
+export function movesSummary({ title, rows }: PullRequestSection): string | null {
 	const moves = title === "Approved" ? APPROVED_MOVES : MOVE_IDS.filter(move => MOVES[move].group === title);
 	if (moves.length < 2) return null;
 	const counts = Map.groupBy(rows, row => row.move);
@@ -262,7 +262,7 @@ export function stepTarget(keys: readonly string[], key: string, by: 1 | -1): { 
  * page shows it now, so switching to the manual sort keeps the order you see. Keys of the repository's pull requests
  * that left the inbox drop out; other repositories' keys stay.
  */
-export function placedManual(manual: readonly string[], repo: Repo, sections: InboxSection[], section: MoveGroup, unit: string, target: string, where: Where): string[] {
+export function placedManual(manual: readonly string[], repo: Repo, sections: PullRequestSection[], section: MoveGroup, unit: string, target: string, where: Where): string[] {
 	const placed = sections.flatMap(({ title, rows }) => {
 		if (title !== section) return rows.map(row => prKey(row.pr));
 		const byUnit = Map.groupBy(rows, row => row.unit);
@@ -279,16 +279,16 @@ export const sectionFoldKey = (repo: string, title: string): string => `${repo}:
 export const foldedByDefault = (key: string): boolean => GROUP_TITLES.some(title => GROUPS[title].folded && key.endsWith(`:${title}`));
 
 /** The pull requests the inbox shows, in its order: those of readable repositories and sections that `isFolded` leaves open. */
-export function shownPullRequests({ repos }: Inbox, isFolded: (key: string) => boolean, order: InboxOrder, agentOn: AgentOn): InboxPullRequest[] {
+export function shownPullRequests({ repos }: PullRequestList, isFolded: (key: string) => boolean, order: PullRequestOrder, agentOn: AgentOn): PullRequestSummary[] {
 	return orderedRepos(repos, order).flatMap(repo => {
 		const key = repoKey(repo);
 		if ("error" in repo || isFolded(key)) return [];
-		return inboxSections(repo.pullRequests, order, agentOn).flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
+		return pullRequestSections(repo.pullRequests, order, agentOn).flatMap(({ title, rows }) => (isFolded(sectionFoldKey(key, title)) ? [] : rows.map(row => row.pr)));
 	});
 }
 
 /** The pull request as the inbox lists it, with the workspace a session on it starts in; `null` when the inbox does not list it. */
-export function listedPullRequest(inbox: Inbox, pr: PullRequest): { pr: InboxPullRequest; cwd: string } | null {
+export function listedPullRequest(inbox: PullRequestList, pr: PullRequest): { pr: PullRequestSummary; cwd: string } | null {
 	for (const repo of inbox.repos) {
 		if ("error" in repo) continue;
 		const listed = repo.pullRequests.find(other => samePullRequest(other, pr));
@@ -298,7 +298,7 @@ export function listedPullRequest(inbox: Inbox, pr: PullRequest): { pr: InboxPul
 }
 
 /** How many pull requests in `inbox` wait on your move. */
-export const yourMoveCount = ({ repos }: Inbox, agentOn: AgentOn): number =>
+export const yourMoveCount = ({ repos }: PullRequestList, agentOn: AgentOn): number =>
 	repos.flatMap(repo => ("error" in repo ? [] : repo.pullRequests)).filter(pr => groupOf(pr, moveOf(pr, agentOn(pr))) === "Your move").length;
 
 /** One fact about where a pull request stands, as its details' Status lists it. */

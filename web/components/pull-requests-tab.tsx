@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { LinkedPullRequest, PullRequest } from "../../src/shared/github";
 import type { RosterHost } from "../../src/shared/sessions";
-import { PullRequestDetails } from "./inbox/pr-page";
+import { PullRequestDetails } from "./pull-requests/pr-page";
 
 interface PullRequestsTabProps {
 	/** What the session and its subagents submitted or worked on, the session's own first. */

@@ -3,7 +3,7 @@
  * prompt that starts its session. The pull request actions live in `src/pull-request-actions.ts`, which routines share.
  */
 import { PULL_REQUEST_ACTIONS, type PullRequestActionId, type QuickAction } from "../src/pull-request-actions";
-import { type InboxPullRequest, type PullRequest, samePullRequest } from "../src/shared/github";
+import { type PullRequestSummary, type PullRequest, samePullRequest } from "../src/shared/github";
 import type { WorkItem } from "../src/shared/sessions";
 import type { Ticket } from "../src/shared/tickets";
 import type { QuickOp, StartOf } from "./starts";
@@ -73,7 +73,7 @@ const TICKET_IDS = Object.keys(TICKET_ACTIONS) as TicketActionId[];
 export const ticketActions = (ticket: Ticket): TicketActionId[] => TICKET_IDS.filter(id => TICKET_ACTIONS[id].applies(ticket));
 
 /** The start of `action` on `pr`, in `cwd`, through the pinned `skill` when one is pinned. */
-export const pullRequestStart = (pr: InboxPullRequest, action: PullRequestActionId, cwd: string, skill: string | null): QuickOp => ({
+export const pullRequestStart = (pr: PullRequestSummary, action: PullRequestActionId, cwd: string, skill: string | null): QuickOp => ({
 	kind: "quick",
 	cwd,
 	prompt: PULL_REQUEST_ACTIONS[action].prompt(pr),

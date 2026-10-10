@@ -3,7 +3,7 @@ import { hashForSession, type PastSession, type RosterHost } from "../../../src/
 import type { UserTodoLink } from "../../../src/user-todos-shared";
 import { hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
-import { hashForInbox, hashForTickets } from "../../routing";
+import { hashForPullRequests, hashForTickets } from "../../routing";
 import type { TodoWorkState } from "../../todo-work-state";
 import { Tooltip } from "@/components/ui/tooltip";
 import { StatusDot } from "../status-dot";
@@ -28,7 +28,7 @@ function linkTarget(link: UserTodoLink, sessions: KnownSessions) {
 			return { href: hashForSession(link.sessionId), label: name, title: host ? `Session ${name}, ${host.status}` : `Session ${name}, ended`, host };
 		}
 		case "pull-request":
-			return { href: hashForInbox(link), label: `${link.repo}#${link.number}`, title: `Pull request ${link.owner}/${link.repo}#${link.number}`, host: null };
+			return { href: hashForPullRequests(link), label: `${link.repo}#${link.number}`, title: `Pull request ${link.owner}/${link.repo}#${link.number}`, host: null };
 		case "ticket":
 			return { href: hashForTickets(link.identifier), label: link.identifier, title: `Linear issue ${link.identifier}`, host: null };
 		default: {
@@ -39,7 +39,7 @@ function linkTarget(link: UserTodoLink, sessions: KnownSessions) {
 }
 
 /** Each link shows the icon of the page it opens. */
-const ICONS = { session: PAGE_ICON.sessions, "pull-request": PAGE_ICON.inbox, ticket: PAGE_ICON.tickets } as const;
+const ICONS = { session: PAGE_ICON.sessions, "pull-request": PAGE_ICON["pull-requests"], ticket: PAGE_ICON.tickets } as const;
 
 interface TodoLinkChipProps {
 	link: UserTodoLink;

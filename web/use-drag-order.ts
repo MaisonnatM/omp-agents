@@ -1,5 +1,5 @@
 import { type DragEvent, useCallback, useRef, useState } from "react";
-import type { Where } from "./inbox-model";
+import type { Where } from "./pull-requests-model";
 
 /** The item being dragged within its `scope`, and where a drop on the item under the pointer would put it. */
 interface Drag {

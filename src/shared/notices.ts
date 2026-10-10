@@ -2,7 +2,7 @@
  * What the bell lists: a newer omp or routed model, a pull request whose next move is yours, and a Slack message that
  * waits on you.
  */
-import type { InboxPullRequest } from "./github";
+import type { PullRequestSummary } from "./github";
 import type { YourMove } from "./moves";
 
 export interface NamedModel {
@@ -37,7 +37,7 @@ export type UpdateSubject = { kind: "omp"; current: string; latest: string } | (
 /** A pull request of a project whose next move is yours, with the project directory a quick action on it starts in. */
 export interface PullRequestSubject {
 	kind: "pull-request";
-	pr: InboxPullRequest;
+	pr: PullRequestSummary;
 	move: YourMove;
 	cwd: string;
 }

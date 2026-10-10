@@ -1,16 +1,16 @@
 import { ArrowLeft } from "lucide-react";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
-import { type Inbox, type InboxPullRequest, type LinkedPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
+import { type PullRequestList, type PullRequestSummary, type LinkedPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";
 import { agentOn, moveOf } from "../../../src/shared/moves";
 import type { RosterHost, WorkItem } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { listedPullRequest, moveAction, reason } from "../../inbox-model";
+import { listedPullRequest, moveAction, reason } from "../../pull-requests-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { actionOn, pendingOf, pullRequestStart } from "../../quick-actions";
-import { inboxStore } from "../../reads";
-import { hashForInbox } from "../../routing";
+import { pullRequestStore } from "../../reads";
+import { hashForPullRequests } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { Header } from "../page-header";
@@ -19,14 +19,14 @@ import { type NextMove, type Placement, PullRequestDetailContent } from "./pr-de
 import { rowId } from "./pr-row";
 
 /** What `pr` waits on next, given the running sessions `sessions` on it. */
-function nextMove(pr: InboxPullRequest, hosts: RosterHost[], sessions: RosterHost[]): NextMove {
+function nextMove(pr: PullRequestSummary, hosts: RosterHost[], sessions: RosterHost[]): NextMove {
 	const move = moveOf(pr, agentOn(hosts)(pr));
 	const holder = move === "answer" ? "needs-input" : move === "agent" ? "working" : null;
 	return { move, reason: reason(pr, move), action: moveAction(pr, move), session: sessions.find(host => host.status === holder) ?? null };
 }
 
 /** Why the inbox does not list the PR a link named. `allProjects`: the sidebar shows every project. */
-function whyMissing(target: PullRequest, inbox: Inbox, allProjects: boolean): string {
+function whyMissing(target: PullRequest, inbox: PullRequestList, allProjects: boolean): string {
 	const repo = `${target.owner}/${target.repo}`;
 	const covered = inbox.repos.some(other => repoKey(other) === repoKey(target));
 	if (covered) {
@@ -60,7 +60,7 @@ interface PullRequestDetailsProps {
 export function PullRequestDetails({ project, hosts, target, placement, version, files, onPick, session }: PullRequestDetailsProps) {
 	const { open, start, dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const { read } = inboxStore.use(project);
+	const { read } = pullRequestStore.use(project);
 	const listed = read && listedPullRequest(read.data, target);
 	const item: WorkItem = { kind: "pull-request", pr: target };
 	const sessions = sessionsOn(item, hosts);
@@ -94,7 +94,7 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 				version={version}
 				files={files}
 				onPick={onPick}
-				onSaved={() => void inboxStore.refresh(project, { fresh: true })}
+				onSaved={() => void pullRequestStore.refresh(project, { fresh: true })}
 			/>
 		</>
 	);
@@ -104,7 +104,7 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 export function PullRequestPage(props: Omit<PullRequestDetailsProps, "placement" | "version">) {
 	const back = (
 		<Tooltip content="Back to the inbox" side="bottom">
-			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to the inbox" render={<a href={hashForInbox(null)} />}>
+			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to the inbox" render={<a href={hashForPullRequests(null)} />}>
 				<ArrowLeft />
 			</Button>
 		</Tooltip>

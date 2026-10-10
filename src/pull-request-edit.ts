@@ -1,7 +1,7 @@
 /** A pull request's labels, review requests, and state, changed from its details through `gh`, and the choices its pickers offer. */
 import { createCache } from "./cache";
 import { dataOf, ghGraphql, ghRest, ghRestWrite, parsePerson } from "./github";
-import { loadPullRequestDetail } from "./inbox";
+import { loadPullRequestDetail } from "./pull-requests";
 import { isObject, str } from "./json";
 import { type Person, type PullRequest, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, type Repo, repoKey, type SettableState } from "./shared/github";
 
