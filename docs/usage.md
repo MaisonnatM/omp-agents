@@ -116,10 +116,10 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Session details sidebar
 
-- The right sidebar shows the focused pane's conversation at a glance, and what its agent captured and shipped: a live session, one of its subagents, or a past session, each from its own transcript file.
+- The right sidebar shows the focused pane's conversation at a glance, and what its agent changed, captured, and shipped: a live session, one of its subagents, or a past session, each from its own transcript file.
   It hides for a pull request's details, the tickets, **Settings**, and the new-session page, and while two or more panes sit side by side, which leaves no single pane to follow; a maximized pane brings it back.
-- Tabs split it: **Outline**, **Media**, and **PRs**.
-  Each tab shows its name and, in a badge, how many items it holds, such as `3` images.
+- Tabs split it: **Outline**, **Files**, **Media**, and **PRs**.
+  Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
   The sidebar remembers the tab you chose, for every view.
 - **Outline** shows the conversation's turns in order, each weighted by how much it matters.
@@ -138,6 +138,14 @@ An action that fails shows its error, and its control becomes available again.
   The turn you are reading carries a shaded background, and moves as you scroll the transcript; the outline scrolls to keep it in view.
   After you click a turn it stays marked until you scroll the transcript yourself, since the last turns may never reach the top of the transcript.
   The list follows the conversation as it goes.
+- **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
+  Each row shows whether the session created, edited, or deleted the file, how many times it changed it, how long ago the last change was, and the lines added and removed, which the list's heading totals.
+  A path inside the session's working directory shows relative to it.
+  Click a file to unfold its changes under it, newest first: each with its kind, its time, its lines added and removed, and its diff as omp recorded it with line numbers.
+  A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
+  A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
+  A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
+  **Open the session's changes**, under the list, opens the session's [changes page](#session-changes); a subagent's Files tab has no such link.
 - Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
 - **Media** shows the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
   On a session that is every image of the session; on a subagent it is that subagent's and its own subagents'.
@@ -157,7 +165,7 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Session changes
 
-- A `#changes/<session id>` address shows the files the session changed as an editor does, in place of the panes.
+- **Open the session's changes** in the sidebar's **Files** tab or a `#changes/<session id>` address shows the files the session changed as an editor does, in place of the panes.
   The sidebar stays on **Sessions**, and the arrow before the title goes back to the session.
 - The page lists two sets of files at once.
   One is what the session's git checkout changed: its worktree, else its directory, against the commit its branch forked from the remote's default branch, else against `HEAD`, else against nothing before the first commit, with uncommitted and untracked files included.
