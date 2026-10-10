@@ -28,11 +28,9 @@ export const sessionEndInboxDir = join(configDir, "end-inbox");
 export const routinesFile = join(configDir, "routines.json");
 /** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */
 export const workspacesFile = join(configDir, "workspaces.json");
-/** Where an older version kept {@link workspacesFile}, which the server moves at startup when it holds a workspace list. */
-export const oldProjectsFile = join(configDir, "projects.json");
 /**
  * The projects, their workers, and the updates waiting for their coordinators, beside {@link tokenFile}; omp's `projects` extension reads it.
- * {@link oldProjectsFile} is the same name, so the server renames an older workspace list away before it reads the projects.
+ * An older version kept the {@link workspacesFile} list under this name, which the server moves away before it reads the projects.
  */
 export const projectsFile = join(configDir, "projects.json");
 /** Project `id`'s notes, which every session of the project reads and writes; outside every repository, so all worktrees share them. */

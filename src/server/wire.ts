@@ -15,6 +15,7 @@ import { type PullRequest, type PullRequestChange, type PullRequestEdit, type Re
 import type { ModelOption } from "../shared/models";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
+import type { ProjectEdit } from "../shared/projects";
 import type { ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
@@ -26,6 +27,8 @@ import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } fro
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
+/** The longest project name the server keeps. */
+const MAX_PROJECT_NAME = 200;
 /** GitHub's owner and repository names. */
 const NAME = /^[\w.-]+$/;
 
@@ -209,6 +212,14 @@ function parsePinChange(value: unknown): Parsed<PinChange> {
 	return Array.isArray(sessionIds) && sessionIds.length > 0 && sessionIds.every(isNonEmpty) ? { ok: { op, sessionIds } } : null;
 }
 
+/** A rename or an archive of a project; the server makes every other change. */
+function parseProjectEdit(value: unknown): Parsed<ProjectEdit> {
+	if (!isObject(value) || !isNonEmpty(value.id)) return null;
+	const { op, id, name } = value;
+	if (op === "archive") return { ok: { op, id } };
+	return op === "rename" && typeof name === "string" && name.length <= MAX_PROJECT_NAME ? { ok: { op, id, name } } : null;
+}
+
 function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest> {
 	switch (value.kind) {
 		case "new": {
@@ -303,6 +314,14 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 		const request = parseStartRequest(value);
 		return isCounter(reqId) && request ? { ok: { t: "start", reqId, ...request.ok } } : null;
 	},
+	"project-create"(value) {
+		const { reqId, name, cwd, prompt } = value;
+		// `null` starts the coordinator on omp's default model.
+		const model = value.model === null ? { ok: null } : parseModel(value.model);
+		const thinking = parseThinking(value.thinking);
+		if (!isCounter(reqId) || typeof name !== "string" || name.length > MAX_PROJECT_NAME || !isNonEmpty(cwd) || !isNonEmpty(prompt) || !model || !thinking) return null;
+		return { ok: { t: "project-create", reqId, name, cwd, prompt, model: model.ok, thinking: thinking.ok } };
+	},
 	"resume-all"({ reqId, sessionIds }) {
 		if (!isCounter(reqId) || !Array.isArray(sessionIds) || sessionIds.length === 0) return null;
 		return sessionIds.every(isNonEmpty) ? { ok: { t: "resume-all", reqId, sessionIds: [...new Set(sessionIds)] } } : null;
@@ -336,6 +355,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	pin(value) {
 		const change = parsePinChange(value.change);
 		return change && { ok: { t: "pin", change: change.ok } };
+	},
+	project(value) {
+		const change = parseProjectEdit(value.change);
+		return change && { ok: { t: "project", change: change.ok } };
 	},
 	notice: ({ ids, op }) => (Array.isArray(ids) && ids.length > 0 && ids.every(isNonEmpty) && isNoticeOp(op) ? { ok: { t: "notice", ids, op } } : null),
 };

@@ -3,10 +3,11 @@ import { withPinnedSkill } from "../commands";
 import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
-import { PLAIN_LAUNCH } from "../omp/rpc";
+import type { RpcLaunch } from "../omp/rpc";
 import { directoryOf } from "../paths";
 import type { PromptImage, StartRequest, StartResult, View } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
+import type { ProjectJoin, ProjectLaunch } from "./project-runner";
 
 interface Started {
 	session: DashboardSession;
@@ -28,10 +29,15 @@ export interface StartEnv {
 	onStarted(): void;
 	/** Links todo `todoId` to session `sessionId`, which a new session started for it, and moves a todo not started yet to In Progress. */
 	linkTodo(todoId: string, sessionId: string): void;
+	/** How a start joins a project: the one `project` names, else the one a resumed session belongs to, else none. */
+	projects: { launchFor(request: StartRequest, project: ProjectLaunch | null): ProjectJoin };
 }
 
+/** Starts `request`; `project` is the project runner's reason for it, which a page's start never has. */
+export type Starter = (request: StartRequest, project: ProjectLaunch | null) => Promise<StartResult>;
+
 /** Runs `start` requests; one ready session per success, none on failure. */
-export function createStarter(env: StartEnv): (request: StartRequest) => Promise<StartResult> {
+export function createStarter(env: StartEnv): Starter {
 	const { sessions } = env;
 	/** Past sessions being resumed, so a second click starts no second omp on the same file. */
 	const resuming = new Set<string>();
@@ -45,7 +51,8 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 		}
 	}
 
-	async function spawnFor(request: StartRequest): Promise<{ started: Started } | { error: string }> {
+	/** `rpcLaunch` is what a project session launches with; a fork belongs to no project. */
+	async function spawnFor(request: StartRequest, rpcLaunch: RpcLaunch): Promise<{ started: Started } | { error: string }> {
 		switch (request.kind) {
 			case "new": {
 				const dir = await directoryOf(request.cwd);
@@ -68,7 +75,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 					return { error: `Cannot read the skills in ${cwd}: ${errorText(err)}` };
 				}
 				return launch("Cannot start omp", async (id, emit) => ({
-					session: await DashboardSession.start(id, cwd, model, thinking, PLAIN_LAUNCH, emit),
+					session: await DashboardSession.start(id, cwd, model, thinking, rpcLaunch, emit),
 					prompt: null,
 					first: { text, images },
 				}));
@@ -85,7 +92,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 				if (!path) return { error: "Cannot resume: this session's file is not known." };
 				resuming.add(sessionId);
 				try {
-					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, PLAIN_LAUNCH, emit), prompt: null }));
+					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, rpcLaunch, emit), prompt: null }));
 				} finally {
 					resuming.delete(sessionId);
 				}
@@ -93,14 +100,16 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 		}
 	}
 
-	return async request => {
-		const outcome = await spawnFor(request);
+	return async (request, project) => {
+		const join = env.projects.launchFor(request, project);
+		const outcome = await spawnFor(request, join.rpc);
 		if ("error" in outcome) return { ok: false, error: outcome.error };
 		const { session, prompt, first } = outcome.started;
 		// A session whose omp exited since it spawned would stay in the roster with no one to remove it.
 		if (!sessions.add(session, request.kind === "new" ? request.subject : null)) return { ok: false, error: "omp exited as the session started." };
-		// The todo links first, so the session's first turn already knows the todo it works on.
+		// The todo and the project link first, so the session's first turn already knows the todo it works on and its role.
 		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
+		join.attach(session);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
 		if (first) void session.prompt(null, first.text, first.images, "steer");
 		env.onStarted();

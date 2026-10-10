@@ -21,6 +21,7 @@ function setup(initial: PastSession[]) {
 		routinesMsg: () => ({ t: "routines" }) as unknown as Extract<ServerMsg, { t: "routines" }>,
 		workspacesMsg: () => ({ t: "workspaces", list: { added: [], hidden: [] } }),
 		pinsMsg: () => ({ t: "pins", sessionIds: [] }),
+		projectsMsg: () => ({ t: "projects", projects: [] }),
 		noticesMsg: () => ({ t: "notices", list: [] }),
 		publish: (_topic, json) => void published.push(JSON.parse(json)),
 		subscriberCount: () => listeners,

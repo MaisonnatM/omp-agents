@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { WorkspacesFile } from "./workspaces-file";
+import { adoptOldWorkspaces, WorkspacesFile } from "./workspaces-file";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -18,8 +18,11 @@ function workspacesPath(): string {
 /** The `projects.json` beside `path`, where an older version saved the list. */
 const oldPathOf = (path: string): string => join(dirname(path), "projects.json");
 
-/** The store at `path`, which takes over the list from the `projects.json` beside it. */
-const workspacesFile = (path: string): WorkspacesFile => new WorkspacesFile(path, oldPathOf(path));
+/** The store at `path`, once it took over the list from the `projects.json` beside it, as the server does at startup. */
+function workspacesFile(path: string): WorkspacesFile {
+	adoptOldWorkspaces(oldPathOf(path), path);
+	return new WorkspacesFile(path);
+}
 
 describe("WorkspacesFile", () => {
 	test("adding shows a hidden directory, an added one stays added while hidden, and the next server reads the result", () => {
