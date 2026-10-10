@@ -2,7 +2,7 @@
 import { errorText, isObject } from "../json";
 import type { Frame } from "./collab";
 import { ompCommand } from "./install";
-import { type RpcProcess, rpc, rpcFrames, type ServiceTierModel, utils } from "./modules";
+import { type RpcHostTool, type RpcProcess, rpc, rpcFrames, type ServiceTierModel, utils } from "./modules";
 
 /** Subset of omp's `Model` (pi-ai src/types.ts) this app reads. */
 export interface RpcModel extends ServiceTierModel {
@@ -96,6 +96,14 @@ export interface RpcChild {
 	write(frame: object): void;
 }
 
+/** What a session gets on top of a plain one: extra `omp` arguments, and the tools this process serves it. */
+export interface RpcLaunch {
+	args: string[];
+	tools: RpcHostTool[];
+}
+
+export const PLAIN_LAUNCH: RpcLaunch = { args: [], tools: [] };
+
 /** Frames `RpcClient` drops: dialogs, which it hands only to its own login flow, title changes, and built-in slash commands' output and model switches. */
 const UNROUTED_FRAMES: Record<string, true> = { extension_ui_request: true, session_info_update: true, command_output: true, config_update: true };
 
@@ -125,12 +133,13 @@ async function readUnroutedFrames(stdout: ReadableStream<Uint8Array>, onFrame: (
  * omp's own `RpcClient`. Resolves once omp reports ready. `onFrame` gets every
  * frame of {@link UNROUTED_FRAMES} from spawn on, so a dialog raised while the session opens is not lost.
  */
-export async function startRpc(cwd: string, onFrame: (frame: Record<string, unknown>) => void): Promise<RpcChild> {
+export async function startRpc(cwd: string, onFrame: (frame: Record<string, unknown>) => void, launch: RpcLaunch): Promise<RpcChild> {
 	let child: RpcProcess | undefined;
 	const client = new rpc.RpcClient({
 		// `rpc-ui` routes tool dialogs such as `ask` over the protocol; under plain `rpc` omp offers no `ask` tool.
 		// omp reads the last `--mode`, and `RpcClient` puts `--mode rpc` first.
-		args: ["--mode", "rpc-ui"],
+		args: ["--mode", "rpc-ui", ...launch.args],
+		customTools: launch.tools,
 		spawn: agentArgs => {
 			const proc = utils.ptree.spawn([...ompCommand, ...agentArgs], { cwd, stdin: "pipe" });
 			const [forClient, forFrames] = proc.stdout.tee();

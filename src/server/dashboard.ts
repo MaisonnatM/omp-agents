@@ -371,6 +371,8 @@ export class Dashboard {
 				this.#views.sync();
 				this.#broadcasts.syncRoster();
 				return;
+			case "turn-ended":
+				return;
 			default: {
 				const unhandled: never = update;
 				return unhandled;

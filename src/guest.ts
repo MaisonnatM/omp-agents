@@ -216,6 +216,12 @@ export class SessionGuest implements LiveSession {
 		});
 	}
 
+	/** {@link prompt}, but rejects while the room takes no messages from this guest, where {@link send} drops one. */
+	async followUp(text: string): Promise<void> {
+		if (!this.canWrite) throw new Error("this terminal session takes no messages from the dashboard");
+		await this.prompt(null, text, [], "followUp");
+	}
+
 	/**
 	 * Prompt the main agent (`agentId` null) or chat to a subagent. The host steers a running agent, prompts an idle
 	 * one, and revives a parked subagent. A follow-up waits here while the agent's turn runs.

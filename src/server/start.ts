@@ -3,6 +3,7 @@ import { withPinnedSkill } from "../commands";
 import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
+import { PLAIN_LAUNCH } from "../omp/rpc";
 import { directoryOf } from "../paths";
 import type { PromptImage, StartRequest, StartResult, View } from "../shared/sessions";
 import type { LiveSessions } from "./live-sessions";
@@ -67,7 +68,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 					return { error: `Cannot read the skills in ${cwd}: ${errorText(err)}` };
 				}
 				return launch("Cannot start omp", async (id, emit) => ({
-					session: await DashboardSession.start(id, cwd, model, thinking, emit),
+					session: await DashboardSession.start(id, cwd, model, thinking, PLAIN_LAUNCH, emit),
 					prompt: null,
 					first: { text, images },
 				}));
@@ -84,7 +85,7 @@ export function createStarter(env: StartEnv): (request: StartRequest) => Promise
 				if (!path) return { error: "Cannot resume: this session's file is not known." };
 				resuming.add(sessionId);
 				try {
-					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, emit), prompt: null }));
+					return await launch("Cannot resume", async (id, emit) => ({ session: await DashboardSession.resume(id, path, PLAIN_LAUNCH, emit), prompt: null }));
 				} finally {
 					resuming.delete(sessionId);
 				}

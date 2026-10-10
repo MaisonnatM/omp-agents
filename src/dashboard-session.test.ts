@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DashboardSession, type DashboardUpdate } from "./dashboard-session";
 import type { Frame } from "./omp/collab";
 import * as rpc from "./omp/rpc";
-import type { RpcChild, RpcClient, RpcState } from "./omp/rpc";
+import { PLAIN_LAUNCH, type RpcChild, type RpcClient, type RpcState } from "./omp/rpc";
 import { LiveSessions } from "./server/live-sessions";
 import { endSession } from "./server/session-end";
 import { createClientHandler, type SocketEnv } from "./server/socket";
@@ -82,8 +82,8 @@ async function startSession(model: { provider: string; id: string } | null = nul
 	const client = new FakeClient();
 	fakeOmp(client);
 	const updates: DashboardUpdate[] = [];
-	const session = await DashboardSession.start("inst-1", "/tmp/project", model, null, update => updates.push(update));
-	return { session, client, rosters: () => updates.filter(update => update.kind === "roster").length };
+	const session = await DashboardSession.start("inst-1", "/tmp/project", model, null, PLAIN_LAUNCH, update => updates.push(update));
+	return { session, client, updates, rosters: () => updates.filter(update => update.kind === "roster").length };
 }
 
 afterEach(() => {
@@ -155,7 +155,7 @@ describe("DashboardSession state refresh", () => {
 			fakeOmp(client);
 			const switched = Promise.withResolvers<void>();
 			const refreshed = Promise.withResolvers<void>();
-			const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => {
+			const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, PLAIN_LAUNCH, update => {
 				if (update.kind === "switched") switched.resolve();
 				if (update.kind === "roster") refreshed.resolve();
 			});
@@ -198,6 +198,22 @@ describe("DashboardSession turns", () => {
 
 		client.fire({ type: "agent_end", isTerminal: true });
 		expect(session.status).toBe("idle");
+	});
+
+	test("a terminal agent_end reports the turn's last reply once, without its suggested prompts", async () => {
+		const { client, updates } = await startSession();
+		const ended = () => updates.filter(update => update.kind === "turn-ended");
+		const assistant = (text: string) => ({ role: "assistant", content: [{ type: "text", text }] });
+		client.fire({ type: "agent_start" });
+		client.fire({ type: "agent_end", isTerminal: false, messages: [assistant("first")] });
+		expect(ended()).toEqual([]);
+		client.fire({
+			type: "agent_end",
+			messages: [assistant("Done: ok\n\nSuggestions:\n1. Ship it"), { role: "assistant", content: [{ type: "toolCall", id: "t1" }] }, { role: "toolResult", content: [] }],
+		});
+		expect(ended()).toEqual([{ kind: "turn-ended", reply: "Done: ok" }]);
+		client.fire({ type: "agent_end", messages: [] });
+		expect(ended().at(-1)).toEqual({ kind: "turn-ended", reply: null });
 	});
 
 	test("a queue_update replaces both queues, and one with a malformed queue changes nothing", async () => {
@@ -311,7 +327,7 @@ describe("DashboardSession prompts", () => {
 		const client = new FakeClient();
 		fakeOmp(client);
 		const order: string[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => {
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, PLAIN_LAUNCH, update => {
 			if (update.kind === "switched") order.push(`switched ${session.sessionId}`);
 		});
 		client.abort = async () => {
@@ -347,7 +363,7 @@ describe("DashboardSession action failures", () => {
 		const client = new FakeClient();
 		fakeOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => updates.push(update));
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, PLAIN_LAUNCH, update => updates.push(update));
 		client.abortAndRestoreQueue = async () => { throw new Error("abort unavailable"); };
 		client.stop = async () => { throw new Error("stop unavailable"); };
 		const sessions = new LiveSessions(() => {});
@@ -379,7 +395,7 @@ describe("DashboardSession action failures", () => {
 		const client = new FakeClient();
 		fakeOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => updates.push(update));
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, PLAIN_LAUNCH, update => updates.push(update));
 		client.setThinkingLevel = async () => { throw new Error("thinking unavailable"); };
 		client.setFastMode = async () => { throw new Error("fast unavailable"); };
 		await expect(session.setThinking("low")).rejects.toThrow("thinking unavailable");
@@ -399,7 +415,7 @@ describe("DashboardSession action failures", () => {
 		};
 		fakeOmp(client);
 		const updates: DashboardUpdate[] = [];
-		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, update => updates.push(update));
+		const session = await DashboardSession.start("inst-1", "/tmp/project", null, null, PLAIN_LAUNCH, update => updates.push(update));
 		lifecycle({ id: "a1", status: "started" });
 		const response = Promise.withResolvers<boolean>();
 		client.cancelSubagent = () => response.promise;
@@ -452,7 +468,7 @@ describe("DashboardSession start", () => {
 		};
 
 		await expect(
-			DashboardSession.start("inst-1", "/tmp/project", { provider: "p", id: "m" }, null, update => order.push(update.kind)),
+			DashboardSession.start("inst-1", "/tmp/project", { provider: "p", id: "m" }, null, PLAIN_LAUNCH, update => order.push(update.kind)),
 		).rejects.toThrow("no such model");
 
 		// The question arrived (a roster change), the process stopped, and only then was the question dropped (another).
