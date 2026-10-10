@@ -3,6 +3,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import type { ChangedEntry } from "../../../src/shared/changes";
 import { foldersAbove, type TreeDir } from "../../changes-model";
 import { cn } from "@/lib/utils";
+import { LineCounts } from "../line-counts";
 
 const STATUS = {
 	added: { letter: "A", tone: "text-emerald-600 dark:text-emerald-400", label: "Added" },
@@ -25,18 +26,6 @@ export function StatusLetter({ file }: { file: ChangedEntry }) {
 	return (
 		<span title={statusLabel(file)} className={cn("w-3 shrink-0 text-center font-mono text-[11px] font-semibold", look.tone)}>
 			{look.letter}
-		</span>
-	);
-}
-
-/** Lines added and removed; nothing for a file git does not count. */
-export function Counts({ added, removed }: { added: number | null; removed: number | null }) {
-	if (!added && !removed) return null;
-	return (
-		<span className="shrink-0 font-mono text-[11px] tabular-nums">
-			{!!added && <span className="text-emerald-600 dark:text-emerald-400">+{added}</span>}
-			{!!added && !!removed && " "}
-			{!!removed && <span className="text-red-600 dark:text-red-400">−{removed}</span>}
 		</span>
 	);
 }
@@ -120,7 +109,7 @@ export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 							<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
 							<span className={cn("min-w-0 flex-1 truncate", file.status === "deleted" && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
 							{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}
-							<Counts added={file.added} removed={file.removed} />
+							<LineCounts added={file.added} removed={file.removed} />
 							<StatusLetter file={file} />
 						</a>
 					</li>

@@ -7,8 +7,9 @@ import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
+import { LineCounts } from "../line-counts";
 import { CodeView } from "./code-view";
-import { Counts, FileTree, StatusLetter, statusLabel } from "./file-tree";
+import { FileTree, StatusLetter, statusLabel } from "./file-tree";
 
 /** Diff shows the changes with unchanged runs folded; File shows the whole file as it is now, its changes marked in the gutter. */
 const MODES = ["diff", "file"] as const;
@@ -72,7 +73,7 @@ export function ChangesExplorer({ files, path, hrefFor, onPick, fileUrl, version
 								</Fragment>
 							))}
 						</p>
-						<Counts added={entry.added} removed={entry.removed} />
+						<LineCounts added={entry.added} removed={entry.removed} />
 						<SizeProvider size="compact">
 							<Tabs value={mode} onValueChange={value => setMode(value as Mode)}>
 								<TabsList aria-label="Show">

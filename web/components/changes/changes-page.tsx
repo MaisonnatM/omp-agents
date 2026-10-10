@@ -10,9 +10,9 @@ import { Button } from "@/components/ui/button";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
+import { LineCounts } from "../line-counts";
 import { Header } from "../page-header";
 import { ChangesExplorer } from "./changes-explorer";
-import { Counts } from "./file-tree";
 
 type Scope = "all" | "session";
 
@@ -46,7 +46,7 @@ export function ChangesPage({ sessionId, path, host, past }: ChangesPageProps) {
 	const meta = changes && (
 		<>
 			{changes.root === null ? "Not a git checkout" : `${changes.branch ?? "detached HEAD"} against ${changes.base?.ref ?? "HEAD"}`} · {files.length} {files.length === 1 ? "file" : "files"}{" "}
-			<Counts added={totals.added} removed={totals.removed} />
+			<LineCounts added={totals.added} removed={totals.removed} />
 		</>
 	);
 	const back = (

@@ -6,6 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { age, readTime } from "../labels";
 import { hashForChanges } from "../routing";
+import { LineCounts } from "./line-counts";
 
 const CHANGE_LABEL: Record<FileChangeKind, string> = { created: "Created", edited: "Edited", rewritten: "Rewritten", deleted: "Deleted" };
 
@@ -35,15 +36,6 @@ function Diff({ diff }: { diff: string }) {
 	);
 }
 
-/** `+12 −3`, the lines added and removed. */
-function LineCounts({ added, removed }: { added: number; removed: number }) {
-	return (
-		<span className="shrink-0 whitespace-nowrap tabular-nums" aria-label={`${added} added, ${removed} removed`}>
-			<span className="text-emerald-600 dark:text-emerald-400">+{added}</span> <span className="text-red-600 dark:text-red-400">−{removed}</span>
-		</span>
-	);
-}
-
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 /** A change's kind and time, then what it recorded: an edit's line counts and diff, or how many lines a write wrote. */
@@ -56,7 +48,7 @@ function Change({ change }: { change: FileChange }) {
 			body = change.diff && <Diff diff={change.diff} />;
 			break;
 		case "write":
-			counts = change.lines !== null && <span className="tabular-nums">{plural(change.lines, "line")}</span>;
+			counts = change.lines !== null && <span className="shrink-0 font-mono text-[11px] whitespace-nowrap tabular-nums">{plural(change.lines, "line")}</span>;
 			body = <p className="text-xs text-muted-foreground">Written whole, so omp recorded no diff.</p>;
 			break;
 		default: {
@@ -100,9 +92,7 @@ function FileRow({ file }: { file: ChangedFile }) {
 						<span className="flex min-w-0 items-baseline gap-1.5">
 							<span className="min-w-0 truncate text-foreground">{name}</span>
 							<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{dir}</span>
-							<span className="text-xs">
-								<LineCounts {...lineTotals(changes)} />
-							</span>
+							<LineCounts {...lineTotals(changes)} />
 						</span>
 						<span className="truncate text-xs text-muted-foreground">{summary}</span>
 					</span>
