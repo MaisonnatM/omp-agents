@@ -1,6 +1,7 @@
 import { defaultFilter } from "cmdk";
 import { Command, Folder, ListTodo, type LucideIcon } from "lucide-react";
 import type { HostStatus } from "../src/shared/sessions";
+import { hasEveryWord } from "./every-word";
 import { type Chord, type KeyEvent, pressesChord, SHORTCUTS, type Shortcut, type ShortcutHandlers, type ShortcutId } from "./shortcuts";
 
 /** A list the command palette shows: the root search, or a view an action pushed onto it. */
@@ -16,7 +17,7 @@ export interface PaletteView {
 }
 
 export const PALETTE_VIEWS: Record<PaletteViewId, PaletteView> = {
-	root: { title: "omp agents", icon: Command, placeholder: "Search sessions and commands…", suggestions: 5 },
+	root: { title: "omp agents", icon: Command, placeholder: "Search sessions, todos, tickets, pull requests, and commands…", suggestions: 5 },
 	workspaces: { title: "Choose workspace", icon: Folder, placeholder: "Search workspaces…", suggestions: 0 },
 	createTodo: { title: "Create todo", icon: ListTodo, placeholder: "Todo title, optionally ending in a due day or #category", suggestions: 0 },
 };
@@ -50,12 +51,12 @@ export type Accessory =
 	| { kind: "text"; text: string };
 
 /** The section an item belongs to; **Suggestions** borrows items from the others. */
-export type HomeSection = "running" | "projects" | "past" | "commands" | "workspaces" | "createTodo" | "fallback";
+export type HomeSection = "running" | "projects" | "past" | "todos" | "tickets" | "pullRequests" | "commands" | "workspaces" | "createTodo" | "fallback";
 
 export type SectionId = "suggestions" | HomeSection;
 
 export interface PaletteItem {
-	/** Stable across reloads, since frecency keys on it: `session:<id>`, `project:<id>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`. */
+	/** Stable across reloads, since frecency keys on it: `session:<id>`, `project:<id>`, `todo:<id>`, `ticket:<identifier>`, `pr:<owner>/<repo>#<number>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`. */
 	id: string;
 	section: HomeSection;
 	title: string;
@@ -64,7 +65,7 @@ export interface PaletteItem {
 	keywords: readonly string[];
 	icon: LucideIcon;
 	accessories: readonly Accessory[];
-	/** The type label at the row's end: `Session`, `Project`, `Command`, `Workspace`. */
+	/** The type label at the row's end: `Session`, `Project`, `Todo`, `Ticket`, `Pull request`, `Command`, `Workspace`. */
 	kind: string;
 	/** Every action, as the action panel groups them. The first group's first action runs on Enter, so it is never empty. */
 	actions: readonly [ActionGroup, ...ActionGroup[]];
@@ -224,10 +225,15 @@ export interface Section {
 	items: readonly PaletteItem[];
 }
 
-/** Sections in the order an empty search lists them. */
+/**
+ * Sections a search alone lists, too long to browse, which match only an item holding every word typed: cmdk's loose
+ * match would find most of hundreds of todos for any word.
+ */
+const SEARCH_ONLY: readonly HomeSection[] = ["todos", "tickets", "pullRequests"];
+/** Sections in the order an empty search lists them; {@link SEARCH_ONLY} ones are left out. */
 const BROWSE_ORDER: readonly SectionId[] = ["suggestions", "running", "projects", "commands", "past", "workspaces", "createTodo", "fallback"];
 /** Sections a search ranks by their best match; equal ones keep this order. */
-const RANKED_ORDER: readonly HomeSection[] = ["running", "projects", "past", "commands", "workspaces"];
+const RANKED_ORDER: readonly HomeSection[] = ["running", "projects", "past", "todos", "tickets", "pullRequests", "commands", "workspaces"];
 /** Sections that hold what the search itself becomes: they match anything, and list after every match. */
 const UNRANKED_ORDER: readonly HomeSection[] = ["createTodo", "fallback"];
 
@@ -236,6 +242,9 @@ const HEADINGS: Record<Exclude<SectionId, "fallback">, string | null> = {
 	running: "Running",
 	projects: "Projects",
 	past: "Past",
+	todos: "Todos",
+	tickets: "Tickets",
+	pullRequests: "Pull requests",
 	commands: "Commands",
 	workspaces: "Workspaces",
 	createTodo: null,
@@ -246,6 +255,7 @@ const headingOf = (id: SectionId, search: string): string | null => (id === "fal
 /** cmdk's match of `search` against the item's words, times its frecency boost; 0 when it does not match. */
 function matchScore(item: PaletteItem, search: string, frecency: Frecency, now: number): number {
 	const words = item.subtitle ? [item.subtitle, ...item.keywords] : [...item.keywords];
+	if (SEARCH_ONLY.includes(item.section) && !hasEveryWord([item.title, ...words].join("\n"), search)) return 0;
 	return defaultFilter(item.title, search, words) * frecencyBoost(frecency[item.id], now);
 }
 

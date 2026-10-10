@@ -149,6 +149,8 @@ An action that fails shows its error, and its control becomes available again.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
   **Open the session's changes**, under the list, opens the session's [changes page](#session-changes); a subagent's Files tab has no such link.
+  The search field above the list keeps the files whose path holds every word typed, in any order and any case, and the heading then counts and totals those, as in `2 of 9 files changed`; Esc clears it.
+  Each view keeps its own search, so opening another session starts with every file listed.
 - Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
 - **Media** shows the images that the agent's tools returned and those of its subagents at any depth, newest first: browser screenshots from `eval`, and image files that `read` opened.
   On a session that is every image of the session; on a subagent it is that subagent's and its own subagents'.
@@ -801,6 +803,7 @@ An action that fails shows its error, and its control becomes available again.
   Drag the line between the list and the details, or focus it and use the left and right arrow keys, to size the list; double-click it to reset, and the browser's localStorage keeps the width.
   A page too narrow for both shows the open todo in place of the list, and its **×** goes back to the list.
   The open todo's bar names its category, its parent for a todo under another, and its status; its ↑ and ↓ open the todo above and below in the list, and **×** closes it.
+  The address names the open todo, as `#todo/<category id>?open=<todo id>`, so a reload, a link, or the browser's Back returns to it.
   A search keeps the open todo on the right even when it hides its row.
   An empty title, or Backspace in an empty one, deletes the todo, and so does the **×** that shows on hover; deleting a todo deletes the todos under it.
   **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
@@ -868,7 +871,7 @@ An action that fails shows its error, and its control becomes available again.
 - A day cell shows three entries and how many more there are; today's number is circled.
   Hover a day, or focus its number, to see all of its entries in a card beside it, each a link like in the day's list.
   Click a day's number, or its **+N more**, to list all of its entries beside the month; today is listed when the page opens.
-- Click an entry to open its routine, its todo list, or its ticket; a Google event opens in Google Calendar in a new tab.
+- Click an entry to open its routine, its todo beside its list, or its ticket; a Google event opens in Google Calendar in a new tab.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
 - To show Google events, connect Google Calendar in **Settings › Integrations**; see [Integrations](#integrations).
   The sidebar lists the calendars checked in Google Calendar's own list, the ones you own under **My calendars** and the ones you subscribed to or others share under **Other calendars**, as Google Calendar groups them.
@@ -1150,6 +1153,8 @@ Alt is Option on macOS.
   On a focused queued row, Cmd+Enter sends it now, Enter or F2 edits it, and Delete removes it.
   With a draft, ↑ moves the caret as usual.
 - Cmd+K opens the command menu, which searches every running and past session, in every workspace, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
+  What you type also searches your todos, the Linear tickets assigned to you once Linear is connected, and the open pull requests of the sidebar's workspace, each under its own heading; each must hold every word typed, in any order, and with nothing typed they stay out of the list.
+  A todo opens beside its list on the Todo page, a ticket opens its details, and a pull request opens its details on the Pull requests page; Cmd+Enter opens a ticket in Linear and a pull request on GitHub.
   The search button in the sidebar header, immediately before the keyboard button, opens it too.
   With nothing typed, **Suggestions** lists the five entries you use most, by how often and how lately, then **Running**, **Commands**, and **Past**.
   What you type ranks every match by how well it matches and how much you use it, and the menu remembers that in this browser.

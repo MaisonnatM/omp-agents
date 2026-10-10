@@ -23,7 +23,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useMemo, u
 import type { Project } from "../../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
-import type { UserTodoCategory } from "../../../src/user-todos-shared";
+import type { UserTodo, UserTodoCategory } from "../../../src/user-todos-shared";
 import {
 	type Accessory,
 	bumpFrecency,
@@ -45,6 +45,8 @@ import {
 import { localDay } from "../../days";
 import { age, folderName, hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
+import { recordItems } from "../../palette-records";
+import { pullRequestsStore, ticketsStore } from "../../reads";
 import { hashForProjects, type OpenMode } from "../../routing";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
@@ -97,6 +99,10 @@ interface CommandPaletteProps {
 	unavailable: ReadonlySet<ShortcutId>;
 	/** The todo list's categories, which a typed `#category` files a new todo under; `null` while the list cannot be edited. */
 	todoCategories: readonly UserTodoCategory[] | null;
+	/** The todo list's top-level todos, which a search lists. */
+	todos: readonly UserTodo[];
+	/** Linear answers, so a search lists the tickets assigned to you. */
+	linearConnected: boolean;
 	/** Every project; the ones not archived list as items that open their page. */
 	projects: readonly Project[];
 	/** Open the new-ticket dialog with a title. Omitted while Linear cannot be called. */
@@ -104,17 +110,21 @@ interface CommandPaletteProps {
 }
 
 /**
- * Searches running and past sessions in every workspace, projects, the page's commands, and workspaces; Enter runs the highlighted
- * entry's first action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title. Its props
- * hold no closure built per render, so a socket update that touches none of them skips it.
+ * Searches running and past sessions in every workspace, projects, the page's commands, and workspaces, and for a search
+ * also the todos, your Linear tickets, and the sidebar workspace's pull requests; Enter runs the highlighted entry's first
+ * action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title. Its props hold no closure
+ * built per render, so a socket update that touches none of them skips it.
  */
-export const CommandPalette = memo(function CommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, todoCategories, projects, onCreateTicket }: CommandPaletteProps) {
+export const CommandPalette = memo(function CommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, todoCategories, todos, linearConnected, projects, onCreateTicket }: CommandPaletteProps) {
 	const { send, start, end, changeTodo } = useDashboardActions();
-	const { starts, ending } = useDashboardStatus();
+	const { starts, ending, pullRequestsScope } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const focusInput = useCallback(() => inputRef.current?.focus(), []);
 	const open = state !== null;
+	// Linear is read only while the palette is open; the pull requests are the workspace's entry that `App` polls.
+	const tickets = ticketsStore.usePolling(null, open && linearConnected).read?.data.tickets;
+	const pullRequestRepos = pullRequestsStore.use(pullRequestsScope).read?.data.repos;
 	// One clock for as long as the palette is open, so a row's frecency does not decay and reorder the list under the pointer.
 	const now = useMemo(() => Date.now(), [open]);
 	const frame = state ? topFrame(state) : null;
@@ -243,6 +253,11 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 		];
 	}, [open, workspaces, workspace, onPickWorkspace]);
 
+	const records = useMemo(
+		(): PaletteItem[] => (open ? recordItems({ todos, tickets: linearConnected ? (tickets ?? []) : [], pullRequestRepos: pullRequestRepos ?? [] }) : []),
+		[open, todos, linearConnected, tickets, pullRequestRepos],
+	);
+
 	const items = useMemo((): PaletteItem[] => {
 		const createTodo = (): void => {
 			const change = todoCategories && quickAddTodo(search, todoCategories, localDay());
@@ -281,12 +296,12 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 					]
 				: [];
 		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
-			root: () => [...sessionItems, ...projectItems, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
+			root: () => [...sessionItems, ...projectItems, ...records, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
 			workspaces: () => workspaceItems,
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, projectItems, commandItems, workspaceItems, search, todoCategories, changeTodo, onCreateTicket]);
+	}, [viewId, sessionItems, projectItems, records, commandItems, workspaceItems, search, todoCategories, changeTodo, onCreateTicket]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	if (state === null || frame === null) return null;
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
