@@ -105,12 +105,17 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
 });
 
-test("↑ takes back a queued message or steps up the todos, Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", () => {
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "todoPrevious"]);
+test("↓ and ↑ step through pull requests, todos, and changed files, ↑ also takes back a queued message, and J and K step through nothing", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["nextPullRequest", "todoNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "previousPullRequest", "todoPrevious", "previousChangedFile"]);
+	expect(press("j", "KeyJ")).toEqual([]);
+	expect(press("k", "KeyK")).toEqual([]);
+});
+
+test("Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", () => {
 	expect(press("[", "BracketLeft", { ctrl: true })).toEqual(["previousSession"]);
 	expect(press("]", "BracketRight", { ctrl: true })).toEqual(["nextSession"]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true })).toEqual([]);
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["todoNext"]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true, shift: true })).toEqual(["moveUp"]);
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
@@ -165,7 +170,7 @@ test("the newest registration tries a key first, and the first handler that take
 	stack.add(1, () => ({ nextPullRequest: () => void calls.push("app") }));
 	stack.add(3, () => ({ todoNext: () => void calls.push("page") }));
 	stack.add(2, () => ({ nextChangedFile: () => void calls.push("middle") }));
-	const event = pressed("j", "KeyJ");
+	const event = pressed("ArrowDown", "ArrowDown");
 	stack.dispatch(event, true, null);
 	expect(calls).toEqual(["page"]);
 	expect(event.defaultPrevented).toBe(true);

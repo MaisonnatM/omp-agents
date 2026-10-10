@@ -79,12 +79,13 @@ function placeOf(list: PullRequestList, pr: PullRequest, agent: AgentOn): { repo
 }
 
 /**
- * J and K move between the rows `shown` lists, or, while the main area shows a pull request's details, show the next or
- * previous one; on its changes page they step through its files instead. O opens the pull request on GitHub, `.` opens a
- * row's quick actions, and E runs `giveToAgent` on the focused row's pull request, or the one the main area shows. A key
- * that has nothing to act on keeps its usual meaning.
+ * ↓ and ↑ move between the rows `shown` lists, or, while the main area shows a pull request's details, show the next or
+ * previous one; on its changes page they step through its files instead. With no row focused they enter the list only
+ * when `entersList`, so the sidebar's list leaves them to scroll the panes. O opens the pull request on GitHub, `.` opens
+ * a row's quick actions, and E runs `giveToAgent` on the focused row's pull request, or the one the main area shows. A
+ * key that has nothing to act on keeps its usual meaning.
  */
-function useTriageKeys(shown: PullRequestSummary[], route: PullRequestsRoute, giveToAgent: (pr: PullRequest) => boolean, openActions: (pr: PullRequestSummary) => boolean): void {
+function useTriageKeys(shown: PullRequestSummary[], route: PullRequestsRoute, entersList: boolean, giveToAgent: (pr: PullRequest) => boolean, openActions: (pr: PullRequestSummary) => boolean): void {
 	const { target } = route;
 	const current = (): number =>
 		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowElement(pr)?.contains(document.activeElement) ?? false);
@@ -97,7 +98,7 @@ function useTriageKeys(shown: PullRequestSummary[], route: PullRequestsRoute, gi
 			if (next) location.hash = hashForPullRequests(next);
 			return true;
 		}
-		const next = at < 0 ? shown[by === 1 ? 0 : shown.length - 1] : shown[at + by];
+		const next = at >= 0 ? shown[at + by] : entersList ? shown[by === 1 ? 0 : shown.length - 1] : undefined;
 		const row = next && rowElement(next);
 		if (!next || !row) return at >= 0;
 		rowLink(next)?.focus({ preventScroll: true });
@@ -243,6 +244,8 @@ interface BoardProps {
 	past: PastSession[];
 	/** What the main area shows: a pull request's row unfolds, scrolls into view, and stays highlighted while its details or changes show. */
 	route: PullRequestsRoute;
+	/** Whether ↓ and ↑ with no row focused enter the list: the page's do, the sidebar's leave them to scroll the panes. */
+	entersList: boolean;
 }
 
 /** What makes an item's drag: the arguments of `useDragOrder`'s function, which change with every drag and so are called in a pass of their own. */
@@ -292,7 +295,7 @@ function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Rea
  * or Alt+Shift+↑ and ↓ reorder the repositories, the sections, and the pull requests in a section; the browser keeps
  * the order. Mount it once per screen, since its keys act on the rows it lists.
  */
-export function usePullRequestsBoard({ project, hosts, past, route }: BoardProps): PullRequestsBoard {
+export function usePullRequestsBoard({ project, hosts, past, route, entersList }: BoardProps): PullRequestsBoard {
 	const { target } = route;
 	const targetKey = target ? prKey(target) : null;
 	const { open, start } = useDashboardActions();
@@ -326,7 +329,7 @@ export function usePullRequestsBoard({ project, hosts, past, route }: BoardProps
 	const onQuickAction = useCallback((pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => start(pullRequestStart(pr, action, cwd, readPinnedSkill())), [start]);
 	const onActionsOpenChange = useCallback((pr: PullRequest, next: boolean) => setActionsOpen(next ? rowId(pr) : null), []);
 	const shown = useMemo(() => (list ? shownPullRequests(list, folds.isFolded, order, agent) : []), [list, folds.isFolded, order, agent]);
-	useTriageKeys(shown, route, giveToAgent, openActions);
+	useTriageKeys(shown, route, entersList, giveToAgent, openActions);
 
 	const repos = useMemo(() => (list ? orderedRepos(list.repos, order) : []), [list, order]);
 	const sectionsOf = useMemo(() => repos.map(repo => ("error" in repo ? [] : pullRequestSections(repo.pullRequests, order, agent))), [repos, order, agent]);

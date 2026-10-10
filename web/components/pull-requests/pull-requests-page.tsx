@@ -98,7 +98,7 @@ interface PullRequestsPageProps {
 export function PullRequestsPage({ project, hosts, past, section }: PullRequestsPageProps) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const board = usePullRequestsBoard({ project, hosts, past, route: { target: null } });
+	const board = usePullRequestsBoard({ project, hosts, past, route: { target: null }, entersList: true });
 	useReveal(section, board.folds, { token: section, block: "start", focus: true });
 	const unmatched = board.poll.read?.data.unmatched ?? [];
 	return (
