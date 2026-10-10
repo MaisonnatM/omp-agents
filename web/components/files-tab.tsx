@@ -4,9 +4,11 @@ import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { hasEveryWord } from "../every-word";
 import { age, readTime } from "../labels";
 import { hashForChanges } from "../routing";
 import { LineCounts } from "./line-counts";
+import { SidebarSearch } from "./sidebar-search";
 import { ViewerDialog } from "./viewer-dialog";
 
 const CHANGE_LABEL: Record<FileChangeKind, string> = { created: "Created", edited: "Edited", rewritten: "Rewritten", deleted: "Deleted" };
@@ -133,10 +135,16 @@ function FileChangesDialog({ file, onClose }: { file: ChangedFile; onClose: () =
 	);
 }
 
-/** The files the view's agent changed, in first-touch order, each opening its changes in a dialog, then a link to the session's changes page. */
+/**
+ * The files the view's agent changed, in first-touch order, each opening its changes in a dialog, then a link to the
+ * session's changes page. A search keeps the files whose path holds every word typed.
+ */
 export function FilesTab({ files, sessionId }: { files: ChangedFile[] | null; sessionId: string | null }) {
 	const [shownPath, setShownPath] = useState<string | null>(null);
+	const [query, setQuery] = useState("");
 	const shown = shownPath === null ? undefined : files?.find(file => file.path === shownPath);
+	const matched = files?.filter(file => hasEveryWord(file.path, query)) ?? [];
+	const count = matched.length === files?.length ? plural(matched.length, "file") : `${matched.length} of ${plural(files?.length ?? 0, "file")}`;
 	return (
 		<>
 			{files &&
@@ -144,15 +152,22 @@ export function FilesTab({ files, sessionId }: { files: ChangedFile[] | null; se
 					<p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p>
 				) : (
 					<SidebarGroup>
-						<SidebarGroupLabel>
-							<span className="min-w-0 flex-1 truncate">{plural(files.length, "file")} changed</span>
-							<LineCounts {...lineTotals(files.flatMap(file => file.changes))} />
-						</SidebarGroupLabel>
-						<SidebarMenu aria-label="Files changed">
-							{files.map(file => (
-								<FileRow key={file.path} file={file} onOpen={() => setShownPath(file.path)} />
-							))}
-						</SidebarMenu>
+						<SidebarSearch label="Filter the changed files" placeholder="Search files" query={query} onQuery={setQuery} />
+						{matched.length === 0 ? (
+							<p className="px-2 py-2 text-xs text-muted-foreground">{`No files match “${query.trim()}”`}</p>
+						) : (
+							<>
+								<SidebarGroupLabel>
+									<span className="min-w-0 flex-1 truncate">{count} changed</span>
+									<LineCounts {...lineTotals(matched.flatMap(file => file.changes))} />
+								</SidebarGroupLabel>
+								<SidebarMenu aria-label="Files changed">
+									{matched.map(file => (
+										<FileRow key={file.path} file={file} onOpen={() => setShownPath(file.path)} />
+									))}
+								</SidebarMenu>
+							</>
+						)}
 					</SidebarGroup>
 				))}
 			{shown && <FileChangesDialog file={shown} onClose={() => setShownPath(null)} />}
