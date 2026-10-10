@@ -12,11 +12,16 @@ const { z } = createRequire(join(process.argv[2], "package.json"))("zod");
 const { default: extension } = await import(process.argv[3]);
 const input = JSON.parse(process.argv[4]);
 let gate;
+let agentStart;
 let tool;
 let confirmations = 0;
+const sessionManager = { getSessionId: () => input.sessionId ?? "session" };
 extension({
 	zod: z,
-	on(name, handler) { if (name === "tool_call") gate = handler; },
+	on(name, handler) {
+		if (name === "tool_call") gate = handler;
+		if (name === "before_agent_start") agentStart = handler;
+	},
 	registerTool(registered) { tool = registered; },
 	appendEntry() {},
 	async exec() { return input.response; },
@@ -28,9 +33,13 @@ if (input.command) {
 		ui: { async confirm() { confirmations++; return input.approve; } },
 	});
 	console.log(JSON.stringify({ result: result ?? null, confirmations }));
-} else if (input.write) {
-	const result = await gate({ toolName: "write", input: { path: input.write } }, { cwd: process.cwd() });
+} else if (input.write || input.edit) {
+	const call = input.edit ? { toolName: "edit", input: input.edit } : { toolName: "write", input: { path: input.write } };
+	const result = await gate(call, { cwd: process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
 	console.log(JSON.stringify({ result: result ?? null }));
+} else if (input.agentStart) {
+	const result = await agentStart({ systemPrompt: ["base"] }, { cwd: process.cwd(), sessionManager, agent: { kind: input.agentKind ?? "main" } });
+	console.log(JSON.stringify({ prompt: result?.systemPrompt ?? null }));
 } else if (input.run) {
 	const result = await tool.execute("call", input.params, undefined, undefined, { cwd: process.cwd(), hasUI: false });
 	console.log(JSON.stringify({ run: { isError: result.isError ?? false, stage: result.details?.state?.stage ?? null } }));
@@ -40,16 +49,17 @@ if (input.command) {
 }
 `;
 
-function exercise(name: "ship" | "todos" | "worktree-guard", input: object): {
+function exercise(name: "ship" | "todos" | "worktree-guard" | "projects", input: object, env: Record<string, string> = {}): {
 	result: { block: boolean; reason: string } | null;
 	confirmations: number;
 	valid: boolean;
 	run: { isError: boolean; stage: string | null };
+	prompt: string[] | null;
 } {
 	const child = Bun.spawnSync([
 		process.execPath, "run", "-", packageDir,
 		join(import.meta.dir, `agent/extensions/${name}.ts`), JSON.stringify(input),
-	], { stdin: Buffer.from(loader), stdout: "pipe", stderr: "pipe" });
+	], { stdin: Buffer.from(loader), stdout: "pipe", stderr: "pipe", env: { ...Bun.env, ...env } });
 	if (child.exitCode !== 0) throw new Error(child.stderr.toString());
 	return JSON.parse(child.stdout.toString());
 }
@@ -135,5 +145,58 @@ describe("user_todo optional due date", () => {
 	test.each([undefined, "2026-10-07", "2026-1-7", "tomorrow"])("date format boundary %s", due => {
 		const { valid } = exercise("todos", { params: { action: "add", text: "Review the PR", due } });
 		expect(valid).toBe(due === undefined || due === "2026-10-07");
+	});
+});
+
+describe("projects", () => {
+	const root = mkdtempSync(join(tmpdir(), "projects-extension-"));
+	afterAll(() => rmSync(root, { recursive: true, force: true }));
+	const env = { XDG_CONFIG_HOME: join(root, "config"), XDG_DATA_HOME: join(root, "data") };
+	const notes = join(root, "data", "omp-agents", "projects", "p1");
+	mkdirSync(join(root, "config", "omp-agents"), { recursive: true });
+	writeFileSync(
+		join(root, "config", "omp-agents", "projects.json"),
+		JSON.stringify({ projects: [{ id: "p1", name: "Billing", coordinator: { sessionId: "s-c" }, workers: [{ id: "w2", title: "Schema", sessionId: "s-w2" }] }] }),
+	);
+
+	test("the coordinator and each worker are told their role and the notes, a subagent in the session too; other sessions are told nothing", () => {
+		const coordinator = exercise("projects", { agentStart: true, sessionId: "s-c" }, env).prompt;
+		expect(coordinator?.[0]).toBe("base");
+		expect(coordinator?.[1]).toStartWith('You are the coordinator of the omp-agents project "Billing".');
+		expect(coordinator?.[1]).toContain(`Read ${join(notes, "README.md")} first.`);
+		expect(coordinator?.[1]).toContain("[omp-agents]");
+		const worker = exercise("projects", { agentStart: true, sessionId: "s-w2" }, env).prompt;
+		expect(worker?.[1]).toStartWith('You are worker w2 ("Schema") of the omp-agents project "Billing"');
+		expect(worker?.[1]).toContain(notes);
+		expect(exercise("projects", { agentStart: true, sessionId: "s-other" }, env).prompt).toBeNull();
+		expect(exercise("projects", { agentStart: true, sessionId: "s-c", agentKind: "sub" }, env).prompt?.[1]).toStartWith("You are the coordinator");
+	});
+
+	test.each([
+		["s-c", join(root, "repo", "src", "app.ts"), true],
+		["s-c", join(notes, "testing.md"), false],
+		["s-c", `${notes}-other/x.md`, true],
+		["s-c", "local://plan.md", false],
+		["s-c", "artifact://12", false],
+		["s-c", `file://${join(notes, "testing.md")}`, true],
+		["s-w2", join(root, "repo", "src", "app.ts"), false],
+		["s-other", join(root, "repo", "src", "app.ts"), false],
+	])("session %s writing %s is blocked: %s", (sessionId, path, blocked) => {
+		const { result } = exercise("projects", { write: path, sessionId }, env);
+		expect(result?.block ?? false).toBe(blocked);
+		if (blocked) expect(result?.reason).toContain("start_worker");
+	});
+
+	test("a subagent in the coordinator's session is held to its limit as the coordinator is", () => {
+		expect(exercise("projects", { write: join(root, "repo", "a.ts"), sessionId: "s-c", agentKind: "sub" }, env).result?.block).toBe(true);
+		expect(exercise("projects", { write: join(notes, "a.md"), sessionId: "s-c", agentKind: "sub" }, env).result).toBeNull();
+	});
+
+	test("a coordinator's hashline edit is checked file by file, and an edit naming no file it can read is refused", () => {
+		const edit = (input: object) => exercise("projects", { edit: input, sessionId: "s-c" }, env).result;
+		expect(edit({ input: `[${join(notes, "README.md")}#1A2B]\nPUT 1.=1:\n+x` })).toBeNull();
+		expect(edit({ input: `[${join(notes, "README.md")}#1A2B]\nPUT 1.=1:\n+x\n[${join(root, "repo", "a.ts")}#3C4D]\nPUT 1.=1:\n+y` })?.block).toBe(true);
+		expect(edit({ input: "*** Begin Patch\n*** Update File: src/a.ts" })?.reason).toContain("names no file");
+		expect(exercise("projects", { edit: { input: "anything" }, sessionId: "s-w2" }, env).result).toBeNull();
 	});
 });

@@ -1,6 +1,7 @@
 /**
  * Projects: a coordinator session that plans and starts worker sessions, which all share one notes directory.
  * The server keeps them in `projects.json` and is its only writer; sessions link to a project by session id.
+ * omp's extension `templates/omp/agent/extensions/projects.ts` reads the file but cannot import `src/`, so it keeps its own copy of the fields it reads: change it with this one.
  */
 import type { HostStatus } from "./sessions";
 
