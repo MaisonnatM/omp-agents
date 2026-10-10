@@ -7,10 +7,11 @@ import { cn } from "@/lib/utils";
 import { age, readTime } from "../labels";
 import { hashForChanges } from "../routing";
 import { LineCounts } from "./line-counts";
+import { ViewerDialog } from "./viewer-dialog";
 
 const CHANGE_LABEL: Record<FileChangeKind, string> = { created: "Created", edited: "Edited", rewritten: "Rewritten", deleted: "Deleted" };
 
-/** omp's numbered diff, `+12|added`, `-12|removed`, ` 12|context`, with blank lines between hunks, in the flow of the list. */
+/** omp's numbered diff, `+12|added`, `-12|removed`, ` 12|context`, with blank lines between hunks. */
 function Diff({ diff }: { diff: string }) {
 	return (
 		<div className="font-mono text-[11px] leading-4" data-diff>
@@ -69,48 +70,73 @@ function Change({ change }: { change: FileChange }) {
 	);
 }
 
-const FILE_LOOK: Record<FileStatus, { icon: LucideIcon; label: string }> = {
+interface FileLook {
+	icon: LucideIcon;
+	label: string;
+}
+
+const FILE_LOOK: Record<FileStatus, FileLook> = {
 	created: { icon: FilePlus, label: "New file" },
 	edited: { icon: FilePen, label: "Edited" },
 	deleted: { icon: FileMinus, label: "Deleted" },
 };
 
-function FileRow({ file }: { file: ChangedFile }) {
-	const [open, setOpen] = useState(false);
+/** A changed file's name, its folder, its look, and the line under its name: what happened, how often, and when last. */
+function factsOf(file: ChangedFile): { name: string; dir: string; look: FileLook; summary: string } {
 	const slash = file.path.lastIndexOf("/");
-	const name = file.path.slice(slash + 1);
-	const dir = slash > 0 ? file.path.slice(0, slash) : "";
 	const { changes } = file;
 	const look = FILE_LOOK[fileStatus(changes)];
 	const last = changes[changes.length - 1].at;
 	const summary = [look.label, plural(changes.length, "change"), last !== null && `${age(last)} ago`].filter(Boolean).join(" · ");
+	return { name: file.path.slice(slash + 1), dir: slash > 0 ? file.path.slice(0, slash) : "", look, summary };
+}
+
+function FileRow({ file, onOpen }: { file: ChangedFile; onOpen: () => void }) {
+	const { name, dir, look, summary } = factsOf(file);
 	return (
 		<SidebarMenuItem>
 			<Tooltip content={`${file.path} · ${summary}`} side="left">
-				<SidebarMenuButton icon={look.icon} aria-expanded={open} onClick={() => setOpen(!open)} className="h-auto min-h-8 items-start py-1.5 [&>svg]:mt-0.5">
+				<SidebarMenuButton icon={look.icon} aria-haspopup="dialog" onClick={onOpen} className="h-auto min-h-8 items-start py-1.5 [&>svg]:mt-0.5">
 					<span className="flex min-w-0 flex-1 flex-col gap-0.5">
 						<span className="flex min-w-0 items-baseline gap-1.5">
 							<span className="min-w-0 truncate text-foreground">{name}</span>
 							<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{dir}</span>
-							<LineCounts {...lineTotals(changes)} />
+							<LineCounts {...lineTotals(file.changes)} />
 						</span>
 						<span className="truncate text-xs text-muted-foreground">{summary}</span>
 					</span>
 				</SidebarMenuButton>
 			</Tooltip>
-			{open && (
-				<ol className="ml-4 space-y-3 border-l border-border py-2 pr-1 pl-3" aria-label={`Changes to ${file.path}, newest first`}>
-					{changes.toReversed().map((change, index) => (
-						<Change key={changes.length - index} change={change} />
-					))}
-				</ol>
-			)}
 		</SidebarMenuItem>
 	);
 }
 
-/** The files the view's agent changed, in first-touch order, each unfolding to its changes, then a link to the session's changes page. */
+/** One file's changes over the page, newest first, each with what omp recorded; it follows the file while the agent edits it. */
+function FileChangesDialog({ file, onClose }: { file: ChangedFile; onClose: () => void }) {
+	const { name, look, summary } = factsOf(file);
+	const { changes } = file;
+	return (
+		<ViewerDialog
+			icon={look.icon}
+			title={name}
+			description={`${file.path} · ${summary}`}
+			actions={<LineCounts {...lineTotals(changes)} />}
+			bodyLabel={`Changes to ${file.path}, newest first`}
+			onClose={onClose}
+		>
+			<ol className="space-y-5 p-4">
+				{changes.toReversed().map((change, index) => (
+					<Change key={changes.length - index} change={change} />
+				))}
+			</ol>
+		</ViewerDialog>
+	);
+}
+
+/** The files the view's agent changed, in first-touch order, each opening its changes in a dialog, then a link to the session's changes page. */
 export function FilesTab({ files, sessionId }: { files: ChangedFile[] | null; sessionId: string | null }) {
+	const [shownPath, setShownPath] = useState<string | null>(null);
+	const shown = shownPath === null ? undefined : files?.find(file => file.path === shownPath);
 	return (
 		<>
 			{files &&
@@ -124,11 +150,12 @@ export function FilesTab({ files, sessionId }: { files: ChangedFile[] | null; se
 						</SidebarGroupLabel>
 						<SidebarMenu aria-label="Files changed">
 							{files.map(file => (
-								<FileRow key={file.path} file={file} />
+								<FileRow key={file.path} file={file} onOpen={() => setShownPath(file.path)} />
 							))}
 						</SidebarMenu>
 					</SidebarGroup>
 				))}
+			{shown && <FileChangesDialog file={shown} onClose={() => setShownPath(null)} />}
 			{sessionId !== null && (
 				<SidebarGroup>
 					<SidebarMenu>
