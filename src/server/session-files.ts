@@ -1,11 +1,12 @@
 /** Every session file on disk, newest first, with the pull requests each session worked on. */
 import { basename, dirname, join } from "node:path";
+import { ConversationSearch } from "../conversation-search";
 import { headHistory, worktreeAt } from "../git";
 import { repoOf } from "../github";
 import { listSessionFiles, readSessionFile, type SavedSession, sessionsDir } from "../omp/sessions";
 import { displayPath } from "../paths";
 import { SessionFactsIndex } from "../session-facts";
-import type { PastSession, SessionFacts } from "../shared/sessions";
+import type { ConversationHit, PastSession, SessionFacts } from "../shared/sessions";
 
 /** omp's `.<file>.jsonl.lock` sidecars: on macOS a burst of writes to a session file can surface only as events for these. */
 const SIDECAR = /^\.(.+\.jsonl)\.lock(?:\.os)?$/;
@@ -48,6 +49,7 @@ export class SessionFiles {
 	readonly facts = new SessionFactsIndex(repoOf, worktreeAt, headHistory);
 	/** The last past-list row of each listed file, rebuilt only when what it shows changed. */
 	readonly #rows = new Map<string, PastRow>();
+	readonly #conversations = new ConversationSearch();
 	readonly #root: string;
 
 	/** `root`: omp's sessions directory, one directory per working directory. */
@@ -139,6 +141,11 @@ export class SessionFiles {
 	/** Read the transcripts for what they link to; whether any session's pull requests, Linear issues, or /ship stage changed. The first read covers every transcript. */
 	refreshFacts(): Promise<boolean> {
 		return this.facts.refresh(this.#files);
+	}
+
+	/** The listed conversations whose prompts or replies hold every word of `query`, the file changed last first. */
+	searchConversations(query: string): Promise<ConversationHit[]> {
+		return this.#conversations.search(this.#files, query);
 	}
 
 	/**

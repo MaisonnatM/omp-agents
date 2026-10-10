@@ -2,7 +2,7 @@
 import { type Project, type Worker, type WorkerPhase, workerPhase } from "../src/shared/projects";
 import { type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import type { Workspace } from "../src/shared/workspaces";
-import { everyWord } from "./every-word";
+import { everyWord } from "../src/shared/every-word";
 
 const HIDDEN_ROOTS = ["/tmp", "/private/tmp"];
 

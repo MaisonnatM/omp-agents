@@ -298,6 +298,7 @@ export class Dashboard {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},
 				projectNotesDir: id => (this.#projects.get(id) ? projectNotesDir(id) : null),
+				searchConversations: query => files.searchConversations(query),
 			},
 			integrations: {
 				google: this.#google,

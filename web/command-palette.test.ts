@@ -160,6 +160,21 @@ describe("paletteSections", () => {
 			["Todos", ["todo:t"]],
 		]);
 	});
+
+	test("conversation matches list for a search only, in the server's order whatever cmdk scores, after the ranked sections and before what the search becomes", () => {
+		const items = [
+			item("fallback:create-todo", "fallback", "Create todo"),
+			item("conversation:b", "conversations", "unrelated words"),
+			item("conversation:a", "conversations", "deploy deploy deploy"),
+			item("session:r", "running", "Deploy web"),
+		];
+		expect(listed(paletteSections(items, "", { "conversation:a": { count: 9, last: NOW } }, NOW, 5))).toEqual([["running", ["session:r"]]]);
+		expect(listed(paletteSections(items, "deploy", {}, NOW))).toEqual([
+			["running", ["session:r"]],
+			["conversations", ["conversation:b", "conversation:a"]],
+			["fallback", ["fallback:create-todo"]],
+		]);
+	});
 });
 
 describe("paletteCommands", () => {

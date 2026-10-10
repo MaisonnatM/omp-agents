@@ -51,6 +51,7 @@ import {
 	MessageScrollerContent,
 	MessageScrollerItem,
 	MessageScrollerViewport,
+	useMessageScroller,
 } from "@/components/ui/message-scroller";
 import { ThinkingIndicator } from "@/components/ui/thinking-indicator";
 import { ThinkingStep, ThinkingSteps, ThinkingStepsContent, ThinkingStepsHeader } from "@/components/ui/thinking-steps";
@@ -62,6 +63,7 @@ import { modeOf, SPLIT_CLICK } from "../labels";
 import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { usePaneLoaded, useTranscript } from "../pane-store";
+import { useReveal } from "../message-reveal";
 import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
@@ -507,6 +509,17 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const visibleBlocks = useMemo(() => withEditedPrompt(blocks, editing), [blocks, editing]);
 	// Item ids repeat across views (a fork keeps its source's history), so the fork's own view must match.
 	const here = fork && sameView(fork.op.view, view) ? fork : null;
+	const { messageId: revealId, done: revealed } = useReveal(view);
+	const { scrollToMessage } = useMessageScroller();
+	// The command palette opened this view at a match. Scroll once the whole transcript has loaded and the scroller has
+	// placed it at its end, a frame later, so that first placement does not undo the scroll.
+	useEffect(() => {
+		if (revealId === null || !loaded || !items.some(item => item.id === revealId)) return;
+		const frame = requestAnimationFrame(() => {
+			if (scrollToMessage(revealId, { align: "start" })) revealed();
+		});
+		return () => cancelAnimationFrame(frame);
+	}, [revealId, loaded, items, scrollToMessage]);
 
 	return (
 		<MessageScroller className="flex-1">

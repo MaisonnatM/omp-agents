@@ -5,6 +5,7 @@ import { type CalendarEventsAnswer, type GoogleStatus, type IntegrationsAnswer, 
 import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
 import type { PullRequestList, RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
+import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/sessions";
 import type { Ticket, TicketsAnswer } from "../src/shared/tickets";
 import { errorText, getJson } from "./api";
 import { createPolledStore } from "./polled-store";
@@ -99,6 +100,33 @@ export function useSearchSources(ticketsWanted: boolean, scope: string | null): 
 	const tickets = ticketsStore.usePolling(null, ticketsWanted).read?.data.tickets;
 	const pullRequestRepos = pullRequestsStore.use(scope).read?.data.repos ?? NO_REPOS;
 	return { tickets: (ticketsWanted && tickets) || NO_TICKETS, pullRequestRepos };
+}
+
+const NO_HITS: ConversationHit[] = [];
+/** How long typing must pause before the conversations are searched. */
+const CONVERSATION_SEARCH_DELAY_MS = 200;
+
+/**
+ * The saved conversations whose prompts or replies hold every word of `query`, asked once typing pauses; none for a
+ * blank query or until the answer for this very query arrives. A failed search lists none.
+ */
+export function useConversationHits(query: string): ConversationHit[] {
+	const [answer, setAnswer] = useState<{ query: string; hits: ConversationHit[] } | null>(null);
+	useEffect(() => {
+		if (!query) return;
+		const abort = new AbortController();
+		const timer = setTimeout(() => {
+			getJson<ConversationSearchAnswer>(`/api/conversations?q=${encodeURIComponent(query)}`, abort.signal).then(
+				({ hits }) => setAnswer({ query, hits }),
+				() => {},
+			);
+		}, CONVERSATION_SEARCH_DELAY_MS);
+		return () => {
+			clearTimeout(timer);
+			abort.abort();
+		};
+	}, [query]);
+	return answer?.query === query ? answer.hits : NO_HITS;
 }
 
 export const analyticsStore = createPolledStore<Analytics>({

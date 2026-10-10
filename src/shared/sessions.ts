@@ -133,6 +133,25 @@ export interface PastSession {
 	interrupted: boolean;
 }
 
+/** A saved conversation whose prompts or replies hold every word of a search: `GET /api/conversations?q=`. */
+export interface ConversationHit {
+	sessionId: string;
+	/** The transcript item of its latest message that holds every word, which the page scrolls to. */
+	messageId: string;
+	role: "user" | "assistant";
+	/** That message on one line, cut around the first word searched. */
+	snippet: string;
+	/** How many of its prompts and replies hold every word. */
+	matches: number;
+}
+
+export interface ConversationSearchAnswer {
+	/** The sessions whose files changed last first, at most {@link MAX_CONVERSATION_HITS}. */
+	hits: ConversationHit[];
+}
+
+export const MAX_CONVERSATION_HITS = 30;
+
 export interface LiveView {
 	kind: "live";
 	instanceId: string;
