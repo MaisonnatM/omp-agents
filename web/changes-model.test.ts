@@ -50,12 +50,12 @@ describe("fileLines", () => {
 });
 
 describe("fileTree", () => {
-	test("joins chains of single folders, lists folders before files, and orders J and K by the tree", () => {
+	test("joins chains of single folders, lists folders before files, and orders ↓ and ↑ by the tree", () => {
 		const tree = fileTree([entry("README.md"), entry("web/components/changes/a.tsx"), entry("web/components/changes/b.tsx"), entry("src/z.ts"), entry("src/server/a.ts")]);
 		expect(tree.dirs.map(dir => dir.name)).toEqual(["src", "web/components/changes"]);
 		expect(tree.dirs[1]!.path).toBe("web/components/changes");
 		expect(treeOrder(tree).map(file => file.path)).toEqual(["src/server/a.ts", "src/z.ts", "web/components/changes/a.tsx", "web/components/changes/b.tsx", "README.md"]);
-		// J or K opening a file reopens the folders above it, a joined chain by its full path.
+		// ↓ or ↑ opening a file reopens the folders above it, a joined chain by its full path.
 		expect(foldersAbove(tree, "src/server/a.ts")).toEqual(["src", "src/server"]);
 		expect(foldersAbove(tree, "web/components/changes/b.tsx")).toEqual(["web/components/changes"]);
 		expect(foldersAbove(tree, "README.md")).toEqual([]);

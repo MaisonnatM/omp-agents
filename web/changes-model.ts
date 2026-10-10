@@ -41,7 +41,7 @@ export function fileTree(files: readonly ChangedEntry[]): TreeDir {
 	return settle(root);
 }
 
-/** The files in the explorer's order, which J and K walk. */
+/** The files in the explorer's order, which ↓ and ↑ walk. */
 export const treeOrder = (dir: TreeDir): ChangedEntry[] => [...dir.dirs.flatMap(treeOrder), ...dir.files];
 
 /** The paths of the folders that hold `path`, outermost first, which must be open for its row to show; `null` when no folder holds it. */

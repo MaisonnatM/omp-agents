@@ -112,7 +112,7 @@ interface PullRequestsNavProps {
 export function PullRequestsNav({ project, hosts, past, route }: PullRequestsNavProps) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const board = usePullRequestsBoard({ project, hosts, past, route });
+	const board = usePullRequestsBoard({ project, hosts, past, route, entersList: false });
 	const { read, error, refreshing } = board.poll;
 	return (
 		<div className="space-y-2">

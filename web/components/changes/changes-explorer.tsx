@@ -23,7 +23,7 @@ interface ChangesExplorerProps {
 	path: string | null;
 	/** The address that opens the file at `path`. */
 	hrefFor: (path: string) => string;
-	/** Opens the file at `path` in place, for the files, J, and K, instead of through its address. */
+	/** Opens the file at `path` in place, for the files, ↓, and ↑, instead of through its address. */
 	onPick?: (path: string) => void;
 	/** The read of the file at `path` in full, with its diff. */
 	fileUrl: (path: string) => string;

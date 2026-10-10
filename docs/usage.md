@@ -178,7 +178,7 @@ An action that fails shows its error, and its control becomes available again.
   Click a folder to close or open it.
   Each file shows its lines added and removed, a blue dot when the session's own calls changed it, and a letter for what git says happened: **A** added, **U** untracked, **M** modified, **D** deleted, and **S** for a file only the session's calls name, outside the checkout or no different from the base.
   A file outside the checkout shows under a `~` or `/` folder.
-  J and K open the next and previous file in the explorer's order, outside text fields, and open the folders above it.
+  ↓ and ↑ open the next and previous file in the explorer's order, outside text fields, and open the folders above it.
 - The editor shows the open file, its path above it, with **Diff** and **File** to choose how; the choice is remembered.
   **Diff**, the default, shows the changes with both line numbers, removed lines red and added lines green, and three unchanged lines around each change; click **Show N unchanged lines** to unfold a run.
   **File** shows the whole file as it is now: a green bar beside added lines, a blue bar beside lines that replaced others, and a red notch where lines were removed.
@@ -602,15 +602,16 @@ An action that fails shows its error, and its control becomes available again.
   An unresolved review thread shows its first comment, under the file and line it is on, which link to the file on the **Code** tab; its replies fold behind a bar that shows who replied, how many replies, and when the last came.
   A red **New** line sits under what happened since you last opened the pull request's timeline in this browser, which its localStorage keeps for 30 days.
   Above the list, the counts of comments and commits, and **Newest first**, which flips the order.
-- **Code** shows the pull request's files as the [session changes](#session-changes) page shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and the open file in **Diff** or **File**, with J and K to step through them.
+- **Code** shows the pull request's files as the [session changes](#session-changes) page shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and the open file in **Diff** or **File**, with ↓ and ↑ to step through them.
   A renamed file shows **R**, and a copied one **A**.
   It reads the files from GitHub, so it needs no checkout of the repository; a file GitHub shows no diff for, such as a binary one or one with a very large diff, shows why instead.
   Opening the tab reads the list from GitHub again, and the files you open within 30 seconds read from that list.
   In the session details sidebar's **PRs** tab, **Code** lists the files instead; a click on one opens the explorer in a dialog at that file, where the others open in place.
 - Each opening reads the pull request again; the server keeps its answer for 30 seconds.
 - The Pull requests page works from the keyboard, outside text fields, while its tab shows.
-  J and K move to the next and previous row, and Enter shows the focused row's details.
-  While the details show, J and K show the next and previous pull request; while the **Code** tab shows, they open the next and previous file.
+  ↓ and ↑ move to the next and previous row, and Enter shows the focused row's details.
+  While the details show, ↓ and ↑ show the next and previous pull request; while the **Code** tab shows, they open the next and previous file.
+  The sidebar's pull request list, which stays while you work in the sessions, takes ↓ and ↑ only once one of its rows has focus, so they keep scrolling a session.
   O opens the focused row's pull request, or the one whose details show, on GitHub, and `.` opens the focused row's quick actions.
   E gives the focused row's move, or the move of the pull request whose details show, to an agent, when a quick action makes that move.
 - `#pull-requests/<owner>/<repo>/<number>` shows one pull request's details.
@@ -802,8 +803,8 @@ An action that fails shows its error, and its control becomes available again.
   An empty title, or Backspace in an empty one, deletes the todo, and so does the **×** that shows on hover; deleting a todo deletes the todos under it.
   **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
 - The search field in the page's header, or `/` outside a text field, keeps the todos whose title or notes, or a todo under them, hold every word typed; Esc clears it.
-  Outside a text field, J and K, or ↓ and ↑, focus the next and previous todo, X marks the focused or open one **Done**, or a closed one **Todo** again, and Enter opens it.
-  While a todo is open, J and K, or ↓ and ↑, open the next and previous one instead, and Esc closes it.
+  Outside a text field, ↓ and ↑ focus the next and previous todo, X marks the focused or open one **Done**, or a closed one **Todo** again, and Enter opens it.
+  While a todo is open, ↓ and ↑ open the next and previous one instead, and Esc closes it.
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.
   Under it, buttons show its status, its priority, its assignee, its category for a top-level todo, and its due day, each opening a menu to change it; the due day's menu also clears it.
   A todo due today reads **Today**, and one whose day has passed reads **Overdue** in red.
@@ -1061,13 +1062,13 @@ Alt is Option on macOS.
 | Cmd+6 | Anywhere | Open or close settings |
 | G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Choose the sidebar's project |
-| J | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
-| K | Pull requests page, outside text fields | Move to the previous pull request, or show its details while one shows |
+| ↓ | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
+| ↑ | Pull requests page, outside text fields | Move to the previous pull request, or show its details while one shows |
 | O | Pull requests page, outside text fields | Open the pull request on GitHub |
 | . | Pull requests page, outside text fields | Open the pull request's quick actions |
 | E | Pull requests page, outside text fields | Give the pull request's next move to an agent |
 | / | Todo page, outside text fields | Search the todos |
-| J / K, ↓ / ↑ | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |
+| ↓ / ↑ | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |
 | X | Todo page, outside text fields | Mark the focused or open todo Done, or a closed one Todo again |
 | S | Todo page, outside text fields | Change the focused or open todo's status |
 | P | Todo page, outside text fields | Change the focused or open todo's priority |
@@ -1076,7 +1077,7 @@ Alt is Option on macOS.
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
-| J / K | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
+| ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.
