@@ -118,14 +118,14 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
  */
 const SIDEBAR_TAB_FIT = {
 	five: {
-		list: "@max-[23rem]/sidebar:self-stretch",
-		tab: "@min-[23rem]/sidebar:[&>svg]:hidden @max-[23rem]/sidebar:flex-1 @max-[23rem]/sidebar:justify-center @max-[23rem]/sidebar:px-0.5",
-		label: "@max-[23rem]/sidebar:sr-only",
-	},
-	six: {
 		list: "@max-[26rem]/sidebar:self-stretch",
 		tab: "@min-[26rem]/sidebar:[&>svg]:hidden @max-[26rem]/sidebar:flex-1 @max-[26rem]/sidebar:justify-center @max-[26rem]/sidebar:px-0.5",
 		label: "@max-[26rem]/sidebar:sr-only",
+	},
+	six: {
+		list: "@max-[29.5rem]/sidebar:self-stretch",
+		tab: "@min-[29.5rem]/sidebar:[&>svg]:hidden @max-[29.5rem]/sidebar:flex-1 @max-[29.5rem]/sidebar:justify-center @max-[29.5rem]/sidebar:px-0.5",
+		label: "@max-[29.5rem]/sidebar:sr-only",
 	},
 };
 
