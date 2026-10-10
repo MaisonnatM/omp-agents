@@ -3,8 +3,8 @@
 The full reference for the dashboard's interface.
 For installation, see the [README](../README.md).
 
-A filled button marks the main action of its surface: Send, Finish, Resume on a past session, and Run now on a routine.
-Suggested prompts, quick actions, forking, and menu items stay quiet, so they never compete with it.
+A filled button marks the main action of its surface: Send, Finish, Resume on a past session, Run now on a routine, and **Work on it** on an open todo.
+Suggested prompts, other quick actions, forking, and menu items stay quiet, so they never compete with it.
 Actions that wait for the server show a spinner or a progress label and block repeated activation until the work finishes.
 Starting a session, stopping a turn, switching model settings, resending a prompt, canceling a subagent, and running a routine use this state.
 Refresh controls and project saves do too.
@@ -686,7 +686,7 @@ An action that fails shows its error, and its control becomes available again.
   A completed or canceled issue has none.
   The button waits while the session starts.
   When the start fails, a note above the issue's details or at the top of the list gives the reason, even when the issue itself cannot load, until you dismiss it.
-  The Pull requests page and the tickets page share that note: either page shows the last failed quick action, whether it ran on a pull request or an issue.
+  The Pull requests page and the tickets page share that note: either page shows the last failed quick action, whether it ran on a pull request, an issue, or a todo, and names a todo by its title.
 - The list of tickets is not tied to the sidebar's project.
   The page reads Linear when it opens and every minute after, and shows the last read at once on a reopen, even after a reload.
   A saved tickets list without each issue's opening date is discarded, and the page reads Linear again.
@@ -783,8 +783,9 @@ An action that fails shows its error, and its control becomes available again.
   A dragged todo keeps its category; change it from the open todo.
   Alt+Shift+↑ and Alt+Shift+↓ move the focused todo one place the same way.
   **Today** sorts by due day and **Archive** by when it was cleared, so neither moves todos.
-- A row shows the todo's priority and status as icons, its title, then what it carries, its assignee's icon when it has one, and the day it was added; a todo under another has its own priority, status, and assignee.
-  Click the priority or the status icon to pick another, or press S or P outside a text field for the focused todo, or else the open one; while the menu is open, the digits pick a choice, 1 to 5 for a status and 0 to 4 for a priority.
+- A row shows the todo's priority as an icon when it has one, its status as an icon, its title, then what it carries, its assignee's icon when it has one, and the day it was added; a todo under another has its own priority, status, and assignee.
+  Click the status icon, or the priority icon when there is one, to pick another, or press S or P outside a text field for the focused todo, or else the open one; while the menu is open, the digits pick a choice, 1 to 5 for a status and 0 to 4 for a priority.
+  The open todo's **Priority** button sets a priority too.
   A does the same for the assignee, with 0 for none, 1 for **You**, and 2 for **Agent**, and Shift+D for the due day.
   Closing a top-level todo, as Done or Canceled, closes the open todos under it the same way.
   At both levels, open todos come first and closed ones after them, so a todo under an open one moves below the ones still open beside it once it closes, and reopening a todo puts it last among them.
@@ -816,14 +817,19 @@ An action that fails shows its error, and its control becomes available again.
   A GitHub table and raw HTML are not formatting the editor knows: they show and save as the text you wrote, one block per line.
   Saving an edit rewrites some markdown the way the editor writes it: a sublist indents four spaces, and `_italic_` and `__bold__` become stars.
   A `*`, `_`, `` ` ``, or `~` you type saves as typed, unless one in the note would read as formatting; then each of them saves after a backslash.
-  A top-level todo then lists its sub-todos, with how many are done, a bar of that share, and each one's status and priority; click one to open it, and the **+** adds one.
-  A card then shows its latest linked session's work state and, when that live session has a question open, its title and **Reply in session**, which opens that session, beside **Start session**; with no linked session, only **Start session** shows.
+  A top-level todo then lists its sub-todos, with how many are done, a bar of that share, and each one's status and its priority when it has one; click one to open it, and the **+** adds one.
+  A card then shows its latest linked session's work state and, when that live session has a question open, its title and **Reply in session**, which opens that session.
+  For an open todo, the card's **Work on it** and **Plan it** start a session on it at once, and **Start session** opens the draft; with no linked session, only those buttons show.
   At the bottom, it shows the day it was added and the session that added it.
 - A top-level todo shows what it links to: a session, a pull request, or a Linear issue, as an icon in the list and a chip under **Links** in the open todo, each opening it here.
   Each shows the icon of the sidebar tab it opens: **Sessions**, **Pull requests**, or **Tickets**.
   A running session shows its status dot; an open todo's **×** on a chip unlinks it.
-- An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's project; `#new/<cwd>?todo=<id>` addresses it.
-  The session links to the todo once omp starts, which moves a **Backlog** or **Todo** todo to **In Progress**, and its agent marks the todo **Done** once it finishes the work; see [Todos from agents](#todos-from-agents).
+- An open top-level todo's **Work on it** and **Plan it** start a session at once, in the sidebar's project, through the pinned skill when one is pinned, and link it to the todo.
+  **Work on it** does what the todo asks from its title, notes, and open sub-todos, in a git worktree on a new branch when it changes code, then commits and reports without pushing.
+  **Plan it**, on a todo not **In Progress** yet, reads what the todo concerns and reports a plan without changing anything.
+  The button waits while the session starts, and a start that fails says why in the card, naming the todo by its title.
+- An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's project, to edit the prompt or pick another directory first; `#new/<cwd>?todo=<id>` addresses it.
+  A session started from a todo links to it once omp starts, which moves a **Backlog** or **Todo** todo to **In Progress**, and its agent marks the todo **Done** once it finishes the work; see [Todos from agents](#todos-from-agents).
 - With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, starting with the last one an issue was created in, then opens an issue from the title and notes, assigned to you, and links it to the todo.
 - The list icon on a ticket adds a todo of no category, last in the list, that links to it.
 - The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
@@ -838,7 +844,7 @@ An action that fails shows its error, and its control becomes available again.
 - An agent adds a todo when it stops on a step outside the session that only you can take, such as setting up an account or a credential, running something on your machine, or reviewing a pull request.
   It asks for an approval or an answer in its reply, not in a todo.
   The todo lands last in no category, as **Todo** with no priority, and its chip names the session that added it and opens it.
-- At each prompt, a session is told which open top-level todo links to it, such as the one its **Start session** started, and which open todos it added.
+- At each prompt, a session is told which open top-level todo links to it, such as the one its **Work on it**, **Plan it**, or **Start session** started, and which open todos it added.
   Its agent checks a linked todo off once it finishes the work, and leaves it open while the work still waits on you.
   It checks off a todo it added once you have done the step or it no longer applies, and adding a todo it already added, with the same title, returns the open one.
   Any agent also checks off a todo whose work you ask it to do.
@@ -975,7 +981,7 @@ An action that fails shows its error, and its control becomes available again.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
   **New sessions** pins a skill.
-  Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request or a Linear issue, then sends its first message through that skill.
+  Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request, a Linear issue, or a todo, then sends its first message through that skill.
   The picker lists the skills of the workspace that Settings opened on, and says which, or your own skills with **User files only**.
   Choose **None** to unpin.
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar; see [Integrations](#integrations).

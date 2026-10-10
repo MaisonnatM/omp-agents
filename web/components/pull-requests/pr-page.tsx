@@ -8,7 +8,7 @@ import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { listedPullRequest, moveAction, reason } from "../../pull-requests-model";
 import { readPinnedSkill } from "../../pinned-skill";
-import { actionOn, pendingOf, pullRequestStart } from "../../quick-actions";
+import { pendingOf, pullRequestStart, quickOn } from "../../quick-actions";
 import { pullRequestsStore } from "../../reads";
 import { hashForPullRequests } from "../../routing";
 import { sessionsOn } from "../../sessions";
@@ -65,7 +65,7 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 	const item: WorkItem = { kind: "pull-request", pr: target };
 	const sessions = sessionsOn(item, hosts);
 	const missing = placement === "page" && read && !listed;
-	const started = quick && actionOn(quick.op.subject, item) !== null;
+	const started = quickOn(quick, item);
 	return (
 		<>
 			{(missing || started) && (
@@ -75,7 +75,7 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 							{whyMissing(target, read.data, project === null)}
 						</p>
 					)}
-					{started && <QuickStartNotice quick={quick} onDismiss={() => dismissStart("quick")} />}
+					{started && <QuickStartNotice quick={started} onDismiss={() => dismissStart("quick")} />}
 				</div>
 			)}
 			<PullRequestDetailContent

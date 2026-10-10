@@ -495,7 +495,7 @@ A `start` of kind `new` carries a `skill`, `null` for none: the draft sends the 
 Once the server knows the directory omp runs in, worktree included, `withPinnedSkill` puts `/skill:<skill> ` before the first prompt, so omp's RPC prompt invokes the skill with the prompt as its arguments.
 A directory without that skill, or a prompt that starts with `/`, keeps the prompt as typed.
 
-A `start` of kind `new` carries a `subject`, `null` for none: a quick action sends the pull request or Linear issue it works on.
+A `start` of kind `new` carries a `subject`, `null` for none: a quick action sends the pull request or Linear issue it works on, and one on a todo sends no subject and names the todo in `todoId` instead.
 `LiveSessions` keeps it by instance id, and `rows()` puts it first among the session's `pullRequests` or `tickets` until the session's tool calls name it, so the roster links the session to its subject from the start, before omp writes the session file.
 The link goes when the session ends.
 
@@ -807,7 +807,7 @@ The page lives in `web/`.
   `#pull-requests` alone shows the Pull requests page, and the sidebar's Pull requests tab then lists its sections.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
-  `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request or a Linear issue, which runs in the background.
+  `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request, a Linear issue, or a todo, which runs in the background.
   `request` resolves or rejects on `done`, and rejects every outstanding request when the socket closes without replaying it.
   Ending sessions stay in a separate set until their requests settle, even if they have already left the roster.
 - `web/use-action.ts`: guards a control against repeated activation, exposes its pending state, and shows failures through the toast manager.
@@ -847,8 +847,10 @@ The page lives in `web/`.
 - `web/components/terminal/terminal-panel.tsx`: the terminal panel under the panes, its tabs, height, and open state, `useTerminalPanel`, which saves the last two in localStorage, and the restore from `GET /api/terminals`.
   `terminal-view.tsx` draws one tab with xterm.js over its `/ws/terminal` socket, fits it to the panel, follows the page's theme, and passes the toggle chord, and every Cmd chord on macOS, to the page's shortcuts.
   `terminal-socket.ts` sends its commands and retains a kill requested while the socket connects, sending it when the socket opens.
-- `web/quick-actions.ts`: the quick actions of the Pull requests page and the tickets page, which pull requests and issues each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
-  `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's or an issue's details, and the note that says why a start failed.
+- `web/quick-actions.ts`: the quick actions of the Pull requests page, the tickets page, and the open todo, which pull requests, issues, and todos each applies to, and the start, with its prompt, that runs it; the pull request actions themselves come from `src/pull-request-actions.ts`.
+  Tickets and todos share the **Work on it** and **Plan it** labels and descriptions in `WORK_ACTIONS`, and each keeps its own rules, which of its items an action applies to and the prompt it sends.
+  `startTarget` turns what a quick start works on into the `subject` or `todoId` its `start` message carries, and `quickOn` picks the quick start that works on an item, whose failure that item's details show.
+  `web/components/quick-actions.tsx` holds their row menu, the buttons on a pull request's, an issue's, or a todo's details, and the note that says why a start failed.
   `web/components/session-chip.tsx` holds the chip that names a session on a row or in the details, with the status dot of a running one.
 - `web/api.ts`: the page's HTTP client, `errorText`, which says what any failure was, and `socketUrl`, the address of the dashboard's and a terminal's WebSocket, `wss:` when the page is on HTTPS.
   `settingsUrl` names a settings route for one workspace, or for the user's own files.
@@ -893,9 +895,11 @@ The page lives in `web/`.
 - `web/components/todo/`: the Todo page.
   `page.tsx` is the page and its lists, **Archive** included, which `LIST_KINDS` marks read-only: its rows put a todo back or delete it for good, and its header offers **Empty** where the others offer **Clear done**.
   Every other list groups its top-level todos by status, in `STATUS_GROUPS` order, under fold headers whose folds `useFolds` keeps; `split.tsx` puts the list on the left and the open todo's `detail.tsx` on the right, at a list width stored in localStorage.
-  `row.tsx` holds a todo's row, with its priority and status buttons, category badge, work-state dot, due day and assignee buttons (each only once set or once its key opened it), link icons, and the day it was added, an archived todo's row, and the row of a todo not added yet; `fields.tsx` holds the status, priority, assignee, and due day pickers, as a row's icon or a labeled property button, and `input.tsx` the input a title is typed into, whose Cmd+Enter starts a session from the todo.
+  `row.tsx` holds a todo's row, with its priority and status buttons, category badge, work-state dot, due day and assignee buttons, link icons, and the day it was added, an archived todo's row, and the row of a todo not added yet; `fields.tsx` holds the status, priority, assignee, and due day pickers, as a row's icon or a labeled property button, and `input.tsx` the input a title is typed into, whose Cmd+Enter starts a session from the todo.
+  As icons, the priority, assignee, and due day pickers show nothing while their field is unset, or for a closed todo's due day, until their key opens them, so a row and a sub-todo follow the same rule.
   `editing.ts` holds `useTodoEditing`, which of those inputs is open, the status a new todo takes, and what its keys do, and deleting with its **Undo** toast; `search.tsx` is the search field.
-  `detail.tsx` is the open todo: a bar with its place, its status, and the ↑, ↓, and **×** buttons, its title, its property pickers, and notes, which `web/components/notes-editor.tsx` shows formatted and edits in place, then for a top-level todo its sub-todos, an agent card with the work state, live agent question, and **Start session**, its links with **Create Linear ticket**, and when it was added and by which session; `links.tsx` draws a todo's link chips and work-state pill, each with an icon-only form for rows, and `add-button.tsx` is the button that adds a todo linking to a pull request row or a ticket row.
+  `detail.tsx` is the open todo: a bar with its place, its status, and the ↑, ↓, and **×** buttons, its title, its property pickers, and notes, which `web/components/notes-editor.tsx` shows formatted and edits in place, then for a top-level todo its sub-todos, an agent card with the work state, live agent question, the **Work on it** and **Plan it** quick actions, and **Start session**, its links with **Create Linear ticket**, and when it was added and by which session.
+  `links.tsx` draws a todo's link chips and work-state pill, each with an icon-only form for rows, and `add-button.tsx` is the button that adds a todo linking to a pull request row or a ticket row.
   `notes-editor.tsx` is a Lexical rich-text editor; `web/markdown-notes.ts` holds its nodes and markdown shortcuts, turns its document into the notes' markdown and back, and decides when its text saves.
   `web/todo-views.ts` holds `LIST_KINDS`, what each list is called and lets you do, which todos it holds, `TODO_STATUS`, each status's label and the Linear state type whose icon it takes, each category's badge color, how a due day reads, and the `move` and `restore` the page sends; `web/use-todo-drag.ts` and `web/use-todo-keys.ts` drag and move rows, and the keys also step the open todo and open its pickers.
   `web/todo-work-state.ts` derives the pill and the **Needs you** filter from the latest linked session's live status, outstanding question, submitted pull request, or recorded `/ship` merge; it keeps unknown and ended sessions distinct from new ideas.
