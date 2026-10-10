@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Inbox, InboxPullRequest } from "../shared/github";
+import type { PullRequestList, PullRequestSummary } from "../shared/github";
 import type { AgentState } from "../shared/moves";
 import type { ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
@@ -29,7 +29,7 @@ const OPUS_ID = "model:anthropic/claude-opus-5-5>claude-opus-5-6";
 
 const MINUTE = 60_000;
 
-const pr = (number: number, fields: Partial<InboxPullRequest> = {}): InboxPullRequest => ({
+const pr = (number: number, fields: Partial<PullRequestSummary> = {}): PullRequestSummary => ({
 	owner: "acme",
 	repo: "webapp",
 	number,
@@ -55,7 +55,7 @@ interface State {
 	installed: string;
 	models: ModelUpdate[];
 	fail?: string;
-	pullRequests?: InboxPullRequest[];
+	pullRequests?: PullRequestSummary[];
 	/** The answer GitHub gave for the repository instead of its pull requests. */
 	githubError?: string;
 	agents?: Record<number, AgentState>;
@@ -82,10 +82,10 @@ function sources(state: State): NoticeSources {
 		upgradeModel: async update => {
 			state.models = state.models.filter(model => model !== update);
 		},
-		inbox: async () => {
+		pullRequests: async () => {
 			const repo = { owner: "acme", repo: "webapp", cwds: ["/code/webapp"] };
-			const inbox: Inbox = { repos: [state.githubError ? { ...repo, error: state.githubError } : { ...repo, pullRequests: state.pullRequests ?? [] }], unmatched: [] };
-			return { inbox, agent: ({ number }) => state.agents?.[number] ?? null };
+			const list: PullRequestList = { repos: [state.githubError ? { ...repo, error: state.githubError } : { ...repo, pullRequests: state.pullRequests ?? [] }], unmatched: [] };
+			return { list, agent: ({ number }) => state.agents?.[number] ?? null };
 		},
 		slack: async () => state.slack ?? [],
 		now: () => state.now ?? 0,

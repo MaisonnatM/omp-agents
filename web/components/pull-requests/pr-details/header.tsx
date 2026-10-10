@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { graphiteUrl } from "../../../inbox-model";
+import { graphiteUrl } from "../../../pull-requests-model";
 import { age, modeOf } from "../../../labels";
 import { QUICK_ACTIONS, type QuickActionId } from "../../../quick-actions";
 import { useCopy } from "../../../use-copy";

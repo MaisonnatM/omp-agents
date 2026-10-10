@@ -7,7 +7,7 @@ import type { ForkPoint } from "./transcript-view";
 
 /**
  * What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. A
- * quick action keeps its subject, the pull request or Linear issue with the action, which the inbox or the tickets page
+ * quick action keeps its subject, the pull request or Linear issue with the action, which the Pull requests page or the tickets page
  * shows progress and failure for; the server links its session to that subject. A **Resume all** resumes each of the
  * sidebar's interrupted sessions.
  */

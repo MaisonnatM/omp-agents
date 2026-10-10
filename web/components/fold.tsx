@@ -1,4 +1,4 @@
-/** Foldable sections that a page keeps folded across reloads, and the reveal of a section or row in them: the inbox's and the tickets page's. */
+/** Foldable sections that a page keeps folded across reloads, and the reveal of a section or row in them: the Pull requests page's and the tickets page's. */
 import { ChevronRight } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";

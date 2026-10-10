@@ -1,8 +1,8 @@
 /**
- * The pull request actions: which inbox pull request each applies to, and the prompt that starts its session.
- * The inbox's quick actions and the routines both read them, so the server and the page share one prompt.
+ * The pull request actions: which listed pull request each applies to, and the prompt that starts its session.
+ * The Pull requests page's quick actions and the routines both read them, so the server and the page share one prompt.
  */
-import { type InboxPullRequest, pullRequestUrl } from "./shared/github";
+import { type PullRequestSummary, pullRequestUrl } from "./shared/github";
 
 export type PullRequestActionId = "fix-ci-and-conflicts" | "fix-ci" | "resolve-conflicts" | "address-comments" | "review" | "thermonuclear-review";
 
@@ -16,25 +16,25 @@ export interface QuickAction<Subject> {
 }
 
 /** What every pull request prompt opens with: which pull request, and its branch. */
-function pullRequestContext(pr: InboxPullRequest): string {
+function pullRequestContext(pr: PullRequestSummary): string {
 	const stacked = pr.stackedOn ? `, stacked on \`${pr.stackedOn}\`` : "";
 	return `Pull request ${pullRequestUrl(pr)} ("${pr.title}"), branch \`${pr.head}\`${stacked}.`;
 }
 
-const ownOpen = (pr: InboxPullRequest): boolean => pr.role === "author" && pr.state !== "merged";
+const ownOpen = (pr: PullRequestSummary): boolean => pr.role === "author" && pr.state !== "merged";
 
 /** The branch that `pr` merges into, as a prompt names it. */
-const baseOf = (pr: InboxPullRequest): string => (pr.stackedOn ? `\`${pr.stackedOn}\`` : "the repository's default branch");
+const baseOf = (pr: PullRequestSummary): string => (pr.stackedOn ? `\`${pr.stackedOn}\`` : "the repository's default branch");
 
 /** The commands that list the failing checks of `pr` and print their logs. */
-const checkLogs = (pr: InboxPullRequest): string => `(\`gh pr checks ${pr.number} -R ${pr.owner}/${pr.repo}\`, \`gh run view <run> --log-failed\`)`;
+const checkLogs = (pr: PullRequestSummary): string => `(\`gh pr checks ${pr.number} -R ${pr.owner}/${pr.repo}\`, \`gh run view <run> --log-failed\`)`;
 
 /** How a session runs the thermo-nuclear review of `pr`: on the `plan` role, through the kit's reviewer agent. */
-const thermonuclear = (pr: InboxPullRequest): string =>
+const thermonuclear = (pr: PullRequestSummary): string =>
 	`Run a thermo-nuclear code quality review of its diff: spawn \`task\` with \`agent: "thermonuclear-reviewer"\` on \`pr://${pr.owner}/${pr.repo}/${pr.number}/diff\` (run the \`thermo-nuclear-code-quality-review\` skill yourself when that agent is missing).`;
 
-/** The inbox's quick actions by id, in the order they are offered. */
-export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<InboxPullRequest>> = {
+/** The Pull requests page's quick actions by id, in the order they are offered. */
+export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<PullRequestSummary>> = {
 	"fix-ci-and-conflicts": {
 		label: "Fix CI and conflicts",
 		description: "Start a session that rebases the branch, resolves its merge conflicts, then fixes the failing checks",
@@ -88,4 +88,4 @@ export const PULL_REQUEST_ACTIONS: Record<PullRequestActionId, QuickAction<Inbox
 const PULL_REQUEST_IDS = Object.keys(PULL_REQUEST_ACTIONS) as PullRequestActionId[];
 
 /** The actions that apply to `pr`, in registry order. */
-export const pullRequestActions = (pr: InboxPullRequest): PullRequestActionId[] => PULL_REQUEST_IDS.filter(id => PULL_REQUEST_ACTIONS[id].applies(pr));
+export const pullRequestActions = (pr: PullRequestSummary): PullRequestActionId[] => PULL_REQUEST_IDS.filter(id => PULL_REQUEST_ACTIONS[id].applies(pr));

@@ -4,7 +4,7 @@
  */
 import { JsonFile } from "../fs";
 import { errorText, isObject } from "../json";
-import { type Inbox, prKey, repoKey } from "../shared/github";
+import { type PullRequestList, prKey, repoKey } from "../shared/github";
 import { type AgentOn, moveOf, YOUR_MOVES, type YourMove } from "../shared/moves";
 import type { ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject } from "../shared/notices";
 import { usesClause } from "../shared/notices";
@@ -19,8 +19,8 @@ export interface NoticeSources {
 	updateOmp(latest: string): Promise<string>;
 	modelUpdates(): Promise<ModelUpdate[]>;
 	upgradeModel(update: ModelUpdate): Promise<void>;
-	/** Every project's inbox, and where the running sessions on each pull request stand. */
-	inbox(): Promise<{ inbox: Inbox; agent: AgentOn }>;
+	/** Every project's pull request list, and where the running sessions on each pull request stand. */
+	pullRequests(): Promise<{ list: PullRequestList; agent: AgentOn }>;
 	/** The Slack messages that wait on you; none while Slack is not connected. */
 	slack(): Promise<SlackFound[]>;
 	now(): number;
@@ -74,10 +74,10 @@ const isYourMove = (move: string): move is YourMove => (YOUR_MOVES as readonly s
 /** The pull request notice `id`'s repository, `owner/repo`. */
 const repoOf = (id: string): string => id.slice("pull-request:".length, id.lastIndexOf("#"));
 
-/** The pull requests of `inbox` whose next move is yours, each a notice per move; the repositories GitHub did not answer for stay unchecked. */
-function pullRequestNotices(inbox: Inbox, agent: AgentOn): Checked {
-	const failed = new Set(inbox.repos.flatMap(repo => ("error" in repo ? [repoKey(repo)] : [])));
-	const found = inbox.repos.flatMap(repo =>
+/** The pull requests of `list` whose next move is yours, each a notice per move; the repositories GitHub did not answer for stay unchecked. */
+function pullRequestNotices(list: PullRequestList, agent: AgentOn): Checked {
+	const failed = new Set(list.repos.flatMap(repo => ("error" in repo ? [repoKey(repo)] : [])));
+	const found = list.repos.flatMap(repo =>
 		"error" in repo
 			? []
 			: repo.pullRequests.flatMap(pr => {
@@ -85,7 +85,7 @@ function pullRequestNotices(inbox: Inbox, agent: AgentOn): Checked {
 					return isYourMove(move) ? [{ id: `pull-request:${prKey(pr)}:${move}`, at: pr.updatedAt, kind: "pull-request", pr, move, cwd: repo.cwds[0] ?? "" } as const] : [];
 				}),
 	);
-	const answered = inbox.repos.flatMap(repo => ("error" in repo ? [] : [repoKey(repo)]));
+	const answered = list.repos.flatMap(repo => ("error" in repo ? [] : [repoKey(repo)]));
 	return { found, unchecked: id => failed.has(repoOf(id)), scopeOf: repoOf, answered, dated: false };
 }
 
@@ -184,8 +184,8 @@ export class Notices {
 			case "model":
 				return all(await this.#modelNotices(), false);
 			case "pull-request": {
-				const { inbox, agent } = await this.#sources.inbox();
-				return pullRequestNotices(inbox, agent);
+				const { list, agent } = await this.#sources.pullRequests();
+				return pullRequestNotices(list, agent);
 			}
 			case "slack":
 				return all(await this.#sources.slack(), true);

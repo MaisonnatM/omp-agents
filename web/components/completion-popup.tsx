@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { completionTrigger, type MentionToken } from "../completion-trigger";
 import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
 import type { Completions } from "../pane-store";
-import { inboxStore, ticketsStore } from "../reads";
+import { pullRequestsStore, ticketsStore } from "../reads";
 import { useDashboardStatus, useMentionLists } from "./dashboard-context";
 import type { PromptEditorHandle } from "./prompt-editor";
 
@@ -102,13 +102,13 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 	const query = token && mentionQuery(token);
 	const tickets = ticketsStore.usePolling(null, query !== null && wants(query, "ticket")).read?.data.tickets ?? [];
 	// The pull requests are the project's entry that `App` polls; the unscoped read would ask GitHub about every repository.
-	const inbox = inboxStore.use(useDashboardStatus().inboxScope).read?.data.repos ?? [];
+	const pullRequestRepos = pullRequestsStore.use(useDashboardStatus().pullRequestsScope).read?.data.repos ?? [];
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	const sections: MenuSection[] =
 		menu === null
 			? []
 			: token
-				? mentionMenu({ text: draft, token, data: { ...lists, tickets, inbox }, composer, files: answer?.items ?? null })
+				? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequestRepos }, composer, files: answer?.items ?? null })
 				: answer?.items.length
 					? [{ title: null, options: answer.items.map(completionOption) }]
 					: [];

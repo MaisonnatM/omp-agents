@@ -1,6 +1,6 @@
 /**
  * The stack a pull request's details show, live from `gh`: as Graphite does, every open pull request of its repository
- * chained to it by base branches, whoever opened them, not only those the inbox lists.
+ * chained to it by base branches, whoever opened them, not only those the Pull requests page lists.
  */
 import { createCache } from "./cache";
 import { AVATAR, authorOf, dataOf, ghGraphql, STATUS } from "./github";

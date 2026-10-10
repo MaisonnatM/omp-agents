@@ -313,7 +313,7 @@ export class SessionFactsScan {
 
 /**
  * The pull requests `refs` name, each once, in order; a submission outranks work on the same PR. A bare number
- * needs the session's `repo`, and a branch needs `heads`, the PRs the inbox listed by `owner/repo:branch`.
+ * needs the session's `repo`, and a branch needs `heads`, the listed PRs by `owner/repo:branch`.
  */
 export function resolveLinks(refs: Iterable<PullRequestRef>, repo: Repo | null, heads: ReadonlyMap<string, PullRequest>): LinkedPullRequest[] {
 	const linked = new Map<string, LinkedPullRequest>();
@@ -432,7 +432,7 @@ const NO_FACTS: SessionFacts = { pullRequests: [], tickets: [], ship: null, work
 
 export class SessionFactsIndex {
 	readonly #sessions = new Map<string, SessionScan>();
-	/** The PRs the inbox listed, by `owner/repo:branch` of their head. */
+	/** The PRs the pull request list holds, by `owner/repo:branch` of their head. */
 	readonly #heads = new Map<string, PullRequest>();
 	readonly #repoOf: (cwd: string) => Promise<Repo | null>;
 	readonly #worktreeAt: (dir: string) => Promise<WorktreeAt | null>;
@@ -474,11 +474,11 @@ export class SessionFactsIndex {
 		return run;
 	}
 
-	/** Which branch heads which PR in `repo`, from the inbox's list of its PRs. Returns whether any session's pull requests changed. */
+	/** Which branch heads which PR in `repo`, from the pull request list's PRs of it. Returns whether any session's pull requests changed. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): boolean {
 		const prefix = headKey(repo, "");
 		for (const key of this.#heads.keys()) if (key.startsWith(prefix)) this.#heads.delete(key);
-		// The inbox lists open PRs before merged ones, so a reused branch name links to the open PR.
+		// The pull request list puts open PRs before merged ones, so a reused branch name links to the open PR.
 		for (const pr of pullRequests) {
 			const key = headKey(pr, pr.head);
 			if (!this.#heads.has(key)) this.#heads.set(key, { owner: pr.owner, repo: pr.repo, number: pr.number });

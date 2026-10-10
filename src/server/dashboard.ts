@@ -9,7 +9,7 @@ import { rmSync } from "node:fs";
 import type { Server } from "bun";
 import { flushJsonFiles } from "../fs";
 import { GoogleCalendarReader } from "../google-calendar";
-import { loadInbox } from "../inbox";
+import { loadPullRequests } from "../pull-requests";
 import { integrationServer } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
@@ -117,7 +117,7 @@ export class Dashboard {
 				updateOmp,
 				modelUpdates,
 				upgradeModel,
-				inbox: async () => ({ inbox: await loadInbox(this.knownCwds(), false), agent: agentOn(sessions.rows(files.factsOf)) }),
+				pullRequests: async () => ({ list: await loadPullRequests(this.knownCwds(), false), agent: agentOn(sessions.rows(files.factsOf)) }),
 				async slack() {
 					const slack = await findMcpServer(MCP_SERVICES.slack.host);
 					return slack && (await mcpSignedIn(slack)) ? waitingOnYou(url => readWithMcpSignIn(slack, url), Date.now()) : [];

@@ -85,10 +85,10 @@ describe("API and socket guards", () => {
 	});
 
 	test("a cross-site GET is refused even with the cookie, and a foreign Host first", () => {
-		expect(guards.admit(request("/api/inbox", { ...signedIn, "sec-fetch-site": "cross-site" }))?.status).toBe(403);
-		expect(guards.admit(request("/api/inbox", { ...signedIn, "sec-fetch-site": "same-site" }))?.status).toBe(403);
-		expect(guards.admit(request("/api/inbox", { ...signedIn, "sec-fetch-site": "same-origin" }))).toBeNull();
-		expect(guards.admit(request("/api/inbox", { ...signedIn, host: "evil.test:4317" }))?.status).toBe(403);
+		expect(guards.admit(request("/api/pull-requests", { ...signedIn, "sec-fetch-site": "cross-site" }))?.status).toBe(403);
+		expect(guards.admit(request("/api/pull-requests", { ...signedIn, "sec-fetch-site": "same-site" }))?.status).toBe(403);
+		expect(guards.admit(request("/api/pull-requests", { ...signedIn, "sec-fetch-site": "same-origin" }))).toBeNull();
+		expect(guards.admit(request("/api/pull-requests", { ...signedIn, host: "evil.test:4317" }))?.status).toBe(403);
 	});
 
 	test("the socket also needs an Origin that matches the Host", () => {

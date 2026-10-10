@@ -4,17 +4,17 @@ import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import type { Routine } from "../../src/routines";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { PaletteEvent } from "../command-palette";
-import type { InboxRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
+import type { PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
 import type { Workspace } from "../use-workspace";
-import { InboxIndex, InboxNav } from "./inbox/inbox-nav";
+import { PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { NoticesBell } from "./notices";
 import { Roster } from "./roster";
 import { SidebarToggle } from "./sidebar-panel";
 
 const NO_VIEWS: View[] = [];
-const NO_INBOX_ROUTE: InboxRoute = { target: null };
+const NO_PULL_REQUESTS_ROUTE: PullRequestsRoute = { target: null };
 
 interface AppSidebarProps {
 	workspace: Workspace;
@@ -72,12 +72,12 @@ export const AppSidebar = memo(function AppSidebar({
 	setShortcutsOpen,
 	toggleSidebar,
 }: AppSidebarProps) {
-	const inbox = useMemo(() => {
+	const pullRequestsTab = useMemo(() => {
 		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
 		if (!listed) return <p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>;
-		// The inbox page lists the pull requests itself, so the sidebar's inbox tab shows its sections then.
-		if (page?.kind === "inbox" && !page.target) return <InboxIndex project={project} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
-		return <InboxNav project={project} hosts={visible.hosts} past={visible.past} route={page?.kind === "inbox" ? page : NO_INBOX_ROUTE} />;
+		// The Pull requests page lists the pull requests itself, so the sidebar's Pull requests tab shows its sections then.
+		if (page?.kind === "pull-requests" && !page.target) return <PullRequestsIndex project={project} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
+		return <PullRequestsNav project={project} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
 	}, [listed, page, project, visible, sectionTarget, onSectionTarget]);
 	const toggle = useMemo(() => <SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />, [toggleSidebar]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
@@ -109,7 +109,7 @@ export const AppSidebar = memo(function AppSidebar({
 			settingsRoute={settings}
 			sectionTarget={sectionTarget}
 			onSectionTarget={onSectionTarget}
-			inbox={inbox}
+			pullRequestsTab={pullRequestsTab}
 			hosts={visible.hosts}
 			project={project}
 			onPickProject={onPickProject}

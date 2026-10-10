@@ -1,12 +1,12 @@
 /**
- * The inbox page's pull requests, per GitHub repository, live from `gh`: as Graphite's inbox gathers them, the
+ * The Pull requests page's pull requests, per GitHub repository, live from `gh`: as Graphite's inbox gathers them, the
  * viewer's open and recently merged PRs and the open PRs that ask the viewer for a review.
  */
 import { createCache } from "./cache";
 import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
-import { type CheckRunState, type Inbox, type InboxPullRequest, type InboxRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, type Repo, type RepoInbox, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
+import { type CheckRunState, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
 
 export { parseRemote, repoOf } from "./github";
 
@@ -15,7 +15,7 @@ const MERGED_DAYS = 7;
 /** The most review threads one page lists; a PR with more counts its unresolved threads as a floor. */
 const THREADS = 100;
 
-/** The pull request's author, its requested reviewers, and its latest reviews, which the inbox's entry and its details both show. */
+/** The pull request's author, its requested reviewers, and its latest reviews, which its row in the list and its details both show. */
 const REVIEW_FIELDS = `author { login ${AVATAR} }
 	reviewRequests(first: 10) { nodes { requestedReviewer {
 		... on User { login ${AVATAR} } ... on Bot { login ${AVATAR} } ... on Mannequin { login ${AVATAR} } ... on Team { slug ${AVATAR} }
@@ -37,7 +37,7 @@ const QUERY = `query($authored: String!, $reviewing: String!, $merged: String!) 
 }`;
 
 /** Each search's alias in `QUERY`, with the viewer's role in what it finds. */
-const SEARCHES: [alias: string, role: InboxRole][] = [
+const SEARCHES: [alias: string, role: PullRequestRole][] = [
 	["authored", "author"],
 	["reviewing", "reviewer"],
 	["merged", "author"],
@@ -71,7 +71,7 @@ function reviewOf(decision: string | undefined, reviewers: Reviewer[]): ReviewDe
 	return review === "changes-requested" && reRequested ? "review-required" : review;
 }
 
-function parseUnresolved(threads: unknown): InboxPullRequest["unresolved"] {
+function parseUnresolved(threads: unknown): PullRequestSummary["unresolved"] {
 	const nodes = nodesOf(threads);
 	const total = isObject(threads) && typeof threads.totalCount === "number" ? threads.totalCount : nodes.length;
 	return { count: nodes.filter(thread => isObject(thread) && thread.isResolved === false).length, exact: total <= nodes.length };
@@ -80,7 +80,7 @@ function parseUnresolved(threads: unknown): InboxPullRequest["unresolved"] {
 /** GitHub reports an open or draft pull request as `CONFLICTING` with its base branch; `UNKNOWN` means not computed yet. */
 const conflictsOf = (node: Record<string, unknown>): boolean => node.state !== "MERGED" && node.state !== "CLOSED" && node.mergeable === "CONFLICTING";
 
-/** What a pull request's inbox entry and its details share, or `null` when GitHub left out its title or branches. */
+/** What a pull request's row in the list and its details share, or `null` when GitHub left out its title or branches. */
 function parsePullRequestHead(node: Record<string, unknown>) {
 	const title = str(node.title);
 	const head = str(node.headRefName);
@@ -107,7 +107,7 @@ function parsePullRequestHead(node: Record<string, unknown>) {
 	};
 }
 
-function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole): InboxPullRequest | null {
+function parsePullRequest(node: unknown, { owner, repo }: Repo, role: PullRequestRole): PullRequestSummary | null {
 	if (!isObject(node) || typeof node.number !== "number") return null;
 	const parsed = parsePullRequestHead(node);
 	const updatedAt = Date.parse(str(node.mergedAt) ?? str(node.updatedAt) ?? "");
@@ -127,9 +127,9 @@ function parsePullRequest(node: unknown, { owner, repo }: Repo, role: InboxRole)
 }
 
 /** The pull requests in `gh api graphql`'s answer to `QUERY`, each once, in search order. */
-export function parseInboxAnswer(answer: unknown, repo: Repo): InboxPullRequest[] {
+export function parseListAnswer(answer: unknown, repo: Repo): PullRequestSummary[] {
 	const data = dataOf(answer);
-	const found = new Map<number, InboxPullRequest>();
+	const found = new Map<number, PullRequestSummary>();
 	for (const [alias, role] of SEARCHES) {
 		for (const node of nodesOf(data[alias])) {
 			const pr = parsePullRequest(node, repo, role);
@@ -139,7 +139,7 @@ export function parseInboxAnswer(answer: unknown, repo: Repo): InboxPullRequest[
 	return [...found.values()];
 }
 
-async function queryRepo(repo: Repo): Promise<InboxPullRequest[]> {
+async function queryRepo(repo: Repo): Promise<PullRequestSummary[]> {
 	const scope = `repo:${repo.owner}/${repo.repo} is:pr`;
 	const since = new Date(Date.now() - MERGED_DAYS * 86_400_000).toISOString().slice(0, 10);
 	const answer = await ghGraphql(QUERY, {
@@ -147,10 +147,10 @@ async function queryRepo(repo: Repo): Promise<InboxPullRequest[]> {
 		reviewing: `${scope} is:open review-requested:@me sort:updated-desc`,
 		merged: `${scope} is:merged author:@me merged:>=${since} sort:updated-desc`,
 	});
-	return parseInboxAnswer(answer, repo);
+	return parseListAnswer(answer, repo);
 }
 
-const loaded = createCache<InboxPullRequest[]>();
+const loaded = createCache<PullRequestSummary[]>();
 
 const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
 
@@ -271,10 +271,10 @@ export function loadPullRequestDetail(pr: PullRequest, fresh = false): Promise<P
 }
 
 /**
- * The inbox for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
+ * The pull request list for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
  * A workspace removed since a session ran there is left out, as a quick action starts its session in a repository's first workspace.
  */
-export async function loadInbox(cwds: string[], fresh: boolean): Promise<Inbox> {
+export async function loadPullRequests(cwds: string[], fresh: boolean): Promise<PullRequestList> {
 	const byRepo = new Map<string, Repo & { cwds: string[] }>();
 	const unmatched: string[] = [];
 	const present = await Promise.all(cwds.map(async cwd => ((await directoryOf(cwd)) === null ? null : cwd)));
@@ -290,7 +290,7 @@ export async function loadInbox(cwds: string[], fresh: boolean): Promise<Inbox> 
 		else byRepo.set(key, { ...repo, cwds: [cwd] });
 	}
 	const repos = await Promise.all(
-		[...byRepo.values()].map(async (entry): Promise<RepoInbox> => {
+		[...byRepo.values()].map(async (entry): Promise<RepoPullRequests> => {
 			try {
 				const pullRequests = await loaded.get(repoKey(entry), () => queryRepo(entry), fresh);
 				return { ...entry, pullRequests };

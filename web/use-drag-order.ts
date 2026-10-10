@@ -1,5 +1,5 @@
 import { type DragEvent, useCallback, useRef, useState } from "react";
-import type { Where } from "./inbox-model";
+import type { Where } from "./pull-requests-model";
 
 /** The item being dragged within its `scope`, and where a drop on the item under the pointer would put it. */
 interface Drag {
@@ -37,7 +37,7 @@ interface Held {
 }
 
 /**
- * Dragging an item among the others of its `scope`, such as the inbox's repositories, its sections, or one section's
+ * Dragging an item among the others of its `scope`, such as the pull request list's repositories, its sections, or one section's
  * pull requests. An item takes a drop only from its own scope; `onDrop` gets the dragged key and the side of `key` it lands on.
  * An item's `handle` and `target` stay the same across renders, so a memoized row that holds them is drawn again only
  * when its `dropAt` or `dragging` changes. The returned function changes when the drag does.

@@ -1,5 +1,5 @@
 import { CircleCheck, CircleDashed, CircleX, Eye, GitMerge, GitPullRequestDraft, type LucideIcon, MessageSquare } from "lucide-react";
-import type { StatusItem } from "../../../inbox-model";
+import type { StatusItem } from "../../../pull-requests-model";
 import type { PullRequestActionId } from "../../../../src/pull-request-actions";
 import type { QuickActionId } from "../../../quick-actions";
 

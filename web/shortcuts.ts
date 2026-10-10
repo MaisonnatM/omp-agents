@@ -22,7 +22,7 @@ export type ShortcutId =
 	| "help"
 	| "restore"
 	| "focusComposer"
-	| "inbox"
+	| "pull-requests"
 	| "tickets"
 	| "newTicket"
 	| "sessions"
@@ -79,7 +79,7 @@ export interface Shortcut {
 	id: ShortcutId;
 	label: string;
 	keys: readonly Binding[];
-	/** What the command palette lists the shortcut as, for the page-wide actions it runs: `Go to inbox`. */
+	/** What the command palette lists the shortcut as, for the page-wide actions it runs: `Go to pull requests`. */
 	command?: string;
 }
 
@@ -146,7 +146,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "i", mod: true }, scope: "anywhere" },
 		],
 	},
-	{ id: "inbox", label: "Go to the pull request inbox", command: "Go to inbox", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
+	{ id: "pull-requests", label: "Go to Pull requests", command: "Go to pull requests", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
 	{ id: "tickets", label: "Go to your Linear tickets", command: "Go to tickets", keys: [{ chord: { key: "2", mod: true }, scope: "anywhere" }] },
 	{ id: "newTicket", label: "Create a Linear ticket, except on the Todo page", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "sessions", label: "Go to the sessions", command: "Go to sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },
@@ -154,11 +154,11 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "calendar", label: "Go to your calendar", command: "Go to calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },
 	{ id: "routines", label: "Go to your routines", command: "Go to routines", keys: [{ goTo: "r" }] },
 	{ id: "project", label: "Choose the sidebar's project", keys: [{ goTo: "p" }] },
-	{ id: "nextPullRequest", label: "Inbox: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
-	{ id: "previousPullRequest", label: "Inbox: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
-	{ id: "pullRequestOnGitHub", label: "Inbox: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
-	{ id: "pullRequestActions", label: "Inbox: open the pull request's quick actions", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
-	{ id: "giveToAgent", label: "Inbox: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
+	{ id: "nextPullRequest", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
+	{ id: "previousPullRequest", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
+	{ id: "pullRequestOnGitHub", label: "Pull requests: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
+	{ id: "pullRequestActions", label: "Pull requests: open the pull request's quick actions", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
+	{ id: "giveToAgent", label: "Pull requests: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{ id: "todoSearch", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
 	{
 		id: "todoNext",
@@ -185,8 +185,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoClose", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "nextChangedFile", label: "Changes: open the next changed file", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", label: "Changes: open the previous changed file", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
-	{ id: "moveUp", label: "Move the focused todo, or the inbox's focused repository, section, or pull request, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
-	{ id: "moveDown", label: "Move the focused todo, or the inbox's focused repository, section, or pull request, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "moveUp", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "moveDown", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "terminal", label: "Show or hide the terminal", command: "Toggle terminal", keys: [{ chord: { key: "`", ctrl: true }, scope: "anywhere" }] },
 ];
 

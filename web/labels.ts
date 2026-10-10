@@ -113,7 +113,7 @@ export const SPLIT_CLICK = IS_MAC ? "⌘-click" : "Ctrl-click";
 
 /**
  * How long ago `at` was: `19m`, `17h 5m`, `2d`. `compact` keeps only the largest whole unit and reads under a minute as
- * `<1m`, so the inbox's ages line up in a narrow column. A time ahead of `now` reads as no time ago.
+ * `<1m`, so the pull request rows' ages line up in a narrow column. A time ahead of `now` reads as no time ago.
  */
 export function age(at: number, { compact = false, now = Date.now() }: { compact?: boolean; now?: number } = {}): string {
 	const minutes = Math.max(0, Math.floor((now - at) / 60_000));

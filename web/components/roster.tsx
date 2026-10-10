@@ -10,10 +10,10 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { agentOn } from "../../src/shared/moves";
-import { yourMoveCount } from "../inbox-model";
+import { yourMoveCount } from "../pull-requests-model";
 import { projectName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
-import { inboxStore, ticketsStore } from "../reads";
+import { pullRequestsStore, ticketsStore } from "../reads";
 import { hashForTickets, type SettingsRoute, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
@@ -114,18 +114,18 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 /**
  * How the sidebar tabs fit its width, by container query: labels while they fit, then icons alone sharing the row.
  * Icons alone keep each name in the tooltip and for screen readers.
- * Each switch sits where the labels fit with counts on Inbox and Sessions and the list's margins; labels never fit beside their icons once both carry counts.
+ * Each switch sits where the labels fit with counts on Pull requests and Sessions and the list's margins; labels never fit beside their icons once both carry counts.
  */
 const SIDEBAR_TAB_FIT = {
 	five: {
-		list: "@max-[23rem]/sidebar:self-stretch",
-		tab: "@min-[23rem]/sidebar:[&>svg]:hidden @max-[23rem]/sidebar:flex-1 @max-[23rem]/sidebar:justify-center @max-[23rem]/sidebar:px-0.5",
-		label: "@max-[23rem]/sidebar:sr-only",
-	},
-	six: {
 		list: "@max-[26rem]/sidebar:self-stretch",
 		tab: "@min-[26rem]/sidebar:[&>svg]:hidden @max-[26rem]/sidebar:flex-1 @max-[26rem]/sidebar:justify-center @max-[26rem]/sidebar:px-0.5",
 		label: "@max-[26rem]/sidebar:sr-only",
+	},
+	six: {
+		list: "@max-[29.5rem]/sidebar:self-stretch",
+		tab: "@min-[29.5rem]/sidebar:[&>svg]:hidden @max-[29.5rem]/sidebar:flex-1 @max-[29.5rem]/sidebar:justify-center @max-[29.5rem]/sidebar:px-0.5",
+		label: "@max-[29.5rem]/sidebar:sr-only",
 	},
 };
 
@@ -165,8 +165,8 @@ interface RosterProps {
 	/** The tickets section a sidebar link last chose. */
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
-	/** The Inbox tab's content. */
-	inbox: ReactNode;
+	/** The Pull requests tab's content. */
+	pullRequestsTab: ReactNode;
 	/** The live sessions, which take a pull request's move while they work on it or ask about it. */
 	hosts: RosterHost[];
 	/** The selected project's `cwd`, or `null` for all projects. */
@@ -200,7 +200,7 @@ export function Roster({
 	settingsRoute,
 	sectionTarget,
 	onSectionTarget,
-	inbox,
+	pullRequestsTab,
 	hosts,
 	project,
 	onPickProject,
@@ -211,11 +211,11 @@ export function Roster({
 }: RosterProps) {
 	const { changeTodo: onTodoChange } = useDashboardActions();
 	const { connected } = useDashboardStatus();
-	const inboxRead = inboxStore.use(project).read;
+	const pullRequestRead = pullRequestsStore.use(project).read;
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
-		inbox: { count: inboxRead ? yourMoveCount(inboxRead.data, agentOn(hosts)) : 0, meaning: "your move" },
+		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
 	const selectedProject = projects.find(({ cwd }) => cwd === project);
 	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
@@ -276,9 +276,9 @@ export function Roster({
 					newSessionLabel={newSessionLabel}
 				/>
 			</TabPanel>
-			<TabPanel value="inbox" asChild>
+			<TabPanel value="pull-requests" asChild>
 				<SidebarContent>
-					{inbox}
+					{pullRequestsTab}
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="tickets" asChild>

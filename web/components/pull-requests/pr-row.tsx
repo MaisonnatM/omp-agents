@@ -1,14 +1,14 @@
 import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
 import { memo, type MouseEvent, useState } from "react";
-import { type InboxPullRequest, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, repoKey } from "../../../src/shared/github";
+import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, repoKey } from "../../../src/shared/github";
 import type { MoveId } from "../../../src/shared/moves";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { type InboxRow, MOVES, moveAction, reason, type StackPlace } from "../../inbox-model";
-import { hashForInbox, type OpenMode, sameView } from "../../routing";
+import { type SectionRow, MOVES, moveAction, reason, type StackPlace } from "../../pull-requests-model";
+import { hashForPullRequests, type OpenMode, sameView } from "../../routing";
 import { hostLabel, LINK_VERB, modeOf, pastLabel, SPLIT_CLICK } from "../../labels";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { QUICK_ACTIONS, type QuickActionId } from "../../quick-actions";
@@ -60,7 +60,7 @@ export function MoveBadge({ move, className }: { move: MoveId; className?: strin
 }
 
 /** A row's move badge: a button that starts the quick action handing the move to an agent, when one applies, else the plain badge. */
-function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: InboxPullRequest; move: MoveId } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
+function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: PullRequestSummary; move: MoveId } & Pick<RowProps, "pending" | "cwd" | "onQuickAction">) {
 	const action = moveAction(pr, move);
 	if (!action) return <MoveBadge move={move} />;
 	const label = `${MOVES[move].label}: ${QUICK_ACTIONS[action].label}`;
@@ -86,7 +86,7 @@ function RowMoveBadge({ pr, move, pending, cwd, onQuickAction }: { pr: InboxPull
 	);
 }
 
-const CHECKS_ICON: Record<InboxPullRequest["checks"], [LucideIcon, string, string] | null> = {
+const CHECKS_ICON: Record<PullRequestSummary["checks"], [LucideIcon, string, string] | null> = {
 	passing: [CircleCheck, "text-emerald-600 dark:text-emerald-400", "Checks pass"],
 	failing: [CircleX, "text-red-600 dark:text-red-400", "Checks fail"],
 	pending: [Clock, "text-amber-600 dark:text-amber-400", "Checks are running"],
@@ -94,12 +94,12 @@ const CHECKS_ICON: Record<InboxPullRequest["checks"], [LucideIcon, string, strin
 };
 
 /** How the head commit's checks went; nothing for a pull request without checks. */
-export function ChecksIcon({ checks, className }: { checks: InboxPullRequest["checks"]; className?: string }) {
+export function ChecksIcon({ checks, className }: { checks: PullRequestSummary["checks"]; className?: string }) {
 	const icon = CHECKS_ICON[checks];
 	return icon && <IconTip icon={icon} className={className} />;
 }
 
-const REVIEW_ICON: Record<InboxPullRequest["review"], [LucideIcon, string, string] | null> = {
+const REVIEW_ICON: Record<PullRequestSummary["review"], [LucideIcon, string, string] | null> = {
 	approved: [UserCheck, "text-emerald-600 dark:text-emerald-400", "Approved"],
 	"changes-requested": [UserX, "text-red-600 dark:text-red-400", "Changes requested"],
 	"review-required": [Eye, "text-muted-foreground", "Waiting on a review"],
@@ -107,14 +107,14 @@ const REVIEW_ICON: Record<InboxPullRequest["review"], [LucideIcon, string, strin
 };
 
 /** Where review stands: the reviewers' pictures, each marked with what they did, else GitHub's review decision as an icon. */
-export function ReviewState({ pr, max, className }: { pr: InboxPullRequest; max: number; className?: string }) {
+export function ReviewState({ pr, max, className }: { pr: PullRequestSummary; max: number; className?: string }) {
 	if (pr.reviewers.length > 0) return <Reviewers reviewers={pr.reviewers} max={max} />;
 	const icon = REVIEW_ICON[pr.review];
 	return icon && <IconTip icon={icon} className={className} />;
 }
 
 /** The lines the pull request adds and removes. */
-export function DiffSize({ pr }: { pr: InboxPullRequest }) {
+export function DiffSize({ pr }: { pr: PullRequestSummary }) {
 	const label = `${pr.additions} line${pr.additions === 1 ? "" : "s"} added, ${pr.deletions} removed`;
 	return (
 		<Tooltip content={label}>
@@ -214,7 +214,7 @@ function SessionChips({ sessions, onOpen, compact }: { sessions: SessionLink[]; 
 	);
 }
 
-/** Where the row sits in its stack, with the branch it stacks on in its tooltip; a PR on a branch the inbox does not list names that branch. */
+/** Where the row sits in its stack, with the branch it stacks on in its tooltip; a PR on a branch the list leaves out names that branch. */
 function StackInfo({ stack, base }: { stack: StackPlace | null; base: string | null }) {
 	if (!stack && !base) return null;
 	const label = stack ? `Pull request ${stack.position} of ${stack.size} in a stack, on ${base ?? "the default branch"}` : `Stacked on ${base}`;
@@ -228,15 +228,15 @@ function StackInfo({ stack, base }: { stack: StackPlace | null; base: string | n
 	);
 }
 
-/** The DOM id of a pull request's row, which an inbox link to that PR scrolls to. */
-export const rowId = (pr: PullRequest): string => `inbox-pr-${repoKey(pr)}/${pr.number}`;
+/** The DOM id of a pull request's row, which a link to that PR on the Pull requests page scrolls to. */
+export const rowId = (pr: PullRequest): string => `pull-request-${repoKey(pr)}/${pr.number}`;
 
-/** The row's element and its link: what the inbox's keys reach by id, so the markup below is their contract. */
+/** The row's element and its link: what the list's keys reach by id, so the markup below is their contract. */
 export const rowElement = (pr: PullRequest): HTMLElement | null => document.getElementById(rowId(pr));
 export const rowLink = (pr: PullRequest): HTMLAnchorElement | null => rowElement(pr)?.querySelector("a") ?? null;
 
 export interface RowProps {
-	row: InboxRow;
+	row: SectionRow;
 	sessions: SessionLink[];
 	/** The pull request whose details the main area shows. */
 	targeted: boolean;
@@ -246,7 +246,7 @@ export interface RowProps {
 	/** The workspace a session on the pull request starts in. */
 	cwd: string;
 	/** The same function for every row, so a row that its props leave unchanged is not drawn again. */
-	onQuickAction: (pr: InboxPullRequest, cwd: string, action: PullRequestActionId) => void;
+	onQuickAction: (pr: PullRequestSummary, cwd: string, action: PullRequestActionId) => void;
 	/** Whether the row's quick actions menu is open, which the `.` shortcut also sets. */
 	actionsOpen: boolean;
 	/** The same function for every row, like `onQuickAction`. */
@@ -264,7 +264,7 @@ export const sameSessions = (a: SessionLink[], b: SessionLink[]): boolean =>
 	a.length === b.length && a.every((link, at) => link.sessionId === b[at]!.sessionId && link.label === b[at]!.label && link.link === b[at]!.link && link.status === b[at]!.status && sameView(link.view, b[at]!.view));
 
 /**
- * How each prop of a row is compared. The inbox keeps each prop the same object while what it shows holds, `sessions`
+ * How each prop of a row is compared. The board keeps each prop the same object while what it shows holds, `sessions`
  * included, except two it rebuilds: the row's data, whenever the roster or the sort changes, compared by what it holds,
  * and the drag item, whose handlers stay the same, compared by them and where a drop would land.
  */
@@ -285,7 +285,7 @@ const PROP_EQUAL: { [K in keyof RowProps]: (a: RowProps[K], b: RowProps[K]) => b
 const sameRowProps = (a: RowProps, b: RowProps): boolean =>
 	(Object.keys(PROP_EQUAL) as (keyof RowProps)[]).every(key => (PROP_EQUAL[key] as (x: unknown, y: unknown) => boolean)(a[key], b[key]));
 
-function RowQuickActions({ pr, pending, cwd, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: InboxPullRequest }) {
+function RowQuickActions({ pr, pending, cwd, onQuickAction, actionsOpen, onActionsOpenChange }: Pick<RowProps, "pending" | "cwd" | "onQuickAction" | "actionsOpen" | "onActionsOpenChange"> & { pr: PullRequestSummary }) {
 	return (
 		<QuickActionsMenu
 			actions={pullRequestActions(pr)}
@@ -314,11 +314,11 @@ function openFromRow(event: MouseEvent<HTMLElement>, pr: PullRequest): void {
 }
 
 /** The pull request's title link remains the keyboard and modifier-click target. */
-function TitleLink({ pr, targeted, className }: { pr: InboxPullRequest; targeted: boolean; className: string }) {
+function TitleLink({ pr, targeted, className }: { pr: PullRequestSummary; targeted: boolean; className: string }) {
 	return (
 		<Tooltip content={`${pr.owner}/${pr.repo}#${pr.number} · ${pr.title}`}>
 			<a
-				href={hashForInbox(pr)}
+				href={hashForPullRequests(pr)}
 				// The row drags, not the link's address.
 				draggable={false}
 				aria-current={targeted ? "page" : undefined}
@@ -331,7 +331,7 @@ function TitleLink({ pr, targeted, className }: { pr: InboxPullRequest; targeted
 }
 
 /**
- * A pull request in the sidebar's inbox: its title and age, then its move and why it waits on it, with its quick
+ * A pull request in the sidebar's list: its title and age, then its move and why it waits on it, with its quick
  * actions on hover. A rail on the left joins the rows of a stack.
  */
 export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
@@ -381,11 +381,11 @@ export const PullRequestRow = memo(function PullRequestRow({ row: { pr, move, st
  * and size columns drop out when the page is too narrow for them.
  */
 const TABLE_COLUMNS =
-	"grid grid-cols-[4rem_minmax(0,1fr)_1.25rem_3.5rem_2rem_1.75rem] items-center gap-x-3 @3xl/inbox:grid-cols-[4rem_minmax(0,1fr)_10rem_3.5rem_1.25rem_3.5rem_6rem_2rem_1.75rem]";
+	"grid grid-cols-[4rem_minmax(0,1fr)_1.25rem_3.5rem_2rem_1.75rem] items-center gap-x-3 @3xl/pull-requests:grid-cols-[4rem_minmax(0,1fr)_10rem_3.5rem_1.25rem_3.5rem_6rem_2rem_1.75rem]";
 
-const WIDE = "hidden @3xl/inbox:flex";
+const WIDE = "hidden @3xl/pull-requests:flex";
 
-/** A pull request in the inbox page's table: one line per column, with the author, number, and reason under its title. */
+/** A pull request in the Pull requests page's table: one line per column, with the author, number, and reason under its title. */
 export const PullRequestTableRow = memo(function PullRequestTableRow({ row: { pr, move, stack }, sessions, targeted, onOpen, drag, moveId, ...actions }: RowProps) {
 	// A review's reason names its author, which this row shows already.
 	const why = move === "review" ? null : reason(pr, move);

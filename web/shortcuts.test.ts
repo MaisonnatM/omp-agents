@@ -51,7 +51,7 @@ test("browser-reserved chords stay the browser's", () => {
 });
 
 test("Cmd+1–6 selects dashboard tabs on macOS, Ctrl+1–6 elsewhere, including AZERTY", () => {
-	const tabs = ["inbox", "tickets", "sessions", "todo", "calendar", "settings"] as const;
+	const tabs = ["pull-requests", "tickets", "sessions", "todo", "calendar", "settings"] as const;
 	const azerty = ["&", "é", "\"", "'", "(", "-"];
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };

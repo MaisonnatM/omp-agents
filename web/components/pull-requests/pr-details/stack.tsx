@@ -2,7 +2,7 @@ import { GitPullRequest, Layers } from "lucide-react";
 import { type LinkedPullRequest, type PullRequest, prKey, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { cn } from "@/lib/utils";
 import { age, LINK_VERB } from "../../../labels";
-import { hashForInbox } from "../../../routing";
+import { hashForPullRequests } from "../../../routing";
 import { DetailSection } from "../../sheet-details";
 import { Avatar } from "../avatars";
 import { ChecksIcon } from "../pr-row";
@@ -41,7 +41,7 @@ export function StackSection({ stack, current, onPick }: { stack: StackedPullReq
 									{label}
 								</button>
 							) : (
-								<a href={hashForInbox(pr)} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
+								<a href={hashForPullRequests(pr)} className="min-w-0 flex-1 truncate underline-offset-2 hover:underline">
 									{label}
 								</a>
 							)}

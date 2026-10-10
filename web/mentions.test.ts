@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { InboxPullRequest } from "../src/shared/github";
+import type { PullRequestSummary } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import type { Ticket } from "../src/shared/tickets";
 import type { ChangedFile, FileChange } from "../src/shared/transcript";
@@ -36,8 +36,8 @@ const data: MentionData = {
 		todo("t4", "Login page copy"),
 	],
 	tickets: [{ id: "ENG-12", title: "Login [beta] flag", url: "https://linear.app/acme/issue/ENG-12" } as Ticket],
-	inbox: [
-		{ owner: "acme", repo: "webapp", cwds: ["/code/webapp"], pullRequests: [{ owner: "acme", repo: "webapp", number: 7, title: "Fix login" } as InboxPullRequest] },
+	pullRequestRepos: [
+		{ owner: "acme", repo: "webapp", cwds: ["/code/webapp"], pullRequests: [{ owner: "acme", repo: "webapp", number: 7, title: "Fix login" } as PullRequestSummary] },
 		{ owner: "acme", repo: "api", cwds: ["/code/api"], error: "GitHub is down" },
 	],
 	hosts: [host("s-self", "Login work"), host("s-live", null)],

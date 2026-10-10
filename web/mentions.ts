@@ -1,6 +1,6 @@
 /** The composer's `@` menu: the categories it offers, the query a token asks, and the rows it shows. */
 import { File, Folder, GitPullRequest, ListTodo, type LucideIcon, MessageSquare, Slash, Sparkles, Ticket } from "lucide-react";
-import { pullRequestUrl, type RepoInbox } from "../src/shared/github";
+import { pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import type { Ticket as LinearTicket } from "../src/shared/tickets";
 import { type ChangedFile, fileStatus } from "../src/shared/transcript";
@@ -18,10 +18,10 @@ export interface MentionLists {
 	past: PastSession[];
 }
 
-/** What the sources list: the page's lists, then the tickets the menu polls while it needs them and the selected project's inbox. */
+/** What the sources list: the page's lists, then the tickets the menu polls while it needs them and the selected project's pull requests. */
 export interface MentionData extends MentionLists {
 	tickets: LinearTicket[];
-	inbox: RepoInbox[];
+	pullRequestRepos: RepoPullRequests[];
 }
 
 /** The composer the menu opens in. */
@@ -136,8 +136,8 @@ const CATEGORIES: readonly Category[] = [
 		prefix: "pr",
 		title: "Pull requests",
 		icon: GitPullRequest,
-		list: ({ inbox }) =>
-			inbox
+		list: ({ pullRequestRepos }) =>
+			pullRequestRepos
 				.flatMap(repo => ("pullRequests" in repo ? repo.pullRequests : []))
 				.map(pr => {
 					const name = `${pr.owner}/${pr.repo}#${pr.number}`;

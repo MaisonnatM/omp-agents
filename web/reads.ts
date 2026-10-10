@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { isObject } from "../src/json";
 import { type CalendarEventsAnswer, type GoogleStatus, type IntegrationsAnswer, MCP_INTEGRATIONS } from "../src/shared/accounts";
 import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
-import type { Inbox, RepoInbox } from "../src/shared/github";
+import type { PullRequestList, RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
 import type { TicketsAnswer } from "../src/shared/tickets";
 import { errorText, getJson } from "./api";
@@ -58,20 +58,21 @@ export function useReplaceableRead<T>(url: string | null, version?: unknown): Re
 	return { data: shown ?? read.data, error: shown ? null : read.error, replace: answer => setReplaced({ url, answered: read.data, answer }) };
 }
 
-/** The open pull requests by project `cwd`, which the sidebar and the inbox page share; `null` reads every project. */
-export const inboxStore = createPolledStore<Inbox>({
+/** The open pull requests by project `cwd`, which the sidebar and the Pull requests page share; `null` reads every project. */
+export const pullRequestsStore = createPolledStore<PullRequestList>({
+	// Keeps its name from before the page was called Pull requests, so the browser's cached list survives.
 	cacheKey: "omp-agents.inbox-cache",
 	url: (cwd, fresh) => {
 		const params = new URLSearchParams();
 		if (cwd !== null) params.set("cwd", cwd);
 		if (fresh) params.set("fresh", "");
-		return `/api/inbox${params.size ? `?${params}` : ""}`;
+		return `/api/pull-requests${params.size ? `?${params}` : ""}`;
 	},
-	isValid: (value): value is Inbox => {
-		const inbox = value as Partial<Inbox> | null;
-		// A read saved before the inbox carried each PR's diff size reads GitHub again.
-		const current = (repo: RepoInbox): boolean => "error" in repo || repo.pullRequests.every(pr => typeof pr.additions === "number");
-		return Array.isArray(inbox?.repos) && Array.isArray(inbox.unmatched) && inbox.repos.every(current);
+	isValid: (value): value is PullRequestList => {
+		const list = value as Partial<PullRequestList> | null;
+		// A read saved before the list carried each PR's diff size reads GitHub again.
+		const current = (repo: RepoPullRequests): boolean => "error" in repo || repo.pullRequests.every(pr => typeof pr.additions === "number");
+		return Array.isArray(list?.repos) && Array.isArray(list.unmatched) && list.repos.every(current);
 	},
 });
 

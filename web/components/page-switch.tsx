@@ -11,8 +11,8 @@ import type { Workspace } from "../use-workspace";
 import { CalendarPage } from "./calendar/calendar-page";
 import { ChangesPage } from "./changes/changes-page";
 import { useDashboardActions } from "./dashboard-context";
-import { InboxPage } from "./inbox/inbox-page";
-import { PullRequestPage } from "./inbox/pr-page";
+import { PullRequestsPage } from "./pull-requests/pull-requests-page";
+import { PullRequestDetailPage } from "./pull-requests/pr-page";
 import { NewSession } from "./new-session";
 import { PaneGrid } from "./pane-grid";
 import { RoutinesPage } from "./routines/routines-page";
@@ -138,11 +138,11 @@ export const PageSwitch = memo(function PageSwitch({
 		}
 		case "settings":
 			return <SettingsPage route={page} workspaces={projects} projectList={projectList} pins={pins} />;
-		case "inbox":
+		case "pull-requests":
 			return page.target === null ? (
-				<InboxPage project={project} hosts={visible.hosts} past={visible.past} section={sectionTarget} />
+				<PullRequestsPage project={project} hosts={visible.hosts} past={visible.past} section={sectionTarget} />
 			) : (
-				<PullRequestPage project={project} hosts={visible.hosts} target={page.target} files={page.files} />
+				<PullRequestDetailPage project={project} hosts={visible.hosts} target={page.target} files={page.files} />
 			);
 		case "tickets":
 			if (linear && !linearCallable) return <TicketsDisconnected linear={linear} />;

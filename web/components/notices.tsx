@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { moveAction } from "../inbox-model";
+import { moveAction } from "../pull-requests-model";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
-import { hashForInbox } from "../routing";
+import { hashForPullRequests } from "../routing";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { SLACK_LOGO } from "./integrations/brand-logos";
@@ -37,7 +37,7 @@ const TOAST_FRESH_MS = 15 * 60_000;
 /** How long a pull request toast or Slack toast stays; an update's stays until dismissed. */
 const TOAST_MS = 6_000;
 
-/** Each of your moves as the bell words it, with the icon and colours of the inbox's badge for it. */
+/** Each of your moves as the bell words it, with the icon and colours of the Pull requests page's badge for it. */
 const MOVE_NOTICE: Record<YourMove, { headline: string; icon: LucideIcon; tone: string }> = {
 	review: { headline: "Review requested", icon: Eye, tone: "bg-blue-500 text-white" },
 	merge: { headline: "Ready to merge", icon: GitMerge, tone: "bg-emerald-500 text-white" },
@@ -89,9 +89,9 @@ function previewOf(notice: Notice): string {
 	}
 }
 
-/** Opens what a pull request notice or Slack notice is about: the pull request in the inbox, or the message in Slack. */
+/** Opens what a pull request notice or Slack notice is about: the pull request on the Pull requests page, or the message in Slack. */
 function follow(notice: Notice): void {
-	if (notice.kind === "pull-request") location.hash = hashForInbox(notice.pr);
+	if (notice.kind === "pull-request") location.hash = hashForPullRequests(notice.pr);
 	else if (notice.kind === "slack") window.open(notice.permalink, "_blank", "noopener,noreferrer");
 }
 
@@ -272,7 +272,7 @@ function NoticeAction({ notice, send, onDone }: { notice: Notice; send: Send; on
 				start(pullRequestStart(pr, action, cwd, readPinnedSkill()));
 				read();
 				onDone();
-				location.hash = hashForInbox(pr);
+				location.hash = hashForPullRequests(pr);
 			}}
 		>
 			{QUICK_ACTIONS[action].label}
@@ -288,7 +288,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 	const read = () => {
 		if (!notice.read) send({ t: "notice", ids: [notice.id], op: "read" });
 	};
-	const href = notice.kind === "pull-request" ? hashForInbox(notice.pr) : notice.kind === "slack" ? notice.permalink : null;
+	const href = notice.kind === "pull-request" ? hashForPullRequests(notice.pr) : notice.kind === "slack" ? notice.permalink : null;
 	const label = `${notice.read ? "" : "Unread: "}${headline}`;
 	return (
 		<li className="group relative flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/70 has-[>a:focus-visible]:bg-muted/70">

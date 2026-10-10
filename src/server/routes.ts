@@ -1,5 +1,5 @@
 /**
- * The HTTP API the page reads and writes omp's settings, analytics, the inbox, pull requests, git checkouts, worktrees,
+ * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
  * the projects Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
@@ -10,7 +10,7 @@ import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import { gitCheckout } from "../git";
 import type { GoogleCalendarReader } from "../google-calendar";
-import { loadInbox, loadPullRequestDetail } from "../inbox";
+import { loadPullRequests, loadPullRequestDetail } from "../pull-requests";
 import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
@@ -56,7 +56,7 @@ export interface SessionRoutesEnv {
 	savedOf(sessionId: string): AnalyticsSessionFacts | null;
 	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
 	placeOf(sessionId: string): SessionPlace | null;
-	/** The inbox listed `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
+	/** The pull request list loaded `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
 }
 
@@ -121,7 +121,7 @@ async function dirParam(params: URLSearchParams): Promise<string | Response> {
 	return (await directoryOf(params.get("cwd") ?? "")) ?? fail(404, "Expected ?cwd= naming a directory");
 }
 
-/** Settings, models, skills, analytics, the inbox, projects, and a session's changes. */
+/** Settings, models, skills, analytics, the pull request list, projects, and a session's changes. */
 function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes {
 	/**
 	 * The `cwd` a request names, `null` when it names none, or the response refusing it. `cwd` must be a
@@ -182,15 +182,15 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	});
 
 	/**
-	 * `GET /api/inbox[?cwd=<dir>][&fresh]`: the pull requests of that workspace's repository, else of every workspace's.
+	 * `GET /api/pull-requests[?cwd=<dir>][&fresh]`: the pull requests of that workspace's repository, else of every workspace's.
 	 * Each answer also tells the pull-request index which branch heads which PR, which links the sessions that pushed them.
 	 */
-	const inbox = get(params => {
+	const pullRequests = get(params => {
 		const cwd = workspaceCwd(params);
 		if (cwd instanceof Response) return cwd;
 		const fresh = params.has("fresh");
 		return answer(async () => {
-			const loaded = await loadInbox(cwd === null ? env.knownCwds() : [cwd], fresh);
+			const loaded = await loadPullRequests(cwd === null ? env.knownCwds() : [cwd], fresh);
 			for (const repo of loaded.repos) if ("pullRequests" in repo) env.learnHeads(repo, repo.pullRequests);
 			return loaded;
 		});
@@ -241,7 +241,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/models/roles": { GET: roles },
 		"/api/analytics": { GET: analytics },
 		"/api/skills": { GET: skills },
-		"/api/inbox": { GET: inbox },
+		"/api/pull-requests": { GET: pullRequests },
 		"/api/projects": { PUT: projectChange },
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },
@@ -365,7 +365,7 @@ function pullRequestRoutes({ get, write }: RouteKit): Routes {
 			return pr instanceof Response ? pr : read(pr, params);
 		});
 
-	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for the inbox's details. */
+	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for a pull request's details. */
 	const pullRequest = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestDetail(pr)));
 
 	/** `GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>`: the open pull requests stacked with that one, top first, for its details' Stack. */

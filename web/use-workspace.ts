@@ -3,7 +3,7 @@ import type { Project } from "../src/shared/projects";
 import type { PastSession, RosterHost } from "../src/shared/sessions";
 import type { DashboardState } from "./dashboard-state";
 import { useProject } from "./project";
-import { inboxStore } from "./reads";
+import { pullRequestsStore } from "./reads";
 import { discoverableSessions, projectSwitch, workspaces } from "./sessions";
 
 /** The directories the sidebar, the palette, and the pages list, and the project they are scoped to. */
@@ -13,14 +13,14 @@ export interface Workspace {
 	hiddenCwds: ReadonlySet<string>;
 	/** The projects, as {@link workspaces} lists them. */
 	projects: Project[];
-	/** The project `cwd` the sidebar and the inbox show, `null` for all projects. */
+	/** The project `cwd` the sidebar and the Pull requests page show, `null` for all projects. */
 	project: string | null;
 	pickProject: (cwd: string | null) => void;
 }
 
 /**
- * The visible sessions, the projects they form, and the selected project. It polls that project's inbox, which keeps the
- * Inbox tab's count current on every page, and follows a session this page starts into its project.
+ * The visible sessions, the projects they form, and the selected project. It polls that project's pull requests, which keeps the
+ * Pull requests tab's count current on every page, and follows a session this page starts into its project.
  */
 export function useWorkspace(state: DashboardState): Workspace {
 	// Temporary and hidden workspaces remain in the raw sessions; only discoverable sessions enter the project and sidebar view.
@@ -32,7 +32,7 @@ export function useWorkspace(state: DashboardState): Workspace {
 	);
 	const [project, pickProject] = useProject(projects);
 	// Until the sessions are listed, the saved project reads as all projects.
-	inboxStore.usePolling(project, state.listed);
+	pullRequestsStore.usePolling(project, state.listed);
 	const { started } = state;
 	useEffect(() => {
 		if (!started) return;
