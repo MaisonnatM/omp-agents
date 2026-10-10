@@ -2,6 +2,7 @@ import { ListTodo } from "lucide-react";
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStoredState } from "../../stored-state";
+import { shortcutKeys } from "../../shortcuts";
 import { Separator, useDragSeparator } from "../drag-separator";
 
 const WIDTH_KEY = "omp-agents.todo-list-width";
@@ -63,7 +64,7 @@ export function TodoSplit({ list, detail }: TodoSplitProps) {
 					<div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
 						<ListTodo aria-hidden className="size-6 text-muted-foreground/60" />
 						<p>No todo open</p>
-						<p className="text-xs text-muted-foreground/80">Click a todo, or focus one with J and K and press Enter.</p>
+						<p className="text-xs text-muted-foreground/80">Click a todo, or focus one with {shortcutKeys("todoNext")} and press Enter.</p>
 					</div>
 				)}
 			</aside>

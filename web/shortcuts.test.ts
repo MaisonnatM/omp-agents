@@ -105,12 +105,12 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
 });
 
-test("↑ takes back a queued message, Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", () => {
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue"]);
+test("↑ takes back a queued message or steps up the todos, Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", () => {
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "todoPrevious"]);
 	expect(press("[", "BracketLeft", { ctrl: true })).toEqual(["previousSession"]);
 	expect(press("]", "BracketRight", { ctrl: true })).toEqual(["nextSession"]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true })).toEqual([]);
-	expect(press("ArrowDown", "ArrowDown")).toEqual([]);
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["todoNext"]);
 	expect(press("ArrowUp", "ArrowUp", { alt: true, shift: true })).toEqual(["moveUp"]);
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });

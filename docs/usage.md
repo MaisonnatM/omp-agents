@@ -787,8 +787,8 @@ An action that fails shows its error, and its control becomes available again.
   An empty title, or Backspace in an empty one, deletes the todo, and so does the **×** that shows on hover; deleting a todo deletes the todos under it.
   **Undo** shows for eight seconds after a delete and puts the todo back where it was, with its todos, notes, and links.
 - The search field in the page's header, or `/` outside a text field, keeps the todos whose title or notes, or a todo under them, hold every word typed; Esc clears it.
-  Outside a text field, J and K focus the next and previous todo, X marks the focused or open one **Done**, or a closed one **Todo** again, and Enter opens it.
-  While a todo is open, J and K open the next and previous one instead, and Esc closes it.
+  Outside a text field, J and K, or ↓ and ↑, focus the next and previous todo, X marks the focused or open one **Done**, or a closed one **Todo** again, and Enter opens it.
+  While a todo is open, J and K, or ↓ and ↑, open the next and previous one instead, and Esc closes it.
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.
   Under it, buttons show its status, its priority, its category for a top-level todo, and its due day, each opening a menu to change it; the due day's menu also clears it.
   A todo due today reads **Today**, and one whose day has passed reads **Overdue** in red.
@@ -1047,7 +1047,7 @@ Alt is Option on macOS.
 | . | Inbox, outside text fields | Open the pull request's quick actions |
 | E | Inbox, outside text fields | Give the pull request's next move to an agent |
 | / | Todo page, outside text fields | Search the todos |
-| J / K | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |
+| J / K, ↓ / ↑ | Todo page, outside text fields | Focus the next or previous todo, or open it while a todo is open |
 | X | Todo page, outside text fields | Mark the focused or open todo Done, or a closed one Todo again |
 | S | Todo page, outside text fields | Change the focused or open todo's status |
 | P | Todo page, outside text fields | Change the focused or open todo's priority |
