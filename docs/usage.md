@@ -140,6 +140,7 @@ An action that fails shows its error, and its control becomes available again.
   The list follows the conversation as it goes.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows whether the session created, edited, or deleted the file, how many times it changed it, how long ago the last change was, and the lines added and removed, which the list's heading totals.
+  As on the changes page, a count of zero is left out, so a file the agent only added to shows `+12` alone.
   A path inside the session's working directory shows relative to it.
   Click a file to unfold its changes under it, newest first: each with its kind, its time, its lines added and removed, and its diff as omp recorded it with line numbers.
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
