@@ -10,6 +10,8 @@ import { $ } from "bun";
 import { BUNDLE_ID } from "./login-item";
 
 const DESKTOP_DIR = import.meta.dir;
+/** Resolving Electron's path downloads its binary into `dist` when missing; Electron 44 has no install step that does it. */
+const ELECTRON_BINARY: string = require("electron");
 const ELECTRON_DIST = join(DESKTOP_DIR, "node_modules", "electron", "dist");
 const ICON = join(DESKTOP_DIR, "icon.png");
 const BRANDED_APP = join(DESKTOP_DIR, "dist", "omp agents.app");
@@ -61,7 +63,7 @@ async function brandedElectron(): Promise<string> {
 	return binary;
 }
 
-const electron = process.platform === "darwin" ? await brandedElectron() : join(DESKTOP_DIR, "node_modules", ".bin", "electron");
+const electron = process.platform === "darwin" ? await brandedElectron() : ELECTRON_BINARY;
 const child = Bun.spawn([electron, DESKTOP_DIR, ...process.argv.slice(2)], { stdio: ["inherit", "inherit", "inherit"], cwd: DESKTOP_DIR });
 for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => child.kill(signal));
 process.exit(await child.exited);
