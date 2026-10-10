@@ -31,13 +31,13 @@ interface TodoKeysOptions {
 	onNew: (() => void) | null;
 	/** The todo the page shows beside the list, `null` for none. */
 	openId: string | null;
-	/** Every todo whose row shows, in the list's order: what J and K open while a todo is open. */
+	/** Every todo whose row shows, in the list's order: what `todoNext` and `todoPrevious` open while a todo is open. */
 	openOrder: readonly string[];
 	onOpen: (id: string | null) => void;
 }
 
 /**
- * J and K focus the next and previous todo, or, while one is open, open the next or previous one and focus its row.
+ * `todoNext` and `todoPrevious` focus the next and previous todo, or, while one is open, open the next or previous one and focus its row.
  * Esc closes the open todo, X marks the focused todo, or else the open one, Done or a closed one Todo, S, P, and
  * Shift+D open the status, priority, and due day pickers of the focused todo or else the open one, C starts a new
  * todo, and Alt+Shift+↑ and ↓ move the focused todo a place. Returns that opening step for the open todo's own

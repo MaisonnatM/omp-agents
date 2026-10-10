@@ -159,8 +159,22 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "pullRequestActions", label: "Inbox: open the pull request's quick actions", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
 	{ id: "giveToAgent", label: "Inbox: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
 	{ id: "todoSearch", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
-	{ id: "todoNext", label: "Focus the next todo, or open it while a todo is open", keys: [{ chord: { key: "j" }, scope: "outside-fields" }] },
-	{ id: "todoPrevious", label: "Focus the previous todo, or open it while a todo is open", keys: [{ chord: { key: "k" }, scope: "outside-fields" }] },
+	{
+		id: "todoNext",
+		label: "Focus the next todo, or open it while a todo is open",
+		keys: [
+			{ chord: { key: "j" }, scope: "outside-fields" },
+			{ chord: { key: "ArrowDown" }, scope: "outside-fields" },
+		],
+	},
+	{
+		id: "todoPrevious",
+		label: "Focus the previous todo, or open it while a todo is open",
+		keys: [
+			{ chord: { key: "k" }, scope: "outside-fields" },
+			{ chord: { key: "ArrowUp" }, scope: "outside-fields" },
+		],
+	},
 	{ id: "todoCheck", label: "Mark the focused or open todo Done, or a closed one Todo again", keys: [{ chord: { key: "x" }, scope: "outside-fields" }] },
 	{ id: "todoStatus", label: "Change the focused or open todo's status", keys: [{ chord: { key: "s" }, scope: "outside-fields" }] },
 	{ id: "todoPriority", label: "Change the focused or open todo's priority", keys: [{ chord: { key: "p" }, scope: "outside-fields" }] },
