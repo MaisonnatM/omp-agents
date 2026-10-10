@@ -313,6 +313,10 @@ An action that fails shows its error, and its control becomes available again.
   The transcript leaves the block out of the reply, and so does its copy button; the composer lists the prompts under its buttons, numbered, while it is empty and nothing else waits on you: no turn runs and no question is open.
   Press a prompt's number to send it at once. ↓ moves a highlight into the list and ↑ back out; Enter sends the highlighted prompt, Tab puts it in the composer to edit first, and Esc drops the highlight.
   A click sends it too.
+  Cmd+click (Ctrl+click off macOS) marks a prompt without sending it.
+  A click or a number then sends the marked prompts plus that one as a single message, one per line.
+  Enter sends them plus the highlighted prompt, if any, and Tab puts the same text in the composer instead.
+  Esc clears the marks along with the highlight.
   Typing hides the list, and clearing the draft shows it again; the next prompt you send ends it.
   The prompts send as you would type them, so a message of your own that starts with a digit needs another character first, such as a space, while the list shows.
   omp's terminal shows the block as part of the reply.

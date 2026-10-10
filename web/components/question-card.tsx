@@ -6,7 +6,7 @@ import { useShape } from "@/lib/shape-context";
 import { useSize } from "@/lib/size-context";
 import { spring } from "@/lib/springs";
 import { cn } from "@/lib/utils";
-import { IS_MAC } from "../shortcuts";
+import { IS_MAC, modHeld } from "../shortcuts";
 import { type OptionLayout, type QuestionOption, QuestionOptions } from "./question-options";
 
 /** What a card asks: rows to pick one of, or a free-text answer. */
@@ -125,7 +125,7 @@ export function QuestionCard({ question, checked, defaultText = "", header, onAn
 			{...rest}
 			onKeyDown={event => {
 				onKeyDown?.(event);
-				if (question.kind !== "text" || event.key !== "Enter" || !(IS_MAC ? event.metaKey : event.ctrlKey)) return;
+				if (question.kind !== "text" || event.key !== "Enter" || !modHeld(event)) return;
 				// Keeps the focused button from also activating.
 				event.preventDefault();
 				submit();
