@@ -41,11 +41,12 @@ describe("UserTodosFile", () => {
 					body: "**Friday**",
 					status: "todo",
 					priority: 0,
+					assignee: null,
 					doneAt: null,
 					due: null,
 					createdAt: CREATED,
 					categoryId: "w",
-					children: [{ id: "b", text: "Write the docs", body: "", status: "todo", priority: 3, doneAt: null, due: null, createdAt: CREATED }],
+					children: [{ id: "b", text: "Write the docs", body: "", status: "todo", priority: 3, assignee: null, doneAt: null, due: null, createdAt: CREATED }],
 					links: [],
 					addedBy: null,
 				},
@@ -54,13 +55,13 @@ describe("UserTodosFile", () => {
 		});
 	});
 
-	test("a list saved before bodies, categories, dates, links, statuses, priorities, and the archive reads with none, a checked todo as Done", () => {
+	test("a list saved before bodies, categories, dates, links, statuses, priorities, assignees, and the archive reads with none, a checked todo as Done", () => {
 		const path = todosPath();
 		writeTodos(
 			path,
 			'{"todos": [{"id": "a", "text": "Old", "children": [{"id": "a1", "text": "Older", "doneAt": "2026-10-05T09:00:00.000Z"}]}, {"id": "b", "text": "Lost", "categoryId": "gone", "children": []}]}',
 		);
-		const old = { body: "", priority: 0 as const, due: null, createdAt: null };
+		const old = { body: "", priority: 0 as const, assignee: null, due: null, createdAt: null };
 		expect(new UserTodosFile(path).list).toEqual({
 			categories: [],
 			todos: [

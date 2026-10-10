@@ -4,7 +4,7 @@ import { hashForTodo, routeFromHash } from "./routing";
 import { leftIn, todosOf } from "./todo-views";
 
 const todo = (id: string, doneAt: string | null = null): UserTodo => ({
-	id, text: id, body: "", status: doneAt === null ? "todo" : "done", priority: 0, doneAt, due: null, createdAt: null, categoryId: null, children: [], addedBy: null,
+	id, text: id, body: "", status: doneAt === null ? "todo" : "done", priority: 0, assignee: null, doneAt, due: null, createdAt: null, categoryId: null, children: [], addedBy: null,
 	links: [{ kind: "session", sessionId: id }],
 });
 const list: UserTodoList = { categories: [], archive: [], todos: [todo("question"), todo("idle"), todo("running"), todo("checked", "2026-10-05T00:00:00Z")] };

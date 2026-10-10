@@ -108,7 +108,8 @@ export function FieldPicker({ field, current, trigger, look = "field", className
 								<CommandEmpty>No match.</CommandEmpty>
 								<CommandGroup>
 									{choices.map((choice, index) => (
-										<CommandItem key={choice.value} value={choice.value} keywords={[choice.label]} onSelect={() => pick(choice.value)}>
+										// cmdk never highlights an item whose value is empty, which would leave the arrow keys and Enter dead.
+										<CommandItem key={choice.value} value={choice.value || choice.label} keywords={[choice.label]} onSelect={() => pick(choice.value)}>
 											{choice.icon}
 											<span className="truncate">{choice.label}</span>
 											<Check aria-hidden className={cn("ml-auto", selected.includes(choice.value) ? "opacity-100" : "opacity-0")} />

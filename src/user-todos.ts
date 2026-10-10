@@ -4,8 +4,8 @@ import { isClosed, type UserTodo, type UserTodoChange, type UserTodoLeaf, type U
 type AddChange = Extract<UserTodoChange, { op: "add" }>;
 
 /**
- * The `add` of a new todo, with a new id unless `id` names it, a Todo with no priority added now; whatever else
- * `fields` leaves out is none, last in the top level.
+ * The `add` of a new todo, with a new id unless `id` names it, an unassigned Todo with no priority added now; whatever
+ * else `fields` leaves out is none, last in the top level.
  */
 export function addTodo(fields: Pick<AddChange, "text"> & Partial<Omit<AddChange, "op">>): AddChange {
 	const {
@@ -20,9 +20,10 @@ export function addTodo(fields: Pick<AddChange, "text"> & Partial<Omit<AddChange
 		addedBy = null,
 		status = "todo",
 		priority = 0,
+		assignee = null,
 		createdAt = new Date().toISOString(),
 	} = fields;
-	return { op: "add", id, parentId, afterId, categoryId, text, body, due, links, addedBy, status, priority, createdAt };
+	return { op: "add", id, parentId, afterId, categoryId, text, body, due, links, addedBy, status, priority, assignee, createdAt };
 }
 
 /**
@@ -69,7 +70,7 @@ function updateAt(todos: UserTodo[], { top, child }: Place, next: (todo: UserTod
 	return todos.with(top, { ...parent, children: parent.children.with(child, next(parent.children[child]!)) });
 }
 
-const leafOf = ({ id, text, body, status, priority, doneAt, due, createdAt }: UserTodoLeaf): UserTodoLeaf => ({ id, text, body, status, priority, doneAt, due, createdAt });
+const leafOf = ({ id, text, body, status, priority, assignee, doneAt, due, createdAt }: UserTodoLeaf): UserTodoLeaf => ({ id, text, body, status, priority, assignee, doneAt, due, createdAt });
 
 const topOf = (leaf: UserTodoLeaf, categoryId: string | null): UserTodo => ({ ...leafOf(leaf), categoryId, children: [], links: [], addedBy: null });
 
@@ -154,6 +155,8 @@ function applyToTodos(todos: UserTodo[], change: TodoChange, isCategory: (id: st
 		}
 		case "set-priority":
 			return target.priority === change.priority ? todos : updateAt(todos, place, todo => ({ ...todo, priority: change.priority }));
+		case "set-assignee":
+			return target.assignee === change.assignee ? todos : updateAt(todos, place, todo => ({ ...todo, assignee: change.assignee }));
 		case "move": {
 			if (place.child === null) {
 				const { categoryId } = change;
@@ -251,6 +254,7 @@ function applyChange(list: UserTodoList, change: UserTodoChange): UserTodoList {
 				body: change.body,
 				status,
 				priority: change.priority,
+				assignee: change.assignee,
 				doneAt: closedAt,
 				due: change.due,
 				createdAt: change.createdAt,

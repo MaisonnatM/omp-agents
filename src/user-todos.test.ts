@@ -5,7 +5,7 @@ import { isClosed, type TodoStatus, type UserTodo, type UserTodoChange, type Use
 const AT = "2026-10-05T09:00:00.000Z";
 const CREATED = "2026-10-01T08:00:00.000Z";
 
-const leaf = (id: string): UserTodoLeaf => ({ id, text: id, body: "", status: "todo", priority: 0, doneAt: null, due: null, createdAt: CREATED });
+const leaf = (id: string): UserTodoLeaf => ({ id, text: id, body: "", status: "todo", priority: 0, assignee: null, doneAt: null, due: null, createdAt: CREATED });
 
 const todo = (id: string, children: string[] = [], { done = false, categoryId = null }: { done?: boolean; categoryId?: string | null } = {}): UserTodo => ({
 	...leaf(id),
@@ -62,11 +62,11 @@ describe("applyUserTodo", () => {
 		expect(shape(after(list, add("n", "a", null, null)))).toBe("a@work(n)");
 	});
 
-	test("add keeps the notes, due day, status, priority, links, and agent it is given, each link once, and none on a todo under another", () => {
+	test("add keeps the notes, due day, status, priority, assignee, links, and agent it is given, each link once, and none on a todo under another", () => {
 		const pr = { kind: "pull-request", owner: "o", repo: "r", number: 7 } as const;
-		const fields = { body: "See PR", due: "2026-10-06", status: "backlog" as const, priority: 2 as const, links: [pr, { ...pr }], addedBy: "s1", createdAt: CREATED };
+		const fields = { body: "See PR", due: "2026-10-06", status: "backlog" as const, priority: 2 as const, assignee: "agent" as const, links: [pr, { ...pr }], addedBy: "s1", createdAt: CREATED };
 		const list = after(listOf([]), addTodo({ id: "a", text: "Review", ...fields }));
-		expect(list.todos[0]).toEqual({ ...todo("a"), text: "Review", body: "See PR", due: "2026-10-06", status: "backlog", priority: 2, links: [pr], addedBy: "s1" });
+		expect(list.todos[0]).toEqual({ ...todo("a"), text: "Review", body: "See PR", due: "2026-10-06", status: "backlog", priority: 2, assignee: "agent", links: [pr], addedBy: "s1" });
 		const child = after(list, addTodo({ id: "c", parentId: "a", text: "c", links: [pr], addedBy: "s1", createdAt: CREATED }));
 		expect(child.todos[0]!.children).toEqual([leaf("c")]);
 	});
@@ -96,16 +96,17 @@ describe("applyUserTodo", () => {
 		expect(shape(after(list, { op: "outdent", id: "a" }))).toBe("a@work(a1 a2 a3) b");
 	});
 
-	test("a todo's body and due day stay with it through edits, indent, and outdent", () => {
+	test("a todo's body, due day, and assignee stay with it through edits, indent, and outdent", () => {
 		const list = listOf([], todo("a"), todo("b"));
 		const edited = after(
 			list,
 			{ op: "edit-body", id: "b", body: "# Notes\n\n- one" },
 			{ op: "edit", id: "b", text: "Bee" },
 			{ op: "set-due", id: "b", due: "2026-10-09" },
+			{ op: "set-assignee", id: "b", assignee: "agent" },
 			{ op: "indent", id: "b" },
 		);
-		const moved = { ...leaf("b"), text: "Bee", body: "# Notes\n\n- one", due: "2026-10-09" };
+		const moved = { ...leaf("b"), text: "Bee", body: "# Notes\n\n- one", due: "2026-10-09", assignee: "agent" as const };
 		expect(edited.todos[0]!.children).toEqual([moved]);
 		expect(after(edited, { op: "outdent", id: "b" }).todos[1]).toEqual({ ...moved, categoryId: null, children: [], links: [], addedBy: null });
 	});
@@ -152,6 +153,18 @@ describe("applyUserTodo", () => {
 		expect(urgent.todos[0]!.children[0]!.priority).toBe(4);
 		expect(shape(urgent)).toBe("a✓(a1)");
 		expect(after(urgent, { op: "set-priority", id: "a", priority: 1 })).toBe(urgent);
+	});
+
+	test("set-assignee sets and clears who should do a todo at either level, and leaves its status", () => {
+		const list = listOf([], todo("a", ["a1"]));
+		const assigned = after(list, { op: "set-assignee", id: "a", assignee: "user" }, { op: "set-assignee", id: "a1", assignee: "agent" });
+		expect(assigned.todos[0]!.assignee).toBe("user");
+		expect(assigned.todos[0]!.children[0]!.assignee).toBe("agent");
+		expect(shape(assigned)).toBe("a(a1)");
+		expect(after(assigned, { op: "set-assignee", id: "a", assignee: "user" })).toBe(assigned);
+		const cleared = after(assigned, { op: "set-assignee", id: "a", assignee: null }, { op: "set-assignee", id: "a1", assignee: null });
+		expect(cleared.todos[0]!.assignee).toBeNull();
+		expect(cleared.todos[0]!.children[0]!.assignee).toBeNull();
 	});
 
 	test("starting a session links the todo and moves one in Backlog or Todo to In Progress, but leaves a started or closed one", () => {
@@ -269,6 +282,8 @@ describe("applyUserTodo", () => {
 			{ op: "set-due", id: "a", due: null },
 			setStatus("a", "todo"),
 			{ op: "set-priority", id: "a", priority: 0 },
+			{ op: "set-assignee", id: "a", assignee: null },
+			{ op: "set-assignee", id: "gone", assignee: "agent" },
 			{ op: "indent", id: "a" },
 			{ op: "outdent", id: "a" },
 			{ op: "clear-done", categoryId: null },

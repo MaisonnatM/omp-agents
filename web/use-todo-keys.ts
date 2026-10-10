@@ -4,7 +4,7 @@ import { useShortcuts } from "./shortcuts";
 import { moveTo, placeIn } from "./todo-views";
 
 /** A todo's property that a key opens the picker of. */
-export type TodoField = "status" | "priority" | "due";
+export type TodoField = "status" | "priority" | "assignee" | "due";
 
 /** The picker a key opened: todo `id`'s `field`, on its row in the list, or in the open todo's details. */
 export interface OpenPicker {
@@ -25,7 +25,7 @@ interface TodoKeysOptions {
 	disabled: boolean;
 	onChange: (change: UserTodoChange) => void;
 	onToggle: (todo: UserTodoLeaf) => void;
-	/** S, P, or Shift+D opened a picker. */
+	/** S, P, A, or Shift+D opened a picker. */
 	onPicker: (picker: OpenPicker) => void;
 	/** C starts a new todo in the Todo group; `null` in a list that takes none. */
 	onNew: (() => void) | null;
@@ -38,9 +38,9 @@ interface TodoKeysOptions {
 
 /**
  * `todoNext` and `todoPrevious` focus the next and previous todo, or, while one is open, open the next or previous one and focus its row.
- * Esc closes the open todo, X marks the focused todo, or else the open one, Done or a closed one Todo, S, P, and
- * Shift+D open the status, priority, and due day pickers of the focused todo or else the open one, C starts a new
- * todo, and Alt+Shift+↑ and ↓ move the focused todo a place. Returns that opening step for the open todo's own
+ * Esc closes the open todo, X marks the focused todo, or else the open one, Done or a closed one Todo, S, P, A, and
+ * Shift+D open the status, priority, assignee, and due day pickers of the focused todo or else the open one, C starts a
+ * new todo, and Alt+Shift+↑ and ↓ move the focused todo a place. Returns that opening step for the open todo's own
  * buttons; `false` at either end of the list.
  */
 export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onChange, onToggle, onPicker, onNew, openId, openOrder, onOpen }: TodoKeysOptions): (step: 1 | -1) => boolean {
@@ -91,6 +91,7 @@ export function useTodoKeys({ listRef, groups, editingId, canMove, disabled, onC
 		},
 		todoStatus: () => pickerFor("status"),
 		todoPriority: () => pickerFor("priority"),
+		todoAssignee: () => pickerFor("assignee"),
 		todoDue: () => pickerFor("due"),
 		// Claims C even when it adds nothing, so the page's own key never falls through to the App's Create ticket.
 		todoNew: () => {

@@ -8,6 +8,7 @@ const todo = (id: string, status: TodoStatus): UserTodo => ({
 	body: "",
 	status,
 	priority: 0,
+	assignee: null,
 	doneAt: status === "done" ? "2026-10-05T09:00:00.000Z" : null,
 	due: null,
 	createdAt: null,
