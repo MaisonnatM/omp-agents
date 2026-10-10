@@ -17,7 +17,7 @@ import { categoryColor, TODO_STATUS, type TodoEntry } from "../../todo-views";
 import { workStateOf } from "../../todo-work-state";
 import type { TodoField } from "../../use-todo-keys";
 import { type Choice, FieldPicker } from "../field-picker";
-import { MarkdownEditor } from "../markdown-editor";
+import { NotesEditor } from "../notes-editor";
 import { preferredTeam, rememberTeam, TeamSelect } from "../tickets/team-select";
 import { StatusIcon, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
 import { TodoInput } from "./input";
@@ -337,7 +337,7 @@ export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChan
 					)}
 					<TodoDuePicker todo={todo} look="property" day={day} disabled={readOnly} {...pickerOf("due")} onChange={onChange} />
 				</div>
-				<MarkdownEditor key={todo.id} value={todo.body} label={`Notes of ${todo.text}`} readOnly={readOnly} onSave={body => onChange({ op: "edit-body", id: todo.id, body })} />
+				<NotesEditor key={todo.id} value={todo.body} label={`Notes of ${todo.text}`} readOnly={readOnly} onSave={body => onChange({ op: "edit-body", id: todo.id, body })} />
 				{top && <SubTodos todo={top} readOnly={readOnly} onChange={onChange} onOpen={onOpen} />}
 				{top && <AgentCard todo={top} readOnly={readOnly} sessions={sessions} newSessionCwd={newSessionCwd} />}
 				{top && (links.length > 0 || (!readOnly && linearConnected && !links.some(link => link.kind === "ticket"))) && (

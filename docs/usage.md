@@ -263,7 +263,7 @@ An action that fails shows its error, and its control becomes available again.
   Markdown renders as the agent's messages do, a TSV or CSV file as a table of its first 1,000 rows, and anything else as plain text; **Show source** shows a rendered file's text.
   A path in an open Markdown file opens in the dialog's place, relative to that file.
   The dialog shows the first 1 MB of a larger file and says so; it refuses a file whose real path, past any link, has another extension, and a file that is not UTF-8.
-  A todo's notes open paths the same way, absolute and `~/` paths only.
+  A todo's notes do not open paths: a path there is plain text.
 - Every prompt has a copy button.
   Among the agent's messages, only the reply that ends each turn has one, not the messages it writes between tool calls.
   A turn still running shows none until it ends.
@@ -792,9 +792,14 @@ An action that fails shows its error, and its control becomes available again.
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.
   Under it, buttons show its status, its priority, its category for a top-level todo, and its due day, each opening a menu to change it; the due day's menu also clears it.
   A todo due today reads **Today**, and one whose day has passed reads **Overdue** in red.
-  Its notes follow, in markdown.
-  The notes render as the agent's messages do, with GitHub's task lists and tables; click them, or press Enter on them, to edit the markdown in the same type.
-  They save and render again when the text field loses focus or on Esc, and also save on Cmd+S; a todo with notes shows a notebook icon in the list.
+  Its notes follow, always formatted.
+  Click into them and type: markdown at the start of a line formats it as you type, `# ` a heading, `- ` a bullet, `1. ` a numbered list, `[ ] ` or `[x] ` a check item, `> ` a quote, and ```` ``` ```` a code block.
+  Around text, `**bold**`, `*italic*`, `` `code` ``, `~~strike~~`, and `[text](url)` format it too, and a typed or pasted URL becomes a link; a click on a link opens it in a new tab, and a click on a check item's box ticks it.
+  The notes save a moment after you stop typing or tick a box, and at once when you click away, on Esc, or on Cmd+S; they are kept as markdown, and a todo with notes shows a notebook icon in the list.
+  Underline and other formatting that markdown cannot hold, as Cmd+U or a paste would bring, does not apply.
+  A GitHub table and raw HTML are not formatting the editor knows: they show and save as the text you wrote, one block per line.
+  Saving an edit rewrites some markdown the way the editor writes it: a sublist indents four spaces, and `_italic_` and `__bold__` become stars.
+  A `*`, `_`, `` ` ``, or `~` you type saves as typed, unless one in the note would read as formatting; then each of them saves after a backslash.
   A top-level todo then lists its sub-todos, with how many are done, a bar of that share, and each one's status and priority; click one to open it, and the **+** adds one.
   A card then shows its latest linked session's work state and, when that live session has a question open, its title and **Reply in session**, which opens that session, beside **Start session**; with no linked session, only **Start session** shows.
   At the bottom, it shows the day it was added and the session that added it.
