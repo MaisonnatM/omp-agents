@@ -77,8 +77,8 @@ interface TicketsPageProps {
 	/** The group a sidebar link last chose, to unfold, scroll to, and focus. */
 	section: SectionTarget | null;
 	/**
-	 * Where a quick action's session starts. A Linear issue names no repository, so the caller passes the sidebar
-	 * project's workspace, as a new session would start in.
+	 * Where a quick action's session starts. A Linear issue names no repository, so the caller passes the directory a
+	 * new session would start in, which the sidebar's workspace decides.
 	 */
 	cwd: string;
 	/** Running sessions, which the issues they work on name. */

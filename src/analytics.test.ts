@@ -14,7 +14,7 @@ function row(sessionFile: string, selector: string, total: number, lastAt: numbe
 const facts = (id: string) => (id === "alpha" ? { title: "Fix billing", cwd: "/work/app" } : null);
 
 describe("analytics session usage", () => {
-	test("a nested subagent folds into its parent, and a deleted session takes its project from a listed neighbor", () => {
+	test("a nested subagent folds into its parent, and a deleted session takes its workspace from a listed neighbor", () => {
 		const rows = [
 			row(`${parent}.jsonl`, "openai/gpt-a", 100, 10),
 			row(`${parent}/task/CasualAlbatross.jsonl`, "anthropic/claude-b", 250, 20, 250),
@@ -37,7 +37,7 @@ describe("analytics session usage", () => {
 		]);
 	});
 
-	test("the payload sorts models and projects by tokens and keeps only the 20 heaviest sessions", () => {
+	test("the payload sorts models and workspaces by tokens and keeps only the 20 heaviest sessions", () => {
 		const model = (provider: string, model: string, tokens: number) => ({
 			provider, model, totalRequests: 1, failedRequests: 0, totalInputTokens: tokens / 2, totalOutputTokens: tokens / 2,
 			totalCacheReadTokens: 0, totalCacheWriteTokens: 0, cacheRate: 0, totalCost: 0.5, avgTokensPerSecond: 20,
@@ -62,7 +62,7 @@ describe("analytics session usage", () => {
 		};
 		const analytics = buildAnalytics("7d", read, root, facts);
 		expect(analytics.sessions.map(session => session.sessionId)).toEqual(["alpha", ...Array.from({ length: 19 }, (_, index) => String(21 - index))]);
-		expect(analytics.projects.map(({ cwd, tokens }) => [cwd, tokens.total])).toEqual([["-work-other", 253], ["/work/app", 100]]);
+		expect(analytics.workspaces.map(({ cwd, tokens }) => [cwd, tokens.total])).toEqual([["-work-other", 253], ["/work/app", 100]]);
 		expect(analytics.models.map(({ selector, tokens }) => [selector, tokens.total])).toEqual([["openai/gpt-a", 253], ["anthropic/claude-b", 100]]);
 		expect(analytics.tools).toEqual([{ name: "read", calls: 7, errors: 1, tokenShare: 125 }]);
 		const providers = [

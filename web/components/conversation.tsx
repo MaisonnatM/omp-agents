@@ -1,12 +1,12 @@
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Project } from "../../src/shared/projects";
 import type { Delivery, LiveView, RosterHost } from "../../src/shared/sessions";
 import type { ChangedFile } from "../../src/shared/transcript";
+import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { InputMessage } from "@/components/ui/input-message";
 import { MessageScrollerProvider, useMessageScroller } from "@/components/ui/message-scroller";
 import { Tooltip } from "@/components/ui/tooltip";
-import { projectName } from "../labels";
+import { folderName } from "../labels";
 import { useChangedFiles, useComposerData, useNextSuggestions } from "../pane-store";
 import type { ModelList } from "../reads";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../shortcuts";
@@ -54,8 +54,8 @@ interface ConversationProps {
 	actions?: ReactNode;
 	/** Whether this is the focused pane, the one session shortcuts act on. */
 	focused: boolean;
-	/** The projects, as {@link workspaces} lists them, which the directory picker offers. */
-	workspaces: Project[];
+	/** The workspaces, as {@link listWorkspaces} lists them, which the directory picker offers. */
+	workspaces: Workspace[];
 }
 
 /** One live session or subagent: header, live transcript, composer. Keyed by view, so drafts, queues, and scroll reset per view. */
@@ -236,7 +236,7 @@ function LiveConversation({
 		() =>
 			session && writable && cwdDisplay !== undefined ? (
 				<EmptyConversation title="No messages yet">
-					omp is running in {projectName(cwdDisplay) ?? cwdDisplay}. Send a message to start its first turn.
+					omp is running in {folderName(cwdDisplay) ?? cwdDisplay}. Send a message to start its first turn.
 				</EmptyConversation>
 			) : undefined,
 		[session, writable, cwdDisplay],

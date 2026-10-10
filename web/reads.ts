@@ -58,7 +58,7 @@ export function useReplaceableRead<T>(url: string | null, version?: unknown): Re
 	return { data: shown ?? read.data, error: shown ? null : read.error, replace: answer => setReplaced({ url, answered: read.data, answer }) };
 }
 
-/** The open pull requests by project `cwd`, which the sidebar and the Pull requests page share; `null` reads every project. */
+/** The open pull requests by workspace `cwd`, which the sidebar and the Pull requests page share; `null` reads every workspace. */
 export const pullRequestsStore = createPolledStore<PullRequestList>({
 	// Keeps its name from before the page was called Pull requests, so the browser's cached list survives.
 	cacheKey: "omp-agents.inbox-cache",
@@ -76,7 +76,7 @@ export const pullRequestsStore = createPolledStore<PullRequestList>({
 	},
 });
 
-/** The Linear issues assigned to you, which the sidebar and the tickets page share; Linear is not per project, so there is one entry. */
+/** The Linear issues assigned to you, which the sidebar and the tickets page share; Linear is not per workspace, so there is one entry. */
 export const ticketsStore = createPolledStore<TicketsAnswer>({
 	cacheKey: "omp-agents.tickets-cache",
 	url: (_, fresh) => `/api/tickets${fresh ? "?fresh" : ""}`,
@@ -111,8 +111,8 @@ export const analyticsStore = createPolledStore<Analytics>({
 			&& Array.isArray(value.models) && value.models.every(model =>
 				isObject(model) && typeof model.selector === "string" && usage(model)
 				&& (model.tokensPerSecond === null || typeof model.tokensPerSecond === "number"))
-			&& Array.isArray(value.projects) && value.projects.every(project =>
-				isObject(project) && typeof project.cwd === "string" && usage(project))
+			&& Array.isArray(value.workspaces) && value.workspaces.every(workspace =>
+				isObject(workspace) && typeof workspace.cwd === "string" && usage(workspace))
 			&& Array.isArray(value.tools) && value.tools.every(tool =>
 				isObject(tool) && typeof tool.name === "string" && numbers(tool, ["calls", "errors", "tokenShare"]))
 			&& Array.isArray(value.sessions) && value.sessions.every(session =>

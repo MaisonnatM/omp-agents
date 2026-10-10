@@ -31,7 +31,7 @@ import {
 	stepTarget,
 	type Where,
 } from "../../pull-requests-model";
-import { projectName } from "../../labels";
+import { folderName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart } from "../../quick-actions";
 import type { PolledEntry } from "../../polled-store";
@@ -176,7 +176,7 @@ export function SortMenu({ order, onSort, onReset }: { order: PullRequestOrder; 
 /** The workspace a repository's heading names after it: a lone workspace whose folder is not the repository's name, or how many there are. */
 export function workspacesLabel({ repo, cwds }: RepoPullRequests): string | null {
 	if (cwds.length !== 1) return `${cwds.length} workspaces`;
-	const folder = projectName(cwds[0]!);
+	const folder = folderName(cwds[0]!);
 	return folder && folder.toLowerCase() !== repo.toLowerCase() ? folder : null;
 }
 
@@ -238,8 +238,8 @@ export interface PullRequestsBoard {
 }
 
 interface BoardProps {
-	/** The sidebar's project `cwd`, or `null` for every project. */
-	project: string | null;
+	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
+	workspace: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** What the main area shows: a pull request's row unfolds, scrolls into view, and stays highlighted while its details or changes show. */
@@ -291,16 +291,16 @@ function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Rea
 }
 
 /**
- * The pull requests of `project` as a board of repositories, sections, and rows, with the keys that move through it. Dragging
+ * The pull requests of `workspace` as a board of repositories, sections, and rows, with the keys that move through it. Dragging
  * or Alt+Shift+↑ and ↓ reorder the repositories, the sections, and the pull requests in a section; the browser keeps
  * the order. Mount it once per screen, since its keys act on the rows it lists.
  */
-export function usePullRequestsBoard({ project, hosts, past, route, entersList }: BoardProps): PullRequestsBoard {
+export function usePullRequestsBoard({ workspace, hosts, past, route, entersList }: BoardProps): PullRequestsBoard {
 	const { target } = route;
 	const targetKey = target ? prKey(target) : null;
 	const { open, start } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const poll = pullRequestsStore.use(project);
+	const poll = pullRequestsStore.use(workspace);
 	const { read } = poll;
 	const list = read?.data ?? null;
 	const folds = usePullRequestsFolds();
@@ -443,7 +443,7 @@ export function usePullRequestsBoard({ project, hosts, past, route, entersList }
 
 	return {
 		poll,
-		refresh: () => void pullRequestsStore.refresh(project, { fresh: true }),
+		refresh: () => void pullRequestsStore.refresh(workspace, { fresh: true }),
 		order,
 		onSort: sort => setOrder({ ...order, sort, manual: sort === "manual" ? shownOrder : order.manual }),
 		onReset: () => setOrder(DEFAULT_ORDER),

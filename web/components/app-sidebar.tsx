@@ -7,7 +7,7 @@ import type { PaletteEvent } from "../command-palette";
 import type { PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
-import type { Workspace } from "../use-workspace";
+import type { WorkspaceScope } from "../use-workspace-scope";
 import { PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { NoticesBell } from "./notices";
 import { Roster } from "./roster";
@@ -17,7 +17,7 @@ const NO_VIEWS: View[] = [];
 const NO_PULL_REQUESTS_ROUTE: PullRequestsRoute = { target: null };
 
 interface AppSidebarProps {
-	workspace: Workspace;
+	scope: WorkspaceScope;
 	sessions: SessionLists;
 	page: Page | null;
 	/** The panes on screen. */
@@ -38,7 +38,7 @@ interface AppSidebarProps {
 	settings: SettingsRoute;
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
-	onPickProject: (cwd: string | null) => void;
+	onPickWorkspace: (cwd: string | null) => void;
 	dispatchPalette: Dispatch<PaletteEvent>;
 	setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
 	toggleSidebar: (side: "left") => void;
@@ -49,7 +49,7 @@ interface AppSidebarProps {
  * message that changes nothing the sidebar shows leaves it alone.
  */
 export const AppSidebar = memo(function AppSidebar({
-	workspace: { visible, projects, project },
+	scope: { visible, workspaces, workspace },
 	sessions: { lists, waiting, query, setQuery, togglePin },
 	page,
 	panes,
@@ -67,18 +67,18 @@ export const AppSidebar = memo(function AppSidebar({
 	settings,
 	sectionTarget,
 	onSectionTarget,
-	onPickProject,
+	onPickWorkspace,
 	dispatchPalette,
 	setShortcutsOpen,
 	toggleSidebar,
 }: AppSidebarProps) {
 	const pullRequestsTab = useMemo(() => {
-		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
+		// Until the sessions are listed, the saved workspace reads as all workspaces, which would ask GitHub about every repository.
 		if (!listed) return <p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>;
 		// The Pull requests page lists the pull requests itself, so the sidebar's Pull requests tab shows its sections then.
-		if (page?.kind === "pull-requests" && !page.target) return <PullRequestsIndex project={project} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
-		return <PullRequestsNav project={project} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
-	}, [listed, page, project, visible, sectionTarget, onSectionTarget]);
+		if (page?.kind === "pull-requests" && !page.target) return <PullRequestsIndex workspace={workspace} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
+		return <PullRequestsNav workspace={workspace} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
+	}, [listed, page, workspace, visible, sectionTarget, onSectionTarget]);
 	const toggle = useMemo(() => <SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />, [toggleSidebar]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const calendarTab = useMemo(
@@ -90,7 +90,7 @@ export const AppSidebar = memo(function AppSidebar({
 	const bell = useMemo(() => <NoticesBell notices={notices} />, [notices]);
 	return (
 		<Roster
-			projects={projects}
+			workspaces={workspaces}
 			lists={lists}
 			waiting={waiting}
 			query={query}
@@ -111,8 +111,8 @@ export const AppSidebar = memo(function AppSidebar({
 			onSectionTarget={onSectionTarget}
 			pullRequestsTab={pullRequestsTab}
 			hosts={visible.hosts}
-			project={project}
-			onPickProject={onPickProject}
+			workspace={workspace}
+			onPickWorkspace={onPickWorkspace}
 			onShowSearch={onShowSearch}
 			onShowShortcuts={onShowShortcuts}
 			bell={bell}

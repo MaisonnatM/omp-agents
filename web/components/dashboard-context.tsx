@@ -45,8 +45,8 @@ export interface DashboardStatus {
 	/** The live sessions the page asked the server to end, by instance id, until it answers. */
 	ending: ReadonlySet<string>;
 	/**
-	 * The project `cwd` whose pull request entry `App` polls, `null` for all projects. A component that wants the pull requests
-	 * reads that entry, never another scope's: the all-projects entry asks GitHub about every repository.
+	 * The workspace `cwd` whose pull request entry `App` polls, `null` for all workspaces. A component that wants the pull requests
+	 * reads that entry, never another scope's: the all-workspaces entry asks GitHub about every repository.
 	 */
 	pullRequestsScope: string | null;
 }

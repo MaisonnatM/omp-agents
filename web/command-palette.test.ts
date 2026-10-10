@@ -42,14 +42,14 @@ describe("paletteReducer", () => {
 			null,
 			{ type: "open" },
 			{ type: "query", query: "dep" },
-			{ type: "push", view: "projects" },
+			{ type: "push", view: "workspaces" },
 			{ type: "query", query: "web" },
-			{ type: "select", itemId: "project:/w" },
+			{ type: "select", itemId: "workspace:/w" },
 			{ type: "togglePanel" },
 		);
-		expect(state?.panel).toEqual({ itemId: "project:/w", query: "" });
+		expect(state?.panel).toEqual({ itemId: "workspace:/w", query: "" });
 		state = apply(state, { type: "escape" });
-		expect([views(state), query(state), state?.panel]).toEqual([["root", "projects"], "web", null]);
+		expect([views(state), query(state), state?.panel]).toEqual([["root", "workspaces"], "web", null]);
 		state = apply(state, { type: "escape" });
 		expect([views(state), query(state)]).toEqual([["root"], "dep"]);
 		state = apply(state, { type: "escape" });
@@ -60,8 +60,8 @@ describe("paletteReducer", () => {
 	test("Backspace in an empty field goes back from a pushed view and does nothing at the root", () => {
 		const root = apply(null, { type: "open" });
 		expect(apply(root, { type: "backspaceOnEmpty" })).toBe(root);
-		const typed = apply(root, { type: "push", view: "projects" }, { type: "query", query: "w" });
-		expect(views(apply(typed, { type: "backspaceOnEmpty" }))).toEqual(["root", "projects"]);
+		const typed = apply(root, { type: "push", view: "workspaces" }, { type: "query", query: "w" });
+		expect(views(apply(typed, { type: "backspaceOnEmpty" }))).toEqual(["root", "workspaces"]);
 		expect(views(apply(typed, { type: "query", query: "" }, { type: "backspaceOnEmpty" }))).toEqual(["root"]);
 	});
 

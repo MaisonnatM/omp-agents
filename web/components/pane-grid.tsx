@@ -1,6 +1,6 @@
 import { memo, useCallback, useRef } from "react";
-import type { Project } from "../../src/shared/projects";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";
+import type { Workspace } from "../../src/shared/workspaces";
 import type { DashboardState } from "../dashboard-state";
 import { type ModelList, UNREAD } from "../reads";
 import { closePane, hashForView, type Layout, sameView } from "../routing";
@@ -14,8 +14,8 @@ interface PaneGridProps {
 	lastHosts: ReadonlyMap<string, RosterHost>;
 	draft: DashboardState["draft"];
 	models: ReadonlyMap<string, ModelList>;
-	/** The projects, which each composer's directory picker offers. */
-	projects: Project[];
+	/** The workspaces, which each composer's directory picker offers. */
+	workspaces: Workspace[];
 	/** A pane fills the grid. */
 	maximized: boolean;
 	/** The right sidebar shows the focused session's details, so the top right pane carries its toggle. */
@@ -29,7 +29,7 @@ interface PaneGridProps {
  * The panes in their grid, up to four, with the handles that resize it. It takes only what the panes read, and every
  * pane's props stay equal while a token streams, so the grid renders for roster and layout changes alone.
  */
-export const PaneGrid = memo(function PaneGrid({ layout, hosts, past, lastHosts, draft, models, projects, maximized, hasDetails, rightOpen, show, toggleSidebar }: PaneGridProps) {
+export const PaneGrid = memo(function PaneGrid({ layout, hosts, past, lastHosts, draft, models, workspaces, maximized, hasDetails, rightOpen, show, toggleSidebar }: PaneGridProps) {
 	const [columns, setColumns] = useSplitRatio("columns");
 	const [rows, setRows] = useSplitRatio("rows");
 	const latest = useRef(layout);
@@ -68,7 +68,7 @@ export const PaneGrid = memo(function PaneGrid({ layout, hosts, past, lastHosts,
 					session={pane.kind === "past" ? past.find(s => s.sessionId === pane.sessionId) ?? null : null}
 					initialDraft={draft && sameView(draft.view, pane) ? draft.text : ""}
 					models={(pane.kind === "live" && models.get(pane.instanceId)) || UNREAD}
-					workspaces={projects}
+					workspaces={workspaces}
 					onLayout={onLayout}
 					toggleRight={toggleRight}
 					rightOpen={rightOpen}

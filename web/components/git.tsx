@@ -3,7 +3,7 @@ import { useState } from "react";
 import { type BranchChoice, type GitCheckout, worktreeDir } from "../../src/shared/git";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { projectName } from "../labels";
+import { folderName } from "../labels";
 import { useCopy } from "../use-copy";
 import { CommandPicker } from "./command-picker";
 
@@ -104,7 +104,7 @@ export function BranchPicker({ checkout, choice, onChoose, disabled = false }: B
 								<>
 									<BranchLabel name={branch.name} title />
 									<span className="ml-auto shrink-0 text-xs text-muted-foreground" title={branch.worktree ?? undefined}>
-										{branch.name === checkout.branch ? "here" : branch.worktree ? projectName(branch.worktree) : "new worktree"}
+										{branch.name === checkout.branch ? "here" : branch.worktree ? folderName(branch.worktree) : "new worktree"}
 									</span>
 								</>
 							),

@@ -120,18 +120,16 @@ test("Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", 
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
-test("G then R or P goes to a page only right after a plain G, before P picks a todo's priority", () => {
+test("G then R or W goes to a page only right after a plain G, and P alone picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
 	expect(after("g", "r")).toEqual(["routines"]);
-	expect(after("g", "p")).toEqual(["project", "todoPriority"]);
-	expect(after(null, "p")).toEqual(["todoPriority"]);
-	expect(after("h", "p")).toEqual(["todoPriority"]);
-	expect(after("g", "P", { shift: true })).toEqual([]);
+	expect(after("g", "w")).toEqual(["workspace"]);
+	expect(after(null, "w")).toEqual([]);
+	expect(after("h", "w")).toEqual([]);
+	expect(after("g", "W", { shift: true })).toEqual([]);
+	expect(after("g", "p")).toEqual(["todoPriority"]);
 	expect(after("g", "i", { ctrl: true })).toEqual(["focusComposer"]);
-	expect(shortcutsFor(keyEvent("p", "KeyP"), "g", false)).toEqual([
-		{ id: "project", scope: "outside-fields" },
-		{ id: "todoPriority", scope: "outside-fields" },
-	]);
+	expect(shortcutsFor(keyEvent("w", "KeyW"), "g", false)).toEqual([{ id: "workspace", scope: "outside-fields" }]);
 });
 
 test("a pair forms from a plain key outside text fields, within a second and a half", () => {

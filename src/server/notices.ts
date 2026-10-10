@@ -19,7 +19,7 @@ export interface NoticeSources {
 	updateOmp(latest: string): Promise<string>;
 	modelUpdates(): Promise<ModelUpdate[]>;
 	upgradeModel(update: ModelUpdate): Promise<void>;
-	/** Every project's pull request list, and where the running sessions on each pull request stand. */
+	/** Every workspace's pull request list, and where the running sessions on each pull request stand. */
 	pullRequests(): Promise<{ list: PullRequestList; agent: AgentOn }>;
 	/** The Slack messages that wait on you; none while Slack is not connected. */
 	slack(): Promise<SlackFound[]>;

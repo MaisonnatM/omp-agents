@@ -34,7 +34,7 @@ export type NoticeStatus =
 /** An omp release newer than the one installed, or a newer version of a routed model. */
 export type UpdateSubject = { kind: "omp"; current: string; latest: string } | ({ kind: "model" } & ModelUpdate);
 
-/** A pull request of a project whose next move is yours, with the project directory a quick action on it starts in. */
+/** A pull request of a workspace whose next move is yours, with the workspace directory a quick action on it starts in. */
 export interface PullRequestSubject {
 	kind: "pull-request";
 	pr: PullRequestSummary;

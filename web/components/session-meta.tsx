@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { graphiteUrl } from "../pull-requests-model";
-import { projectName } from "../labels";
+import { folderName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import { hashForPullRequests } from "../routing";
 import { OrgIcon } from "./org-icon";
@@ -14,14 +14,14 @@ const PARENT_CRUMB = "font-normal text-muted-foreground";
 const PullRequestsIcon = PAGE_ICON["pull-requests"];
 
 /**
- * `webapp / Fix login`: the project a session runs in, then `path`, each name below the one before it. Hover the project
+ * `webapp / Fix login`: the workspace a session runs in, then `path`, each name below the one before it. Hover the workspace
  * for its full directory, and the worktree it works in when another.
  */
 export function SessionTrail({ cwdDisplay, worktree, path }: { cwdDisplay: string; worktree: string | null; path: string[] }) {
 	return (
 		<>
 			<Tooltip content={worktree ? `${cwdDisplay}, working in ${worktree}` : cwdDisplay}>
-				<span className={path.length > 0 ? PARENT_CRUMB : undefined}>{projectName(cwdDisplay) ?? cwdDisplay}</span>
+				<span className={path.length > 0 ? PARENT_CRUMB : undefined}>{folderName(cwdDisplay) ?? cwdDisplay}</span>
 			</Tooltip>
 			{path.map((name, index) => (
 				<Fragment key={index}>

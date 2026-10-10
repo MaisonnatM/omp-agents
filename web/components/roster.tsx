@@ -1,6 +1,7 @@
 import { Folder, Keyboard, Search } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { RosterHost, View } from "../../src/shared/sessions";
+import type { Workspace } from "../../src/shared/workspaces";
 import type { Routine } from "../../src/routines";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
 import { agentOn } from "../../src/shared/moves";
 import { yourMoveCount } from "../pull-requests-model";
-import { projectName } from "../labels";
+import { folderName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import { pullRequestsStore, ticketsStore } from "../reads";
 import { hashForTickets, type SettingsRoute, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "../routing";
@@ -29,20 +30,20 @@ import { workspaceItems } from "./workspace-picker";
 import { TodoCategories } from "./todo/categories";
 import type { KnownSessions } from "./todo/links";
 
-interface ProjectPickerProps {
-	/** The projects, as {@link workspaces} lists them. */
-	projects: { cwd: string; cwdDisplay: string }[];
-	/** The selected project's `cwd`, or `null` for all projects. */
+interface SidebarWorkspacePickerProps {
+	/** The workspaces, as {@link listWorkspaces} lists them. */
+	workspaces: Workspace[];
+	/** The selected workspace's `cwd`, or `null` for all workspaces. */
 	current: string | null;
 	onPick: (cwd: string | null) => void;
 }
 
 /** Scopes the roster to one directory's running and past sessions. */
-function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
+function SidebarWorkspacePicker({ workspaces, current, onPick }: SidebarWorkspacePickerProps) {
 	const [open, setOpen] = useState(false);
-	useShortcuts({ project: () => setOpen(shown => !shown) });
-	const selected = projects.find(project => project.cwd === current);
-	const label = selected ? (projectName(selected.cwdDisplay) ?? selected.cwdDisplay) : "All projects";
+	useShortcuts({ workspace: () => setOpen(shown => !shown) });
+	const selected = workspaces.find(workspace => workspace.cwd === current);
+	const label = selected ? (folderName(selected.cwdDisplay) ?? selected.cwdDisplay) : "All workspaces";
 	const pick = (cwd: string | null) => (): void => {
 		if (cwd !== current) onPick(cwd);
 	};
@@ -50,26 +51,26 @@ function ProjectPicker({ projects, current, onPick }: ProjectPickerProps) {
 		<CommandPicker
 			trigger={<span className="truncate">{label}</span>}
 			icon={Folder}
-			tooltip={selected?.cwdDisplay ?? "All projects"}
-			shortcut="project"
+			tooltip={selected?.cwdDisplay ?? "All workspaces"}
+			shortcut="workspace"
 			ariaLabel={`Show sessions from: ${label}`}
 			className="min-w-0 font-semibold"
-			search={{ label: "Search projects" }}
+			search={{ label: "Search workspaces" }}
 			width="md"
 			open={open}
 			onOpenChange={setOpen}
 			list={{
 				kind: "ready",
 				groups: [
-					{ key: "all", items: [{ value: "All projects", label: "All projects", selected: current === null, onSelect: pick(null) }] },
+					{ key: "all", items: [{ value: "All workspaces", label: "All workspaces", selected: current === null, onSelect: pick(null) }] },
 					{
-						key: "projects",
-						heading: "Projects",
-						items: workspaceItems(projects, current, project => pick(project.cwd)()),
+						key: "workspaces",
+						heading: "Workspaces",
+						items: workspaceItems(workspaces, current, workspace => pick(workspace.cwd)()),
 					},
 				],
 			}}
-			empty="No project matches."
+			empty="No workspace matches."
 		/>
 	);
 }
@@ -131,11 +132,11 @@ const SIDEBAR_TAB_FIT = {
 
 
 interface RosterProps {
-	/** The projects, as {@link workspaces} lists them. */
-	projects: { cwd: string; cwdDisplay: string }[];
-	/** The sessions tab's lists, under the selected project and matching `query`. */
+	/** The workspaces, as {@link listWorkspaces} lists them. */
+	workspaces: Workspace[];
+	/** The sessions tab's lists, under the selected workspace and matching `query`. */
 	lists: SidebarSessions;
-	/** Live sessions in the selected project that wait on your move, whatever the search field hides. */
+	/** Live sessions in the selected workspace that wait on your move, whatever the search field hides. */
 	waiting: number;
 	/** What the sessions tab's search field holds; it narrows `lists`. */
 	query: string;
@@ -155,7 +156,7 @@ interface RosterProps {
 	userTodos: UserTodoList | null;
 	/** The list the Todo page shows. */
 	todoView: TodoListView;
-	/** Unfiltered sessions, so the project picker does not hide a todo's linked session. */
+	/** Unfiltered sessions, so the workspace picker does not hide a todo's linked session. */
 	todoSessions: KnownSessions;
 	routines: Routine[];
 	/** The page under the Calendar tab that is open. */
@@ -169,9 +170,9 @@ interface RosterProps {
 	pullRequestsTab: ReactNode;
 	/** The live sessions, which take a pull request's move while they work on it or ask about it. */
 	hosts: RosterHost[];
-	/** The selected project's `cwd`, or `null` for all projects. */
-	project: string | null;
-	onPickProject: (cwd: string | null) => void;
+	/** The selected workspace's `cwd`, or `null` for all workspaces. */
+	workspace: string | null;
+	onPickWorkspace: (cwd: string | null) => void;
 	onShowSearch: () => void;
 	onShowShortcuts: () => void;
 	/** The button that hides the sidebar, first in the header. */
@@ -181,7 +182,7 @@ interface RosterProps {
 }
 
 export function Roster({
-	projects,
+	workspaces,
 	lists,
 	waiting,
 	query,
@@ -202,8 +203,8 @@ export function Roster({
 	onSectionTarget,
 	pullRequestsTab,
 	hosts,
-	project,
-	onPickProject,
+	workspace,
+	onPickWorkspace,
 	onShowSearch,
 	onShowShortcuts,
 	bell,
@@ -211,20 +212,20 @@ export function Roster({
 }: RosterProps) {
 	const { changeTodo: onTodoChange } = useDashboardActions();
 	const { connected } = useDashboardStatus();
-	const pullRequestRead = pullRequestsStore.use(project).read;
+	const pullRequestRead = pullRequestsStore.use(workspace).read;
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
 		"pull-requests": { count: pullRequestRead ? yourMoveCount(pullRequestRead.data, agentOn(hosts)) : 0, meaning: "your move" },
 	};
-	const selectedProject = projects.find(({ cwd }) => cwd === project);
-	const newSessionLabel = selectedProject ? `New session in ${projectName(selectedProject.cwdDisplay) ?? selectedProject.cwdDisplay}` : "New session";
+	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
+	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
 	const fit = ticketsShown ? SIDEBAR_TAB_FIT.six : SIDEBAR_TAB_FIT.five;
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-0">
 				<h1 className="sr-only">omp sessions</h1>
-				<ProjectPicker projects={projects} current={project} onPick={onPickProject} />
+				<SidebarWorkspacePicker workspaces={workspaces} current={workspace} onPick={onPickWorkspace} />
 				<Tooltip content="Command menu" shortcut={shortcutLabels("switcher")} side="bottom">
 					<Button variant="ghost" size="icon-compact" className="ml-auto shrink-0 text-muted-foreground" aria-label="Command menu" onClick={onShowSearch}>
 						<Search />
@@ -271,7 +272,7 @@ export function Roster({
 					onQuery={onQuery}
 					onTogglePin={onTogglePin}
 					open={open}
-					showProject={project === null}
+					showWorkspace={workspace === null}
 					newSessionOpen={newSessionOpen}
 					newSessionLabel={newSessionLabel}
 				/>

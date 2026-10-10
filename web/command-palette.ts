@@ -4,7 +4,7 @@ import type { HostStatus } from "../src/shared/sessions";
 import { type Chord, type KeyEvent, pressesChord, SHORTCUTS, type Shortcut, type ShortcutHandlers, type ShortcutId } from "./shortcuts";
 
 /** A list the command palette shows: the root search, or a view an action pushed onto it. */
-export type PaletteViewId = "root" | "projects" | "createTodo";
+export type PaletteViewId = "root" | "workspaces" | "createTodo";
 
 export interface PaletteView {
 	/** What the footer and the back chip name the view. */
@@ -17,7 +17,7 @@ export interface PaletteView {
 
 export const PALETTE_VIEWS: Record<PaletteViewId, PaletteView> = {
 	root: { title: "omp agents", icon: Command, placeholder: "Search sessions and commands…", suggestions: 5 },
-	projects: { title: "Choose project", icon: Folder, placeholder: "Search projects…", suggestions: 0 },
+	workspaces: { title: "Choose workspace", icon: Folder, placeholder: "Search workspaces…", suggestions: 0 },
 	createTodo: { title: "Create todo", icon: ListTodo, placeholder: "Todo title, optionally ending in a due day or #category", suggestions: 0 },
 };
 
@@ -50,12 +50,12 @@ export type Accessory =
 	| { kind: "text"; text: string };
 
 /** The section an item belongs to; **Suggestions** borrows items from the others. */
-export type HomeSection = "running" | "past" | "commands" | "projects" | "createTodo" | "fallback";
+export type HomeSection = "running" | "past" | "commands" | "workspaces" | "createTodo" | "fallback";
 
 export type SectionId = "suggestions" | HomeSection;
 
 export interface PaletteItem {
-	/** Stable across reloads, since frecency keys on it: `session:<id>`, `command:<id>`, `project:<cwd>`, `fallback:create-todo`. */
+	/** Stable across reloads, since frecency keys on it: `session:<id>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`. */
 	id: string;
 	section: HomeSection;
 	title: string;
@@ -64,7 +64,7 @@ export interface PaletteItem {
 	keywords: readonly string[];
 	icon: LucideIcon;
 	accessories: readonly Accessory[];
-	/** The type label at the row's end: `Session`, `Command`, `Project`. */
+	/** The type label at the row's end: `Session`, `Command`, `Workspace`. */
 	kind: string;
 	/** Every action, as the action panel groups them. The first group's first action runs on Enter, so it is never empty. */
 	actions: readonly [ActionGroup, ...ActionGroup[]];
@@ -225,9 +225,9 @@ export interface Section {
 }
 
 /** Sections in the order an empty search lists them. */
-const BROWSE_ORDER: readonly SectionId[] = ["suggestions", "running", "commands", "past", "projects", "createTodo", "fallback"];
+const BROWSE_ORDER: readonly SectionId[] = ["suggestions", "running", "commands", "past", "workspaces", "createTodo", "fallback"];
 /** Sections a search ranks by their best match; equal ones keep this order. */
-const RANKED_ORDER: readonly HomeSection[] = ["running", "past", "commands", "projects"];
+const RANKED_ORDER: readonly HomeSection[] = ["running", "past", "commands", "workspaces"];
 /** Sections that hold what the search itself becomes: they match anything, and list after every match. */
 const UNRANKED_ORDER: readonly HomeSection[] = ["createTodo", "fallback"];
 
@@ -236,7 +236,7 @@ const HEADINGS: Record<Exclude<SectionId, "fallback">, string | null> = {
 	running: "Running",
 	past: "Past",
 	commands: "Commands",
-	projects: "Projects",
+	workspaces: "Workspaces",
 	createTodo: null,
 };
 

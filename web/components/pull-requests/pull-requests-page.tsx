@@ -83,8 +83,8 @@ function RepoTable({ view }: { view: RepoView }) {
 }
 
 interface PullRequestsPageProps {
-	/** The sidebar's project `cwd`, or `null` for every project. */
-	project: string | null;
+	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
+	workspace: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** The section a sidebar link last chose, to unfold, scroll to, and focus. */
@@ -92,13 +92,13 @@ interface PullRequestsPageProps {
 }
 
 /**
- * The pull requests in the main area, as a table: those of the sidebar's project, or of every project, read from
+ * The pull requests in the main area, as a table: those of the sidebar's workspace, or of every workspace, read from
  * GitHub. It keeps the sidebar list's order, folds, and keys.
  */
-export function PullRequestsPage({ project, hosts, past, section }: PullRequestsPageProps) {
+export function PullRequestsPage({ workspace, hosts, past, section }: PullRequestsPageProps) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const board = usePullRequestsBoard({ project, hosts, past, route: { target: null }, entersList: true });
+	const board = usePullRequestsBoard({ workspace, hosts, past, route: { target: null }, entersList: true });
 	useReveal(section, board.folds, { token: section, block: "start", focus: true });
 	const unmatched = board.poll.read?.data.unmatched ?? [];
 	return (

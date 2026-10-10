@@ -40,7 +40,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "analytics", label: "Analytics", icon: BarChart3, scope: "general" },
 	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, scope: "general" },
 	{ value: "integrations", label: "Integrations", icon: Plug, scope: "general" },
-	{ value: "projects", label: "Projects", icon: Folders, scope: "general" },
+	{ value: "workspaces", label: "Workspaces", icon: Folders, scope: "general" },
 	{ value: "models", label: "Models", icon: RouteIcon, scope: "workspace" },
 	{ value: "files", label: "Files", icon: FileText, scope: "workspace" },
 	{ value: "worktrees", label: "Worktrees", icon: GitBranch, scope: "workspace" },
@@ -124,7 +124,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   project files and config. `#settings` and an unknown section open Analytics.
  * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, and `?todo=<id>` with that todo's
  *   title and notes as its first message. No omp runs until its first message.
- * - `#pull-requests` shows the sidebar's Pull requests tab, which lists the pull requests of the sidebar's project, beside the panes,
+ * - `#pull-requests` shows the sidebar's Pull requests tab, which lists the pull requests of the sidebar's workspace, beside the panes,
  *   and `#pull-requests/<owner>/<repo>/<number>` shows that pull request's details in the main content.
  *   `#pull-requests/<owner>/<repo>/<number>/files` opens its changes page on the first file, and `…/files/<path>` on the file
  *   at that encoded path. Any other `#pull-requests/…` shows the tab alone.

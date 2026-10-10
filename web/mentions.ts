@@ -18,7 +18,7 @@ export interface MentionLists {
 	past: PastSession[];
 }
 
-/** What the sources list: the page's lists, then the tickets the menu polls while it needs them and the selected project's pull requests. */
+/** What the sources list: the page's lists, then the tickets the menu polls while it needs them and the selected workspace's pull requests. */
 export interface MentionData extends MentionLists {
 	tickets: LinearTicket[];
 	pullRequestRepos: RepoPullRequests[];

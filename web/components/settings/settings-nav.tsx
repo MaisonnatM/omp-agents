@@ -3,7 +3,7 @@ import { hashForSettings, SETTINGS_SECTIONS, type SettingsRoute } from "../../ro
 
 const GROUPS = [
 	{ scope: "general", label: "General" },
-	{ scope: "workspace", label: "Workspace" },
+	{ scope: "workspace", label: "This workspace" },
 ] as const;
 
 /** The Settings tab of the sidebar: the sections that are the same in every workspace, then those the workspace picker changes. */

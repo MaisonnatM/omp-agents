@@ -21,7 +21,7 @@ const USAGE_POLL_MS = 60_000;
 const MINUTE_TICK_MS = 60_000;
 /** omp and the model catalog release a few times a week; each check runs `omp models` and asks npm for omp's newest release. */
 const NOTICE_CHECK_MS = 6 * 60 * 60_000;
-/** Each activity check asks GitHub for every project's pull requests and searches Slack twice. */
+/** Each activity check asks GitHub for every workspace's pull requests and searches Slack twice. */
 const ACTIVITY_CHECK_MS = 2 * 60_000;
 
 export interface LoopHandlers {

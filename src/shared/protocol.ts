@@ -4,9 +4,9 @@ import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
-import type { Project, ProjectList } from "./projects";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
+import type { Workspace, WorkspaceList } from "./workspaces";
 
 export type ServerMsg =
 	/** `reset` replaces the roster with `hosts`; otherwise `hosts` replace or join by `instanceId` and `removed` leave. `error` is why the registry could not be listed, and comes with every message. */
@@ -35,8 +35,8 @@ export type ServerMsg =
 	| { t: "user-todos"; list: UserTodoList }
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
 	| { t: "routines"; routines: Routine[] }
-	/** The directories Settings → Projects added and hid, whole, sent when a socket opens and after every change. */
-	| { t: "projects"; list: ProjectList<Project> }
+	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */
+	| { t: "workspaces"; list: WorkspaceList<Workspace> }
 	/** The pinned sessions' ids, whole, sent when a socket opens and after every change. */
 	| { t: "pins"; sessionIds: string[] }
 	/** Every notice the bell lists, whole, sent when a socket opens and after every change. */

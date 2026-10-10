@@ -21,7 +21,7 @@ describe("documentTitle", () => {
 		expect(documentTitle({ kind: "pull-requests", target: null }, view, host("Fix login"), null)).toBe("Pull requests · omp agents");
 	});
 
-	test("a live session reads as its name, else its project", () => {
+	test("a live session reads as its name, else its workspace", () => {
 		const view = { kind: "live", instanceId: "a", agentId: null } as const;
 		expect(documentTitle(null, view, host("Fix login"), null)).toBe("Fix login · omp agents");
 		expect(documentTitle(null, view, host(null), null)).toBe("webapp · omp agents");

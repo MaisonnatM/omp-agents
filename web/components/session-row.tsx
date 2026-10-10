@@ -18,7 +18,7 @@ import {
 import { SidebarMenuAction, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { PaletteAction } from "../command-palette";
-import { hostLabel, modeOf, pastLabel, projectName, pullRequestsLabel, SPLIT_CLICK } from "../labels";
+import { folderName, hostLabel, modeOf, pastLabel, pullRequestsLabel, SPLIT_CLICK } from "../labels";
 import type { OpenMode } from "../routing";
 import { sessionActions, type SessionEntry, type SessionRun } from "../session-actions";
 import { Age } from "./age";
@@ -69,9 +69,9 @@ function SessionButton({ view, label, title, badge, ship, facts, when, dot, open
 	);
 }
 
-/** The project a titled row ran in, before its title, shown only under all projects. An untitled row's label is already the project's name. */
-function ProjectBadge({ cwdDisplay }: { cwdDisplay: string }) {
-	const name = projectName(cwdDisplay);
+/** The workspace a titled row ran in, before its title, shown only under all workspaces. An untitled row's label is already the workspace's name. */
+function WorkspaceBadge({ cwdDisplay }: { cwdDisplay: string }) {
+	const name = folderName(cwdDisplay);
 	return name ? <Badge size="compact" className="shrink-0 self-center">{name}</Badge> : null;
 }
 
@@ -171,14 +171,14 @@ interface RowProps<T> {
 	pinned: boolean;
 	/** The session is on screen. */
 	open: boolean;
-	/** All projects are listed, so a titled row names its project. */
-	showProject: boolean;
+	/** All workspaces are listed, so a titled row names its workspace. */
+	showWorkspace: boolean;
 	/** Pin the session, or unpin it when it is pinned. */
 	onTogglePin: (sessionId: string) => void;
 }
 
 /** A past session's row, with Resume, and Move to past while it is interrupted. */
-export const PastRow = memo(function PastRow({ session, pinned, open, showProject, onTogglePin }: RowProps<PastSession>) {
+export const PastRow = memo(function PastRow({ session, pinned, open, showWorkspace, onTogglePin }: RowProps<PastSession>) {
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "past", sessionId: session.sessionId };
 	const label = pastLabel(session);
@@ -188,7 +188,7 @@ export const PastRow = memo(function PastRow({ session, pinned, open, showProjec
 				view={view}
 				label={label}
 				title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-				badge={showProject && session.title !== null ? <ProjectBadge cwdDisplay={session.cwdDisplay} /> : null}
+				badge={showWorkspace && session.title !== null ? <WorkspaceBadge cwdDisplay={session.cwdDisplay} /> : null}
 				ship={session.ship}
 				facts={sessionFacts([pinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)], session.pullRequests)}
 				when={session.modifiedAt}
@@ -207,7 +207,7 @@ function HostStatus({ host }: { host: RosterHost }) {
 }
 
 /** A running session's row, with its status dot, and End session where the server controls it. */
-export const HostRow = memo(function HostRow({ session: host, pinned, open, showProject, onTogglePin }: RowProps<RosterHost>) {
+export const HostRow = memo(function HostRow({ session: host, pinned, open, showWorkspace, onTogglePin }: RowProps<RosterHost>) {
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
 	const label = hostLabel(host);
@@ -217,7 +217,7 @@ export const HostRow = memo(function HostRow({ session: host, pinned, open, show
 				view={view}
 				label={label}
 				title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-				badge={showProject && host.sessionName !== null ? <ProjectBadge cwdDisplay={host.cwdDisplay} /> : null}
+				badge={showWorkspace && host.sessionName !== null ? <WorkspaceBadge cwdDisplay={host.cwdDisplay} /> : null}
 				ship={host.ship}
 				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline", host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests)], host.pullRequests)}
 				when={host.startedAt}

@@ -27,7 +27,7 @@ interface ConversationHeaderProps {
 }
 
 /**
- * A live session's or subagent's trail, `project / title`, or `project / title / subagent` with the way back to its session;
+ * A live session's or subagent's trail, `workspace / title`, or `workspace / title / subagent` with the way back to its session;
  * the connection status; a session's pull requests, its directory in Cursor, and End session, which shows it is
  * ending until the server answers, though the session may leave the roster before then.
  */

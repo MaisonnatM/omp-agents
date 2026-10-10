@@ -29,7 +29,7 @@ export type ShortcutId =
 	| "todo"
 	| "calendar"
 	| "routines"
-	| "project"
+	| "workspace"
 	| "nextPullRequest"
 	| "previousPullRequest"
 	| "pullRequestOnGitHub"
@@ -153,7 +153,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todo", label: "Go to your todo list", command: "Go to todo list", keys: [{ chord: { key: "4", mod: true }, scope: "anywhere" }] },
 	{ id: "calendar", label: "Go to your calendar", command: "Go to calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },
 	{ id: "routines", label: "Go to your routines", command: "Go to routines", keys: [{ goTo: "r" }] },
-	{ id: "project", label: "Choose the sidebar's project", keys: [{ goTo: "p" }] },
+	{ id: "workspace", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
 	{ id: "nextPullRequest", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "pullRequestOnGitHub", label: "Pull requests: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
@@ -255,7 +255,7 @@ export function chordLabel({ key, mod, ctrl, alt, shift }: Chord): string {
 	return [(mod || ctrl) && "Ctrl", alt && "Alt", shift && "Shift", name].filter(Boolean).join("+");
 }
 
-/** {@link chordLabel}, or `G then P` for a pair. */
+/** {@link chordLabel}, or `G then R` for a pair. */
 export function bindingLabel(binding: Binding): string {
 	if ("goTo" in binding) return `${GO.toUpperCase()} then ${binding.goTo.toUpperCase()}`;
 	return chordLabel(binding.chord);

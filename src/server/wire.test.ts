@@ -4,7 +4,7 @@ import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseCalendarShown, parseClientMsg, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit } from "./wire";
+import { parseCalendarShown, parseClientMsg, parseGoogleClient, parseIntegrationId, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -291,18 +291,18 @@ describe("parseClientMsg", () => {
 	});
 });
 
-describe("parseProjectChange", () => {
+describe("parseWorkspaceChange", () => {
 	test("adds a directory by any path the server then resolves, and hides or shows one by its absolute path", () => {
-		expect(parseProjectChange({ op: "add", cwd: "~/code/app" })?.ok).toEqual({ op: "add", cwd: "~/code/app" });
-		expect(parseProjectChange({ op: "hide", cwd: "/home/user/app" })?.ok).toEqual({ op: "hide", cwd: "/home/user/app" });
-		expect(parseProjectChange({ op: "show", cwd: "/home/user/app" })?.ok).toEqual({ op: "show", cwd: "/home/user/app" });
+		expect(parseWorkspaceChange({ op: "add", cwd: "~/code/app" })?.ok).toEqual({ op: "add", cwd: "~/code/app" });
+		expect(parseWorkspaceChange({ op: "hide", cwd: "/home/user/app" })?.ok).toEqual({ op: "hide", cwd: "/home/user/app" });
+		expect(parseWorkspaceChange({ op: "show", cwd: "/home/user/app" })?.ok).toEqual({ op: "show", cwd: "/home/user/app" });
 	});
 
 	test("rejects hiding or showing a relative path, an unknown op, and an empty directory", () => {
-		expect(parseProjectChange({ op: "hide", cwd: "~/code/app" })).toBeNull();
-		expect(parseProjectChange({ op: "show", cwd: "app" })).toBeNull();
-		expect(parseProjectChange({ op: "remove", cwd: "/home/user/app" })).toBeNull();
-		expect(parseProjectChange({ op: "add", cwd: "" })).toBeNull();
+		expect(parseWorkspaceChange({ op: "hide", cwd: "~/code/app" })).toBeNull();
+		expect(parseWorkspaceChange({ op: "show", cwd: "app" })).toBeNull();
+		expect(parseWorkspaceChange({ op: "remove", cwd: "/home/user/app" })).toBeNull();
+		expect(parseWorkspaceChange({ op: "add", cwd: "" })).toBeNull();
 	});
 });
 describe("parsePullRequestQuery", () => {

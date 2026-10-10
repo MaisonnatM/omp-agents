@@ -20,8 +20,8 @@ import {
 	Wrench,
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useMemo, useRef } from "react";
-import type { Project } from "../../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
+import type { Workspace } from "../../../src/shared/workspaces";
 import type { UserTodoCategory } from "../../../src/user-todos-shared";
 import {
 	type Accessory,
@@ -42,7 +42,7 @@ import {
 	topFrame,
 } from "../../command-palette";
 import { localDay } from "../../days";
-import { age, hostLabel, pastLabel, projectName } from "../../labels";
+import { age, folderName, hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
 import type { OpenMode } from "../../routing";
 import { sessionActions, type SessionEntry } from "../../session-actions";
@@ -79,13 +79,13 @@ interface CommandPaletteProps {
 	dispatch: (event: PaletteEvent) => void;
 	hosts: RosterHost[];
 	past: PastSession[];
-	/** The projects, as the sidebar's project picker lists them. */
-	projects: Project[];
-	/** The sidebar's project, or `null` for all projects. */
-	project: string | null;
-	/** Open `view`, whose session ran in `cwd`, and keep it listed by switching the sidebar to its project. */
+	/** The workspaces, as the sidebar's workspace picker lists them. */
+	workspaces: Workspace[];
+	/** The sidebar's workspace, or `null` for all workspaces. */
+	workspace: string | null;
+	/** Open `view`, whose session ran in `cwd`, and keep it listed by switching the sidebar to its workspace. */
 	onOpenSession: (view: View, cwd: string, mode: OpenMode) => void;
-	onPickProject: (cwd: string | null) => void;
+	onPickWorkspace: (cwd: string | null) => void;
 	/** Pinned sessions, by session ID. */
 	pinned: ReadonlySet<string>;
 	onTogglePin: (sessionId: string) => void;
@@ -100,11 +100,11 @@ interface CommandPaletteProps {
 }
 
 /**
- * Searches running and past sessions in every project, the page's commands, and projects; Enter runs the highlighted
+ * Searches running and past sessions in every workspace, the page's commands, and workspaces; Enter runs the highlighted
  * entry's first action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title. Its props
  * hold no closure built per render, so a socket update that touches none of them skips it.
  */
-export const CommandPalette = memo(function CommandPalette({ state, dispatch, hosts, past, projects, project, onOpenSession, onPickProject, pinned, onTogglePin, handlers, unavailable, todoCategories, onCreateTicket }: CommandPaletteProps) {
+export const CommandPalette = memo(function CommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, todoCategories, onCreateTicket }: CommandPaletteProps) {
 	const { send, start, end, changeTodo } = useDashboardActions();
 	const { starts, ending } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
@@ -192,32 +192,32 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? Command, run: { kind: "do", fn: () => void handlers[id]?.() } }]],
 				}),
 			),
-			pushItem("command:project", "Choose project…", Folder, "projects", ["switch project", "workspace"], shortcutLabels("project")),
+			pushItem("command:workspace", "Choose workspace…", Folder, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),
 			pushItem("command:create-todo", "Create todo", ListTodo, "createTodo", ["add todo", "task"], []),
 		];
 	}, [open, handlers, unavailable]);
 
-	const projectItems = useMemo((): PaletteItem[] => {
+	const workspaceItems = useMemo((): PaletteItem[] => {
 		if (!open) return [];
-		const pickProject = (cwd: string | null): void => {
-			if (cwd !== project) onPickProject(cwd);
+		const pickWorkspace = (cwd: string | null): void => {
+			if (cwd !== workspace) onPickWorkspace(cwd);
 		};
-		const projectItem = (id: string, title: string, subtitle: string | undefined, icon: LucideIcon, cwd: string | null): PaletteItem => ({
+		const workspaceItem = (id: string, title: string, subtitle: string | undefined, icon: LucideIcon, cwd: string | null): PaletteItem => ({
 			id,
-			section: "projects",
+			section: "workspaces",
 			title,
 			subtitle,
 			keywords: [],
 			icon,
-			accessories: cwd === project ? [{ kind: "text", text: "Current" }] : [],
-			kind: "Project",
-			actions: [[{ id: "pick", title: "Show its sessions", icon, run: { kind: "do", fn: () => pickProject(cwd) } }]],
+			accessories: cwd === workspace ? [{ kind: "text", text: "Current" }] : [],
+			kind: "Workspace",
+			actions: [[{ id: "pick", title: "Show its sessions", icon, run: { kind: "do", fn: () => pickWorkspace(cwd) } }]],
 		});
 		return [
-			projectItem("project:all", "All projects", undefined, Layers, null),
-			...projects.map(({ cwd, cwdDisplay }) => projectItem(`project:${cwd}`, projectName(cwdDisplay) ?? cwdDisplay, cwdDisplay, Folder, cwd)),
+			workspaceItem("workspace:all", "All workspaces", undefined, Layers, null),
+			...workspaces.map(({ cwd, cwdDisplay }) => workspaceItem(`workspace:${cwd}`, folderName(cwdDisplay) ?? cwdDisplay, cwdDisplay, Folder, cwd)),
 		];
-	}, [open, projects, project, onPickProject]);
+	}, [open, workspaces, workspace, onPickWorkspace]);
 
 	const items = useMemo((): PaletteItem[] => {
 		const createTodo = (): void => {
@@ -258,11 +258,11 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 				: [];
 		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
 			root: () => [...sessionItems, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
-			projects: () => projectItems,
+			workspaces: () => workspaceItems,
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, commandItems, projectItems, search, todoCategories, changeTodo, onCreateTicket]);
+	}, [viewId, sessionItems, commandItems, workspaceItems, search, todoCategories, changeTodo, onCreateTicket]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	if (state === null || frame === null) return null;
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;

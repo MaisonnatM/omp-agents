@@ -270,7 +270,7 @@ When the output is not a usage report, the footer shows the last line omp wrote 
 omp-stats owns the request history in `~/.omp/stats.db`, under omp's config root.
 `src/omp/stats.ts` starts `statsLive()` on the first Analytics read; it syncs every session transcript, watches for changes, and resyncs every five minutes until the server stops it on shutdown.
 The dashboard calls omp-stats' aggregate and tool reads for the selected range, then groups request rows by session file for the top sessions.
-`src/analytics.ts` folds nested subagent and advisor files into their top-level session, assigns the session's working directory from the saved-session index, and orders models, projects, and sessions by token usage.
+`src/analytics.ts` folds nested subagent and advisor files into their top-level session, assigns the session's working directory from the saved-session index, and orders models, workspaces, and sessions by token usage.
 `src/omp/stats.ts` reads time buckets by recorded provider through omp-stats' rollup-aware `getProviderTimeSeries`, using the same source as the totals cards.
 `src/analytics.ts` derives chart totals and provider totals from those rows, fills missing buckets with zeros, and starts all time at the first request.
 `web/components/settings/provider-trend.tsx` renders Recharts stacked bars, bucket details, and an optional data table from that provider breakdown.
@@ -352,7 +352,7 @@ A `pin` socket message carries a `PinChange`, `{ op, sessionIds }` with `op` one
 Every socket hears the pins after each change as a `pins` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the pins back to its own socket alone.
 The page shows a change before the server answers, and its **Pin** and **Unpin** send `pin` or `unpin` from the pins it holds.
 Pins an older page kept in the browser's localStorage, under `omp-agents.pinned-sessions`, go to the server as one `pin` the first time the page hears the pins, and the key is then removed.
-Each server keeps its own copy in memory, as with the projects, so a routine's pin shows at once on the pages of the server that owns routines.
+Each server keeps its own copy in memory, as with the workspaces, so a routine's pin shows at once on the pages of the server that owns routines.
 
 ## Notifications
 
@@ -400,7 +400,7 @@ Each file carries the SHA-256 of its text.
 
 `GET /api/analytics?range=<range>` answers `Analytics` from omp-stats, defaulting to `7d`.
 The accepted ranges are `24h`, `7d`, `30d`, `90d`, and `all`; an unknown range returns 400.
-The answer includes totals, time buckets with per-provider usage, provider totals, models, projects, agent types, tools, the 20 sessions with the most tokens, and live indexing status.
+The answer includes totals, time buckets with per-provider usage, provider totals, models, workspaces, agent types, tools, the 20 sessions with the most tokens, and live indexing status.
 
 Edits go through two endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:
 
@@ -466,11 +466,11 @@ A missing directory is removed the same way, which drops only that registration.
 A start that creates a branch's worktree and registers its session excludes a removal, and so does a removal that has begun: a removal waits for the starts under way, reads the live and saved sessions once, then checks and removes each confirmed checkout in turn.
 Starts that create no worktree, such as a resume or a routine's session, stay parallel and wait only while a removal runs.
 
-`PUT /api/projects` takes a `ProjectChange`, `{ op, cwd }` with `op` one of `add`, `hide`, and `show`, checked by `parseProjectChange` in `src/server/wire.ts`.
+`PUT /api/workspaces` takes a `WorkspaceChange`, `{ op, cwd }` with `op` one of `add`, `hide`, and `show`, checked by `parseWorkspaceChange` in `src/server/wire.ts`.
 `add` resolves `cwd` through `directoryOf` in `src/paths.ts`, which expands `~`, and answers 400 when it is not a directory; `hide` and `show` take an absolute path.
-`applyProject` in `src/shared/projects.ts` applies one change: adding also shows a hidden directory, and a directory in both lists is hidden, so **Show** offers an added one again.
-A change that changes the list saves `projects.json` and sends every socket a `projects` message, its `list` of added and hidden directories, each with its `cwdDisplay`, also sent when a socket opens.
-A request's `?cwd=` may name an added directory, as the settings workspaces and a project's pull request list do; the every-project pull request list and the worktrees inventory read only the directories sessions ran in.
+`applyWorkspace` in `src/shared/workspaces.ts` applies one change: adding also shows a hidden directory, and a directory in both lists is hidden, so **Show** offers an added one again.
+A change that changes the list saves `workspaces.json` and sends every socket a `workspaces` message, its `list` of added and hidden directories, each with its `cwdDisplay`, also sent when a socket opens.
+A request's `?cwd=` may name an added directory, as the settings under **This workspace** and a workspace's pull request list do; the every-workspace pull request list and the worktrees inventory read only the directories sessions ran in.
 The page lists added directories after those sessions ran in, and drops a hidden directory, not the directories inside it, from its pickers, session lists, counts, and search, as it does `/tmp`.
 
 `GET /api/models/connected?cwd=<directory>` answers `{ models }`: the models that `omp models` lists from the providers you are connected to, for the new-session draft's model menu.
@@ -642,7 +642,7 @@ The model's thinking text uses that same group.
 `Button`'s `loading` prop preserves its label's width, shows a spinner, disables the control, and sets `aria-busy`.
 `InputMessage` takes `sending` and `stopping` for its send and Stop controls.
 shadcn's `message-scroller` follows streaming content, preserves the reader's scroll position, and supplies the jump-to-latest button.
-The model, thinking, and project pickers use shadcn's `popover` and `command` combobox pattern, and the Calendar page's day cards shadcn's `hover-card`.
+The model, thinking, and workspace pickers use shadcn's `popover` and `command` combobox pattern, and the Calendar page's day cards shadcn's `hover-card`.
 Fluid's sidebar rail, mobile drawer, cookie, and toggle shortcut are removed from the vendored sidebar, which keeps only the bordered panel.
 The dashboard sizes and toggles each sidebar in `web/components/sidebar-panel.tsx`, which gives each its own width and open state, because Fluid's provider held only one of each.
 Sidebar widths and the split between panes share `web/components/drag-separator.tsx`: `useDragSeparator` owns the pointer capture, arrow keys, and double-click reset, and `Separator` is the element.
@@ -699,8 +699,8 @@ The server lives in `src/`:
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
   `prompt-files.ts` holds the files a prompt carries as text: `withFiles` and `splitFiles`, which put them after the typed text and take them back off, `plainText`, which tells a text file, and the limits and body of `PUT /api/attachment/document`.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
-- `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and projects, joining saved-session titles and working directories without reading transcripts.
-- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `projects.json`, `pins.json`, `calendars.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
+- `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and workspaces, joining saved-session titles and working directories without reading transcripts.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `workspaces.json`, `pins.json`, `calendars.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
@@ -756,8 +756,10 @@ The server lives in `src/`:
   `src/user-todos-parse.ts` reads the list and its changes from JSON for the file, the socket, the todo inbox, and the desktop shell: a file from before any of those fields reads with none of them, a todo with no status as `done` when it has a `doneAt` and `todo` otherwise, and a change from a page or an agent is held to the length limits, a `restore` too.
   A `user-todo` socket message carries one change, and every socket hears the list after it as a `user-todos` message on the roster topic, also sent when a socket opens; a change that changes nothing sends the list back to its own socket alone.
   A `start` of kind `new` may name a `todoId`; once omp starts, `src/server/start.ts` links the todo to the new session through `StartEnv.linkTodo`, before it sends the first message, and `src/server/dashboard.ts` applies the changes `startChanges` in `src/user-todos.ts` returns: the link, and `set-status` `in-progress` for a `backlog` or `todo` todo.
-- `src/shared/projects.ts`: the Settings › Projects list, `ProjectList` of added and hidden directories, its `ProjectChange`, and `applyProject`, which the server applies to its file.
-  `src/server/projects-file.ts` keeps the list in `projects.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `projects.json.invalid`.
+- `src/shared/workspaces.ts`: the Settings › Workspaces list, `WorkspaceList` of added and hidden directories, its `WorkspaceChange`, and `applyWorkspace`, which the server applies to its file.
+  `src/server/workspaces-file.ts` keeps the list in `workspaces.json` beside the access token and moves a file it cannot read, or one that holds a relative path, to `workspaces.json.invalid`.
+  At startup, before the list loads, it moves `projects.json`, where an older version kept the list, to `workspaces.json` when it holds a workspace list and `workspaces.json` does not exist; a `projects.json` in any other shape stays where it is.
+  The move links the new name, then unlinks the old one, so it never replaces a `workspaces.json` that a server beside it wrote, and any other failure is logged rather than stopping the server.
 - `src/shared/pins.ts`: the sidebar's pins, their `PinChange`, and `applyPins`, which the server applies to its file and the page to the pins it shows before the server answers; see [Pins](#pins).
   `src/server/pins-file.ts` keeps them in `pins.json` beside the access token and moves a file it cannot read to `pins.json.invalid`.
 - `src/shared/notices.ts`: the bell's `Notice`, an update (a newer omp or a `ModelUpdate`) with its `NoticeStatus`, a pull request with your move, or a Slack message, with its seen and read flags, and the socket's `NOTICE_OPS`.
@@ -798,7 +800,7 @@ The page lives in `web/`.
 
 - `web/app.tsx`: the page shell.
   It builds the two dashboard contexts and lays out the sidebars, the page, the command palette, and the dialogs, and leaves each slice of state to a hook of its own.
-  `web/use-workspace.ts` holds the visible sessions, the projects, the selected project, and its pull request poll.
+  `web/use-workspace-scope.ts` holds the visible sessions, the workspaces, the selected workspace, which localStorage keeps, and its pull request poll.
   `web/use-focused-session.ts` holds the focused pane's session, the document title, and the sidebar following a `/move`.
   `web/use-session-lists.ts` holds the Sessions tab's lists and search, and pins and unpins through the server's pins, and `web/use-sidebar-tab.ts` the tab and `showTab`.
   `web/use-overlays.ts` holds the shortcuts dialog, the command palette, the file dialog, and the new-ticket dialog.
@@ -830,11 +832,11 @@ The page lives in `web/`.
   `web/calendar-model.ts` lays a month's routine runs, past and planned, its due todos and tickets, and Google events out by day.
   `web/days.ts` names a local day as todos, tickets, and the calendar do, `YYYY-MM-DD`, and walks the days between two of them.
 - `web/page-icons.ts`: the icon of each dashboard page, which its sidebar tab and every link into the page show.
-  `web/routing.ts` owns the sidebar tab vocabulary, the settings sections, and the page/hash routes; `web/components/workspace-picker.tsx` owns the directory picker and the workspace rows it shares with the sidebar's project picker.
-- `web/components/settings/settings-nav.tsx`: the Settings sidebar's links, one per section of `SETTINGS_SECTIONS` in `web/routing.ts`, grouped by scope into **General** and **Workspace**.
-  The open section is in the hash, `#settings/<section>/<encoded cwd>`; `settings-page.tsx` keeps inactive panels mounted to preserve unsaved drafts, and shows the workspace picker on the Workspace sections only.
+  `web/routing.ts` owns the sidebar tab vocabulary, the settings sections, and the page/hash routes; `web/components/workspace-picker.tsx` owns the directory picker and the workspace rows it shares with the sidebar's workspace picker.
+- `web/components/settings/settings-nav.tsx`: the Settings sidebar's links, one per section of `SETTINGS_SECTIONS` in `web/routing.ts`, grouped by scope into **General** and **This workspace**.
+  The open section is in the hash, `#settings/<section>/<encoded cwd>`; `settings-page.tsx` keeps inactive panels mounted to preserve unsaved drafts, and shows the workspace picker on the **This workspace** sections only.
   `preferences-tab.tsx` holds the dashboard's browser-local choices, and `routing-tab.tsx` the Models section: roles, model chains, provider order, and retries.
-  `projects-tab.tsx` lists the projects with **Hide**, the hidden ones with **Show**, and adds a directory by path through `PUT /api/projects`; the list it shows comes back as the `projects` socket message.
+  `workspaces-tab.tsx` lists the workspaces with **Hide**, the hidden ones with **Show**, and adds a directory by path through `PUT /api/workspaces`; the list it shows comes back as the `workspaces` socket message.
 - `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
   `provider-trend.tsx` renders the stacked provider chart and bucket-data table; `analytics-format.ts` shares number and cost formatting across the section.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.
@@ -859,11 +861,11 @@ The page lives in `web/`.
   A version change retains the last answer and exposes `refreshing` until the new read settles, including a failed read.
   A URL change never returns the previous URL's answer.
   `useReplaceableRead` shows the version a save answered until that URL is read again.
-  The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the pull requests, with one entry per project, one for the tickets, with one entry, since Linear is not per project, one for the MCP integrations, one for the Google calendars shown, and one for the Calendar page's Google events, with one entry per month.
+  The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the pull requests, with one entry per workspace, one for the tickets, with one entry, since Linear is not per workspace, one for the MCP integrations, one for the Google calendars shown, and one for the Calendar page's Google events, with one entry per month.
   A read in flight belongs to its entry: a new read of an entry replaces only the read of that entry in flight, and the components that poll one entry share one timer, which starts with the first and stops with the last.
   Its `update` applies a saved change to the current answer and aborts older reads before they can replace that answer.
   `web/app.tsx` polls the pull requests instead, on every page once the sessions are listed, for the Pull requests tab's count, and the sidebar's pull request list reads that entry.
-  The composer's `@` menu reads the pull request entry that `pullRequestsScope` in the status context names, the one `web/app.tsx` polls, so it starts no poll of its own and never reads the all-projects entry, which asks GitHub about every repository, in place of the selected project's.
+  The composer's `@` menu reads the pull request entry that `pullRequestsScope` in the status context names, the one `web/app.tsx` polls, so it starts no poll of its own and never reads the all-workspaces entry, which asks GitHub about every repository, in place of the selected workspace's.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes through `useQueuedSave` from `web/use-queued-save.ts`, which shows a change at once and sends each after the ones before it; the picker button and its searchable list, and the due date's, live in `web/components/field-picker.tsx`, which the Todo page and a pull request's details share, with an open state its owner can hold so a key opens it, and digits that pick a choice.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft's branch picker.
   `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests and tickets also show.
@@ -880,13 +882,12 @@ The page lives in `web/`.
   `web/session-actions.ts` lists what can be done to a session, which both a sidebar row's menu and the palette offer.
 - `web/theme.ts`: the light, dark, or system theme, which `web/main.tsx` applies before the first render and the settings page changes.
 - `web/scroll-fade.ts`: sets the `.scroll-fade` edge opacities from JS in browsers without scroll-driven animations, such as Firefox, which `web/main.tsx` starts before the first render; elsewhere `web/globals.css` drives them with scroll timelines.
-- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the session details tab, the sidebar's project, the pinned skill, the pull request list's order, and how often and how lately each command palette entry ran; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the Pull requests and tickets pages' folded sections.
+- `web/stored-state.ts`: `useStoredState`, a value kept in localStorage that removes its default rather than store it, which holds the theme, the sidebars, the split ratios, the session details tab, the sidebar's workspace, the pinned skill, the pull request list's order, and how often and how lately each command palette entry ran; and `useStoredKeys`, a set of keys on top of it, which holds the sessions pinned in the sidebar and the Pull requests and tickets pages' folded sections.
   Every component that holds the same key sees a change at once, so the Pull requests page and its sidebar index share their folds and order.
   A component keeps one key for as long as it is mounted.
   `sidebarSessions` in `web/sessions.ts` splits the sessions into the sidebar's pinned, running, interrupted, and past lists, which the page also walks for the previous and next session keys.
-  `discoverableSessions` leaves sessions under `/tmp` out of those lists and the project picker, and `projectSwitch` keeps a started session's project only when that directory is discoverable.
-- `web/project.ts`: `useProject`, the sidebar's selected project, kept in localStorage, which `web/use-workspace.ts` uses to scope the sidebar and the pull request list.
-- `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the project picker; `web/components/pull-requests/pull-requests-nav.tsx` is its Pull requests tab, and `web/components/section-link.tsx` the section link that the tickets list and the Pull requests page's section index share.
+  `discoverableSessions` leaves sessions under `/tmp` out of those lists and the workspace picker, and `workspaceSwitch` keeps a started session's workspace only when that directory is discoverable.
+- `web/components/roster.tsx`: the left sidebar's tabs, its tickets list, and the workspace picker; `web/components/pull-requests/pull-requests-nav.tsx` is its Pull requests tab, and `web/components/section-link.tsx` the section link that the tickets list and the Pull requests page's section index share.
   `web/components/session-list.tsx` is its Sessions tab, which lists the first 100 past sessions until you ask for more.
   `web/components/session-row.tsx` holds `PastRow` and `HostRow`, memoized on the row's session, so a roster push or a search keystroke renders only the rows it changed; the row's menu items read the dashboard contexts only once the menu opens, and their ages count up on the page's one minute timer.
   `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab: the calendar, the Google calendars under **My calendars** and **Other calendars**, each a checkbox that shows or hides its events, and then the routines by name.

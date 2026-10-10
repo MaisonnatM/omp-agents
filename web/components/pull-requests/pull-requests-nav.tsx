@@ -97,8 +97,8 @@ function RepoBlock({ view }: { view: RepoView }) {
 }
 
 interface PullRequestsNavProps {
-	/** The sidebar's project `cwd`, or `null` for every project. */
-	project: string | null;
+	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
+	workspace: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
 	/** What the main area shows: a pull request's row unfolds, scrolls into view, and stays highlighted while its details or changes show. */
@@ -106,13 +106,13 @@ interface PullRequestsNavProps {
 }
 
 /**
- * The sidebar's pull request list beside the panes or a pull request's details: the pull requests of its project, or of every
- * project, by repository in sections named after whose move it is, read from GitHub.
+ * The sidebar's pull request list beside the panes or a pull request's details: the pull requests of its workspace, or of every
+ * workspace, by repository in sections named after whose move it is, read from GitHub.
  */
-export function PullRequestsNav({ project, hosts, past, route }: PullRequestsNavProps) {
+export function PullRequestsNav({ workspace, hosts, past, route }: PullRequestsNavProps) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const board = usePullRequestsBoard({ project, hosts, past, route, entersList: false });
+	const board = usePullRequestsBoard({ workspace, hosts, past, route, entersList: false });
 	const { read, error, refreshing } = board.poll;
 	return (
 		<div className="space-y-2">
@@ -145,16 +145,16 @@ export function PullRequestsNav({ project, hosts, past, route }: PullRequestsNav
 }
 
 interface PullRequestsIndexProps {
-	/** The sidebar's project `cwd`, or `null` for every project. */
-	project: string | null;
+	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
+	workspace: string | null;
 	hosts: RosterHost[];
 	target: SectionTarget | null;
 	onTarget: (target: SectionTarget) => void;
 }
 
 /** The sidebar beside the Pull requests page: each repository's sections with their pull request counts, each a link to its card on the page. Drag a repository's name to reorder them, as on the page. */
-export function PullRequestsIndex({ project, hosts, target, onTarget }: PullRequestsIndexProps) {
-	const { read, error } = pullRequestsStore.use(project);
+export function PullRequestsIndex({ workspace, hosts, target, onTarget }: PullRequestsIndexProps) {
+	const { read, error } = pullRequestsStore.use(workspace);
 	const [order, setOrder] = usePullRequestsOrder();
 	const drag = useDragOrder();
 	if (!read) return note(error ? `Cannot load pull requests: ${error}` : "Asking GitHub for pull requests…");
