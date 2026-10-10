@@ -7,7 +7,7 @@ A filled button marks the main action of its surface: Send, Finish, Resume on a 
 Suggested prompts, other quick actions, forking, and menu items stay quiet, so they never compete with it.
 Actions that wait for the server show a spinner or a progress label and block repeated activation until the work finishes.
 Starting a session, stopping a turn, switching model settings, resending a prompt, canceling a subagent, and running a routine use this state.
-Refresh controls and project saves do too.
+Refresh controls and workspace saves do too.
 An action that fails shows its error, and its control becomes available again.
 
 - [Sessions sidebar](#sessions-sidebar)
@@ -33,35 +33,35 @@ An action that fails shows its error, and its control becomes available again.
 - The content header and both sidebar header rows are 48 px tall at the default font size, each with a hairline under it.
 - The dot before each session shows its state.
   Green means a turn is running, blue means the agent is idle after finishing a turn, and amber means a question waits for an answer.
-- Under **All projects**, a session row with a title starts with a badge that names its project, the last segment of its working directory.
-  With one project picked, the rows show no badge.
-  A row without a title shows the project's name as its label, with no badge.
-- The project picker in the sidebar header shows only the running, idle, interrupted, and past sessions from one working directory.
-  It lists the directories that a live or saved session ran in, live sessions' directories first, then the ones added in **Settings › Projects**, except temporary directories and hidden projects.
+- Under **All workspaces**, a session row with a title starts with a badge that names its workspace, the last segment of its working directory.
+  With one workspace picked, the rows show no badge.
+  A row without a title shows the workspace's name as its label, with no badge.
+- The workspace picker in the sidebar header shows only the running, idle, interrupted, and past sessions from one working directory.
+  It lists the directories that a live or saved session ran in, live sessions' directories first, then the ones added in **Settings › Workspaces**, except temporary directories and hidden workspaces.
   The session counts then count that directory's sessions only, such as `2 running` and `9 past`.
-  Picking a project also opens its most recently started running session in the focused pane, unless that pane already shows a session from the project or a page such as a pull request, Settings, or the new-session draft covers the panes.
-  Choose **All projects** to list every session again.
+  Picking a workspace also opens its most recently started running session in the focused pane, unless that pane already shows a session from the workspace or a page such as a pull request, Settings, or the new-session draft covers the panes.
+  Choose **All workspaces** to list every session again.
   The choice is saved in the browser's localStorage.
   If no session from the saved directory is left, the sidebar lists every session.
-- **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected project when there is one, and stays highlighted while the draft is open.
-- The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected project.
+- **New session** at the top of the **Sessions** tab opens the new-session draft, in the selected workspace when there is one, and stays highlighted while the draft is open.
+- The search field under it narrows every group to the sessions whose title or working directory holds every word typed, in any order and any case, within the selected workspace.
   A group left without a match hides, and `No sessions match` shows when none is left; Esc clears the field.
-  Cmd+K opens the command menu, which searches every project instead.
-- Sessions in `/tmp` or `/private/tmp`, including their subdirectories, are hidden from project and workspace pickers, session lists and counts, and session search.
-  Starting or opening one does not replace the saved project.
+  Cmd+K opens the command menu, which searches every workspace instead.
+- Sessions in `/tmp` or `/private/tmp`, including their subdirectories, are hidden from the workspace pickers, session lists and counts, and session search.
+  Starting or opening one does not replace the saved workspace.
   Their saved transcripts remain available through a direct session link.
-- A project hidden in **Settings › Projects** is left out the same way, but only its own directory: sessions in a directory inside it stay listed.
+- A workspace hidden in **Settings › Workspaces** is left out the same way, but only its own directory: sessions in a directory inside it stay listed.
 - **Pin** in a row's menu moves the session to the **Pinned** group at the top of the list, and **Unpin** moves it back.
   The group lists pinned running sessions first, then pinned past ones, interrupted ones first, and shows only while it has a row.
   A pinned session stays pinned when it ends, is resumed, or is interrupted, and an interrupted one says `interrupted` after its title.
-  The selected project applies to the group too.
+  The selected workspace applies to the group too.
   The server keeps the pins in `pins.json` beside its access token, by session id, so every browser tab and the desktop app show the same ones.
   Pins that a browser kept before then move to the server the first time its page connects.
 - A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group above it, and moves back when its next turn starts.
   A session waiting on a question stays under **Running**, and a pinned session stays under **Pinned** whatever its state.
   The group shows only while it has a row.
 - Click the **Pinned**, **Idle**, **Running**, **Interrupted**, or **Past** group label to collapse or expand its rows.
-  The browser's localStorage keeps each group's choice across tabs, projects, navigation, and reloads, even while the group has no rows.
+  The browser's localStorage keeps each group's choice across tabs, workspaces, navigation, and reloads, even while the group has no rows.
 - The past sessions list every saved session that has no live host, newest first, with its title (else its first prompt) and how long ago it last changed; hover a row to see its working directory.
   Select one to read its transcript.
   The page cannot write to it until you resume it.
@@ -69,7 +69,7 @@ An action that fails shows its error, and its control becomes available again.
   The group lists the 100 newest at first, and **Show 100 more** at its end adds the next ones.
 - The interrupted sessions, between the running and the past ones, list the sessions that the dashboard started and that stopped without **End session**: because the dashboard server stopped or crashed, which stops every session it started, or because omp exited on its own.
   The group shows only while it has a row.
-  Its **Resume all** button resumes every session it lists, under the selected project, as **Resume** does for one; a pane that shows one of them then shows it live.
+  Its **Resume all** button resumes every session it lists, under the selected workspace, as **Resume** does for one; a pane that shows one of them then shows it live.
   A session that was working when it stopped, or waiting on a question, also gets the prompt `continue`, so it picks its turn back up; an idle one waits for your next message.
   When some fail to start, a note under the group label names how many and the first reason, until **Dismiss**.
   **Move to past** in a row's menu moves it to the past sessions.
@@ -84,7 +84,7 @@ An action that fails shows its error, and its control becomes available again.
   The session details sidebar's button stays at the end of the top-right pane's header, whether the sidebar is shown or hidden, and leaves with the sidebar while panes sit side by side.
   Cmd+B (Ctrl+B on Linux and Windows) toggles the sessions sidebar, and Cmd+Alt+B the session details sidebar.
   Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
-- The left sidebar's session rows leave out the full working directory and the model; hover the project in the pane header to see the directory, and the composer shows the model.
+- The left sidebar's session rows leave out the full working directory and the model; hover the workspace in the pane header to see the directory, and the composer shows the model.
 - A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
   Hover the logo to see the plan's name and account.
   A provider without a logo shows the plan's name instead.
@@ -102,7 +102,7 @@ An action that fails shows its error, and its control becomes available again.
 - The terminal is a panel under the panes, between the two sidebars, with a tab for each shell.
   **Terminal** in the bottom strip, Ctrl+\` on every platform, or **Toggle terminal** in the command menu shows or hides it.
   Ctrl+\` works from inside the terminal too, and on macOS so does every Cmd shortcut, since a shell reads no Cmd key; on Linux and Windows every other Ctrl key goes to the shell.
-- Each tab runs your login shell (`$SHELL -l`) on the dashboard server, in the focused session's worktree, else its directory, else the sidebar's project, else your home directory.
+- Each tab runs your login shell (`$SHELL -l`) on the dashboard server, in the focused session's worktree, else its directory, else the sidebar's workspace, else your home directory.
   The tab is named by that directory; hover it for the full path.
   `+` opens another tab in the same place, and the shell gets neither the server's `PORT` nor `OMP_AGENTS_PARENT`, so a dev server it starts does not reach for the dashboard's port.
   A new tab shows **Starting shell…** until the server opens its shell.
@@ -161,7 +161,7 @@ An action that fails shows its error, and its control becomes available again.
   **Other pull requests of the session** lists the session's pull requests that the stack does not show, each with whether the session submitted or worked on it.
   The pull request then shows as its details on the Pull requests page do: the same header, then the **Summary**, **Timeline**, and **Code** tabs; **Code** lists the changed files, and a click on one opens its diff in a dialog over the page.
   The header and the tab bar stay pinned to the top of the sidebar while the details scroll, with no fade over them.
-  The quick actions apply only when the pull request list of the sidebar's project includes the pull request.
+  The quick actions apply only when the pull request list of the sidebar's workspace includes the pull request.
   Opening the tab, or picking another pull request, reads it from GitHub, and so does each start and end of the view's turn, so its checks and reviews follow the agent's pushes; the server keeps its answer for 30 seconds.
 - A tab with nothing to show says so, and **Outline** says when the conversation is still loading.
 
@@ -254,7 +254,7 @@ An action that fails shows its error, and its control becomes available again.
   A subagent's own `task` calls link its subagents the same way.
   A past session's ids are not links, because the dashboard opens subagents only of a running session.
 - A subagent's header starts with a back arrow that opens the session's main agent in the pane, or focuses the pane that already shows it.
-  Its trail then names the project, the session's title, and the subagent's id, as in `webapp / Fix login / 0-Explore`.
+  Its trail then names the workspace, the session's title, and the subagent's id, as in `webapp / Fix login / 0-Explore`.
 - In a subagent of a terminal session, a message steers a running subagent, prompts an idle one, and revives a parked one.
   A follow-up (Ctrl+Enter, or Cmd+Enter on macOS) waits in the dashboard until the subagent stops running.
   In a subagent of a session that the dashboard started, a message steers a running subagent at its next step, through omp's RPC `steer_subagent`.
@@ -284,9 +284,9 @@ An action that fails shows its error, and its control becomes available again.
 - A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, and the todos, tickets, pull requests, and sessions the `@` menu inserted.
   Hover a chip for the full path or title; a ticket or pull request chip opens it in a new tab.
   The outline's **Request** shows the first prompt the same way.
-- A session's header is its trail: its project, the last segment of its working directory (`~/code/webapp` reads `webapp`), then its title, as in `webapp / Fix login`.
-  A session without a title shows its project alone.
-  Hover the project to see the full directory, and the worktree the session works in when that differs.
+- A session's header is its trail: its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`), then its title, as in `webapp / Fix login`.
+  A session without a title shows its workspace alone.
+  Hover the workspace to see the full directory, and the worktree the session works in when that differs.
   That is the linked worktree of the same repository that the session's own bash calls last named as their `cwd`, as when a session started in the main checkout adds a worktree and works there.
   A bash `cwd` in the session's own checkout, outside git, or in another repository leaves the worktree as it was, and one in a directory that is gone falls back to the session's directory.
 - On the right of a session's header, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
@@ -411,20 +411,20 @@ An action that fails shows its error, and its control becomes available again.
 ## Starting, ending, resuming, and forking
 
 - To start a session, click **New session** at the top of the **Sessions** tab.
-  The page shows a new-session draft with the same header and composer as a running session: its trail reads `webapp / New session`, and hovering the project shows the directory that omp will run in.
+  The page shows a new-session draft with the same header and composer as a running session: its trail reads `webapp / New session`, and hovering the workspace shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
-  The directory is the selected project's, else the open session's, else the newest live session's, else the newest past session's.
-  To start in another directory, under **All projects** or not, pick it in the directory picker after the model picker, or press Cmd+Alt+P.
-  It lists the projects the sidebar lists, and **Use** takes any directory typed into its search field.
+  The directory is the selected workspace's, else the open session's, else the newest live session's, else the newest past session's.
+  To start in another directory, under **All workspaces** or not, pick it in the directory picker after the model picker, or press Cmd+Alt+P.
+  It lists the workspaces the sidebar lists, and **Use** takes any directory typed into its search field.
   The message you typed stays in the composer.
   Sending the first message starts omp there and sends it the message.
   The message stays in the composer while omp starts, and also if the start fails, with the error above it.
   When omp is ready, the dashboard opens the session in the focused pane.
   The draft is in the URL hash, `#new` or `#new/<encoded directory>`, and leaves the panes behind it, as **Settings** does.
-  A session that you start or fork in another directory than the selected project switches the project picker to that directory, so the sidebar lists it.
+  A session that you start or fork in another directory than the selected workspace switches the workspace picker to that directory, so the sidebar lists it.
 - A session that the dashboard started has the directory picker after its model picker too.
   Picking a directory moves the session there, as omp's `/move` does: the transcript stays, and the header and the session's tools follow the new directory.
-  The sidebar's project picker switches to the new directory, as for a session you start there, unless it shows all projects.
+  The sidebar's workspace picker switches to the new directory, as for a session you start there, unless it shows all workspaces.
   The picker is disabled while a turn runs or waits on a question, since omp moves only an idle session.
   A typed `/move <path>` works the same way; in a session with no reply yet, the dashboard follows the move once omp writes the first reply.
 - The draft's composer has the model menu at its bottom left, as a running session's does, without its Fast row.
@@ -447,11 +447,11 @@ An action that fails shows its error, and its control becomes available again.
   Picking another branch runs omp in the worktree that has it checked out, or adds a worktree for it when none has.
   Type a name that no branch has to create that branch from the branch picked before it, as GitHub's branch menu does; a new branch always gets its own worktree.
   A new worktree goes beside the repository's main worktree, named after both with each run of characters other than letters, digits, `.`, `-`, and `_` turned into `-` (`~/code/webapp-fix-login` for `fix/login`).
-  Hovering the project in the header then shows the directory omp will run in, after the draft's own.
+  Hovering the workspace in the header then shows the directory omp will run in, after the draft's own.
   The worktree is added only when you send the first message, and a branch or worktree that git refuses shows git's reason above the composer.
 - omp titles a session that the dashboard started from its first message, as it does in a terminal, within a few seconds and while the first turn still runs.
   omp's RPC mode titles no prompt by itself, so once omp holds a message of an untitled session, the dashboard sends it a bare `/rename`, which makes omp title the session from the conversation so far.
-  Until the title arrives, the sidebar and the header show the project's name.
+  Until the title arrives, the sidebar and the header show the workspace's name.
   A conversation of greetings or acknowledgements only, such as `hi`, stays untitled until a later message.
   omp counts that title as one that you set, as it counts a `/rename` in a terminal.
 - A running session shows **End session** in its header, unless its room is read-only.
@@ -513,7 +513,7 @@ An action that fails shows its error, and its control becomes available again.
   Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
-  The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the project that the sidebar's picker shows, pinned ones included, whatever the sidebar's search hides.
+  The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the workspace that the sidebar's picker shows, pinned ones included, whatever the sidebar's search hides.
   **Calendar** opens a month of Google events, routine runs, and due todos and tickets, with your routines listed under it; see [Calendar](#calendar) and [Routines](#routines).
   The tabs show their names, and when the sidebar is too narrow for every name, their icons alone across the sidebar's width; hover an icon for its name.
   The tabs never spill past the sidebar.
@@ -521,9 +521,9 @@ An action that fails shows its error, and its control becomes available again.
   Once you open a pull request or a session from the Pull requests page, the sidebar lists the pull requests instead, beside the details or the session panes.
   The tab stays on **Pull requests** while you open sessions from it, until you choose **Sessions**.
   The **Your move** count stands out in bold.
-  The **Pull requests** tab counts the pull requests that wait on your move, for the project that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
+  The **Pull requests** tab counts the pull requests that wait on your move, for the workspace that the sidebar's picker shows, and reads GitHub every minute on every page so the count stays current.
   A `#pull-requests` address opens the Pull requests page.
-  The pull request list covers the GitHub repository of the project that the sidebar's picker shows, or under **All projects** every repository that a session ran in, one section per repository.
+  The pull request list covers the GitHub repository of the workspace that the sidebar's picker shows, or under **All workspaces** every repository that a session ran in, one section per repository.
   A workspace's repository is the one its `origin` remote names.
   A directory removed since its sessions ran, such as a deleted worktree, is no longer a workspace, so quick actions start in a workspace that still exists.
   Each repository lists your open pull requests, your merges from the last seven days, and the open pull requests that ask you for a review.
@@ -566,7 +566,7 @@ An action that fails shows its error, and its control becomes available again.
   The back arrow at the start of the page header, **Back to Pull requests**, brings the Pull requests page back.
   Click a session to open it.
   The dashboard reads GitHub through `gh` when it loads and every minute after, on every page, so the **Pull requests** tab's count stays current.
-  Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen project at once; the top of the list says when that list was read, and the browser's localStorage keeps the last one of each project.
+  Reopening the Pull requests page, even after a reload, shows the last pull request list read for the chosen workspace at once; the top of the list says when that list was read, and the browser's localStorage keeps the last one of each workspace.
   The server keeps each repository's answer for 30 seconds, and the refresh button asks GitHub again at once.
 - The sort button at the top of the Pull requests page orders the pull requests within each section: **Recently updated**, the default, **Newest first** and **Oldest first** by number, or **Manual**.
   Any sort but **Manual** keeps your moves in their order and sorts within each move.
@@ -680,14 +680,14 @@ An action that fails shows its error, and its control becomes available again.
   A row and the details show a chip for every running session that works on the issue, whether a quick action started it or it read or changed the issue with omp's Linear tools, so they say whether an agent still works on it, after a reload too.
   A row shows two chips at most.
   The session also shows in the sessions sidebar.
-  A Linear issue names no repository, so the session starts where a new session would: in the sidebar project's workspace, or under **All projects** in the open session's workspace, else the newest session's.
+  A Linear issue names no repository, so the session starts where a new session would: in the sidebar's workspace, or under **All workspaces** in the open session's workspace, else the newest session's.
   **Work on it**, on any open issue, implements the issue in a git worktree on Linear's branch for it, continuing a branch or pull request that exists already, then commits and reports without pushing.
   **Plan it**, on an issue that has not started yet (triage, backlog, or unstarted), reads the issue and the code and reports a plan without changing anything.
   A completed or canceled issue has none.
   The button waits while the session starts.
   When the start fails, a note above the issue's details or at the top of the list gives the reason, even when the issue itself cannot load, until you dismiss it.
   The Pull requests page and the tickets page share that note: either page shows the last failed quick action, whether it ran on a pull request, an issue, or a todo, and names a todo by its title.
-- The list of tickets is not tied to the sidebar's project.
+- The list of tickets is not tied to the sidebar's workspace.
   The page reads Linear when it opens and every minute after, and shows the last read at once on a reopen, even after a reload.
   A saved tickets list without each issue's opening date is discarded, and the page reads Linear again.
   The server keeps Linear's answer for 30 seconds, and **Refresh** asks again at once.
@@ -750,7 +750,7 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Todo list
 
-- The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session or a project, in place of the panes.
+- The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session or a workspace, in place of the panes.
   The sidebar then lists **All**, **Today**, **Needs you**, **From agents**, and **Archive**, then your categories, each with how many top-level todos are open in it.
   Each category has a color dot, and its todos carry a badge of that color.
   Click one to show its todos alone; `#todo/today`, `#todo/needs`, `#todo/agents`, `#todo/archive`, and `#todo/<category id>` address them.
@@ -824,11 +824,11 @@ An action that fails shows its error, and its control becomes available again.
 - A top-level todo shows what it links to: a session, a pull request, or a Linear issue, as an icon in the list and a chip under **Links** in the open todo, each opening it here.
   Each shows the icon of the sidebar tab it opens: **Sessions**, **Pull requests**, or **Tickets**.
   A running session shows its status dot; an open todo's **×** on a chip unlinks it.
-- An open top-level todo's **Work on it** and **Plan it** start a session at once, in the sidebar's project, through the pinned skill when one is pinned, and link it to the todo.
+- An open top-level todo's **Work on it** and **Plan it** start a session at once, in the sidebar's workspace, through the pinned skill when one is pinned, and link it to the todo.
   **Work on it** does what the todo asks from its title, notes, and open sub-todos, in a git worktree on a new branch when it changes code, then commits and reports without pushing.
   **Plan it**, on a todo not **In Progress** yet, reads what the todo concerns and reports a plan without changing anything.
   The button waits while the session starts, and a start that fails says why in the card, naming the todo by its title.
-- An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's project, to edit the prompt or pick another directory first; `#new/<cwd>?todo=<id>` addresses it.
+- An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's workspace, to edit the prompt or pick another directory first; `#new/<cwd>?todo=<id>` addresses it.
   A session started from a todo links to it once omp starts, which moves a **Backlog** or **Todo** todo to **In Progress**, and its agent marks the todo **Done** once it finishes the work; see [Todos from agents](#todos-from-agents).
 - With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, starting with the last one an issue was created in, then opens an issue from the title and notes, assigned to you, and links it to the todo.
 - The list icon on a ticket adds a todo of no category, last in the list, that links to it.
@@ -925,8 +925,8 @@ An action that fails shows its error, and its control becomes available again.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
   The sidebar lists seven sections in two groups.
-  **General** holds **Analytics**, **Preferences**, **Integrations**, and **Projects**, which are the same whatever the workspace.
-  **Workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the chosen workspace loads them; only these sections show the workspace picker.
+  **General** holds **Analytics**, **Preferences**, **Integrations**, and **Workspaces**, which are the same whatever the workspace.
+  **This workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the chosen workspace loads them; only these sections show the workspace picker.
   It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit, and the selected section stays when you change workspace.
 - **Analytics** shows request usage for the last 24 hours.
@@ -942,7 +942,7 @@ An action that fails shows its error, and its control becomes available again.
   Focus the chart and use Left or Right to move between buckets; Escape closes the details.
   **View bucket data** shows the same numbers in a table, including empty buckets and requests that recorded no tokens.
   The **24h** chart labels local hours; daily charts label UTC dates.
-  Models and projects are ordered by tokens, followed by the token split among main agents, subagents, and advisors, and by tool calls.
+  Models and workspaces are ordered by tokens, followed by the token split among main agents, subagents, and advisors, and by tool calls.
   The top 20 sessions include their subagents' usage; select a session to open it.
   omp keeps the usage of a session whose transcript you deleted, so it stays listed as **Deleted session**, without a link.
   It covers every session whatever workspace the header picks.
@@ -985,12 +985,12 @@ An action that fails shows its error, and its control becomes available again.
   The picker lists the skills of the workspace that Settings opened on, and says which, or your own skills with **User files only**.
   Choose **None** to unpin.
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar; see [Integrations](#integrations).
-- **Projects** lists the directories that the sidebar's project picker and the directory pickers offer.
-  Type a path in **Directory** and choose **Add project** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
-  **Hide** drops a project and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
-  Hidden projects list under **Hidden**, and **Show** offers one again.
-  The server keeps the list in `projects.json` beside its access token, so every browser tab and the desktop app show the same projects.
-- **Settings** opens on the workspace of the session that you had open, so it includes that project's files and its `.omp/config.yml` overrides.
+- **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer.
+  Type a path in **Directory** and choose **Add workspace** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
+  **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
+  Hidden workspaces list under **Hidden**, and **Show** offers one again.
+  The server keeps the list in `workspaces.json` beside its access token, so every browser tab and the desktop app show the same workspaces.
+- **Settings** opens on the workspace of the session that you had open, so it includes that workspace's project files and its `.omp/config.yml` overrides.
   With no session open, it shows user files only.
   Use the workspace picker in the header of a Workspace section to choose another directory that a session ran in, or **User files only**.
   Selecting the active **Settings** sidebar tab keeps the section and the workspace you chose.
@@ -1067,7 +1067,7 @@ Alt is Option on macOS.
 | Cmd+5 | Anywhere | Go to your calendar |
 | Cmd+6 | Anywhere | Open or close settings |
 | G then R | Outside text fields | Go to your routines |
-| G then P | Outside text fields | Choose the sidebar's project |
+| G then W | Outside text fields | Choose the sidebar's workspace |
 | ↓ | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
 | ↑ | Pull requests page, outside text fields | Move to the previous pull request, or show its details while one shows |
 | O | Pull requests page, outside text fields | Open the pull request on GitHub |
@@ -1086,7 +1086,7 @@ Alt is Option on macOS.
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the project, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.
 - Cmd+1 through Cmd+5 select the dashboard's tabs, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers stay fixed when Tickets is hidden without a Linear connection; Cmd+2 then keeps its browser behavior.
   Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or another digit keeps its browser behavior.
@@ -1097,14 +1097,14 @@ Alt is Option on macOS.
   ↑ moves the last queued message back only while the composer is empty, as ↑ edits your last message in Slack.
   On a focused queued row, Cmd+Enter sends it now, Enter or F2 edits it, and Delete removes it.
   With a draft, ↑ moves the caret as usual.
-- Cmd+K opens the command menu, which searches every running and past session, in every project, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
+- Cmd+K opens the command menu, which searches every running and past session, in every workspace, by title, directory, pull request, or Linear issue, and the page's commands, such as **Go to pull requests** or **Toggle sessions sidebar**.
   The search button in the sidebar header, immediately before the keyboard button, opens it too.
   With nothing typed, **Suggestions** lists the five entries you use most, by how often and how lately, then **Running**, **Commands**, and **Past**.
   What you type ranks every match by how well it matches and how much you use it, and the menu remembers that in this browser.
   Enter runs the highlighted entry's main action, which opens a session in the focused pane, and Cmd+Enter runs its second, which opens a session in a split.
-  A session from another project switches the sidebar to that project.
+  A session from another workspace switches the sidebar to that workspace.
   Cmd+K inside the menu lists every action of the highlighted entry, as the session row's menu does, and you can search them; Cmd+Shift+P pins or unpins a session, Cmd+Shift+C copies its path, and Cmd+Shift+X ends it, without opening that list.
-  **Choose project…** switches the sidebar's project, and **Create todo** asks for a todo's title; Esc or Backspace in the empty field goes back.
+  **Choose workspace…** switches the sidebar's workspace, and **Create todo** asks for a todo's title; Esc or Backspace in the empty field goes back.
   The bar at the bottom names where you are, what Enter does, and **Actions**, which opens the same list as Cmd+K.
   Esc closes the action list, then goes back, then clears what you typed, then closes the menu.
   Whatever you type also offers **Create todo**, last, which adds it at the end of **All**, with no category.
@@ -1126,7 +1126,7 @@ Alt is Option on macOS.
   Cmd+3 goes back from the Pull requests page, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
   Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, and G then R the **Routines** page.
   Cmd+6 opens Settings, where the model roles and the integrations live, and closes it again.
-  G then P opens the project picker with its search field focused.
+  G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.
   The dashboard does not read `~/.omp/agent/keybindings.yml`.
 
@@ -1155,7 +1155,7 @@ Alt is Option on macOS.
   Right-click in a text field for cut, copy, paste, and spelling suggestions.
 - The window remembers its size and position.
 - The window title follows what the page shows, and a browser tab's title does too: the focused session's name, a subagent's name ahead of its session's, `Pull requests`, `Tickets` or the open ticket's identifier, `Todo`, `Settings`, or `New session`, then `omp agents`.
-  A session without a name reads as its project, and nothing open reads `omp agents`.
+  A session without a name reads as its workspace, and nothing open reads `omp agents`.
 - The Dock, the menu bar, and Cmd+Tab show `omp agents` and the dashboard's icon, not Electron's.
 - Alt+Shift+Cmd+T, from any app, brings the window up with the command menu's **Create todo** open, so you can type a title and press Enter to create a todo.
   When another app holds the keys, the app logs so and the shortcut does nothing.

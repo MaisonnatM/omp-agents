@@ -1,5 +1,6 @@
 import { type ReactNode, useId, useState } from "react";
 import { COMMAND_TIME_LIMIT, type Weekday } from "../../../src/routines";
+import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type RoutineSpec, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";
@@ -128,8 +129,8 @@ function ScheduleEditor({
 interface RoutineEditorProps {
 	initial: RoutineDraft;
 	isNew: boolean;
-	/** The projects, which the workspace picker offers. */
-	workspaces: { cwd: string; cwdDisplay: string }[];
+	/** The workspaces, which the workspace picker offers. */
+	workspaces: Workspace[];
 	connected: boolean;
 	onSave: (routine: RoutineSpec) => void;
 	onCancel: () => void;

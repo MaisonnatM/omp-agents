@@ -24,8 +24,10 @@ export const userTodoInboxDir = join(configDir, "todo-inbox");
 export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
 export const routinesFile = join(configDir, "routines.json");
-/** The directories Settings → Projects added and hid, beside {@link tokenFile}. */
-export const projectsFile = join(configDir, "projects.json");
+/** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */
+export const workspacesFile = join(configDir, "workspaces.json");
+/** Where an older version kept {@link workspacesFile}, which the server moves at startup when it holds a workspace list. */
+export const oldProjectsFile = join(configDir, "projects.json");
 /** The sessions the sidebar pins, beside {@link tokenFile}. */
 export const pinsFile = join(configDir, "pins.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */

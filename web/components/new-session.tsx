@@ -2,11 +2,12 @@ import { Sparkles } from "lucide-react";
 import { type KeyboardEvent, useRef, useState } from "react";
 import type { BranchChoice } from "../../src/shared/git";
 import { type ConnectedModels, type ModelOption, selectorOf } from "../../src/shared/models";
+import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InputMessage } from "@/components/ui/input-message";
 import { Tooltip } from "@/components/ui/tooltip";
-import { projectName } from "../labels";
+import { folderName } from "../labels";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
 import { useRead } from "../reads";
@@ -28,8 +29,8 @@ import { DirectoryPicker } from "./workspace-picker";
 interface NewSessionProps {
 	/** Where omp starts, as typed or displayed (`~/code/webapp`). */
 	cwd: string;
-	/** The projects, as {@link workspaces} lists them, which the directory picker offers. */
-	workspaces: { cwd: string; cwdDisplay: string }[];
+	/** The workspaces, as {@link listWorkspaces} lists them, which the directory picker offers. */
+	workspaces: Workspace[];
 	launch: StartOf<"new"> | null;
 	connected: boolean;
 	/** The server's last answer to this draft's `complete`. */
@@ -128,7 +129,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	};
 	const directCommand = blockedShortcut(draft, "new");
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
-	const name = projectName(target.dir) ?? target.dir;
+	const name = folderName(target.dir) ?? target.dir;
 	const title = <SessionTrail cwdDisplay={cwd} worktree={target.dir === cwd ? null : target.dir} path={["New session"]} />;
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">

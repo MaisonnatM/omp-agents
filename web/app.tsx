@@ -29,7 +29,7 @@ import { toasts } from "./components/toaster";
 import { integrationsStore } from "./reads";
 import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
-import { defaultCwd, projectSession, projectSwitch } from "./sessions";
+import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
 import { startOf } from "./starts";
 import { useDashboard } from "./use-dashboard";
 import { useFocusedSession } from "./use-focused-session";
@@ -38,7 +38,7 @@ import { usePageShortcuts } from "./use-page-shortcuts";
 import { useSessionLists } from "./use-session-lists";
 import { settingsRoute, useSidebarTab } from "./use-sidebar-tab";
 import { useTranscriptDisplay } from "./use-transcript-display";
-import { useWorkspace } from "./use-workspace";
+import { useWorkspaceScope } from "./use-workspace-scope";
 
 const ALL_TODOS: TodoListView = { kind: "all" };
 
@@ -51,10 +51,10 @@ export function App() {
 
 	const { layout } = state;
 	const sidebars = useSidebarPanels();
-	const workspace = useWorkspace(state);
-	const { visible, projects, project, pickProject, hiddenCwds } = workspace;
-	const focused = useFocusedSession(state, page, workspace);
-	const sessions = useSessionLists(workspace, state.pins, changePins);
+	const scope = useWorkspaceScope(state);
+	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds } = scope;
+	const focused = useFocusedSession(state, page, scope);
+	const sessions = useSessionLists(scope, state.pins, changePins);
 	const overlays = useOverlays();
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
@@ -70,7 +70,7 @@ export function App() {
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
-	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, project);
+	const defaultWorkspace = defaultCwd(focused.view, visible.hosts, visible.past, workspace);
 	// The live rows of the sessions list, whose order ending a session moves its panes along.
 	const listedHosts = sessions.listed.flatMap(view => (view.kind === "live" ? view.instanceId : []));
 	const latest = useRef({ layout, listedHosts, ending: state.ending, sidebars, page, hosts: visible.hosts, liveHosts: state.hosts, cwd: focused.cwd });
@@ -95,24 +95,24 @@ export function App() {
 		const { sidebars } = latest.current;
 		sidebars.setOpen(side, !sidebars.panels[side].open);
 	}, []);
-	const switchProject = useCallback(
+	const switchWorkspace = useCallback(
 		(cwd: string | null): void => {
-			pickProject(cwd);
-			// A page such as the tickets stays; only the panes follow the sidebar into the project.
+			pickWorkspace(cwd);
+			// A page such as the tickets stays; only the panes follow the sidebar into the workspace.
 			const { page, hosts, cwd: viewCwd } = latest.current;
-			const next = page ? null : projectSession(cwd, hosts, viewCwd);
+			const next = page ? null : workspaceSession(cwd, hosts, viewCwd);
 			if (next) open(next, "replace");
 		},
-		[pickProject, open],
+		[pickWorkspace, open],
 	);
-	/** The palette opens a session from any project, so the sidebar switches to that project to keep it listed. */
+	/** The palette opens a session from any workspace, so the sidebar switches to that workspace to keep it listed. */
 	const openFromPalette = useCallback(
 		(picked: View, cwd: string, mode: OpenMode): void => {
-			const next = projectSwitch(project, cwd, hiddenCwds);
-			if (next !== null) pickProject(next);
+			const next = workspaceSwitch(workspace, cwd, hiddenCwds);
+			if (next !== null) pickWorkspace(next);
 			open(picked, mode);
 		},
-		[project, hiddenCwds, pickProject, open],
+		[workspace, hiddenCwds, pickWorkspace, open],
 	);
 
 	const { setShortcutsOpen, setFilePath, setNewTicket, dispatchPalette } = overlays;
@@ -151,10 +151,10 @@ export function App() {
 	const resume = startOf(state.starts, "resume");
 	const quick = startOf(state.starts, "quick");
 	const resumeAll = startOf(state.starts, "resume-all");
-	// The project whose pull requests `useWorkspace` polls, so the `@` menu reads the entry the page keeps current.
+	// The workspace whose pull requests `useWorkspaceScope` polls, so the `@` menu reads the entry the page keeps current.
 	const status = useMemo(
-		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope: project }),
-		[state.connected, fork, resume, quick, resumeAll, state.ending, project],
+		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope: workspace }),
+		[state.connected, fork, resume, quick, resumeAll, state.ending, workspace],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);
 
@@ -175,7 +175,7 @@ export function App() {
 					<SidebarProvider className="min-h-0 flex-1">
 						<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
 							<AppSidebar
-								workspace={workspace}
+								scope={scope}
 								sessions={sessions}
 								page={page}
 								panes={layout.panes}
@@ -193,7 +193,7 @@ export function App() {
 								settings={settings}
 								sectionTarget={sectionTarget}
 								onSectionTarget={setSectionTarget}
-								onPickProject={switchProject}
+								onPickWorkspace={switchWorkspace}
 								dispatchPalette={dispatchPalette}
 								setShortcutsOpen={setShortcutsOpen}
 								toggleSidebar={toggleSidebar}
@@ -215,14 +215,14 @@ export function App() {
 													models={state.models}
 													userTodos={state.userTodos}
 													routines={state.routines}
-													projectList={state.projectList}
+													workspaceList={state.workspaceList}
 													pins={state.pins}
 													newSessionCompletions={state.newSessionCompletions}
 													connected={state.connected}
 													listed={state.listed}
 													rosterError={state.rosterError}
 													newStart={startOf(state.starts, "new")}
-													workspace={workspace}
+													scope={scope}
 													defaultWorkspace={defaultWorkspace}
 													sectionTarget={sectionTarget}
 													todoView={todoView}
@@ -240,7 +240,7 @@ export function App() {
 									</ToolsExpanded>
 								</ActivityVisibility.Provider>
 							</Plans>
-							<TerminalPanel panel={terminal} cwd={focused.workspace ?? project ?? "~"} />
+							<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
 						</SidebarInset>
 						{detailsView && (
 							<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
@@ -250,7 +250,7 @@ export function App() {
 									working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
 									sessionId={focused.sessionId}
 									pullRequests={focused.row?.pullRequests ?? []}
-									project={project}
+									workspace={workspace}
 									hosts={visible.hosts}
 								/>
 							</DashboardSidebar>
@@ -263,10 +263,10 @@ export function App() {
 							dispatch={dispatchPalette}
 							hosts={visible.hosts}
 							past={visible.past}
-							projects={projects}
-							project={project}
+							workspaces={workspaces}
+							workspace={workspace}
 							onOpenSession={openFromPalette}
-							onPickProject={switchProject}
+							onPickWorkspace={switchWorkspace}
 							pinned={sessions.pinned}
 							onTogglePin={sessions.togglePin}
 							handlers={handlers}

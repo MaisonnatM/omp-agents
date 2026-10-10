@@ -311,7 +311,7 @@ describe("stepping through the sidebar's sessions", () => {
 	});
 
 	test("from a view the sidebar does not list, or none, steps onto the first or last row", () => {
-		const elsewhere: View = { kind: "live", instanceId: "other project", agentId: null };
+		const elsewhere: View = { kind: "live", instanceId: "other workspace", agentId: null };
 		expect(adjacentSession(listed, elsewhere, 1)).toEqual(a);
 		expect(adjacentSession(listed, null, -1)).toEqual(old);
 		expect(adjacentSession([], null, 1)).toBe(null);

@@ -15,7 +15,7 @@ const COLLAPSED_GROUPS_KEY = "omp-agents.sidebar-collapsed-groups";
 const PAST_PAGE = 100;
 
 interface SessionListProps {
-	/** The sessions tab's lists, under the selected project and matching `query`. */
+	/** The sessions tab's lists, under the selected workspace and matching `query`. */
 	lists: SidebarSessions;
 	/** What the search field holds; it narrows `lists`. */
 	query: string;
@@ -24,16 +24,16 @@ interface SessionListProps {
 	onTogglePin: (sessionId: string) => void;
 	/** Views on screen, highlighted in the list. */
 	open: View[];
-	/** All projects are listed, so a titled row names its project. */
-	showProject: boolean;
+	/** All workspaces are listed, so a titled row names its workspace. */
+	showWorkspace: boolean;
 	/** The new-session draft is open. */
 	newSessionOpen: boolean;
-	/** The New session button's label, naming the selected project. */
+	/** The New session button's label, naming the selected workspace. */
 	newSessionLabel: string;
 }
 
 /** The Sessions tab: New session, the search field, and the pinned, idle, running, interrupted, and past groups. */
-export function SessionList({ lists, query, onQuery, onTogglePin, open, showProject, newSessionOpen, newSessionLabel }: SessionListProps) {
+export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, newSessionLabel }: SessionListProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const { connected, starts: { resumeAll } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
@@ -43,7 +43,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showProj
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	/** The search field narrows the lists, so a group left empty hides rather than saying it has no sessions. */
 	const filtering = query.trim() !== "";
-	const rowProps = { showProject, onTogglePin };
+	const rowProps = { showWorkspace, onTogglePin };
 	const hostRows = (hosts: SidebarSessions["running"], isPinned: boolean) =>
 		hosts.map(host => (
 			<HostRow key={host.instanceId} session={host} pinned={isPinned} open={isOpen({ kind: "live", instanceId: host.instanceId, agentId: null })} {...rowProps} />

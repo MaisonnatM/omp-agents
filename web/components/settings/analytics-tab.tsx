@@ -1,11 +1,11 @@
-/** The settings tab for omp's request usage by time, model, project, agent, tool, and session. */
+/** The settings tab for omp's request usage by time, model, workspace, agent, tool, and session. */
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { ANALYTICS_RANGES, type Analytics, type AnalyticsRange, type AnalyticsSession } from "../../../src/shared/analytics";
 import { hashForSession } from "../../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { modelLabel, modelOrg, projectName, providerLabel, readTime } from "../../labels";
+import { folderName, modelLabel, modelOrg, providerLabel, readTime } from "../../labels";
 import { analyticsStore } from "../../reads";
 import { OrgIcon } from "../org-icon";
 import { LoadNote } from "../sheet-details";
@@ -78,7 +78,7 @@ function AgentSplit({ agents }: { agents: Analytics["agents"] }) {
 
 function SessionRow({ session }: { session: AnalyticsSession }) {
 	const { sessionId, title, listed, cwd, usage, subagentTokens, models, lastAt } = session;
-	const name = title ?? (listed ? (projectName(cwd) ?? "Untitled session") : "Deleted session");
+	const name = title ?? (listed ? (folderName(cwd) ?? "Untitled session") : "Deleted session");
 	return (
 		<tr>
 			<th scope="row" className="max-w-48 border-t border-border py-2 text-start font-medium">
@@ -88,7 +88,7 @@ function SessionRow({ session }: { session: AnalyticsSession }) {
 					<span className="block truncate font-normal text-muted-foreground" title={`${sessionId}: its transcript is no longer on disk`}>{name}</span>
 				)}
 			</th>
-			<td className="max-w-32 truncate border-t border-border py-2 ps-4 text-muted-foreground" title={cwd}>{projectName(cwd) ?? cwd}</td>
+			<td className="max-w-32 truncate border-t border-border py-2 ps-4 text-muted-foreground" title={cwd}>{folderName(cwd) ?? cwd}</td>
 			<Count title={`${full.format(usage.tokens.total)} tokens`}>{compact.format(usage.tokens.total)}</Count>
 			<Count title={`${full.format(subagentTokens)} subagent tokens`}>{percent.format(usage.tokens.total ? subagentTokens / usage.tokens.total : 0)}</Count>
 			<Count>{dollars(usage.cost)}</Count>
@@ -99,7 +99,7 @@ function SessionRow({ session }: { session: AnalyticsSession }) {
 }
 
 function UsageBody({ data }: { data: Analytics }) {
-	const { totals, series, providers, models, projects, agents, tools, sessions, range } = data;
+	const { totals, series, providers, models, workspaces, agents, tools, sessions, range } = data;
 	const labels = models.map(({ selector }) => modelLabel(selector));
 	/** Model names more than one provider serves, which the models table tells apart by provider. */
 	const sharedLabels = new Set(labels.filter((label, index) => labels.indexOf(label) !== index));
@@ -131,14 +131,14 @@ function UsageBody({ data }: { data: Analytics }) {
 						</tr>)}
 					</Table>
 				</section>
-				<section className="space-y-3" aria-labelledby="analytics-projects">
-					<h3 id="analytics-projects" className="text-sm font-semibold">Projects</h3>
-					<Table label="Projects by token usage" columns={["Project", "Tokens", "Requests", "Cost"]}>
-						{projects.map(project => <tr key={project.cwd}>
-							<th scope="row" className="max-w-64 truncate border-t border-border py-2 text-start font-medium" title={project.cwd}>{projectName(project.cwd) ?? project.cwd}</th>
-							<Count title={`${full.format(project.tokens.total)} tokens`}>{compact.format(project.tokens.total)}</Count>
-							<Count>{full.format(project.requests)}</Count>
-							<Count>{dollars(project.cost)}</Count>
+				<section className="space-y-3" aria-labelledby="analytics-workspaces">
+					<h3 id="analytics-workspaces" className="text-sm font-semibold">Workspaces</h3>
+					<Table label="Workspaces by token usage" columns={["Workspace", "Tokens", "Requests", "Cost"]}>
+						{workspaces.map(workspace => <tr key={workspace.cwd}>
+							<th scope="row" className="max-w-64 truncate border-t border-border py-2 text-start font-medium" title={workspace.cwd}>{folderName(workspace.cwd) ?? workspace.cwd}</th>
+							<Count title={`${full.format(workspace.tokens.total)} tokens`}>{compact.format(workspace.tokens.total)}</Count>
+							<Count>{full.format(workspace.requests)}</Count>
+							<Count>{dollars(workspace.cost)}</Count>
 						</tr>)}
 					</Table>
 				</section>
@@ -157,7 +157,7 @@ function UsageBody({ data }: { data: Analytics }) {
 			</section>
 			<section className="space-y-3" aria-labelledby="analytics-sessions">
 				<h3 id="analytics-sessions" className="text-sm font-semibold">Top sessions</h3>
-				<Table label="Top 20 sessions by token usage" columns={["Session", "Project", "Tokens", "Subagents", "Cost", "Models", "Last active"]} textColumns={2} wide>
+				<Table label="Top 20 sessions by token usage" columns={["Session", "Workspace", "Tokens", "Subagents", "Cost", "Models", "Last active"]} textColumns={2} wide>
 					{sessions.map(session => <SessionRow key={session.sessionId} session={session} />)}
 				</Table>
 			</section>

@@ -117,7 +117,7 @@ function analytics(range: AnalyticsRange, requests: number): Analytics {
 		providers: [],
 		series: [{ start: 1, tokens: 300, cost: 0.5, requests, providers: [] }],
 		models: [],
-		projects: [],
+		workspaces: [],
 		agents: { main: 300, subagent: 0, advisor: 0 },
 		tools: [],
 		sessions: [],

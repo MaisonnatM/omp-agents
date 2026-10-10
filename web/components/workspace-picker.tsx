@@ -1,18 +1,18 @@
 import { Folder } from "lucide-react";
 import { useState } from "react";
-import type { Project } from "../../src/shared/projects";
-import { projectName } from "../labels";
+import type { Workspace } from "../../src/shared/workspaces";
+import { folderName } from "../labels";
 import type { ShortcutId } from "../shortcuts";
 import { CommandPicker, type PickerItem } from "./command-picker";
 
 /** The same visible directory row and search words for the roster and the new-session picker. */
-export function workspaceItems(workspaces: Project[], current: string | null, onPick: (workspace: Project) => void): PickerItem[] {
+export function workspaceItems(workspaces: Workspace[], current: string | null, onPick: (workspace: Workspace) => void): PickerItem[] {
 	return workspaces.map(workspace => ({
 		value: workspace.cwd,
 		keywords: [workspace.cwdDisplay],
 		label: (
 			<span className="flex min-w-0 flex-col">
-				<span className="truncate">{projectName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
+				<span className="truncate">{folderName(workspace.cwdDisplay) ?? workspace.cwdDisplay}</span>
 				<span className="truncate text-xs text-muted-foreground">{workspace.cwdDisplay}</span>
 			</span>
 		),
@@ -23,7 +23,7 @@ export function workspaceItems(workspaces: Project[], current: string | null, on
 
 interface DirectoryPickerProps {
 	cwd: string;
-	workspaces: Project[];
+	workspaces: Workspace[];
 	disabled: boolean;
 	/** What hovering the trigger says; `cwd` when omitted. */
 	tooltip?: string;
@@ -37,7 +37,7 @@ interface DirectoryPickerProps {
 	onPick: (cwd: string) => void;
 }
 
-/** A working directory: a project the dashboard lists, or any directory typed into the search field. */
+/** A working directory: a workspace the dashboard lists, or any directory typed into the search field. */
 export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shortcut, side = "top", open, onOpenChange, onPick }: DirectoryPickerProps) {
 	const [query, setQuery] = useState("");
 	const typed = query.trim();
@@ -46,7 +46,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 	};
 	return (
 		<CommandPicker
-			trigger={<span className="truncate">{projectName(cwd) ?? cwd}</span>}
+			trigger={<span className="truncate">{folderName(cwd) ?? cwd}</span>}
 			icon={Folder}
 			ariaLabel={`Working directory: ${cwd}`}
 			tooltip={tooltip}
@@ -66,7 +66,7 @@ export function DirectoryPicker({ cwd, workspaces, disabled, tooltip = cwd, shor
 				groups: [
 					{
 						key: "workspaces",
-						heading: "Projects",
+						heading: "Workspaces",
 						items: workspaceItems(workspaces, cwd, workspace => pick(workspace.cwdDisplay)),
 					},
 					...(typed && !workspaces.some(w => w.cwd === typed || w.cwdDisplay === typed)

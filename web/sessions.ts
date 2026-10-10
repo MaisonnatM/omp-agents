@@ -1,10 +1,10 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
-import type { Project } from "../src/shared/projects";
 import { type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
+import type { Workspace } from "../src/shared/workspaces";
 
 const HIDDEN_ROOTS = ["/tmp", "/private/tmp"];
 
-/** A working directory outside `/tmp` and `/private/tmp`, including their descendants, and not one Settings → Projects hid. */
+/** A working directory outside `/tmp` and `/private/tmp`, including their descendants, and not one Settings → Workspaces hid. */
 export function discoverableCwd(cwd: string, hidden: ReadonlySet<string>): boolean {
 	return !hidden.has(cwd) && !HIDDEN_ROOTS.some(root => cwd === root || cwd.startsWith(`${root}/`));
 }
@@ -17,19 +17,19 @@ export function discoverableSessions(hosts: RosterHost[], past: PastSession[], h
 	return { hosts: listed(hosts), past: listed(past) };
 }
 
-/** The project a started or picked session switches to, so it stays listed. `null` keeps the current project; a temporary or hidden directory is not a switch. */
-export function projectSwitch(project: string | null, cwd: string, hidden: ReadonlySet<string>): string | null {
-	if (project === null || cwd === project || !discoverableCwd(cwd, hidden)) return null;
+/** The workspace a started or picked session switches to, so it stays listed. `null` keeps the current workspace; a temporary or hidden directory is not a switch. */
+export function workspaceSwitch(workspace: string | null, cwd: string, hidden: ReadonlySet<string>): string | null {
+	if (workspace === null || cwd === workspace || !discoverableCwd(cwd, hidden)) return null;
 	return cwd;
 }
 
 const newestFirst = (a: RosterHost, b: RosterHost): number => b.startedAt - a.startedAt;
 
 /**
- * The session the focused pane follows a picked project into: its most recently started running one, unless the pane
- * already shows a session from `cwd`. `null` for All projects, or when no session runs there.
+ * The session the focused pane follows a picked workspace into: its most recently started running one, unless the pane
+ * already shows a session from `cwd`. `null` for All workspaces, or when no session runs there.
  */
-export function projectSession(cwd: string | null, hosts: RosterHost[], shownCwd: string | undefined): View | null {
+export function workspaceSession(cwd: string | null, hosts: RosterHost[], shownCwd: string | undefined): View | null {
 	if (cwd === null || shownCwd === cwd) return null;
 	const newest = hosts.filter(host => host.cwd === cwd).toSorted(newestFirst)[0];
 	return newest ? { kind: "live", instanceId: newest.instanceId, agentId: null } : null;
@@ -37,21 +37,21 @@ export function projectSession(cwd: string | null, hosts: RosterHost[], shownCwd
 
 /**
  * Where a new session starts unless the user picks another directory: the open session's,
- * else the newest live one's, else the newest past one's, each only from `project` when one is selected.
+ * else the newest live one's, else the newest past one's, each only from `workspace` when one is selected.
  */
-export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[], project: string | null): string {
+export function defaultCwd(view: View | null, hosts: RosterHost[], past: PastSession[], workspace: string | null): string {
 	const open =
 		view?.kind === "live"
 			? hosts.find(host => host.instanceId === view.instanceId)
 			: past.find(session => session.sessionId === view?.sessionId);
 	const rows = [open, ...hosts.toSorted(newestFirst), ...past];
 	// Sessions from old omp versions recorded no directory.
-	const chosen = rows.find(row => row?.cwdDisplay && (project === null || row.cwd === project));
+	const chosen = rows.find(row => row?.cwdDisplay && (workspace === null || row.cwd === workspace));
 	return chosen?.cwdDisplay ?? "~";
 }
 
-/** Directories sessions ran in, live ones first, then past ones newest first, then the ones Settings → Projects added. The settings page reads a workspace from one. */
-export function workspaces(hosts: RosterHost[], past: PastSession[], added: readonly Project[]): Project[] {
+/** Directories sessions ran in, live ones first, then past ones newest first, then the ones Settings → Workspaces added. The settings page reads a workspace from one. */
+export function listWorkspaces(hosts: RosterHost[], past: PastSession[], added: readonly Workspace[]): Workspace[] {
 	const byCwd = new Map<string, string>();
 	for (const row of [...hosts.toSorted(newestFirst), ...past, ...added]) {
 		// Sessions from old omp versions recorded no directory.
@@ -60,7 +60,7 @@ export function workspaces(hosts: RosterHost[], past: PastSession[], added: read
 	return [...byCwd].map(([cwd, cwdDisplay]) => ({ cwd, cwdDisplay }));
 }
 
-/** The sessions tab's lists, each only from `project` when one is selected. A pinned session leaves its own list for `pinned`. */
+/** The sessions tab's lists, each only from `workspace` when one is selected. A pinned session leaves its own list for `pinned`. */
 export interface SidebarSessions {
 	/** Pinned running sessions, then pinned past ones, interrupted first. */
 	pinned: { hosts: RosterHost[]; past: PastSession[] };
@@ -72,12 +72,12 @@ export interface SidebarSessions {
 	ended: PastSession[];
 }
 
-export function sidebarSessions(hosts: RosterHost[], past: PastSession[], project: string | null, pinned: ReadonlySet<string>): SidebarSessions {
-	const inProject = (row: { cwd: string }): boolean => project === null || row.cwd === project;
+export function sidebarSessions(hosts: RosterHost[], past: PastSession[], workspace: string | null, pinned: ReadonlySet<string>): SidebarSessions {
+	const inWorkspace = (row: { cwd: string }): boolean => workspace === null || row.cwd === workspace;
 	const isPinned = (row: { sessionId: string }): boolean => pinned.has(row.sessionId);
-	const shownHosts = hosts.filter(inProject);
+	const shownHosts = hosts.filter(inWorkspace);
 	const unpinnedHosts = shownHosts.filter(host => !isPinned(host));
-	const shownPast = past.filter(inProject);
+	const shownPast = past.filter(inWorkspace);
 	return {
 		pinned: {
 			hosts: shownHosts.filter(isPinned),

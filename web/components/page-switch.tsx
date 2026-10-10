@@ -7,7 +7,7 @@ import type { Layout, Page, TodoListView } from "../routing";
 import { hashForNewSession } from "../routing";
 import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
-import type { Workspace } from "../use-workspace";
+import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
 import { ChangesPage } from "./changes/changes-page";
 import { useDashboardActions } from "./dashboard-context";
@@ -52,7 +52,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "draft" | "models" | "userTodos" | "routines" | "projectList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "draft" | "models" | "userTodos" | "routines" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -60,7 +60,7 @@ interface PageSwitchProps extends PageState {
 	page: Page | null;
 	/** The new session under way or failed, if there is one. */
 	newStart: StartOf<"new"> | null;
-	workspace: Workspace;
+	scope: WorkspaceScope;
 	/** Where a new session starts when nothing picks a directory. */
 	defaultWorkspace: string;
 	/** The tickets section a sidebar link last chose. */
@@ -90,14 +90,14 @@ export const PageSwitch = memo(function PageSwitch({
 	models,
 	userTodos,
 	routines,
-	projectList,
+	workspaceList,
 	pins,
 	newSessionCompletions,
 	connected,
 	listed,
 	rosterError,
 	newStart,
-	workspace,
+	scope,
 	defaultWorkspace,
 	sectionTarget,
 	todoView,
@@ -111,7 +111,7 @@ export const PageSwitch = memo(function PageSwitch({
 	toggleSidebar,
 }: PageSwitchProps) {
 	const { send, start, dismissStart, changeTodo } = useDashboardActions();
-	const { visible, projects, project } = workspace;
+	const { visible, workspaces, workspace } = scope;
 	switch (page?.kind) {
 		case "new": {
 			const cwd = page.cwd ?? defaultWorkspace;
@@ -121,7 +121,7 @@ export const PageSwitch = memo(function PageSwitch({
 					// A todo's title and notes start the draft, so the draft mounts anew once the list names it.
 					key={seed ? `todo:${page.todoId}` : "new"}
 					cwd={cwd}
-					workspaces={projects}
+					workspaces={workspaces}
 					launch={newStart}
 					connected={connected}
 					completions={newSessionCompletions}
@@ -137,12 +137,12 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		}
 		case "settings":
-			return <SettingsPage route={page} workspaces={projects} projectList={projectList} pins={pins} />;
+			return <SettingsPage route={page} workspaces={workspaces} workspaceList={workspaceList} pins={pins} />;
 		case "pull-requests":
 			return page.target === null ? (
-				<PullRequestsPage project={project} hosts={visible.hosts} past={visible.past} section={sectionTarget} />
+				<PullRequestsPage workspace={workspace} hosts={visible.hosts} past={visible.past} section={sectionTarget} />
 			) : (
-				<PullRequestDetailPage project={project} hosts={visible.hosts} target={page.target} files={page.files} />
+				<PullRequestDetailPage workspace={workspace} hosts={visible.hosts} target={page.target} files={page.files} />
 			);
 		case "tickets":
 			if (linear && !linearCallable) return <TicketsDisconnected linear={linear} />;
@@ -172,7 +172,7 @@ export const PageSwitch = memo(function PageSwitch({
 					target={routinesTarget}
 					// Every host, since a routine may run in `/tmp`, which the sidebar hides, and its runs still name their sessions.
 					hosts={hosts}
-					workspaces={projects}
+					workspaces={workspaces}
 					defaultCwd={defaultWorkspace}
 					connected={connected}
 				/>
@@ -199,7 +199,7 @@ export const PageSwitch = memo(function PageSwitch({
 						lastHosts={lastHosts}
 						draft={draft}
 						models={models}
-						projects={projects}
+						workspaces={workspaces}
 						maximized={maximized}
 						hasDetails={hasDetails}
 						rightOpen={rightOpen}

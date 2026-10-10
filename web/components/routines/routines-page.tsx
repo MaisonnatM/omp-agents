@@ -2,6 +2,7 @@ import { ArrowLeft, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Routine, RoutineChange, RoutineRun, RoutineTask } from "../../../src/routines";
 import type { RosterHost, View } from "../../../src/shared/sessions";
+import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
@@ -291,8 +292,8 @@ interface RoutinesPageProps {
 	/** The routine whose settings and runs show, `null` for the list. */
 	target: string | null;
 	hosts: RosterHost[];
-	/** The projects, which the editor's workspace picker offers. */
-	workspaces: { cwd: string; cwdDisplay: string }[];
+	/** The workspaces, which the editor's workspace picker offers. */
+	workspaces: Workspace[];
 	/** Where a new routine's sessions start until you pick another directory. */
 	defaultCwd: string;
 	connected: boolean;

@@ -15,11 +15,11 @@ import { type PullRequest, type PullRequestChange, type PullRequestEdit, type Re
 import type { ModelOption } from "../shared/models";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
-import type { ProjectChange } from "../shared/projects";
 import type { ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues } from "../shared/tickets";
+import type { WorkspaceChange } from "../shared/workspaces";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
 import { isDay, isTodoId, parseTodoChange } from "../user-todos-parse";
 import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } from "../worktrees-shared";
@@ -563,10 +563,10 @@ export function parseWorktreeRemoval(body: unknown): Parsed<WorktreeRemovalReque
 	return { ok: { action: "remove", plans } };
 }
 
-const isProjectOp = oneOf(["add", "hide", "show"] as const);
+const isWorkspaceOp = oneOf(["add", "hide", "show"] as const);
 
-/** The body of `PUT /api/projects`: `{ op, cwd }`. Adding takes any path a new session takes; hiding and showing name an absolute directory. */
-export function parseProjectChange(body: unknown): Parsed<ProjectChange> {
-	if (!isObject(body) || !isProjectOp(body.op) || !isNonEmpty(body.cwd)) return null;
+/** The body of `PUT /api/workspaces`: `{ op, cwd }`. Adding takes any path a new session takes; hiding and showing name an absolute directory. */
+export function parseWorkspaceChange(body: unknown): Parsed<WorkspaceChange> {
+	if (!isObject(body) || !isWorkspaceOp(body.op) || !isNonEmpty(body.cwd)) return null;
 	return body.op === "add" || body.cwd.startsWith("/") ? { ok: { op: body.op, cwd: body.cwd } } : null;
 }

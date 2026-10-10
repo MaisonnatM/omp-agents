@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the projects Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { join } from "node:path";
@@ -27,15 +27,15 @@ import { ClientConfigError } from "../mcp-clients";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
-import type { ProjectChange } from "../shared/projects";
 import { PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
+import type { WorkspaceChange } from "../shared/workspaces";
 import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
-import { type Parsed, parseCalendarShown, parseGoogleClient, parseIntegrationId, parseProjectChange, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorktreeRemoval, SHA256 } from "./wire";
+import { type Parsed, parseCalendarShown, parseGoogleClient, parseIntegrationId, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
@@ -44,14 +44,14 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** The longest span `GET /api/calendar/events` reads: a month view's six weeks, with room to spare. */
 const MAX_EVENT_SPAN_MS = 62 * 86_400_000;
 
-/** What the session routes read: the directories sessions ran in, their files, and the projects Settings keeps. */
+/** What the session routes read: the directories sessions ran in, their files, and the workspaces Settings keeps. */
 export interface SessionRoutesEnv {
 	/** Directories sessions ran in: live ones first, then saved ones newest first. */
 	knownCwds(): string[];
-	/** The directories Settings → Projects added, which the page names as workspaces before any session runs there. */
+	/** The directories Settings → Workspaces added, which the page names as workspaces before any session runs there. */
 	addedCwds(): string[];
-	/** Apply `change` to the projects and send every socket the projects after it. */
-	changeProjects(change: ProjectChange): void;
+	/** Apply `change` to the workspaces and send every socket the workspaces after it. */
+	changeWorkspaces(change: WorkspaceChange): void;
 	/** The listed file of a session, for Analytics' title and working directory. */
 	savedOf(sessionId: string): AnalyticsSessionFacts | null;
 	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
@@ -121,11 +121,11 @@ async function dirParam(params: URLSearchParams): Promise<string | Response> {
 	return (await directoryOf(params.get("cwd") ?? "")) ?? fail(404, "Expected ?cwd= naming a directory");
 }
 
-/** Settings, models, skills, analytics, the pull request list, projects, and a session's changes. */
+/** Settings, models, skills, analytics, the pull request list, workspaces, and a session's changes. */
 function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes {
 	/**
 	 * The `cwd` a request names, `null` when it names none, or the response refusing it. `cwd` must be a
-	 * directory some session ran in or Settings → Projects added: the page names workspaces that way, as it names sessions by id.
+	 * directory some session ran in or Settings → Workspaces added: the page names workspaces that way, as it names sessions by id.
 	 */
 	function workspaceCwd(params: URLSearchParams): string | null | Response {
 		const cwd = params.get("cwd");
@@ -196,16 +196,16 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		});
 	});
 
-	/** `PUT /api/projects` `{ op, cwd }`: add a directory as a project, or hide or show one. */
-	const projectChange = write(
-		async (body): Promise<ProjectChange | Response> => {
-			const change = checked(parseProjectChange(body), "Expected { op, cwd } with op add, hide, or show");
+	/** `PUT /api/workspaces` `{ op, cwd }`: add a directory as a workspace, or hide or show one. */
+	const workspaceChange = write(
+		async (body): Promise<WorkspaceChange | Response> => {
+			const change = checked(parseWorkspaceChange(body), "Expected { op, cwd } with op add, hide, or show");
 			if (change instanceof Response || change.op !== "add") return change;
 			const cwd = await directoryOf(change.cwd);
 			return cwd ? { op: "add", cwd } : fail(400, `${change.cwd.trim()} is not a directory.`);
 		},
 		async change => {
-			env.changeProjects(change);
+			env.changeWorkspaces(change);
 			return {};
 		},
 	);
@@ -242,7 +242,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/analytics": { GET: analytics },
 		"/api/skills": { GET: skills },
 		"/api/pull-requests": { GET: pullRequests },
-		"/api/projects": { PUT: projectChange },
+		"/api/workspaces": { PUT: workspaceChange },
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },
 	};

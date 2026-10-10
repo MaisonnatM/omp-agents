@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson } from "../../api";
-import { projectName } from "../../labels";
+import { folderName } from "../../labels";
 import { useStoredState } from "../../stored-state";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { type TerminalHandle, TerminalView } from "./terminal-view";
@@ -51,7 +51,7 @@ const newTab = (cwd: string): Tab => ({ key: crypto.randomUUID(), target: { cwd 
 
 interface TerminalPanelProps {
 	panel: TerminalPanelState;
-	/** Where a new tab's shell starts: the focused session's worktree, else the sidebar's project, else `~`. */
+	/** Where a new tab's shell starts: the focused session's worktree, else the sidebar's workspace, else `~`. */
 	cwd: string;
 }
 
@@ -136,7 +136,7 @@ export function TerminalPanel({ panel, cwd }: TerminalPanelProps) {
 				<div role="tablist" aria-label="Terminals" className="flex min-w-0 items-center gap-0.5 overflow-x-auto">
 					{tabs.map(tab => {
 						const dir = tab.terminal?.cwdDisplay ?? ("cwd" in tab.target ? tab.target.cwd : "");
-						const name = projectName(dir) ?? dir;
+						const name = folderName(dir) ?? dir;
 						const selected = tab.key === active;
 						return (
 							<div key={tab.key} className={cn("flex shrink-0 items-center rounded-md text-xs", selected ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60")}>

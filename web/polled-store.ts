@@ -29,7 +29,7 @@ interface PolledStoreOptions<T> {
 
 /**
  * A store of server reads by scope that the sidebar and a page share, kept in localStorage and re-read while a page that
- * uses it is open. The scope names what the read is about, such as a project; it is `null` for a read about everything,
+ * uses it is open. The scope names what the read is about, such as a workspace; it is `null` for a read about everything,
  * or in a store with one entry. The entries and their cache hold `null` under `""`.
  */
 export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOptions<T>) {

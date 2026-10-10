@@ -159,9 +159,9 @@ export function formatBytes(bytes: number): string {
 	return `${value >= 10 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`;
 }
 
-/** The project a directory holds, its last segment: `~/code/webapp` reads `webapp`. */
-export const projectName = (cwdDisplay: string): string | undefined => cwdDisplay.split("/").filter(Boolean).pop();
+/** A directory's last segment: `~/code/webapp` reads `webapp`. */
+export const folderName = (dir: string): string | undefined => dir.split("/").filter(Boolean).pop();
 
-export const hostLabel = (host: RosterHost): string => host.sessionName ?? projectName(host.cwdDisplay) ?? host.cwdDisplay;
+export const hostLabel = (host: RosterHost): string => host.sessionName ?? folderName(host.cwdDisplay) ?? host.cwdDisplay;
 
-export const pastLabel = (session: PastSession): string => session.title ?? projectName(session.cwdDisplay) ?? "Untitled session";
+export const pastLabel = (session: PastSession): string => session.title ?? folderName(session.cwdDisplay) ?? "Untitled session";

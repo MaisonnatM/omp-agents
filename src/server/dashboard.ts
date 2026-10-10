@@ -18,7 +18,7 @@ import { type HostSnapshot, listHosts } from "../omp/collab";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, pinsFile, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, userTodoInboxDir, userTodosFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, oldProjectsFile, pinsFile, routinesFile, sessionEndInboxDir, serverLockFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { runShell } from "../proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { modelUpdates, upgradeModel } from "../settings";
@@ -41,7 +41,6 @@ import { Loops } from "./loops";
 import { ACTIVITY_KINDS, Notices, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
-import { ProjectsFile } from "./projects-file";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 import { createRoutes, type Routes } from "./routes";
@@ -53,6 +52,7 @@ import { TodoInbox } from "./todo-inbox";
 import { UserTodosFile } from "./user-todos-file";
 import { type Socket, send, Views } from "./views";
 import { parseClientMsg } from "./wire";
+import { WorkspacesFile } from "./workspaces-file";
 
 /** What the dashboard publishes through once the server listens. */
 type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
@@ -63,7 +63,7 @@ export class Dashboard {
 	readonly #interrupted = new InterruptedSessions(interruptedFile);
 	readonly #todos = new UserTodosFile(userTodosFile);
 	readonly #routines = new RoutinesFile(routinesFile);
-	readonly #projects = new ProjectsFile(projectsFile);
+	readonly #workspaces = new WorkspacesFile(workspacesFile, oldProjectsFile);
 	readonly #pins = new PinsFile(pinsFile);
 	readonly #calendars = new CalendarsFile(calendarsFile);
 	/** The terminal panel's shells, which the server's `/ws/terminal` upgrades open and attach to. */
@@ -97,7 +97,7 @@ export class Dashboard {
 		const files = this.#files;
 		const todos = this.#todos;
 		const routines = this.#routines;
-		const projects = this.#projects;
+		const workspaces = this.#workspaces;
 		const pins = this.#pins;
 		const interrupted = this.#interrupted;
 		const ownerLock = (this.#ownerLock = new OwnerLock(serverLockFile, port));
@@ -131,9 +131,9 @@ export class Dashboard {
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
 			userTodosMsg: () => ({ t: "user-todos", list: todos.list }),
 			routinesMsg: () => ({ t: "routines", routines: routines.routines }),
-			projectsMsg: () => {
-				const [added, hidden] = [projects.list.added, projects.list.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
-				return { t: "projects", list: { added, hidden } };
+			workspacesMsg: () => {
+				const [added, hidden] = [workspaces.list.added, workspaces.list.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
+				return { t: "workspaces", list: { added, hidden } };
 			},
 			pinsMsg: () => ({ t: "pins", sessionIds: pins.sessionIds }),
 			noticesMsg: () => ({ t: "notices", list: notices.list }),
@@ -251,9 +251,9 @@ export class Dashboard {
 			guards,
 			sessions: {
 				knownCwds: () => this.knownCwds(),
-				addedCwds: () => this.#projects.list.added,
-				changeProjects: change => {
-					if (this.#projects.apply(change)) broadcasts.pushProjects();
+				addedCwds: () => this.#workspaces.list.added,
+				changeWorkspaces: change => {
+					if (this.#workspaces.apply(change)) broadcasts.pushWorkspaces();
 				},
 				savedOf: files.savedOf,
 				placeOf(sessionId) {

@@ -1,7 +1,7 @@
 import { Maximize2, Minimize2, X } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
-import type { Project } from "../../src/shared/projects";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";
+import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -29,8 +29,8 @@ interface PaneProps {
 	session: PastSession | null;
 	initialDraft: string;
 	models: ModelList;
-	/** The projects, which the composer's directory picker offers. */
-	workspaces: Project[];
+	/** The workspaces, which the composer's directory picker offers. */
+	workspaces: Workspace[];
 	onLayout: (index: number, kind: "max" | "close") => void;
 	toggleRight: () => void;
 	rightOpen: boolean;

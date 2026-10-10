@@ -25,20 +25,20 @@ function nextMove(pr: PullRequestSummary, hosts: RosterHost[], sessions: RosterH
 	return { move, reason: reason(pr, move), action: moveAction(pr, move), session: sessions.find(host => host.status === holder) ?? null };
 }
 
-/** Why the pull request list does not hold the PR a link named. `allProjects`: the sidebar shows every project. */
-function whyMissing(target: PullRequest, list: PullRequestList, allProjects: boolean): string {
+/** Why the pull request list does not hold the PR a link named. `allWorkspaces`: the sidebar shows every workspace. */
+function whyMissing(target: PullRequest, list: PullRequestList, allWorkspaces: boolean): string {
 	const repo = `${target.owner}/${target.repo}`;
 	const covered = list.repos.some(other => repoKey(other) === repoKey(target));
 	if (covered) {
 		return `${repo}#${target.number} is not among these pull requests. The Pull requests page lists your open pull requests, your merges from the last seven days, and the pull requests that wait for your review.`;
 	}
-	if (allProjects) return `${repo}#${target.number} is not among these pull requests, because no session ran in ${repo}.`;
-	return `${repo}#${target.number} is not among these pull requests, which cover only the project that the sidebar shows. Choose All projects in the sidebar to include ${repo}.`;
+	if (allWorkspaces) return `${repo}#${target.number} is not among these pull requests, because no session ran in ${repo}.`;
+	return `${repo}#${target.number} is not among these pull requests, which cover only the workspace that the sidebar shows. Choose All workspaces in the sidebar to include ${repo}.`;
 }
 
 interface PullRequestDetailsProps {
-	/** The sidebar's project `cwd`, or `null` for every project. */
-	project: string | null;
+	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
+	workspace: string | null;
 	hosts: RosterHost[];
 	target: PullRequest;
 	placement: Placement;
@@ -53,14 +53,14 @@ interface PullRequestDetailsProps {
 }
 
 /**
- * `target`'s details with the quick actions that start a session on it, as the pull request list of `project` holds it, after what
+ * `target`'s details with the quick actions that start a session on it, as the pull request list of `workspace` holds it, after what
  * became of a quick start on it. The page also says why the list does not hold it; the sidebar does not, since most
  * past sessions' merged pull requests would carry that note.
  */
-export function PullRequestDetails({ project, hosts, target, placement, version, files, onPick, session }: PullRequestDetailsProps) {
+export function PullRequestDetails({ workspace, hosts, target, placement, version, files, onPick, session }: PullRequestDetailsProps) {
 	const { open, start, dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const { read } = pullRequestsStore.use(project);
+	const { read } = pullRequestsStore.use(workspace);
 	const listed = read && listedPullRequest(read.data, target);
 	const item: WorkItem = { kind: "pull-request", pr: target };
 	const sessions = sessionsOn(item, hosts);
@@ -72,7 +72,7 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 				<div className={cn("space-y-2", placement === "page" && "px-6 pt-4")}>
 					{missing && (
 						<p role="status" className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-							{whyMissing(target, read.data, project === null)}
+							{whyMissing(target, read.data, workspace === null)}
 						</p>
 					)}
 					{started && <QuickStartNotice quick={started} onDismiss={() => dismissStart("quick")} />}
@@ -94,7 +94,7 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 				version={version}
 				files={files}
 				onPick={onPick}
-				onSaved={() => void pullRequestsStore.refresh(project, { fresh: true })}
+				onSaved={() => void pullRequestsStore.refresh(workspace, { fresh: true })}
 			/>
 		</>
 	);

@@ -39,8 +39,8 @@ interface SessionDetailsProps {
 	sessionId: string | null;
 	/** What the view's session and its subagents submitted or worked on, the session's own first. */
 	pullRequests: LinkedPullRequest[];
-	/** The sidebar's project `cwd`, or `null` for every project. */
-	project: string | null;
+	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
+	workspace: string | null;
 	hosts: RosterHost[];
 }
 
@@ -48,7 +48,7 @@ interface SessionDetailsProps {
  * The right sidebar's content for the focused view: an outline of its conversation's turns, the files its agent changed,
  * the images its agents' tools returned, and its session's pull requests, each tab apart.
  */
-export function SessionDetails({ view, working, sessionId, pullRequests, project, hosts }: SessionDetailsProps) {
+export function SessionDetails({ view, working, sessionId, pullRequests, workspace, hosts }: SessionDetailsProps) {
 	const files = useChangedFiles(view);
 	const media = useMedia(view);
 	const turnCount = useTurnCount(view);
@@ -83,7 +83,7 @@ export function SessionDetails({ view, working, sessionId, pullRequests, project
 			</TabPanel>
 			<TabPanel value="pull-requests" asChild>
 				<SidebarContent viewportClassName={PINNED_VIEWPORT}>
-					<SessionPullRequestsTab pullRequests={pullRequests} project={project} hosts={hosts} version={working} />
+					<SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>

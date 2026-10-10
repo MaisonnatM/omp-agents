@@ -48,7 +48,7 @@ export interface Analytics {
 	/** Most tokens first. `selector` is `provider/model`; `tokensPerSecond` is the mean output rate, null when unmeasured. */
 	models: (Usage & { selector: string; tokensPerSecond: number | null })[];
 	/** By working directory, most tokens first. */
-	projects: (Usage & { cwd: string })[];
+	workspaces: (Usage & { cwd: string })[];
 	/** Total tokens by who sent the request. */
 	agents: Record<"main" | "subagent" | "advisor", number>;
 	/** Most calls first. `tokenShare` is the tokens of the requests that called the tool, split among their calls. */

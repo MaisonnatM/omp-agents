@@ -1,6 +1,6 @@
 /**
  * What every socket hears on the `roster` topic: the roster, the past-session list, plan usage, the Todo page's list,
- * the routines, the projects, the pins, and the notices. Each push publishes only what changed since the last one: the roster and
+ * the routines, the workspaces, the pins, and the notices. Each push publishes only what changed since the last one: the roster and
  * the past list as the rows that changed, joined, or left, the rest whole. Roster and past pushes wait for a listener; a
  * socket that subscribes gets all eight at once, the two lists whole.
  */
@@ -14,7 +14,7 @@ const TOPIC = "roster";
 /** Coalesce bursts of subagent progress into one roster push. */
 const ROSTER_PUSH_MS = 150;
 
-type Broadcast = Extract<ServerMsg, { t: "usage" | "user-todos" | "routines" | "projects" | "pins" | "notices" }>;
+type Broadcast = Extract<ServerMsg, { t: "usage" | "user-todos" | "routines" | "workspaces" | "pins" | "notices" }>;
 
 export interface BroadcastDeps {
 	/** The rows of the live sessions, and why the registry could not be listed, if it could not. */
@@ -22,7 +22,7 @@ export interface BroadcastDeps {
 	past(): PastSession[];
 	userTodosMsg(): Extract<ServerMsg, { t: "user-todos" }>;
 	routinesMsg(): Extract<ServerMsg, { t: "routines" }>;
-	projectsMsg(): Extract<ServerMsg, { t: "projects" }>;
+	workspacesMsg(): Extract<ServerMsg, { t: "workspaces" }>;
 	pinsMsg(): Extract<ServerMsg, { t: "pins" }>;
 	noticesMsg(): Extract<ServerMsg, { t: "notices" }>;
 	/** Publishes `json` on the `roster` topic. */
@@ -36,8 +36,8 @@ export interface BroadcastDeps {
 
 export class Broadcasts {
 	readonly #deps: BroadcastDeps;
-	/** The last message of each kind published, empty for usage until `omp usage` first answers, and for the todos, routines, projects, pins, and notices until they first change. */
-	readonly #last: Record<Broadcast["t"], string> = { usage: "", "user-todos": "", routines: "", projects: "", pins: "", notices: "" };
+	/** The last message of each kind published, empty for usage until `omp usage` first answers, and for the todos, routines, workspaces, pins, and notices until they first change. */
+	readonly #last: Record<Broadcast["t"], string> = { usage: "", "user-todos": "", routines: "", workspaces: "", pins: "", notices: "" };
 	/** The roster as the listeners last heard it, and its registry error. */
 	readonly #roster = new HeardList<RosterHost>(host => host.instanceId);
 	#rosterError: string | null = null;
@@ -54,7 +54,7 @@ export class Broadcasts {
 		return this.#deps.subscriberCount(TOPIC) > 0;
 	}
 
-	/** Subscribe `ws` and send it the current roster, past list, usage, todos, routines, projects, pins, and notices. */
+	/** Subscribe `ws` and send it the current roster, past list, usage, todos, routines, workspaces, pins, and notices. */
 	open(ws: Socket): void {
 		// The sockets that listen already hear what changed first, so the lists `ws` starts from are theirs too.
 		const roster = this.#syncRoster();
@@ -65,7 +65,7 @@ export class Broadcasts {
 		if (this.#last.usage) ws.send(this.#last.usage);
 		send(ws, this.#deps.userTodosMsg());
 		send(ws, this.#deps.routinesMsg());
-		send(ws, this.#deps.projectsMsg());
+		send(ws, this.#deps.workspacesMsg());
 		send(ws, this.#deps.pinsMsg());
 		send(ws, this.#deps.noticesMsg());
 	}
@@ -110,8 +110,8 @@ export class Broadcasts {
 		this.#publishChanged(this.#deps.routinesMsg());
 	}
 
-	pushProjects(): void {
-		this.#publishChanged(this.#deps.projectsMsg());
+	pushWorkspaces(): void {
+		this.#publishChanged(this.#deps.workspacesMsg());
 	}
 
 	pushPins(): void {
