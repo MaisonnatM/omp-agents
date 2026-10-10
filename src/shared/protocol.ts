@@ -4,6 +4,7 @@ import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
+import type { Project, ProjectEdit } from "./projects";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
 import type { Workspace, WorkspaceList } from "./workspaces";
@@ -39,6 +40,8 @@ export type ServerMsg =
 	| { t: "workspaces"; list: WorkspaceList<Workspace> }
 	/** The pinned sessions' ids, whole, sent when a socket opens and after every change. */
 	| { t: "pins"; sessionIds: string[] }
+	/** Every project, archived ones too, whole, sent when a socket opens and after every change. */
+	| { t: "projects"; projects: Project[] }
 	/** Every notice the bell lists, whole, sent when a socket opens and after every change. */
 	| { t: "notices"; list: Notice[] }
 	/** Answers this socket's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
@@ -68,6 +71,8 @@ export type ClientMsg =
 	| { t: "end"; instanceId: string }
 	/** Start a dashboard session. `reqId` counts per page and comes back with the answer. */
 	| ({ t: "start"; reqId: number } & StartRequest)
+	/** Create a project and start its coordinator in `cwd` on `prompt`, at `model` and `thinking` as `start` takes them, answered with `started` for `reqId` as a `start` is. An empty `name` reads as New project. */
+	| { t: "project-create"; reqId: number; name: string; cwd: string; prompt: string; model: ModelOption | null; thinking: string | null }
 	/** Resume each of these past sessions, as `start` with `resume` does. `reqId` counts per page and comes back with the answer. */
 	| { t: "resume-all"; reqId: number; sessionIds: string[] }
 	/** Move an interrupted session to the past sessions. */
@@ -90,6 +95,8 @@ export type ClientMsg =
 	| { t: "routine"; change: RoutineChange }
 	/** Pin or unpin sessions; every socket then gets the pins as they are after. */
 	| { t: "pin"; change: PinChange }
+	/** Rename or archive a project; every socket then gets the projects as they are after. */
+	| { t: "project"; change: ProjectEdit }
 	/** Update notices `ids`, mark them seen or read, or clear them. */
 	| { t: "notice"; ids: string[]; op: NoticeOp };
 

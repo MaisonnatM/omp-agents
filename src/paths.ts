@@ -5,6 +5,8 @@ import { join, resolve } from "node:path";
 export const HOME = homedir();
 
 const configDir = join(process.env.XDG_CONFIG_HOME || join(HOME, ".config"), "omp-agents");
+/** Files the dashboard keeps that the file dialog may open, unlike {@link configDir}: `$XDG_DATA_HOME/omp-agents`, else `~/.local/share/omp-agents`. */
+const dataDir = join(process.env.XDG_DATA_HOME || join(HOME, ".local", "share"), "omp-agents");
 
 /** Where the dashboard keeps its access token: `$XDG_CONFIG_HOME/omp-agents/token`, else `~/.config/omp-agents/token`. */
 export const tokenFile = join(configDir, "token");
@@ -26,8 +28,13 @@ export const sessionEndInboxDir = join(configDir, "end-inbox");
 export const routinesFile = join(configDir, "routines.json");
 /** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */
 export const workspacesFile = join(configDir, "workspaces.json");
-/** Where an older version kept {@link workspacesFile}, which the server moves at startup when it holds a workspace list. */
-export const oldProjectsFile = join(configDir, "projects.json");
+/**
+ * The projects, their workers, and the updates waiting for their coordinators, beside {@link tokenFile}; omp's `projects` extension reads it.
+ * An older version kept the {@link workspacesFile} list under this name, which the server moves away before it reads the projects.
+ */
+export const projectsFile = join(configDir, "projects.json");
+/** Project `id`'s notes, which every session of the project reads and writes; outside every repository, so all worktrees share them. */
+export const projectNotesDir = (id: string): string => join(dataDir, "projects", id);
 /** The sessions the sidebar pins, beside {@link tokenFile}. */
 export const pinsFile = join(configDir, "pins.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */

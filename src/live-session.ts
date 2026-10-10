@@ -33,6 +33,8 @@ export interface LiveSession {
 	 * Rejects when the text cannot be prepared, and a subagent's message with images, which omp gives no subagent.
 	 */
 	prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void>;
+	/** Send `text` to the main agent as a follow-up while a turn runs, else as a prompt, as a project's runner does; unlike {@link prompt}, also rejects when it does not reach omp. */
+	followUp(text: string): Promise<void>;
 	/** Take a queued message back with its images; `null` when the session no longer holds it. */
 	dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<WithdrawnMessage | null>;
 	/** Turn a queued follow-up into a steer, which the running turn takes at its next step; whether it was still queued. */

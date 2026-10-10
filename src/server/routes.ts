@@ -35,6 +35,7 @@ import { readTextFile } from "../text-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
+import { listNotes } from "./project-notes";
 import { type Parsed, parseCalendarShown, parseGoogleClient, parseIntegrationId, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
@@ -58,6 +59,8 @@ export interface SessionRoutesEnv {
 	placeOf(sessionId: string): SessionPlace | null;
 	/** The pull request list loaded `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
 	learnHeads(repo: Repo, pullRequests: readonly (PullRequest & { head: string })[]): void;
+	/** The notes directory of project `id`, or `null` when there is no such project. */
+	projectNotesDir(id: string): string | null;
 }
 
 /** What the integration routes read beyond omp's own config: Google Calendar and the calendars it shows. */
@@ -232,6 +235,13 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		return file ? Response.json(file) : fail(404, `The session changed no file ${path}`);
 	});
 
+	/** `GET /api/project-notes?id=<project id>`: the project's notes directory and the Markdown files in it, which the file dialog opens. */
+	const projectNotes = get(params => {
+		const id = params.get("id") ?? "";
+		const dir = env.projectNotesDir(id);
+		return dir === null ? fail(404, `No project ${id}`) : answer(async () => ({ dir, notes: await listNotes(dir) }));
+	});
+
 	return {
 		"/api/settings": { GET: settings },
 		"/api/settings/routing": { PUT: settingsWrite(saveRouting) },
@@ -245,6 +255,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/workspaces": { PUT: workspaceChange },
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },
+		"/api/project-notes": { GET: projectNotes },
 	};
 }
 

@@ -5,6 +5,7 @@
  * and the loops through its live-update handler, and a notice change reaches the broadcasts that read the notices.
  * No constructor calls either; nothing follows the registry, watches a directory, or publishes before {@link Dashboard.start}.
  */
+import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
 import type { Server } from "bun";
 import { flushJsonFiles } from "../fs";
@@ -18,13 +19,14 @@ import { type HostSnapshot, listHosts } from "../omp/collab";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, oldProjectsFile, pinsFile, routinesFile, sessionEndInboxDir, serverLockFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { runShell } from "../proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
 import type { PinChange } from "../shared/pins";
+import type { ProjectEdit } from "../shared/projects";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
@@ -41,18 +43,21 @@ import { Loops } from "./loops";
 import { ACTIVITY_KINDS, Notices, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
+import { seedNotes } from "./project-notes";
+import { ProjectRunner, projectsExtensionArgs, type RunnerSession } from "./project-runner";
+import { ProjectsFile } from "./projects-file";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
 import { createRoutes, type Routes } from "./routes";
 import { endSession } from "./session-end";
 import { SessionFiles } from "./session-files";
 import { type ClientHandler, createClientHandler } from "./socket";
-import { createStarter } from "./start";
+import { createStarter, type Starter } from "./start";
 import { TodoInbox } from "./todo-inbox";
 import { UserTodosFile } from "./user-todos-file";
 import { type Socket, send, Views } from "./views";
 import { parseClientMsg } from "./wire";
-import { WorkspacesFile } from "./workspaces-file";
+import { adoptOldWorkspaces, WorkspacesFile } from "./workspaces-file";
 
 /** What the dashboard publishes through once the server listens. */
 type Publisher = Pick<Server<unknown>, "publish" | "subscriberCount">;
@@ -63,7 +68,8 @@ export class Dashboard {
 	readonly #interrupted = new InterruptedSessions(interruptedFile);
 	readonly #todos = new UserTodosFile(userTodosFile);
 	readonly #routines = new RoutinesFile(routinesFile);
-	readonly #workspaces = new WorkspacesFile(workspacesFile, oldProjectsFile);
+	readonly #workspaces: WorkspacesFile;
+	readonly #projects: ProjectsFile;
 	readonly #pins = new PinsFile(pinsFile);
 	readonly #calendars = new CalendarsFile(calendarsFile);
 	/** The terminal panel's shells, which the server's `/ws/terminal` upgrades open and attach to. */
@@ -82,6 +88,7 @@ export class Dashboard {
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
 	readonly #endInbox: EndInbox;
 	readonly #runner: RoutineRunner;
+	readonly #projectRunner: ProjectRunner;
 	readonly #loops: Loops;
 	readonly #handleClientMsg: ClientHandler;
 	/** The server, from {@link start} on; until then there is no socket to publish to. */
@@ -94,10 +101,13 @@ export class Dashboard {
 	#activityFresh = false;
 
 	constructor(port: number) {
+		// An older version kept the workspace list in `projects.json`, so it moves before the projects load from that name.
+		adoptOldWorkspaces(projectsFile, workspacesFile);
+		const workspaces = (this.#workspaces = new WorkspacesFile(workspacesFile));
+		const projects = (this.#projects = new ProjectsFile(projectsFile));
 		const files = this.#files;
 		const todos = this.#todos;
 		const routines = this.#routines;
-		const workspaces = this.#workspaces;
 		const pins = this.#pins;
 		const interrupted = this.#interrupted;
 		const ownerLock = (this.#ownerLock = new OwnerLock(serverLockFile, port));
@@ -136,6 +146,7 @@ export class Dashboard {
 				return { t: "workspaces", list: { added, hidden } };
 			},
 			pinsMsg: () => ({ t: "pins", sessionIds: pins.sessionIds }),
+			projectsMsg: () => ({ t: "projects", projects: projects.projects }),
 			noticesMsg: () => ({ t: "notices", list: notices.list }),
 			publish: (topic, json) => void this.#publisher?.publish(topic, json),
 			subscriberCount: topic => this.#publisher?.subscriberCount(topic) ?? 0,
@@ -151,6 +162,7 @@ export class Dashboard {
 			linkTodo: (todoId, sessionId) => {
 				for (const change of startChanges(todos.list, todoId, sessionId, new Date().toISOString())) this.#applyTodo(change);
 			},
+			projects: { launchFor: (request, project) => this.#projectRunner.launchFor(request, project) },
 		});
 		const worktrees = (this.#worktrees = new Worktrees({
 			knownCwds: () => this.knownCwds(),
@@ -163,7 +175,8 @@ export class Dashboard {
 				}));
 			},
 		}));
-		const startSession = (this.#startSession = request => worktrees.start(() => starter(request), request.kind === "new" && request.branch !== null));
+		const startWith: Starter = (request, project) => worktrees.start(() => starter(request, project), request.kind === "new" && request.branch !== null);
+		const startSession = (this.#startSession = request => startWith(request, null));
 		this.#endInbox = new EndInbox(sessionEndInboxDir, {
 			end: async sessionId => {
 				const session = sessions.bySessionId(sessionId);
@@ -189,6 +202,23 @@ export class Dashboard {
 			},
 			onChange: () => broadcasts.pushRoutines(),
 			changePins: change => void this.#applyPinChange(change),
+		}));
+		const runnerSession = (session: LiveSession | undefined): RunnerSession | null => {
+			if (!session) return null;
+			const { status, requests } = session.row();
+			return { sessionId: session.sessionId, status, requests, prompt: text => session.followUp(text) };
+		};
+		const projectRunner = (this.#projectRunner = new ProjectRunner({
+			file: projects,
+			start: startWith,
+			session: instanceId => runnerSession(sessions.get(instanceId)),
+			bySessionId: sessionId => runnerSession(sessions.bySessionId(sessionId)),
+			interrupted: sessionId => interrupted.has(sessionId),
+			extensionArgs: projectsExtensionArgs,
+			seedNotes: (id, name, goal) => seedNotes(projectNotesDir(id), name, goal),
+			now: Date.now,
+			newId: randomUUID,
+			onChange: () => broadcasts.pushProjects(),
 		}));
 		this.#loops = new Loops(sessionsDir, {
 			onRegistryTick: async () => {
@@ -219,6 +249,8 @@ export class Dashboard {
 			sessions,
 			views,
 			start: startSession,
+			createProject: spec => projectRunner.create(spec),
+			changeProject: (ws, change) => this.#changeProject(ws, change),
 			end: async instanceId => {
 				const session = sessions.get(instanceId);
 				if (session) await this.#endLive(session);
@@ -265,6 +297,7 @@ export class Dashboard {
 				learnHeads(repo, pullRequests) {
 					if (files.facts.learnHeads(repo, pullRequests)) broadcasts.pushAll();
 				},
+				projectNotesDir: id => (this.#projects.get(id) ? projectNotesDir(id) : null),
 			},
 			integrations: {
 				google: this.#google,
@@ -301,6 +334,7 @@ export class Dashboard {
 	 */
 	async stop(): Promise<void> {
 		this.#loops.stop();
+		this.#projectRunner.stop();
 		this.#todoInbox.stop();
 		this.#endInbox.stop();
 		await this.#sessions.dispose();
@@ -341,11 +375,12 @@ export class Dashboard {
 		return [...new Set([...this.#sessions.cwds(), ...this.#files.cwds()].filter(Boolean))];
 	}
 
-	/** Where every live session's update goes: the views, the broadcasts, the routines, and the loops. */
+	/** Where every live session's update goes: the views, the broadcasts, the routines, the projects, and the loops. */
 	#onLiveUpdate(instanceId: string, update: SessionUpdate): void {
 		switch (update.kind) {
 			case "roster":
 				this.#runner.observe(instanceId);
+				this.#projectRunner.observe(instanceId);
 				this.#broadcasts.rosterChanged();
 				return;
 			case "event":
@@ -358,6 +393,7 @@ export class Dashboard {
 				// Only a session this dashboard started reports its exit.
 				const sessionId = this.#sessions.get(instanceId)?.sessionId;
 				if (sessionId && !update.ended) this.#interrupted.interrupt(sessionId);
+				this.#projectRunner.exited(instanceId);
 				this.#sessions.remove(instanceId);
 				this.#broadcasts.syncRoster();
 				void this.#loops.listNow();
@@ -370,6 +406,10 @@ export class Dashboard {
 				// Before the edited prompt's events, so they land in the new file's transcript.
 				this.#views.sync();
 				this.#broadcasts.syncRoster();
+				this.#projectRunner.switched(instanceId);
+				return;
+			case "turn-ended":
+				this.#projectRunner.turnEnded(instanceId, update.reply);
 				return;
 			default: {
 				const unhandled: never = update;
@@ -397,6 +437,12 @@ export class Dashboard {
 		return changed;
 	}
 
+	/** Applies `change` to the projects and sends every socket the projects after it, or sends `ws` the ones it missed when nothing changed. */
+	#changeProject(ws: Socket, change: ProjectEdit): void {
+		if (this.#projects.apply(change)) this.#broadcasts.pushProjects();
+		else send(ws, { t: "projects", projects: this.#projects.projects });
+	}
+
 	/** Ends `session` as **End session** does, then removes the linked worktree it worked in: the one its bash calls last ran in, else its own directory's. */
 	#endLive(session: LiveSession): Promise<void> {
 		return endSession(
@@ -414,8 +460,10 @@ export class Dashboard {
 			// What the server that ran them saved since this one started.
 			this.#routines.reload();
 			this.#todos.reload();
+			this.#projects.reload();
 			this.#broadcasts.pushRoutines();
 			this.#broadcasts.pushUserTodos();
+			this.#broadcasts.pushProjects();
 			this.#runner.recover();
 			void this.#todoInbox.drain();
 		}

@@ -24,8 +24,9 @@ function holdsWorkspaces(path: string): boolean {
  * Moves `oldPath`, where an older version saved the list, to `path`, when it holds a workspace list; a file there in any
  * other shape is not this list and stays. Linking then unlinking never replaces `path`, which a server beside this one may
  * have written: when `path` exists the old file stays, and when another server moved it first there is nothing to move.
+ * Runs before anything reads either file.
  */
-function adoptOldFile(oldPath: string, path: string): void {
+export function adoptOldWorkspaces(oldPath: string, path: string): void {
 	if (!holdsWorkspaces(oldPath)) return;
 	try {
 		linkSync(oldPath, path);
@@ -40,9 +41,7 @@ export class WorkspacesFile {
 	readonly #file: JsonFile<WorkspaceList>;
 	#list: WorkspaceList;
 
-	/** `oldPath` is where an older version saved the list; it becomes `path` before the list loads. */
-	constructor(path: string, oldPath: string) {
-		adoptOldFile(oldPath, path);
+	constructor(path: string) {
 		// Someone may have edited the file by hand, so one that holds something else moves aside rather than being written over.
 		this.#file = new JsonFile(path, { parse: parseWorkspaces, holds: "a workspace list", onInvalid: "aside", indent: "\t" });
 		this.#list = this.#file.load() ?? NO_WORKSPACES;

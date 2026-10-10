@@ -9,12 +9,12 @@ import { errorText, isObject, isTexts } from "./json";
 import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
 import { loadOmpConfig } from "./omp/config";
 import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
-import { type RpcChild, type RpcClient, type RpcState, startRpc } from "./omp/rpc";
+import { PLAIN_LAUNCH, type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
 import { endsMidTurn } from "./omp/sessions";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
-import { isUserPrompt } from "./transcript";
+import { isUserPrompt, splitSuggestions } from "./transcript";
 import { TurnGate } from "./turn-gate";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
@@ -33,7 +33,9 @@ export type DashboardUpdate =
 	/** omp appended to `path` without the lock churn that the file watcher reports on macOS, as a `!` command's record. */
 	| { kind: "written"; path: string }
 	/** The session moved to a new file and session id, so its views read that file from now on. */
-	| { kind: "switched" };
+	| { kind: "switched" }
+	/** A turn ran to its end, which the queue did not hand to a follow-up; `reply` is its last text without suggested prompts, `null` when it ended on none. */
+	| { kind: "turn-ended"; reply: string | null };
 
 /** Same shape as a Collab instance id, so the page's hash routing treats both alike. */
 export const newInstanceId = (): string => randomBytes(8).toString("hex");
@@ -65,6 +67,19 @@ async function recordedCwd(sessionFile: string): Promise<string> {
 
 /** Session events after which the model, thinking level, or context size can have changed. */
 const STATE_EVENTS = new Set(["turn_end", "model_changed", "thinking_level_changed", "auto_compaction_end"]);
+
+/** The text of the last assistant message among `messages` that has any, without its suggested prompts; `null` when none has text. */
+function lastReply(messages: unknown): string | null {
+	if (!Array.isArray(messages)) return null;
+	for (const message of messages.toReversed()) {
+		if (!isObject(message) || message.role !== "assistant" || !Array.isArray(message.content)) continue;
+		const text = message.content
+			.flatMap(block => (isObject(block) && block.type === "text" && typeof block.text === "string" && block.text.trim() ? [block.text] : []))
+			.join("\n\n");
+		if (text) return splitSuggestions(text).body;
+	}
+	return null;
+}
 
 export class DashboardSession implements LiveSession {
 	readonly instanceId: string;
@@ -136,15 +151,16 @@ export class DashboardSession implements LiveSession {
 		});
 	}
 
-	/** Spawn omp in `cwd`, on `model` and at `thinking` when they name one, and wait until it accepts commands. `emit` hears `instanceId` from spawn on, before this resolves. */
+	/** Spawn omp in `cwd` with `launch`, on `model` and at `thinking` when they name one, and wait until it accepts commands. `emit` hears `instanceId` from spawn on, before this resolves. */
 	static start(
 		instanceId: string,
 		cwd: string,
 		model: ModelOption | null,
 		thinking: string | null,
+		launch: RpcLaunch,
 		emit: (update: DashboardUpdate) => void,
 	): Promise<DashboardSession> {
-		return DashboardSession.#spawn(instanceId, cwd, emit, async client => {
+		return DashboardSession.#spawn(instanceId, cwd, launch, emit, async client => {
 			if (model) await client.setModel(model.provider, model.id);
 			if (thinking) {
 				const levels = await client.getAvailableThinkingLevels();
@@ -162,7 +178,7 @@ export class DashboardSession implements LiveSession {
 		// omp would repair such a file in place on open.
 		if (await endsMidTurn(sourceFile)) throw new Error("this session ended mid-turn. Resume it in omp once, then fork.");
 		let prompt = "";
-		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sourceFile), emit, async client => {
+		const session = await DashboardSession.#spawn(instanceId, await recordedCwd(sourceFile), PLAIN_LAUNCH, emit, async client => {
 			if ((await client.switchSession(sourceFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
 			try {
 				const branched = await client.branch(entryId);
@@ -177,9 +193,9 @@ export class DashboardSession implements LiveSession {
 		return { session, prompt };
 	}
 
-	/** Spawn omp holding `sessionFile`, as `omp --resume` does. omp records an abort in a file that ended mid-turn. */
-	static async resume(instanceId: string, sessionFile: string, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
-		return DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), emit, async client => {
+	/** Spawn omp with `launch` holding `sessionFile`, as `omp --resume` does. omp records an abort in a file that ended mid-turn. */
+	static async resume(instanceId: string, sessionFile: string, launch: RpcLaunch, emit: (update: DashboardUpdate) => void): Promise<DashboardSession> {
+		return DashboardSession.#spawn(instanceId, await recordedCwd(sessionFile), launch, emit, async client => {
 			if ((await client.switchSession(sessionFile)).cancelled) throw new Error("an omp extension cancelled opening the session");
 		});
 	}
@@ -188,12 +204,13 @@ export class DashboardSession implements LiveSession {
 	static async #spawn(
 		instanceId: string,
 		cwd: string,
+		launch: RpcLaunch,
 		emit: (update: DashboardUpdate) => void,
 		prepare: (client: RpcClient) => Promise<void>,
 	): Promise<DashboardSession> {
 		const requests = new PendingRequests(() => emit({ kind: "roster" }));
 		let session: DashboardSession | undefined;
-		const child = await startRpc(cwd, frame => {
+		const onFrame = (frame: Record<string, unknown>): void => {
 			if (frame.type === "session_info_update" || frame.type === "config_update") {
 				if (session) session.#refresh();
 				return;
@@ -206,7 +223,8 @@ export class DashboardSession implements LiveSession {
 			const change = parseRpcRequest(frame, Date.now());
 			if (change?.kind === "add") requests.add(change.request);
 			else if (change?.kind === "cancel") requests.remove(change.id);
-		});
+		};
+		const child = await startRpc(cwd, onFrame, launch);
 		try {
 			await child.client.setSubagentSubscription("progress");
 			await prepare(child.client);
@@ -311,11 +329,21 @@ export class DashboardSession implements LiveSession {
 			if (images.length > 0) throw new Error("A ! command takes no images.");
 			return this.#shell(text);
 		}
+		await this.#send(text, images, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
+	}
+
+	followUp(text: string): Promise<void> {
+		return this.#send(text, [], "followUp").catch((err: unknown) => {
+			this.#fail("Prompt failed", err);
+			throw err;
+		});
+	}
+
+	/** Sends `text` and `images` to the main agent through the turn gate; rejects when omp does not take them. */
+	async #send(text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
 		this.#userCommand = text.startsWith("/");
 		const content = images.map(image => ({ type: "image" as const, ...image }));
-		await this.#turn
-			.run(() => this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery))
-			.catch((err: unknown) => this.#fail("Prompt failed", err));
+		await this.#turn.run(() => this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery));
 	}
 
 	/** A `!` command, which omp runs in the session's directory and records in its file for the agent to see. */
@@ -489,6 +517,7 @@ export class DashboardSession implements LiveSession {
 		else if (event.type === "agent_end" && event.isTerminal !== false) {
 			this.#setActivity("idle");
 			this.#refresh();
+			this.#emit({ kind: "turn-ended", reply: lastReply(event.messages) });
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
 			this.queue = { steering: event.steering, followUp: event.followUp };
 			this.#emit({ kind: "roster" });

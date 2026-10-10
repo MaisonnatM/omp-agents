@@ -34,7 +34,7 @@ export function useFocusedSession(state: DashboardState, page: Page | null, { wo
 	const host = view?.kind === "live" ? state.hosts.find(h => h.instanceId === view.instanceId) : undefined;
 	const past = view?.kind === "past" ? state.past.find(s => s.sessionId === view.sessionId) : undefined;
 	const lastHost = view?.kind === "live" ? state.lastHosts.get(view.instanceId) ?? null : null;
-	const title = documentTitle(page ?? null, view, host ?? lastHost, past ?? null);
+	const title = documentTitle(page ?? null, view, host ?? lastHost, past ?? null, state.projects);
 	useEffect(() => {
 		document.title = title;
 	}, [title]);

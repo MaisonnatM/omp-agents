@@ -5,24 +5,12 @@
  * A file from before `schedules`, before a run's `outcome`, or before a prompt task's `pin` migrates here, so everything else sees the current shape.
  */
 import { JsonFile } from "../fs";
-import { isObject, isTexts } from "../json";
+import { isObject, isTexts, parseAll } from "../json";
 import { applyRoutine, MAX_ROUTINE_RUNS, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
 import { parseRoutineSpec } from "./wire";
 
 interface Stored {
 	routines: Routine[];
-}
-
-/** Every entry of `values` through `parse`, or `null` when `values` is no array or one entry does not parse. */
-function parseAll<T>(values: unknown, parse: (value: unknown) => T | null): T[] | null {
-	if (!Array.isArray(values)) return null;
-	const parsed: T[] = [];
-	for (const value of values) {
-		const entry = parse(value);
-		if (entry === null) return null;
-		parsed.push(entry);
-	}
-	return parsed;
 }
 
 /** A session a run recorded before `outcome`, which also held its `label`. */

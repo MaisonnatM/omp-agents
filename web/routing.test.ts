@@ -10,6 +10,7 @@ import {
 	hashForLayout,
 	hashForNewSession,
 	hashForPullRequestFiles,
+	hashForProjects,
 	hashForRoutines,
 	hashForSettings,
 	hashForTickets,
@@ -157,6 +158,20 @@ describe("layout hash", () => {
 		expect(routeFromHash("#routinesx").kind).toBe("panes");
 	});
 
+	test("the projects hash opens the list, the New project form, or one project, and round-trips an id", () => {
+		const id = "8b1e0c2a-5d3f-4a7e-9c60-2f4d1e8a7b35";
+		const list: Route = { kind: "page", page: { kind: "projects", target: { kind: "list" } } };
+		expect(hashForProjects({ kind: "list" })).toBe("#projects");
+		expect(hashForProjects({ kind: "new" })).toBe("#projects/new");
+		expect(hashForProjects({ kind: "project", id })).toBe(`#projects/${id}`);
+		expect(routeFromHash(hashForProjects({ kind: "project", id }))).toEqual({ kind: "page", page: { kind: "projects", target: { kind: "project", id } } });
+		expect(routeFromHash(hashForProjects({ kind: "new" }))).toEqual({ kind: "page", page: { kind: "projects", target: { kind: "new" } } });
+		expect(routeFromHash(hashForProjects({ kind: "list" }))).toEqual(list);
+		expect(routeFromHash("#projects/")).toEqual(list);
+		expect(routeFromHash("#projects/%zz")).toEqual(list);
+		expect(routeFromHash("#projectsx").kind).toBe("panes");
+	});
+
 	test("the changes hash opens a session's first file or one by path, slashes and absolute paths kept, and is not read as a layout", () => {
 		expect(hashForChanges("01a0f6a5-181e")).toBe("#changes/01a0f6a5-181e");
 		expect(routeFromHash("#changes/01a0f6a5-181e")).toEqual({ kind: "page", page: { kind: "changes", sessionId: "01a0f6a5-181e", path: null } });
@@ -252,6 +267,7 @@ describe("opening and closing panes", () => {
 		expect(layoutAfterStart(layout, { kind: "fork", view: a, itemId: "u1", point: { entryId: "e1", prefill: true } }, "c")).toEqual(split([a, past, c], 2));
 		expect(layoutAfterStart(layout, quick, "c")).toBeNull();
 		expect(layoutAfterStart(layout, { kind: "resume-all", sessionIds: ["s"] }, "c")).toBeNull();
+		expect(layoutAfterStart(layout, { kind: "project", name: "", cwd: "~/a", prompt: "plan", model: null, thinking: null }, "c")).toEqual(split([a, past, c], 2));
 	});
 
 	test("a Resume all shows each resumed session live in the pane of its transcript, and leaves the panes otherwise", () => {

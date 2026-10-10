@@ -3,11 +3,12 @@ import { useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { SidebarContent, SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarInput, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
-import { sameView } from "../routing";
-import type { SidebarSessions } from "../sessions";
+import { hashForProjects, sameView } from "../routing";
+import { projectHosts, type SidebarSessions } from "../sessions";
 import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
+import { ProjectSessions } from "./project-group";
 import { HostRow, PastRow } from "./session-row";
 
 const COLLAPSED_GROUPS_KEY = "omp-agents.sidebar-collapsed-groups";
@@ -32,13 +33,13 @@ interface SessionListProps {
 	newSessionLabel: string;
 }
 
-/** The Sessions tab: New session, the search field, and the pinned, idle, running, interrupted, and past groups. */
+/** The Sessions tab: New session, the search field, then the projects, and the pinned, idle, running, interrupted, and past groups. */
 export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, newSessionLabel }: SessionListProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const { connected, starts: { resumeAll } } = useDashboardStatus();
 	const [collapsed, toggleGroup] = useStoredKeys(COLLAPSED_GROUPS_KEY);
 	const [pastShown, setPastShown] = useState(PAST_PAGE);
-	const { pinned, running, idle, interrupted, ended } = lists;
+	const { projects, pinned, running, idle, interrupted, ended } = lists;
 	const resumingAll = resumeAll?.phase === "starting";
 	const isOpen = (view: View): boolean => open.some(pane => sameView(pane, view));
 	/** The search field narrows the lists, so a group left empty hides rather than saying it has no sessions. */
@@ -81,8 +82,38 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				</label>
 			</SidebarGroup>
 			<SidebarContent>
-				{filtering && pinned.hosts.length + pinned.past.length + idle.length + running.length + interrupted.length + ended.length === 0 && (
+				{filtering && projects.length + pinned.hosts.length + pinned.past.length + idle.length + running.length + interrupted.length + ended.length === 0 && (
 					<p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>
+				)}
+				{(!filtering || projects.length > 0) && (
+					<SidebarGroup
+						collapsible
+						open={!collapsed.has("projects")}
+						onOpenChange={() => toggleGroup("projects")}
+						headerActions={
+							<SidebarGroupActions>
+								<Tooltip content="New project">
+									<SidebarGroupAction asChild>
+										<a href={hashForProjects({ kind: "new" })} aria-label="New project">
+											<Plus />
+										</a>
+									</SidebarGroupAction>
+								</Tooltip>
+							</SidebarGroupActions>
+						}
+					>
+						<SidebarGroupLabel>{projects.length === 0 ? "No projects" : projects.length === 1 ? "1 project" : `${projects.length} projects`}</SidebarGroupLabel>
+						{projects.map(group => (
+							<ProjectSessions
+								key={group.project.id}
+								group={group}
+								open={!collapsed.has(`project:${group.project.id}`)}
+								onOpenChange={() => toggleGroup(`project:${group.project.id}`)}
+								isOpen={isOpen}
+								{...rowProps}
+							/>
+						))}
+					</SidebarGroup>
 				)}
 				{pinned.hosts.length + pinned.past.length > 0 && (
 					<SidebarGroup collapsible open={!collapsed.has("pinned")} onOpenChange={() => toggleGroup("pinned")}>
@@ -102,7 +133,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				{(!filtering || running.length > 0) && (
 					<SidebarGroup collapsible open={!collapsed.has("running")} onOpenChange={() => toggleGroup("running")}>
 						<SidebarGroupLabel>
-							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length > 0 ? "No other sessions running" : "No sessions"}
+							{running.length > 0 ? `${running.length} running` : pinned.hosts.length + idle.length + projectHosts(projects).length > 0 ? "No other sessions running" : "No sessions"}
 						</SidebarGroupLabel>
 						<SidebarMenu aria-label="Running omp sessions">{hostRows(running, false)}</SidebarMenu>
 					</SidebarGroup>

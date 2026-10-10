@@ -5,10 +5,12 @@ import { directoryOf } from "../paths";
 import type { RoutineChange } from "../routines";
 import type { NoticeOp } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
+import type { ProjectEdit } from "../shared/projects";
 import type { ClientFrame, ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { UserTodoChange } from "../user-todos-shared";
 import type { LiveSessions } from "./live-sessions";
+import type { ProjectSpec } from "./project-runner";
 import { type Socket, send, type Views, watching } from "./views";
 import type { MsgOf } from "./wire";
 
@@ -16,6 +18,10 @@ export interface SocketEnv {
 	sessions: LiveSessions;
 	views: Views;
 	start(request: StartRequest): Promise<StartResult>;
+	/** Create a project in `spec.cwd` and start its coordinator on `spec.prompt`, ready once the coordinator is. */
+	createProject(spec: ProjectSpec): Promise<StartResult>;
+	/** Apply `change` to the projects and send every socket the projects after it, or, when it changes nothing, send `ws` the projects it missed. */
+	changeProject(ws: Socket, change: ProjectEdit): void;
 	/** End live session `instanceId` as **End session** does, then remove the git worktree it worked in. */
 	end(instanceId: string): Promise<void>;
 	/** Move interrupted session `sessionId` to the past sessions. */
@@ -97,6 +103,9 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	async start({ start }, ws, msg) {
 		send(ws, { t: "started", reqId: msg.reqId, result: await start(msg) });
 	},
+	async "project-create"({ createProject }, ws, { reqId, name, cwd, prompt, model, thinking }) {
+		send(ws, { t: "started", reqId, result: await createProject({ name, cwd, prompt, model, thinking }) });
+	},
 	async "resume-all"({ sessions, start, stoppedMidTurn }, ws, { reqId, sessionIds }) {
 		const results = await Promise.all(
 			sessionIds.map(async sessionId => {
@@ -136,6 +145,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, ws: Socket, msg:
 	"user-todo": ({ changeTodo }, ws, { change }) => changeTodo(ws, change),
 	routine: ({ changeRoutine, runRoutine }, ws, { change }) => (change.op === "run-now" ? runRoutine(change.id) : changeRoutine(ws, change)),
 	pin: ({ changePins }, ws, { change }) => changePins(ws, change),
+	project: ({ changeProject }, ws, { change }) => changeProject(ws, change),
 	notice: ({ changeNotices }, _ws, { ids, op }) => changeNotices(ids, op),
 };
 

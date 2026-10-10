@@ -69,6 +69,14 @@ export interface RoutinesRoute {
 	target: string | null;
 }
 
+/** What the Projects page shows: every project, the New project form, or one project's coordinator, workers, updates, and notes. */
+export type ProjectsTarget = { kind: "list" } | { kind: "new" } | { kind: "project"; id: string };
+
+/** The Projects page, showing `target`. */
+export interface ProjectsRoute {
+	target: ProjectsTarget;
+}
+
 /** The directory a new session starts in, as typed or displayed (`~/code/webapp`); `null` for {@link defaultCwd}. `todoId` names the todo it works on. */
 export interface NewSessionRoute {
 	cwd: string | null;
@@ -88,6 +96,7 @@ export type Page =
 	| ({ kind: "tickets" } & TicketsRoute)
 	| ({ kind: "todo" } & TodoRoute)
 	| ({ kind: "routines" } & RoutinesRoute)
+	| ({ kind: "projects" } & ProjectsRoute)
 	| { kind: "calendar" }
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "changes" } & ChangesRoute);
@@ -133,6 +142,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
  *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone.
  * - `#routines` opens the Routines page with every routine, and `#routines/<id>` with that routine's settings and runs.
+ * - `#projects` opens the Projects page with every project, `#projects/new` with the New project form, and `#projects/<id>`
+ *   with that project's coordinator, workers, and notes. Project ids are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
@@ -155,6 +166,10 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }) };
 	},
 	routines: rest => ({ kind: "routines", target: rest ? decodeSegment(rest) : null }),
+	projects: rest => {
+		const id = rest && rest !== "new" ? decodeSegment(rest) : null;
+		return { kind: "projects", target: rest === "new" ? { kind: "new" } : id ? { kind: "project", id } : { kind: "list" } };
+	},
 	calendar: () => ({ kind: "calendar" }),
 	changes: rest => {
 		const [sessionId = "", path] = (rest ?? "").split("/");
@@ -183,6 +198,8 @@ function restOfPage(page: Page): string | null {
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
 		case "routines":
 			return page.target === null ? null : encodeURIComponent(page.target);
+		case "projects":
+			return page.target.kind === "list" ? null : page.target.kind === "new" ? "new" : encodeURIComponent(page.target.id);
 		case "calendar":
 			return null;
 		case "changes":
@@ -205,6 +222,7 @@ export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = n
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
 export const hashForTodo = (list: TodoListView): string => hashForPage({ kind: "todo", list });
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
+export const hashForProjects = (target: ProjectsTarget): string => hashForPage({ kind: "projects", target });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection, cwd: string | null): string => hashForPage({ kind: "settings", section, cwd });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
@@ -261,7 +279,7 @@ function paneForView(view: View): string {
 	return view.agentId === null ? session : `${session}/${encodeURIComponent(view.agentId)}`;
 }
 
-/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `routines`, `session`, or `new`. `null` for a pane whose ids do not decode. */
+/** Instance ids are hex, so none reads as `past`, `settings`, `pull-requests`, `tickets`, `todo`, `routines`, `projects`, `session`, or `new`. `null` for a pane whose ids do not decode. */
 function viewFromPane(pane: string): View | null {
 	if (pane.startsWith(PAST_PREFIX)) {
 		const sessionId = decodeSegment(pane.slice(PAST_PREFIX.length));
@@ -352,7 +370,7 @@ export function swapView(layout: Layout, from: View, to: View): Layout {
 
 /**
  * The layout once start `op` answers with live session `instanceId`, `null` to leave it: a resumed session takes the
- * pane of the past session it continues, a new session or a fork opens in the focused pane, and a quick action's
+ * pane of the past session it continues, a new session, a fork, or a new project's coordinator opens in the focused pane, and a quick action's
  * session runs in the background.
  */
 export function layoutAfterStart(layout: Layout, op: StartOp, instanceId: string): Layout | null {
@@ -362,6 +380,7 @@ export function layoutAfterStart(layout: Layout, op: StartOp, instanceId: string
 			return swapView(layout, { kind: "past", sessionId: op.sessionId }, live);
 		case "new":
 		case "fork":
+		case "project":
 			return openView(layout, live, "replace");
 		case "quick":
 		case "resume-all":

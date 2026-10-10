@@ -15,6 +15,7 @@ import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { PullRequestDetailPage } from "./pull-requests/pr-page";
 import { NewSession } from "./new-session";
 import { PaneGrid } from "./pane-grid";
+import { ProjectsPage } from "./projects/projects-page";
 import { RoutinesPage } from "./routines/routines-page";
 import { SettingsPage } from "./settings/settings-page";
 import { TicketsDisconnected, TicketsPage } from "./tickets/tickets-page";
@@ -52,7 +53,7 @@ function todoSeed(list: UserTodoList | null, todoId: string | null): { text: str
 /** The page state's fields the pages read, each the same object until it changes, so a socket update to any other field skips the page. */
 type PageState = Pick<
 	DashboardState,
-	"hosts" | "past" | "lastHosts" | "layout" | "draft" | "models" | "userTodos" | "routines" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
+	"hosts" | "past" | "lastHosts" | "layout" | "draft" | "models" | "userTodos" | "routines" | "projects" | "workspaceList" | "pins" | "newSessionCompletions" | "connected" | "listed" | "rosterError"
 >;
 
 interface PageSwitchProps extends PageState {
@@ -60,6 +61,8 @@ interface PageSwitchProps extends PageState {
 	page: Page | null;
 	/** The new session under way or failed, if there is one. */
 	newStart: StartOf<"new"> | null;
+	/** The new project under way or failed, if there is one. */
+	projectStart: StartOf<"project"> | null;
 	scope: WorkspaceScope;
 	/** Where a new session starts when nothing picks a directory. */
 	defaultWorkspace: string;
@@ -90,6 +93,7 @@ export const PageSwitch = memo(function PageSwitch({
 	models,
 	userTodos,
 	routines,
+	projects,
 	workspaceList,
 	pins,
 	newSessionCompletions,
@@ -97,6 +101,7 @@ export const PageSwitch = memo(function PageSwitch({
 	listed,
 	rosterError,
 	newStart,
+	projectStart,
 	scope,
 	defaultWorkspace,
 	sectionTarget,
@@ -175,6 +180,22 @@ export const PageSwitch = memo(function PageSwitch({
 					workspaces={workspaces}
 					defaultCwd={defaultWorkspace}
 					connected={connected}
+				/>
+			);
+		case "projects":
+			return (
+				// Keyed by its target, so leaving for another project or the list closes the form and the rename field.
+				<ProjectsPage
+					key={page.target.kind === "project" ? page.target.id : page.target.kind}
+					projects={projects}
+					target={page.target}
+					// Every session, since a project's workers may run in `/tmp`, which the sidebar hides.
+					hosts={hosts}
+					past={past}
+					workspaces={workspaces}
+					defaultCwd={defaultWorkspace}
+					connected={connected}
+					launch={projectStart}
 				/>
 			);
 		case "calendar":

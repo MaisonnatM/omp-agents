@@ -47,7 +47,7 @@ Besides a live session's own hash, the routes are:
 - `#pull-requests`, `#pull-requests/<owner>/<repo>/<number>`, `#pull-requests/<owner>/<repo>/<number>/files`, `#pull-requests/<owner>/<repo>/<number>/files/<encoded path>`;
 - `#tickets`, `#tickets/<identifier>`;
 - `#todo`, `#todo/today`, `#todo/agents`, `#todo/archive`, `#todo/<category id>`;
-- `#calendar`, `#routines`, `#routines/<id>`;
+- `#calendar`, `#routines`, `#routines/<id>`, `#projects`, `#projects/new`, `#projects/<id>`;
 - `#new`, `#new/<encoded cwd>`, `#new/<encoded cwd>?todo=<todo id>`;
 - `#settings`, `#settings/<section>`, `#settings/<section>/<encoded cwd>`, where `<section>` is `analytics`, `preferences`, `integrations`, `workspaces`, `models`, `files`, or `worktrees`.
 

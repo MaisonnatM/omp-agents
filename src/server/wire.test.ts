@@ -171,6 +171,22 @@ describe("parseClientMsg", () => {
 		expect(change({ op: "pin", sessionIds: "s1" })).toBeNull();
 	});
 
+	test("project-create takes a name, a workspace, a first message, a model or null, and a thinking level or null; project takes only a rename or an archive", () => {
+		const create = { t: "project-create" as const, reqId: 3, name: "", cwd: "~/code/app", prompt: "Migrate billing.", model: null, thinking: null };
+		expect(msg(create)).toEqual(create);
+		expect(msg({ ...create, model: { provider: "anthropic", id: "claude" }, thinking: "high" })).toEqual({ ...create, model: { provider: "anthropic", id: "claude" }, thinking: "high" });
+		expect(msg({ ...create, thinking: "" })).toBeNull();
+		expect(msg({ ...create, prompt: " " })).toBeNull();
+		expect(msg({ ...create, cwd: "" })).toBeNull();
+		expect(msg({ ...create, name: "x".repeat(201) })).toBeNull();
+		expect(msg({ ...create, reqId: -1 })).toBeNull();
+		const change = (value: unknown) => msg({ t: "project", change: value });
+		expect(change({ op: "rename", id: "p1", name: "Billing v3" })).toEqual({ t: "project", change: { op: "rename", id: "p1", name: "Billing v3" } });
+		expect(change({ op: "archive", id: "p1", name: "ignored" })).toEqual({ t: "project", change: { op: "archive", id: "p1" } });
+		expect(change({ op: "relink", from: "s1", to: "s2" })).toBeNull();
+		expect(change({ op: "archive", id: "" })).toBeNull();
+	});
+
 	test("a prompt's images must be base64 of a type models read, within the size limit", () => {
 		const png = { data: "aGVsbG8=", mimeType: "image/png" };
 		const prompt = (images: unknown) => msg({ t: "prompt", view: live, text: "", images, delivery: "steer" });

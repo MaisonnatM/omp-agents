@@ -20,6 +20,7 @@ import {
 	Wrench,
 } from "lucide-react";
 import { type KeyboardEvent as ReactKeyboardEvent, memo, useCallback, useMemo, useRef } from "react";
+import type { Project } from "../../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import type { UserTodoCategory } from "../../../src/user-todos-shared";
@@ -44,7 +45,7 @@ import {
 import { localDay } from "../../days";
 import { age, folderName, hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
-import type { OpenMode } from "../../routing";
+import { hashForProjects, type OpenMode } from "../../routing";
 import { sessionActions, type SessionEntry } from "../../session-actions";
 import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
@@ -70,6 +71,7 @@ const COMMAND_ICON: Partial<Record<ShortcutId, LucideIcon>> = {
 	todo: PAGE_ICON.todo,
 	calendar: PAGE_ICON.calendar,
 	routines: Repeat,
+	projects: PAGE_ICON.projects,
 	terminal: SquareTerminal,
 };
 
@@ -95,16 +97,18 @@ interface CommandPaletteProps {
 	unavailable: ReadonlySet<ShortcutId>;
 	/** The todo list's categories, which a typed `#category` files a new todo under; `null` while the list cannot be edited. */
 	todoCategories: readonly UserTodoCategory[] | null;
+	/** Every project; the ones not archived list as items that open their page. */
+	projects: readonly Project[];
 	/** Open the new-ticket dialog with a title. Omitted while Linear cannot be called. */
 	onCreateTicket?: (title: string) => void;
 }
 
 /**
- * Searches running and past sessions in every workspace, the page's commands, and workspaces; Enter runs the highlighted
+ * Searches running and past sessions in every workspace, projects, the page's commands, and workspaces; Enter runs the highlighted
  * entry's first action, ⌘K lists the rest, and what you type can become a todo or a Linear ticket's title. Its props
  * hold no closure built per render, so a socket update that touches none of them skips it.
  */
-export const CommandPalette = memo(function CommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, todoCategories, onCreateTicket }: CommandPaletteProps) {
+export const CommandPalette = memo(function CommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, todoCategories, projects, onCreateTicket }: CommandPaletteProps) {
 	const { send, start, end, changeTodo } = useDashboardActions();
 	const { starts, ending } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
@@ -166,6 +170,26 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 		};
 		return [...hosts.map(host => sessionItem({ kind: "live", host })), ...past.map(session => sessionItem({ kind: "past", session }))];
 	}, [open, hosts, past, pinned, resuming, ending, onOpenSession, onTogglePin, start, send, end]);
+
+	const projectItems = useMemo(
+		(): PaletteItem[] =>
+			open
+				? projects
+						.filter(project => !project.archived)
+						.map(project => ({
+							id: `project:${project.id}`,
+							section: "projects",
+							title: project.name,
+							subtitle: project.cwd,
+							keywords: project.workers.map(worker => worker.title),
+							icon: PAGE_ICON.projects,
+							accessories: [],
+							kind: "Project",
+							actions: [[{ id: "open", title: "Open project", icon: PAGE_ICON.projects, run: { kind: "link", href: hashForProjects({ kind: "project", id: project.id }) } }]],
+						}))
+				: [],
+		[open, projects],
+	);
 
 	const commandItems = useMemo((): PaletteItem[] => {
 		if (!open) return [];
@@ -257,12 +281,12 @@ export const CommandPalette = memo(function CommandPalette({ state, dispatch, ho
 					]
 				: [];
 		const itemsOf: Record<PaletteViewId, () => PaletteItem[]> = {
-			root: () => [...sessionItems, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
+			root: () => [...sessionItems, ...projectItems, ...commandItems, ...todoItem("fallback:create-todo", "fallback", `Create todo “${search}”`), ...ticketItem()],
 			workspaces: () => workspaceItems,
 			createTodo: () => todoItem("fallback:create-todo", "createTodo", "Create todo", search),
 		};
 		return itemsOf[viewId]();
-	}, [viewId, sessionItems, commandItems, workspaceItems, search, todoCategories, changeTodo, onCreateTicket]);
+	}, [viewId, sessionItems, projectItems, commandItems, workspaceItems, search, todoCategories, changeTodo, onCreateTicket]);
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	if (state === null || frame === null) return null;
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;

@@ -57,6 +57,7 @@ An action that fails shows its error, and its control becomes available again.
   The selected workspace applies to the group too.
   The server keeps the pins in `pins.json` beside its access token, by session id, so every browser tab and the desktop app show the same ones.
   Pins that a browser kept before then move to the server the first time its page connects.
+- Each project lists its coordinator and workers in a group of its own at the top of the list, above **Pinned**, even when they run in `/tmp`; see [Projects](#projects).
 - A live session whose turn ended, the blue dot, leaves **Running** for the **Idle** group above it, and moves back when its next turn starts.
   A session waiting on a question stays under **Running**, and a pinned session stays under **Pinned** whatever its state.
   The group shows only while it has a row.
@@ -919,6 +920,56 @@ An action that fails shows its error, and its control becomes available again.
 - The server keeps the routines in `routines.json` beside its access token, so every browser tab and the desktop app show the same ones.
   While the page has lost the server, the routines cannot be changed.
 
+## Projects
+
+- A project is a coordinator session that plans the work and hands it to worker sessions, as Cursor's Projects do.
+  The coordinator never changes the project's code: it starts a worker for each change, follows what the workers report, and tells you what is done and what waits on you.
+  Every session of a project reads and keeps one shared directory of notes.
+- The **Projects** page, a `#projects` address, G then P, or **Go to projects** in the command menu, lists the projects.
+  On the **Todo** page, G then P picks the focused or open todo's priority instead, as P alone does there; with no todo focused or open, it opens the projects.
+  **New project** on that page, the **+** of the sidebar's projects group, or `#projects/new` opens its form: a name, the workspace the coordinator starts in, its model and effort, as on a new session, and its first message, which says what the project is for.
+  **Create** starts the coordinator on that message and opens its pane; a name left empty becomes **New project**.
+  The project exists once its coordinator runs, so a start that fails leaves none behind.
+- The coordinator has four tools that the dashboard serves it, and only it has them.
+  `start_worker` starts a worker: a new dashboard session on a prompt that stands alone, with a short title, in the project's workspace or a directory the coordinator names, absolute, `~/`, or relative to the workspace.
+  Workers are numbered `w1`, `w2`, and so on in the order their sessions start, and run on omp's default model.
+  `list_workers` lists the workers and their phases, `read_worker` reads one worker's whole last reply and the questions it waits on, and `message_worker` sends one a message as you would: a running worker gets it after its current turn, and a stopped one is resumed first.
+- The **Sessions** tab lists each project as a collapsible group at the top, under the project's name: the coordinator first, with a **Coordinator** badge, then the workers in order, `w1` first.
+  A worker's row reads as the title the coordinator gave it, beside its `w1`, `w2` badge, rather than the title omp generated for the session.
+  A project's sessions leave the other groups, **Pinned** included, and the group lists them even in `/tmp`, which the sidebar otherwise hides.
+  With a workspace selected, a project shows when it started there or one of its sessions runs or ran there.
+  A search that matches a project's name keeps all its rows, and one that matches a worker's title keeps that worker.
+- `#projects/<id>` opens one project: its coordinator's status with **Open coordinator**, a table of its workers in order with each one's phase and last reply, the updates still waiting for the coordinator, and its notes files.
+  A worker's phase is working, asking while it waits on a question, idle, interrupted when it stopped without **End session**, or ended.
+  Click a notes file to open it in the file dialog.
+  **Rename** renames the project, and **Archive** archives it: its group leaves the sidebar, its sessions go back to the other groups, and its coordinator's tools refuse to start, list, read, or message workers.
+- Workers report back on their own, so the coordinator never polls.
+  Each time a worker finishes a turn, asks a question, or stops, the dashboard keeps an update for the coordinator; a worker's later finished turn replaces its earlier one, since the coordinator reads only its last reply.
+  Once the coordinator runs and is idle, every waiting update reaches it as one message that starts with `[omp-agents] Project update.`, quoting each finished worker's last reply up to 2,000 characters.
+  When omp does not take that message, the updates keep waiting, and the coordinator's next change of state, such as its next turn ending, sends them again.
+  A worker you prompt yourself reports the same way when its turn finishes.
+  A worker is told to end each turn on a report that stands alone, since the coordinator reads only its last reply, and to end its turn with a question it needs answered rather than ask it through the `ask` tool.
+  A question a worker still asks through `ask` waits for you in the dashboard: the coordinator cannot answer it, and its update tells the coordinator to tell you.
+- A project's notes live in `$XDG_DATA_HOME/omp-agents/projects/<id>/`, `~/.local/share/omp-agents/projects/<id>/` by default, outside every repository, so every worktree the project works in shares them.
+  A new project starts with `README.md`, which holds the goal from the first message and links the others, `testing.md` for how to build, run, and test the work, `preferences.md` for how you want it done, and `research.md` for what agents found out, with sources.
+  Every session of the project is told to read `README.md` first and to record there what lasts.
+  The coordinator may edit and write only these notes: its `edit` and `write` calls outside them, and calls whose files the extension cannot tell, are refused, and it is told to start a worker instead.
+  Its `local://` and `artifact://` scratch files are allowed.
+  A subagent that runs in a project session's own session, such as an advisor, has its role and its limit; one with a session of its own, such as a `task` subagent, has neither.
+- The role text and that limit come from the omp extension `~/.omp/agent/extensions/projects.ts`, which `bun run omp-template` installs.
+  When it is not installed, the dashboard loads this repository's copy with `-e` for each project session, so a project works either way.
+  The extension adds the session's role and the notes' place to every prompt, so they survive compaction.
+- **Resume** keeps a project's session in its project: a resumed coordinator gets its tools back, and the updates that waited while it was stopped reach it once it is idle.
+  Resuming it with `omp --resume` in a terminal gives it the role text, when the extension is installed, but no coordinator tools, since only the dashboard serves them.
+  A `/move` or an edited prompt, which gives a session a new id, keeps it in its project, and a fork of a project's session belongs to no project.
+- The server keeps the projects and their waiting updates in `projects.json` beside its access token, so no update is lost while the coordinator is stopped or the dashboard restarts.
+  Quitting the dashboard stops its sessions without telling any coordinator.
+- This first version has limits.
+  The coordinator cannot answer a worker's question; only you can, in the dashboard.
+  No tool ends a worker, so end one yourself with **End session**.
+  The coordinator's limit covers its `edit` and `write` calls, not its shell commands.
+  **Archive** cannot be undone, and an archived project's workers still report to its coordinator, which can no longer act on what they say.
+
 ## Settings
 
 - **Settings** is the last sidebar tab, after **Calendar**.
@@ -1067,6 +1118,7 @@ Alt is Option on macOS.
 | Cmd+5 | Anywhere | Go to your calendar |
 | Cmd+6 | Anywhere | Open or close settings |
 | G then R | Outside text fields | Go to your routines |
+| G then P | Outside text fields | Go to your projects |
 | G then W | Outside text fields | Choose the sidebar's workspace |
 | ↓ | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
 | ↑ | Pull requests page, outside text fields | Move to the previous pull request, or show its details while one shows |
@@ -1124,7 +1176,7 @@ Alt is Option on macOS.
   Both stay as you set them in this browser.
 - Cmd+1 opens the Pull requests page, and Cmd+2 opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page.
   Cmd+3 goes back from the Pull requests page, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
-  Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, and G then R the **Routines** page.
+  Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, G then R the **Routines** page, and G then P the **Projects** page.
   Cmd+6 opens Settings, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.

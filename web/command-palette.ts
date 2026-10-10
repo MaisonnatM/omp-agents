@@ -50,12 +50,12 @@ export type Accessory =
 	| { kind: "text"; text: string };
 
 /** The section an item belongs to; **Suggestions** borrows items from the others. */
-export type HomeSection = "running" | "past" | "commands" | "workspaces" | "createTodo" | "fallback";
+export type HomeSection = "running" | "projects" | "past" | "commands" | "workspaces" | "createTodo" | "fallback";
 
 export type SectionId = "suggestions" | HomeSection;
 
 export interface PaletteItem {
-	/** Stable across reloads, since frecency keys on it: `session:<id>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`. */
+	/** Stable across reloads, since frecency keys on it: `session:<id>`, `project:<id>`, `command:<id>`, `workspace:<cwd>`, `fallback:create-todo`. */
 	id: string;
 	section: HomeSection;
 	title: string;
@@ -64,7 +64,7 @@ export interface PaletteItem {
 	keywords: readonly string[];
 	icon: LucideIcon;
 	accessories: readonly Accessory[];
-	/** The type label at the row's end: `Session`, `Command`, `Workspace`. */
+	/** The type label at the row's end: `Session`, `Project`, `Command`, `Workspace`. */
 	kind: string;
 	/** Every action, as the action panel groups them. The first group's first action runs on Enter, so it is never empty. */
 	actions: readonly [ActionGroup, ...ActionGroup[]];
@@ -225,15 +225,16 @@ export interface Section {
 }
 
 /** Sections in the order an empty search lists them. */
-const BROWSE_ORDER: readonly SectionId[] = ["suggestions", "running", "commands", "past", "workspaces", "createTodo", "fallback"];
+const BROWSE_ORDER: readonly SectionId[] = ["suggestions", "running", "projects", "commands", "past", "workspaces", "createTodo", "fallback"];
 /** Sections a search ranks by their best match; equal ones keep this order. */
-const RANKED_ORDER: readonly HomeSection[] = ["running", "past", "commands", "workspaces"];
+const RANKED_ORDER: readonly HomeSection[] = ["running", "projects", "past", "commands", "workspaces"];
 /** Sections that hold what the search itself becomes: they match anything, and list after every match. */
 const UNRANKED_ORDER: readonly HomeSection[] = ["createTodo", "fallback"];
 
 const HEADINGS: Record<Exclude<SectionId, "fallback">, string | null> = {
 	suggestions: "Suggestions",
 	running: "Running",
+	projects: "Projects",
 	past: "Past",
 	commands: "Commands",
 	workspaces: "Workspaces",
