@@ -1,11 +1,12 @@
-import { GitPullRequest, Images, TableOfContents } from "lucide-react";
+import { FileDiff, GitPullRequest, Images, TableOfContents } from "lucide-react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
-import { useMedia, useTurnCount } from "../pane-store";
+import { useChangedFiles, useMedia, useTurnCount } from "../pane-store";
 import { useStoredState } from "../stored-state";
+import { FilesTab } from "./files-tab";
 import { MediaTab } from "./media-tab";
 import { OutlineTab } from "./outline-tab";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
@@ -13,7 +14,7 @@ import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 /** The right sidebar's tab, which localStorage keeps across views. The key keeps its old name, and a tab that no longer exists reads as the outline. */
 const TAB_KEY = "omp-agents.plan-tab";
 
-const DETAILS_TABS = ["outline", "media", "pull-requests"] as const;
+const DETAILS_TABS = ["outline", "files", "media", "pull-requests"] as const;
 type DetailsTab = (typeof DETAILS_TABS)[number];
 
 /** Each tab names itself and counts its items in a badge, which screen readers hear through the tab's name. */
@@ -34,6 +35,8 @@ interface SessionDetailsProps {
 	view: View;
 	/** Marks the last turn as still running; a change also reads the shown pull request again. */
 	working: boolean;
+	/** The session whose changes page the Files tab links to; `null` for a subagent's view and for a live session not yet in the roster. */
+	sessionId: string | null;
 	/** What the view's session and its subagents submitted or worked on, the session's own first. */
 	pullRequests: LinkedPullRequest[];
 	/** The sidebar's project `cwd`, or `null` for every project. */
@@ -42,10 +45,11 @@ interface SessionDetailsProps {
 }
 
 /**
- * The right sidebar's content for the focused view: an outline of its conversation's turns, the images its agents' tools
- * returned, and its session's pull requests, each tab apart.
+ * The right sidebar's content for the focused view: an outline of its conversation's turns, the files its agent changed,
+ * the images its agents' tools returned, and its session's pull requests, each tab apart.
  */
-export function SessionDetails({ view, working, pullRequests, project, hosts }: SessionDetailsProps) {
+export function SessionDetails({ view, working, sessionId, pullRequests, project, hosts }: SessionDetailsProps) {
+	const files = useChangedFiles(view);
 	const media = useMedia(view);
 	const turnCount = useTurnCount(view);
 	const [tab, setTab] = useStoredState<DetailsTab>(TAB_KEY, raw => DETAILS_TABS.find(tab => tab === raw) ?? "outline");
@@ -56,6 +60,7 @@ export function SessionDetails({ view, working, pullRequests, project, hosts }: 
 				<SizeProvider size="compact">
 					<TabsList aria-label="Session details">
 						<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", turnCount)} />
+						<TabItem value="files" icon={FileDiff} className={TAB_CLASS} {...tabLabel("Files", files?.length ?? 0)} />
 						<TabItem value="media" icon={Images} className={TAB_CLASS} {...tabLabel("Media", media?.length ?? 0)} />
 						<TabItem value="pull-requests" icon={GitPullRequest} className={TAB_CLASS} {...tabLabel("PRs", pullRequests.length)} />
 					</TabsList>
@@ -64,6 +69,11 @@ export function SessionDetails({ view, working, pullRequests, project, hosts }: 
 			<TabPanel value="outline" asChild>
 				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
 					<OutlineTab view={view} working={working} />
+				</SidebarContent>
+			</TabPanel>
+			<TabPanel value="files" asChild>
+				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
+					<FilesTab files={files} sessionId={sessionId} />
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="media" asChild>

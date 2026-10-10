@@ -15,6 +15,8 @@ export interface FocusedSession {
 	past: PastSession | undefined;
 	/** An ended live session's last roster row, for the header after it left the roster. */
 	lastHost: RosterHost | null;
+	/** The session the view belongs to, whose changes page the Files tab links to; `null` for a subagent's view and for a live session not yet in the roster. */
+	sessionId: string | null;
 	/** The view's roster row, an ended session's last one, or its past entry: what the PRs tab lists. */
 	row: RosterHost | PastSession | undefined;
 	/** The directory the view's session runs or ran in. */
@@ -46,5 +48,6 @@ export function useFocusedSession(state: DashboardState, page: Page | null, { pr
 		if (next !== null) pickProject(next);
 	}, [host?.instanceId, host?.cwd, project]);
 	const session = host ?? past;
-	return { view, host, past, lastHost, row: host ?? lastHost ?? past, cwd: session?.cwd, workspace: session ? (session.worktree ?? session.cwd) : null };
+	const sessionId = view?.kind === "past" ? view.sessionId : view?.kind === "live" && view.agentId === null ? ((host ?? lastHost)?.sessionId ?? null) : null;
+	return { view, host, past, lastHost, sessionId, row: host ?? lastHost ?? past, cwd: session?.cwd, workspace: session ? (session.worktree ?? session.cwd) : null };
 }
