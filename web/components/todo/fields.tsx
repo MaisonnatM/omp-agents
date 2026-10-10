@@ -59,6 +59,9 @@ interface TodoFieldProps {
 	onChange: (change: UserTodoChange) => void;
 }
 
+/** Whether a picker shows nothing: an icon picker hides an unset field until its key opens it. */
+const hidden = (look: FieldLook, unset: boolean, open: boolean | undefined): boolean => look === "icon" && unset && !open;
+
 export function TodoStatusPicker({ todo, look, onChange, ...props }: TodoFieldProps) {
 	const { label } = TODO_STATUS[todo.status];
 	return (
@@ -85,6 +88,7 @@ export function TodoStatusPicker({ todo, look, onChange, ...props }: TodoFieldPr
 }
 
 export function TodoPriorityPicker({ todo, look, onChange, ...props }: TodoFieldProps) {
+	if (hidden(look, todo.priority === 0, props.open)) return null;
 	const label = PRIORITY_LABEL[todo.priority];
 	return (
 		<FieldPicker
@@ -110,6 +114,7 @@ export function TodoPriorityPicker({ todo, look, onChange, ...props }: TodoField
 }
 
 export function TodoAssigneePicker({ todo, look, onChange, ...props }: TodoFieldProps) {
+	if (hidden(look, todo.assignee === null, props.open)) return null;
 	const { label } = ASSIGNEE[todo.assignee ?? "none"];
 	return (
 		<FieldPicker
@@ -146,6 +151,7 @@ export function DueText({ due, day }: { due: string; day: string }) {
 }
 
 export function TodoDuePicker({ todo, look, day, onChange, ...props }: TodoFieldProps & { day: string }) {
+	if (hidden(look, todo.due === null || todo.doneAt !== null, props.open)) return null;
 	return (
 		<DuePicker
 			{...props}

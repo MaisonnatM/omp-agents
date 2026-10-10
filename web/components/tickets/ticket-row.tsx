@@ -20,7 +20,7 @@ import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Ticket, TicketPriority, TicketStatus } from "../../../src/shared/tickets";
 import { cn } from "@/lib/utils";
 import { dateLabel, dayLabel } from "../../labels";
-import { type QuickActionId, type TicketActionId, ticketActions } from "../../quick-actions";
+import { type QuickActionId, ticketActions, type WorkActionId } from "../../quick-actions";
 import { hashForTickets, type OpenMode } from "../../routing";
 import { PRIORITY_LABEL, type StatusKind, statusKind } from "../../tickets-model";
 import { IconTip } from "../pull-requests/avatars";
@@ -74,7 +74,7 @@ interface TicketRowProps {
 	onOpen: (view: View, mode: OpenMode) => void;
 	/** The quick action whose session is starting for this issue, if any. */
 	pending: QuickActionId | null;
-	onQuickAction: (action: TicketActionId) => void;
+	onQuickAction: (action: WorkActionId) => void;
 }
 
 export function TicketRow({ ticket, sessions, onOpen, pending, onQuickAction }: TicketRowProps) {

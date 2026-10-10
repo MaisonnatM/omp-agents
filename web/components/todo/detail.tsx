@@ -11,13 +11,17 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getJson, putJson } from "../../api";
 import { dayLabel } from "../../labels";
+import { readPinnedSkill } from "../../pinned-skill";
+import { pendingOf, type QuickItem, quickOn, todoActions, todoStart, type WorkActionId } from "../../quick-actions";
 import { hashForNewSession } from "../../routing";
 import { shortcutLabels } from "../../shortcuts";
 import { categoryColor, TODO_STATUS, type TodoEntry } from "../../todo-views";
 import { workStateOf } from "../../todo-work-state";
 import type { TodoField } from "../../use-todo-keys";
+import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { type Choice, FieldPicker } from "../field-picker";
 import { NotesEditor } from "../notes-editor";
+import { QuickActionButton, QuickStartNotice } from "../quick-actions";
 import { preferredTeam, rememberTeam, TeamSelect } from "../tickets/team-select";
 import { StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
 import { TodoInput } from "./input";
@@ -126,7 +130,7 @@ function CategoryDot({ categoryId }: { categoryId: string | null }) {
 	return <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ backgroundColor: categoryId === null ? "var(--muted-foreground)" : badgeColors[categoryColor(categoryId)] }} />;
 }
 
-/** A top-level todo's sub-todos: how many are done, a row per sub-todo with its own status and priority, and a way to add one. */
+/** A top-level todo's sub-todos: how many are done, a row per sub-todo with its own status and its priority when set, and a way to add one. */
 function SubTodos({ todo, readOnly, onChange, onOpen }: { todo: UserTodo; readOnly: boolean; onChange: (change: UserTodoChange) => void; onOpen: (id: string) => void }) {
 	// A fresh input after each added sub-todo, so it starts empty; `null` while none is being typed.
 	const [adding, setAdding] = useState<number | null>(null);
@@ -178,7 +182,7 @@ function SubTodos({ todo, readOnly, onChange, onOpen }: { todo: UserTodo; readOn
 				))}
 				{adding !== null && (
 					<li className="flex h-9 items-center gap-1.5 px-2 text-sm">
-						<span className="flex w-[54px] shrink-0 justify-end pr-1">
+						<span className="flex w-6 shrink-0 justify-center">
 							<StatusIcon status="todo" className="opacity-60" />
 						</span>
 						<TodoInput
@@ -204,21 +208,42 @@ function SubTodos({ todo, readOnly, onChange, onOpen }: { todo: UserTodo; readOn
 }
 
 /**
- * What an agent does with a top-level todo: the linked session's state and its open question, with the way to reply,
- * and **Start session**. Without a linked session, just **Start session**.
+ * What an agent does with a top-level todo: the linked session's state and its open question, with the way to reply, then
+ * **Work on it** and **Plan it**, which start a session on it at once, and **Start session**, which opens the new-session
+ * draft. Without a linked session, just the buttons.
  */
 function AgentCard({ todo, readOnly, sessions, newSessionCwd }: { todo: UserTodo; readOnly: boolean; sessions: KnownSessions; newSessionCwd: string }) {
+	const { start, dismissStart } = useDashboardActions();
+	const { starts: { quick } } = useDashboardStatus();
 	const linked = todo.links.findLast(link => link.kind === "session");
 	const sessionId = linked?.kind === "session" ? linked.sessionId : null;
 	const question = sessionId === null ? undefined : sessions.hosts.find(host => host.sessionId === sessionId)?.requests[0];
-	const start = (
-		<Tooltip content="Start a session from this todo">
-			<Button variant={question ? "secondary" : "primary"} size="compact" leadingIcon={Play} asChild>
-				<a href={hashForNewSession(newSessionCwd, todo.id)}>{sessionId === null ? "Start session" : "Start another session"}</a>
-			</Button>
-		</Tooltip>
+	const item: QuickItem = { kind: "todo", id: todo.id };
+	const actions = todoActions(todo);
+	const pending = pendingOf(quick, item);
+	const failed = quickOn(quick, item);
+	const main: "reply" | WorkActionId | "draft" = question ? "reply" : (actions.at(0) ?? "draft");
+	const controls = !readOnly && (
+		<div className="flex flex-col gap-2">
+			<div className="flex flex-wrap gap-2">
+				{main === "reply" && sessionId !== null && (
+					<Button variant="primary" size="compact" asChild>
+						<a href={hashForSession(sessionId)}>Reply in session</a>
+					</Button>
+				)}
+				{actions.map(action => (
+					<QuickActionButton key={action} action={action} primary={main === action} pending={pending} onRun={() => start(todoStart(todo, action, newSessionCwd, readPinnedSkill()))} />
+				))}
+				<Tooltip content="Open a new-session draft from this todo, to edit its prompt or pick its directory">
+					<Button variant={main === "draft" ? "primary" : actions.length > 0 ? "ghost" : "secondary"} size="compact" leadingIcon={Play} asChild>
+						<a href={hashForNewSession(newSessionCwd, todo.id)}>{sessionId === null ? "Start session" : "Start another session"}</a>
+					</Button>
+				</Tooltip>
+			</div>
+			{failed && <QuickStartNotice quick={failed} onDismiss={() => dismissStart("quick")} />}
+		</div>
 	);
-	if (sessionId === null) return readOnly ? null : <div>{start}</div>;
+	if (sessionId === null) return controls || null;
 	return (
 		<div className="rounded-lg border border-border text-sm">
 			<div className="flex items-center gap-2 px-3 py-2">
@@ -230,16 +255,7 @@ function AgentCard({ todo, readOnly, sessions, newSessionCwd }: { todo: UserTodo
 					<p className="mt-0.5 whitespace-pre-wrap">{question.title}</p>
 				</div>
 			)}
-			{!readOnly && (
-				<div className="flex flex-wrap gap-2 border-t border-border px-3 py-2">
-					{question && (
-						<Button variant="primary" size="compact" asChild>
-							<a href={hashForSession(sessionId)}>Reply in session</a>
-						</Button>
-					)}
-					{start}
-				</div>
-			)}
+			{controls && <div className="border-t border-border px-3 py-2">{controls}</div>}
 		</div>
 	);
 }

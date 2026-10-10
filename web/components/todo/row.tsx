@@ -34,7 +34,7 @@ interface TodoRowProps {
 	onChange: (change: UserTodoChange) => void;
 }
 
-/** A todo's row: its priority, status, and assignee, title, what it carries, when it was added, and the buttons that add under it and delete it. */
+/** A todo's row: its priority when set, status, and assignee, title, what it carries, when it was added, and the buttons that add under it and delete it. */
 export function TodoRow({ section, entry, siblings, category, day, sessions, disabled, open, picker, onPicker, drag, editing, onOpen, onChange }: TodoRowProps) {
 	const { todo } = entry;
 	const top = entry.parent === null ? entry.todo : null;
@@ -100,8 +100,8 @@ export function TodoRow({ section, entry, siblings, category, day, sessions, dis
 					{category.name}
 				</Badge>
 			)}
-			{((todo.due !== null && !closed) || picker === "due") && <TodoDuePicker todo={todo} look="icon" day={day} disabled={disabled} {...pickerOf("due")} onChange={onChange} />}
-			{(todo.assignee !== null || picker === "assignee") && <TodoAssigneePicker todo={todo} look="icon" disabled={disabled} {...pickerOf("assignee")} onChange={onChange} />}
+			<TodoDuePicker todo={todo} look="icon" day={day} disabled={disabled} {...pickerOf("due")} onChange={onChange} />
+			<TodoAssigneePicker todo={todo} look="icon" disabled={disabled} {...pickerOf("assignee")} onChange={onChange} />
 			{top?.links.filter(link => link.kind !== "session").map(link => <TodoLinkChip key={JSON.stringify(link)} link={link} sessions={sessions} compact />)}
 			{todo.body.trim() && (
 				<Tooltip content="Has notes">
@@ -205,7 +205,7 @@ interface DraftRowProps {
 export function DraftRow({ draft, section, editing }: DraftRowProps) {
 	return (
 		<li className={cn("flex items-start gap-1.5 rounded-md px-2 py-1 text-sm leading-snug", draft.parentId !== null && "ml-6")}>
-			<span className="flex w-[54px] shrink-0 justify-end pr-1">
+			<span className="flex w-6 shrink-0 justify-center">
 				<StatusIcon status={draft.status} className="mt-0.5 opacity-60" />
 			</span>
 			<TodoInput

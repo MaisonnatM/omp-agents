@@ -2,13 +2,13 @@ import type { BranchChoice } from "../src/shared/git";
 import type { ModelOption } from "../src/shared/models";
 import type { ClientMsg } from "../src/shared/protocol";
 import type { PromptImage, StartResult, View } from "../src/shared/sessions";
-import { type QuickSubject, workItemOf } from "./quick-actions";
+import { type QuickSubject, startTarget } from "./quick-actions";
 import type { ForkPoint } from "./transcript-view";
 
 /**
  * What the user asked to start. A fork keeps the message it branched at, so its pane can show the progress there. A
- * quick action keeps its subject, the pull request or Linear issue with the action, which the Pull requests page or the tickets page
- * shows progress and failure for; the server links its session to that subject. A **Resume all** resumes each of the
+ * quick action keeps its subject, the pull request, Linear issue, or todo with the action, which its page shows progress
+ * and failure for; the server links its session to that subject. A **Resume all** resumes each of the
  * sidebar's interrupted sessions.
  */
 export type StartOp =
@@ -51,7 +51,7 @@ export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 		case "new":
 			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: op.images, branch: op.branch, model: op.model, thinking: op.thinking, skill: op.skill, subject: null, todoId: op.todoId };
 		case "quick":
-			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill, subject: workItemOf(op.subject), todoId: null };
+			return { t: "start", reqId, kind: "new", cwd: op.cwd, prompt: op.prompt, images: [], branch: null, model: null, thinking: null, skill: op.skill, ...startTarget(op.subject) };
 		case "fork":
 			return { t: "start", reqId, kind: "fork", view: op.view, entryId: op.point.entryId };
 		case "resume":

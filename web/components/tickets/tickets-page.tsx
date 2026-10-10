@@ -6,7 +6,7 @@ import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { readPinnedSkill } from "../../pinned-skill";
-import { pendingOf, type TicketActionId, ticketActions, ticketStart } from "../../quick-actions";
+import { pendingOf, ticketActions, ticketStart, type WorkActionId } from "../../quick-actions";
 import { ticketsStore, useReplaceableRead } from "../../reads";
 import { hashForTickets, type OpenMode } from "../../routing";
 import { sessionsOn } from "../../sessions";
@@ -36,7 +36,7 @@ interface GroupProps {
 	hosts: RosterHost[];
 	onOpen: (view: View, mode: OpenMode) => void;
 	quick: StartOf<"quick"> | null;
-	onQuickAction: (ticket: Ticket, action: TicketActionId) => void;
+	onQuickAction: (ticket: Ticket, action: WorkActionId) => void;
 }
 
 function GroupSection({ group, open, onToggle, hosts, onOpen, quick, onQuickAction }: GroupProps) {
@@ -94,7 +94,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	const [version, setVersion] = useState(0);
 	const detailRead = useReplaceableRead<TicketDetail>(target && `/api/ticket?${new URLSearchParams({ id: target })}`, version);
 	const folds = useFolds(COLLAPSED_KEY);
-	const start = (ticket: Ticket, action: TicketActionId) => startSession(ticketStart(ticket, action, cwd, readPinnedSkill()));
+	const start = (ticket: Ticket, action: WorkActionId) => startSession(ticketStart(ticket, action, cwd, readPinnedSkill()));
 	const listRef = useRef<HTMLDivElement>(null);
 	const returnTo = useRef<string | null>(null);
 	useEffect(() => {

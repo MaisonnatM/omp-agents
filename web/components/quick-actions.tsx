@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 
-import { QUICK_ACTIONS, type QuickActionId } from "../quick-actions";
+import { QUICK_ACTIONS, type QuickActionId, type QuickSubject } from "../quick-actions";
 import type { OpenMode } from "../routing";
 import type { StartOf } from "../starts";
 import { LiveSessionChips } from "./session-chip";
@@ -84,11 +84,27 @@ interface NoticeProps {
 	onDismiss: () => void;
 }
 
+/** The name a failure notice gives what a quick start works on. */
+function subjectName(subject: QuickSubject): string {
+	switch (subject.kind) {
+		case "pull-request":
+			return `${subject.pr.owner}/${subject.pr.repo}#${subject.pr.number}`;
+		case "ticket":
+			return subject.id;
+		case "todo":
+			return `"${subject.text}"`;
+		default: {
+			const unhandled: never = subject;
+			return unhandled;
+		}
+	}
+}
+
 /** Why the last quick action's session did not start, with a button that forgets it; nothing while it starts. */
 export function QuickStartNotice({ quick, onDismiss }: NoticeProps) {
 	if (quick.phase !== "failed") return null;
 	const { subject } = quick.op;
-	const name = subject.kind === "ticket" ? subject.id : `${subject.pr.owner}/${subject.pr.repo}#${subject.pr.number}`;
+	const name = subjectName(subject);
 	return (
 		<p role="alert" className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
 			<span className="min-w-0">
