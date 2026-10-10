@@ -9,6 +9,7 @@ import { hostLabel, pastLabel } from "./labels";
 import { PAGE_ICON } from "./page-icons";
 import { listedPullRequests } from "./pull-requests-model";
 import { hashForOpenTodo, hashForPullRequests, hashForTickets, type OpenMode } from "./routing";
+import { type SessionEntry, viewOf } from "./session-actions";
 import { TODO_STATUS } from "./todo-views";
 
 export interface PaletteRecords {
@@ -80,36 +81,43 @@ export function recordItems({ todos, tickets, pullRequestRepos }: PaletteRecords
 /** Open `view`, whose session ran in `cwd`, in the focused pane or a split, scrolled to message `messageId`. */
 export type OpenAt = (view: View, cwd: string, mode: OpenMode, messageId: string) => void;
 
+/** The most conversation matches the palette lists. */
+const MAX_CONVERSATION_ITEMS = 30;
+
 /**
  * One palette item for each conversation match of a session the sidebar lists, the server's order kept, opening it at
- * the matching message; a match in a session the sidebar hides, such as one in `/tmp`, is left out.
+ * the matching message, up to {@link MAX_CONVERSATION_ITEMS}; a match in a session the sidebar hides, such as one in `/tmp`, is left out.
  */
 export function conversationItems(hits: readonly ConversationHit[], hosts: readonly RosterHost[], past: readonly PastSession[], openAt: OpenAt): PaletteItem[] {
-	const rows = new Map<string, { view: View; cwd: string; title: string; state: Accessory }>([
-		...past.map(session => [session.sessionId, { view: { kind: "past", sessionId: session.sessionId }, cwd: session.cwd, title: pastLabel(session), state: { kind: "age", at: session.modifiedAt } }] as const),
-		...hosts.map(host => [host.sessionId, { view: { kind: "live", instanceId: host.instanceId, agentId: null }, cwd: host.cwd, title: hostLabel(host), state: { kind: "status", status: host.status } }] as const),
+	// A session that runs is listed live, so its live entry is set last and wins.
+	const entries = new Map<string, SessionEntry>([
+		...past.map(session => [session.sessionId, { kind: "past", session }] as const),
+		...hosts.map(host => [host.sessionId, { kind: "live", host }] as const),
 	]);
 	return hits.flatMap((hit): PaletteItem[] => {
-		const row = rows.get(hit.sessionId);
-		if (!row) return [];
+		const entry = entries.get(hit.sessionId);
+		if (!entry) return [];
+		const view = viewOf(entry);
+		const { cwd } = entry.kind === "live" ? entry.host : entry.session;
 		const matches: Accessory = { kind: "text", text: hit.matches === 1 ? "1 match" : `${hit.matches} matches` };
+		const state: Accessory = entry.kind === "live" ? { kind: "status", status: entry.host.status } : { kind: "age", at: entry.session.modifiedAt };
 		return [
 			{
 				id: `conversation:${hit.sessionId}`,
 				section: "conversations",
 				title: hit.snippet,
-				subtitle: row.title,
+				subtitle: entry.kind === "live" ? hostLabel(entry.host) : pastLabel(entry.session),
 				keywords: [],
 				icon: hit.role === "user" ? User : Bot,
-				accessories: [matches, row.state],
+				accessories: [matches, state],
 				kind: "Message",
 				actions: [
 					[
-						{ id: "open", title: "Open at this message", icon: AppWindow, run: { kind: "do", fn: () => openAt(row.view, row.cwd, "replace", hit.messageId) } },
-						{ id: "split", title: "Open in split at this message", icon: Columns2, run: { kind: "do", fn: () => openAt(row.view, row.cwd, "split", hit.messageId) } },
+						{ id: "open", title: "Open at this message", icon: AppWindow, run: { kind: "do", fn: () => openAt(view, cwd, "replace", hit.messageId) } },
+						{ id: "split", title: "Open in split at this message", icon: Columns2, run: { kind: "do", fn: () => openAt(view, cwd, "split", hit.messageId) } },
 					],
 				],
 			},
 		];
-	});
+	}).slice(0, MAX_CONVERSATION_ITEMS);
 }

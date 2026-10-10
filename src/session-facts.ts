@@ -13,9 +13,12 @@
  *
  * The session's own bash calls tell which linked worktree it works in: a session started in a repository's main
  * checkout often adds a worktree and runs its commands there with bash's `cwd`.
+ *
+ * The scan of a session's own file also keeps its prompts and replies, which the conversation search reads.
  */
 import { access } from "node:fs/promises";
 import { resolve } from "node:path";
+import { type Conversation, foldConversationLine } from "./conversation-search";
 import { branchAt, type HeadHistory, type WorktreeAt } from "./git";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
@@ -337,17 +340,24 @@ export function resolveLinks(refs: Iterable<PullRequestRef>, repo: Repo | null, 
 /** One transcript, read up to its last complete line. */
 class TranscriptScan {
 	scan = new SessionFactsScan();
+	/** The prompts and replies of a session's own file; `null` for a subagent's, which the conversation search leaves out. */
+	conversation: Conversation | null;
 	readonly #lines: LineReader;
 
-	constructor(path: string) {
+	constructor(path: string, own: boolean) {
+		this.conversation = own ? new Map() : null;
 		this.#lines = new LineReader(path, () => {
 			this.scan = new SessionFactsScan();
+			if (this.conversation) this.conversation = new Map();
 		});
 	}
 
 	/** Resolves `false` when the file could not be read; it reads again on the next call. */
 	read(): Promise<boolean> {
-		return this.#lines.read(line => this.scan.applyLine(line));
+		return this.#lines.read(line => {
+			this.scan.applyLine(line);
+			if (this.conversation) foldConversationLine(this.conversation, line);
+		});
 	}
 }
 
@@ -464,6 +474,16 @@ export class SessionFactsIndex {
 		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.scan.ship ?? null, worktree: session.worktree };
 	}
 
+	/** The prompts and replies of the session file in `sessionPath`, as read so far; `null` before its first scan. */
+	conversationOf(sessionPath: string): Conversation | null {
+		return this.#sessions.get(sessionPath)?.transcripts.get(sessionPath)?.conversation ?? null;
+	}
+
+	/** Resolves once the refreshes asked for so far are done. */
+	settled(): Promise<void> {
+		return this.#chain.then(() => {});
+	}
+
 	/**
 	 * Read what the listed session files gained since the last refresh and forget unlisted ones.
 	 * Resolves whether any session's pull requests, Linear issues, /ship stage, or worktree changed. Refreshes run one at a time.
@@ -565,12 +585,12 @@ export class SessionFactsIndex {
 		let session = this.#sessions.get(path);
 		const previousShip = session?.transcripts.get(path)?.scan.ship;
 		session ??= {
-			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path)]]), refs: [], submitted: new Map(),
+			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path, true)]]), refs: [], submitted: new Map(),
 			repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null, branch: null,
 		};
 		this.#sessions.set(path, session);
 		for (const file of await subagentFiles(path)) {
-			if (!session.transcripts.has(file)) session.transcripts.set(file, new TranscriptScan(file));
+			if (!session.transcripts.has(file)) session.transcripts.set(file, new TranscriptScan(file, false));
 		}
 		const reads = await Promise.all([...session.transcripts.values()].map(transcript => transcript.read()));
 		if (!reads.includes(false)) session.modifiedAt = modifiedAt;

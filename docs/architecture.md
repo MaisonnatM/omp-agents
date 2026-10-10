@@ -512,7 +512,8 @@ It folds the session's transcript with `Work` for the files its own `edit` and `
 It computes the list again and answers 404 for a path the list does not hold, so it reads no file the session and its checkout did not change, and passes the path with `--literal-pathspecs`, so a name such as `app/[id]/page.tsx` is not a glob.
 While the changes page of a live session shows, the page watches that session's view, so its `work` messages reach the page, which reads both routes again whenever the session's changes grow.
 `GET /api/project-notes?id=<project id>` answers a project's notes, `{ dir, notes }`, each note a `ProjectNote` (`{ name, path, modifiedAt }`) for a Markdown file in the directory, `README.md` first and then by name, or 404 for a project the server does not know; the page opens a note through `GET /api/file`.
-`GET /api/conversations?q=<words>` answers `ConversationSearchAnswer` from `src/shared/sessions.ts`: up to 30 saved conversations whose prompts or replies hold every word, the file changed last first, each by its latest such message, with that message's transcript item id, a snippet, and how many messages match; a blank `q` is a 400.
+`GET /api/conversations?q=<words>` answers `ConversationSearchAnswer` from `src/shared/sessions.ts`: every saved conversation whose prompts or replies hold every word, the file changed last first, each by its latest such message, with that message's transcript item id, a snippet, and how many messages match; a blank `q` is a 400.
+It waits for the transcript reads asked for so far, then reads nothing itself; the page leaves out the sessions the sidebar hides and lists the first 30.
 `GET /api/pull-request/files?owner=<o>&repo=<r>&number=<n>` answers the list on a pull request's **Code** tab, `PullRequestChanges` in `src/shared/github.ts`: its title and branches from `gh api repos/<o>/<r>/pulls/<n>`, and its files from `gh api --paginate --slurp repos/<o>/<r>/pulls/<n>/files`, which lists up to GitHub's 3000 where GraphQL's `files` stops at 100.
 It reads GitHub again on each call and keeps the answer, with each file's `patch` and blob id, for the file reads for 30 seconds.
 `GET /api/pull-request/file?owner=<o>&repo=<r>&number=<n>&path=<path>` answers one file of that list in full, `ChangedFileText`, and 404 for a path the list does not hold.
@@ -778,8 +779,9 @@ The server lives in `src/`:
 - `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below; `src/line-reader.ts` holds the incremental `LineReader` and the `ReadQueue` that serializes its reads, which `src/media.ts` shares.
 - `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, `toolResultOf`, `toolSummary`, and `imagesOf`, which the folds below and `src/guest.ts` read instead of walking the entry shape themselves.
 - `src/transcript.ts`: folds session-file lines and live events into display items.
-- `src/conversation-search.ts`: `ConversationSearch`, which `SessionFiles.searchConversations` runs for `GET /api/conversations`.
-  The first search folds every listed session file's prompts and replies with `Transcript`, skipping the tool-result lines unparsed, so a match names the same item id the pane shows; a later search reads only the files whose time changed, from where it stopped, and forgets the files no longer listed.
+- `src/conversation-search.ts`: the conversation search behind `GET /api/conversations`.
+  `SessionFactsIndex` folds each session's own file, not its subagents', through `foldConversationLine` as it reads it, keeping the prompts' and replies' item ids and text: `messageItemsOf` in `src/transcript.ts` names them as the pane's fold does, from one entry alone, and the tool-result lines go unparsed.
+  `searchConversations` then matches those with `everyWord` and reads no file.
 - `src/work.ts`: folds session-file lines into the files changed.
 - `src/media.ts`: collects the images that a transcript's and its subagents' tools returned, for the `media` message.
 - `src/session-facts.ts`: finds the pull requests and Linear issues each session submitted or worked on, its latest /ship step (`parseShipProgress`), and the linked worktree it works in; `SessionFactsIndex.factsOf(path)` answers them as one `SessionFacts`.
@@ -892,7 +894,7 @@ The page lives in `web/`.
   It and the page state apply the server's list updates, the roster's and the past sessions', through `applyDelta` in `web/keyed-list.ts`, which keeps every entry an update leaves alone as the same object.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
 - `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/pull-requests-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, `web/calendar-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
-  `src/shared/every-word.ts` holds `everyWord`, the one search rule the sidebar's sessions, the Files tab, the Todo page, the model search, the `@` menu, the command palette's todos, tickets, and pull requests, and the server's conversation search share: every word typed, in any order and any case.
+  `src/shared/every-word.ts` holds `everyWord` and `searchWords`, the one search rule the sidebar's sessions, the Files tab, the Todo page, the model search, the `@` menu, the command palette's todos, tickets, and pull requests, and the server's conversation search share: every word typed, in any order and any case.
 - `web/changes-model.ts`: the changes page's explorer tree, the diff's folded runs, and the file view's gutter marks; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines.
 - `web/file-paths.ts`: which paths in agent text name a text file, and the absolute path each resolves to.
   `web/delimited.ts` parses a TSV or CSV file into rows.
@@ -954,7 +956,8 @@ The page lives in `web/`.
   Shortcuts with a `command` title are also the command palette's commands, and `web/app.tsx` hands the palette the same handlers it registers.
 - `web/command-palette.ts`: the command palette's model, which renders nothing: its items and their actions, the reducer over its stack of views and its action panel, and the ranking, which multiplies cmdk's match score by a frecency boost kept in localStorage.
   `SECTIONS` there says how each section lists: always, only for a search or under Suggestions with every word required, as the todos, tickets, and pull requests do, in the server's order after those, as the conversation matches do, or after every match, as what the search becomes; `web/palette-records.ts` builds the records' and the matches' items, each opening the page that shows it, a todo through the `?open=` of its list's hash.
-  `useConversationHits` in `web/reads.ts` asks `GET /api/conversations` once typing pauses for 200 ms, and a match opens its session through `web/message-reveal.ts`, which the pane's `Transcript` reads to scroll to the message once the transcript has loaded.
+  `useConversationHits` in `web/reads.ts` asks `GET /api/conversations` through `useRead` once typing pauses for 200 ms; `highlightOnFound` moves the highlight from what the search becomes to the first item when the matches arrive.
+  A match opens its session through `web/message-reveal.ts`, a `keyedStore` by view, which the pane's `Transcript` reads to scroll once to the message after the transcript has loaded.
   `web/components/command-palette/` draws it, opened from the sidebar header or with Cmd+K: the dialog and its list, the action panel that Cmd+K opens on the highlighted entry, and the footer.
   It mounts only while open, so a closed palette builds no list and polls nothing; it asks for the Linear tickets while Linear answers.
   `web/session-actions.ts` lists what can be done to a session, which both a sidebar row's menu and the palette offer.

@@ -146,11 +146,9 @@ export interface ConversationHit {
 }
 
 export interface ConversationSearchAnswer {
-	/** The sessions whose files changed last first, at most {@link MAX_CONVERSATION_HITS}. */
+	/** Every match, the session whose file changed last first. */
 	hits: ConversationHit[];
 }
-
-export const MAX_CONVERSATION_HITS = 30;
 
 export interface LiveView {
 	kind: "live";

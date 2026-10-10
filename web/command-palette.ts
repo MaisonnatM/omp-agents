@@ -251,15 +251,16 @@ const SECTIONS: Record<HomeSection, { heading: string | null; listing: Listing }
 
 const listingOf = (section: HomeSection): Listing => SECTIONS[section].listing;
 
-/** The `browsed` sections in the order an empty search lists them, after Suggestions. */
-const BROWSE_ORDER: readonly HomeSection[] = ["running", "projects", "commands", "past", "workspaces"];
-/** The `browsed` and `searched` sections, which a search ranks by their best match; equal ones keep this order. */
-const RANKED_ORDER: readonly HomeSection[] = ["running", "projects", "past", "todos", "tickets", "pullRequests", "commands", "workspaces"];
-/** The `found` sections, then the `typed` ones, in the order they list after the ranked ones. */
-const UNRANKED_ORDER = (["found", "typed"] as const).flatMap(listing => (Object.keys(SECTIONS) as HomeSection[]).filter(section => listingOf(section) === listing));
-
 /** Whether a search scores a section's items: `found` and `typed` ones list without a score. */
 const ranks = (section: HomeSection): boolean => listingOf(section) === "browsed" || listingOf(section) === "searched";
+
+/** The `browsed` sections in the order an empty search lists them, after Suggestions. */
+const BROWSE_ORDER: readonly HomeSection[] = ["running", "projects", "commands", "past", "workspaces"];
+const SECTION_ORDER = Object.keys(SECTIONS) as HomeSection[];
+/** The sections a search ranks by their best match; equal ones keep {@link SECTIONS}' order. */
+const RANKED_ORDER = SECTION_ORDER.filter(ranks);
+/** The `found` sections, then the `typed` ones, which list in {@link SECTIONS}' order after the ranked ones. */
+const UNRANKED_ORDER = SECTION_ORDER.filter(section => !ranks(section));
 
 const headingOf = (id: SectionId, search: string): string | null => (id === "suggestions" ? "Suggestions" : id === "fallback" ? `Use “${search}”` : SECTIONS[id].heading);
 
@@ -300,6 +301,16 @@ export function paletteSections(items: readonly PaletteItem[], query: string, fr
 		.filter(filled)
 		.toSorted((a, b) => score(b.items[0]!) - score(a.items[0]!));
 	return [...ranked, ...UNRANKED_ORDER.map(id => inSection(items, id)).filter(filled)];
+}
+
+/**
+ * The item to highlight once `found` matches arrive, after the rest of a search listed: the first item, when the
+ * highlight sits on what the search becomes, where cmdk leaves it while nothing else matched; `null` to leave it.
+ */
+export function highlightOnFound(sections: readonly Section[], selectedId: string): string | null {
+	const selected = sections.flatMap(section => section.items).find(item => item.id === selectedId);
+	const first = sections[0]?.items[0];
+	return first && selected && first !== selected && listingOf(selected.section) === "typed" ? first.id : null;
 }
 
 export type PaletteCommand = Shortcut & { command: string };

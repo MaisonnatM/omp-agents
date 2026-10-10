@@ -27,7 +27,7 @@ import { ClientConfigError } from "../mcp-clients";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
-import { type ConversationHit, PROMPT_IMAGE_TYPES } from "../shared/sessions";
+import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { TICKET_ID } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { SystemLoadReader } from "../system-load";
@@ -247,7 +247,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	/** `GET /api/conversations?q=<words>`: the saved conversations whose prompts or replies hold every word, each by its latest such message. */
 	const conversations = get(params => {
 		const query = params.get("q")?.trim() ?? "";
-		return query ? answer(async () => ({ hits: await env.searchConversations(query) })) : fail(400, "Expected ?q= with a word to search");
+		return query ? answer(async (): Promise<ConversationSearchAnswer> => ({ hits: await env.searchConversations(query) })) : fail(400, "Expected ?q= with a word to search");
 	});
 
 	return {

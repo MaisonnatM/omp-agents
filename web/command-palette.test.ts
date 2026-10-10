@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { Folder } from "lucide-react";
 import {
 	chordAction,
+	highlightOnFound,
 	type Frecency,
 	type HomeSection,
 	type PaletteAction,
@@ -174,6 +175,14 @@ describe("paletteSections", () => {
 			["conversations", ["conversation:b", "conversation:a"]],
 			["fallback", ["fallback:create-todo"]],
 		]);
+	});
+
+	test("arriving matches take the highlight from what the search becomes, and leave a highlight on a match where it is", () => {
+		const items = [item("fallback:create-todo", "fallback", "Create todo"), item("conversation:a", "conversations", "deploy"), item("session:r", "running", "Deploy web")];
+		const sections = paletteSections(items, "deploy", {}, NOW);
+		expect(highlightOnFound(sections, "fallback:create-todo")).toBe("session:r");
+		expect(highlightOnFound(sections, "conversation:a")).toBeNull();
+		expect(highlightOnFound(paletteSections([items[0]!], "deploy", {}, NOW), "fallback:create-todo")).toBeNull();
 	});
 });
 

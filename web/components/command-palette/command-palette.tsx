@@ -30,6 +30,7 @@ import {
 	chordAction,
 	decodeFrecency,
 	FRECENCY_KEY,
+	highlightOnFound,
 	PALETTE_VIEWS,
 	PANEL_CHORD,
 	type PaletteAction,
@@ -307,10 +308,10 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 	const sections = useMemo(() => paletteSections(items, query, frecency, now, view.suggestions), [items, query, frecency, now, view.suggestions]);
 	const selected = sections.flatMap(section => section.items).find(item => item.id === frame.selected) ?? null;
 	const panelItem = state.panel && selected?.id === state.panel.itemId ? selected : null;
-	// Conversation matches arrive after the rest. A highlight left on what the search alone offered, such as Create todo, moves to the first match.
-	const firstId = sections[0]?.items[0]?.id;
+	// Runs as the conversation matches arrive, with the sections that list them.
 	useEffect(() => {
-		if (hits.length > 0 && selected?.section === "fallback" && firstId !== undefined) dispatch({ type: "select", itemId: firstId });
+		const id = hits.length > 0 ? highlightOnFound(sections, frame.selected) : null;
+		if (id !== null) dispatch({ type: "select", itemId: id });
 	}, [hits]);
 	const empty =
 		frame.view !== "createTodo" ? "No results." : todoCategories ? "Type the todo’s title." : "Todos cannot be edited while the dashboard is disconnected.";

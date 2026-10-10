@@ -108,25 +108,16 @@ const CONVERSATION_SEARCH_DELAY_MS = 200;
 
 /**
  * The saved conversations whose prompts or replies hold every word of `query`, asked once typing pauses; none for a
- * blank query or until the answer for this very query arrives. A failed search lists none.
+ * blank query, until the answer for this very query arrives, or when the search fails.
  */
 export function useConversationHits(query: string): ConversationHit[] {
-	const [answer, setAnswer] = useState<{ query: string; hits: ConversationHit[] } | null>(null);
+	const [settled, setSettled] = useState(query);
 	useEffect(() => {
-		if (!query) return;
-		const abort = new AbortController();
-		const timer = setTimeout(() => {
-			getJson<ConversationSearchAnswer>(`/api/conversations?q=${encodeURIComponent(query)}`, abort.signal).then(
-				({ hits }) => setAnswer({ query, hits }),
-				() => {},
-			);
-		}, CONVERSATION_SEARCH_DELAY_MS);
-		return () => {
-			clearTimeout(timer);
-			abort.abort();
-		};
+		const timer = setTimeout(() => setSettled(query), CONVERSATION_SEARCH_DELAY_MS);
+		return () => clearTimeout(timer);
 	}, [query]);
-	return answer?.query === query ? answer.hits : NO_HITS;
+	const read = useRead<ConversationSearchAnswer>(query && settled === query ? `/api/conversations?q=${encodeURIComponent(query)}` : null);
+	return read.data?.hits ?? NO_HITS;
 }
 
 export const analyticsStore = createPolledStore<Analytics>({

@@ -1158,7 +1158,6 @@ Alt is Option on macOS.
   A todo opens beside its list on the Todo page, a ticket opens its details, and a pull request opens its details on the Pull requests page; Cmd+Enter opens a ticket in Linear and a pull request on GitHub.
   **In conversations**, under those, lists the sessions whose prompts or replies hold every word typed, up to 30, the latest active first, each by the latest such message and how many match; tool output and thinking are not searched.
   Enter opens the session scrolled to that message, and Cmd+Enter opens it in a split.
-  The first search after the dashboard starts reads every saved transcript, which takes about a second.
   The search button in the sidebar header, immediately before the keyboard button, opens it too.
   With nothing typed, **Suggestions** lists the five entries you use most, by how often and how lately, then **Running**, **Commands**, and **Past**.
   What you type ranks every match by how well it matches and how much you use it, and the menu remembers that in this browser.
