@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DONE_KEPT_HOURS } from "../../../src/user-todos";
 import { localDay } from "../../days";
-import type { TodoListView } from "../../routing";
-import { byStatus, LIST_KINDS, lastOf, leftIn, matches, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todosOf } from "../../todo-views";
+import { hashForTodo, type TodoListView } from "../../routing";
+import { byStatus, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
 import { useTodoDrag } from "../../use-todo-drag";
 import { type OpenPicker, type TodoField, useTodoKeys } from "../../use-todo-keys";
 import { FoldButton, useFolds } from "../fold";
@@ -24,6 +24,8 @@ interface TodoPageProps {
 	/** `null` until the server sends the list. */
 	list: UserTodoList | null;
 	view: TodoListView;
+	/** The todo the route opens beside the list; one the list does not hold opens nothing. */
+	openId: string | null;
 	/** Changes would not reach the server, so the list is read-only. */
 	disabled: boolean;
 	onChange: (change: UserTodoChange) => void;
@@ -50,8 +52,10 @@ export function TodoPage({ list, ...props }: TodoPageProps) {
 	return <LoadedTodoPage list={list} {...props} />;
 }
 
-function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessionCwd, linearConnected }: TodoPageProps & { list: UserTodoList }) {
-	const [openId, setOpenId] = useState<string | null>(null);
+function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, newSessionCwd, linearConnected }: TodoPageProps & { list: UserTodoList }) {
+	const openTodo = (id: string | null): void => {
+		location.hash = hashForTodo(view, id);
+	};
 	const [query, setQuery] = useState("");
 	const [picker, setPicker] = useState<OpenPicker | null>(null);
 	const listRef = useRef<HTMLElement>(null);
@@ -61,10 +65,10 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 	const canAdd = !disabled && kind.add !== null;
 	const sessions: KnownSessions = { hosts, past };
 	const listed = todosOf(list, view, day, sessions);
-	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todo => matches(todo, query)) };
+	const section: Section = { categoryId: view.kind === "category" ? view.id : null, todos: listed.filter(todoMatcher(query)) };
 	// Looked up before the search filters the list, so typing a search keeps the open todo on screen.
 	const open = openId === null ? null : (placeIn([listed], openId)?.entry ?? null);
-	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && setOpenId(null), newSessionCwd });
+	const editing = useTodoEditing({ list, kind, day, frozen, onChange, onRemoved: id => openId === id && openTodo(null), newSessionCwd });
 	const drag = useTodoDrag(kind.canMove && !frozen, onChange);
 	const folds = useFolds(FOLDS_KEY, foldedByDefault);
 
@@ -95,7 +99,7 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 		onNew: canAdd ? () => startDraft("todo") : null,
 		openId: open && open.todo.id,
 		openOrder: order,
-		onOpen: setOpenId,
+		onOpen: openTodo,
 	});
 
 	/** The new todo typed at this place; a top-level one only in the group of its status. */
@@ -118,7 +122,7 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 			onPicker={field => setPicker(field && { id: entry.todo.id, field, inRow: true })}
 			drag={drag}
 			editing={editing}
-			onOpen={setOpenId}
+			onOpen={openTodo}
 			onChange={onChange}
 		/>
 	);
@@ -179,7 +183,7 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 						{kind.readOnly ? (
 							<ul aria-label="Archived todos" className="flex flex-col gap-0.5">
 								{section.todos.map(todo => (
-									<ArchivedRow key={todo.id} todo={todo} disabled={disabled} open={todo.id === openId} onOpen={setOpenId} onChange={onChange} />
+									<ArchivedRow key={todo.id} todo={todo} disabled={disabled} open={todo.id === openId} onOpen={openTodo} onChange={onChange} />
 								))}
 							</ul>
 						) : (
@@ -242,8 +246,8 @@ function LoadedTodoPage({ list, view, disabled, onChange, hosts, past, newSessio
 							picker={picker && !picker.inRow && picker.id === open.todo.id ? picker.field : null}
 							onPicker={field => setPicker(field && { id: open.todo.id, field, inRow: false })}
 							onChange={onChange}
-							onOpen={setOpenId}
-							onClose={() => setOpenId(null)}
+							onOpen={openTodo}
+							onClose={() => openTodo(null)}
 							onPrevious={at > 0 ? () => openStep(-1) : undefined}
 							onNext={at >= 0 && at < order.length - 1 ? () => openStep(1) : undefined}
 							sessions={sessions}

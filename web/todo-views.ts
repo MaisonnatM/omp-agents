@@ -3,6 +3,7 @@ import { Archive, Bot, CalendarClock, ListTodo, type LucideIcon, MessageCircleQu
 import type { TodoStatus, UserTodo, UserTodoChange, UserTodoLeaf, UserTodoList } from "../src/user-todos-shared";
 import type { BadgeColor } from "@/components/ui/badge";
 import { localDay } from "./days";
+import { everyWord } from "./every-word";
 import { DAY_FORMAT } from "./labels";
 import type { TodoListView } from "./routing";
 import type { StatusKind } from "./tickets-model";
@@ -130,11 +131,9 @@ export const sameTodoView = (a: TodoListView, b: TodoListView): boolean =>
 	a.kind === b.kind && (a.kind !== "category" || (b.kind === "category" && a.id === b.id));
 
 /** Whether a todo's title or notes, or one under it, holds every word of `query`, ignoring case. */
-export function matches(todo: UserTodo, query: string): boolean {
-	const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-	if (words.length === 0) return true;
-	const text = [todo, ...todo.children].map(leaf => `${leaf.text}\n${leaf.body}`).join("\n").toLowerCase();
-	return words.every(word => text.includes(word));
+export function todoMatcher(query: string): (todo: UserTodo) => boolean {
+	const holds = everyWord(query);
+	return todo => holds([todo, ...todo.children].map(leaf => `${leaf.text}\n${leaf.body}`).join("\n"));
 }
 
 /** Whether two todos share a status, which a move keeps them within. */

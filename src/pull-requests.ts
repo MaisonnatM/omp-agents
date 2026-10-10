@@ -6,7 +6,7 @@ import { createCache } from "./cache";
 import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, parsePerson, REVIEW, REVIEW_EVENT, REVIEWER, repoOf, STATUS } from "./github";
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
-import { type CheckRunState, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
+import { type CheckRunState, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, pullRequestName, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
 
 export { parseRemote, repoOf } from "./github";
 
@@ -199,7 +199,7 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 	const data = dataOf(answer);
 	const repository = isObject(data.repository) ? data.repository : {};
 	const node = repository.pullRequest;
-	const name = `${pr.owner}/${pr.repo}#${pr.number}`;
+	const name = pullRequestName(pr);
 	if (!isObject(node)) throw new Error(`GitHub has no pull request ${name}`);
 	const head = parsePullRequestHead(node);
 	const createdAt = Date.parse(str(node.createdAt) ?? "");

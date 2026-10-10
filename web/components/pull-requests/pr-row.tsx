@@ -1,6 +1,6 @@
 import { CircleCheck, CircleX, Clock, Eye, GitCompareArrows, GitMerge, Layers, type LucideIcon, MessageCircleQuestionMark, MessageSquare, UserCheck, UserX } from "lucide-react";
 import { memo, type MouseEvent, useState } from "react";
-import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, repoKey } from "../../../src/shared/github";
+import { type PullRequestSummary, type LinkedPullRequest, prKey, type PullRequest, type PullRequestLink, pullRequestName, repoKey } from "../../../src/shared/github";
 import type { MoveId } from "../../../src/shared/moves";
 import type { HostStatus, PastSession, RosterHost, View } from "../../../src/shared/sessions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuShortcut } from "@/components/ui/menu";
@@ -316,7 +316,7 @@ function openFromRow(event: MouseEvent<HTMLElement>, pr: PullRequest): void {
 /** The pull request's title link remains the keyboard and modifier-click target. */
 function TitleLink({ pr, targeted, className }: { pr: PullRequestSummary; targeted: boolean; className: string }) {
 	return (
-		<Tooltip content={`${pr.owner}/${pr.repo}#${pr.number} · ${pr.title}`}>
+		<Tooltip content={`${pullRequestName(pr)} · ${pr.title}`}>
 			<a
 				href={hashForPullRequests(pr)}
 				// The row drags, not the link's address.

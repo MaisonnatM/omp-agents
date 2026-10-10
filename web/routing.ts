@@ -59,9 +59,10 @@ export interface SettingsRoute {
 /** Which todos the Todo page lists: every one, one category's, due ones, those waiting on you, those agents added, or the archive. */
 export type TodoListView = { kind: "all" } | { kind: "category"; id: string } | { kind: "today" } | { kind: "needs" } | { kind: "agents" } | { kind: "archive" };
 
-/** The Todo page, listing `list`. */
+/** The Todo page, listing `list`, with todo `open` beside it when it is non-null and in the list. */
 export interface TodoRoute {
 	list: TodoListView;
+	open: string | null;
 }
 
 /** The Routines page: the list, or routine `target`'s settings and runs when it is non-null. */
@@ -140,7 +141,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#tickets` opens the tickets page, which lists the viewer's assigned Linear issues, and `#tickets/<identifier>`
  *   opens that issue's details in the main content. Any other `#tickets/…` opens the list alone.
  * - `#todo` opens the Todo page with every todo, `#todo/today`, `#todo/needs`, `#todo/agents`, and `#todo/archive` with the todos due by
- *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone.
+ *   today, waiting on you, added by agents, or in the archive; `#todo/<category id>` shows that category alone, and `?open=<id>` opens that todo.
  * - `#routines` opens the Routines page with every routine, and `#routines/<id>` with that routine's settings and runs.
  * - `#projects` opens the Projects page with every project, `#projects/new` with the New project form, and `#projects/<id>`
  *   with that project's coordinator, workers, and notes. Project ids are UUIDs, so none reads as `new`.
@@ -159,11 +160,12 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "pull-requests", target: { owner: match[1]!, repo: match[2]!, number: Number(match[3]) }, files };
 	},
 	tickets: rest => ({ kind: "tickets", target: rest !== null && TICKET_ID.test(rest) ? rest : null }),
-	todo: rest => {
-		if (!rest) return { kind: "todo", list: { kind: "all" } };
+	todo: (rest, query) => {
+		const open = query.get("open") || null;
+		if (!rest) return { kind: "todo", list: { kind: "all" }, open };
 		const named = Object.hasOwn(TODO_LISTS, rest) ? TODO_LISTS[rest as keyof typeof TODO_LISTS] : null;
 		const id = named ? null : decodeSegment(rest);
-		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }) };
+		return { kind: "todo", list: named ?? (id === null ? { kind: "all" } : { kind: "category", id }), open };
 	},
 	routines: rest => ({ kind: "routines", target: rest ? decodeSegment(rest) : null }),
 	projects: rest => {
@@ -211,16 +213,40 @@ function restOfPage(page: Page): string | null {
 	}
 }
 
+/** The `?name=value` that follows `page`'s path: the todo a new session works on, or the todo the Todo page opens; `null` for none. */
+function queryOfPage(page: Page): string | null {
+	switch (page.kind) {
+		case "new":
+			return page.todoId === null ? null : `todo=${encodeURIComponent(page.todoId)}`;
+		case "todo":
+			return page.open === null ? null : `open=${encodeURIComponent(page.open)}`;
+		case "settings":
+		case "pull-requests":
+		case "tickets":
+		case "routines":
+		case "projects":
+		case "calendar":
+		case "changes":
+			return null;
+		default: {
+			const never: never = page;
+			return never;
+		}
+	}
+}
+
 export function hashForPage(page: Page): string {
 	const rest = restOfPage(page);
-	const query = page.kind === "new" && page.todoId !== null ? `?todo=${encodeURIComponent(page.todoId)}` : "";
-	return `#${page.kind}${rest === null ? "" : `/${rest}`}${query}`;
+	const query = queryOfPage(page);
+	return `#${page.kind}${rest === null ? "" : `/${rest}`}${query === null ? "" : `?${query}`}`;
 }
 
 export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
-export const hashForTodo = (list: TodoListView): string => hashForPage({ kind: "todo", list });
+export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
+/** A todo opened in its category's list, else in every todo's; `categoryId` is its own, or its parent's for a todo under another. */
+export const hashForOpenTodo = (id: string, categoryId: string | null): string => hashForTodo(categoryId === null ? { kind: "all" } : { kind: "category", id: categoryId }, id);
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
 export const hashForProjects = (target: ProjectsTarget): string => hashForPage({ kind: "projects", target });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });

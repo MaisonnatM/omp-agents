@@ -276,8 +276,10 @@ export function App() {
 							handlers={handlers}
 							unavailable={unavailable}
 							todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
+							todos={mentionLists.todos}
+							linearConnected={linearCallable}
 							projects={state.projects}
-							onCreateTicket={linearCallable ? setNewTicket : undefined}
+							onCreateTicket={setNewTicket}
 						/>
 					</SidebarProvider>
 					<StatusBar usage={state.usage} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />

@@ -1,13 +1,15 @@
 /** The composer's `@` menu: the categories it offers, the query a token asks, and the rows it shows. */
 import { File, Folder, GitPullRequest, ListTodo, type LucideIcon, MessageSquare, Slash, Sparkles, Ticket } from "lucide-react";
-import { pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
+import { pullRequestName, pullRequestUrl, type RepoPullRequests } from "../src/shared/github";
 import type { CompletionItem, PastSession, RosterHost } from "../src/shared/sessions";
 import type { Ticket as LinearTicket } from "../src/shared/tickets";
 import { type ChangedFile, fileStatus } from "../src/shared/transcript";
 import type { UserTodo } from "../src/user-todos-shared";
 import type { MentionToken } from "./completion-trigger";
+import { everyWord } from "./every-word";
 import { isAbsolutePath } from "./file-paths";
 import { hostLabel, pastLabel } from "./labels";
+import { listedPullRequests } from "./pull-requests-model";
 
 export type CategoryId = "file" | "todo" | "ticket" | "pull-request" | "session";
 
@@ -82,21 +84,17 @@ interface Mention {
 	reference: string;
 }
 
-/** Every word of `words` is in the mention's label or detail, in any order and any case. */
-function matches(mention: Mention, words: string): boolean {
-	const text = `${mention.label}\n${mention.detail ?? ""}`.toLowerCase();
-	return words.toLowerCase().split(/\s+/).every(word => text.includes(word));
-}
-
 /** A category the page answers, filtering what `list` gives. */
 function source({ list, ...category }: Omit<Category, "searchLimit" | "options"> & { list(data: MentionData, composer: Composer): Mention[] }): Category {
 	return {
 		...category,
 		searchLimit: 3,
-		options: ({ words, data, composer, replace }) =>
-			list(data, composer)
-				.filter(mention => matches(mention, words))
-				.map(({ label, detail, reference }) => ({ icon: category.icon, label, detail, edit: replace(`${reference} `), opens: false })),
+		options: ({ words, data, composer, replace }) => {
+			const holds = everyWord(words);
+			return list(data, composer)
+				.filter(({ label, detail }) => holds(`${label}\n${detail ?? ""}`))
+				.map(({ label, detail, reference }) => ({ icon: category.icon, label, detail, edit: replace(`${reference} `), opens: false }));
+		},
 	};
 }
 
@@ -137,12 +135,10 @@ const CATEGORIES: readonly Category[] = [
 		title: "Pull requests",
 		icon: GitPullRequest,
 		list: ({ pullRequestRepos }) =>
-			pullRequestRepos
-				.flatMap(repo => ("pullRequests" in repo ? repo.pullRequests : []))
-				.map(pr => {
-					const name = `${pr.owner}/${pr.repo}#${pr.number}`;
-					return { label: pr.title, detail: name, reference: `[${linkText(`${name} ${pr.title}`)}](${pullRequestUrl(pr)})` };
-				}),
+			listedPullRequests(pullRequestRepos).map(pr => {
+				const name = pullRequestName(pr);
+				return { label: pr.title, detail: name, reference: `[${linkText(`${name} ${pr.title}`)}](${pullRequestUrl(pr)})` };
+			}),
 	}),
 	source({
 		id: "session",

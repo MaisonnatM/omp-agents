@@ -8,7 +8,7 @@ const PAGE_TAB: Partial<Record<Page["kind"], SidebarTab>> = { "pull-requests": "
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions" | "settings">, Page> = {
 	"pull-requests": { kind: "pull-requests", target: null },
 	tickets: { kind: "tickets", target: null },
-	todo: { kind: "todo", list: { kind: "all" } },
+	todo: { kind: "todo", list: { kind: "all" }, open: null },
 	calendar: { kind: "calendar" },
 };
 

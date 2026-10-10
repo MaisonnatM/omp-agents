@@ -1,5 +1,6 @@
 /** What the model menu derives from the model list and plan usage. */
 import type { ModelEntry, PlanUsage, PlanWindow } from "../src/shared/models";
+import { everyWord } from "./every-word";
 
 /** A trailing context size in a model id, as Cursor's `claude-opus-5-5-1m` names its 1M-token variant. */
 const CONTEXT_SUFFIX = /-\d+[km]$/i;
@@ -44,8 +45,7 @@ export function providerQuota(plans: readonly PlanUsage[], provider: string): Pr
 
 /** The model search's filter, as cmdk calls it: every word typed is in the model's selector or one of its names, in any order. */
 export function modelMatch(value: string, search: string, keywords: readonly string[] = []): number {
-	const text = [value, ...keywords].join(" ").toLowerCase();
-	return search.toLowerCase().split(/\s+/).every(word => text.includes(word)) ? 1 : 0;
+	return everyWord(search)([value, ...keywords].join(" ")) ? 1 : 0;
 }
 
 const LEVEL_LABELS: Record<string, string> = {

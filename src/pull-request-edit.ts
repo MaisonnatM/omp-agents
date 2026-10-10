@@ -3,7 +3,7 @@ import { createCache } from "./cache";
 import { dataOf, ghGraphql, ghRest, ghRestWrite, parsePerson } from "./github";
 import { loadPullRequestDetail } from "./pull-requests";
 import { isObject, str } from "./json";
-import { type Person, type PullRequest, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, type Repo, repoKey, type SettableState } from "./shared/github";
+import { type Person, type PullRequest, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
 
 const OPTIONS_TTL_MS = 5 * 60_000;
 
@@ -49,7 +49,7 @@ async function setState(pr: PullRequest, target: SettableState): Promise<void> {
 	const data = dataOf(await ghGraphql(STATE_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }));
 	const node = isObject(data.repository) && isObject(data.repository.pullRequest) ? data.repository.pullRequest : null;
 	const id = node && str(node.id);
-	if (!node || !id) throw new Error(`GitHub has no pull request ${pr.owner}/${pr.repo}#${pr.number}`);
+	if (!node || !id) throw new Error(`GitHub has no pull request ${pullRequestName(pr)}`);
 	if (node.state === "MERGED") throw new Error("A merged pull request keeps its state");
 	for (const step of stateSteps({ open: node.state === "OPEN", draft: node.isDraft === true }, target)) dataOf(await ghGraphql(mutation(step), { id }));
 }
