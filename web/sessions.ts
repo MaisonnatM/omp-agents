@@ -1,4 +1,5 @@
 /** What the roster and past-session lists say about where sessions ran, and what they work on. */
+import { type Project, type Worker, type WorkerPhase, workerPhase } from "../src/shared/projects";
 import { type PastSession, type RosterHost, type View, type WorkItem, worksOn } from "../src/shared/sessions";
 import type { Workspace } from "../src/shared/workspaces";
 
@@ -60,8 +61,57 @@ export function listWorkspaces(hosts: RosterHost[], past: PastSession[], added: 
 	return [...byCwd].map(([cwd, cwdDisplay]) => ({ cwd, cwdDisplay }));
 }
 
-/** The sessions tab's lists, each only from `workspace` when one is selected. A pinned session leaves its own list for `pinned`. */
+/** A session as the lists show it: its live row while it runs, else its saved one. */
+export type SessionRow = { kind: "live"; host: RosterHost } | { kind: "past"; session: PastSession };
+
+/** What opens `row`: its live view while it runs, else its transcript. */
+const viewOf = (row: SessionRow): View => (row.kind === "live" ? { kind: "live", instanceId: row.host.instanceId, agentId: null } : { kind: "past", sessionId: row.session.sessionId });
+
+/** A session of a project, as the sidebar and the Projects page show it; `row`, `view`, and `cwdDisplay` are `null` until either list names it. */
+export interface ProjectSession {
+	row: SessionRow | null;
+	view: View | null;
+	phase: WorkerPhase;
+	cwdDisplay: string | null;
+}
+
+export function projectSession(sessionId: string, hosts: RosterHost[], past: PastSession[]): ProjectSession {
+	const host = hosts.find(candidate => candidate.sessionId === sessionId);
+	const session = host ? undefined : past.find(candidate => candidate.sessionId === sessionId);
+	const row: SessionRow | null = host ? { kind: "live", host } : session ? { kind: "past", session } : null;
+	return {
+		row,
+		view: row && viewOf(row),
+		phase: workerPhase(host?.status ?? null, session?.interrupted ?? false),
+		cwdDisplay: host?.cwdDisplay ?? session?.cwdDisplay ?? null,
+	};
+}
+
+/** A session of a project as the sidebar lists it. A pinned member stays in its project, and `pinned` says it is pinned. */
+export interface ProjectMember {
+	/** The worker it is, whose title the coordinator gave it names the row; `null` for the coordinator. */
+	worker: Worker | null;
+	row: SessionRow;
+	pinned: boolean;
+}
+
+/** A project's group in the sessions tab: its coordinator first, then its workers in order, `w1` first. */
+export interface ProjectGroup {
+	project: Project;
+	members: ProjectMember[];
+}
+
+/** Every session, temporary and hidden directories too, and the projects: a project lists its sessions wherever they run. */
+export interface ProjectSources {
+	projects: Project[];
+	hosts: RosterHost[];
+	past: PastSession[];
+}
+
+/** The sessions tab's lists, each only from `workspace` when one is selected. A project's session leaves the other lists for its project, and a pinned session leaves its own list for `pinned`. */
 export interface SidebarSessions {
+	/** The projects not archived, with a session in `workspace` or started there. */
+	projects: ProjectGroup[];
 	/** Pinned running sessions, then pinned past ones, interrupted first. */
 	pinned: { hosts: RosterHost[]; past: PastSession[] };
 	/** Live sessions whose turn runs, or that wait on a question. */
@@ -72,13 +122,29 @@ export interface SidebarSessions {
 	ended: PastSession[];
 }
 
-export function sidebarSessions(hosts: RosterHost[], past: PastSession[], workspace: string | null, pinned: ReadonlySet<string>): SidebarSessions {
+/** `project`'s sessions that run or were saved, coordinator first; a worker whose session neither runs nor is listed yet is left out. */
+function projectMembers(project: Project, hosts: RosterHost[], past: PastSession[], pinned: ReadonlySet<string>): ProjectMember[] {
+	const members = [{ worker: null, sessionId: project.coordinator.sessionId }, ...project.workers.map(worker => ({ worker, sessionId: worker.sessionId }))];
+	return members.flatMap(({ worker, sessionId }): ProjectMember[] => {
+		const { row } = projectSession(sessionId, hosts, past);
+		return row ? [{ worker, row, pinned: pinned.has(sessionId) }] : [];
+	});
+}
+
+export function sidebarSessions(hosts: RosterHost[], past: PastSession[], workspace: string | null, pinned: ReadonlySet<string>, sources: ProjectSources): SidebarSessions {
 	const inWorkspace = (row: { cwd: string }): boolean => workspace === null || row.cwd === workspace;
+	const projects = sources.projects
+		.filter(project => !project.archived)
+		.map(project => ({ project, members: projectMembers(project, sources.hosts, sources.past, pinned) }))
+		.filter(({ project, members }) => inWorkspace(project) || members.some(({ row }) => inWorkspace(row.kind === "live" ? row.host : row.session)));
+	const members = new Set(projects.flatMap(group => [group.project.coordinator.sessionId, ...group.project.workers.map(worker => worker.sessionId)]));
+	const listed = (row: { cwd: string; sessionId: string }): boolean => inWorkspace(row) && !members.has(row.sessionId);
 	const isPinned = (row: { sessionId: string }): boolean => pinned.has(row.sessionId);
-	const shownHosts = hosts.filter(inWorkspace);
+	const shownHosts = hosts.filter(listed);
 	const unpinnedHosts = shownHosts.filter(host => !isPinned(host));
-	const shownPast = past.filter(inWorkspace);
+	const shownPast = past.filter(listed);
 	return {
+		projects,
 		pinned: {
 			hosts: shownHosts.filter(isPinned),
 			past: shownPast.filter(isPinned).toSorted((a, b) => Number(b.interrupted) - Number(a.interrupted)),
@@ -90,7 +156,7 @@ export function sidebarSessions(hosts: RosterHost[], past: PastSession[], worksp
 	};
 }
 
-/** `lists` with only the rows whose title or directory holds every word of `query`, ignoring case. */
+/** `lists` with only the rows whose title or directory holds every word of `query`, ignoring case; a project whose name matches keeps every row. */
 export function searchSessions(lists: SidebarSessions, query: string): SidebarSessions {
 	const words = query.toLowerCase().split(/\s+/).filter(Boolean);
 	if (words.length === 0) return lists;
@@ -100,7 +166,15 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 	};
 	const hosts = (rows: RosterHost[]): RosterHost[] => rows.filter(host => matches(host.sessionName, host.cwdDisplay));
 	const past = (rows: PastSession[]): PastSession[] => rows.filter(session => matches(session.title, session.cwdDisplay));
+	// A worker's row reads as the title the coordinator gave it.
+	const member = ({ worker, row }: ProjectMember): boolean =>
+		row.kind === "live" ? matches(worker?.title ?? row.host.sessionName, row.host.cwdDisplay) : matches(worker?.title ?? row.session.title, row.session.cwdDisplay);
 	return {
+		projects: lists.projects.flatMap(group => {
+			if (matches(group.project.name, "")) return [group];
+			const members = group.members.filter(member);
+			return members.length > 0 ? [{ ...group, members }] : [];
+		}),
 		pinned: { hosts: hosts(lists.pinned.hosts), past: past(lists.pinned.past) },
 		running: hosts(lists.running),
 		idle: hosts(lists.idle),
@@ -109,13 +183,19 @@ export function searchSessions(lists: SidebarSessions, query: string): SidebarSe
 	};
 }
 
-/** How many live sessions in `lists` wait on your move: a turn that finished, or a question left open. */
-export const waitingCount = ({ pinned, running, idle }: SidebarSessions): number =>
-	[...pinned.hosts, ...running, ...idle].filter(host => host.status === "idle" || host.status === "needs-input").length;
+/** The live sessions of `groups`. */
+export const projectHosts = (groups: ProjectGroup[]): RosterHost[] => groups.flatMap(({ members }) => members.flatMap(({ row }) => (row.kind === "live" ? [row.host] : [])));
+
+/** Whether live session `host` waits on your move: a turn that finished, or a question left open. */
+export const waitsOnYou = (host: RosterHost): boolean => host.status === "idle" || host.status === "needs-input";
+
+/** How many live sessions in `lists` wait on your move. */
+export const waitingCount = ({ projects, pinned, running, idle }: SidebarSessions): number => [...projectHosts(projects), ...pinned.hosts, ...running, ...idle].filter(waitsOnYou).length;
 
 /** Every row of the sessions tab in its order, which the previous and next session keys walk. */
-export function listedViews({ pinned, running, idle, interrupted, ended }: SidebarSessions): View[] {
+export function listedViews({ projects, pinned, running, idle, interrupted, ended }: SidebarSessions): View[] {
 	const live = (hosts: RosterHost[]): View[] => hosts.map(({ instanceId }) => ({ kind: "live", instanceId, agentId: null }));
 	const saved = (sessions: PastSession[]): View[] => sessions.map(({ sessionId }) => ({ kind: "past", sessionId }));
-	return [...live(pinned.hosts), ...saved(pinned.past), ...live([...idle, ...running]), ...saved([...interrupted, ...ended])];
+	const members = projects.flatMap(({ members }) => members.map(({ row }) => viewOf(row)));
+	return [...members, ...live(pinned.hosts), ...saved(pinned.past), ...live([...idle, ...running]), ...saved([...interrupted, ...ended])];
 }

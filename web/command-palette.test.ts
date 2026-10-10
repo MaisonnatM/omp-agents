@@ -126,6 +126,18 @@ describe("paletteSections", () => {
 			["past", ["session:p2"]],
 		]);
 	});
+
+	test("projects list under their own heading, after the running sessions, and a search finds them", () => {
+		const items = [item("command:c1", "commands", "c1"), item("project:p", "projects", "Launch"), item("session:r", "running", "r")];
+		const browsed = paletteSections(items, "", {}, NOW);
+		expect(listed(browsed)).toEqual([
+			["running", ["session:r"]],
+			["projects", ["project:p"]],
+			["commands", ["command:c1"]],
+		]);
+		expect(browsed[1]?.heading).toBe("Projects");
+		expect(listed(paletteSections(items, "launch", {}, NOW))).toEqual([["projects", ["project:p"]]]);
+	});
 });
 
 describe("paletteCommands", () => {

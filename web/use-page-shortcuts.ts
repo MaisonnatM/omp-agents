@@ -106,6 +106,11 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (page?.kind === "routines") return false;
 				navigate({ kind: "routines", target: null });
 			},
+			projects: () => {
+				const { page, navigate } = latest.current;
+				if (page?.kind === "projects" && page.target.kind === "list") return false;
+				navigate({ kind: "projects", target: { kind: "list" } });
+			},
 			restore: () => {
 				const { maximized, layout, show } = latest.current;
 				if (!maximized) return false;

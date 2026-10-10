@@ -175,20 +175,24 @@ interface RowProps<T> {
 	showWorkspace: boolean;
 	/** Pin the session, or unpin it when it is pinned. */
 	onTogglePin: (sessionId: string) => void;
+	/** The session's role in the project whose group lists it, Coordinator or a worker's id; its badge replaces the workspace's. */
+	role?: string;
+	/** The title the coordinator gave the worker, which names the row in place of the session's own title. */
+	roleTitle?: string;
 }
 
 /** A past session's row, with Resume, and Move to past while it is interrupted. */
-export const PastRow = memo(function PastRow({ session, pinned, open, showWorkspace, onTogglePin }: RowProps<PastSession>) {
+export const PastRow = memo(function PastRow({ session, pinned, open, showWorkspace, onTogglePin, role, roleTitle }: RowProps<PastSession>) {
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "past", sessionId: session.sessionId };
-	const label = pastLabel(session);
+	const label = roleTitle ?? pastLabel(session);
 	return (
 		<RowMenu label={label} entry={{ kind: "past", session }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}
 				title={`${session.cwd}\nlast active ${new Date(session.modifiedAt).toLocaleString()}`}
-				badge={showWorkspace && session.title !== null ? <WorkspaceBadge cwdDisplay={session.cwdDisplay} /> : null}
+				badge={role ? <Badge size="compact" className="shrink-0 self-center">{role}</Badge> : showWorkspace && session.title !== null ? <WorkspaceBadge cwdDisplay={session.cwdDisplay} /> : null}
 				ship={session.ship}
 				facts={sessionFacts([pinned && session.interrupted && "interrupted", session.pullRequests.length > 0 && pullRequestsLabel(session.pullRequests)], session.pullRequests)}
 				when={session.modifiedAt}
@@ -207,17 +211,17 @@ function HostStatus({ host }: { host: RosterHost }) {
 }
 
 /** A running session's row, with its status dot, and End session where the server controls it. */
-export const HostRow = memo(function HostRow({ session: host, pinned, open, showWorkspace, onTogglePin }: RowProps<RosterHost>) {
+export const HostRow = memo(function HostRow({ session: host, pinned, open, showWorkspace, onTogglePin, role, roleTitle }: RowProps<RosterHost>) {
 	const { open: onOpen } = useDashboardActions();
 	const view: View = { kind: "live", instanceId: host.instanceId, agentId: null };
-	const label = hostLabel(host);
+	const label = roleTitle ?? hostLabel(host);
 	return (
 		<RowMenu label={label} entry={{ kind: "live", host }} onScreen={open} pinned={pinned} onTogglePin={onTogglePin}>
 			<SessionButton
 				view={view}
 				label={label}
 				title={`${statusLabel(host.status)}\n${host.cwd}\npid ${host.pid} · ${host.source === "terminal" ? `${host.participants} participants${host.relayConnected ? "" : " · relay offline"}` : "started here"}`}
-				badge={showWorkspace && host.sessionName !== null ? <WorkspaceBadge cwdDisplay={host.cwdDisplay} /> : null}
+				badge={role ? <Badge size="compact" className="shrink-0 self-center">{role}</Badge> : showWorkspace && host.sessionName !== null ? <WorkspaceBadge cwdDisplay={host.cwdDisplay} /> : null}
 				ship={host.ship}
 				facts={sessionFacts([host.source === "terminal" && !host.relayConnected && "relay offline", host.pullRequests.length > 0 && pullRequestsLabel(host.pullRequests)], host.pullRequests)}
 				when={host.startedAt}

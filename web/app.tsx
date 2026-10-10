@@ -54,7 +54,9 @@ export function App() {
 	const scope = useWorkspaceScope(state);
 	const { visible, workspaces, workspace, pickWorkspace, hiddenCwds } = scope;
 	const focused = useFocusedSession(state, page, scope);
-	const sessions = useSessionLists(scope, state.pins, changePins);
+	// Every session, `/tmp` and hidden directories too: a project lists its sessions wherever they run.
+	const projectSources = useMemo(() => ({ projects: state.projects, hosts: state.hosts, past: state.past }), [state.projects, state.hosts, state.past]);
+	const sessions = useSessionLists(scope, projectSources, state.pins, changePins);
 	const overlays = useOverlays();
 	const display = useTranscriptDisplay();
 	const terminal = useTerminalPanel();
@@ -215,6 +217,7 @@ export function App() {
 													models={state.models}
 													userTodos={state.userTodos}
 													routines={state.routines}
+													projects={state.projects}
 													workspaceList={state.workspaceList}
 													pins={state.pins}
 													newSessionCompletions={state.newSessionCompletions}
@@ -222,6 +225,7 @@ export function App() {
 													listed={state.listed}
 													rosterError={state.rosterError}
 													newStart={startOf(state.starts, "new")}
+													projectStart={startOf(state.starts, "project")}
 													scope={scope}
 													defaultWorkspace={defaultWorkspace}
 													sectionTarget={sectionTarget}
@@ -272,6 +276,7 @@ export function App() {
 							handlers={handlers}
 							unavailable={unavailable}
 							todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
+							projects={state.projects}
 							onCreateTicket={linearCallable ? setNewTicket : undefined}
 						/>
 					</SidebarProvider>

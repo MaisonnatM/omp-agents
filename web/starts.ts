@@ -10,6 +10,7 @@ import type { ForkPoint } from "./transcript-view";
  * quick action keeps its subject, the pull request, Linear issue, or todo with the action, which its page shows progress
  * and failure for; the server links its session to that subject. A **Resume all** resumes each of the
  * sidebar's interrupted sessions.
+ * A project starts its coordinator on `prompt`; an empty `name` reads as New project.
  */
 export type StartOp =
 	| {
@@ -29,7 +30,8 @@ export type StartOp =
 	| { kind: "resume"; sessionId: string }
 	/** `skill`: the skill pinned in the settings, `null` for none. */
 	| { kind: "quick"; cwd: string; prompt: string; subject: QuickSubject; skill: string | null }
-	| { kind: "resume-all"; sessionIds: string[] };
+	| { kind: "resume-all"; sessionIds: string[] }
+	| { kind: "project"; name: string; cwd: string; prompt: string; model: ModelOption | null; thinking: string | null };
 
 export type NewOp = Extract<StartOp, { kind: "new" }>;
 
@@ -58,6 +60,8 @@ export const messageOf = (op: StartOp, reqId: number): ClientMsg => {
 			return { t: "start", reqId, kind: "resume", sessionId: op.sessionId };
 		case "resume-all":
 			return { t: "resume-all", reqId, sessionIds: op.sessionIds };
+		case "project":
+			return { t: "project-create", reqId, name: op.name, cwd: op.cwd, prompt: op.prompt, model: op.model, thinking: op.thinking };
 		default: {
 			const never: never = op;
 			return never;
@@ -111,6 +115,7 @@ const LOST: Record<StartKind, string> = {
 	resume: "Lost the dashboard server while resuming. The session may still appear.",
 	quick: "Lost the dashboard server while the session was starting. It may still appear.",
 	"resume-all": "Lost the dashboard server while resuming. The sessions may still appear.",
+	project: "Lost the dashboard server while the project was starting. It may still appear.",
 };
 
 /** The answer to every start under way went to the socket that just closed. */

@@ -1,3 +1,4 @@
+import type { Project } from "../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import { hostLabel, pastLabel } from "./labels";
 import type { Page } from "./routing";
@@ -5,7 +6,7 @@ import type { Page } from "./routing";
 export const APP_NAME = "omp agents";
 
 /** What the page or conversation in front is called, or `null` when nothing is open. */
-function contextOf(page: Page | null, view: View | null, host: RosterHost | null, past: PastSession | null): string | null {
+function contextOf(page: Page | null, view: View | null, host: RosterHost | null, past: PastSession | null, projects: readonly Project[]): string | null {
 	switch (page?.kind) {
 		case "new":
 			return "New session";
@@ -19,6 +20,11 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return "Todo";
 		case "routines":
 			return "Routines";
+		case "projects": {
+			const { target } = page;
+			if (target.kind === "new") return "New project";
+			return (target.kind === "project" && projects.find(({ id }) => id === target.id)?.name) || "Projects";
+		}
 		case "calendar":
 			return "Calendar";
 		case "changes":
@@ -34,9 +40,9 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 
 /**
  * The tab title, which the desktop app's window shows too: the open page or the focused conversation, then the app.
- * `host` and `past` are the rows of `view`, `null` once the roster no longer lists them.
+ * `host` and `past` are the rows of `view`, `null` once the roster no longer lists them; `projects` name a project's page.
  */
-export function documentTitle(page: Page | null, view: View | null, host: RosterHost | null, past: PastSession | null): string {
-	const context = contextOf(page, view, host, past);
+export function documentTitle(page: Page | null, view: View | null, host: RosterHost | null, past: PastSession | null, projects: readonly Project[]): string {
+	const context = contextOf(page, view, host, past, projects);
 	return context ? `${context} · ${APP_NAME}` : APP_NAME;
 }
