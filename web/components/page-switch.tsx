@@ -160,6 +160,7 @@ export const PageSwitch = memo(function PageSwitch({
 				<TodoPage
 					list={userTodos}
 					view={todoView}
+					openId={page.open}
 					hosts={hosts}
 					past={past}
 					disabled={!connected}

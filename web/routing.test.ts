@@ -14,6 +14,7 @@ import {
 	hashForRoutines,
 	hashForSettings,
 	hashForTickets,
+	hashForOpenTodo,
 	hashForTodo,
 	hashForView,
 	type Layout,
@@ -135,17 +136,21 @@ describe("layout hash", () => {
 		for (const hash of ["#tickets", "#tickets/ENG-2368", "#tickets/x"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
-	test("the todo hash opens every todo, a list that is not a category, or one category's, and no todo hash is read as a layout", () => {
+	test("the todo hash opens every todo, a list that is not a category, or one category's, with a todo open or none, and no todo hash is read as a layout", () => {
 		expect(hashForTodo({ kind: "all" })).toBe("#todo");
 		expect(hashForTodo({ kind: "category", id: "a b/c" })).toBe("#todo/a%20b%2Fc");
-		expect(routeFromHash("#todo")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" } } });
-		expect(routeFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "category", id: "a b/c" } } });
-		expect(routeFromHash("#todo/")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" } } });
+		expect(routeFromHash("#todo")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" }, open: null } });
+		expect(routeFromHash("#todo/a%20b%2Fc")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "category", id: "a b/c" }, open: null } });
+		expect(routeFromHash("#todo/")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" }, open: null } });
 		for (const kind of ["today", "agents", "archive"] as const) {
 			expect(hashForTodo({ kind })).toBe(`#todo/${kind}`);
-			expect(routeFromHash(`#todo/${kind}`)).toEqual({ kind: "page", page: { kind: "todo", list: { kind } } });
+			expect(routeFromHash(`#todo/${kind}`)).toEqual({ kind: "page", page: { kind: "todo", list: { kind }, open: null } });
 		}
-		for (const hash of ["#todo", "#todo/0b9e"]) expect(routeFromHash(hash).kind).toBe("page");
+		expect(hashForOpenTodo("t 1", null)).toBe("#todo?open=t%201");
+		expect(hashForOpenTodo("t1", "work")).toBe("#todo/work?open=t1");
+		expect(routeFromHash("#todo?open=t%201")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "all" }, open: "t 1" } });
+		expect(routeFromHash("#todo/today?open=t1")).toEqual({ kind: "page", page: { kind: "todo", list: { kind: "today" }, open: "t1" } });
+		for (const hash of ["#todo", "#todo/0b9e", "#todo?open=t1"]) expect(routeFromHash(hash).kind).toBe("page");
 	});
 
 	test("the routines hash opens the list or one routine, and no routines hash is read as a layout", () => {
@@ -199,7 +204,7 @@ describe("layout hash", () => {
 
 	test("a malformed percent-escape names nothing instead of throwing: the page opens without its target, and its pane drops", () => {
 		const page = (page: Page): Route => ({ kind: "page", page });
-		expect(routeFromHash("#todo/%E0")).toEqual(page({ kind: "todo", list: { kind: "all" } }));
+		expect(routeFromHash("#todo/%E0")).toEqual(page({ kind: "todo", list: { kind: "all" }, open: null }));
 		expect(routeFromHash("#routines/%zz")).toEqual(page({ kind: "routines", target: null }));
 		expect(routeFromHash("#settings/models/%E0")).toEqual(page({ kind: "settings", section: "models", cwd: null }));
 		expect(routeFromHash("#new/%E0?todo=t1")).toEqual(page({ kind: "new", cwd: null, todoId: "t1" }));

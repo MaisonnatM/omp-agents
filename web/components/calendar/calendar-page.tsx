@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { type CalendarEntry, calendarEntries } from "../../calendar-model";
 import { localDay } from "../../days";
 import { calendarEventsStore, integrationsStore, monthSpan, ticketsStore } from "../../reads";
-import { hashForRoutines, hashForTickets, hashForTodo } from "../../routing";
+import { hashForOpenTodo, hashForRoutines, hashForTickets } from "../../routing";
 import { scheduleWords, timeWords } from "../../routines-model";
 import { useMinute } from "../../use-minute";
 import { PageFrame } from "../list-page";
@@ -55,7 +55,7 @@ function entryHref(entry: CalendarEntry): string {
 		case "routine-interval":
 			return hashForRoutines(entry.routineId);
 		case "todo":
-			return hashForTodo(entry.categoryId === null ? { kind: "all" } : { kind: "category", id: entry.categoryId });
+			return hashForOpenTodo(entry.todoId, entry.categoryId);
 		case "ticket":
 			return hashForTickets(entry.identifier);
 		case "event":
