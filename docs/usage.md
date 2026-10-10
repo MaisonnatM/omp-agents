@@ -142,7 +142,8 @@ An action that fails shows its error, and its control becomes available again.
   Each row shows whether the session created, edited, or deleted the file, how many times it changed it, how long ago the last change was, and the lines added and removed, which the list's heading totals.
   As on the changes page, a count of zero is left out, so a file the agent only added to shows `+12` alone.
   A path inside the session's working directory shows relative to it.
-  Click a file to unfold its changes under it, newest first: each with its kind, its time, its lines added and removed, and its diff as omp recorded it with line numbers.
+  Click a file to open its changes in a dialog over the page, newest first: each with its kind, its time, its lines added and removed, and its diff as omp recorded it with line numbers.
+  The dialog follows the file while the agent keeps editing it, and Esc closes it.
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
