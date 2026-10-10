@@ -1,6 +1,15 @@
-/** A todo's status, priority, and due day as pickers, as an icon on its row or a labeled button in its details. */
-import { CalendarClock } from "lucide-react";
-import { TODO_PRIORITIES, TODO_STATUSES, type TodoPriority, type TodoStatus, type UserTodoChange, type UserTodoLeaf } from "../../../src/user-todos-shared";
+/** A todo's status, priority, assignee, and due day as pickers, as an icon on its row or a labeled button in its details. */
+import { BotMessageSquare, CalendarClock, CircleDashed, type LucideIcon, User } from "lucide-react";
+import {
+	TODO_ASSIGNEES,
+	TODO_PRIORITIES,
+	TODO_STATUSES,
+	type TodoAssignee,
+	type TodoPriority,
+	type TodoStatus,
+	type UserTodoChange,
+	type UserTodoLeaf,
+} from "../../../src/user-todos-shared";
 import { cn } from "@/lib/utils";
 import { PRIORITY_LABEL } from "../../tickets-model";
 import { dueLabel, TODO_STATUS } from "../../todo-views";
@@ -17,8 +26,20 @@ function PriorityIcon({ priority }: { priority: TodoPriority }) {
 	return <Icon aria-hidden className={cn("size-4 shrink-0", color)} />;
 }
 
+const ASSIGNEE: Record<TodoAssignee | "none", { label: string; icon: LucideIcon }> = {
+	none: { label: "No assignee", icon: CircleDashed },
+	user: { label: "You", icon: User },
+	agent: { label: "Agent", icon: BotMessageSquare },
+};
+
+function AssigneeIcon({ assignee }: { assignee: TodoAssignee | null }) {
+	const { icon: Icon } = ASSIGNEE[assignee ?? "none"];
+	return <Icon aria-hidden className={cn("size-4 shrink-0", assignee === null && "text-muted-foreground")} />;
+}
+
 const STATUS_CHOICES: Choice[] = TODO_STATUSES.map(status => ({ value: status, label: TODO_STATUS[status].label, icon: <StatusIcon status={status} /> }));
 const PRIORITY_CHOICES: Choice[] = TODO_PRIORITIES.map(priority => ({ value: String(priority), label: PRIORITY_LABEL[priority], icon: <PriorityIcon priority={priority} /> }));
+const ASSIGNEE_CHOICES: Choice[] = [null, ...TODO_ASSIGNEES].map(assignee => ({ value: assignee ?? "", label: ASSIGNEE[assignee ?? "none"].label, icon: <AssigneeIcon assignee={assignee} /> }));
 
 /** How a picker's button looks: a bare icon on a row, or a labeled button in the details' property row. */
 export type FieldLook = "icon" | "property";
@@ -83,6 +104,31 @@ export function TodoPriorityPicker({ todo, look, onChange, ...props }: TodoField
 			onPick={value => {
 				const priority = TODO_PRIORITIES.find(priority => String(priority) === value);
 				if (priority !== undefined && priority !== todo.priority) onChange({ op: "set-priority", id: todo.id, priority });
+			}}
+		/>
+	);
+}
+
+export function TodoAssigneePicker({ todo, look, onChange, ...props }: TodoFieldProps) {
+	const { label } = ASSIGNEE[todo.assignee ?? "none"];
+	return (
+		<FieldPicker
+			{...props}
+			field="Assignee"
+			current={label}
+			trigger={
+				<>
+					<AssigneeIcon assignee={todo.assignee} />
+					{look === "property" && <span className={cn("truncate", todo.assignee === null && "text-muted-foreground")}>{todo.assignee === null ? "Assignee" : label}</span>}
+				</>
+			}
+			className={BUTTON[look]}
+			choices={ASSIGNEE_CHOICES}
+			selected={[todo.assignee ?? ""]}
+			firstKey={0}
+			onPick={value => {
+				const assignee = value === "" ? null : TODO_ASSIGNEES.find(assignee => assignee === value);
+				if (assignee !== undefined && assignee !== todo.assignee) onChange({ op: "set-assignee", id: todo.id, assignee });
 			}}
 		/>
 	);

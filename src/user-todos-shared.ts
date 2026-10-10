@@ -21,6 +21,10 @@ export type TodoPriority = 0 | 1 | 2 | 3 | 4;
 
 export const TODO_PRIORITIES: readonly TodoPriority[] = [0, 1, 2, 3, 4];
 
+/** Who should do a todo: you or an agent. Assigning an agent records it only; it starts no session. */
+export const TODO_ASSIGNEES = ["user", "agent"] as const;
+export type TodoAssignee = (typeof TODO_ASSIGNEES)[number];
+
 /** A todo of your own, on the Todo page, under a top-level one. It holds none, so the list is two deep at most. */
 export interface UserTodoLeaf {
 	id: string;
@@ -30,6 +34,8 @@ export interface UserTodoLeaf {
 	body: string;
 	status: TodoStatus;
 	priority: TodoPriority;
+	/** Who should do it, you or an agent; `null` for no one. */
+	assignee: TodoAssignee | null;
 	/** When it was closed (Done or Canceled), as an ISO 8601 time; `null` while open. Set exactly when `status` is done or canceled. */
 	doneAt: string | null;
 	/** The day it is due, `YYYY-MM-DD`; `null` for none. */
@@ -69,7 +75,7 @@ export type UserTodoChange =
 	/**
 	 * After todo `afterId` among `parentId`'s todos (the top level for `null`), or last for `null`. A top-level todo goes
 	 * in category `categoryId`, or in none when that category is gone; one under another goes in its parent's. A top-level
-	 * todo takes `links` and `addedBy`; any todo takes `body`, `due`, `status`, and `priority`. A closed `status` closes it at `createdAt`.
+	 * todo takes `links` and `addedBy`; any todo takes `body`, `due`, `status`, `priority`, and `assignee`. A closed `status` closes it at `createdAt`.
 	 */
 	| {
 			op: "add";
@@ -84,6 +90,7 @@ export type UserTodoChange =
 			addedBy: string | null;
 			status: TodoStatus;
 			priority: TodoPriority;
+			assignee: TodoAssignee | null;
 			createdAt: string | null;
 	  }
 	| { op: "edit"; id: string; text: string }
@@ -94,6 +101,7 @@ export type UserTodoChange =
 	 */
 	| { op: "set-status"; id: string; status: TodoStatus; at: string }
 	| { op: "set-priority"; id: string; priority: TodoPriority }
+	| { op: "set-assignee"; id: string; assignee: TodoAssignee | null }
 	/** A todo of the list or of the archive, with its todos. */
 	| { op: "remove"; id: string }
 	/** Puts back a todo `remove` took at `index` among the top-level todos, or among top-level todo `parentId`'s, which holds leaves only. */

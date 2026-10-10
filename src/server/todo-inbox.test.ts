@@ -20,7 +20,7 @@ function inboxDir(): string {
 describe("TodoInbox", () => {
 	test("applies an agent's adds as Todo and its checks as Done, oldest first, and sets aside an uncheck, a removal, or a file that is not a change", async () => {
 		const dir = inboxDir();
-		const add = { op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "Approve the migration", addedBy: "s1", status: "canceled", priority: 1 };
+		const add = { op: "add", id: "a", parentId: null, afterId: null, categoryId: null, text: "Approve the migration", addedBy: "s1", status: "canceled", priority: 1, assignee: "user" };
 		writeFileSync(join(dir, "2-x.json"), JSON.stringify({ op: "toggle", id: "a", doneAt: "2026-10-05T09:00:00.000Z" }));
 		writeFileSync(join(dir, "1-x.json"), JSON.stringify(add));
 		writeFileSync(join(dir, "3-x.json"), JSON.stringify({ op: "remove", id: "mine" }));
@@ -31,7 +31,7 @@ describe("TodoInbox", () => {
 		const applied: UserTodoChange[] = [];
 		await new TodoInbox(dir, change => applied.push(change)).drain();
 		expect(applied.map(change => change.op)).toEqual(["add", "set-status"]);
-		expect(applied[0]).toMatchObject({ text: "Approve the migration", addedBy: "s1", status: "todo", priority: 0 });
+		expect(applied[0]).toMatchObject({ text: "Approve the migration", addedBy: "s1", status: "todo", priority: 0, assignee: null });
 		expect(applied[1]).toEqual({ op: "set-status", id: "a", status: "done", at: "2026-10-05T09:00:00.000Z" });
 		expect(readdirSync(dir).sort()).toEqual(["3-x.json.invalid", "4-x.json.invalid", "5-x.json.invalid", "6-x.tmp", "7-x.json.invalid"]);
 	});

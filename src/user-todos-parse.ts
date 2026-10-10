@@ -6,8 +6,10 @@ import { isObject } from "./json";
 import { inStatusOrder } from "./user-todos";
 import {
 	isClosed,
+	TODO_ASSIGNEES,
 	TODO_PRIORITIES,
 	TODO_STATUSES,
+	type TodoAssignee,
 	type TodoPriority,
 	type TodoStatus,
 	type UserTodo,
@@ -35,6 +37,7 @@ export const isDay = (value: unknown): value is string => {
 const isTime = (value: unknown): value is string => typeof value === "string" && !Number.isNaN(Date.parse(value));
 const isStatus = (value: unknown): value is TodoStatus => TODO_STATUSES.includes(value as TodoStatus);
 const isPriority = (value: unknown): value is TodoPriority => TODO_PRIORITIES.includes(value as TodoPriority);
+const isAssignee = (value: unknown): value is TodoAssignee => TODO_ASSIGNEES.includes(value as TodoAssignee);
 const isNonEmpty = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
 
 function isOptional<T>(value: unknown, is: (value: unknown) => value is T): value is T | null {
@@ -92,18 +95,18 @@ function parseAll<T>(values: unknown, parse: (value: unknown) => T | null): T[] 
 }
 
 /**
- * A file written before todos had a body, a due day, a status, a priority, or an added time reads each as having none:
- * a todo with no status is Done when it has a `doneAt` and Todo otherwise. An open status drops a `doneAt`, and a closed
- * one without a `doneAt` reads as Todo, so `doneAt` is set exactly while the todo is closed.
+ * A file written before todos had a body, a due day, a status, a priority, an assignee, or an added time reads each as
+ * having none: a todo with no status is Done when it has a `doneAt` and Todo otherwise. An open status drops a `doneAt`,
+ * and a closed one without a `doneAt` reads as Todo, so `doneAt` is set exactly while the todo is closed.
  */
 function parseLeaf(value: unknown, fields: Fields): UserTodoLeaf | null {
 	if (!isObject(value)) return null;
-	const { id, text, body = "", due = null, doneAt = null, priority = 0, createdAt = null } = value;
+	const { id, text, body = "", due = null, doneAt = null, priority = 0, assignee = null, createdAt = null } = value;
 	if (!fields.id(id) || !fields.text(text) || !fields.body(body) || !isOptional(due, isDay) || !isOptional(doneAt, isTime)) return null;
 	const { status = doneAt === null ? "todo" : "done" } = value;
-	if (!isStatus(status) || !isPriority(priority) || !isOptional(createdAt, isTime)) return null;
+	if (!isStatus(status) || !isPriority(priority) || !isOptional(assignee, isAssignee) || !isOptional(createdAt, isTime)) return null;
 	const open = !isClosed(status) || doneAt === null;
-	return { id, text, body, status: open && isClosed(status) ? "todo" : status, priority, doneAt: open ? null : doneAt, due, createdAt };
+	return { id, text, body, status: open && isClosed(status) ? "todo" : status, priority, assignee, doneAt: open ? null : doneAt, due, createdAt };
 }
 
 /** A top-level todo; one from before categories, links, or agents has none of them. */
@@ -160,11 +163,12 @@ export function parseTodoChange(value: unknown): UserTodoChange | null {
 	if (!isId(id)) return null;
 	switch (op) {
 		case "add": {
-			const { parentId, body = "", due = null, links = [], addedBy = null, status = "todo", priority = 0, createdAt = null } = value;
+			const { parentId, body = "", due = null, links = [], addedBy = null, status = "todo", priority = 0, assignee = null, createdAt = null } = value;
 			const parsed = parseAll(links, parseTodoLink);
 			if (!SENT.text(text) || !isOptionalId(parentId) || !isOptionalId(afterId) || !isOptionalId(categoryId) || !SENT.body(body)) return null;
-			if (!isOptional(due, isDay) || !isOptionalId(addedBy) || !parsed || !isStatus(status) || !isPriority(priority) || !isOptional(createdAt, isTime)) return null;
-			return { op, id, parentId, afterId, categoryId, text, body, due, links: parsed, addedBy, status, priority, createdAt };
+			if (!isOptional(due, isDay) || !isOptionalId(addedBy) || !parsed || !isStatus(status) || !isPriority(priority) || !isOptional(assignee, isAssignee)) return null;
+			if (!isOptional(createdAt, isTime)) return null;
+			return { op, id, parentId, afterId, categoryId, text, body, due, links: parsed, addedBy, status, priority, assignee, createdAt };
 		}
 		case "edit":
 			return SENT.text(text) ? { op, id, text } : null;
@@ -174,6 +178,8 @@ export function parseTodoChange(value: unknown): UserTodoChange | null {
 			return isStatus(value.status) && isTime(value.at) ? { op, id, status: value.status, at: value.at } : null;
 		case "set-priority":
 			return isPriority(value.priority) ? { op, id, priority: value.priority } : null;
+		case "set-assignee":
+			return isOptional(value.assignee, isAssignee) ? { op, id, assignee: value.assignee } : null;
 		case "move":
 			return isOptionalId(afterId) && isOptionalId(categoryId) ? { op, id, afterId, categoryId } : null;
 		case "set-due":
@@ -201,13 +207,13 @@ export function parseTodoChange(value: unknown): UserTodoChange | null {
 
 /**
  * A change omp's `user_todo` tool leaves, in the format the installed extension writes, which predates statuses; `null`
- * for anything else. Its `add` becomes a Todo with no priority, added at `at`, and its `toggle` that checks a todo at
- * `doneAt` becomes `set-status` Done at that time, or Todo at `at` for one that unchecks it.
+ * for anything else. Its `add` becomes an unassigned Todo with no priority, added at `at`, and its `toggle` that checks
+ * a todo at `doneAt` becomes `set-status` Done at that time, or Todo at `at` for one that unchecks it.
  */
 export function parseAgentChange(value: unknown, at: string): UserTodoChange | null {
 	if (!isObject(value) || value.op !== "toggle") {
 		const change = parseTodoChange(value);
-		return change?.op === "add" ? { ...change, status: "todo", priority: 0, createdAt: at } : change;
+		return change?.op === "add" ? { ...change, status: "todo", priority: 0, assignee: null, createdAt: at } : change;
 	}
 	const { id, doneAt } = value;
 	if (!SENT.id(id) || !isOptional(doneAt, isTime)) return null;

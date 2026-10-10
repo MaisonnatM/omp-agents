@@ -13,6 +13,7 @@ const leaf = (id: string, text: string, doneAt: string | null = null): UserTodoL
 	body: "",
 	status: doneAt === null ? "todo" : "done",
 	priority: 0,
+	assignee: null,
 	doneAt,
 	due: null,
 	createdAt: null,

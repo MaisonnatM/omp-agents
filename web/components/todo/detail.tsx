@@ -19,7 +19,7 @@ import type { TodoField } from "../../use-todo-keys";
 import { type Choice, FieldPicker } from "../field-picker";
 import { NotesEditor } from "../notes-editor";
 import { preferredTeam, rememberTeam, TeamSelect } from "../tickets/team-select";
-import { StatusIcon, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
+import { StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
 import { TodoInput } from "./input";
 import { AddedByChip, type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
 
@@ -315,6 +315,7 @@ export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChan
 				<div className="flex flex-wrap items-center gap-1.5" aria-label="Properties">
 					<TodoStatusPicker todo={todo} look="property" disabled={readOnly} {...pickerOf("status")} onChange={onChange} />
 					<TodoPriorityPicker todo={todo} look="property" disabled={readOnly} {...pickerOf("priority")} onChange={onChange} />
+					<TodoAssigneePicker todo={todo} look="property" disabled={readOnly} {...pickerOf("assignee")} onChange={onChange} />
 					{top && (
 						<FieldPicker
 							field="Category"

@@ -759,6 +759,7 @@ An action that fails shows its error, and its control becomes available again.
   The **+** that shows on hover adds a todo under that one.
 - A todo has a status, as a Linear issue does: **Backlog**, **Todo**, **In Progress**, **Done**, or **Canceled**; a new todo is **Todo**, and Done and Canceled close it.
   It also has a priority on Linear's scale: none, **Urgent**, **High**, **Medium**, or **Low**.
+  It can be assigned to **You** or to an **Agent**, or to no one, as a new todo is; assigning an agent only records who should do it, and starts no session and changes no status.
 - Every list but **Archive** groups its top-level todos by status, **In Progress**, **Todo**, **Backlog**, **Done**, then **Canceled**, each under a header with the status's icon, its name, and how many todos it holds; click a header to fold or unfold its group.
   **Done** and **Canceled** start folded, the browser's localStorage keeps what you fold, and a search unfolds every group.
   A group with no todo hides, except **Todo** in a list you can add to.
@@ -767,9 +768,9 @@ An action that fails shows its error, and its control becomes available again.
   A dragged todo keeps its category; change it from the open todo.
   Alt+Shift+↑ and Alt+Shift+↓ move the focused todo one place the same way.
   **Today** sorts by due day and **Archive** by when it was cleared, so neither moves todos.
-- A row shows the todo's priority and status as icons, its title, then what it carries, and the day it was added; a todo under another has its own priority and status.
+- A row shows the todo's priority and status as icons, its title, then what it carries, its assignee's icon when it has one, and the day it was added; a todo under another has its own priority, status, and assignee.
   Click the priority or the status icon to pick another, or press S or P outside a text field for the focused todo, or else the open one; while the menu is open, the digits pick a choice, 1 to 5 for a status and 0 to 4 for a priority.
-  Shift+D does the same for the due day.
+  A does the same for the assignee, with 0 for none, 1 for **You**, and 2 for **Agent**, and Shift+D for the due day.
   Closing a top-level todo, as Done or Canceled, closes the open todos under it the same way.
   At both levels, open todos come first and closed ones after them, so a todo under an open one moves below the ones still open beside it once it closes, and reopening a todo puts it last among them.
   An open top-level todo linked to a session shows a work-state dot in the list and a pill in the open todo, instead of repeating the session's name: **Agent working**, **Needs you**, **In review**, **Shipped**, **Session ended**, or **Session unavailable**.
@@ -790,7 +791,7 @@ An action that fails shows its error, and its control becomes available again.
   Outside a text field, J and K, or ↓ and ↑, focus the next and previous todo, X marks the focused or open one **Done**, or a closed one **Todo** again, and Enter opens it.
   While a todo is open, J and K, or ↓ and ↑, open the next and previous one instead, and Esc closes it.
 - An open todo shows its title, which you edit in place, with Enter or a click elsewhere saving and Esc undoing.
-  Under it, buttons show its status, its priority, its category for a top-level todo, and its due day, each opening a menu to change it; the due day's menu also clears it.
+  Under it, buttons show its status, its priority, its assignee, its category for a top-level todo, and its due day, each opening a menu to change it; the due day's menu also clears it.
   A todo due today reads **Today**, and one whose day has passed reads **Overdue** in red.
   Its notes follow, always formatted.
   Click into them and type: markdown at the start of a line formats it as you type, `# ` a heading, `- ` a bullet, `1. ` a numbered list, `[ ] ` or `[x] ` a check item, `> ` a quote, and ```` ``` ```` a code block.
@@ -811,7 +812,7 @@ An action that fails shows its error, and its control becomes available again.
 - With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, starting with the last one an issue was created in, then opens an issue from the title and notes, assigned to you, and links it to the todo.
 - The list icon on a ticket adds a todo of no category, last in the list, that links to it.
 - The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
-  A `todos.json` from before categories, notes, due days, links, the archive, statuses, or priorities still loads, with none of them; a todo checked then reads as **Done**, an unchecked one as **Todo**, both with no priority.
+  A `todos.json` from before categories, notes, due days, links, the archive, statuses, priorities, or assignees still loads, with none of them; a todo checked then reads as **Done**, an unchecked one as **Todo**, both with no priority.
   A `todos.json` that the server cannot read as a todo list is moved to `todos.json.invalid` rather than written over.
   While the page has lost the server, the list cannot be changed.
 
@@ -1056,6 +1057,7 @@ Alt is Option on macOS.
 | X | Todo page, outside text fields | Mark the focused or open todo Done, or a closed one Todo again |
 | S | Todo page, outside text fields | Change the focused or open todo's status |
 | P | Todo page, outside text fields | Change the focused or open todo's priority |
+| A | Todo page, outside text fields | Change the focused or open todo's assignee |
 | Shift+D | Todo page, outside text fields | Change the focused or open todo's due day |
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |

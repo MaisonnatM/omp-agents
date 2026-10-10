@@ -9,7 +9,7 @@ import { workStateOf } from "../../todo-work-state";
 import type { TodoDrag } from "../../use-todo-drag";
 import type { TodoField } from "../../use-todo-keys";
 import type { Draft, TodoEditing } from "./editing";
-import { StatusIcon, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
+import { StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
 import { TodoInput } from "./input";
 import { type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
 
@@ -34,7 +34,7 @@ interface TodoRowProps {
 	onChange: (change: UserTodoChange) => void;
 }
 
-/** A todo's row: its priority and status, title, what it carries, when it was added, and the buttons that add under it and delete it. */
+/** A todo's row: its priority, status, and assignee, title, what it carries, when it was added, and the buttons that add under it and delete it. */
 export function TodoRow({ section, entry, siblings, category, day, sessions, disabled, open, picker, onPicker, drag, editing, onOpen, onChange }: TodoRowProps) {
 	const { todo } = entry;
 	const top = entry.parent === null ? entry.todo : null;
@@ -101,6 +101,7 @@ export function TodoRow({ section, entry, siblings, category, day, sessions, dis
 				</Badge>
 			)}
 			{((todo.due !== null && !closed) || picker === "due") && <TodoDuePicker todo={todo} look="icon" day={day} disabled={disabled} {...pickerOf("due")} onChange={onChange} />}
+			{(todo.assignee !== null || picker === "assignee") && <TodoAssigneePicker todo={todo} look="icon" disabled={disabled} {...pickerOf("assignee")} onChange={onChange} />}
 			{top?.links.filter(link => link.kind !== "session").map(link => <TodoLinkChip key={JSON.stringify(link)} link={link} sessions={sessions} compact />)}
 			{todo.body.trim() && (
 				<Tooltip content="Has notes">

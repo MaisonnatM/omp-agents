@@ -41,6 +41,7 @@ export type ShortcutId =
 	| "todoCheck"
 	| "todoStatus"
 	| "todoPriority"
+	| "todoAssignee"
 	| "todoDue"
 	| "todoNew"
 	| "todoClose"
@@ -178,6 +179,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoCheck", label: "Mark the focused or open todo Done, or a closed one Todo again", keys: [{ chord: { key: "x" }, scope: "outside-fields" }] },
 	{ id: "todoStatus", label: "Change the focused or open todo's status", keys: [{ chord: { key: "s" }, scope: "outside-fields" }] },
 	{ id: "todoPriority", label: "Change the focused or open todo's priority", keys: [{ chord: { key: "p" }, scope: "outside-fields" }] },
+	{ id: "todoAssignee", label: "Change the focused or open todo's assignee", keys: [{ chord: { key: "a" }, scope: "outside-fields" }] },
 	{ id: "todoDue", label: "Change the focused or open todo's due day", keys: [{ chord: { key: "d", shift: true }, scope: "outside-fields" }] },
 	{ id: "todoNew", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
