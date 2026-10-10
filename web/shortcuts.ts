@@ -215,6 +215,9 @@ export const IS_MAC =
 	typeof navigator !== "undefined" &&
 	/mac/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || "");
 
+/** Whether `event` holds ⌘ on macOS, where Ctrl-click opens the context menu, or Ctrl elsewhere. */
+export const modHeld = (event: { metaKey: boolean; ctrlKey: boolean }): boolean => (IS_MAC ? event.metaKey : event.ctrlKey);
+
 export interface Match {
 	id: ShortcutId;
 	scope: Scope;

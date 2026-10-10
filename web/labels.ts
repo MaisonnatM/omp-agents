@@ -3,7 +3,7 @@ import type { MouseEvent } from "react";
 import type { PullRequest, PullRequestLink } from "../src/shared/github";
 import type { OmpFile, OmpFileKind } from "../src/shared/models";
 import type { PastSession, RosterHost } from "../src/shared/sessions";
-import { IS_MAC } from "./shortcuts";
+import { IS_MAC, modHeld } from "./shortcuts";
 import type { OpenMode } from "./routing";
 
 /** Settings page file groups, in the order the page lists them. */
@@ -105,8 +105,8 @@ export function modelOrg(selector: string): string {
 	return FAMILY_ORGS.find(([family]) => family.test(id))?.[1] ?? providerOrg(provider);
 }
 
-/** ⌘-click on macOS, where Ctrl-click opens the context menu, and Ctrl-click elsewhere, opens a row in a new pane. */
-export const modeOf = (event: MouseEvent): OpenMode => ((IS_MAC ? event.metaKey : event.ctrlKey) ? "split" : "replace");
+/** ⌘-click on macOS and Ctrl-click elsewhere ({@link modHeld}) opens a row in a new pane. */
+export const modeOf = (event: MouseEvent): OpenMode => (modHeld(event) ? "split" : "replace");
 
 /** The gesture {@link modeOf} reads as a split, as hints name it. */
 export const SPLIT_CLICK = IS_MAC ? "⌘-click" : "Ctrl-click";

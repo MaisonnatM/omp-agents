@@ -47,6 +47,8 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/thinking-steps.tsx`: `icon` takes a component as well as a name, and `iconClassName` styles it.
   Its layout effect is React's `useLayoutEffect`, since the dashboard never renders on a server; the same goes for `hooks/use-merge-split.tsx`, `ui/sidebar-group.tsx`, and the sidebar menu files.
 - `hooks/use-fluid-hover.ts`: `remeasure` called again before its frame runs does nothing, so a list of rows registering drops readiness and queues one measurement instead of one per row.
+- `hooks/use-fluid-hover.ts`: a click in the gap beside a row reaches the row with the click's modifier keys, instead of as a plain `element.click()`.
+  A Cmd+click there marks a suggested prompt instead of sending it.
 - `ui/sidebar.tsx`: `scroll-fade-once-scrolled` on the scroll areas, so the fade shows only once scrolled.
 - `ui/sidebar-menu.tsx`: `gap-0.5` between rows, and the `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
 - `ui/sidebar-menu.tsx`: `SidebarMenuActions`, `SidebarMenuSkeleton`, `SidebarMenuSub`, `SidebarMenuSubItem`, and `SidebarMenuSubButton` are removed, since nothing renders them.

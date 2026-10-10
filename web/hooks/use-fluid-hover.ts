@@ -488,8 +488,18 @@ export function useFluidHover<T extends HTMLElement>(
         if (Math.hypot(dx, dy) > gapClickMaxDistance) return;
       }
       // A real DOM click on the item, so its own handlers (and the primitive
-      // wrapping it, if any) run exactly as if the pointer had been inside.
-      resolveActivator(element).click();
+      // wrapping it, if any) run exactly as if the pointer had been inside,
+      // modifier keys included.
+      resolveActivator(element).dispatchEvent(
+        new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          metaKey: e.metaKey,
+          ctrlKey: e.ctrlKey,
+          shiftKey: e.shiftKey,
+          altKey: e.altKey,
+        })
+      );
     },
     [isItemDisabled, gapClick, gapClickMaxDistance]
   );
