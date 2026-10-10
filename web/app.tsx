@@ -153,7 +153,7 @@ export function App() {
 	const resumeAll = startOf(state.starts, "resume-all");
 	// The project whose pull requests `useWorkspace` polls, so the `@` menu reads the entry the page keeps current.
 	const status = useMemo(
-		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestScope: project }),
+		(): DashboardStatus => ({ connected: state.connected, starts: { fork, resume, quick, resumeAll }, ending: state.ending, pullRequestsScope: project }),
 		[state.connected, fork, resume, quick, resumeAll, state.ending, project],
 	);
 	const mentionLists = useMemo(() => ({ todos: state.userTodos?.todos ?? [], hosts: visible.hosts, past: visible.past }), [state.userTodos, visible]);

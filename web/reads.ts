@@ -59,7 +59,7 @@ export function useReplaceableRead<T>(url: string | null, version?: unknown): Re
 }
 
 /** The open pull requests by project `cwd`, which the sidebar and the Pull requests page share; `null` reads every project. */
-export const pullRequestStore = createPolledStore<PullRequestList>({
+export const pullRequestsStore = createPolledStore<PullRequestList>({
 	// Keeps its name from before the page was called Pull requests, so the browser's cached list survives.
 	cacheKey: "omp-agents.inbox-cache",
 	url: (cwd, fresh) => {

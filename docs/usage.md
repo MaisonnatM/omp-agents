@@ -985,7 +985,7 @@ An action that fails shows its error, and its control becomes available again.
 
 - The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists what waits on you, newest first, and its badge counts the notices you have not read, up to `9+`.
 - Three sources feed it.
-  - **GitHub**: a pull request whose move is yours on the Pull requests page, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
+  - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
     Every two minutes while a page is open, and as soon as a page opens after none was, the server reads the pull requests of the workspaces that the Pull requests page covers.
   - **Slack**: a message from someone else in a direct or group conversation you have not answered since, one notice per conversation, and each mention of you in a channel, from the last three days.

@@ -35,7 +35,7 @@ import { projectName } from "../../labels";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, pullRequestStart } from "../../quick-actions";
 import type { PolledEntry } from "../../polled-store";
-import { pullRequestStore } from "../../reads";
+import { pullRequestsStore } from "../../reads";
 import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import { type SectionTarget, sectionId } from "../../section";
 import { useShortcuts } from "../../shortcuts";
@@ -53,10 +53,10 @@ const ORDER_KEY = "omp-agents.inbox-order";
 const SORTS = Object.keys(PULL_REQUEST_SORTS) as PullRequestSort[];
 
 /** The pull request list's order, which every list of it shares and the browser keeps. */
-export const usePullRequestOrder = () => useStoredState(ORDER_KEY, decodeOrder, JSON.stringify);
+export const usePullRequestsOrder = () => useStoredState(ORDER_KEY, decodeOrder, JSON.stringify);
 
 /** The pull request list's folds, which the page and the sidebar share and the browser keeps. */
-export const usePullRequestFolds = (): Folds => useFolds(FOLDS_KEY, foldedByDefault);
+export const usePullRequestsFolds = (): Folds => useFolds(FOLDS_KEY, foldedByDefault);
 
 /** `order` with the repository `key` put on the `where` side of `beside`; the repositories a list does not show, `shown` being those it does, keep their place behind them. */
 export const withRepoMoved = (order: PullRequestOrder, shown: string[], key: string, beside: string, where: Where): PullRequestOrder => ({
@@ -226,7 +226,7 @@ export interface RepoView extends Placed {
 	sections: SectionView[];
 }
 
-export interface PullRequestBoard {
+export interface PullRequestsBoard {
 	poll: PolledEntry<PullRequestList>;
 	refresh: () => void;
 	order: PullRequestOrder;
@@ -292,16 +292,16 @@ function useSessionsByPullRequest(hosts: RosterHost[], past: PastSession[]): Rea
  * or Alt+Shift+↑ and ↓ reorder the repositories, the sections, and the pull requests in a section; the browser keeps
  * the order. Mount it once per screen, since its keys act on the rows it lists.
  */
-export function usePullRequestBoard({ project, hosts, past, route }: BoardProps): PullRequestBoard {
+export function usePullRequestsBoard({ project, hosts, past, route }: BoardProps): PullRequestsBoard {
 	const { target } = route;
 	const targetKey = target ? prKey(target) : null;
 	const { open, start } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const poll = pullRequestStore.use(project);
+	const poll = pullRequestsStore.use(project);
 	const { read } = poll;
 	const list = read?.data ?? null;
-	const folds = usePullRequestFolds();
-	const [order, setOrder] = usePullRequestOrder();
+	const folds = usePullRequestsFolds();
+	const [order, setOrder] = usePullRequestsOrder();
 	const drag = useDragOrder();
 	const agent = useMemo(() => agentOn(hosts), [hosts]);
 	const place = useMemo(() => (list && target ? placeOf(list, target, agent) : null), [list, targetKey, agent]);
@@ -440,7 +440,7 @@ export function usePullRequestBoard({ project, hosts, past, route }: BoardProps)
 
 	return {
 		poll,
-		refresh: () => void pullRequestStore.refresh(project, { fresh: true }),
+		refresh: () => void pullRequestsStore.refresh(project, { fresh: true }),
 		order,
 		onSort: sort => setOrder({ ...order, sort, manual: sort === "manual" ? shownOrder : order.manual }),
 		onReset: () => setOrder(DEFAULT_ORDER),

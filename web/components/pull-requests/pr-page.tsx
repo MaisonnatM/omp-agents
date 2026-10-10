@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { listedPullRequest, moveAction, reason } from "../../pull-requests-model";
 import { readPinnedSkill } from "../../pinned-skill";
 import { actionOn, pendingOf, pullRequestStart } from "../../quick-actions";
-import { pullRequestStore } from "../../reads";
+import { pullRequestsStore } from "../../reads";
 import { hashForPullRequests } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
@@ -60,7 +60,7 @@ interface PullRequestDetailsProps {
 export function PullRequestDetails({ project, hosts, target, placement, version, files, onPick, session }: PullRequestDetailsProps) {
 	const { open, start, dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const { read } = pullRequestStore.use(project);
+	const { read } = pullRequestsStore.use(project);
 	const listed = read && listedPullRequest(read.data, target);
 	const item: WorkItem = { kind: "pull-request", pr: target };
 	const sessions = sessionsOn(item, hosts);
@@ -94,14 +94,14 @@ export function PullRequestDetails({ project, hosts, target, placement, version,
 				version={version}
 				files={files}
 				onPick={onPick}
-				onSaved={() => void pullRequestStore.refresh(project, { fresh: true })}
+				onSaved={() => void pullRequestsStore.refresh(project, { fresh: true })}
 			/>
 		</>
 	);
 }
 
 /** A pull request from the Pull requests page in the main area, with the quick actions that start a session on it. */
-export function PullRequestPage(props: Omit<PullRequestDetailsProps, "placement" | "version">) {
+export function PullRequestDetailPage(props: Omit<PullRequestDetailsProps, "placement" | "version">) {
 	const back = (
 		<Tooltip content="Back to Pull requests" side="bottom">
 			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label="Back to Pull requests" render={<a href={hashForPullRequests(null)} />}>

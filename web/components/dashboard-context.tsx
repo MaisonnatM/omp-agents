@@ -48,7 +48,7 @@ export interface DashboardStatus {
 	 * The project `cwd` whose pull request entry `App` polls, `null` for all projects. A component that wants the pull requests
 	 * reads that entry, never another scope's: the all-projects entry asks GitHub about every repository.
 	 */
-	pullRequestScope: string | null;
+	pullRequestsScope: string | null;
 }
 
 export const DashboardStatusContext = createContext<DashboardStatus | null>(null);

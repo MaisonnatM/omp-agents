@@ -21,7 +21,7 @@ export interface MentionLists {
 /** What the sources list: the page's lists, then the tickets the menu polls while it needs them and the selected project's pull requests. */
 export interface MentionData extends MentionLists {
 	tickets: LinearTicket[];
-	pullRequests: RepoPullRequests[];
+	pullRequestRepos: RepoPullRequests[];
 }
 
 /** The composer the menu opens in. */
@@ -136,8 +136,8 @@ const CATEGORIES: readonly Category[] = [
 		prefix: "pr",
 		title: "Pull requests",
 		icon: GitPullRequest,
-		list: ({ pullRequests }) =>
-			pullRequests
+		list: ({ pullRequestRepos }) =>
+			pullRequestRepos
 				.flatMap(repo => ("pullRequests" in repo ? repo.pullRequests : []))
 				.map(pr => {
 					const name = `${pr.owner}/${pr.repo}#${pr.number}`;

@@ -8,7 +8,7 @@ import type { PullRequestsRoute, Page, SettingsRoute, SidebarTab, TodoListView }
 import type { SectionTarget } from "../section";
 import type { SessionLists } from "../use-session-lists";
 import type { Workspace } from "../use-workspace";
-import { PullRequestIndex, PullRequestNav } from "./pull-requests/list-nav";
+import { PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { NoticesBell } from "./notices";
 import { Roster } from "./roster";
 import { SidebarToggle } from "./sidebar-panel";
@@ -72,12 +72,12 @@ export const AppSidebar = memo(function AppSidebar({
 	setShortcutsOpen,
 	toggleSidebar,
 }: AppSidebarProps) {
-	const pullRequests = useMemo(() => {
+	const pullRequestsTab = useMemo(() => {
 		// Until the sessions are listed, the saved project reads as all projects, which would ask GitHub about every repository.
 		if (!listed) return <p className="px-3 py-1 text-xs text-muted-foreground">Listing sessions…</p>;
 		// The Pull requests page lists the pull requests itself, so the sidebar's Pull requests tab shows its sections then.
-		if (page?.kind === "pull-requests" && !page.target) return <PullRequestIndex project={project} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
-		return <PullRequestNav project={project} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
+		if (page?.kind === "pull-requests" && !page.target) return <PullRequestsIndex project={project} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
+		return <PullRequestsNav project={project} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
 	}, [listed, page, project, visible, sectionTarget, onSectionTarget]);
 	const toggle = useMemo(() => <SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />, [toggleSidebar]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
@@ -109,7 +109,7 @@ export const AppSidebar = memo(function AppSidebar({
 			settingsRoute={settings}
 			sectionTarget={sectionTarget}
 			onSectionTarget={onSectionTarget}
-			pullRequests={pullRequests}
+			pullRequestsTab={pullRequestsTab}
 			hosts={visible.hosts}
 			project={project}
 			onPickProject={onPickProject}

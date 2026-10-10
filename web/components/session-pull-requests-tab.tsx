@@ -17,7 +17,7 @@ interface PullRequestsTabProps {
  * The session's pull requests in the right sidebar: one's details as the Pull requests page shows them, the first until another
  * is picked from its stack or from the session's other pull requests, which its Summary lists.
  */
-export function PullRequestsTab({ pullRequests, project, hosts, version }: PullRequestsTabProps) {
+export function SessionPullRequestsTab({ pullRequests, project, hosts, version }: PullRequestsTabProps) {
 	const [picked, setPicked] = useState<PullRequest | null>(null);
 	const shown = picked ?? pullRequests[0];
 	if (!shown) return <p className="px-4 py-2 text-sm text-muted-foreground">No pull request yet.</p>;

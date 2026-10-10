@@ -3,7 +3,7 @@ import type { Project } from "../src/shared/projects";
 import type { PastSession, RosterHost } from "../src/shared/sessions";
 import type { DashboardState } from "./dashboard-state";
 import { useProject } from "./project";
-import { pullRequestStore } from "./reads";
+import { pullRequestsStore } from "./reads";
 import { discoverableSessions, projectSwitch, workspaces } from "./sessions";
 
 /** The directories the sidebar, the palette, and the pages list, and the project they are scoped to. */
@@ -32,7 +32,7 @@ export function useWorkspace(state: DashboardState): Workspace {
 	);
 	const [project, pickProject] = useProject(projects);
 	// Until the sessions are listed, the saved project reads as all projects.
-	pullRequestStore.usePolling(project, state.listed);
+	pullRequestsStore.usePolling(project, state.listed);
 	const { started } = state;
 	useEffect(() => {
 		if (!started) return;

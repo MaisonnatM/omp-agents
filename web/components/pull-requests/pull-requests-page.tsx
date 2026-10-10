@@ -8,8 +8,8 @@ import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton, useReveal } from "../fold";
 import { ListPage } from "../list-page";
 import { QuickStartNotice } from "../quick-actions";
-import { pullRequestSectionTarget, type RepoView, type SectionView, SortMenu, UnmatchedTip, usePullRequestBoard, workspacesLabel } from "./list-board";
-import { SectionCount } from "./list-nav";
+import { pullRequestSectionTarget, type RepoView, type SectionView, SortMenu, UnmatchedTip, usePullRequestsBoard, workspacesLabel } from "./pull-requests-board";
+import { SectionCount } from "./pull-requests-nav";
 import { PullRequestTableRow } from "./pr-row";
 
 const note = (text: string) => <p className="text-sm text-muted-foreground">{text}</p>;
@@ -98,7 +98,7 @@ interface PullRequestsPageProps {
 export function PullRequestsPage({ project, hosts, past, section }: PullRequestsPageProps) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const board = usePullRequestBoard({ project, hosts, past, route: { target: null } });
+	const board = usePullRequestsBoard({ project, hosts, past, route: { target: null } });
 	useReveal(section, board.folds, { token: section, block: "start", focus: true });
 	const unmatched = board.poll.read?.data.unmatched ?? [];
 	return (

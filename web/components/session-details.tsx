@@ -8,7 +8,7 @@ import { useMedia, useTurnCount } from "../pane-store";
 import { useStoredState } from "../stored-state";
 import { MediaTab } from "./media-tab";
 import { OutlineTab } from "./outline-tab";
-import { PullRequestsTab } from "./pull-requests-tab";
+import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 
 /** The right sidebar's tab, which localStorage keeps across views. The key keeps its old name, and a tab that no longer exists reads as the outline. */
 const TAB_KEY = "omp-agents.plan-tab";
@@ -73,7 +73,7 @@ export function SessionDetails({ view, working, pullRequests, project, hosts }: 
 			</TabPanel>
 			<TabPanel value="pull-requests" asChild>
 				<SidebarContent viewportClassName={PINNED_VIEWPORT}>
-					<PullRequestsTab pullRequests={pullRequests} project={project} hosts={hosts} version={working} />
+					<SessionPullRequestsTab pullRequests={pullRequests} project={project} hosts={hosts} version={working} />
 				</SidebarContent>
 			</TabPanel>
 		</Tabs>

@@ -10,7 +10,7 @@ import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { pullRequestSections, orderedRepos } from "../../pull-requests-model";
 import { readTime } from "../../labels";
-import { pullRequestStore } from "../../reads";
+import { pullRequestsStore } from "../../reads";
 import { hashForPullRequests, type PullRequestsRoute } from "../../routing";
 import type { SectionTarget } from "../../section";
 import { DROP_LINE, useDragOrder } from "../../use-drag-order";
@@ -18,7 +18,7 @@ import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton } from "../fold";
 import { QuickStartNotice } from "../quick-actions";
 import { SectionLink } from "../section-link";
-import { pullRequestSectionTarget, type RepoView, type SectionView, SortMenu, UnmatchedTip, usePullRequestBoard, usePullRequestOrder, withRepoMoved, workspacesLabel } from "./list-board";
+import { pullRequestSectionTarget, type RepoView, type SectionView, SortMenu, UnmatchedTip, usePullRequestsBoard, usePullRequestsOrder, withRepoMoved, workspacesLabel } from "./pull-requests-board";
 import { PullRequestRow } from "./pr-row";
 
 const note = (text: string) => <p className="px-3 py-1 text-xs text-muted-foreground">{text}</p>;
@@ -96,7 +96,7 @@ function RepoBlock({ view }: { view: RepoView }) {
 	);
 }
 
-interface PullRequestNavProps {
+interface PullRequestsNavProps {
 	/** The sidebar's project `cwd`, or `null` for every project. */
 	project: string | null;
 	hosts: RosterHost[];
@@ -109,10 +109,10 @@ interface PullRequestNavProps {
  * The sidebar's pull request list beside the panes or a pull request's details: the pull requests of its project, or of every
  * project, by repository in sections named after whose move it is, read from GitHub.
  */
-export function PullRequestNav({ project, hosts, past, route }: PullRequestNavProps) {
+export function PullRequestsNav({ project, hosts, past, route }: PullRequestsNavProps) {
 	const { dismissStart } = useDashboardActions();
 	const { starts: { quick } } = useDashboardStatus();
-	const board = usePullRequestBoard({ project, hosts, past, route });
+	const board = usePullRequestsBoard({ project, hosts, past, route });
 	const { read, error, refreshing } = board.poll;
 	return (
 		<div className="space-y-2">
@@ -144,7 +144,7 @@ export function PullRequestNav({ project, hosts, past, route }: PullRequestNavPr
 	);
 }
 
-interface PullRequestIndexProps {
+interface PullRequestsIndexProps {
 	/** The sidebar's project `cwd`, or `null` for every project. */
 	project: string | null;
 	hosts: RosterHost[];
@@ -153,9 +153,9 @@ interface PullRequestIndexProps {
 }
 
 /** The sidebar beside the Pull requests page: each repository's sections with their pull request counts, each a link to its card on the page. Drag a repository's name to reorder them, as on the page. */
-export function PullRequestIndex({ project, hosts, target, onTarget }: PullRequestIndexProps) {
-	const { read, error } = pullRequestStore.use(project);
-	const [order, setOrder] = usePullRequestOrder();
+export function PullRequestsIndex({ project, hosts, target, onTarget }: PullRequestsIndexProps) {
+	const { read, error } = pullRequestsStore.use(project);
+	const [order, setOrder] = usePullRequestsOrder();
 	const drag = useDragOrder();
 	if (!read) return note(error ? `Cannot load pull requests: ${error}` : "Asking GitHub for pull requests…");
 	const agent = agentOn(hosts);

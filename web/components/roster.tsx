@@ -13,7 +13,7 @@ import { agentOn } from "../../src/shared/moves";
 import { yourMoveCount } from "../pull-requests-model";
 import { projectName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
-import { pullRequestStore, ticketsStore } from "../reads";
+import { pullRequestsStore, ticketsStore } from "../reads";
 import { hashForTickets, type SettingsRoute, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
@@ -166,7 +166,7 @@ interface RosterProps {
 	sectionTarget: SectionTarget | null;
 	onSectionTarget: (target: SectionTarget) => void;
 	/** The Pull requests tab's content. */
-	pullRequests: ReactNode;
+	pullRequestsTab: ReactNode;
 	/** The live sessions, which take a pull request's move while they work on it or ask about it. */
 	hosts: RosterHost[];
 	/** The selected project's `cwd`, or `null` for all projects. */
@@ -200,7 +200,7 @@ export function Roster({
 	settingsRoute,
 	sectionTarget,
 	onSectionTarget,
-	pullRequests,
+	pullRequestsTab,
 	hosts,
 	project,
 	onPickProject,
@@ -211,7 +211,7 @@ export function Roster({
 }: RosterProps) {
 	const { changeTodo: onTodoChange } = useDashboardActions();
 	const { connected } = useDashboardStatus();
-	const pullRequestRead = pullRequestStore.use(project).read;
+	const pullRequestRead = pullRequestsStore.use(project).read;
 	/** The count after a tab's label, and what it counts, for its accessible name. */
 	const tabCounts: Partial<Record<SidebarTab, { count: number; meaning: string }>> = {
 		sessions: { count: waiting, meaning: "waiting on you" },
@@ -278,7 +278,7 @@ export function Roster({
 			</TabPanel>
 			<TabPanel value="pull-requests" asChild>
 				<SidebarContent>
-					{pullRequests}
+					{pullRequestsTab}
 				</SidebarContent>
 			</TabPanel>
 			<TabPanel value="tickets" asChild>

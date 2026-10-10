@@ -36,7 +36,7 @@ const data: MentionData = {
 		todo("t4", "Login page copy"),
 	],
 	tickets: [{ id: "ENG-12", title: "Login [beta] flag", url: "https://linear.app/acme/issue/ENG-12" } as Ticket],
-	pullRequests: [
+	pullRequestRepos: [
 		{ owner: "acme", repo: "webapp", cwds: ["/code/webapp"], pullRequests: [{ owner: "acme", repo: "webapp", number: 7, title: "Fix login" } as PullRequestSummary] },
 		{ owner: "acme", repo: "api", cwds: ["/code/api"], error: "GitHub is down" },
 	],
