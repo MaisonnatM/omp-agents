@@ -730,7 +730,25 @@ Each thread is read with `format=metadata` and only its `From` and `Subject` hea
 A `MailThread` holds the thread id, the display name of the last message's sender or else its address, the first message's subject, the thread's snippet with its HTML entities decoded, the last message's `internalDate`, whether any message carries the `UNREAD` label, the number of messages, and a link that opens the thread in Gmail under the inbox's address.
 A thread without an id, messages, or an arrival time is left out, and one that cannot be read fails the whole answer with Google's message, so the list never has a silent gap.
 The client keeps the answer for a minute, unless `fresh` asks again.
+The signed-in address is kept for a minute too, so opening a conversation right after the inbox's read reads no profile.
 The Inbox page and its sidebar tab read it through `gmailStore` in `web/reads.ts` every minute while Gmail's connection is `ready` or `failing`; otherwise the page shows Gmail's integration row.
+
+`GET /api/gmail/thread?id=<thread id>[&fresh]` answers a `ThreadAnswer`, `{ id, subject, url, messages }`, from `GmailClient.thread`, which reads `threads/<id>?format=full`; a request without an id is a 400.
+Drafts are left out as the inbox leaves them out, the subject is the first message's, and the link is the inbox's.
+Each `MailMessage` holds its id, the people its `From`, `To`, and `Cc` headers name, split at commas outside quoted names and angle brackets, its `internalDate`, its `UNREAD` label, its snippet with entities decoded, its body, and its attachments.
+The body comes from a walk of the message's MIME tree: in `multipart/alternative` the `text/html` version wins over `text/plain`, any other multipart reads as its first part with a body, and a part that names a file is never a body.
+Each text part is decoded from base64url in the `charset` its `Content-Type` names, and in UTF-8 when no decoder knows that charset.
+Every part that names a file becomes an attachment, with its name, MIME type, and size; nothing downloads it.
+A message without an id or an arrival time is left out, and each conversation is kept for a minute per id.
+The page keeps the conversations it read in memory only, by id, through `readMailThread` and `useMailThread` in `web/reads.ts`, since bodies are large and private.
+It reads a conversation once, reads the next and previous ones of the list ahead while one shows, and reads one again from Gmail on **Refresh**, or when the inbox lists a message that arrived after the last read.
+
+A message's HTML renders in an `iframe` whose `srcdoc` is built by `mailDocument` in `web/inbox-model.ts`, with `sandbox="allow-same-origin"` and nothing else.
+Without `allow-scripts` the message's scripts and event handlers never run, and the sandbox also blocks its forms, its popups, and a `<meta http-equiv="refresh">`, so it cannot navigate the frame.
+That makes `allow-same-origin` safe, and the page needs it to size the frame to the message, to open the message's links in a new tab with no opener or referrer, and to pass keys pressed inside it on to the page's shortcuts.
+The document's head comes before the message's markup, with the policy `default-src 'none'; img-src https: data:; style-src 'unsafe-inline' https:; font-src https: data:` and `<meta name="referrer" content="no-referrer">`, so a message loads images, styles, and fonts and nothing else, and sends no referrer.
+Remote images still load, so a sender who tracks opens with them sees the dashboard's request, without a referrer.
+The frame sits on white in both themes, since mail is written for white.
 
 ## Front-end components
 
@@ -793,8 +811,8 @@ The server lives in `src/`:
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle: a view nobody shows any more, or one whose file changes, has its tail and media tree closed, so a read still in flight and the tail's held-back updates publish nothing.
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
-  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and pull request list shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations and their OAuth client setups; `calendar.ts` the Google calendars, their events, a new event, and the events kept on this computer; `git.ts` the checkouts and branches; `models.ts` the models, routing, plan usage, and omp's files; `notices.ts` the bell's notices; and `analytics.ts` the Analytics section.
-  `gmail.ts` holds `MailThread` and `InboxAnswer`, the Inbox page's conversations.
+  `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and pull request list shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations and their OAuth client setups; `calendar.ts` the Google calendars, their events, a new event, and the events kept on this computer; `git.ts` the checkouts and branches; `repo-files.ts` the repository page's file list; `models.ts` the models, routing, plan usage, and omp's files; `notices.ts` the bell's notices; and `analytics.ts` the Analytics section.
+  `gmail.ts` holds `MailThread` and `InboxAnswer`, the Inbox page's conversations, and `ThreadAnswer` with its `MailMessage`, `MailPerson`, `MailBody`, and `MailAttachment`, one conversation in full.
   `newSessionRequest` in `sessions.ts` builds a new-session start with every option not given defaulted, for the socket's parser, the routine runner, and their tests.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
   `selectorOf` names a model as `provider/id`, which both session transports and the model picker use, and `pullRequestUrl` a pull request's GitHub page, which the server's prompts and the page's links share.
@@ -843,7 +861,7 @@ The server lives in `src/`:
 - `src/google-calendar.ts`: `GoogleCalendarClient`, the calendars checked in your Google Calendar and the events in a span of those the Calendar page shows, read from Google's Calendar API with omp's Google Calendar sign-in, and the events it adds to and deletes from the calendars you may write to.
   `src/server/calendars-file.ts` keeps the ids of the calendars unchecked in the Calendar tab's sidebar in `calendars.json` beside the access token, and moves a file it cannot read to `calendars.json.invalid`.
   `src/server/local-events-file.ts` keeps the events added to **This computer** in `events.json` beside the access token, and moves a file it cannot read to `events.json.invalid`; see [New and local events](#new-and-local-events).
-- `src/gmail.ts`: `GmailClient`, the latest conversations of your Gmail inbox, read from Google's Gmail API with omp's Gmail sign-in; see [Gmail](#gmail).
+- `src/gmail.ts`: `GmailClient`, the latest conversations of your Gmail inbox and one conversation in full, read from Google's Gmail API with omp's Gmail sign-in, and the walk of a message's MIME tree; see [Gmail](#gmail).
 - `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout behind `src/integrations.ts`.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the pull request list's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
 - `src/user-todos-shared.ts`: the Todo page's types, which the server, the page, and the extension that reads `todos.json` all follow: `UserTodoList`, `UserTodo`, `UserTodoLink`, `UserTodoChange`, and the statuses (`TODO_STATUSES`, `isClosed`), priorities (`TODO_PRIORITIES`, Linear's scale, as tickets use), and assignees (`TODO_ASSIGNEES`: `user` or `agent`).
@@ -927,9 +945,10 @@ The page lives in `web/`.
   `toBlocks` in `web/transcript-view.ts` keeps the blocks that a token leaves alone as the same objects, and the transcript's rows are memoized on them.
   It and the page state apply the server's list updates, the roster's and the past sessions', through `applyDelta` in `web/keyed-list.ts`, which keeps every entry an update leaves alone as the same object.
 - `web/dashboard-state.ts`: the page state and its reducer, which `web/use-dashboard.ts` runs.
-- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/pull-requests-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, `web/calendar-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
-  `src/shared/every-word.ts` holds `everyWord` and `searchWords`, the one search rule the sidebar's sessions, the Files tab, the Todo page, the model search, the `@` menu, the command palette's todos, tickets, and pull requests, and the server's conversation search share: every word typed, in any order and any case.
-- `web/changes-model.ts`: the changes page's explorer tree, the diff's folded runs, and the file view's gutter marks; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines.
+- `web/routing.ts`, `web/sessions.ts`, `web/labels.ts`, `web/pull-requests-model.ts`, `web/tickets-model.ts`, `web/routines-model.ts`, `web/calendar-model.ts`, `web/inbox-model.ts`, and `web/transcript-view.ts`, and `web/document-title.ts` (the tab and window title): the pure transforms from server messages to what the page renders, and the hash routes.
+  `web/inbox-model.ts` folds a conversation's messages into open, closed, and stacked rows with `foldMessages` and `foldsAfter`, words its recipients, cuts plain text into links, and builds a message's sandboxed document.
+  `src/shared/every-word.ts` holds `everyWord` and `searchWords`, the one search rule the sidebar's sessions, the Files tab, the repository page's files, the Todo page, the model search, the `@` menu, the command palette's todos, tickets, and pull requests, and the server's conversation search share: every word typed, in any order and any case.
+- `web/changes-model.ts`: the changes page's explorer tree, the diff's folded runs, and the file view's gutter marks; `web/file-tree.ts` holds the explorer's tree of folders, generic over its file rows, which the changes page and the repository page share; `web/code-highlight.ts` cuts `lowlight`'s syntax colors into lines.
 - `web/file-paths.ts`: which paths in agent text name a text file, and the absolute path each resolves to.
   `web/delimited.ts` parses a TSV or CSV file into rows.
   `web/components/file-link.tsx` holds the link that opens such a path, and `web/components/file-dialog.tsx` the dialog that shows the file.
@@ -977,6 +996,7 @@ The page lives in `web/`.
   `useGoogleCalendars` there tells whether Google Calendar is connected and reads its calendars, for the Calendar tab's sidebar, the Calendar page, and the new-event dialog, and `useGmailInbox` answers Gmail's integration and the inbox with its unread count, read through `gmailStore` while Gmail is connected, for the Inbox page and its tab.
   A read in flight belongs to its entry: a new read of an entry replaces only the read of that entry in flight, and the components that poll one entry share one timer, which starts with the first and stops with the last.
   Its `update` applies a saved change to the current answer and aborts older reads before they can replace that answer.
+  The Inbox page's conversations are not a polled store: `readMailThread` and `useMailThread` keep them in memory by thread id, one read each, and a later read supersedes one in flight.
   `web/app.tsx` polls the pull requests instead, on every page once the sessions are listed, for the Pull requests tab's count, and the sidebar's pull request list reads that entry.
   The composer's `@` menu reads the pull request entry that `pullRequestsScope` in the status context names, the one `web/app.tsx` polls, so it starts no poll of its own and never reads the all-workspaces entry, which asks GitHub about every repository, in place of the selected workspace's.
   `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes through `useQueuedSave` from `web/use-queued-save.ts`, which shows a change at once and sends each after the ones before it; the picker button and its searchable list, and the due date's, live in `web/components/field-picker.tsx`, which the Todo page and a pull request's details share, with an open state its owner can hold so a key opens it, and digits that pick a choice.
@@ -1033,7 +1053,9 @@ The page lives in `web/`.
 - `web/components/calendar/calendar-page.tsx`: the Calendar page, a month of `web/calendar-model.ts` entries and the chosen day's list beside it, including Google events and the events kept on this computer read with `web/reads.ts`, and the delete button of each event in the day's list that is kept on this computer or in a Google calendar you may write to.
   It draws the month's grid and each day's hover card itself, and takes the month and year menus and arrows from Kibo UI's calendar, `web/components/kibo-ui/calendar/index.tsx`, whose month and year live in jotai atoms, so the page keeps its month while you leave and come back.
   `web/components/calendar/new-event.tsx` holds `NewEventDialog`, which **New event** and C open: a title, all day or a start and end time, and the calendar, a shown Google calendar you may write to or **This computer**, the last one used kept in localStorage; it sends the event and hands the page what the server answered.
-- `web/components/inbox/inbox-page.tsx`: the Inbox page, the Gmail inbox's conversations, each a link that opens it in Gmail, dated by `mailTime` in `web/labels.ts`, or Gmail's integration row while the dashboard cannot read Gmail.
+- `web/components/inbox/inbox-page.tsx`: the Inbox page, the Gmail inbox's conversations, each a link to `#inbox/<thread id>`, dated by `mailTime` in `web/labels.ts`, or Gmail's integration row while the dashboard cannot read Gmail.
+  Its list takes ↓, ↑, and O, and back from a conversation focus returns to its row, as on the tickets page.
+  `thread-view.tsx` holds `ThreadDetail`, the conversation in full in a `DetailPage`, which takes ↓, ↑, Esc, and O while it shows, and `mail-frame.tsx` holds `MailFrame`, the sandboxed frame of a message's HTML; see [Gmail](#gmail).
 - `web/components/pane.tsx`: a pane, whose view renders inside a `RenderBoundary` from `web/components/render-boundary.tsx`, so a view that throws shows its error in that pane and the rest of the page stays; `web/app.tsx` puts one around the page too, and both clear when the hash names another view.
   `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button, `past-conversation.tsx` a past session's view, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` a session header's trail and pull request menu.
@@ -1063,9 +1085,9 @@ The page lives in `web/`.
   `pr-timeline.tsx` is the **Timeline**: commits, comments, reviews, and unresolved threads in one list by day, with the **New** line from the last visit it keeps in localStorage.
   `pr-row.tsx` draws the sidebar row and the table row, and exports the DOM lookups of a row and its link that the board's keys use.
   `web/use-drag-order.ts` drags the pull request list's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
-  The tickets, Pull requests, and Inbox pages use `web/components/list-page.tsx` for their frame, header, and load and refresh states, its issue details use its `DetailPage`, and the Todo, Routines, and Calendar pages its `PageFrame`.
-  Both details views use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
-  `LoadNote` is the loading or error line that the pull request's details, the issue's, and the list page share.
+  The tickets, Pull requests, and Inbox pages use `web/components/list-page.tsx` for their frame, header, and load and refresh states, their issue and conversation details use its `DetailPage`, and the Todo, Routines, and Calendar pages its `PageFrame`.
+  The pull request's and the issue's details use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
+  `LoadNote` is the loading or error line that the pull request's details, the issue's, the conversation's, and the list page share.
   `web/components/fold.tsx` holds the fold button that the Pull requests and tickets pages share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
   The Pull requests page binds ↓, ↑, O, E, and `.` through `useShortcuts`, over the pull requests that `shownPullRequests` in `web/pull-requests-model.ts` lists in order, so a folded section's rows drop out, and binds Alt+Shift+↑ and ↓ to move the focused heading or row by its `data-move` attribute.
 - `web/components/ui`, `web/lib`, and `web/hooks`: files from the Fluid registry, and `web/components/kibo-ui` from Kibo UI's; `web/components/ui/PATCHES.md` lists every change the dashboard makes to them.
