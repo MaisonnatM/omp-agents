@@ -1,71 +1,57 @@
 import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
-import { Fragment, useEffect, useRef, useState } from "react";
-import type { ChangedEntry } from "../../../src/shared/changes";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { foldersAbove, type TreeDir } from "../../changes-model";
 import { cn } from "@/lib/utils";
-import { LineCounts } from "../line-counts";
 
-const STATUS = {
-	added: { letter: "A", tone: "text-emerald-600 dark:text-emerald-400", label: "Added" },
-	untracked: { letter: "U", tone: "text-emerald-600 dark:text-emerald-400", label: "Untracked" },
-	modified: { letter: "M", tone: "text-amber-600 dark:text-amber-400", label: "Modified" },
-	deleted: { letter: "D", tone: "text-red-600 dark:text-red-400", label: "Deleted" },
-	renamed: { letter: "R", tone: "text-violet-600 dark:text-violet-400", label: "Renamed" },
-	// Outside the checkout, or changed back to the base: git lists no change.
-	unlisted: { letter: "S", tone: "text-sky-600 dark:text-sky-400", label: "Changed by this session; git shows no change against the base" },
-} as const;
-
-/** What happened to `file`, and whether this session's own calls changed it. */
-export function statusLabel(file: ChangedEntry): string {
-	const { label } = STATUS[file.status ?? "unlisted"];
-	return file.session && file.status !== null ? `${label}; this session edited it` : label;
+/** What a file's row shows besides its name: its tooltip, whether its name is struck through, and what follows the name. */
+export interface FileDecoration {
+	title: string;
+	struck: boolean;
+	trailing: ReactNode;
 }
 
-export function StatusLetter({ file }: { file: ChangedEntry }) {
-	const look = STATUS[file.status ?? "unlisted"];
-	return (
-		<span title={statusLabel(file)} className={cn("w-3 shrink-0 text-center font-mono text-[11px] font-semibold", look.tone)}>
-			{look.letter}
-		</span>
-	);
-}
-
-interface FileTreeProps {
-	tree: TreeDir;
+interface FileTreeProps<F extends { path: string }> {
+	tree: TreeDir<F>;
 	/** The open file's path, highlighted and kept in view. */
 	open: string | null;
 	/** The address that opens the file at `path`. */
 	hrefFor: (path: string) => string;
 	/** Opens the file at `path` in place on a plain click, which then leaves the address alone. */
 	onPick?: (path: string) => void;
+	/** Every folder starts closed, for a list too long to show whole; otherwise every folder starts open. */
+	startClosed?: boolean;
+	decorate: (file: F) => FileDecoration;
 }
 
-/**
- * The changed files as folders, each folder open until you close it, and opened again when a file in it opens. A dot
- * marks the files a session's own calls changed.
- */
-export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
-	const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
-	const [revealed, setRevealed] = useState(open);
+/** Files as folders, each folder open or closed until you click it, and opened when a file in it opens. */
+export function FileTree<F extends { path: string }>({ tree, open, hrefFor, onPick, startClosed = false, decorate }: FileTreeProps<F>) {
+	// The folders clicked away from how they start.
+	const [toggled, setToggled] = useState<ReadonlySet<string>>(new Set());
+	// `null` at first, so a file open from the start opens its folders too.
+	const [revealed, setRevealed] = useState<string | null>(null);
 	if (revealed !== open) {
 		setRevealed(open);
-		const above = new Set(open === null ? [] : (foldersAbove(tree, open) ?? []));
-		if ([...closed].some(path => above.has(path))) setClosed(new Set([...closed].filter(path => !above.has(path))));
+		const shut = (open === null ? [] : (foldersAbove(tree, open) ?? [])).filter(path => startClosed !== toggled.has(path));
+		if (shut.length > 0) {
+			const next = new Set(toggled);
+			for (const path of shut) if (!next.delete(path)) next.add(path);
+			setToggled(next);
+		}
 	}
 	const openRow = useRef<HTMLAnchorElement>(null);
 	useEffect(() => {
 		openRow.current?.scrollIntoView({ block: "nearest" });
 	}, [open]);
 	const toggle = (path: string): void =>
-		setClosed(prev => {
+		setToggled(prev => {
 			const next = new Set(prev);
 			if (!next.delete(path)) next.add(path);
 			return next;
 		});
-	const level = (dir: TreeDir, depth: number) => (
+	const level = (dir: TreeDir<F>, depth: number) => (
 		<>
 			{dir.dirs.map(child => {
-				const shut = closed.has(child.path);
+				const shut = startClosed !== toggled.has(child.path);
 				const Chevron = shut ? ChevronRight : ChevronDown;
 				return (
 					<Fragment key={child.path}>
@@ -88,12 +74,13 @@ export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 			})}
 			{dir.files.map(file => {
 				const current = file.path === open;
+				const { title, struck, trailing } = decorate(file);
 				return (
 					<li key={file.path}>
 						<a
 							ref={current ? openRow : undefined}
 							href={hrefFor(file.path)}
-							title={`${file.path}: ${statusLabel(file)}`}
+							title={title}
 							onClick={
 								onPick &&
 								(event => {
@@ -107,10 +94,8 @@ export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 							style={{ paddingLeft: depth * 12 + 20 }}
 						>
 							<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-							<span className={cn("min-w-0 flex-1 truncate", file.status === "deleted" && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
-							{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}
-							<LineCounts added={file.added} removed={file.removed} />
-							<StatusLetter file={file} />
+							<span className={cn("min-w-0 flex-1 truncate", struck && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
+							{trailing}
 						</a>
 					</li>
 				);
@@ -118,4 +103,18 @@ export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 		</>
 	);
 	return <ul>{level(tree, 0)}</ul>;
+}
+
+/** A file's path as breadcrumbs above its code, its name last; `title` is its tooltip. */
+export function PathCrumbs({ path, title }: { path: string; title: string }) {
+	return (
+		<p className="flex min-w-0 flex-1 items-center gap-1 font-mono text-xs text-muted-foreground" title={title}>
+			{path.split("/").map((part, index, parts) => (
+				<Fragment key={index}>
+					{index > 0 && <ChevronRight aria-hidden className="size-3 shrink-0" />}
+					<span className={index === parts.length - 1 ? "truncate text-foreground" : "shrink-0"}>{part}</span>
+				</Fragment>
+			))}
+		</p>
+	);
 }
