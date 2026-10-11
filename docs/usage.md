@@ -705,7 +705,8 @@ An action that fails shows its error, and its control becomes available again.
 
 - **Integrations** is a section of [Settings](#settings): a row for each service omp's sessions reach through an MCP server, Linear, Slack, Google Calendar, and Gmail so far.
   **Connected** lists the services that hold a sign-in, working or not, and **Available** lists the rest.
-- Each MCP row shows whether omp is connected, by listing the server's tools with omp's sign-in: **Connected** with the server's host and the number of tools, which unfolds to their names, **Needs reconnecting** when the server refuses the sign-in, **Unreachable** with the server's error and **Check again** or, for a one-step fix the server's answer names, **Open the fix**, or **Not connected** or **Signed out** when omp has no server or no sign-in for it.
+- Each MCP row shows whether omp is connected, by listing the server's tools with omp's sign-in: **Connected** with the server's host and the number of tools, which unfolds to their names, **Needs reconnecting** when the server refuses the sign-in, **Unreachable** with the server's error and **Check again**, or **Not connected** or **Signed out** when omp has no server or no sign-in for it.
+  When Google's MCP server answers HTTP 403, the Google Calendar or Gmail row says the MCP API is most often off in the OAuth client's Google Cloud project, and adds **Enable Calendar MCP API** or **Enable Gmail MCP API**, which opens Google's page that turns it on in that project, the number the client ID starts with.
   An unconfigured Slack, Google Calendar, or Gmail row says **Not set up** until its OAuth client is saved.
   The section checks again every minute while it is open, and **Refresh** checks at once.
 - **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, `https://mcp.slack.com/mcp`, `https://calendarmcp.googleapis.com/mcp/v1`, or `https://gmailmcp.googleapis.com/mcp/v1`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
@@ -750,13 +751,15 @@ An action that fails shows its error, and its control becomes available again.
   Paste the client ID and secret, then **Connect**; Google asks you to grant reading and editing your events, reading your calendar list, and free/busy.
   omp stores the secret in that server's entry in `~/.omp/agent/mcp.json`, and the secret, client-change, and **Replace OAuth client** rules are Slack's.
   Once connected, the row lists the calendars checked in Google Calendar's own list, in their colors, with why the last read of one failed; one you unchecked in the Calendar page's sidebar shows muted and says **Hidden on the Calendar page**.
-  Google Calendar's MCP tools need the Calendar MCP API enabled in the OAuth client's Google Cloud project; the row's **Open the fix** opens the enable page when it is off, and the **Check again** button re-checks after you enable it. The Calendar page reads Google's Calendar API and does not need the MCP API.
+  Google Calendar's MCP tools also need the Calendar MCP API on in that project; the row links to it when Google refuses them.
+  The Calendar page reads Google's Calendar API and does not need the MCP API.
 - Gmail shows **Not set up** and **Set up** until its OAuth client is saved, and its form is Google Calendar's.
   In a [Google Cloud project](https://console.cloud.google.com/apis/library/gmail.googleapis.com), turn on the Gmail API.
   Under [Credentials](https://console.cloud.google.com/apis/credentials), create an OAuth client ID of type **Web application**, and add `http://localhost:3119/callback`, with your callback port, as an authorized redirect URI; the client you made for Google Calendar works too.
   Paste the client ID and secret, then **Connect**; Google asks you to grant reading your email, and nothing that sends, deletes, or changes it.
   omp stores the secret in the Gmail server's entry in `~/.omp/agent/mcp.json`, apart from Google Calendar's, and the secret, client-change, and **Replace OAuth client** rules are Slack's.
-  Gmail's MCP tools need the Gmail MCP API enabled in the OAuth client's Google Cloud project; the row's **Open the fix** opens the enable page when it is off, and **Check again** re-checks after you enable it. The Inbox page reads Google's Gmail API and does not need the MCP API.
+  Gmail's MCP tools also need the Gmail MCP API on in that project; the row links to it when Google refuses them.
+  The Inbox page reads Google's Gmail API and does not need the MCP API.
 
 ## Todo list
 

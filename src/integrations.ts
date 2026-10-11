@@ -7,12 +7,12 @@ import { errorText } from "./json";
 import { clientSetups, type ClientSave, planGoogleSave, planSlackSave } from "./mcp-clients";
 import {
 	addMcpServer,
+	ApiError,
 	type ApiWrite,
 	callWithMcpSignIn,
 	checkMcpServer,
 	findMcpServer,
 	type McpServer,
-	McpNeedsFix,
 	McpRefused,
 	mcpSignedIn,
 	signInMcp,
@@ -30,7 +30,6 @@ import {
 	type McpConnection,
 	type McpIntegration,
 	type McpIntegrationId,
-	type McpServerRef,
 	type SlackClientInput,
 } from "./shared/accounts";
 import { createSignIn, type SignIn } from "./sign-in";
@@ -73,9 +72,7 @@ export async function connectionOf(found: McpServer | null, probes: McpProbes): 
 		return { kind: "ready", server, tools: await probes.tools(found) };
 	} catch (err) {
 		if (err instanceof McpRefused) return { kind: "refused", server, error: errorText(err) };
-		const failing: { kind: "failing"; server: McpServerRef; error: string; fix?: { url: string } } = { kind: "failing", server, error: errorText(err) };
-		if (err instanceof McpNeedsFix) failing.fix = err.fix;
-		return failing;
+		return { kind: "failing", server, error: errorText(err), status: err instanceof ApiError ? err.status : null };
 	}
 }
 

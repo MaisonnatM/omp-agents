@@ -1,6 +1,16 @@
 import { ChevronRight, CircleAlert, ExternalLink, KeyRound, LoaderCircle, LogOut, RefreshCw, WifiOff } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
-import { isGoogleIntegration, MCP_SERVICES, type McpConnection, type McpIntegration, type McpIntegrationId, type McpServerRef, type SignInState, signedIn } from "../../../src/shared/accounts";
+import {
+	googleMcpEnableUrl,
+	isGoogleIntegration,
+	MCP_SERVICES,
+	type McpConnection,
+	type McpIntegration,
+	type McpIntegrationId,
+	type McpServerRef,
+	type SignInState,
+	signedIn,
+} from "../../../src/shared/accounts";
 import { Badge, type BadgeColor } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
@@ -10,7 +20,7 @@ import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { type BrandLogo, GMAIL_LOGO, GOOGLE_CALENDAR_LOGO, LINEAR_LOGO, SLACK_LOGO } from "./brand-logos";
-import { GoogleClientForm } from "./google-client-form";
+import { GOOGLE_TEXT, GoogleClientForm } from "./google-client-form";
 import { Callout, IntegrationRow, MetaDot } from "./integration-row";
 import { SlackAppForm } from "./slack-app-form";
 
@@ -113,6 +123,13 @@ function SignOutConfirm({ id, name, onDone }: { id: McpIntegrationId; name: stri
 			)}
 		</Callout>
 	);
+}
+
+/** For a Google row whose MCP server answered 403, the API to turn on and Google's page that turns it on; otherwise `null`. */
+function googleApiOff(integration: McpIntegration, connection: Extract<McpConnection, { kind: "failing" }>): { api: string; url: string } | null {
+	if (!isGoogleIntegration(integration) || connection.status !== 403 || !integration.setup.clientId) return null;
+	const url = googleMcpEnableUrl(connection.server.host, integration.setup.clientId);
+	return url ? { api: GOOGLE_TEXT[integration.id].mcpApi, url } : null;
 }
 
 /** One service whose MCP server omp signs in to: where omp stands with it, the buttons that sign in and out, and `children` below. */
@@ -229,19 +246,25 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 			</Callout>
 		);
 	} else if (connection.kind === "failing") {
-		const fix = connection.fix;
-		const action = fix ? (
-			<Button variant="secondary" size="compact" leadingIcon={ExternalLink} render={<a href={fix.url} target="_blank" rel="noreferrer" />}>
-				Open the fix
-			</Button>
-		) : (
-			<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={refreshing} onClick={() => void integrationsStore.refresh(null, { fresh: true })}>
-				Check again
-			</Button>
-		);
+		const apiOff = googleApiOff(integration, connection);
 		callout = (
-			<Callout tone="warning" icon={WifiOff} action={action}>
-				{connection.error}
+			<Callout
+				tone="warning"
+				icon={WifiOff}
+				action={
+					<div className="flex items-center gap-2">
+						{apiOff && (
+							<Button variant="secondary" size="compact" leadingIcon={ExternalLink} render={<a href={apiOff.url} target="_blank" rel="noreferrer" />}>
+								Enable {apiOff.api}
+							</Button>
+						)}
+						<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={refreshing} onClick={() => void integrationsStore.refresh(null, { fresh: true })}>
+							Check again
+						</Button>
+					</div>
+				}
+			>
+				{apiOff ? `Google refused ${label}'s tools to omp's sessions (HTTP 403), most often because the ${apiOff.api} is off in your OAuth client's Google Cloud project.` : connection.error}
 			</Callout>
 		);
 	}
