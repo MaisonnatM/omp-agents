@@ -1,6 +1,6 @@
 /** Polled lists under a page header. */
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -123,4 +123,42 @@ export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, no
 			</TooltipProvider>
 		</PageFrame>
 	);
+}
+
+/**
+ * Moves keyboard focus by one row in the list `items`, scrolling the new row into view. Returns `true` if focus moved.
+ * `rowOf` looks up the row's element by item; each row holds the focusable link. With nothing focused inside the list,
+ * the focus enters the list only when `entersList` (default `true`); false leaves the row unchanged.
+ */
+export function stepRows<T>(items: readonly T[], rowOf: (item: T) => HTMLElement | null, by: 1 | -1, entersList = true): boolean {
+	const active = document.activeElement;
+	const at = items.findIndex(item => rowOf(item)?.contains(active) ?? false);
+	const next = at >= 0 ? items[at + by] : entersList ? items[by === 1 ? 0 : items.length - 1] : undefined;
+	if (!next) return at >= 0;
+	const row = rowOf(next);
+	if (!row) return at >= 0;
+	const link = row.querySelector("a") as HTMLElement | null;
+	if (!link) return at >= 0;
+	link.focus({ preventScroll: true });
+	row.scrollIntoView({ block: "nearest" });
+	return true;
+}
+
+/**
+ * Saves `target`'s `keyOf` on a change, and on the next change to `null` focuses the matching row, or `fallback` when
+ * the row is not mounted yet. `ready` is the dependency that gates the second focus pass (a polled read that has the
+ * data). `rowLink` looks up the row's focusable link by key.
+ */
+export function useReturnFocus<T>(target: T | null, keyOf: (target: T) => string, rowLink: (key: string) => HTMLElement | null | undefined, ready: unknown, fallback?: () => HTMLElement | null): void {
+	const returnTo = useRef<string | null>(null);
+	useEffect(() => {
+		if (target !== null) returnTo.current = keyOf(target);
+	}, [target]);
+	useEffect(() => {
+		if (target !== null || returnTo.current === null) return;
+		const destination = rowLink(returnTo.current) ?? fallback?.() ?? null;
+		if (!destination) return;
+		destination.focus();
+		returnTo.current = null;
+	}, [target, ready]);
 }

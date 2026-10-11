@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { shortcutLabels } from "../../shortcuts";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton, useFolds, useReveal } from "../fold";
-import { DetailPage, ListPage } from "../list-page";
+import { DetailPage, ListPage, useReturnFocus } from "../list-page";
 import { DetailQuickActions, QuickStartNotice } from "../quick-actions";
 import { TicketDetailContent } from "./ticket-details";
 import { statusIcon, TicketRow, ticketRowId } from "./ticket-row";
@@ -93,18 +93,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	const folds = useFolds(COLLAPSED_KEY);
 	const start = (ticket: Ticket, action: WorkActionId) => startSession(ticketStart(ticket, action, cwd, readPinnedSkill()));
 	const listRef = useRef<HTMLDivElement>(null);
-	const returnTo = useRef<string | null>(null);
-	useEffect(() => {
-		if (target !== null) returnTo.current = target;
-	}, [target]);
-	// Back from an issue's details, focus returns to its row, else the list: the lists mount only after a read.
-	useEffect(() => {
-		if (target !== null || returnTo.current === null) return;
-		const destination = document.getElementById(ticketRowId(returnTo.current))?.querySelector("a") ?? listRef.current;
-		if (!destination) return;
-		destination.focus();
-		returnTo.current = null;
-	}, [target, poll.read]);
+	useReturnFocus(target, id => id, id => document.getElementById(ticketRowId(id))?.querySelector<HTMLElement>("a"), poll.read, () => listRef.current);
 	useReveal(target === null ? section : null, folds, { token: section, block: "start", focus: true });
 
 	if (target !== null) {

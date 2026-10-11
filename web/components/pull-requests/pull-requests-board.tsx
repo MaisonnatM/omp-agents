@@ -43,7 +43,8 @@ import { useStoredState } from "../../stored-state";
 import { type DragItem, useDragOrder } from "../../use-drag-order";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { type Folds, useFolds, useReveal } from "../fold";
-import { type RowProps, rowElement, rowId, rowLink, sameSessions, sessionsByPullRequest } from "./pr-row";
+import { stepRows } from "../list-page";
+import { type RowProps, rowElement, rowId, sameSessions, sessionsByPullRequest } from "./pr-row";
 
 // Both keys keep their names from before the page was called Pull requests, so the browser's saved folds and order survive.
 /** The repositories and sections flipped from their default fold: `owner/repo`, and `owner/repo:<section title>`. */
@@ -91,19 +92,14 @@ function useTriageKeys(shown: PullRequestSummary[], route: PullRequestsRoute, en
 		target ? shown.findIndex(pr => samePullRequest(pr, target)) : shown.findIndex(pr => rowElement(pr)?.contains(document.activeElement) ?? false);
 	const step = (by: 1 | -1): boolean => {
 		if (route.target !== null && route.files !== null) return false;
-		const at = current();
 		if (target) {
+			const at = current();
 			if (at < 0) return false;
 			const next = shown[at + by];
 			if (next) location.hash = hashForPullRequests(next);
 			return true;
 		}
-		const next = at >= 0 ? shown[at + by] : entersList ? shown[by === 1 ? 0 : shown.length - 1] : undefined;
-		const row = next && rowElement(next);
-		if (!next || !row) return at >= 0;
-		rowLink(next)?.focus({ preventScroll: true });
-		row.scrollIntoView({ block: "nearest" });
-		return true;
+		return stepRows(shown, pr => rowElement(pr), by, entersList);
 	};
 	useShortcuts({
 		nextPullRequest: () => step(1),

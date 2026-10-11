@@ -1,4 +1,3 @@
-import { useEffect, useRef } from "react";
 import { callable } from "../../../src/shared/accounts";
 import type { MailThread } from "../../../src/shared/gmail";
 import { cn } from "@/lib/utils";
@@ -6,7 +5,7 @@ import { gmailStore, useGmailInbox } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { useShortcuts } from "../../shortcuts";
 import { DisconnectedPage } from "../integrations/disconnected-page";
-import { ListPage } from "../list-page";
+import { ListPage, stepRows, useReturnFocus } from "../list-page";
 import { MailTime, ThreadDetail } from "./thread-view";
 
 const TITLE = "Inbox";
@@ -43,21 +42,14 @@ function ThreadRow({ thread }: { thread: MailThread }) {
 
 /** The inbox's rows, which ↓ and ↑ move between, from the first or last row while none has focus; O opens the focused one in Gmail. */
 function ThreadList({ threads }: { threads: MailThread[] }) {
-	const focused = (): number => threads.findIndex(thread => document.getElementById(rowId(thread.id))?.contains(document.activeElement) ?? false);
-	const step = (by: 1 | -1): boolean => {
-		const at = focused();
-		const next = at >= 0 ? threads[at + by] : threads[by === 1 ? 0 : threads.length - 1];
-		const row = next && document.getElementById(rowId(next.id));
-		if (!row) return at >= 0;
-		row.querySelector("a")?.focus({ preventScroll: true });
-		row.scrollIntoView({ block: "nearest" });
-		return true;
-	};
+	const focused = (): MailThread | undefined => threads.find(thread => document.getElementById(rowId(thread.id))?.contains(document.activeElement));
+	const rowOf = (thread: MailThread): HTMLElement | null => document.getElementById(rowId(thread.id));
+	const step = (by: 1 | -1): boolean => stepRows(threads, rowOf, by);
 	useShortcuts({
 		inboxNext: () => step(1),
 		inboxPrevious: () => step(-1),
 		inboxOnGmail: () => {
-			const thread = threads[focused()];
+			const thread = focused();
 			if (!thread) return false;
 			window.open(thread.url, "_blank", "noopener,noreferrer");
 		},
@@ -79,18 +71,7 @@ function ThreadList({ threads }: { threads: MailThread[] }) {
 export function InboxPage({ target }: { target: string | null }) {
 	const { gmail, inbox, unread } = useGmailInbox();
 	const read = inbox.read?.data;
-	const returnTo = useRef<string | null>(null);
-	useEffect(() => {
-		if (target !== null) returnTo.current = target;
-	}, [target]);
-	// Back from a conversation, focus returns to its row: the rows mount only after a read.
-	useEffect(() => {
-		if (target !== null || returnTo.current === null) return;
-		const row = document.getElementById(rowId(returnTo.current))?.querySelector("a");
-		if (!row) return;
-		row.focus();
-		returnTo.current = null;
-	}, [target, inbox.read]);
+	useReturnFocus(target, id => id, id => document.getElementById(rowId(id))?.querySelector<HTMLElement>("a"), inbox.read);
 
 	if (gmail && !callable(gmail.connection)) return <DisconnectedPage title={TITLE} meta={META} integration={gmail} />;
 
