@@ -1,11 +1,11 @@
 import { Check } from "lucide-react";
 import { useState } from "react";
 import type { Routine } from "../../../src/routines";
-import { type CalendarShownInput, callable, type GoogleCalendar, type GoogleStatus } from "../../../src/shared/accounts";
+import type { CalendarShownInput, GoogleCalendar, GoogleStatus } from "../../../src/shared/calendar";
 import { useCalendarMonth, useCalendarYear } from "@/components/kibo-ui/calendar";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { errorText, putJson } from "../../api";
-import { calendarEventsStore, googleStore, integrationsStore, monthSpan } from "../../reads";
+import { calendarEventsStore, googleStore, monthSpan, useGoogleCalendars } from "../../reads";
 import { hashForCalendar, hashForRoutines } from "../../routing";
 
 /** The page under the Calendar tab that is open: the calendar, or the Routines page on a routine or, `null`, the list; `null` for another page. */
@@ -22,14 +22,12 @@ const CALENDAR_GROUPS = [
  * its color that shows or hides its events on the Calendar page; nothing while the dashboard cannot call Google Calendar.
  */
 function GoogleCalendarGroups() {
-	const connection = integrationsStore.usePolling().read?.data.integrations["google-calendar"].connection;
-	const connected = connection !== undefined && callable(connection);
-	const calendars = googleStore.usePolling(null, connected).read?.data.calendars;
+	const { calendars } = useGoogleCalendars();
 	const [month] = useCalendarMonth();
 	const [year] = useCalendarYear();
 	const [failure, setFailure] = useState<string | null>(null);
 	const [pending, setPending] = useState<ReadonlyMap<string, boolean>>(new Map());
-	if (!connected || !calendars) return null;
+	if (!calendars) return null;
 
 	const settle = (id: string): void =>
 		setPending(current => {

@@ -9,17 +9,17 @@ import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
 import type { Server } from "bun";
 import { flushJsonFiles } from "../fs";
-import { GoogleCalendarReader } from "../google-calendar";
+import { GoogleCalendarClient } from "../google-calendar";
 import { loadPullRequests } from "../pull-requests";
 import { integrationServer } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
-import { findMcpServer, mcpSignedIn, readWithMcpSignIn } from "../omp/mcp";
+import { callWithMcpSignIn, findMcpServer, mcpSignedIn } from "../omp/mcp";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, interruptedFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { runShell } from "../proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { modelUpdates, upgradeModel } from "../settings";
@@ -38,6 +38,7 @@ import { CalendarsFile } from "./calendars-file";
 import { EndInbox } from "./end-inbox";
 import type { Guards } from "./http";
 import { InterruptedSessions } from "./interrupted";
+import { LocalEventsFile } from "./local-events-file";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops } from "./loops";
 import { ACTIVITY_KINDS, Notices, UPDATE_KINDS } from "./notices";
@@ -72,13 +73,14 @@ export class Dashboard {
 	readonly #projects: ProjectsFile;
 	readonly #pins = new PinsFile(pinsFile);
 	readonly #calendars = new CalendarsFile(calendarsFile);
+	readonly #localEvents = new LocalEventsFile(localEventsFile);
 	/** The terminal panel's shells, which the server's `/ws/terminal` upgrades open and attach to. */
 	readonly terminals = new Terminals();
 	/** Aborts as the dashboard stops, which stops every routine command still running. */
 	readonly #stopping = new AbortController();
 	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the todo inbox. */
 	readonly #ownerLock: OwnerLock;
-	readonly #google: GoogleCalendarReader;
+	readonly #google: GoogleCalendarClient;
 	readonly #sessions: LiveSessions;
 	readonly #views: Views;
 	readonly #notices: Notices;
@@ -114,7 +116,7 @@ export class Dashboard {
 		// The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
 		rmSync(oldGoogleFile, { force: true });
 		const calendars = this.#calendars;
-		this.#google = new GoogleCalendarReader(async url => readWithMcpSignIn(await integrationServer("google-calendar"), url), () => calendars.hidden);
+		this.#google = new GoogleCalendarClient(async (url, init) => callWithMcpSignIn(await integrationServer("google-calendar"), url, init), () => calendars.hidden);
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -130,7 +132,7 @@ export class Dashboard {
 				pullRequests: async () => ({ list: await loadPullRequests(this.knownCwds(), false), agent: agentOn(sessions.rows(files.factsOf)) }),
 				async slack() {
 					const slack = await findMcpServer(MCP_SERVICES.slack.host);
-					return slack && (await mcpSignedIn(slack)) ? waitingOnYou(url => readWithMcpSignIn(slack, url), Date.now()) : [];
+					return slack && (await mcpSignedIn(slack)) ? waitingOnYou(url => callWithMcpSignIn(slack, url), Date.now()) : [];
 				},
 				now: Date.now,
 			},
@@ -300,9 +302,10 @@ export class Dashboard {
 				projectNotesDir: id => (this.#projects.get(id) ? projectNotesDir(id) : null),
 				searchConversations: query => files.searchConversations(query),
 			},
-			integrations: {
+			calendar: {
 				google: this.#google,
 				setCalendarShown: (id, shown) => this.#calendars.setShown(id, shown),
+				localEvents: this.#localEvents,
 			},
 			files: { worktrees: this.#worktrees, terminals: this.terminals },
 		});

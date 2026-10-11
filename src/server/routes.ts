@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar, prompt images, and the text files agent text names through.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar and the events kept on this computer, prompt images, and the text files agent text names through.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { join } from "node:path";
@@ -9,7 +9,7 @@ import { errorText } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import { gitCheckout } from "../git";
-import type { GoogleCalendarReader } from "../google-calendar";
+import type { GoogleCalendarClient } from "../google-calendar";
 import { loadPullRequests, loadPullRequestDetail } from "../pull-requests";
 import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
 import { blobsDir } from "../omp/config";
@@ -25,6 +25,7 @@ import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMe
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
 import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
+import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
 import { type ConversationHit, type ConversationSearchAnswer, PROMPT_IMAGE_TYPES } from "../shared/sessions";
@@ -35,8 +36,9 @@ import { readTextFile } from "../text-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
+import type { LocalEventsFile } from "./local-events-file";
 import { listNotes } from "./project-notes";
-import { type Parsed, parseCalendarShown, parseGoogleClient, parseIntegrationId, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
+import { type Parsed, parseCalendarShown, parseGoogleClient, parseIntegrationId, parseLocalEventId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
@@ -65,11 +67,12 @@ export interface SessionRoutesEnv {
 	searchConversations(query: string): Promise<ConversationHit[]>;
 }
 
-/** What the integration routes read beyond omp's own config: Google Calendar and the calendars it shows. */
-export interface IntegrationRoutesEnv {
-	google: GoogleCalendarReader;
+/** What the calendar routes read: Google Calendar, the calendars it shows, and the events kept on this computer. */
+export interface CalendarRoutesEnv {
+	google: GoogleCalendarClient;
 	/** Show or hide Google calendar `id`'s events on the Calendar page, and save the choice. */
 	setCalendarShown(id: string, shown: boolean): void;
+	localEvents: LocalEventsFile;
 }
 
 /** What the file routes read: the registered worktrees and the terminal panel's shells. */
@@ -82,7 +85,7 @@ export interface FileRoutesEnv {
 export interface RouteEnv {
 	guards: Guards;
 	sessions: SessionRoutesEnv;
-	integrations: IntegrationRoutesEnv;
+	calendar: CalendarRoutesEnv;
 	files: FileRoutesEnv;
 }
 
@@ -268,10 +271,8 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	};
 }
 
-/** The MCP integrations, Google Calendar, and Linear tickets. */
-function integrationRoutes({ get, write }: RouteKit, env: IntegrationRoutesEnv): Routes {
-	const { google } = env;
-
+/** The MCP integrations and Linear tickets. */
+function integrationRoutes({ get, write }: RouteKit): Routes {
 	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server, and the sign-in the page last started. */
 	const integrations = get(params => answer(() => loadIntegrations(params.has("fresh"))));
 
@@ -290,27 +291,6 @@ function integrationRoutes({ get, write }: RouteKit, env: IntegrationRoutesEnv):
 
 	/** `PUT /api/integrations/google-calendar/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client; a client the MCP config cannot take is a 400. */
 	const googleClient = write(body => checked(parseGoogleClient(body)), saveGoogleClient, err => (err instanceof ClientConfigError ? fail(400, err.message) : null));
-
-	/** `GET /api/google[?fresh]`: the calendars checked in your Google Calendar's list, with why each one's last read failed. */
-	const googleStatus = get(params => answer(() => google.status(params.has("fresh"))));
-
-	/** `PUT /api/google/calendars` `{ id, shown }`: show or hide one calendar's events on the Calendar page; answers the calendars after it. */
-	const calendarShown = write(
-		body => checked(parseCalendarShown(body), "Expected { id, shown } naming a calendar"),
-		async ({ id, shown }) => {
-			env.setCalendarShown(id, shown);
-			return google.status();
-		},
-	);
-
-	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your shown Google calendars in that span. */
-	const calendarEvents = get(params => {
-		const from = new Date(params.get("from") ?? "");
-		const to = new Date(params.get("to") ?? "");
-		const span = to.getTime() - from.getTime();
-		if (!(span > 0 && span <= MAX_EVENT_SPAN_MS)) return fail(400, "Expected ?from= and ?to= ISO times, at most 62 days apart");
-		return answer(() => google.events(from, to, params.has("fresh")));
-	});
 
 	/** `GET /api/tickets[?fresh]`: the viewer's assigned Linear issues, or why they could not be read. */
 	const tickets = get(params => answer(() => loadTickets(params.has("fresh"))));
@@ -363,9 +343,6 @@ function integrationRoutes({ get, write }: RouteKit, env: IntegrationRoutesEnv):
 		"/api/integrations/sign-out": { PUT: integrationSignOut },
 		"/api/integrations/slack/client": { PUT: slackClient },
 		"/api/integrations/google-calendar/client": { PUT: googleClient },
-		"/api/google": { GET: googleStatus },
-		"/api/google/calendars": { PUT: calendarShown },
-		"/api/calendar/events": { GET: calendarEvents },
 		"/api/tickets": { GET: tickets },
 		"/api/linear/teams": { GET: teams },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },
@@ -373,6 +350,71 @@ function integrationRoutes({ get, write }: RouteKit, env: IntegrationRoutesEnv):
 		"/api/ticket/attachment": { PUT: ticketAttach },
 		"/api/ticket/options": { GET: ticketOptions },
 		"/api/ticket/media": { GET: ticketMedia },
+	};
+}
+
+/** Google Calendar's calendars and events, the events the Calendar page adds, and the events kept on this computer. */
+function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Routes {
+	const { google, localEvents } = env;
+
+	/** `GET /api/google[?fresh]`: the calendars checked in your Google Calendar's list, with why each one's last read failed. */
+	const googleStatus = get(params => answer(() => google.status(params.has("fresh"))));
+
+	/** `PUT /api/google/calendars` `{ id, shown }`: show or hide one calendar's events on the Calendar page; answers the calendars after it. */
+	const calendarShown = write(
+		body => checked(parseCalendarShown(body), "Expected { id, shown } naming a calendar"),
+		async ({ id, shown }) => {
+			env.setCalendarShown(id, shown);
+			return google.status();
+		},
+	);
+
+	/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your shown Google calendars in that span. */
+	const calendarEvents = get(params => {
+		const from = new Date(params.get("from") ?? "");
+		const to = new Date(params.get("to") ?? "");
+		const span = to.getTime() - from.getTime();
+		if (!(span > 0 && span <= MAX_EVENT_SPAN_MS)) return fail(400, "Expected ?from= and ?to= ISO times, at most 62 days apart");
+		return answer(() => google.events(from, to, params.has("fresh")));
+	});
+
+	/** `GET /api/calendar/local`: every event kept on this computer. */
+	const localCalendarEvents = get(() => answer(async (): Promise<LocalEventsAnswer> => ({ events: [...localEvents.all] })));
+
+	/** `PUT /api/calendar/events/new`: `NewEvent`, kept on this computer or added to a Google calendar you may write to; answers `NewEventAnswer`. */
+	const eventCreate = write(
+		body => checked(parseNewEvent(body), "Expected { title, when, calendar }: a title, an all-day span of days or a timed span that ends after it starts, and this computer or a Google calendar"),
+		async ({ title, when, calendar }): Promise<NewEventAnswer> => {
+			switch (calendar.kind) {
+				case "local":
+					return { kept: localEvents.add(title, when) };
+				case "google":
+					await google.create(calendar.calendarId, title, when);
+					return { kept: null };
+				default: {
+					const unhandled: never = calendar;
+					return unhandled;
+				}
+			}
+		},
+	);
+
+	/** `PUT /api/calendar/local/remove` `{ id }`: removes an event kept on this computer, if it is still there; answers `{}`. */
+	const localEventRemove = write(
+		body => checked(parseLocalEventId(body), "Expected { id } naming an event kept on this computer"),
+		async id => {
+			localEvents.remove(id);
+			return {};
+		},
+	);
+
+	return {
+		"/api/google": { GET: googleStatus },
+		"/api/google/calendars": { PUT: calendarShown },
+		"/api/calendar/events": { GET: calendarEvents },
+		"/api/calendar/events/new": { PUT: eventCreate },
+		"/api/calendar/local": { GET: localCalendarEvents },
+		"/api/calendar/local/remove": { PUT: localEventRemove },
 	};
 }
 
@@ -502,7 +544,8 @@ export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
 	return {
 		...sessionRoutes(kit, env.sessions),
-		...integrationRoutes(kit, env.integrations),
+		...integrationRoutes(kit),
+		...calendarRoutes(kit, env.calendar),
 		...pullRequestRoutes(kit),
 		...fileRoutes(kit, env.files),
 	};

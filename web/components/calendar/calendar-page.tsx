@@ -1,9 +1,12 @@
+import { Plus, Trash2 } from "lucide-react";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
+import { errorText } from "../../../src/json";
 import type { Routine } from "../../../src/routines";
-import { callable } from "../../../src/shared/accounts";
+import type { LocalEvent } from "../../../src/shared/calendar";
 import type { UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
 	CalendarDate,
 	CalendarDatePagination,
@@ -17,19 +20,22 @@ import {
 	useCalendarYear,
 } from "@/components/kibo-ui/calendar";
 import { cn } from "@/lib/utils";
+import { putJson } from "../../api";
 import { type CalendarEntry, calendarEntries } from "../../calendar-model";
-import { localDay } from "../../days";
-import { calendarEventsStore, integrationsStore, monthSpan, ticketsStore } from "../../reads";
+import { dateOfDay, localDay } from "../../days";
+import { calendarEventsStore, localEventsStore, monthSpan, ticketsStore, useGoogleCalendars } from "../../reads";
 import { hashForOpenTodo, hashForRoutines, hashForTickets } from "../../routing";
 import { scheduleWords, timeWords } from "../../routines-model";
+import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useMinute } from "../../use-minute";
 import { PageFrame } from "../list-page";
+import { NewEventDialog } from "./new-event";
 
 const WEEKDAYS = daysForLocale("en-US", 1);
 /** The entries a day cell shows before its **+N more**. */
 const CELL_ENTRIES = 3;
 
-/** The entry's dot, by what it is and how it went. */
+/** The entry's dot, by what it is and how it went; an event's dot takes its color instead. */
 function dotClass(entry: CalendarEntry): string {
 	switch (entry.kind) {
 		case "routine":
@@ -49,7 +55,8 @@ function dotClass(entry: CalendarEntry): string {
 const isClosed = (entry: CalendarEntry): boolean =>
 	(entry.kind === "todo" && entry.done) || (entry.kind === "ticket" && (entry.statusType === "completed" || entry.statusType === "canceled"));
 
-function entryHref(entry: CalendarEntry): string {
+/** Where the entry links; `null` for an event kept on this computer, which has no page of its own. */
+function entryHref(entry: CalendarEntry): string | null {
 	switch (entry.kind) {
 		case "routine":
 		case "routine-interval":
@@ -59,7 +66,7 @@ function entryHref(entry: CalendarEntry): string {
 		case "ticket":
 			return hashForTickets(entry.identifier);
 		case "event":
-			return entry.event.url;
+			return entry.event.source.kind === "google" ? entry.event.source.url : null;
 	}
 }
 
@@ -89,8 +96,10 @@ function entryDetail(entry: CalendarEntry): string {
 			return entry.done ? "Todo, done" : "Todo due";
 		case "ticket":
 			return `Linear ticket due, ${entry.status}`;
-		case "event":
-			return `${entry.event.calendar}, ${entry.event.when.allDay ? "all day" : "Google Calendar"}`;
+		case "event": {
+			const { place, when, source } = entry.event;
+			return when.allDay ? `${place}, all day` : source.kind === "google" ? `${place}, Google Calendar` : place;
+		}
 	}
 }
 
@@ -109,17 +118,38 @@ function entryKey(entry: CalendarEntry): string {
 	}
 }
 
-/** An entry as a link to what it shows; a Google event opens in a new tab. */
-function EntryLink({ entry, className, style, children }: { entry: CalendarEntry; className: string; style?: CSSProperties; children: ReactNode }) {
+interface EntryLinkProps {
+	entry: CalendarEntry;
+	className: string;
+	style?: CSSProperties;
+	/** What clicking an entry without a link does, such as choosing its day; without it, that entry is plain text. */
+	onSelect?: () => void;
+	children: ReactNode;
+}
+
+/** An entry as a link to what it shows, a Google event in a new tab; an event kept on this computer links nowhere. */
+function EntryLink({ entry, className, style, onSelect, children }: EntryLinkProps) {
+	const href = entryHref(entry);
+	if (href === null) {
+		return onSelect ? (
+			<button type="button" onClick={onSelect} className={cn("w-full text-left", className)} style={style}>
+				{children}
+			</button>
+		) : (
+			<div className={className} style={style}>
+				{children}
+			</div>
+		);
+	}
 	const external = entry.kind === "event";
 	return (
-		<a href={entryHref(entry)} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className={className} style={style}>
+		<a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className={className} style={style}>
 			{children}
 		</a>
 	);
 }
 
-/** The entry's dot: by what it is and how it went, or a Google event's calendar color. */
+/** The entry's dot: by what it is and how it went, or an event's color. */
 function EntryDot({ entry, className }: { entry: CalendarEntry; className?: string }) {
 	return <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", dotClass(entry), className)} style={entry.kind === "event" ? { backgroundColor: entry.event.color } : undefined} />;
 }
@@ -135,12 +165,13 @@ function EntryText({ entry, className }: { entry: CalendarEntry; className?: str
 	);
 }
 
-/** One line of a day cell: an all-day Google event as a band in its calendar's color, anything else as a dot and its text. */
-function CellEntry({ entry }: { entry: CalendarEntry }) {
+/** One line of a day cell: an all-day event as a band in its color, anything else as a dot and its text. `onSelect` chooses the cell's day. */
+function CellEntry({ entry, onSelect }: { entry: CalendarEntry; onSelect: () => void }) {
 	if (entry.kind === "event" && entry.event.when.allDay) {
 		return (
 			<EntryLink
 				entry={entry}
+				onSelect={onSelect}
 				className="flex h-5 items-center rounded-sm bg-[color-mix(in_oklab,var(--event)_16%,transparent)] px-1.5 text-[11px] font-medium text-foreground hover:bg-[color-mix(in_oklab,var(--event)_26%,transparent)]"
 				style={{ "--event": entry.event.color } as CSSProperties}
 			>
@@ -149,26 +180,53 @@ function CellEntry({ entry }: { entry: CalendarEntry }) {
 		);
 	}
 	return (
-		<EntryLink entry={entry} className="flex h-5 items-center gap-1.5 rounded-sm px-1 text-[11px] hover:bg-hover">
+		<EntryLink entry={entry} onSelect={onSelect} className="flex h-5 items-center gap-1.5 rounded-sm px-1 text-[11px] hover:bg-hover">
 			<EntryDot entry={entry} />
 			<EntryText entry={entry} />
 		</EntryLink>
 	);
 }
 
-/** A day's entries, each with what it is, as the day's list and a day's hover card show them. */
-function DayEntries({ entries }: { entries: CalendarEntry[] }) {
+/** Removes event `id` kept on this computer, named `title` in what it says when it cannot. */
+type RemoveLocal = (id: string, title: string) => Promise<void>;
+
+/** The button that removes event `id` kept on this computer, busy until `onRemove` settles. */
+function RemoveLocalEvent({ id, title, onRemove }: { id: string; title: string; onRemove: RemoveLocal }) {
+	const [removing, setRemoving] = useState(false);
+	return (
+		<Tooltip content="Remove this event" side="left">
+			<Button
+				variant="ghost"
+				size="icon-compact"
+				className="mt-0.5 shrink-0"
+				aria-label={`Remove ${title}`}
+				loading={removing}
+				onClick={async () => {
+					setRemoving(true);
+					await onRemove(id, title);
+					setRemoving(false);
+				}}
+			>
+				<Trash2 />
+			</Button>
+		</Tooltip>
+	);
+}
+
+/** A day's entries, each with what it is, as the day's list and a day's hover card show them; with `onRemove`, an event kept on this computer has a remove button. */
+function DayEntries({ entries, onRemove }: { entries: CalendarEntry[]; onRemove?: RemoveLocal }) {
 	return (
 		<ul className="space-y-px">
 			{entries.map(entry => (
-				<li key={entryKey(entry)}>
-					<EntryLink entry={entry} className="flex items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-hover">
+				<li key={entryKey(entry)} className="flex items-start gap-1">
+					<EntryLink entry={entry} className="flex min-w-0 flex-1 items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-hover">
 						<EntryDot entry={entry} className="mt-[7px] size-2" />
 						<span className="min-w-0 flex-1">
 							<EntryText entry={entry} className="block text-sm" />
 							<span className="block truncate text-xs text-muted-foreground">{entryDetail(entry)}</span>
 						</span>
 					</EntryLink>
+					{onRemove && entry.kind === "event" && entry.event.source.kind === "local" && <RemoveLocalEvent id={entry.event.source.id} title={entry.event.title} onRemove={onRemove} />}
 				</li>
 			))}
 		</ul>
@@ -186,12 +244,12 @@ function DayHeading({ day, count, className }: { day: Date; count: number; class
 }
 
 /** The chosen day's entries beside the month. */
-function DayList({ day, entries }: { day: Date | null; entries: CalendarEntry[] }) {
+function DayList({ day, entries, onRemove }: { day: Date | null; entries: CalendarEntry[]; onRemove: RemoveLocal }) {
 	if (day === null) return <p className="px-2 text-sm text-muted-foreground">Choose a day to list everything on it.</p>;
 	return (
 		<section aria-label={day.toDateString()} className="space-y-2 lg:sticky lg:top-0 lg:self-start">
 			<DayHeading day={day} count={entries.length} className="px-2" />
-			{entries.length === 0 ? <p className="px-2 text-sm text-muted-foreground">Nothing on this day.</p> : <DayEntries entries={entries} />}
+			{entries.length === 0 ? <p className="px-2 text-sm text-muted-foreground">Nothing on this day.</p> : <DayEntries entries={entries} onRemove={onRemove} />}
 		</section>
 	);
 }
@@ -223,7 +281,7 @@ function DayCell({ date, entries, today, selected, onSelect, className }: DayCel
 				{date.getDate()}
 			</button>
 			{entries.slice(0, CELL_ENTRIES).map(entry => (
-				<CellEntry key={entryKey(entry)} entry={entry} />
+				<CellEntry key={entryKey(entry)} entry={entry} onSelect={() => onSelect(date)} />
 			))}
 			{entries.length > CELL_ENTRIES && (
 				<button type="button" onClick={() => onSelect(date)} className="self-start rounded-sm px-1 text-[11px] text-muted-foreground hover:bg-hover hover:text-foreground">
@@ -261,33 +319,74 @@ interface CalendarPageProps {
 	ticketsShown: boolean;
 }
 
-/** A month of Google events, routine runs, and due todos and Linear tickets, with one day's list beside it. */
+/** A month of Google events and events kept on this computer, routine runs, and due todos and Linear tickets, with one day's list beside it. */
 export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProps) {
 	const now = useMinute();
 	const [month, setMonth] = useCalendarMonth();
 	const [year, setYear] = useCalendarYear();
 	const [selected, setSelected] = useState<Date | null>(() => new Date(now));
+	/** The day the new-event dialog opened on, while it is open. */
+	const [newEventDay, setNewEventDay] = useState<string | null>(null);
+	const [removeError, setRemoveError] = useState<string | null>(null);
 	const tickets = ticketsStore.usePolling(null, ticketsShown).read?.data.tickets ?? null;
-	const googleConnection = integrationsStore.usePolling().read?.data.integrations["google-calendar"].connection;
-	const connected = googleConnection !== undefined && callable(googleConnection);
-	const eventsRead = calendarEventsStore.usePolling(monthSpan(year, month), connected);
+	const { connected } = useGoogleCalendars();
+	const span = monthSpan(year, month);
+	const eventsRead = calendarEventsStore.usePolling(span, connected);
 	const events = connected ? (eventsRead.read?.data.events ?? null) : null;
+	const localRead = localEventsStore.usePolling();
+	const localEvents = localRead.read?.data.events ?? null;
 	const byDay = useMemo(() => {
 		const days = new Map<string, CalendarEntry[]>();
-		for (const entry of calendarEntries({ routines, todos, tickets: ticketsShown ? tickets : null, events }, year, month, now)) {
+		for (const entry of calendarEntries({ routines, todos, tickets: ticketsShown ? tickets : null, events, localEvents }, year, month, now)) {
 			const day = days.get(entry.day);
 			if (day) day.push(entry);
 			else days.set(entry.day, [entry]);
 		}
 		return days;
-	}, [routines, todos, tickets, ticketsShown, events, year, month, now]);
+	}, [routines, todos, tickets, ticketsShown, events, localEvents, year, month, now]);
 	const days = useMemo(() => gridDays(year, month), [year, month]);
 	const shownDay = selected !== null && selected.getFullYear() === year && selected.getMonth() === month ? localDay(selected) : null;
 	const today = new Date(now);
 	const todayKey = localDay(today);
+
+	const show = (date: Date): void => {
+		setMonth(date.getMonth() as CalendarState["month"]);
+		setYear(date.getFullYear());
+		setSelected(date);
+	};
+	const openNewEvent = (): void => setNewEventDay(current => current ?? shownDay ?? todayKey);
+	// Claims C even while the dialog is open, so the page's key never falls through to the App's Create ticket.
+	useShortcuts({ calendarNewEvent: openNewEvent });
+	const removeLocal = async (id: string, title: string): Promise<void> => {
+		setRemoveError(null);
+		try {
+			await putJson<object>("/api/calendar/local/remove", { id });
+		} catch (err) {
+			setRemoveError(`Cannot remove ${title}: ${errorText(err)}`);
+			return;
+		}
+		localEventsStore.update(answer => ({ events: answer.events.filter(event => event.id !== id) }));
+	};
+	/** Shows a new event, which starts on `day`: one kept on this computer at once, and one added to Google Calendar once its month is read again. */
+	const created = (day: string, kept: LocalEvent | null): void => {
+		const date = dateOfDay(day);
+		if (kept) localEventsStore.update(answer => ({ events: [...answer.events, kept] }));
+		else void calendarEventsStore.refresh(monthSpan(date.getFullYear(), date.getMonth()));
+		setNewEventDay(null);
+		show(date);
+	};
+
+	const failures: string[] = [];
+	if (connected && eventsRead.error) failures.push(`Cannot read Google Calendar: ${eventsRead.error}`);
+	if (localRead.error) failures.push(`Cannot read the events on this computer: ${localRead.error}`);
+	if (removeError) failures.push(removeError);
 	return (
-		<PageFrame title="Calendar" meta={["Routine runs", connected && "Google events", "due todos", ticketsShown && "Linear tickets"].filter(Boolean).join(", ")}>
-			{connected && eventsRead.error && <p role="alert" className="px-6 pt-4 text-sm text-red-600 dark:text-red-400">Cannot read Google Calendar: {eventsRead.error}</p>}
+		<PageFrame title="Calendar" meta={["Routine runs", connected && "Google events", "events on this computer", "due todos", ticketsShown && "Linear tickets"].filter(Boolean).join(", ")}>
+			{failures.map(failure => (
+				<p key={failure} role="alert" className="px-6 pt-4 text-sm text-red-600 dark:text-red-400">
+					{failure}
+				</p>
+			))}
 			<div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
 				<CalendarProvider className="overflow-hidden rounded-xl border border-border bg-background">
 					<CalendarDate>
@@ -296,14 +395,12 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 							<CalendarYearPicker start={today.getFullYear() - 1} end={today.getFullYear() + 2} />
 						</CalendarDatePicker>
 						<div className="flex items-center gap-1">
-							<Button
-								variant="tertiary"
-								onClick={() => {
-									setMonth(today.getMonth() as CalendarState["month"]);
-									setYear(today.getFullYear());
-									setSelected(today);
-								}}
-							>
+							<Tooltip content="Add an event to Google Calendar or this computer" shortcut={shortcutLabels("calendarNewEvent")} side="bottom">
+								<Button variant="tertiary" leadingIcon={Plus} onClick={openNewEvent}>
+									New event
+								</Button>
+							</Tooltip>
+							<Button variant="tertiary" onClick={() => show(today)}>
 								Today
 							</Button>
 							<CalendarDatePagination className="gap-0" />
@@ -330,8 +427,9 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 						})}
 					</div>
 				</CalendarProvider>
-				<DayList day={shownDay === null ? null : selected} entries={shownDay === null ? [] : (byDay.get(shownDay) ?? [])} />
+				<DayList day={shownDay === null ? null : selected} entries={shownDay === null ? [] : (byDay.get(shownDay) ?? [])} onRemove={removeLocal} />
 			</div>
+			{newEventDay !== null && <NewEventDialog day={newEventDay} onClose={() => setNewEventDay(null)} onCreated={created} />}
 		</PageFrame>
 	);
 }

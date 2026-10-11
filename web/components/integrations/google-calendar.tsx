@@ -1,6 +1,7 @@
 import { CircleAlert } from "lucide-react";
 import { type FormEvent, useId, useRef, useState } from "react";
-import { GOOGLE_CLIENT_ID, type GoogleClientInput, type GoogleSetup, type GoogleStatus, googleRedirectUri, type McpIntegration } from "../../../src/shared/accounts";
+import { GOOGLE_CLIENT_ID, type GoogleClientInput, type GoogleSetup, googleRedirectUri, type McpIntegration } from "../../../src/shared/accounts";
+import type { GoogleStatus } from "../../../src/shared/calendar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { errorText, putJson } from "../../api";

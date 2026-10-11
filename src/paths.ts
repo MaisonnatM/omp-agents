@@ -39,6 +39,8 @@ export const projectNotesDir = (id: string): string => join(dataDir, "projects",
 export const pinsFile = join(configDir, "pins.json");
 /** The Google calendars the Calendar page's sidebar unchecked, beside {@link tokenFile}. */
 export const calendarsFile = join(configDir, "calendars.json");
+/** The events the Calendar page keeps on this computer, beside {@link tokenFile}. */
+export const localEventsFile = join(configDir, "events.json");
 /** The notices the bell's user saw or cleared, beside {@link tokenFile}. */
 export const noticesFile = join(configDir, "notices.json");
 /** The Google calendars' secret addresses an older version kept, beside {@link tokenFile}; the server deletes it at startup. */

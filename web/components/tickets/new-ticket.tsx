@@ -1,4 +1,3 @@
-import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Box, ChevronRight, CircleUser, Maximize2, Minimize2, Paperclip, Tag, UsersRound, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { errorText } from "../../../src/json";
@@ -13,6 +12,7 @@ import { chordLabel } from "../../shortcuts";
 import { PRIORITY_LABEL, statusOrder } from "../../tickets-model";
 import { fileBase64 } from "../prompt-attachments";
 import { DuePicker, FieldPicker } from "../field-picker";
+import { ERROR_TEXT, FormDialog, FormDialogHeader, isSubmitChord, type Submit } from "../form-dialog";
 import { PRIORITIES } from "./ticket-fields";
 import { LabelDot, PRIORITY_ICON, statusIcon } from "./ticket-row";
 import { preferredTeam, rememberTeam } from "./team-select";
@@ -20,12 +20,10 @@ import { preferredTeam, rememberTeam } from "./team-select";
 const MAX_ATTACHMENT_MB = MAX_TICKET_ATTACHMENT_BYTES / (1024 * 1024);
 
 /** Where the form stands: being written, sent to Linear, refused with Linear's reason, or opened while the dialog stays for the next one. */
-type Submit =
-	| { kind: "writing" }
-	| { kind: "creating" }
-	| { kind: "failed"; error: string }
+type TicketSubmit = Submit<
 	/** `refused` names each file Linear did not attach, with its reason. */
-	| { kind: "created"; identifier: string; refused: string[] };
+	{ kind: "created"; identifier: string; refused: string[] }
+>;
 
 /** The new issue's fields the pills set. `assignee` is `"me"` until another is picked, as the issue opens assigned to you. */
 interface Fields {
@@ -46,10 +44,6 @@ function firstStatus(statuses: TicketStatus[]): TicketStatus | undefined {
 	return sorted.find(status => status.statusType === "backlog") ?? sorted[0];
 }
 
-const isSubmitChord = (event: KeyboardEvent): boolean => event.key === "Enter" && (event.metaKey || event.ctrlKey);
-
-const ERROR_TEXT = "text-xs text-red-600 dark:text-red-400";
-
 /**
  * Linear's new-issue dialog: the team, a title, a markdown description, a pill for each field, and files to attach,
  * starting from `title`. The issue opens assigned to you unless another assignee is picked, then its details open,
@@ -59,40 +53,20 @@ export function NewTicketDialog({ title, onClose }: { title: string; onClose: ()
 	const [creating, setCreating] = useState(false);
 	const [expanded, setExpanded] = useState(false);
 	return (
-		<DialogPrimitive.Root open onOpenChange={open => !open && !creating && onClose()}>
-			<DialogPrimitive.Portal>
-				<DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
-				<DialogPrimitive.Content
-					aria-describedby={undefined}
-					className={cn(
-						"fixed left-1/2 z-50 flex max-h-[calc(100vh-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-2xl border bg-popover text-popover-foreground shadow-2xl outline-hidden",
-						expanded ? "top-[5vh] h-[90vh] w-[min(60rem,calc(100vw-2rem))]" : "top-[15%] w-[min(44rem,calc(100vw-2rem))]",
-					)}
-				>
-					<NewTicketForm
-						title={title}
-						onCreating={setCreating}
-						onCreated={onClose}
-						actions={
-							<>
-								<Tooltip content={expanded ? "Shrink the dialog" : "Expand the dialog"} side="bottom">
-									<Button variant="ghost" size="icon-compact" aria-label={expanded ? "Shrink" : "Expand"} onClick={() => setExpanded(!expanded)}>
-										{expanded ? <Minimize2 /> : <Maximize2 />}
-									</Button>
-								</Tooltip>
-								<Tooltip content="Close" shortcut={["Esc"]} side="bottom">
-									<DialogPrimitive.Close asChild>
-										<Button variant="ghost" size="icon-compact" aria-label="Close" disabled={creating}>
-											<X />
-										</Button>
-									</DialogPrimitive.Close>
-								</Tooltip>
-							</>
-						}
-					/>
-				</DialogPrimitive.Content>
-			</DialogPrimitive.Portal>
-		</DialogPrimitive.Root>
+		<FormDialog busy={creating} onClose={onClose} className={expanded ? "top-[5vh] h-[90vh] w-[min(60rem,calc(100vw-2rem))]" : "top-[15%] w-[min(44rem,calc(100vw-2rem))]"}>
+			<NewTicketForm
+				title={title}
+				onCreating={setCreating}
+				onCreated={onClose}
+				actions={
+					<Tooltip content={expanded ? "Shrink the dialog" : "Expand the dialog"} side="bottom">
+						<Button variant="ghost" size="icon-compact" aria-label={expanded ? "Shrink" : "Expand"} onClick={() => setExpanded(!expanded)}>
+							{expanded ? <Minimize2 /> : <Maximize2 />}
+						</Button>
+					</Tooltip>
+				}
+			/>
+		</FormDialog>
 	);
 }
 
@@ -100,7 +74,7 @@ interface NewTicketFormProps {
 	title: string;
 	onCreating: (creating: boolean) => void;
 	onCreated: () => void;
-	/** The header's buttons at its end. */
+	/** The header's buttons before its close button. */
 	actions: ReactNode;
 }
 
@@ -113,7 +87,7 @@ function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: 
 	const [files, setFiles] = useState<File[]>([]);
 	const [fileNote, setFileNote] = useState<string | null>(null);
 	const [createMore, setCreateMore] = useState(false);
-	const [submit, setSubmit] = useState<Submit>({ kind: "writing" });
+	const [submit, setSubmit] = useState<TicketSubmit>({ kind: "writing" });
 	const [retry, setRetry] = useState(0);
 	const titleRef = useRef<HTMLTextAreaElement>(null);
 	const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -203,37 +177,42 @@ function NewTicketForm({ title: initialTitle, onCreating, onCreated, actions }: 
 				void create();
 			}}
 		>
-			<div className="flex items-center gap-1.5 px-4 pt-3.5 text-[13px]">
-				{teams.data?.length && team ? (
-					<FieldPicker
-						look="chip"
-						field="Team"
-						current={team.name}
-						trigger={
-							<>
-								<UsersRound aria-hidden className="size-3.5 text-violet-500" />
-								<span className="font-medium">{team.key}</span>
-							</>
-						}
-						choices={teams.data.map(candidate => ({ value: candidate.id, label: `${candidate.name} (${candidate.key})` }))}
-						selected={[team.id]}
-						disabled={creating}
-						onPick={id => {
-							if (id === team.id) return;
-							setPicked(id);
-							// Statuses, labels, and projects belong to a team, so another team's choices start afresh.
-							set({ state: null, labels: [], project: null });
-						}}
-					/>
-				) : (
-					<span className={teams.error || teams.data ? ERROR_TEXT : "text-muted-foreground"}>
-						{teams.error ? `Cannot read Linear's teams: ${teams.error}` : teams.data ? "Linear lists no team to open the issue in." : "Reading teams…"}
-					</span>
-				)}
-				<ChevronRight aria-hidden className="size-3.5 text-muted-foreground" />
-				<DialogPrimitive.Title className="font-normal text-foreground">New issue</DialogPrimitive.Title>
-				<div className="ml-auto flex items-center gap-0.5">{actions}</div>
-			</div>
+			<FormDialogHeader
+				title="New issue"
+				busy={creating}
+				actions={actions}
+				lead={
+					<>
+						{teams.data?.length && team ? (
+							<FieldPicker
+								look="chip"
+								field="Team"
+								current={team.name}
+								trigger={
+									<>
+										<UsersRound aria-hidden className="size-3.5 text-violet-500" />
+										<span className="font-medium">{team.key}</span>
+									</>
+								}
+								choices={teams.data.map(candidate => ({ value: candidate.id, label: `${candidate.name} (${candidate.key})` }))}
+								selected={[team.id]}
+								disabled={creating}
+								onPick={id => {
+									if (id === team.id) return;
+									setPicked(id);
+									// Statuses, labels, and projects belong to a team, so another team's choices start afresh.
+									set({ state: null, labels: [], project: null });
+								}}
+							/>
+						) : (
+							<span className={teams.error || teams.data ? ERROR_TEXT : "text-muted-foreground"}>
+								{teams.error ? `Cannot read Linear's teams: ${teams.error}` : teams.data ? "Linear lists no team to open the issue in." : "Reading teams…"}
+							</span>
+						)}
+						<ChevronRight aria-hidden className="size-3.5 text-muted-foreground" />
+					</>
+				}
+			/>
 			<div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto px-5 pt-3">
 				<textarea
 					ref={titleRef}

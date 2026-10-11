@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { GoogleCalendarReader, type GoogleGet } from "./google-calendar";
+import { GoogleCalendarClient, type GoogleFetch } from "./google-calendar";
 
 const OCTOBER = [new Date("2026-10-01T00:00:00+02:00"), new Date("2026-11-01T00:00:00+01:00")] as const;
 
@@ -52,10 +52,15 @@ const TEAM_EVENTS = {
 	items: [{ id: "retro", status: "confirmed", summary: "Retro", htmlLink: "https://www.google.com/calendar/event?eid=retro", start: { dateTime: "2026-10-09T15:00:00+02:00" }, end: { dateTime: "2026-10-09T16:00:00+02:00" } }],
 };
 
-/** A reader over `answers`, by the path and `pageToken` of each address, that leaves out the `hidden` calendars, with the addresses it read. */
-function readerOf(answers: Record<string, unknown>, hidden: ReadonlySet<string> = new Set()): { reader: GoogleCalendarReader; reads: string[] } {
+/** A client over `answers`, by the path and `pageToken` of each address, that leaves out the `hidden` calendars, with the addresses it read and what it posted. */
+function clientOf(answers: Record<string, unknown>, hidden: ReadonlySet<string> = new Set()): { client: GoogleCalendarClient; reads: string[]; posts: { url: string; body: unknown }[] } {
 	const reads: string[] = [];
-	const get: GoogleGet = async url => {
+	const posts: { url: string; body: unknown }[] = [];
+	const fetch: GoogleFetch = async (url, init) => {
+		if (init) {
+			posts.push({ url, body: init.body });
+			return { id: "created" };
+		}
 		reads.push(url);
 		const { pathname, searchParams } = new URL(url);
 		const key = `${pathname}${searchParams.has("pageToken") ? `#${searchParams.get("pageToken")}` : ""}`;
@@ -64,7 +69,7 @@ function readerOf(answers: Record<string, unknown>, hidden: ReadonlySet<string> 
 		if (answer === undefined) throw new Error(`unexpected read ${key}`);
 		return answer;
 	};
-	return { reader: new GoogleCalendarReader(get, () => hidden), reads };
+	return { client: new GoogleCalendarClient(fetch, () => hidden), reads, posts };
 }
 
 const LIST = "/calendar/v3/users/me/calendarList";
@@ -72,8 +77,8 @@ const WORK = "/calendar/v3/calendars/max%40example.com/events";
 const TEAM = "/calendar/v3/calendars/team%40group.calendar.google.com/events";
 
 test("the shown calendars' events keep each repeat, link to the event, end all-day events on their last day, and leave out what Google Calendar hides", async () => {
-	const { reader, reads } = readerOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: { items: [] } });
-	expect(await reader.events(...OCTOBER)).toEqual({
+	const { client, reads } = clientOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: { items: [] } });
+	expect(await client.events(...OCTOBER)).toEqual({
 		events: [
 			{ id: "max@example.com/standup_20261005T073000Z", title: "Standup", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=standup1", when: { allDay: false, start: Date.parse("2026-10-05T07:30:00Z"), end: Date.parse("2026-10-05T08:00:00Z") } },
 			{ id: "max@example.com/standup_20261026T083000Z", title: "Standup", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=standup2", when: { allDay: false, start: Date.parse("2026-10-26T08:30:00Z"), end: Date.parse("2026-10-26T09:00:00Z") } },
@@ -86,47 +91,47 @@ test("the shown calendars' events keep each repeat, link to the event, end all-d
 });
 
 test("a long calendar list and event list are read to their last page", async () => {
-	const { reader } = readerOf({
+	const { client } = clientOf({
 		[LIST]: { items: [CALENDARS.items[0]], nextPageToken: "p2" },
 		[`${LIST}#p2`]: { items: [CALENDARS.items[1]] },
 		[WORK]: { items: [WORK_EVENTS.items[0]], nextPageToken: "e2" },
 		[`${WORK}#e2`]: { items: [WORK_EVENTS.items[1]] },
 		[TEAM]: { items: [] },
 	});
-	expect((await reader.status()).calendars.map(calendar => calendar.name)).toEqual(["max@example.com", "Eng team"]);
-	expect((await reader.events(...OCTOBER)).events.map(event => event.id)).toEqual(["max@example.com/standup_20261005T073000Z", "max@example.com/standup_20261026T083000Z"]);
+	expect((await client.status()).calendars.map(calendar => calendar.name)).toEqual(["max@example.com", "Eng team"]);
+	expect((await client.events(...OCTOBER)).events.map(event => event.id)).toEqual(["max@example.com/standup_20261005T073000Z", "max@example.com/standup_20261026T083000Z"]);
 });
 
 test("a calendar that cannot be read keeps its error for the settings while the others answer, and fails the read only when none can", async () => {
-	const { reader } = readerOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: new Error("Not Found") });
-	expect((await reader.events(...OCTOBER)).events).toHaveLength(3);
-	expect((await reader.status()).calendars.map(({ name, error }) => ({ name, error }))).toEqual([
+	const { client } = clientOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: new Error("Not Found") });
+	expect((await client.events(...OCTOBER)).events).toHaveLength(3);
+	expect((await client.status()).calendars.map(({ name, error }) => ({ name, error }))).toEqual([
 		{ name: "max@example.com", error: null },
 		{ name: "Eng team", error: "Not Found" },
 	]);
 
-	const none = readerOf({ [LIST]: CALENDARS, [WORK]: new Error("Forbidden"), [TEAM]: new Error("Not Found") }).reader;
+	const none = clientOf({ [LIST]: CALENDARS, [WORK]: new Error("Forbidden"), [TEAM]: new Error("Not Found") }).client;
 	await expect(none.events(...OCTOBER)).rejects.toThrow("Forbidden");
-	const empty = readerOf({ [LIST]: { items: [CALENDARS.items[2]] } }).reader;
+	const empty = clientOf({ [LIST]: { items: [CALENDARS.items[2]] } }).client;
 	await expect(empty.events(...OCTOBER)).rejects.toThrow("No calendar is checked");
 });
 
 test("a calendar unchecked on the Calendar page is not read and its events are left out, and the list keeps it unshown in Google Calendar's group", async () => {
 	const hidden = new Set(["max@example.com"]);
-	const { reader, reads } = readerOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: TEAM_EVENTS }, hidden);
-	expect(await reader.events(...OCTOBER)).toEqual({
+	const { client, reads } = clientOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: TEAM_EVENTS }, hidden);
+	expect(await client.events(...OCTOBER)).toEqual({
 		events: [
 			{ id: "team@group.calendar.google.com/retro", title: "Retro", calendar: "Eng team", color: "#b99aff", url: "https://www.google.com/calendar/event?eid=retro", when: { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") } },
 		],
 	});
 	expect(reads.some(url => url.includes("max%40example.com"))).toBe(false);
-	expect((await reader.status()).calendars).toEqual([
-		{ id: "max@example.com", name: "max@example.com", color: "#9fe1e7", group: "mine", shown: false, error: null },
-		{ id: "team@group.calendar.google.com", name: "Eng team", color: "#b99aff", group: "other", shown: true, error: null },
+	expect((await client.status()).calendars).toEqual([
+		{ id: "max@example.com", name: "max@example.com", color: "#9fe1e7", group: "mine", writable: true, shown: false, error: null },
+		{ id: "team@group.calendar.google.com", name: "Eng team", color: "#b99aff", group: "other", writable: false, shown: true, error: null },
 	]);
 
 	hidden.delete("max@example.com");
-	expect((await reader.events(...OCTOBER)).events.map(event => event.id)).toEqual([
+	expect((await client.events(...OCTOBER)).events.map(event => event.id)).toEqual([
 		"max@example.com/standup_20261005T073000Z",
 		"max@example.com/standup_20261026T083000Z",
 		"max@example.com/offsite",
@@ -135,7 +140,38 @@ test("a calendar unchecked on the Calendar page is not read and its events are l
 });
 
 test("with every calendar unchecked on the Calendar page, the events are none and no calendar is read", async () => {
-	const { reader, reads } = readerOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: TEAM_EVENTS }, new Set(["max@example.com", "team@group.calendar.google.com"]));
-	expect(await reader.events(...OCTOBER)).toEqual({ events: [] });
+	const { client, reads } = clientOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: TEAM_EVENTS }, new Set(["max@example.com", "team@group.calendar.google.com"]));
+	expect(await client.events(...OCTOBER)).toEqual({ events: [] });
 	expect(reads.map(url => new URL(url).pathname)).toEqual([LIST]);
+});
+
+const FAMILY = { id: "family@group.calendar.google.com", summary: "Family", backgroundColor: "#16a765", selected: true, accessRole: "writer" };
+const FAMILY_EVENTS = "/calendar/v3/calendars/family%40group.calendar.google.com/events";
+
+test("a new event posts to its calendar, all day with Google's exclusive end or timed in ISO times, and the next read of that calendar asks Google again", async () => {
+	const answers: Record<string, unknown> = { [LIST]: { items: [CALENDARS.items[0], FAMILY] }, [WORK]: { items: [] }, [FAMILY_EVENTS]: { items: [] } };
+	const { client, posts } = clientOf(answers);
+	expect((await client.status()).calendars.map(({ name, writable }) => ({ name, writable }))).toEqual([
+		{ name: "max@example.com", writable: true },
+		{ name: "Family", writable: true },
+	]);
+	expect((await client.events(...OCTOBER)).events).toEqual([]);
+
+	await client.create("max@example.com", "Offsite", { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" });
+	await client.create("family@group.calendar.google.com", "Dinner", { allDay: false, start: Date.parse("2026-10-09T17:00:00Z"), end: Date.parse("2026-10-09T19:30:00Z") });
+	expect(posts).toEqual([
+		{ url: `https://www.googleapis.com${WORK}`, body: { summary: "Offsite", start: { date: "2026-10-14" }, end: { date: "2026-10-16" } } },
+		{ url: `https://www.googleapis.com${FAMILY_EVENTS}`, body: { summary: "Dinner", start: { dateTime: "2026-10-09T17:00:00.000Z" }, end: { dateTime: "2026-10-09T19:30:00.000Z" } } },
+	]);
+
+	answers[WORK] = { items: [WORK_EVENTS.items[5]] };
+	expect((await client.events(...OCTOBER)).events.map(event => event.id)).toEqual(["max@example.com/offsite"]);
+});
+
+test("a new event in a calendar you may only read, or one not checked in your list, is refused before Google is asked", async () => {
+	const { client, posts } = clientOf({ [LIST]: CALENDARS });
+	const when = { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-14" } as const;
+	await expect(client.create("team@group.calendar.google.com", "Retro", when)).rejects.toThrow("You may only read Eng team, so it takes no new events.");
+	await expect(client.create("hidden@group.calendar.google.com", "Retro", when)).rejects.toThrow("That calendar is not checked in your Google Calendar's list.");
+	expect(posts).toEqual([]);
 });

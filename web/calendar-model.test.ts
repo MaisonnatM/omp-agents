@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import type { Routine, RoutineRun, Schedule } from "../src/routines";
-import type { CalendarEvent } from "../src/shared/accounts";
+import type { CalendarEvent, LocalEvent } from "../src/shared/calendar";
 import type { Ticket } from "../src/shared/tickets";
 import type { UserTodo, UserTodoList } from "../src/user-todos-shared";
 import { type CalendarEntry, calendarEntries } from "./calendar-model";
@@ -52,7 +52,7 @@ const ticket = (fields: Partial<Ticket>): Ticket => ({
 });
 
 const october = (sources: Partial<Parameters<typeof calendarEntries>[0]>, now = NOW): CalendarEntry[] =>
-	calendarEntries({ routines: [], todos: null, tickets: null, events: null, ...sources }, OCTOBER.year, OCTOBER.month, now);
+	calendarEntries({ routines: [], todos: null, tickets: null, events: null, localEvents: null, ...sources }, OCTOBER.year, OCTOBER.month, now);
 const days = (entries: CalendarEntry[], state?: string): string[] =>
 	entries.filter(entry => entry.kind === "routine" && (state === undefined || entry.state === state)).map(({ day }) => day);
 
@@ -109,7 +109,7 @@ describe("routines", () => {
 	});
 
 	test("a month after now plans from the last run through it", () => {
-		const entries = calendarEntries({ routines: [routine({})], todos: null, tickets: null, events: null }, 2026, 11, NOW);
+		const entries = calendarEntries({ routines: [routine({})], todos: null, tickets: null, events: null, localEvents: null }, 2026, 11, NOW);
 		expect(days(entries, "planned")).toHaveLength(23);
 	});
 });
@@ -161,6 +161,24 @@ describe("Google events", () => {
 			["2026-10-24", at("2026-10-24T23:30:00+02:00")],
 			["2026-10-25", null],
 			["2026-10-26", at("2026-10-26T23:00:00+01:00")],
+		]);
+	});
+});
+
+describe("events kept on this computer", () => {
+	const local = (when: LocalEvent["when"], id = "e1"): LocalEvent => ({ id, title: "Dentist", when });
+
+	test("an all-day event spanning the previous month and the next shows once on every day of October", () => {
+		const entries = october({ localEvents: [local({ allDay: true, firstDay: "2026-09-28", lastDay: "2026-11-03" })] });
+		expect(entries.map(entry => [entry.kind, entry.day, entry.at])).toEqual(Array.from({ length: 31 }, (_, i) => ["event", `2026-10-${String(i + 1).padStart(2, "0")}`, null]));
+	});
+
+	test("a timed event shows on its local day, at its start, beside a Google event of the same day, in slate as on this computer", () => {
+		const google: CalendarEvent = { id: "personal/one", title: "Birthday", calendar: "Personal", color: "#4285f4", url: "https://calendar.google.com/calendar/event?eid=one", when: { allDay: true, firstDay: "2026-10-09", lastDay: "2026-10-09" } };
+		const entries = october({ events: [google], localEvents: [local({ allDay: false, start: at("2026-10-08T23:30:00Z"), end: at("2026-10-09T00:15:00Z") })] });
+		expect(entries).toEqual([
+			{ kind: "event", day: "2026-10-09", at: null, event: { id: "personal/one", title: "Birthday", when: { allDay: true, firstDay: "2026-10-09", lastDay: "2026-10-09" }, color: "#4285f4", place: "Personal", source: { kind: "google", url: "https://calendar.google.com/calendar/event?eid=one" } } },
+			{ kind: "event", day: "2026-10-09", at: at("2026-10-09T01:30:00+02:00"), event: { id: "e1", title: "Dentist", when: { allDay: false, start: at("2026-10-08T23:30:00Z"), end: at("2026-10-09T00:15:00Z") }, color: "#64748b", place: "This computer", source: { kind: "local", id: "e1" } } },
 		]);
 	});
 });

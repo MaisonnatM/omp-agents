@@ -860,9 +860,9 @@ An action that fails shows its error, and its control becomes available again.
 
 - The **Calendar** tab, or a `#calendar` address, shows a month in place of the panes, Monday first.
   The sidebar then lists **Calendar**, then, once Google Calendar is connected, your Google calendars under **My calendars** and **Other calendars**, then **All** and each routine by name.
-- Each day lists its routine runs, the todos due on it, and, once connected, the Linear tickets due on it and events of the Google calendars you added.
+- Each day lists its routine runs, the todos due on it, the events you keep on this computer, and, once connected, the Linear tickets due on it and events of the Google calendars you added.
   A green dot is a run that went through, a red one a run that failed, and a hollow one a run still to come.
-  A violet dot is a todo, an amber one a ticket, and a timed Google event uses its calendar's color; an all-day event is a band in that color; a done or canceled todo or ticket is struck through.
+  A violet dot is a todo, an amber one a ticket, a timed Google event uses its calendar's color, and an event on this computer is slate gray; an all-day event is a band in that color; a done or canceled todo or ticket is struck through.
 - Planned runs follow each routine's schedules from its last run.
   A time that passed without a run shows as now, since the next minute's check runs it.
   A paused routine shows its past runs and no planned ones.
@@ -872,7 +872,17 @@ An action that fails shows its error, and its control becomes available again.
   Hover a day, or focus its number, to see all of its entries in a card beside it, each a link like in the day's list.
   Click a day's number, or its **+N more**, to list all of its entries beside the month; today is listed when the page opens.
 - Click an entry to open its routine, its todo beside its list, or its ticket; a Google event opens in Google Calendar in a new tab.
+  An event on this computer has no page of its own, so clicking it in a day cell lists its day.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
+- **New event**, beside **Today**, or C outside a text field, adds an event on the day listed beside the month, or today when none is.
+  Type its title, then either check **All day** and pick its first and last days, or pick its day and its start and end times.
+  A timed event starts at the next whole hour on today and at 9:00 on another day, and lasts an hour; moving its start moves its end with it, and an end at or before the start shows an error and keeps **Create event** off.
+  **Calendar** picks where it goes: one of your Google calendars that the page shows and that you own or may edit, yours first, or **This computer**, which needs no Google sign-in.
+  The dialog starts on the calendar you picked last, while it is still offered.
+  Enter in the title or Cmd+Enter creates it, and Esc closes the dialog; the month then shows the event and lists its first day.
+- An event on **This computer** stays in `events.json` beside the server's access token, so every browser tab and the desktop app show it, and nothing leaves this computer.
+  In the day's list beside the month, its trash button removes it; to change one, remove it and add it again.
+  A Google event is changed or deleted in Google Calendar, which its entry opens.
 - To show Google events, connect Google Calendar in **Settings › Integrations**; see [Integrations](#integrations).
   The sidebar lists the calendars checked in Google Calendar's own list, the ones you own under **My calendars** and the ones you subscribed to or others share under **Other calendars**, as Google Calendar groups them.
   Each has a checkbox in its color: uncheck one to hide its events on this page, and check it to show them again; the month updates at once.
@@ -1115,7 +1125,7 @@ Alt is Option on macOS.
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
 | Cmd+1 | Anywhere | Go to Pull requests |
 | Cmd+2 | Anywhere | Go to your Linear tickets, when connected |
-| C | Outside text fields, except on the Todo page | Create a Linear ticket, when connected |
+| C | Outside text fields, except on the Todo and Calendar pages | Create a Linear ticket, when connected |
 | Cmd+3 | Anywhere | Go to the sessions |
 | Cmd+4 | Anywhere | Go to your todo list |
 | Cmd+5 | Anywhere | Go to your calendar |
@@ -1137,11 +1147,12 @@ Alt is Option on macOS.
 | Shift+D | Todo page, outside text fields | Change the focused or open todo's due day |
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |
+| C | Calendar page, outside text fields | Add an event |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, and the open todo's ↑, ↓, and **×**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, and the Calendar page's **New event**.
 - Cmd+1 through Cmd+5 select the dashboard's tabs, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers stay fixed when Tickets is hidden without a Linear connection; Cmd+2 then keeps its browser behavior.
   Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or another digit keeps its browser behavior.
@@ -1182,7 +1193,7 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in this browser.
-- Cmd+1 opens the Pull requests page, and Cmd+2 opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page.
+- Cmd+1 opens the Pull requests page, and Cmd+2 opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page but the Todo and Calendar pages, where it adds a todo or an event.
   Cmd+3 goes back from the Pull requests page, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
   Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, G then R the **Routines** page, and G then P the **Projects** page.
   Cmd+6 opens Settings, where the model roles and the integrations live, and closes it again.
