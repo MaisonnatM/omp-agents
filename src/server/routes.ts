@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar and the events kept on this computer, prompt images, and the text files agent text names through.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, and the text files agent text names through.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { join } from "node:path";
@@ -10,6 +10,7 @@ import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import { gitCheckout } from "../git";
 import type { GoogleCalendarClient } from "../google-calendar";
+import type { GmailClient } from "../gmail";
 import { loadPullRequests, loadPullRequestDetail } from "../pull-requests";
 import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
 import { blobsDir } from "../omp/config";
@@ -86,6 +87,8 @@ export interface RouteEnv {
 	guards: Guards;
 	sessions: SessionRoutesEnv;
 	calendar: CalendarRoutesEnv;
+	/** Your Gmail inbox, which the Inbox page lists. */
+	gmail: GmailClient;
 	files: FileRoutesEnv;
 }
 
@@ -422,6 +425,13 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 	};
 }
 
+/** Your Gmail inbox, read only. */
+function gmailRoutes({ get }: RouteKit, gmail: GmailClient): Routes {
+	/** `GET /api/gmail/inbox[?fresh]`: the signed-in address and its inbox's latest conversations. */
+	const inbox = get(params => answer(() => gmail.inbox(params.has("fresh"))));
+	return { "/api/gmail/inbox": { GET: inbox } };
+}
+
 /** GitHub pull requests in full: details, stack, options, edits, and their changed files. */
 function pullRequestRoutes({ get, write }: RouteKit): Routes {
 	/** A read of the pull request `?owner=&repo=&number=` names, refused with `badRequest`. */
@@ -550,6 +560,7 @@ export function createRoutes(env: RouteEnv): Routes {
 		...sessionRoutes(kit, env.sessions),
 		...integrationRoutes(kit),
 		...calendarRoutes(kit, env.calendar),
+		...gmailRoutes(kit, env.gmail),
 		...pullRequestRoutes(kit),
 		...fileRoutes(kit, env.files),
 	};

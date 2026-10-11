@@ -15,7 +15,7 @@ const API = "https://www.googleapis.com/calendar/v3";
 const DEFAULT_COLOR = "#039be5";
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
-/** Calls a Google Calendar API address with your sign-in: reads its JSON, or with `init` posts its body as JSON and reads the answer. */
+/** Calls a Google API address with your sign-in: reads its JSON, or with `init` posts its body as JSON and reads the answer. */
 export type GoogleFetch = (url: string, init?: JsonPost) => Promise<unknown>;
 
 /** A calendar list entry as Google Calendar lists it, before the Calendar page's own checkbox and last read. */
