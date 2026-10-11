@@ -6,7 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { foldMessages, foldsAfter, linkParts, NO_FOLDS, personLabel, recipientsLine } from "../../inbox-model";
 import { formatBytes, mailTime } from "../../labels";
-import { readMailThread, useMailThread } from "../../reads";
+import { mailThreadStore, useMailThread } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { DetailPage } from "../list-page";
@@ -136,15 +136,15 @@ interface ThreadDetailProps {
  * the dashboard reads Gmail read only.
  */
 export function ThreadDetail({ id, listed, previous, next, address }: ThreadDetailProps) {
-	const { read, error, loading } = useMailThread(id, listed?.at ?? null);
+	const { read, error, refreshing } = useMailThread(id, listed?.at ?? null);
 	const thread = read?.data ?? null;
 	const messages = thread?.messages ?? [];
 	const [folds, fold] = useReducer(foldsAfter, NO_FOLDS);
 	const url = thread?.url ?? listed?.url ?? null;
 
 	useEffect(() => {
-		if (previous) readMailThread(previous.id);
-		if (next) readMailThread(next.id);
+		if (previous) mailThreadStore.ensure(previous.id);
+		if (next) mailThreadStore.ensure(next.id);
 	}, [previous, next]);
 
 	const step = (neighbour: MailThread | undefined): boolean => {
@@ -184,8 +184,8 @@ export function ThreadDetail({ id, listed, previous, next, address }: ThreadDeta
 							Expand all
 						</Button>
 					)}
-					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={loading} onClick={() => readMailThread(id, true)}>
-						{loading && thread ? "Refreshing…" : "Refresh"}
+					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void mailThreadStore.refresh(id, { fresh: true })}>
+						{refreshing && thread ? "Refreshing…" : "Refresh"}
 					</Button>
 					<Tooltip content="Open the conversation in Gmail" shortcut={shortcutLabels("inboxOnGmail")} side="bottom">
 						<Button variant="ghost" size="compact" leadingIcon={ExternalLink} disabled={!url} render={url ? <a href={url} target="_blank" rel="noreferrer" /> : undefined}>

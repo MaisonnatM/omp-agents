@@ -253,12 +253,12 @@ globalThis.fetch = url => {
 	return promise;
 };
 const { createRoot } = await import("react-dom/client");
-const { readMailThread, useMailThread } = await import("./reads.ts");
+const { useMailThread } = await import("./reads.ts");
 
 const seen = [];
 function Probe({ arrived }) {
-	const { read, loading } = useMailThread("18f2a", arrived);
-	const state = JSON.stringify({ subject: read?.data.subject ?? null, loading });
+	const { read, refreshing } = useMailThread("18f2a", arrived);
+	const state = JSON.stringify({ subject: read?.data.subject ?? null, refreshing });
 	if (seen.at(-1) !== state) seen.push(state);
 	return null;
 }
@@ -266,35 +266,25 @@ const root = createRoot(container);
 const render = arrived => act(async () => root.render(createElement(Probe, { arrived })));
 const answer = (index, subject) => act(async () => requests[index].resolve(Response.json({ id: "18f2a", subject, url: "", messages: [] })));
 await render(null);
-readMailThread("18f2a");
 await answer(0, "first");
 await render(0);
-readMailThread("18f2a");
-await act(async () => {
-	readMailThread("18f2a", true);
-	readMailThread("18f2a", true);
-});
-await answer(2, "newest");
-await answer(1, "superseded");
 await render(Date.now() + 60_000);
-await answer(3, "after a reply");
+await answer(1, "after a reply");
 console.log(JSON.stringify({ urls: requests.map(({ url }) => url), seen: seen.map(state => JSON.parse(state)) }));
 `;
 
-test("a conversation is read once, a fresh read supersedes one in flight, and a reply listed after the read reads it again", async () => {
+test("a conversation is read once and again when the inbox lists a later message arrival", async () => {
 	const child = Bun.spawn([process.execPath, "--eval", mailThreadScenario], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" });
 	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
 	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
 	expect(JSON.parse(stdout)).toEqual({
-		urls: ["/api/gmail/thread?id=18f2a", "/api/gmail/thread?id=18f2a&fresh", "/api/gmail/thread?id=18f2a&fresh", "/api/gmail/thread?id=18f2a&fresh"],
+		urls: ["/api/gmail/thread?id=18f2a", "/api/gmail/thread?id=18f2a&fresh"],
 		seen: [
-			{ subject: null, loading: false },
-			{ subject: null, loading: true },
-			{ subject: "first", loading: false },
-			{ subject: "first", loading: true },
-			{ subject: "newest", loading: false },
-			{ subject: "newest", loading: true },
-			{ subject: "after a reply", loading: false },
+			{ subject: null, refreshing: false },
+			{ subject: null, refreshing: true },
+			{ subject: "first", refreshing: false },
+			{ subject: "first", refreshing: true },
+			{ subject: "after a reply", refreshing: false },
 		],
 	});
 });

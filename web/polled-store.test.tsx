@@ -167,6 +167,36 @@ describe("polled store", () => {
 		}
 	});
 
+	test("ensure reads once and again only after the kept answer changes or the in-flight one settles", async () => {
+		const polled = store();
+		const pending = new Map<string, { finish: (n: number) => void }>();
+		globalThis.fetch = ((url: string) => {
+			const { promise, resolve } = Promise.withResolvers<Response>();
+			pending.set(url, { finish: n => resolve(new Response(JSON.stringify({ n }), { status: 200 })) });
+			return promise;
+		}) as unknown as typeof fetch;
+		polled.ensure("a");
+		polled.ensure("a");
+		expect(pending.size).toBe(1);
+		pending.get("/polled/a")?.finish(1);
+		await Promise.resolve();
+		polled.ensure("a");
+		polled.ensure("a");
+		expect(pending.size).toBe(1);
+	});
+
+	test("ensure without persistence or validators leaves localStorage untouched", async () => {
+		const polled = createPolledStore<{ n: number }>({ url: () => "/polled" });
+		let calls = 0;
+		globalThis.fetch = (async () => {
+			calls += 1;
+			return new Response(JSON.stringify({ n: 1 }));
+		}) as unknown as typeof fetch;
+		await polled.refresh();
+		expect(memory.size).toBe(0);
+		expect(calls).toBe(1);
+	});
+
 	test("localStorage keeps only reads whose data has the store's shape", () => {
 		const cacheKey = `test.polled.${keys.length}`;
 		keys.push(cacheKey);
