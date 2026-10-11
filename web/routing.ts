@@ -38,6 +38,12 @@ export interface TicketsRoute {
 	target: string | null;
 }
 
+/** The Inbox list, or the Gmail conversation whose details replace it when `target` is non-null. */
+export interface InboxRoute {
+	/** Gmail's thread id: `18f2a3c4d5e6f708`. */
+	target: string | null;
+}
+
 /**
  * The settings page's sections, in the sidebar's order. A `workspace` section shows omp's files and config as a session in
  * the chosen workspace loads them; a `general` section is the same whatever the workspace.
@@ -105,7 +111,7 @@ export type Page =
 	| ({ kind: "routines" } & RoutinesRoute)
 	| ({ kind: "projects" } & ProjectsRoute)
 	| { kind: "calendar" }
-	| { kind: "inbox" }
+	| ({ kind: "inbox" } & InboxRoute)
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "changes" } & ChangesRoute);
 
@@ -153,7 +159,9 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#projects` opens the Projects page with every project, `#projects/new` with the New project form, and `#projects/<id>`
  *   with that project's coordinator, workers, and notes. Project ids are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
- * - `#inbox` opens the Inbox page, your Gmail inbox's latest conversations.
+ * - `#inbox` opens the Inbox page, your Gmail inbox's latest conversations, and `#inbox/<thread id>` opens that
+ *   conversation in full in the main content.
+ * - `#repo/<dir>` opens every file of the git checkout that directory is in, read only, and `#repo/<dir>/<path>` the file at that path; both are encoded.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	settings: rest => {
@@ -181,7 +189,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "projects", target: rest === "new" ? { kind: "new" } : id ? { kind: "project", id } : { kind: "list" } };
 	},
 	calendar: () => ({ kind: "calendar" }),
-	inbox: () => ({ kind: "inbox" }),
+	inbox: rest => ({ kind: "inbox", target: rest ? decodeSegment(rest) : null }),
 	changes: rest => {
 		const [sessionId = "", path] = (rest ?? "").split("/");
 		return { kind: "changes", sessionId: decodeSegment(sessionId) ?? "", path: path ? decodeSegment(path) : null };
@@ -208,11 +216,11 @@ function restOfPage(page: Page): string | null {
 		case "todo":
 			return page.list.kind === "all" ? null : page.list.kind === "category" ? encodeURIComponent(page.list.id) : page.list.kind;
 		case "routines":
+		case "inbox":
 			return page.target === null ? null : encodeURIComponent(page.target);
 		case "projects":
 			return page.target.kind === "list" ? null : page.target.kind === "new" ? "new" : encodeURIComponent(page.target.id);
 		case "calendar":
-		case "inbox":
 			return null;
 		case "changes":
 			return `${encodeURIComponent(page.sessionId)}${page.path === null ? "" : `/${encodeURIComponent(page.path)}`}`;
@@ -255,6 +263,7 @@ export function hashForPage(page: Page): string {
 export const hashForPullRequests = (target: PullRequest | null): string => hashForPage(target ? { kind: "pull-requests", target, files: null } : { kind: "pull-requests", target: null });
 export const hashForPullRequestFiles = (pr: PullRequest, path: string | null = null): string => hashForPage({ kind: "pull-requests", target: pr, files: { path } });
 export const hashForTickets = (target: string | null): string => hashForPage({ kind: "tickets", target });
+export const hashForInbox = (target: string | null): string => hashForPage({ kind: "inbox", target });
 export const hashForTodo = (list: TodoListView, open: string | null = null): string => hashForPage({ kind: "todo", list, open });
 /** A todo opened in its category's list, else in every todo's; `categoryId` is its own, or its parent's for a todo under another. */
 export const hashForOpenTodo = (id: string, categoryId: string | null): string => hashForTodo(categoryId === null ? { kind: "all" } : { kind: "category", id: categoryId }, id);

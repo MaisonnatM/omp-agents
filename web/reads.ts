@@ -3,14 +3,15 @@ import { useEffect, useMemo, useState } from "react";
 import { isObject } from "../src/json";
 import { callable, type IntegrationsAnswer, MCP_INTEGRATIONS, type McpIntegration } from "../src/shared/accounts";
 import type { CalendarEventsAnswer, GoogleCalendar, GoogleStatus, LocalEventsAnswer } from "../src/shared/calendar";
-import type { InboxAnswer } from "../src/shared/gmail";
+import type { InboxAnswer, ThreadAnswer } from "../src/shared/gmail";
 import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
 import type { PullRequestList, RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
 import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/sessions";
 import type { Ticket, TicketsAnswer } from "../src/shared/tickets";
 import { errorText, getJson } from "./api";
-import { createPolledStore, type PolledEntry } from "./polled-store";
+import { keyedStore } from "./keyed-store";
+import { createPolledStore, type PolledEntry, type PolledRead } from "./polled-store";
 
 export interface ReadState<T> {
 	data: T | null;
@@ -214,6 +215,49 @@ export function useGmailInbox(): { gmail: McpIntegration<"gmail"> | null; inbox:
 	const inbox = gmailStore.usePolling(null, gmail !== null && callable(gmail.connection));
 	const unread = inbox.read?.data.threads.filter(thread => thread.unread).length ?? 0;
 	return { gmail, inbox, unread };
+}
+
+/** One conversation's read: its last answer, kept while a fresh read loads, why the latest read failed, and whether one is in flight. */
+export interface MailThreadRead {
+	read: PolledRead<ThreadAnswer> | null;
+	error: string | null;
+	loading: boolean;
+}
+
+const NO_THREAD_READ: MailThreadRead = { read: null, error: null, loading: false };
+
+/** The conversations read since the page loaded, by thread id, in memory only: unlike the inbox's list, their bodies are large and private. */
+const threadReads = keyedStore(NO_THREAD_READ);
+/** The latest read of each thread id in flight; an earlier one that settles after it changes nothing. */
+const threadRequests = new Map<string, symbol>();
+
+/** Reads conversation `id` unless it is read or being read; `fresh` reads it again, past the server's cache too. */
+export function readMailThread(id: string, fresh = false): void {
+	const entry = threadReads.get(id);
+	if (!fresh && (entry.read !== null || entry.loading)) return;
+	const request = Symbol(id);
+	threadRequests.set(id, request);
+	threadReads.set(id, { ...entry, loading: true });
+	const settle = (patch: Partial<MailThreadRead>): void => {
+		if (threadRequests.get(id) !== request) return;
+		threadRequests.delete(id);
+		threadReads.set(id, { ...threadReads.get(id), ...patch, loading: false });
+	};
+	getJson<ThreadAnswer>(`/api/gmail/thread?${new URLSearchParams({ id })}${fresh ? "&fresh" : ""}`).then(
+		data => settle({ read: { data, at: Date.now() }, error: null }),
+		(err: unknown) => settle({ error: errorText(err) }),
+	);
+}
+
+/**
+ * Conversation `id`, read the first time it is asked for, and again from Gmail once `arrived`, when its last message
+ * arrived as the inbox lists it, is later than that read: a reply came since.
+ */
+export function useMailThread(id: string, arrived: number | null): MailThreadRead {
+	const entry = threadReads.use(id);
+	const stale = arrived !== null && entry.read !== null && entry.read.at < arrived;
+	useEffect(() => readMailThread(id, stale), [id, stale]);
+	return entry;
 }
 
 /** Every event kept on this computer, which the Calendar page reads with or without Google Calendar. */

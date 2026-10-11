@@ -10,7 +10,7 @@ const TAB_PAGE: Record<Exclude<SidebarTab, "sessions" | "settings">, Page> = {
 	tickets: { kind: "tickets", target: null },
 	todo: { kind: "todo", list: { kind: "all" }, open: null },
 	calendar: { kind: "calendar" },
-	inbox: { kind: "inbox" },
+	inbox: { kind: "inbox", target: null },
 };
 
 /** The settings section and workspace the Settings tab's links keep: the open page's, else Analytics and the focused session's directory. */
