@@ -1,6 +1,6 @@
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { useGmailInbox } from "../../reads";
-import { hashForPage } from "../../routing";
+import { hashForInbox } from "../../routing";
 
 /** The Inbox tab of the sidebar: the signed-in address over the Inbox, with its unread count. */
 export function InboxNav() {
@@ -12,7 +12,7 @@ export function InboxNav() {
 			<SidebarMenu aria-label="Mailboxes">
 				<SidebarMenuItem>
 					<SidebarMenuButton asChild isActive>
-						<a href={hashForPage({ kind: "inbox" })} aria-current="page" aria-label={unread > 0 ? `Inbox, ${unread} unread` : "Inbox"}>
+						<a href={hashForInbox(null)} aria-current="page" aria-label={unread > 0 ? `Inbox, ${unread} unread` : "Inbox"}>
 							Inbox
 						</a>
 					</SidebarMenuButton>

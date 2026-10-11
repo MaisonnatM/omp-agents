@@ -38,6 +38,7 @@ import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
 import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
+import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
 import { type Parsed, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
@@ -436,7 +437,21 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 function gmailRoutes({ get }: RouteKit, gmail: GmailClient): Routes {
 	/** `GET /api/gmail/inbox[?fresh]`: the signed-in address and its inbox's latest conversations. */
 	const inbox = get(params => answer(() => gmail.inbox(params.has("fresh"))));
-	return { "/api/gmail/inbox": { GET: inbox } };
+	/** `GET /api/gmail/thread?id=<id>[&fresh]`: that conversation in full, for the Inbox page's details. */
+	const thread = get(params => {
+		const id = params.get("id");
+		return id ? answer(() => gmail.thread(id, params.has("fresh"))) : fail(400, "Expected ?id= naming a Gmail conversation");
+	});
+	/** `GET /api/gmail/message?thread=<id>&id=<id>`: a message's HTML as a document of its own, which the Inbox page frames. */
+	const message = get(async params => {
+		const threadId = params.get("thread");
+		const id = params.get("id");
+		if (!threadId || !id) return fail(400, "Expected ?thread= and ?id= naming a Gmail message");
+		const html = await gmail.messageHtml(threadId, id).catch((err: unknown) => fail(500, errorText(err)));
+		if (html instanceof Response) return html;
+		return html === undefined ? fail(404, `Conversation ${threadId} holds no HTML message ${id}`) : mailDocument(html);
+	});
+	return { "/api/gmail/inbox": { GET: inbox }, "/api/gmail/thread": { GET: thread }, "/api/gmail/message": { GET: message } };
 }
 
 /** GitHub pull requests in full: details, stack, options, edits, and their changed files. */

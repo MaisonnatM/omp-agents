@@ -6,6 +6,7 @@ import {
 	closePane,
 	endSession,
 	hashForChanges,
+	hashForInbox,
 	hashForPullRequests,
 	hashForLayout,
 	hashForPage,
@@ -164,10 +165,16 @@ describe("layout hash", () => {
 		expect(routeFromHash("#routinesx").kind).toBe("panes");
 	});
 
-	test("the inbox hash opens the Inbox page, a trailing path still opens it, and it is not read as a layout", () => {
-		expect(hashForPage({ kind: "inbox" })).toBe("#inbox");
-		expect(routeFromHash("#inbox")).toEqual({ kind: "page", page: { kind: "inbox" } });
-		expect(routeFromHash("#inbox/anything")).toEqual({ kind: "page", page: { kind: "inbox" } });
+	test("the inbox hash opens the list or one conversation, round-trips a thread id, and is not read as a layout", () => {
+		const list: Route = { kind: "page", page: { kind: "inbox", target: null } };
+		expect(hashForInbox(null)).toBe("#inbox");
+		expect(hashForInbox("18f2a3c4d5e6f708")).toBe("#inbox/18f2a3c4d5e6f708");
+		expect(hashForInbox("a/b c")).toBe("#inbox/a%2Fb%20c");
+		expect(routeFromHash("#inbox")).toEqual(list);
+		expect(routeFromHash("#inbox/")).toEqual(list);
+		expect(routeFromHash("#inbox/18f2a3c4d5e6f708")).toEqual({ kind: "page", page: { kind: "inbox", target: "18f2a3c4d5e6f708" } });
+		expect(routeFromHash(hashForInbox("a/b c"))).toEqual({ kind: "page", page: { kind: "inbox", target: "a/b c" } });
+		expect(routeFromHash("#inbox/%E0")).toEqual(list);
 		expect(routeFromHash("#inboxes").kind).toBe("panes");
 	});
 

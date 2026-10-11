@@ -1,6 +1,6 @@
 /** Polled lists under a page header. */
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -40,13 +40,15 @@ interface DetailPageProps {
 	backLabel: string;
 	/** What the page tells above its content: a quick action's notice, or why the item is not listed. */
 	notice?: ReactNode;
+	/** The header's buttons. */
+	actions?: ReactNode;
 	children: ReactNode;
 	/** Classes for the column that holds the content: a width other than the reading width. */
 	className?: string;
 }
 
-/** A page for one item of a list, a pull request or an issue: the frame with a back arrow to the list, `notice`, and the item's content. */
-export function DetailPage({ title, meta, backHref, backLabel, notice, children, className }: DetailPageProps) {
+/** A page for one item of a list, a pull request, an issue, or a conversation: the frame with a back arrow to the list, `notice`, and the item's content. */
+export function DetailPage({ title, meta, backHref, backLabel, notice, actions, children, className }: DetailPageProps) {
 	const back = (
 		<Tooltip content={backLabel} side="bottom">
 			<Button variant="ghost" size="icon-compact" className="shrink-0 text-muted-foreground" aria-label={backLabel} render={<a href={backHref} />}>
@@ -55,7 +57,7 @@ export function DetailPage({ title, meta, backHref, backLabel, notice, children,
 		</Tooltip>
 	);
 	return (
-		<PageFrame title={title} meta={meta} leading={back}>
+		<PageFrame title={title} meta={meta} leading={back} actions={actions}>
 			<TooltipProvider>
 				<div className={cn("mx-auto w-full max-w-5xl space-y-6 px-6 py-6", className)}>
 					{notice}
@@ -121,4 +123,42 @@ export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, no
 			</TooltipProvider>
 		</PageFrame>
 	);
+}
+
+/**
+ * Moves keyboard focus by one row in the list `items`, scrolling the new row into view. Returns `true` if focus moved.
+ * `rowOf` looks up the row's element by item; each row holds the focusable link. With nothing focused inside the list,
+ * the focus enters the list only when `entersList` (default `true`); false leaves the row unchanged.
+ */
+export function stepRows<T>(items: readonly T[], rowOf: (item: T) => HTMLElement | null, by: 1 | -1, entersList = true): boolean {
+	const active = document.activeElement;
+	const at = items.findIndex(item => rowOf(item)?.contains(active) ?? false);
+	const next = at >= 0 ? items[at + by] : entersList ? items[by === 1 ? 0 : items.length - 1] : undefined;
+	if (!next) return at >= 0;
+	const row = rowOf(next);
+	if (!row) return at >= 0;
+	const link = row.querySelector("a") as HTMLElement | null;
+	if (!link) return at >= 0;
+	link.focus({ preventScroll: true });
+	row.scrollIntoView({ block: "nearest" });
+	return true;
+}
+
+/**
+ * Saves `target`'s `keyOf` on a change, and on the next change to `null` focuses the matching row, or `fallback` when
+ * the row is not mounted yet. `ready` is the dependency that gates the second focus pass (a polled read that has the
+ * data). `rowLink` looks up the row's focusable link by key.
+ */
+export function useReturnFocus<T>(target: T | null, keyOf: (target: T) => string, rowLink: (key: string) => HTMLElement | null | undefined, ready: unknown, fallback?: () => HTMLElement | null): void {
+	const returnTo = useRef<string | null>(null);
+	useEffect(() => {
+		if (target !== null) returnTo.current = keyOf(target);
+	}, [target]);
+	useEffect(() => {
+		if (target !== null || returnTo.current === null) return;
+		const destination = rowLink(returnTo.current) ?? fallback?.() ?? null;
+		if (!destination) return;
+		destination.focus();
+		returnTo.current = null;
+	}, [target, ready]);
 }

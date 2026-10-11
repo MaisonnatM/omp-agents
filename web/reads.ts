@@ -1,9 +1,9 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { isObject } from "../src/json";
 import { callable, type IntegrationsAnswer, MCP_INTEGRATIONS, type McpIntegration } from "../src/shared/accounts";
 import type { CalendarEventsAnswer, GoogleCalendar, GoogleStatus, LocalEventsAnswer } from "../src/shared/calendar";
-import type { InboxAnswer } from "../src/shared/gmail";
+import type { InboxAnswer, ThreadAnswer } from "../src/shared/gmail";
 import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
 import type { PullRequestList, RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
@@ -214,6 +214,30 @@ export function useGmailInbox(): { gmail: McpIntegration<"gmail"> | null; inbox:
 	const inbox = gmailStore.usePolling(null, gmail !== null && callable(gmail.connection));
 	const unread = inbox.read?.data.threads.filter(thread => thread.unread).length ?? 0;
 	return { gmail, inbox, unread };
+}
+
+/** The conversations read since the page loaded, by thread id, in memory only: unlike the inbox's list, their bodies are large and private. */
+export const mailThreadStore = createPolledStore<ThreadAnswer>({
+	url: (id, fresh) => `/api/gmail/thread?${new URLSearchParams({ id: id ?? "" })}${fresh ? "&fresh" : ""}`,
+});
+
+/** A thread read: the last answer, whether the latest attempt failed, and whether one is in flight. */
+export type MailThreadRead = PolledEntry<ThreadAnswer>;
+
+/**
+ * Conversation `id`, read the first time it is asked for, and again from Gmail once `arrived`, when its last message
+ * arrived as the inbox lists it, is later than that read: a reply came since.
+ */
+export function useMailThread(id: string, arrived: number | null): MailThreadRead {
+	const entry = mailThreadStore.use(id);
+	const entryRef = useRef(entry);
+	entryRef.current = entry;
+	useEffect(() => {
+		const current = entryRef.current;
+		if (current.read === null) mailThreadStore.ensure(id);
+		else if (arrived !== null && current.read.at < arrived) void mailThreadStore.refresh(id, { fresh: true });
+	}, [id, arrived]);
+	return entry;
 }
 
 /** Every event kept on this computer, which the Calendar page reads with or without Google Calendar. */

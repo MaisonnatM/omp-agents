@@ -908,8 +908,18 @@ An action that fails shows its error, and its control becomes available again.
   The sidebar then shows your Gmail address over one **Inbox** row with how many conversations are unread.
 - Each row shows who sent the conversation's last message, how many messages it holds when more than one, its subject and a snippet, and when its last message arrived: the time today, the day earlier this year, and the full date before.
   An unread conversation is bold, with a blue dot before it, and the header counts them beside your address.
-- Click a row to open the conversation in Gmail in a new tab, signed in as the inbox's address.
-  The page only reads your mail: it never sends, deletes, labels, or marks a conversation read, so reading one in Gmail is what marks it read.
+- Click a row, or focus it and press Enter, to open the conversation in full in place of the list, at an `#inbox/<thread id>` address.
+  Outside text fields, ↓ and ↑ focus the next and previous row, and O opens the focused row's conversation in Gmail in a new tab, signed in as the inbox's address.
+- An open conversation shows its subject, its last sender, and how many messages it holds, drafts left out.
+  As in Gmail, the last message and every unread one show in full and earlier ones on one line with their snippet; three or more of those in a row after the first fold into one **N older messages** row.
+  Click a line or that row to unfold it, click a full message's header to fold it again, and **Expand all** unfolds every message.
+- A full message shows its sender's name and address, whom it went to, when it arrived, with the full date and time on hover, its attachments by name and size, and its text.
+  An HTML message shows as its sender wrote it, on white in both themes, with its scripts, forms, and popups blocked; it may load images, styles, and fonts, never sends the dashboard's address as the referrer, and its links open in a new tab.
+  A plain text message keeps its line breaks, and its web addresses are links.
+  The dashboard does not download attachments; **Open in Gmail** opens them there.
+- While a conversation shows, ↓ and ↑ open the next and previous conversation of the list, which the page reads ahead so they show at once, Esc goes back to the list with that conversation's row focused, and O or **Open in Gmail** opens it in Gmail.
+  **Refresh** reads it from Gmail again, and the page also does once the list shows a message that arrived after it read the conversation.
+- The page only reads your mail: it never sends, deletes, labels, or marks a conversation read, so opening one here leaves it unread, in Gmail and in the list, until you read it in Gmail.
 - The page reads Gmail again every minute while it is open, and **Refresh** asks Gmail at once; the server keeps each read for a minute.
   While Gmail is not connected, or its sign-in stops working, the page shows Gmail's row from **Settings › Integrations** to connect from there.
 
@@ -1170,11 +1180,14 @@ Alt is Option on macOS.
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |
 | C | Calendar page, outside text fields | Add an event |
+| ↓ / ↑ | Inbox page, outside text fields | Focus the next or previous conversation, or open it while a conversation shows |
+| Esc | Inbox page, outside text fields | Go back from a conversation to the list |
+| O | Inbox page, outside text fields | Open the focused or open conversation in Gmail |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, and the Calendar page's **New event**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Inbox conversation's **Open in Gmail**.
 - Cmd+1 through Cmd+5 select the dashboard's tabs, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers stay fixed when Tickets is hidden without a Linear connection; Cmd+2 then keeps its browser behavior.
   The **Inbox** tab takes no number, so G then I opens it.

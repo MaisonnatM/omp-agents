@@ -19,29 +19,35 @@ export interface PolledEntry<T> {
 }
 
 interface PolledStoreOptions<T> {
-	/** The localStorage key under which the last read of every key is kept, so a reopened page shows at once, even after a reload. */
-	cacheKey: string;
 	/** The API path that reads `scope`; `fresh` makes the server skip its own cache too. */
 	url: (scope: string | null, fresh: boolean) => string;
+	/** The localStorage key under which the last read of every key is kept, so a reopened page shows at once, even after a reload. */
+	cacheKey?: string;
 	/** Whether a value read back from localStorage has the shape of `T`. */
-	isValid: (value: unknown) => value is T;
+	isValid?: (value: unknown) => value is T;
+	/** When given, the last read of each key is kept in localStorage and rehydrated at construction. Takes precedence over `cacheKey` and `isValid`. */
+	persist?: { cacheKey: string; isValid: (value: unknown) => value is T };
 }
 
 /**
- * A store of server reads by scope that the sidebar and a page share, kept in localStorage and re-read while a page that
- * uses it is open. The scope names what the read is about, such as a workspace; it is `null` for a read about everything,
- * or in a store with one entry. The entries and their cache hold `null` under `""`.
+ * A store of server reads by scope that the sidebar and a page share, kept in localStorage (when `cacheKey` or `persist`
+ * is given) and re-read while a page that uses it is open. The scope names what the read is about, such as a workspace;
+ * it is `null` for a read about everything, or in a store with one entry. Entries and their cache hold `null` under `""`.
  */
-export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOptions<T>) {
+export function createPolledStore<T>({ cacheKey, url, isValid, persist: persistConfig }: PolledStoreOptions<T>) {
 	const empty: PolledEntry<T> = { read: null, error: null, refreshing: false };
+	const storeKey = persistConfig?.cacheKey ?? cacheKey;
+	const storeIsValid = persistConfig?.isValid ?? isValid;
+	const caches = storeKey !== undefined && storeIsValid !== undefined;
 
 	function storedEntries(): Map<string, PolledRead<T>> {
+		if (!caches || storeKey === undefined || storeIsValid === undefined) return new Map();
 		try {
-			const stored: unknown = JSON.parse(localStorage.getItem(cacheKey) ?? "{}");
+			const stored: unknown = JSON.parse(localStorage.getItem(storeKey) ?? "{}");
 			if (typeof stored !== "object" || stored === null) return new Map();
 			return new Map(
 				Object.entries(stored).flatMap(([key, read]: [string, Partial<PolledRead<T>> | null]) =>
-					typeof read?.at === "number" && isValid(read.data) ? [[key, read as PolledRead<T>]] : [],
+					typeof read?.at === "number" && storeIsValid(read.data) ? [[key, read as PolledRead<T>]] : [],
 				),
 			);
 		} catch {
@@ -62,9 +68,10 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 	}
 
 	function persist(): void {
+		if (!caches || storeKey === undefined) return;
 		const reads = Object.fromEntries(cached);
 		try {
-			localStorage.setItem(cacheKey, JSON.stringify(reads));
+			localStorage.setItem(storeKey, JSON.stringify(reads));
 		} catch {
 			// Over quota: the reads still show from memory until the next reload.
 		}
@@ -82,13 +89,20 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 			if (controller.signal.aborted) return;
 			const read = { data, at: Date.now() };
 			update(key, { read, error: null, refreshing: false });
-			cached.set(key, read);
+			if (caches) cached.set(key, read);
 			persist();
 		} catch (err) {
 			if (!controller.signal.aborted) update(key, { error: errorText(err), refreshing: false });
 		} finally {
 			if (inflight.get(key) === controller) inflight.delete(key);
 		}
+	}
+
+	/** Reads `scope` if no read has been kept and no request is in flight yet; nothing otherwise. */
+	function ensure(scope: string | null = null): void {
+		const key = scope ?? "";
+		if (entries.get(key).read !== null || inflight.has(key)) return;
+		refresh(scope).catch(err => console.error(err));
 	}
 
 	/** Applies a saved change to the current answer, superseding any read begun before it. */
@@ -100,7 +114,7 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 		inflight.delete(key);
 		const read = { data: change(current.data), at: Date.now() };
 		update(key, { read, error: null, refreshing: false });
-		cached.set(key, read);
+		if (caches) cached.set(key, read);
 		persist();
 	}
 
@@ -138,5 +152,6 @@ export function createPolledStore<T>({ cacheKey, url, isValid }: PolledStoreOpti
 		poll,
 		refresh,
 		update: changeAnswer,
+		ensure,
 	};
 }

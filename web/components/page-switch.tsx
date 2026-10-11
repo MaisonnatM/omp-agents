@@ -204,7 +204,7 @@ export const PageSwitch = memo(function PageSwitch({
 		case "calendar":
 			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} />;
 		case "inbox":
-			return <InboxPage />;
+			return <InboxPage target={page.target} />;
 		case "changes":
 			return (
 				<ChangesPage

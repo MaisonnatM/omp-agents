@@ -135,3 +135,161 @@ test("a second read within a minute asks Gmail nothing, and a fresh one reads ag
 	await client.inbox(true);
 	expect(reads).toHaveLength(8);
 });
+
+/** A MIME part as Gmail's `format=full` answers it. */
+interface FakePart {
+	partId: string;
+	mimeType: string;
+	filename: string;
+	headers: { name: string; value: string }[];
+	body: { size: number; data?: string; attachmentId?: string };
+	parts?: FakePart[];
+}
+
+function part(mimeType: string, content: { text?: string | Uint8Array; charset?: string; filename?: string; size?: number; parts?: FakePart[] } = {}): FakePart {
+	const { text, charset, filename = "", size, parts } = content;
+	const data = text === undefined ? undefined : Buffer.from(text).toString("base64url");
+	return {
+		partId: "0",
+		mimeType,
+		filename,
+		headers: [{ name: "Content-Type", value: charset ? `${mimeType}; charset="${charset}"` : mimeType }],
+		body: data === undefined ? { size: size ?? 0, ...(filename && { attachmentId: `att-${filename}` }) } : { size: size ?? data.length, data },
+		...(parts && { parts }),
+	};
+}
+
+/** A message as Gmail's `threads.get` answers it with `format=full`. */
+function fullMessage(id: string, headers: Record<string, string>, labelIds: string[], internalDate: string, payload: FakePart, snippet = "a snippet") {
+	return {
+		id,
+		threadId: "18f2a",
+		labelIds,
+		snippet,
+		internalDate,
+		payload: { ...payload, headers: [...payload.headers, ...Object.entries(headers).map(([name, value]) => ({ name, value }))] },
+	};
+}
+
+const THREAD = `${INBOX}/18f2a`;
+
+/** A client whose Gmail holds conversation 18f2a with `messages`, plus the inbox of {@link twoThreads}. */
+const threadClient = (...messages: unknown[]) => clientOf({ ...twoThreads(), [THREAD]: { id: "18f2a", historyId: "9910", messages } });
+
+test("a conversation reads each message's people, arrival, unread state, snippet, and HTML over its plain text, oldest first", async () => {
+	const { client, reads } = threadClient(
+		fullMessage(
+			"m1",
+			{ From: '"Alice Doe" <alice@example.com>', To: '"Doe, Jane" <jane@example.com>, bob@example.com', Cc: '"Max \\"the\\" Dev" <max+work@example.com>', Subject: " Draft review " },
+			["INBOX"],
+			"1791000000000",
+			part("multipart/alternative", { parts: [part("text/plain", { text: "Hi *Jane*" }), part("text/html", { text: "<p>Hi <b>Jane</b></p>" })] }),
+			"Hi Jane &amp; Bob",
+		),
+		fullMessage("m2", { From: "bob@example.com", To: "Alice Doe <alice@example.com>", Subject: "Re: Draft review" }, ["UNREAD", "INBOX"], "1791003600000", part("text/plain", { text: "Looks good." })),
+	);
+	expect(await client.thread("18f2a")).toEqual({
+		id: "18f2a",
+		subject: "Draft review",
+		url: "https://mail.google.com/mail/?authuser=max%2Bwork%40example.com#inbox/18f2a",
+		messages: [
+			{
+				id: "m1",
+				from: { name: "Alice Doe", address: "alice@example.com" },
+				to: [
+					{ name: "Doe, Jane", address: "jane@example.com" },
+					{ name: "", address: "bob@example.com" },
+				],
+				cc: [{ name: 'Max "the" Dev', address: "max+work@example.com" }],
+				at: 1791000000000,
+				unread: false,
+				snippet: "Hi Jane & Bob",
+				body: { kind: "html" },
+				attachments: [],
+			},
+			{
+				id: "m2",
+				from: { name: "", address: "bob@example.com" },
+				to: [{ name: "Alice Doe", address: "alice@example.com" }],
+				cc: [],
+				at: 1791003600000,
+				unread: true,
+				snippet: "a snippet",
+				body: { kind: "text", text: "Looks good." },
+				attachments: [],
+			},
+		],
+	});
+	const read = new URL(reads.find(url => new URL(url).pathname === THREAD)!);
+	expect(Object.fromEntries(read.searchParams)).toEqual({ format: "full" });
+});
+
+test("an alternative without HTML reads as its plain text", async () => {
+	const { client } = threadClient(
+		fullMessage("m1", { From: "a@example.com" }, ["INBOX"], "1791000000000", part("multipart/alternative", { parts: [part("text/plain", { text: "Only text\nhere" })] })),
+	);
+	expect((await client.thread("18f2a")).messages.map(message => message.body)).toEqual([{ kind: "text", text: "Only text\nhere" }]);
+});
+
+test("a mixed message reads as its nested body, and lists every named file as an attachment, a text file too, never as the body", async () => {
+	const payload = part("multipart/mixed", {
+		parts: [
+			part("text/plain", { text: "Read me first", filename: "notes.txt", size: 13 }),
+			part("multipart/alternative", { parts: [part("text/plain", { text: "Report attached." }), part("text/html", { text: "<p>Report attached.</p>" })] }),
+			part("application/pdf", { filename: "Q3 report.pdf", size: 52341 }),
+		],
+	});
+	const [message] = (await threadClient(fullMessage("m1", { From: "a@example.com" }, ["INBOX"], "1791000000000", payload)).client.thread("18f2a")).messages;
+	expect([message?.body, message?.attachments]).toEqual([
+		{ kind: "html" },
+		[
+			{ name: "notes.txt", type: "text/plain", size: 13 },
+			{ name: "Q3 report.pdf", type: "application/pdf", size: 52341 },
+		],
+	]);
+});
+
+test("a part reads in the charset its Content-Type names, and in UTF-8 when no decoder knows it", async () => {
+	const latin1 = part("text/plain", { text: new Uint8Array([0x43, 0x61, 0x66, 0xe9, 0x20, 0xe0, 0x20, 0x31, 0x30, 0xa0, 0x80]), charset: "ISO-8859-1" });
+	const unknown = part("text/plain", { text: "Crème brûlée", charset: "x-made-up" });
+	const { client } = threadClient(
+		fullMessage("m1", { From: "a@example.com" }, ["INBOX"], "1791000000000", latin1),
+		fullMessage("m2", { From: "a@example.com" }, ["INBOX"], "1791000000001", unknown),
+	);
+	expect((await client.thread("18f2a")).messages.map(message => message.body)).toEqual([
+		{ kind: "text", text: "Café à 10\u00a0€" },
+		{ kind: "text", text: "Crème brûlée" },
+	]);
+});
+
+test("a conversation leaves out drafts, and a message with no part it can show has an empty body", async () => {
+	const { client } = threadClient(
+		fullMessage("m1", { From: "a@example.com", Subject: "Plans" }, ["INBOX"], "1791000000000", part("image/png", { size: 1200 })),
+		fullMessage("m2", { From: "Max <max+work@example.com>", Subject: "Re: Plans" }, ["DRAFT"], "1791000000001", part("text/plain", { text: "draft reply" })),
+	);
+	const thread = await client.thread("18f2a");
+	expect([thread.subject, thread.messages.map(message => [message.id, message.body])]).toEqual(["Plans", [["m1", { kind: "empty" }]]]);
+});
+
+test("a conversation reuses the inbox's signed-in address, a second open within a minute asks Gmail nothing, and a fresh one reads again", async () => {
+	const { client, reads } = threadClient(fullMessage("m1", { From: "a@example.com" }, ["INBOX"], "1791000000000", part("text/plain", { text: "hi" })));
+	await client.inbox();
+	expect(reads).toHaveLength(4);
+	await client.thread("18f2a");
+	expect(reads.slice(4).map(url => new URL(url).pathname)).toEqual([THREAD]);
+	await client.thread("18f2a");
+	expect(reads).toHaveLength(5);
+	await client.thread("18f2a", true);
+	expect(reads.slice(5).map(url => new URL(url).pathname)).toEqual([THREAD]);
+});
+
+test("a message's HTML comes from the conversation's kept read, and is undefined for a plain text message or one the conversation does not hold", async () => {
+	const { client, reads } = threadClient(
+		fullMessage("m1", { From: "a@example.com" }, ["INBOX"], "1791000000000", part("multipart/alternative", { parts: [part("text/plain", { text: "Hi" }), part("text/html", { text: "<p>Hi</p>" })] })),
+		fullMessage("m2", { From: "b@example.com" }, ["INBOX"], "1791000000001", part("text/plain", { text: "Plain" })),
+	);
+	await client.thread("18f2a");
+	expect(reads.map(url => new URL(url).pathname)).toEqual(["/gmail/v1/users/me/profile", THREAD]);
+	expect([await client.messageHtml("18f2a", "m1"), await client.messageHtml("18f2a", "m2"), await client.messageHtml("18f2a", "m9")]).toEqual(["<p>Hi</p>", undefined, undefined]);
+	expect(reads).toHaveLength(2);
+});

@@ -1,4 +1,4 @@
-/** The Inbox page's mail: the latest conversations of your Gmail inbox, read only. */
+/** The Inbox page's mail: the latest conversations of your Gmail inbox, and one conversation in full, read only. */
 
 /** One conversation in your Gmail inbox, as the Inbox page lists it. */
 export interface MailThread {
@@ -23,4 +23,53 @@ export interface MailThread {
 export interface InboxAnswer {
 	address: string;
 	threads: MailThread[];
+}
+
+/** Someone an address header names. */
+export interface MailPerson {
+	/** Their display name; `""` when the header gives none. */
+	name: string;
+	address: string;
+}
+
+/**
+ * What a message reads as: its HTML part, else its plain text part, else nothing the page can show. The HTML stays on the
+ * server, and the page loads it from `GET /api/gmail/message` as a document of its own.
+ */
+export type MailBody = { kind: "html" } | { kind: "text"; text: string } | { kind: "empty" };
+
+/** A file a message carries, which the page names but does not download. */
+export interface MailAttachment {
+	name: string;
+	/** Its MIME type: `application/pdf`. */
+	type: string;
+	/** Its size in bytes, as Gmail counts it. */
+	size: number;
+}
+
+/** One message of a conversation, drafts left out, as the Inbox page's details show it. */
+export interface MailMessage {
+	id: string;
+	/** The first person the `From` header names; an empty name and address when it names none. */
+	from: MailPerson;
+	to: MailPerson[];
+	cc: MailPerson[];
+	/** When it arrived, epoch ms. */
+	at: number;
+	unread: boolean;
+	/** Gmail's snippet of the message, as plain text. */
+	snippet: string;
+	body: MailBody;
+	attachments: MailAttachment[];
+}
+
+/** `GET /api/gmail/thread?id=<id>[&fresh]`: one conversation in full. */
+export interface ThreadAnswer {
+	id: string;
+	/** The first message's subject; `""` when it has none. */
+	subject: string;
+	/** The conversation in Gmail, signed in as the inbox's address. */
+	url: string;
+	/** Its messages, oldest first. */
+	messages: MailMessage[];
 }
