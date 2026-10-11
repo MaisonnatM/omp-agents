@@ -76,7 +76,11 @@ export const MCP_SERVICES: Record<McpIntegrationId, McpService> = {
 };
 
 /** The services that sign in with a Google OAuth client of your own. */
-export type GoogleService = "google-calendar" | "gmail";
+export const GOOGLE_SERVICES = ["google-calendar", "gmail"] as const satisfies readonly McpIntegrationId[];
+export type GoogleService = (typeof GOOGLE_SERVICES)[number];
+
+/** The services whose OAuth client Settings › Integrations saves; Linear registers its own. */
+export type ClientService = Exclude<McpIntegrationId, "linear">;
 
 /**
  * What each Google sign-in asks for. Google Calendar: events, to read them here and let omp sessions write them, the
@@ -155,19 +159,14 @@ export type McpConnection =
 	| { kind: "refused"; server: McpServerRef; error: string }
 	| { kind: "failing"; server: McpServerRef; error: string };
 
-/** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and Linear's Tickets tab shows. */
+/** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and its tab, Linear's Tickets or Gmail's Inbox, shows. */
 export const signedIn = (connection: McpConnection): boolean => connection.kind !== "absent" && connection.kind !== "signed-out";
 
 /** Whether the dashboard calls the service's tools: the server took omp's sign-in, or failed for a reason a retry may clear. */
 export const callable = (connection: McpConnection): boolean => connection.kind === "ready" || connection.kind === "failing";
 
 /** Each service's saved OAuth client, without the secret: `null` for Linear, which registers its own. */
-export interface McpSetups {
-	linear: null;
-	slack: SlackSetup;
-	"google-calendar": GoogleSetup;
-	gmail: GoogleSetup;
-}
+export type McpSetups = { linear: null; slack: SlackSetup } & Record<GoogleService, GoogleSetup>;
 
 /** One service of `GET /api/integrations`, and what `PUT /api/integrations/sign-in`, `/sign-out`, and `/<id>/client` answer. */
 export type McpIntegration<Id extends McpIntegrationId = McpIntegrationId> = {
@@ -179,6 +178,9 @@ export type McpIntegration<Id extends McpIntegrationId = McpIntegrationId> = {
 		setup: McpSetups[K];
 	};
 }[Id];
+
+/** Whether `integration` signs in with a Google OAuth client of your own. */
+export const isGoogleIntegration = (integration: McpIntegration): integration is McpIntegration<GoogleService> => GOOGLE_SERVICES.some(id => id === integration.id);
 
 /** `GET /api/integrations[?fresh]`: every MCP integration by its id. */
 export interface IntegrationsAnswer {

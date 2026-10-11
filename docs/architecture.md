@@ -620,7 +620,7 @@ Canvas, list, file, reaction, and channel-creation scopes are not requested.
 `GET /api/integrations` answers `{ integrations }`, one `McpIntegration`, `{ id, connection, signIn, setup }`, under each service's id.
 `setup` is `null` for Linear, which registers its own OAuth client.
 For Slack it is a `SlackSetup` with the client ID, whether a client secret is stored, the redirect URI, the callback port, the scope string, and `configured`.
-For Google Calendar and Gmail, the two `GoogleService`s, it is a `GoogleSetup` with the client ID, whether a client secret is stored, the callback port, and `configured`.
+For Google Calendar and Gmail, the `GOOGLE_SERVICES` in `src/shared/accounts.ts`, it is a `GoogleSetup` with the client ID, whether a client secret is stored, the callback port, and `configured`.
 The client secret is absent from that body.
 `GET /api/settings` does not read `mcp.json` either.
 Its file list comes from omp's context, prompt, command, rule, skill, hook, and agent discovery.
@@ -636,7 +636,7 @@ Otherwise `checkMcpServer` in `src/omp/mcp.ts` lists the server's tools with `to
 The server keeps each list for a minute and never a failure; `?fresh` lists again, and a sign-in, a sign-out, or a 401 on a tickets call drops it.
 While a service's sign-in waits on the browser, its connection is the one last answered, without listing the tools again.
 The page shows the **Tickets** tab while Linear's connection is `ready`, `refused`, or `failing`, and the **Inbox** tab while Gmail's is, and keeps the last read in localStorage.
-`App` in `web/app.tsx` turns both into one `hiddenTabs` set, which the sidebar's tabs, the tab a page selects, and the tabs' shortcuts all read, and the tab row fits its width by how many tabs show.
+Each gated tab names its service as the `integration` of its row in `SIDEBAR_TABS` in `web/routing.ts`, and `App` in `web/app.tsx` turns those rows into one `hiddenTabs` set, which the sidebar's tabs, the tab a page selects, and the tabs' shortcuts all read, and the tab row fits its width by how many tabs show.
 The dashboard calls Linear only while its connection is `ready` or `failing`: the tickets page shows Linear's integration row instead of the issues otherwise, and the Todo page's **Create Linear ticket** and the Calendar's tickets wait on it too.
 
 `PUT /api/integrations/slack/client` takes `{ clientId, clientSecret?, redirectUri, callbackPort, scope }`.
@@ -685,7 +685,7 @@ A sign-in that omp does not manage stays, and the route answers an error that sa
 
 `src/google-calendar.ts` reads and writes Google Calendar's REST API (`https://www.googleapis.com/calendar/v3`) with the token omp holds for its Google Calendar MCP server, so the Calendar page needs no sign-in of its own.
 Google Calendar's MCP tools answer only for OAuth clients enrolled in Google's Workspace Developer Preview Program, while the API answers any client that requested the same scopes.
-`callWithMcpSignIn` in `src/omp/mcp.ts` sends the server's token with a GET, or, given a `JsonPost`, with a POST of its `body` as JSON; a 401 forgets the token and the tool list and throws `McpRefused`, and any other failure throws Google's `error.message`.
+`googleFetch(id)` in `src/integrations.ts` is the `GoogleFetch` both Google clients call: it finds omp's server for Google service `id` and calls `callWithMcpSignIn` in `src/omp/mcp.ts`, which sends the server's token with a GET, or, given a `JsonPost`, with a POST of its `body` as JSON; a 401 forgets the token and the tool list and throws `McpRefused`, and any other failure throws Google's `error.message`.
 `GET /api/google` answers the calendars checked in your Google Calendar's list (`calendarList`, `selected`), each with its id, the name you gave it or else its own, its color, its `group`, its `writable` flag, its `shown` flag, and the error of its last read.
 `group` is `mine` for a calendar whose `accessRole` is `owner`, Google Calendar's **My calendars**, and `other` for the rest, its **Other calendars**.
 `writable` is true for an `accessRole` of `owner` or `writer`, the calendars a new event may go in.
@@ -718,7 +718,7 @@ The page owns what a write changes: it adds the kept event that `PUT /api/calend
 
 ### Gmail
 
-`GmailClient` in `src/gmail.ts` reads Gmail's REST API (`https://gmail.googleapis.com/gmail/v1/users/me`) with the token omp holds for its Gmail MCP server, through `callWithMcpSignIn` as `GoogleCalendarClient` does, so the Inbox page needs no sign-in of its own.
+`GmailClient` in `src/gmail.ts` reads Gmail's REST API (`https://gmail.googleapis.com/gmail/v1/users/me`) with the token omp holds for its Gmail MCP server, through `googleFetch("gmail")` as `GoogleCalendarClient` reads through `googleFetch("google-calendar")`, so the Inbox page needs no sign-in of its own.
 Gmail's MCP tools answer only for OAuth clients enrolled in Google's Workspace Developer Preview Program, while the API answers any client that requested `gmail.readonly`.
 The client only reads: nothing in the dashboard sends, deletes, labels, or marks mail read.
 `GET /api/gmail/inbox` answers an `InboxAnswer` from `src/shared/gmail.ts`, `{ address, threads }`: the signed-in address from `profile`, and a `MailThread` for each of the inbox's latest 50 threads (`threads?labelIds=INBOX&maxResults=50`), in Gmail's order.
@@ -970,7 +970,7 @@ The page lives in `web/`.
   A URL change never returns the previous URL's answer.
   `useReplaceableRead` shows the version a save answered until that URL is read again.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the pull requests, with one entry per workspace, one for the tickets, with one entry, since Linear is not per workspace, one for the MCP integrations, one for the Google calendars shown, one for the Calendar page's Google events, with one entry per month, one for its events kept on this computer, with one entry, and one for the Gmail inbox, with one entry.
-  `useGoogleCalendars` there tells whether Google Calendar is connected and reads its calendars, for the Calendar tab's sidebar, the Calendar page, and the new-event dialog, and `useGmailInbox` tells whether Gmail is connected and reads the inbox through `gmailStore`, for the Inbox page and its tab.
+  `useGoogleCalendars` there tells whether Google Calendar is connected and reads its calendars, for the Calendar tab's sidebar, the Calendar page, and the new-event dialog, and `useGmailInbox` answers Gmail's integration and the inbox with its unread count, read through `gmailStore` while Gmail is connected, for the Inbox page and its tab.
   A read in flight belongs to its entry: a new read of an entry replaces only the read of that entry in flight, and the components that poll one entry share one timer, which starts with the first and stops with the last.
   Its `update` applies a saved change to the current answer and aborts older reads before they can replace that answer.
   `web/app.tsx` polls the pull requests instead, on every page once the sessions are listed, for the Pull requests tab's count, and the sidebar's pull request list reads that entry.
@@ -1029,7 +1029,7 @@ The page lives in `web/`.
 - `web/components/calendar/calendar-page.tsx`: the Calendar page, a month of `web/calendar-model.ts` entries and the chosen day's list beside it, including Google events and the events kept on this computer read with `web/reads.ts`, and the remove button of each kept event in the day's list.
   It draws the month's grid and each day's hover card itself, and takes the month and year menus and arrows from Kibo UI's calendar, `web/components/kibo-ui/calendar/index.tsx`, whose month and year live in jotai atoms, so the page keeps its month while you leave and come back.
   `web/components/calendar/new-event.tsx` holds `NewEventDialog`, which **New event** and C open: a title, all day or a start and end time, and the calendar, a shown Google calendar you may write to or **This computer**, the last one used kept in localStorage; it sends the event and hands the page what the server answered.
-- `web/components/inbox/inbox-page.tsx`: the Inbox page, the Gmail inbox's conversations, each a link that opens it in Gmail, dated by `mailTime` in `web/labels.ts`, and `InboxDisconnected`, Gmail's integration row while the dashboard cannot read Gmail.
+- `web/components/inbox/inbox-page.tsx`: the Inbox page, the Gmail inbox's conversations, each a link that opens it in Gmail, dated by `mailTime` in `web/labels.ts`, or Gmail's integration row while the dashboard cannot read Gmail.
 - `web/components/pane.tsx`: a pane, whose view renders inside a `RenderBoundary` from `web/components/render-boundary.tsx`, so a view that throws shows its error in that pane and the rest of the page stays; `web/app.tsx` puts one around the page too, and both clear when the hash names another view.
   `conversation.tsx` holds the live composer, `conversation-header.tsx` its header with the End session button, `past-conversation.tsx` a past session's view, and `transcript.tsx` the transcript, whose `task` rows link to their subagents.
   `subject.ts` is `subjectOf`, the one place that tells a session from a subagent and derives what the composer may do; `model-slot.tsx` is the model and thinking switch, and `session-meta.tsx` a session header's trail and pull request menu.
@@ -1044,7 +1044,7 @@ The page lives in `web/`.
 - `web/components/changes/`: the changes page, `changes-page.tsx`, with its explorer and editor, `changes-explorer.tsx`, which a pull request's **Code** tab shows too, the explorer's tree, `file-tree.tsx`, and its Diff and File views, `code-view.tsx`.
   `web/components/line-counts.tsx` draws the lines added and removed, `+12 −3`, that the changes page and the Files tab share.
 - `web/components/pull-requests/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.
-  `web/components/integrations/` holds the integration rows that the Settings page's Integrations section, `web/components/settings/integrations-tab.tsx`, sorts into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which the tickets and Inbox pages also show while Linear or Gmail is not connected, and takes what shows below it as children, such as the calendars `google-calendar.tsx` lists under Google Calendar's row.
+  `web/components/integrations/` holds the integration rows that the Settings page's Integrations section, `web/components/settings/integrations-tab.tsx`, sorts into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which `DisconnectedPage` in `disconnected-page.tsx` shows on the tickets and Inbox pages while Linear or Gmail is not connected, and takes what shows below it as children, such as the calendars `google-calendar.tsx` lists under Google Calendar's row.
   Rows lay out through `integration-row.tsx` and draw their brand marks from `brand-logos.tsx`; `mcp-integration.tsx` starts its sign-ins with `web/use-sign-in.ts`, and its `SignOutConfirm` asks before a sign-out and shows its failure.
   `slack-app-form.tsx` holds Slack's confidential-app setup, field errors, and scope selection, `google-client-form.tsx` the OAuth client form of a Google service, Google Calendar or Gmail, with each one's API and grant in `GOOGLE_TEXT`, and `client-form.tsx` the steps, fields, and outside links both forms share; the generic MCP row owns its connection and sign-in controls.
   `web/components/more-actions-menu.tsx` is the ⋯ menu of a row's rarer actions, which the integration rows and the Routines page share.

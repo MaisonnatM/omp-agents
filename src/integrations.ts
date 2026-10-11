@@ -7,8 +7,10 @@ import { errorText } from "./json";
 import { clientSetups, type ClientSave, planGoogleSave, planSlackSave } from "./mcp-clients";
 import {
 	addMcpServer,
+	callWithMcpSignIn,
 	checkMcpServer,
 	findMcpServer,
+	type JsonPost,
 	type McpServer,
 	McpRefused,
 	mcpSignedIn,
@@ -18,6 +20,7 @@ import {
 	writeMcpServer,
 } from "./omp/mcp";
 import {
+	type ClientService,
 	type GoogleClientInput,
 	type GoogleService,
 	type IntegrationsAnswer,
@@ -43,6 +46,12 @@ export async function integrationServer(id: McpIntegrationId): Promise<McpServer
 	if (!server) throw new Error(`${MCP_SERVICES[id].label} is not connected. Connect it in Settings › Integrations.`);
 	return server;
 }
+
+/** Calls a Google API address with your sign-in: reads its JSON, or with `init` posts its body as JSON and reads the answer. */
+export type GoogleFetch = (url: string, init?: JsonPost) => Promise<unknown>;
+
+/** {@link GoogleFetch} with omp's sign-in to Google service `id`. */
+export const googleFetch = (id: GoogleService): GoogleFetch => async (url, init) => callWithMcpSignIn(await integrationServer(id), url, init);
 
 /** How {@link connectionOf} asks omp about a server: whether it holds a sign-in, and the server's tools with it. */
 export interface McpProbes {
@@ -86,7 +95,7 @@ export async function loadIntegrations(fresh: boolean): Promise<IntegrationsAnsw
 
 const GOOGLE_SETUP_ERROR = "Set up the Google OAuth client before connecting. Save its client ID, client secret, and callback port.";
 
-const SETUP_ERROR: Record<Exclude<McpIntegrationId, "linear">, string> = {
+const SETUP_ERROR: Record<ClientService, string> = {
 	slack: "Set up the Slack app before connecting. Save a client ID, client secret, HTTPS redirect, callback port, and at least one supported scope.",
 	"google-calendar": GOOGLE_SETUP_ERROR,
 	gmail: GOOGLE_SETUP_ERROR,
@@ -111,7 +120,7 @@ export async function startIntegrationSignIn(id: McpIntegrationId): Promise<McpI
  * Saves `id`'s OAuth client, as `plan` makes it from the user MCP config, and answers the integration.
  * A waiting sign-in is cancelled. A new client ID or secret also drops the credentials omp manages for that server.
  */
-async function saveClient(id: Exclude<McpIntegrationId, "linear">, plan: (path: string) => Promise<ClientSave>): Promise<McpIntegration> {
+async function saveClient(id: ClientService, plan: (path: string) => Promise<ClientSave>): Promise<McpIntegration> {
 	const path = userMcpConfigPath();
 	const planned = await plan(path);
 	signIns[id].cancel();

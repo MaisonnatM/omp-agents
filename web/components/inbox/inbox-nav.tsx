@@ -4,8 +4,8 @@ import { hashForPage } from "../../routing";
 
 /** The Inbox tab of the sidebar: the signed-in address over the Inbox, with its unread count. */
 export function InboxNav() {
-	const read = useGmailInbox().inbox.read?.data;
-	const unread = read?.threads.filter(thread => thread.unread).length ?? 0;
+	const { inbox, unread } = useGmailInbox();
+	const read = inbox.read?.data;
 	return (
 		<SidebarGroup>
 			{read && <SidebarGroupLabel title={read.address}>{read.address}</SidebarGroupLabel>}

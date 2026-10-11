@@ -1,6 +1,6 @@
 import { ChevronRight, CircleAlert, ExternalLink, KeyRound, LoaderCircle, LogOut, RefreshCw, WifiOff } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
-import { MCP_SERVICES, type McpConnection, type McpIntegration, type McpIntegrationId, type McpServerRef, type SignInState, signedIn } from "../../../src/shared/accounts";
+import { isGoogleIntegration, MCP_SERVICES, type McpConnection, type McpIntegration, type McpIntegrationId, type McpServerRef, type SignInState, signedIn } from "../../../src/shared/accounts";
 import { Badge, type BadgeColor } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
@@ -304,7 +304,7 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 		>
 			{callout}
 			{formOpen && integration.id === "slack" && <SlackAppForm setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />}
-			{formOpen && (integration.id === "google-calendar" || integration.id === "gmail") && (
+			{formOpen && isGoogleIntegration(integration) && (
 				<GoogleClientForm id={integration.id} setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />
 			)}
 			{children}

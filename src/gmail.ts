@@ -4,7 +4,7 @@
  * clients in Google's Developer Preview Program. It only reads: nothing here sends, labels, or marks mail read.
  */
 import { createCache } from "./cache";
-import type { GoogleFetch } from "./google-calendar";
+import type { GoogleFetch } from "./integrations";
 import { isObject, nonEmptyStr, str } from "./json";
 import { mapLimit } from "./map-limit";
 import type { InboxAnswer, MailThread } from "./shared/gmail";
@@ -42,14 +42,16 @@ function headerOf(message: Record<string, unknown>, name: string): string {
 	return (isObject(header) && str(header.value)) || "";
 }
 
+const hasLabel = (message: Record<string, unknown>, label: string): boolean => Array.isArray(message.labelIds) && message.labelIds.includes(label);
+
 /** A thread as the Inbox page lists it, or `null` for one without an id, a message other than a draft, or an arrival time. */
 function threadOf(thread: unknown, snippet: string, address: string): MailThread | null {
 	if (!isObject(thread) || !Array.isArray(thread.messages)) return null;
 	const id = nonEmptyStr(thread.id);
-	const messages = thread.messages.filter(isObject).filter(message => !(Array.isArray(message.labelIds) && message.labelIds.includes("DRAFT")));
+	const messages = thread.messages.filter(isObject).filter(message => !hasLabel(message, "DRAFT"));
 	const [first, last] = [messages[0], messages.at(-1)];
 	if (!id || !first || !last) return null;
-	const at = Number(str(last.internalDate) ?? Number.NaN);
+	const at = typeof last.internalDate === "string" ? Number(last.internalDate) : Number.NaN;
 	if (!Number.isFinite(at)) return null;
 	return {
 		id,
@@ -57,7 +59,7 @@ function threadOf(thread: unknown, snippet: string, address: string): MailThread
 		subject: headerOf(first, "Subject").trim(),
 		snippet: decodeEntities(snippet),
 		at,
-		unread: messages.some(message => Array.isArray(message.labelIds) && message.labelIds.includes("UNREAD")),
+		unread: messages.some(message => hasLabel(message, "UNREAD")),
 		count: messages.length,
 		url: `https://mail.google.com/mail/?authuser=${encodeURIComponent(address)}#inbox/${id}`,
 	};

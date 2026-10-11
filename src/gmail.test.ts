@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { GmailClient } from "./gmail";
-import type { GoogleFetch } from "./google-calendar";
+import type { GoogleFetch } from "./integrations";
 
 const PROFILE = { emailAddress: "max+work@example.com", messagesTotal: 1204, threadsTotal: 873, historyId: "9921" };
 

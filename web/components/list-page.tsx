@@ -77,7 +77,7 @@ interface ListPageProps<Data> {
 	poll: PolledEntry<Data>;
 	onRefresh: () => void;
 	/** What became of the last quick action, above the lists. */
-	notice: ReactNode;
+	notice?: ReactNode;
 	/** Classes for the column that holds the lists: the spacing between them, and a width other than the reading width. */
 	className?: string;
 	/** Buttons before Refresh. */

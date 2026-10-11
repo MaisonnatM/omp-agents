@@ -52,6 +52,12 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			if (next) open(next, "replace");
 			else if (!listed.length) return false;
 		};
+		const goToTab = (tab: Exclude<SidebarTab, "sessions" | "settings" | "pull-requests">) => (): boolean | void => {
+			const { hiddenTabs, page, showTab } = latest.current;
+			if (hiddenTabs.has(tab)) return false;
+			if (page?.kind === tab) return;
+			showTab(tab);
+		};
 		return {
 			help: () => latest.current.setShortcutsOpen(open => !open),
 			switcher: () => latest.current.dispatchPalette(latest.current.palette ? { type: "close" } : { type: "open" }),
@@ -77,12 +83,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (page?.kind === "pull-requests" && !page.target) return;
 				latest.current.showTab("pull-requests");
 			},
-			tickets: () => {
-				const { hiddenTabs, page } = latest.current;
-				if (hiddenTabs.has("tickets")) return false;
-				if (page?.kind === "tickets") return;
-				latest.current.showTab("tickets");
-			},
+			tickets: goToTab("tickets"),
 			newTicket: () => {
 				const { linearCallable, setNewTicket } = latest.current;
 				if (!linearCallable) return false;
@@ -93,20 +94,9 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (tab === "sessions" && !page) return;
 				latest.current.showTab("sessions");
 			},
-			todo: () => {
-				if (latest.current.page?.kind === "todo") return;
-				latest.current.showTab("todo");
-			},
-			calendar: () => {
-				if (latest.current.page?.kind === "calendar") return;
-				latest.current.showTab("calendar");
-			},
-			inbox: () => {
-				const { hiddenTabs, page } = latest.current;
-				if (hiddenTabs.has("inbox")) return false;
-				if (page?.kind === "inbox") return;
-				latest.current.showTab("inbox");
-			},
+			todo: goToTab("todo"),
+			calendar: goToTab("calendar"),
+			inbox: goToTab("inbox"),
 			routines: () => {
 				const { page, navigate } = latest.current;
 				if (page?.kind === "routines") return false;
@@ -131,7 +121,8 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 	const unavailable = useMemo(
 		() =>
 			new Set<ShortcutId>([
-				...hiddenTabs,
+				// A sidebar tab's shortcut has the tab's id.
+				...(hiddenTabs satisfies ReadonlySet<ShortcutId>),
 				...(linearCallable ? [] : ["newTicket" as const]),
 				...(hasDetails ? [] : ["detailsSidebar" as const]),
 			]),

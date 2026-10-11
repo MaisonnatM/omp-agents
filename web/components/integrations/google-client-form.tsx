@@ -78,7 +78,7 @@ export function GoogleClientForm({ id, setup, connected, onDone }: GoogleClientF
 	const clearError = (field: keyof FieldErrors) => setErrors(current => (current[field] ? { ...current, [field]: undefined } : current));
 
 	return (
-		<form aria-label="Google OAuth client" noValidate onSubmit={event => void save(event)} className="space-y-4 rounded-lg bg-muted/60 p-4 text-[13px]">
+		<form aria-label={`${MCP_SERVICES[id].label} OAuth client`} noValidate onSubmit={event => void save(event)} className="space-y-4 rounded-lg bg-muted/60 p-4 text-[13px]">
 			<ol className="space-y-2.5">
 				<Step n={1}>
 					In a <External href={`https://console.cloud.google.com/apis/library/${text.library}`}>Google Cloud project</External>, turn on the {text.api}.

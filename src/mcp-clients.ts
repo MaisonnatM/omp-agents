@@ -4,6 +4,7 @@
  */
 import { type McpServer, type McpServerConfig, credentialFor, readMcpServers, serverOnHost, userMcpConfigPath } from "./omp/mcp";
 import {
+	type ClientService,
 	DEFAULT_GOOGLE_CALLBACK_PORT,
 	GOOGLE_SCOPES,
 	type GoogleClientInput,
@@ -11,6 +12,7 @@ import {
 	type GoogleSetup,
 	googleRedirectUri,
 	MCP_SERVICES,
+	type McpSetups,
 	normalizeSlackScope,
 	type SlackClientInput,
 	type SlackSetup,
@@ -68,7 +70,7 @@ export function googleSetupFrom(server: McpServerConfig | undefined): GoogleSetu
 }
 
 /** Slack's, Google Calendar's, and Gmail's setups from the user MCP file. An unconfigured service still gets its defaults. */
-export async function clientSetups(): Promise<{ slack: SlackSetup } & Record<GoogleService, GoogleSetup>> {
+export async function clientSetups(): Promise<Omit<McpSetups, "linear">> {
 	const servers = await readMcpServers(userMcpConfigPath());
 	return {
 		slack: slackSetupFrom(serverOnHost(servers, MCP_SERVICES.slack.host)?.config),
@@ -76,8 +78,6 @@ export async function clientSetups(): Promise<{ slack: SlackSetup } & Record<Goo
 		gmail: googleSetupFrom(serverOnHost(servers, MCP_SERVICES.gmail.host)?.config),
 	};
 }
-
-type ClientService = "slack" | GoogleService;
 
 /**
  * The next server entry for `id` with the client `clientId` and the OAuth settings `oauth`, without writing it.

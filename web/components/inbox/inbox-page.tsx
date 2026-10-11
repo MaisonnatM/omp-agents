@@ -1,11 +1,10 @@
-import type { McpIntegration } from "../../../src/shared/accounts";
+import { callable } from "../../../src/shared/accounts";
 import type { MailThread } from "../../../src/shared/gmail";
 import { cn } from "@/lib/utils";
 import { mailTime } from "../../labels";
 import { gmailStore, useGmailInbox } from "../../reads";
-import { IntegrationList } from "../integrations/integration-row";
-import { McpIntegrationRow } from "../integrations/mcp-integration";
-import { ListPage, PageFrame } from "../list-page";
+import { DisconnectedPage } from "../integrations/disconnected-page";
+import { ListPage } from "../list-page";
 
 const TITLE = "Inbox";
 const META = "Your Gmail inbox";
@@ -41,11 +40,11 @@ function ThreadRow({ thread }: { thread: MailThread }) {
 	);
 }
 
-/** Your Gmail inbox's latest conversations, newest first, each opening in Gmail. */
+/** Your Gmail inbox's latest conversations, newest first, each opening in Gmail, or Gmail's integration row while omp cannot read it. */
 export function InboxPage() {
-	const { inbox } = useGmailInbox();
+	const { gmail, inbox, unread } = useGmailInbox();
+	if (gmail && !callable(gmail.connection)) return <DisconnectedPage title={TITLE} meta={META} integration={gmail} />;
 	const read = inbox.read?.data;
-	const unread = read?.threads.filter(thread => thread.unread).length ?? 0;
 	return (
 		<ListPage
 			title={TITLE}
@@ -54,7 +53,6 @@ export function InboxPage() {
 			loading="Asking Gmail for your inbox…"
 			poll={inbox}
 			onRefresh={() => void gmailStore.refresh(null, { fresh: true })}
-			notice={null}
 			className="max-w-none px-4 pt-3"
 		>
 			{({ threads }) =>
@@ -69,18 +67,5 @@ export function InboxPage() {
 				)
 			}
 		</ListPage>
-	);
-}
-
-/** The Inbox page while omp cannot read Gmail: Gmail's integration row, to connect from here as from Settings › Integrations. */
-export function InboxDisconnected({ gmail }: { gmail: McpIntegration }) {
-	return (
-		<PageFrame title={TITLE} meta={META}>
-			<div className="mx-auto w-full max-w-3xl px-6 py-6">
-				<IntegrationList label="Gmail connection">
-					<McpIntegrationRow integration={gmail} />
-				</IntegrationList>
-			</div>
-		</PageFrame>
 	);
 }

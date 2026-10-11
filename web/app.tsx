@@ -27,7 +27,7 @@ import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
 import { integrationsStore } from "./reads";
-import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, type SidebarTab, type TodoListView } from "./routing";
+import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
 import { startOf } from "./starts";
@@ -64,17 +64,10 @@ export function App() {
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const linear = integrations?.linear ?? null;
-	const gmail = integrations?.gmail ?? null;
-	const linearSignedIn = linear !== null && signedIn(linear.connection);
-	const gmailSignedIn = gmail !== null && signedIn(gmail.connection);
-	/**
-	 * The tabs that do not show, nor their shortcuts: Tickets until omp holds a sign-in to Linear, and Inbox until it holds one to Gmail,
-	 * even one the service refuses, which the page then offers to reconnect.
-	 */
-	const hiddenTabs = useMemo(
-		() => new Set<SidebarTab>([...(linearSignedIn ? [] : ["tickets" as const]), ...(gmailSignedIn ? [] : ["inbox" as const])]),
-		[linearSignedIn, gmailSignedIn],
-	);
+	const hidden = SIDEBAR_TABS.flatMap(row => ("integration" in row && !(integrations && signedIn(integrations[row.integration].connection)) ? [row.value] : []));
+	const hiddenKey = hidden.join();
+	/** The tabs that do not show, nor their shortcuts: the same set until one hides or shows, whatever the integrations' polls answer. */
+	const hiddenTabs = useMemo((): ReadonlySet<SidebarTab> => new Set(hidden), [hiddenKey]);
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
 	const settings = useMemo(() => settingsRoute(page, focused.cwd), [page, focused.cwd]);
@@ -243,7 +236,6 @@ export function App() {
 													routinesTarget={routinesTarget}
 													linear={linear}
 													linearCallable={linearCallable}
-													gmail={gmail}
 													maximized={maximized}
 													hasDetails={detailsView !== null}
 													rightOpen={sidebars.panels.right.open}

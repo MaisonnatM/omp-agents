@@ -112,30 +112,36 @@ function TicketsNav({ target, onTarget }: TicketsNavProps) {
 	);
 }
 
+interface TabFit {
+	list: string;
+	tab: string;
+	label: string;
+}
 
 /**
- * How the sidebar tabs fit its width, by container query: labels while they fit, then icons alone sharing the row.
- * Icons alone keep each name in the tooltip and for screen readers.
- * Each switch sits where the labels fit with counts on Pull requests and Sessions and the list's margins; labels never fit beside their icons once both carry counts.
+ * How the sidebar tabs fit its width, by how many tabs show, through container queries: labels while they fit, then icons
+ * alone sharing the row. Icons alone keep each name in the tooltip and for screen readers. The tiers go by tab count
+ * only, not by which tabs show, and leave room for counts on Pull requests and Sessions and the list's margins.
  */
 const SIDEBAR_TAB_FIT = {
-	five: {
+	5: {
 		list: "@max-[26rem]/sidebar:self-stretch",
 		tab: "@min-[26rem]/sidebar:[&>svg]:hidden @max-[26rem]/sidebar:flex-1 @max-[26rem]/sidebar:justify-center @max-[26rem]/sidebar:px-0.5",
 		label: "@max-[26rem]/sidebar:sr-only",
 	},
-	six: {
+	6: {
 		list: "@max-[29.5rem]/sidebar:self-stretch",
 		tab: "@min-[29.5rem]/sidebar:[&>svg]:hidden @max-[29.5rem]/sidebar:flex-1 @max-[29.5rem]/sidebar:justify-center @max-[29.5rem]/sidebar:px-0.5",
 		label: "@max-[29.5rem]/sidebar:sr-only",
 	},
-	seven: {
+	7: {
 		list: "@max-[33rem]/sidebar:self-stretch",
 		tab: "@min-[33rem]/sidebar:[&>svg]:hidden @max-[33rem]/sidebar:flex-1 @max-[33rem]/sidebar:justify-center @max-[33rem]/sidebar:px-0.5",
 		label: "@max-[33rem]/sidebar:sr-only",
 	},
-};
+} satisfies Record<number, TabFit>;
 
+const hasTabFit = (count: number): count is keyof typeof SIDEBAR_TAB_FIT => count in SIDEBAR_TAB_FIT;
 
 interface RosterProps {
 	/** The workspaces, as {@link listWorkspaces} lists them. */
@@ -226,7 +232,7 @@ export function Roster({
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
 	const shownTabs = SIDEBAR_TABS.filter(({ value }) => !hiddenTabs.has(value));
-	const fit = shownTabs.length >= 7 ? SIDEBAR_TAB_FIT.seven : shownTabs.length === 6 ? SIDEBAR_TAB_FIT.six : SIDEBAR_TAB_FIT.five;
+	const fit = SIDEBAR_TAB_FIT[hasTabFit(shownTabs.length) ? shownTabs.length : 7];
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-0">

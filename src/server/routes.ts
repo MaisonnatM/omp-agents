@@ -25,7 +25,7 @@ import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
-import type { GoogleService, McpIntegration, McpIntegrationId } from "../shared/accounts";
+import { GOOGLE_SERVICES, type GoogleService, type McpIntegration, type McpIntegrationId } from "../shared/accounts";
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
@@ -346,8 +346,7 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
 		"/api/integrations/sign-out": { PUT: integrationSignOut },
 		"/api/integrations/slack/client": { PUT: slackClient },
-		"/api/integrations/google-calendar/client": { PUT: googleClient("google-calendar") },
-		"/api/integrations/gmail/client": { PUT: googleClient("gmail") },
+		...Object.fromEntries(GOOGLE_SERVICES.map(id => [`/api/integrations/${id}/client`, { PUT: googleClient(id) }])),
 		"/api/tickets": { GET: tickets },
 		"/api/linear/teams": { GET: teams },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },
