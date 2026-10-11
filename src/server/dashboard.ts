@@ -9,9 +9,10 @@ import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
 import type { Server } from "bun";
 import { flushJsonFiles } from "../fs";
+import { GmailClient } from "../gmail";
 import { GoogleCalendarClient } from "../google-calendar";
 import { loadPullRequests } from "../pull-requests";
-import { integrationServer } from "../integrations";
+import { googleFetch } from "../integrations";
 import { errorText } from "../json";
 import type { LiveSession } from "../live-session";
 import { callWithMcpSignIn, findMcpServer, mcpSignedIn } from "../omp/mcp";
@@ -81,6 +82,7 @@ export class Dashboard {
 	/** Which of the servers beside each other, such as a smoke run on another port, runs routines and the todo inbox. */
 	readonly #ownerLock: OwnerLock;
 	readonly #google: GoogleCalendarClient;
+	readonly #gmail = new GmailClient(googleFetch("gmail"));
 	readonly #sessions: LiveSessions;
 	readonly #views: Views;
 	readonly #notices: Notices;
@@ -116,7 +118,7 @@ export class Dashboard {
 		// The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
 		rmSync(oldGoogleFile, { force: true });
 		const calendars = this.#calendars;
-		this.#google = new GoogleCalendarClient(async (url, init) => callWithMcpSignIn(await integrationServer("google-calendar"), url, init), () => calendars.hidden);
+		this.#google = new GoogleCalendarClient(googleFetch("google-calendar"), () => calendars.hidden);
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -307,6 +309,7 @@ export class Dashboard {
 				setCalendarShown: (id, shown) => this.#calendars.setShown(id, shown),
 				localEvents: this.#localEvents,
 			},
+			gmail: this.#gmail,
 			files: { worktrees: this.#worktrees, terminals: this.terminals },
 		});
 	}

@@ -15,8 +15,8 @@ export interface PageShortcutInput {
 	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through. */
 	listed: View[];
 	view: View | null;
-	/** omp is signed in to Linear, so the Tickets shortcut applies. */
-	ticketsShown: boolean;
+	/** The sidebar tabs that do not show; their shortcuts do not apply. */
+	hiddenTabs: ReadonlySet<SidebarTab>;
 	/** The dashboard can create Linear issues, so the new-ticket shortcut applies. */
 	linearCallable: boolean;
 	/** The right sidebar has a session to show. */
@@ -52,6 +52,12 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			if (next) open(next, "replace");
 			else if (!listed.length) return false;
 		};
+		const goToTab = (tab: Exclude<SidebarTab, "sessions" | "settings" | "pull-requests">) => (): boolean | void => {
+			const { hiddenTabs, page, showTab } = latest.current;
+			if (hiddenTabs.has(tab)) return false;
+			if (page?.kind === tab) return;
+			showTab(tab);
+		};
 		return {
 			help: () => latest.current.setShortcutsOpen(open => !open),
 			switcher: () => latest.current.dispatchPalette(latest.current.palette ? { type: "close" } : { type: "open" }),
@@ -77,12 +83,7 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (page?.kind === "pull-requests" && !page.target) return;
 				latest.current.showTab("pull-requests");
 			},
-			tickets: () => {
-				const { ticketsShown, page } = latest.current;
-				if (!ticketsShown) return false;
-				if (page?.kind === "tickets") return;
-				latest.current.showTab("tickets");
-			},
+			tickets: goToTab("tickets"),
 			newTicket: () => {
 				const { linearCallable, setNewTicket } = latest.current;
 				if (!linearCallable) return false;
@@ -93,14 +94,9 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (tab === "sessions" && !page) return;
 				latest.current.showTab("sessions");
 			},
-			todo: () => {
-				if (latest.current.page?.kind === "todo") return;
-				latest.current.showTab("todo");
-			},
-			calendar: () => {
-				if (latest.current.page?.kind === "calendar") return;
-				latest.current.showTab("calendar");
-			},
+			todo: goToTab("todo"),
+			calendar: goToTab("calendar"),
+			inbox: goToTab("inbox"),
 			routines: () => {
 				const { page, navigate } = latest.current;
 				if (page?.kind === "routines") return false;
@@ -120,16 +116,17 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 		};
 	}, []);
 	useShortcuts(handlers);
-	const { ticketsShown, linearCallable, hasDetails } = input;
+	const { hiddenTabs, linearCallable, hasDetails } = input;
 	/** Commands that would do nothing now. */
 	const unavailable = useMemo(
 		() =>
 			new Set<ShortcutId>([
-				...(ticketsShown ? [] : ["tickets" as const]),
+				// A sidebar tab's shortcut has the tab's id.
+				...(hiddenTabs satisfies ReadonlySet<ShortcutId>),
 				...(linearCallable ? [] : ["newTicket" as const]),
 				...(hasDetails ? [] : ["detailsSidebar" as const]),
 			]),
-		[ticketsShown, linearCallable, hasDetails],
+		[hiddenTabs, linearCallable, hasDetails],
 	);
 	return { handlers, unavailable };
 }

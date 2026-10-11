@@ -1,21 +1,27 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { BarChart3, FileText, Folders, GitBranch, Plug, Route as RouteIcon, SlidersHorizontal } from "lucide-react";
+import { BarChart3, FileText, Folders, GitBranch, type LucideIcon, Plug, Route as RouteIcon, SlidersHorizontal } from "lucide-react";
+import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
 import { TICKET_ID } from "../src/shared/tickets";
 import type { StartOp } from "./starts";
 import { PAGE_ICON } from "./page-icons";
 
+/**
+ * The sidebar's tabs, in order. A tab with an `integration` shows, and its shortcut applies, only while omp holds a
+ * sign-in to that service, even one the service refuses, which the page then offers to reconnect.
+ */
 export const SIDEBAR_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"] },
-	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets },
+	{ value: "tickets", label: "Tickets", icon: PAGE_ICON.tickets, integration: "linear" },
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
+	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox, integration: "gmail" },
 	{ value: "settings", label: "Settings", icon: PAGE_ICON.settings },
-] as const;
+] as const satisfies readonly { value: string; label: string; icon: LucideIcon; integration?: McpIntegrationId }[];
 
-/** The sidebar's tab; the tickets, todo, calendar, and settings tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** The sidebar's tab; the tickets, todo, calendar, inbox, and settings tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 const PAST_PREFIX = "past/";
@@ -99,6 +105,7 @@ export type Page =
 	| ({ kind: "routines" } & RoutinesRoute)
 	| ({ kind: "projects" } & ProjectsRoute)
 	| { kind: "calendar" }
+	| { kind: "inbox" }
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "changes" } & ChangesRoute);
 
@@ -146,6 +153,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#projects` opens the Projects page with every project, `#projects/new` with the New project form, and `#projects/<id>`
  *   with that project's coordinator, workers, and notes. Project ids are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
+ * - `#inbox` opens the Inbox page, your Gmail inbox's latest conversations.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	settings: rest => {
@@ -173,6 +181,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "projects", target: rest === "new" ? { kind: "new" } : id ? { kind: "project", id } : { kind: "list" } };
 	},
 	calendar: () => ({ kind: "calendar" }),
+	inbox: () => ({ kind: "inbox" }),
 	changes: rest => {
 		const [sessionId = "", path] = (rest ?? "").split("/");
 		return { kind: "changes", sessionId: decodeSegment(sessionId) ?? "", path: path ? decodeSegment(path) : null };
@@ -203,6 +212,7 @@ function restOfPage(page: Page): string | null {
 		case "projects":
 			return page.target.kind === "list" ? null : page.target.kind === "new" ? "new" : encodeURIComponent(page.target.id);
 		case "calendar":
+		case "inbox":
 			return null;
 		case "changes":
 			return `${encodeURIComponent(page.sessionId)}${page.path === null ? "" : `/${encodeURIComponent(page.path)}`}`;
@@ -226,6 +236,7 @@ function queryOfPage(page: Page): string | null {
 		case "routines":
 		case "projects":
 		case "calendar":
+		case "inbox":
 		case "changes":
 			return null;
 		default: {

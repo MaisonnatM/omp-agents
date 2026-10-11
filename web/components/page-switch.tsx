@@ -11,6 +11,8 @@ import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
 import { ChangesPage } from "./changes/changes-page";
 import { useDashboardActions } from "./dashboard-context";
+import { InboxPage } from "./inbox/inbox-page";
+import { DisconnectedPage } from "./integrations/disconnected-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { PullRequestDetailPage } from "./pull-requests/pr-page";
 import { NewSession } from "./new-session";
@@ -18,7 +20,7 @@ import { PaneGrid } from "./pane-grid";
 import { ProjectsPage } from "./projects/projects-page";
 import { RoutinesPage } from "./routines/routines-page";
 import { SettingsPage } from "./settings/settings-page";
-import { TicketsDisconnected, TicketsPage } from "./tickets/tickets-page";
+import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
 
 function EmptyState({ rosterError }: { rosterError: string | null }) {
@@ -150,7 +152,7 @@ export const PageSwitch = memo(function PageSwitch({
 				<PullRequestDetailPage workspace={workspace} hosts={visible.hosts} target={page.target} files={page.files} />
 			);
 		case "tickets":
-			if (linear && !linearCallable) return <TicketsDisconnected linear={linear} />;
+			if (linear && !linearCallable) return <DisconnectedPage title={TICKETS_TITLE} meta={TICKETS_META} integration={linear} />;
 			// Until the sessions are listed, the workspace a quick action starts in is not known yet.
 			if (!listed) return <p className="m-auto text-sm text-muted-foreground">Listing sessions…</p>;
 			return <TicketsPage target={page.target} section={sectionTarget} cwd={defaultWorkspace} hosts={visible.hosts} />;
@@ -201,6 +203,8 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		case "calendar":
 			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} />;
+		case "inbox":
+			return <InboxPage />;
 		case "changes":
 			return (
 				<ChangesPage

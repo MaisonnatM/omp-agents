@@ -28,6 +28,7 @@ export type ShortcutId =
 	| "sessions"
 	| "todo"
 	| "calendar"
+	| "inbox"
 	| "routines"
 	| "projects"
 	| "workspace"
@@ -154,6 +155,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "sessions", label: "Go to the sessions", command: "Go to sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },
 	{ id: "todo", label: "Go to your todo list", command: "Go to todo list", keys: [{ chord: { key: "4", mod: true }, scope: "anywhere" }] },
 	{ id: "calendar", label: "Go to your calendar", command: "Go to calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },
+	{ id: "inbox", label: "Go to your Gmail inbox", command: "Open inbox", keys: [{ goTo: "i" }] },
 	{ id: "routines", label: "Go to your routines", command: "Go to routines", keys: [{ goTo: "r" }] },
 	// After a G, P is also the Todo page's `todoPriority`: the page outranks the App, so the priority wins while a todo is focused or open, and its handler declines otherwise.
 	{ id: "projects", label: "Go to your projects", command: "Go to projects", keys: [{ goTo: "p" }] },

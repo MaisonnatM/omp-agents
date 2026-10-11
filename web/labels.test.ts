@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { age, dayLabel, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
+import { age, dayLabel, mailTime, modelLabel, modelOrg, providerLabel, skillLabel } from "./labels";
 
 describe("model labels", () => {
 	test("a direct provider's model reads as its family and dotted version", () => {
@@ -51,6 +51,15 @@ describe("day labels", () => {
 		const now = new Date(2026, 0, 2, 9);
 		expect(dayLabel(new Date(2026, 0, 1, 23).toISOString(), now)).not.toContain("2026");
 		expect(dayLabel(new Date(2025, 11, 31, 23).toISOString(), now)).toContain("2025");
+	});
+
+	test("mail reads as its time on today's date, its day earlier this year, and its full date in an earlier year", () => {
+		const now = new Date(2026, 0, 2, 9);
+		const clock = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+		expect(mailTime(new Date(2026, 0, 2, 8, 5).getTime(), now)).toBe(clock.format(new Date(2026, 0, 2, 8, 5)));
+		expect(mailTime(new Date(2026, 0, 1, 23).getTime(), now)).toBe(dayLabel(new Date(2026, 0, 1, 23).toISOString(), now));
+		const lastYear = mailTime(new Date(2025, 11, 31, 23).getTime(), now);
+		expect([lastYear.includes("2025"), lastYear.includes("31")]).toEqual([true, true]);
 	});
 });
 

@@ -509,7 +509,7 @@ export function parseSlackClient(body: unknown): Parsed<SlackClientInput, { erro
 	return { ok: clientSecret === undefined ? { clientId, redirectUri, callbackPort: body.callbackPort, scope } : { clientId, clientSecret, redirectUri, callbackPort: body.callbackPort, scope } };
 }
 
-/** The body of `PUT /api/integrations/google-calendar/client`. An empty secret is omitted so the saved secret can stay. */
+/** The body of `PUT /api/integrations/<google-calendar|gmail>/client`. An empty secret is omitted so the saved secret can stay. */
 export function parseGoogleClient(body: unknown): Parsed<GoogleClientInput, { error: string }> {
 	if (!isObject(body)) return { error: "Expected { clientId, callbackPort } for the Google OAuth client." };
 	const clientId = typeof body.clientId === "string" ? body.clientId.trim() : "";

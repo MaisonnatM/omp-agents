@@ -1,7 +1,6 @@
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { RosterHost, View } from "../../../src/shared/sessions";
-import type { McpIntegration } from "../../../src/shared/accounts";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -16,18 +15,16 @@ import { shortcutLabels } from "../../shortcuts";
 import { type TicketGroup, ticketGroups, ticketSection } from "../../tickets-model";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
 import { FoldButton, useFolds, useReveal } from "../fold";
-import { DetailPage, ListPage, PageFrame } from "../list-page";
+import { DetailPage, ListPage } from "../list-page";
 import { DetailQuickActions, QuickStartNotice } from "../quick-actions";
-import { IntegrationList } from "../integrations/integration-row";
-import { McpIntegrationRow } from "../integrations/mcp-integration";
 import { TicketDetailContent } from "./ticket-details";
 import { statusIcon, TicketRow, ticketRowId } from "./ticket-row";
 
 /** Folded status groups, by status name. */
 const COLLAPSED_KEY = "omp-agents.tickets-collapsed";
 
-const TITLE = "Tickets";
-const META = "Your assigned issues on Linear";
+export const TICKETS_TITLE = "Tickets";
+export const TICKETS_META = "Your assigned issues on Linear";
 
 interface GroupProps {
 	group: TicketGroup;
@@ -144,8 +141,8 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 
 	return (
 		<ListPage
-			title={TITLE}
-			meta={META}
+			title={TICKETS_TITLE}
+			meta={TICKETS_META}
 			noun="the tickets"
 			loading="Asking Linear for your issues…"
 			poll={poll}
@@ -181,18 +178,5 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 				);
 			}}
 		</ListPage>
-	);
-}
-
-/** The tickets page while omp cannot read Linear: Linear's integration row, to connect from here as from Settings › Integrations. */
-export function TicketsDisconnected({ linear }: { linear: McpIntegration }) {
-	return (
-		<PageFrame title={TITLE} meta={META}>
-			<div className="mx-auto w-full max-w-3xl px-6 py-6">
-				<IntegrationList label="Linear connection">
-					<McpIntegrationRow integration={linear} />
-				</IntegrationList>
-			</div>
-		</PageFrame>
 	);
 }

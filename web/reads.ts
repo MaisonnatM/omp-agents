@@ -1,15 +1,16 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
 import { useEffect, useMemo, useState } from "react";
 import { isObject } from "../src/json";
-import { callable, type IntegrationsAnswer, MCP_INTEGRATIONS } from "../src/shared/accounts";
+import { callable, type IntegrationsAnswer, MCP_INTEGRATIONS, type McpIntegration } from "../src/shared/accounts";
 import type { CalendarEventsAnswer, GoogleCalendar, GoogleStatus, LocalEventsAnswer } from "../src/shared/calendar";
+import type { InboxAnswer } from "../src/shared/gmail";
 import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
 import type { PullRequestList, RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
 import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/sessions";
 import type { Ticket, TicketsAnswer } from "../src/shared/tickets";
 import { errorText, getJson } from "./api";
-import { createPolledStore } from "./polled-store";
+import { createPolledStore, type PolledEntry } from "./polled-store";
 
 export interface ReadState<T> {
 	data: T | null;
@@ -194,6 +195,21 @@ export function useGoogleCalendars(): { connected: boolean; calendars: GoogleCal
 	const connected = connection !== undefined && callable(connection);
 	const calendars = googleStore.usePolling(null, connected).read?.data.calendars ?? null;
 	return { connected, calendars: connected ? calendars : null };
+}
+
+/** Your Gmail inbox's latest conversations, which the Inbox page and its sidebar tab share. */
+export const gmailStore = createPolledStore<InboxAnswer>({
+	cacheKey: "omp-agents.gmail-cache",
+	url: (_, fresh) => `/api/gmail/inbox${fresh ? "?fresh" : ""}`,
+	isValid: (value): value is InboxAnswer => isObject(value) && typeof value.address === "string" && Array.isArray(value.threads),
+});
+
+/** Gmail's integration, `null` before the first read, and your inbox with its unread conversations, read every minute while the dashboard can call Gmail. */
+export function useGmailInbox(): { gmail: McpIntegration<"gmail"> | null; inbox: PolledEntry<InboxAnswer>; unread: number } {
+	const gmail = integrationsStore.usePolling().read?.data.integrations.gmail ?? null;
+	const inbox = gmailStore.usePolling(null, gmail !== null && callable(gmail.connection));
+	const unread = inbox.read?.data.threads.filter(thread => thread.unread).length ?? 0;
+	return { gmail, inbox, unread };
 }
 
 /** Every event kept on this computer, which the Calendar page reads with or without Google Calendar. */

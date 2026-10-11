@@ -1,15 +1,18 @@
 /**
- * The OAuth client of the Slack and Google Calendar apps that Settings › Integrations saves: the setup the page shows,
- * read from the user MCP config, and the server entry a save would write, planned from it without writing.
+ * The OAuth client of the Slack, Google Calendar, and Gmail apps that Settings › Integrations saves: the setup the page
+ * shows, read from the user MCP config, and the server entry a save would write, planned from it without writing.
  */
 import { type McpServer, type McpServerConfig, credentialFor, readMcpServers, serverOnHost, userMcpConfigPath } from "./omp/mcp";
 import {
+	type ClientService,
 	DEFAULT_GOOGLE_CALLBACK_PORT,
-	GOOGLE_CALENDAR_SCOPES,
+	GOOGLE_SCOPES,
 	type GoogleClientInput,
+	type GoogleService,
 	type GoogleSetup,
 	googleRedirectUri,
 	MCP_SERVICES,
+	type McpSetups,
 	normalizeSlackScope,
 	type SlackClientInput,
 	type SlackSetup,
@@ -56,7 +59,7 @@ export function slackSetupFrom(server: McpServerConfig | undefined): SlackSetup 
 	return { clientId, hasClientSecret, redirectUri, callbackPort, scope, configured };
 }
 
-/** Public Google Calendar setup for one stored server. A callback port must be saved, since omp's own default differs. */
+/** Public setup of a Google service for one stored server. A callback port must be saved, since omp's own default differs. */
 export function googleSetupFrom(server: McpServerConfig | undefined): GoogleSetup {
 	const oauth = server?.oauth;
 	const clientId = clientIdOf(oauth);
@@ -66,16 +69,15 @@ export function googleSetupFrom(server: McpServerConfig | undefined): GoogleSetu
 	return { clientId, hasClientSecret, callbackPort, configured: clientId !== null && hasClientSecret && validPort(storedPort) };
 }
 
-/** Slack's and Google Calendar's setups from the user MCP file. An unconfigured service still gets its defaults. */
-export async function clientSetups(): Promise<{ slack: SlackSetup; "google-calendar": GoogleSetup }> {
+/** Slack's, Google Calendar's, and Gmail's setups from the user MCP file. An unconfigured service still gets its defaults. */
+export async function clientSetups(): Promise<Omit<McpSetups, "linear">> {
 	const servers = await readMcpServers(userMcpConfigPath());
 	return {
 		slack: slackSetupFrom(serverOnHost(servers, MCP_SERVICES.slack.host)?.config),
 		"google-calendar": googleSetupFrom(serverOnHost(servers, MCP_SERVICES["google-calendar"].host)?.config),
+		gmail: googleSetupFrom(serverOnHost(servers, MCP_SERVICES.gmail.host)?.config),
 	};
 }
-
-type ClientService = "slack" | "google-calendar";
 
 /**
  * The next server entry for `id` with the client `clientId` and the OAuth settings `oauth`, without writing it.
@@ -108,12 +110,13 @@ export const planSlackSave = (filePath: string, input: SlackClientInput): Promis
 	planClientSave(filePath, "slack", input.clientId.trim(), input.clientSecret, { scope: input.scope, redirectUri: input.redirectUri, callbackPort: input.callbackPort });
 
 /**
- * The next Google Calendar server entry for validated `input`, without writing it: the client, the scopes the dashboard
- * and the MCP server's tools need, a consent prompt so Google grants a refresh token every time, and the loopback redirect.
+ * The next server entry of Google service `id` for validated `input`, without writing it: the client, the scopes the
+ * dashboard and the MCP server's tools need, a consent prompt so Google grants a refresh token every time, and the
+ * loopback redirect.
  */
-export const planGoogleSave = (filePath: string, input: GoogleClientInput): Promise<ClientSave> =>
-	planClientSave(filePath, "google-calendar", input.clientId.trim(), input.clientSecret, {
-		scope: GOOGLE_CALENDAR_SCOPES.join(" "),
+export const planGoogleSave = (filePath: string, id: GoogleService, input: GoogleClientInput): Promise<ClientSave> =>
+	planClientSave(filePath, id, input.clientId.trim(), input.clientSecret, {
+		scope: GOOGLE_SCOPES[id].join(" "),
 		prompt: "consent",
 		redirectUri: googleRedirectUri(input.callbackPort),
 		callbackPort: input.callbackPort,

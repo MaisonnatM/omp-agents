@@ -512,9 +512,10 @@ An action that fails shows its error, and its control becomes available again.
   During live review the badge names the active rebase, review-comment, or CI-fix work.
   omp writes each step to its session file; the dashboard reads those entries for running and past sessions and updates when the step changes.
   Other sessions have no workflow badge.
-- Six tabs under the sidebar header, **Pull requests**, **Tickets**, **Sessions**, **Todo**, **Calendar**, and **Settings**, switch pages and what the sidebar lists.
+- Seven tabs under the sidebar header, **Pull requests**, **Tickets**, **Sessions**, **Todo**, **Calendar**, **Inbox**, and **Settings**, switch pages and what the sidebar lists.
   Click a tab or use the left and right arrow keys while a tab has focus to switch pages.
   **Tickets** shows only once Linear is connected; see [Linear tickets](#linear-tickets).
+  **Inbox** shows only once Gmail is connected; see [Inbox](#inbox).
   **Sessions** lists the running and past sessions, and **Todo** opens your own todo list, with its categories in the sidebar; see [Todo list](#todo-list).
   The **Sessions** tab counts the live sessions that wait on you, idle after a turn or with a question open, for the workspace that the sidebar's picker shows, pinned ones included, whatever the sidebar's search hides.
   **Calendar** opens a month of Google events, routine runs, and due todos and tickets, with your routines listed under it; see [Calendar](#calendar) and [Routines](#routines).
@@ -702,15 +703,15 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Integrations
 
-- **Integrations** is a section of [Settings](#settings): a row for each service omp's sessions reach through an MCP server, Linear, Slack, and Google Calendar so far.
+- **Integrations** is a section of [Settings](#settings): a row for each service omp's sessions reach through an MCP server, Linear, Slack, Google Calendar, and Gmail so far.
   **Connected** lists the services that hold a sign-in, working or not, and **Available** lists the rest.
 - Each MCP row shows whether omp is connected, by listing the server's tools with omp's sign-in: **Connected** with the server's host and the number of tools, which unfolds to their names, **Needs reconnecting** when the server refuses the sign-in, **Unreachable** with the server's error and **Check again**, or **Not connected** or **Signed out** when omp has no server or no sign-in for it.
-  An unconfigured Slack or Google Calendar row says **Not set up** until its OAuth client is saved.
+  An unconfigured Slack, Google Calendar, or Gmail row says **Not set up** until its OAuth client is saved.
   The section checks again every minute while it is open, and **Refresh** checks at once.
-- **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, `https://mcp.slack.com/mcp`, or `https://calendarmcp.googleapis.com/mcp/v1`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
+- **Connect** signs in the way omp's `/mcp reauth` does, saves the sign-in in omp's credentials, and adds the service's MCP server, such as `https://mcp.linear.app/mcp`, `https://mcp.slack.com/mcp`, `https://calendarmcp.googleapis.com/mcp/v1`, or `https://gmailmcp.googleapis.com/mcp/v1`, to `~/.omp/agent/mcp.json` when omp has none, so new omp sessions can use its tools too.
   Linear sends the browser back to `localhost:3000`, so that port must be free while you sign in.
   Slack sends the browser to the HTTPS redirect saved for the app, and omp listens for HTTP on the saved callback port.
-  Google Calendar sends the browser back to `localhost` on the saved callback port, 3119 unless you change it.
+  Google Calendar and Gmail send the browser back to `localhost` on the saved callback port, 3119 unless you change it.
   While it waits, the row says so, links to the sign-in page again, and hides its other buttons.
 - A connected row's ⋯ menu holds **Reconnect**, which signs in again over a sign-in that the server refused or that still works, and **Sign out**.
   **Sign out** asks first, then removes the sign-ins omp manages for the service, as omp's `/mcp unauth` does, so omp's sessions lose its tools too; the server stays in `mcp.json`.
@@ -750,6 +751,12 @@ An action that fails shows its error, and its control becomes available again.
   omp stores the secret in that server's entry in `~/.omp/agent/mcp.json`, and the secret, client-change, and **Replace OAuth client** rules are Slack's.
   Once connected, the row lists the calendars checked in Google Calendar's own list, in their colors, with why the last read of one failed; one you unchecked in the Calendar page's sidebar shows muted and says **Hidden on the Calendar page**.
   Google Calendar's MCP tools answer omp's sessions only when the client's Google Cloud project is in Google's Workspace Developer Preview Program; the Calendar page reads Google's Calendar API and does not need it.
+- Gmail shows **Not set up** and **Set up** until its OAuth client is saved, and its form is Google Calendar's.
+  In a [Google Cloud project](https://console.cloud.google.com/apis/library/gmail.googleapis.com), turn on the Gmail API.
+  Under [Credentials](https://console.cloud.google.com/apis/credentials), create an OAuth client ID of type **Web application**, and add `http://localhost:3119/callback`, with your callback port, as an authorized redirect URI; the client you made for Google Calendar works too.
+  Paste the client ID and secret, then **Connect**; Google asks you to grant reading your email, and nothing that sends, deletes, or changes it.
+  omp stores the secret in the Gmail server's entry in `~/.omp/agent/mcp.json`, apart from Google Calendar's, and the secret, client-change, and **Replace OAuth client** rules are Slack's.
+  Gmail's MCP tools answer omp's sessions only when the client's Google Cloud project is in Google's Workspace Developer Preview Program; the Inbox page reads Google's Gmail API and does not need it.
 
 ## Todo list
 
@@ -892,6 +899,18 @@ An action that fails shows its error, and its control becomes available again.
   A calendar unchecked in Google Calendar's own list is not listed; check it there first.
   The page leaves out canceled events, the ones you declined, and working locations, repeats multi-day events on each day, and refreshes the open month every minute.
 
+## Inbox
+
+- The **Inbox** tab, G then I, or an `#inbox` address shows the latest 50 conversations of your Gmail inbox in place of the panes, newest first, as Gmail lists them.
+  The tab and its shortcut show only once Gmail is connected in **Settings › Integrations**; see [Integrations](#integrations).
+  The sidebar then shows your Gmail address over one **Inbox** row with how many conversations are unread.
+- Each row shows who sent the conversation's last message, how many messages it holds when more than one, its subject and a snippet, and when its last message arrived: the time today, the day earlier this year, and the full date before.
+  An unread conversation is bold, with a blue dot before it, and the header counts them beside your address.
+- Click a row to open the conversation in Gmail in a new tab, signed in as the inbox's address.
+  The page only reads your mail: it never sends, deletes, labels, or marks a conversation read, so reading one in Gmail is what marks it read.
+- The page reads Gmail again every minute while it is open, and **Refresh** asks Gmail at once; the server keeps each read for a minute.
+  While Gmail is not connected, or its sign-in stops working, the page shows Gmail's row from **Settings › Integrations** to connect from there.
+
 ## Routines
 
 - A routine starts sessions, or runs a shell command, on one or more schedules.
@@ -985,7 +1004,7 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Settings
 
-- **Settings** is the last sidebar tab, after **Calendar**.
+- **Settings** is the last sidebar tab, after **Calendar** and, once Gmail is connected, **Inbox**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
   The sidebar lists seven sections in two groups.
@@ -1048,7 +1067,7 @@ An action that fails shows its error, and its control becomes available again.
   Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request, a Linear issue, or a todo, then sends its first message through that skill.
   The picker lists the skills of the workspace that Settings opened on, and says which, or your own skills with **User files only**.
   Choose **None** to unpin.
-- **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar; see [Integrations](#integrations).
+- **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar and Gmail; see [Integrations](#integrations).
 - **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer.
   Type a path in **Directory** and choose **Add workspace** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
@@ -1130,6 +1149,7 @@ Alt is Option on macOS.
 | Cmd+4 | Anywhere | Go to your todo list |
 | Cmd+5 | Anywhere | Go to your calendar |
 | Cmd+6 | Anywhere | Open or close settings |
+| G then I | Outside text fields | Go to your Gmail inbox, when connected |
 | G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Go to your projects |
 | G then W | Outside text fields | Choose the sidebar's workspace |
@@ -1155,6 +1175,7 @@ Alt is Option on macOS.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, and the Calendar page's **New event**.
 - Cmd+1 through Cmd+5 select the dashboard's tabs, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers stay fixed when Tickets is hidden without a Linear connection; Cmd+2 then keeps its browser behavior.
+  The **Inbox** tab takes no number, so G then I opens it.
   Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or another digit keeps its browser behavior.
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.
@@ -1194,8 +1215,8 @@ Alt is Option on macOS.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in this browser.
 - Cmd+1 opens the Pull requests page, and Cmd+2 opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page but the Todo and Calendar pages, where it adds a todo or an event.
-  Cmd+3 goes back from the Pull requests page, the todo list, the calendar, the routines, Settings, or the new-session draft to the panes.
-  Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, G then R the **Routines** page, and G then P the **Projects** page.
+  Cmd+3 goes back from the Pull requests page, the todo list, the calendar, the inbox, the routines, Settings, or the new-session draft to the panes.
+  Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, G then I the **Inbox** page when connected to Gmail, G then R the **Routines** page, and G then P the **Projects** page.
   Cmd+6 opens Settings, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.

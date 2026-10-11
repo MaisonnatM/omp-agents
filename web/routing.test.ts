@@ -8,6 +8,7 @@ import {
 	hashForChanges,
 	hashForPullRequests,
 	hashForLayout,
+	hashForPage,
 	hashForNewSession,
 	hashForPullRequestFiles,
 	hashForProjects,
@@ -161,6 +162,13 @@ describe("layout hash", () => {
 		expect(routeFromHash(`#routines/${id}`)).toEqual({ kind: "page", page: { kind: "routines", target: id } });
 		expect(routeFromHash("#routines/")).toEqual({ kind: "page", page: { kind: "routines", target: null } });
 		expect(routeFromHash("#routinesx").kind).toBe("panes");
+	});
+
+	test("the inbox hash opens the Inbox page, a trailing path still opens it, and it is not read as a layout", () => {
+		expect(hashForPage({ kind: "inbox" })).toBe("#inbox");
+		expect(routeFromHash("#inbox")).toEqual({ kind: "page", page: { kind: "inbox" } });
+		expect(routeFromHash("#inbox/anything")).toEqual({ kind: "page", page: { kind: "inbox" } });
+		expect(routeFromHash("#inboxes").kind).toBe("panes");
 	});
 
 	test("the projects hash opens the list, the New project form, or one project, and round-trips an id", () => {

@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar and the events kept on this computer, prompt images, and the text files agent text names through.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, and the text files agent text names through.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { join } from "node:path";
@@ -10,6 +10,7 @@ import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import { gitCheckout } from "../git";
 import type { GoogleCalendarClient } from "../google-calendar";
+import type { GmailClient } from "../gmail";
 import { loadPullRequests, loadPullRequestDetail } from "../pull-requests";
 import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
 import { blobsDir } from "../omp/config";
@@ -24,7 +25,7 @@ import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
-import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
+import { GOOGLE_SERVICES, type GoogleService, type McpIntegration, type McpIntegrationId } from "../shared/accounts";
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
@@ -86,6 +87,7 @@ export interface RouteEnv {
 	guards: Guards;
 	sessions: SessionRoutesEnv;
 	calendar: CalendarRoutesEnv;
+	gmail: GmailClient;
 	files: FileRoutesEnv;
 }
 
@@ -286,11 +288,13 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 	/** `PUT /api/integrations/sign-out`: removes the sign-ins omp manages for the integration's server, as `/mcp unauth` does; its config stays. */
 	const integrationSignOut = integrationWrite(signOutIntegration);
 
-	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app; a client the MCP config cannot take is a 400. */
-	const slackClient = write(body => checked(parseSlackClient(body)), saveSlackClient, err => (err instanceof ClientConfigError ? fail(400, err.message) : null));
+	const refuseClient = (err: unknown): Response | null => (err instanceof ClientConfigError ? fail(400, err.message) : null);
 
-	/** `PUT /api/integrations/google-calendar/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client; a client the MCP config cannot take is a 400. */
-	const googleClient = write(body => checked(parseGoogleClient(body)), saveGoogleClient, err => (err instanceof ClientConfigError ? fail(400, err.message) : null));
+	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app. */
+	const slackClient = write(body => checked(parseSlackClient(body)), saveSlackClient, refuseClient);
+
+	/** `PUT /api/integrations/<google-calendar|gmail>/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client for that service. */
+	const googleClient = (id: GoogleService): Handler => write(body => checked(parseGoogleClient(body)), input => saveGoogleClient(id, input), refuseClient);
 
 	/** `GET /api/tickets[?fresh]`: the viewer's assigned Linear issues, or why they could not be read. */
 	const tickets = get(params => answer(() => loadTickets(params.has("fresh"))));
@@ -342,7 +346,7 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
 		"/api/integrations/sign-out": { PUT: integrationSignOut },
 		"/api/integrations/slack/client": { PUT: slackClient },
-		"/api/integrations/google-calendar/client": { PUT: googleClient },
+		...Object.fromEntries(GOOGLE_SERVICES.map(id => [`/api/integrations/${id}/client`, { PUT: googleClient(id) }])),
 		"/api/tickets": { GET: tickets },
 		"/api/linear/teams": { GET: teams },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },
@@ -416,6 +420,13 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 		"/api/calendar/local": { GET: localCalendarEvents },
 		"/api/calendar/local/remove": { PUT: localEventRemove },
 	};
+}
+
+/** Your Gmail inbox, read only. */
+function gmailRoutes({ get }: RouteKit, gmail: GmailClient): Routes {
+	/** `GET /api/gmail/inbox[?fresh]`: the signed-in address and its inbox's latest conversations. */
+	const inbox = get(params => answer(() => gmail.inbox(params.has("fresh"))));
+	return { "/api/gmail/inbox": { GET: inbox } };
 }
 
 /** GitHub pull requests in full: details, stack, options, edits, and their changed files. */
@@ -546,6 +557,7 @@ export function createRoutes(env: RouteEnv): Routes {
 		...sessionRoutes(kit, env.sessions),
 		...integrationRoutes(kit),
 		...calendarRoutes(kit, env.calendar),
+		...gmailRoutes(kit, env.gmail),
 		...pullRequestRoutes(kit),
 		...fileRoutes(kit, env.files),
 	};

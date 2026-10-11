@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { GoogleCalendarClient, type GoogleFetch } from "./google-calendar";
+import { GoogleCalendarClient } from "./google-calendar";
+import type { GoogleFetch } from "./integrations";
 
 const OCTOBER = [new Date("2026-10-01T00:00:00+02:00"), new Date("2026-11-01T00:00:00+01:00")] as const;
 

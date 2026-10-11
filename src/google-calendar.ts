@@ -5,8 +5,8 @@
  * tools answer only for OAuth clients in Google's Developer Preview Program.
  */
 import { type Cache, createCache } from "./cache";
+import type { GoogleFetch } from "./integrations";
 import { errorText, isObject, nonEmptyStr, str } from "./json";
-import type { JsonPost } from "./omp/mcp";
 import type { CalendarEvent, CalendarEventsAnswer, EventWhen, GoogleCalendar, GoogleStatus } from "./shared/calendar";
 
 const API = "https://www.googleapis.com/calendar/v3";
@@ -14,9 +14,6 @@ const API = "https://www.googleapis.com/calendar/v3";
 /** Google Calendar's default calendar color, for a list entry that names none. */
 const DEFAULT_COLOR = "#039be5";
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
-
-/** Calls a Google Calendar API address with your sign-in: reads its JSON, or with `init` posts its body as JSON and reads the answer. */
-export type GoogleFetch = (url: string, init?: JsonPost) => Promise<unknown>;
 
 /** A calendar list entry as Google Calendar lists it, before the Calendar page's own checkbox and last read. */
 type ListedCalendar = Omit<GoogleCalendar, "shown" | "error">;
