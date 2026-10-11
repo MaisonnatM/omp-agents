@@ -1,17 +1,32 @@
-/** Local days as todos, tickets, and the calendar name them: `YYYY-MM-DD`, which sorts as the days do. */
+/** Local days as todos, tickets, and the calendar name them: `YYYY-MM-DD`, which sorts as the days do; and the `HH:MM` of a time input. */
+
+const pad = (n: number): string => String(n).padStart(2, "0");
 
 /** The day of `at` in the browser's time zone. */
 export function localDay(at: number | Date = new Date()): string {
 	const date = new Date(at);
-	const pad = (n: number): string => String(n).padStart(2, "0");
 	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** `minutes` after midnight as an `<input type="time">` value, `HH:MM`. */
+export const timeInputValue = (minutes: number): string => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
+
+/** The minutes after midnight of an `<input type="time">` value, `HH:MM`, or `null` for a cleared one. */
+export function minutesOfTimeInput(value: string): number | null {
+	const match = /^(\d{2}):(\d{2})$/.exec(value);
+	return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+/** The local midnight that starts `day`, `YYYY-MM-DD`. */
+export function dateOfDay(day: string): Date {
+	const [y, m, d] = day.split("-").map(Number);
+	return new Date(y!, m! - 1, d!);
 }
 
 /** Every day from `first` to `last`, both included; none when `last` comes first. */
 export function daysBetween(first: string, last: string): string[] {
 	const days: string[] = [];
-	const [y, m, d] = first.split("-").map(Number);
-	for (const date = new Date(y!, m! - 1, d!); ; date.setDate(date.getDate() + 1)) {
+	for (const date = dateOfDay(first); ; date.setDate(date.getDate() + 1)) {
 		const day = localDay(date);
 		if (day > last) return days;
 		days.push(day);

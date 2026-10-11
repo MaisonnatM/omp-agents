@@ -1,9 +1,25 @@
-/** What the Calendar page shows on each day of a month: Google events, routine runs, past and planned, and todos and tickets on the day they are due. */
+/** What the Calendar page shows on each day of a month: Google events and events kept on this computer, routine runs, past and planned, and todos and tickets on the day they are due. */
 import { nextDueAt, type Routine, type RoutineRun } from "../src/routines";
-import type { CalendarEvent } from "../src/shared/accounts";
+import type { CalendarEvent, EventWhen, LocalEvent } from "../src/shared/calendar";
 import type { Ticket, TicketStatusType } from "../src/shared/tickets";
 import type { UserTodoList } from "../src/user-todos-shared";
 import { daysBetween, localDay } from "./days";
+
+/** The one color of the events kept on this computer, a neutral slate. */
+const LOCAL_EVENT_COLOR = "#64748b";
+
+/** An event as the page shows it, from one of your Google calendars or kept on this computer. */
+export interface ShownEvent {
+	id: string;
+	title: string;
+	when: EventWhen;
+	/** Its calendar's color, `#rrggbb`. */
+	color: string;
+	/** Where it lives: its Google calendar's name, or `This computer`. */
+	place: string;
+	/** A Google event's page in Google Calendar, or the id that removes an event kept on this computer. */
+	source: { kind: "google"; url: string } | { kind: "local"; id: string };
+}
 
 /** One thing on one day; `day` is the local day, `YYYY-MM-DD`, and `at` its time, `null` for one without. */
 export type CalendarEntry =
@@ -13,8 +29,8 @@ export type CalendarEntry =
 	| { kind: "routine-interval"; day: string; at: null; routineId: string; name: string; minutes: number }
 	| { kind: "todo"; day: string; at: null; todoId: string; categoryId: string | null; text: string; done: boolean }
 	| { kind: "ticket"; day: string; at: null; identifier: string; title: string; status: string; statusType: TicketStatusType }
-	/** One day of a Google event, timed on its first day; an event across days shows on each. */
-	| { kind: "event"; day: string; at: number | null; event: CalendarEvent };
+	/** One day of an event, timed on its first day; an event across days shows on each. */
+	| { kind: "event"; day: string; at: number | null; event: ShownEvent };
 
 export interface CalendarSources {
 	routines: Routine[];
@@ -24,6 +40,8 @@ export interface CalendarSources {
 	tickets: Ticket[] | null;
 	/** `null` while Google Calendar is not connected or not read yet. */
 	events: CalendarEvent[] | null;
+	/** `null` until the server sends them. */
+	localEvents: LocalEvent[] | null;
 }
 
 const DAY_MINUTES = 1440;
@@ -60,21 +78,28 @@ function routineEntries(routine: Routine, from: number, to: number, now: number)
 	return entries;
 }
 
-/** The days of `event` from `first` through `last`, the month's first and last days. */
-function eventEntries(event: CalendarEvent, first: string, last: string): CalendarEntry[] {
-	const { when } = event;
+/** The days of an event that happens `when`, from `first` through `last`, the month's first and last days, a timed event's time on its first day. */
+function eventDays(when: EventWhen, first: string, last: string): { day: string; at: number | null }[] {
 	const start = when.allDay ? when.firstDay : localDay(when.start);
 	const end = when.allDay ? when.lastDay : localDay(when.end - 1);
-	return daysBetween(start < first ? first : start, end > last ? last : end).map(day => ({ kind: "event", day, at: when.allDay || day !== start ? null : when.start, event }));
+	return daysBetween(start < first ? first : start, end > last ? last : end).map(day => ({ day, at: when.allDay || day !== start ? null : when.start }));
 }
 
 /** Everything the month of `year` and `month` (0 for January) holds, by day, then by time with the untimed first. */
-export function calendarEntries({ routines, todos, tickets, events }: CalendarSources, year: number, month: number, now: number): CalendarEntry[] {
+export function calendarEntries({ routines, todos, tickets, events, localEvents }: CalendarSources, year: number, month: number, now: number): CalendarEntry[] {
 	const from = new Date(year, month, 1).getTime();
 	const to = new Date(year, month + 1, 1).getTime();
 	const [first, end] = [localDay(from), localDay(to)];
+	const last = localDay(to - 1);
 	const inMonth = (day: string | null): day is string => day !== null && day >= first && day < end;
-	const entries = [...routines.flatMap(routine => routineEntries(routine, from, to, now)), ...(events ?? []).flatMap(event => eventEntries(event, first, localDay(to - 1)))];
+	const shown: ShownEvent[] = [
+		...(events ?? []).map(({ id, title, when, color, calendar, url }): ShownEvent => ({ id, title, when, color, place: calendar, source: { kind: "google", url } })),
+		...(localEvents ?? []).map(({ id, title, when }): ShownEvent => ({ id, title, when, color: LOCAL_EVENT_COLOR, place: "This computer", source: { kind: "local", id } })),
+	];
+	const entries: CalendarEntry[] = [
+		...routines.flatMap(routine => routineEntries(routine, from, to, now)),
+		...shown.flatMap(event => eventDays(event.when, first, last).map((slot): CalendarEntry => ({ kind: "event", ...slot, event }))),
+	];
 	for (const todo of todos?.todos ?? []) {
 		for (const item of [todo, ...todo.children]) {
 			if (inMonth(item.due)) entries.push({ kind: "todo", day: item.due, at: null, todoId: item.id, categoryId: todo.categoryId, text: item.text, done: item.doneAt !== null });

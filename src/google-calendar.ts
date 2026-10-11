@@ -1,12 +1,13 @@
 /**
- * Google Calendar, read-only: the calendars checked in your Google Calendar's list and their events, which the Calendar
- * page lists unless you unchecked a calendar there. It reads Google's Calendar API with the token omp holds for its
- * Google Calendar MCP server, the same sign-in and scopes: the server's own tools answer only for OAuth clients in
- * Google's Developer Preview Program.
+ * Google Calendar: the calendars checked in your Google Calendar's list and their events, which the Calendar page lists
+ * unless you unchecked a calendar there, and the events it adds to the calendars you may write to. It calls Google's
+ * Calendar API with the token omp holds for its Google Calendar MCP server, the same sign-in and scopes: the server's own
+ * tools answer only for OAuth clients in Google's Developer Preview Program.
  */
-import { createCache } from "./cache";
+import { type Cache, createCache } from "./cache";
 import { errorText, isObject, nonEmptyStr, str } from "./json";
-import type { CalendarEvent, CalendarEventsAnswer, GoogleCalendar, GoogleStatus } from "./shared/accounts";
+import type { JsonPost } from "./omp/mcp";
+import type { CalendarEvent, CalendarEventsAnswer, EventWhen, GoogleCalendar, GoogleStatus } from "./shared/calendar";
 
 const API = "https://www.googleapis.com/calendar/v3";
 
@@ -14,8 +15,8 @@ const API = "https://www.googleapis.com/calendar/v3";
 const DEFAULT_COLOR = "#039be5";
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
-/** Reads the JSON at a Google Calendar API address with your sign-in. */
-export type GoogleGet = (url: string) => Promise<unknown>;
+/** Calls a Google Calendar API address with your sign-in: reads its JSON, or with `init` posts its body as JSON and reads the answer. */
+export type GoogleFetch = (url: string, init?: JsonPost) => Promise<unknown>;
 
 /** A calendar list entry as Google Calendar lists it, before the Calendar page's own checkbox and last read. */
 type ListedCalendar = Omit<GoogleCalendar, "shown" | "error">;
@@ -31,11 +32,21 @@ function calendarOf(item: unknown): ListedCalendar | null {
 		name: nonEmptyStr(item.summaryOverride) ?? nonEmptyStr(item.summary) ?? id,
 		color: color && HEX_COLOR.test(color) ? color : DEFAULT_COLOR,
 		group: item.accessRole === "owner" ? "mine" : "other",
+		writable: item.accessRole === "owner" || item.accessRole === "writer",
 	};
 }
 
-/** The day before `day`, both `YYYY-MM-DD`. */
-const dayBefore = (day: string): string => new Date(Date.parse(`${day}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+/** The day `days` after `day`, both `YYYY-MM-DD`; a negative `days` goes back. */
+const dayPlus = (day: string, days: number): string => new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+
+/** An all-day event's day, or a timed event's ISO time, as Google's `start` and `end` take them. */
+type GoogleTime = { date: string } | { dateTime: string };
+
+/** `when` as Google's `start` and `end`, whose all-day end is the day after the last. */
+const googleTimes = (when: EventWhen): { start: GoogleTime; end: GoogleTime } =>
+	when.allDay
+		? { start: { date: when.firstDay }, end: { date: dayPlus(when.lastDay, 1) } }
+		: { start: { dateTime: new Date(when.start).toISOString() }, end: { dateTime: new Date(when.end).toISOString() } };
 
 /**
  * One event as the page shows it, or `null` for one Google Calendar hides or draws apart: canceled, declined by you,
@@ -58,26 +69,29 @@ function eventOf(item: unknown, calendar: ListedCalendar): CalendarEvent | null 
 	if (firstDay) {
 		// Google ends an all-day event on the day after it.
 		const end = str(item.end.date);
-		return { ...event, when: { allDay: true, firstDay, lastDay: end && end > firstDay ? dayBefore(end) : firstDay } };
+		return { ...event, when: { allDay: true, firstDay, lastDay: end && end > firstDay ? dayPlus(end, -1) : firstDay } };
 	}
 	const start = Date.parse(str(item.start.dateTime) ?? "");
 	const end = Date.parse(str(item.end.dateTime) ?? "");
 	return end > start ? { ...event, when: { allDay: false, start, end } } : null;
 }
 
-/** The calendars your Google Calendar shows, and the events of those the Calendar page shows, each read at most once a minute. */
-export class GoogleCalendarReader {
-	readonly #get: GoogleGet;
+/**
+ * The calendars your Google Calendar shows, and the events of those the Calendar page shows, each read at most once a
+ * minute, and the events it adds.
+ */
+export class GoogleCalendarClient {
+	readonly #fetch: GoogleFetch;
 	/** The ids of the calendars the Calendar page's sidebar unchecked. */
 	readonly #hidden: () => ReadonlySet<string>;
 	readonly #lists = createCache<ListedCalendar[]>(60_000);
-	/** Each calendar's events by calendar and span. */
-	readonly #reads = createCache<CalendarEvent[]>(60_000);
+	/** Each calendar's events by its id, then by `<timeMin> <timeMax>`. */
+	readonly #reads = new Map<string, Cache<CalendarEvent[]>>();
 	/** Why each calendar's last read failed, by its id. */
 	readonly #errors = new Map<string, string>();
 
-	constructor(get: GoogleGet, hidden: () => ReadonlySet<string>) {
-		this.#get = get;
+	constructor(fetch: GoogleFetch, hidden: () => ReadonlySet<string>) {
+		this.#fetch = fetch;
 		this.#hidden = hidden;
 	}
 
@@ -85,7 +99,7 @@ export class GoogleCalendarReader {
 	async #items(url: URL): Promise<unknown[]> {
 		const items: unknown[] = [];
 		for (;;) {
-			const page = await this.#get(url.toString());
+			const page = await this.#fetch(url.toString());
 			if (!isObject(page)) throw new Error("Google Calendar answered something other than a list");
 			if (Array.isArray(page.items)) items.push(...page.items);
 			const next = nonEmptyStr(page.nextPageToken);
@@ -114,8 +128,10 @@ export class GoogleCalendarReader {
 
 	#events(calendar: ListedCalendar, from: Date, to: Date, fresh: boolean): Promise<CalendarEvent[]> {
 		const [timeMin, timeMax] = [from.toISOString(), to.toISOString()];
-		return this.#reads.get(
-			`${calendar.id} ${timeMin} ${timeMax}`,
+		let reads = this.#reads.get(calendar.id);
+		if (!reads) this.#reads.set(calendar.id, (reads = createCache<CalendarEvent[]>(60_000)));
+		return reads.get(
+			`${timeMin} ${timeMax}`,
 			async () => {
 				const url = new URL(`${API}/calendars/${encodeURIComponent(calendar.id)}/events`);
 				for (const [key, value] of Object.entries({ singleEvents: "true", orderBy: "startTime", timeMin, timeMax, maxResults: "2500" })) url.searchParams.set(key, value);
@@ -151,5 +167,17 @@ export class GoogleCalendarReader {
 		const read = lists.filter(list => list !== null);
 		if (read.length === 0) throw new Error(this.#errors.get(calendars[0]!.id));
 		return { events: read.flat() };
+	}
+
+	/**
+	 * Adds an event titled `title` to calendar `calendarId`, which must be checked in your Google Calendar's list and one you
+	 * may write to. The next read of that calendar's events asks Google again, so it shows the event.
+	 */
+	async create(calendarId: string, title: string, when: EventWhen): Promise<void> {
+		const calendar = (await this.#calendars(false)).find(listed => listed.id === calendarId);
+		if (!calendar) throw new Error("That calendar is not checked in your Google Calendar's list. Check it there to add events to it.");
+		if (!calendar.writable) throw new Error(`You may only read ${calendar.name}, so it takes no new events. Pick a calendar you own or may edit.`);
+		await this.#fetch(`${API}/calendars/${encodeURIComponent(calendarId)}/events`, { method: "POST", body: { summary: title, ...googleTimes(when) } });
+		this.#reads.delete(calendarId);
 	}
 }

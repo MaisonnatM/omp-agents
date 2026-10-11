@@ -1,7 +1,8 @@
 import { RefreshCw } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { callable, type GoogleStatus, type IntegrationsAnswer, MCP_INTEGRATIONS, signedIn } from "../../../src/shared/accounts";
+import { callable, type IntegrationsAnswer, MCP_INTEGRATIONS, signedIn } from "../../../src/shared/accounts";
+import type { GoogleStatus } from "../../../src/shared/calendar";
 import { readTime } from "../../labels";
 import type { PolledEntry } from "../../polled-store";
 import { googleStore, integrationsStore } from "../../reads";

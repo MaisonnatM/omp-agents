@@ -6,7 +6,8 @@
  */
 import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
-import { type CalendarShownInput, GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
+import { GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
+import { type CalendarShownInput, type EventWhen, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar } from "../shared/calendar";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
@@ -452,6 +453,34 @@ export const parseIntegrationId = (body: unknown): Parsed<McpIntegrationId> => (
 /** The body of `PUT /api/google/calendars`: `{ id, shown }`, a Google calendar's id and whether the Calendar page shows it. */
 export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>
 	isObject(body) && isNonEmpty(body.id) && typeof body.shown === "boolean" ? { ok: { id: body.id, shown: body.shown } } : null;
+
+const isTime = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value);
+
+/** An event's days or times: all-day days that do not run backward, or a timed span that ends after it starts. */
+export function parseEventWhen(value: unknown): EventWhen | null {
+	if (!isObject(value)) return null;
+	if (value.allDay === true) return isDay(value.firstDay) && isDay(value.lastDay) && value.lastDay >= value.firstDay ? { allDay: true, firstDay: value.firstDay, lastDay: value.lastDay } : null;
+	if (value.allDay === false) return isTime(value.start) && isTime(value.end) && value.end > value.start ? { allDay: false, start: value.start, end: value.end } : null;
+	return null;
+}
+
+function parseNewEventCalendar(value: unknown): NewEventCalendar | null {
+	if (!isObject(value)) return null;
+	if (value.kind === "local") return { kind: "local" };
+	return value.kind === "google" && isNonEmpty(value.calendarId) ? { kind: "google", calendarId: value.calendarId } : null;
+}
+
+/** The body of `PUT /api/calendar/events/new`: a trimmed title of at most {@link MAX_EVENT_TITLE} characters, when it happens, and the calendar it goes in. */
+export function parseNewEvent(body: unknown): Parsed<NewEvent> {
+	if (!isObject(body) || !isNonEmpty(body.title)) return null;
+	const title = body.title.trim();
+	const when = parseEventWhen(body.when);
+	const calendar = parseNewEventCalendar(body.calendar);
+	return title.length <= MAX_EVENT_TITLE && when && calendar ? { ok: { title, when, calendar } } : null;
+}
+
+/** The body of `PUT /api/calendar/local/remove`: `{ id }` of an event kept on this computer. */
+export const parseLocalEventId = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.id) ? { ok: body.id } : null);
 
 const validPort = (port: unknown): port is number => typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
 

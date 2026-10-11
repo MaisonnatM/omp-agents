@@ -4,7 +4,7 @@ import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseCalendarShown, parseClientMsg, parseGoogleClient, parseIntegrationId, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
+import { parseCalendarShown, parseClientMsg, parseGoogleClient, parseIntegrationId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -386,6 +386,39 @@ describe("parseCalendarShown", () => {
 		expect(parseCalendarShown({ id: "", shown: true })).toBeNull();
 		expect(parseCalendarShown({ id: "max@example.com", shown: "false" })).toBeNull();
 		expect(parseCalendarShown({ id: "max@example.com" })).toBeNull();
+	});
+});
+
+describe("parseNewEvent", () => {
+	const timed = { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") };
+
+	test("takes a trimmed title, all-day days or a timed span, and this computer or a Google calendar", () => {
+		expect(parseNewEvent({ title: "  Offsite ", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" }, calendar: { kind: "local" }, extra: 1 })?.ok).toEqual({
+			title: "Offsite",
+			when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" },
+			calendar: { kind: "local" },
+		});
+		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "google", calendarId: "max@example.com" } })?.ok).toEqual({
+			title: "Retro",
+			when: { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") },
+			calendar: { kind: "google", calendarId: "max@example.com" },
+		});
+		expect(parseNewEvent({ title: "One day", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-14" }, calendar: { kind: "local" } })?.ok.title).toBe("One day");
+	});
+
+	test("refuses an empty or overlong title, an end at or before the start, a last day before the first, a bad day, or an unknown calendar", () => {
+		const local = { kind: "local" };
+		expect(parseNewEvent({ title: "  ", when: timed, calendar: local })).toBeNull();
+		expect(parseNewEvent({ title: "x".repeat(501), when: timed, calendar: local })).toBeNull();
+		expect(parseNewEvent({ title: "Retro", when: { ...timed, end: timed.start }, calendar: local })).toBeNull();
+		expect(parseNewEvent({ title: "Retro", when: { ...timed, end: timed.start - 1 }, calendar: local })).toBeNull();
+		expect(parseNewEvent({ title: "Retro", when: { ...timed, start: 1.5 }, calendar: local })).toBeNull();
+		expect(parseNewEvent({ title: "Trip", when: { allDay: true, firstDay: "2026-10-15", lastDay: "2026-10-14" }, calendar: local })).toBeNull();
+		expect(parseNewEvent({ title: "Trip", when: { allDay: true, firstDay: "2026-02-30", lastDay: "2026-03-01" }, calendar: local })).toBeNull();
+		expect(parseNewEvent({ title: "Trip", when: { allDay: true, firstDay: "14/10/2026", lastDay: "2026-10-15" }, calendar: local })).toBeNull();
+		expect(parseNewEvent({ title: "Trip", when: { allDay: "yes", firstDay: "2026-10-14", lastDay: "2026-10-15" }, calendar: local })).toBeNull();
+		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "google", calendarId: "" } })).toBeNull();
+		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "outlook" } })).toBeNull();
 	});
 });
 

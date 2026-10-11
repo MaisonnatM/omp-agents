@@ -225,12 +225,20 @@ async function request(server: McpServer, method: string, params: Record<string,
 	return response.result;
 }
 
+/** A POST of `body` as JSON, for {@link callWithMcpSignIn}. */
+export interface JsonPost {
+	method: "POST";
+	body: unknown;
+}
+
 /**
- * The JSON at `url`, an API of the service behind `server` that takes the same OAuth token, read with omp's sign-in.
- * Throws {@link McpRefused} on 401, and the API's own `error.message` on another failure.
+ * The JSON at `url`, an API of the service behind `server` that takes the same OAuth token, called with omp's sign-in:
+ * a GET, or with `init` a POST of its body as JSON. Throws {@link McpRefused} on 401, and the API's own `error.message` on another failure.
  */
-export async function readWithMcpSignIn(server: McpServer, url: string): Promise<unknown> {
-	const response = await fetch(url, { headers: { Authorization: `Bearer ${await tokenOf(server.credentialId)}` }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+export async function callWithMcpSignIn(server: McpServer, url: string, init?: JsonPost): Promise<unknown> {
+	const headers: Record<string, string> = { Authorization: `Bearer ${await tokenOf(server.credentialId)}` };
+	const call: RequestInit = init ? { method: init.method, headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(init.body) } : { headers };
+	const response = await fetch(url, { ...call, signal: AbortSignal.timeout(TIMEOUT_MS) });
 	if (response.status === 401) throw refused(server);
 	const text = await response.text();
 	if (response.ok) return toolJson(new URL(url).host, "API", text);

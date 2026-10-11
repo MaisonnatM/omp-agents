@@ -46,6 +46,7 @@ export type ShortcutId =
 	| "todoDue"
 	| "todoNew"
 	| "todoClose"
+	| "calendarNewEvent"
 	| "nextChangedFile"
 	| "previousChangedFile"
 	| "moveUp"
@@ -149,7 +150,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	},
 	{ id: "pull-requests", label: "Go to Pull requests", command: "Go to pull requests", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
 	{ id: "tickets", label: "Go to your Linear tickets", command: "Go to tickets", keys: [{ chord: { key: "2", mod: true }, scope: "anywhere" }] },
-	{ id: "newTicket", label: "Create a Linear ticket, except on the Todo page", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "newTicket", label: "Create a Linear ticket, except on the Todo and Calendar pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "sessions", label: "Go to the sessions", command: "Go to sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },
 	{ id: "todo", label: "Go to your todo list", command: "Go to todo list", keys: [{ chord: { key: "4", mod: true }, scope: "anywhere" }] },
 	{ id: "calendar", label: "Go to your calendar", command: "Go to calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },
@@ -172,6 +173,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoDue", label: "Change the focused or open todo's due day", keys: [{ chord: { key: "d", shift: true }, scope: "outside-fields" }] },
 	{ id: "todoNew", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
+	{ id: "calendarNewEvent", label: "Calendar: add an event", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "nextChangedFile", label: "Changes: open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "moveUp", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },

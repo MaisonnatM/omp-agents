@@ -1,4 +1,4 @@
-/** The integrations: omp's MCP sign-ins, and the Google calendar events the Google Calendar sign-in reads. */
+/** The integrations: omp's MCP sign-ins and the OAuth clients they use. */
 
 /** A sign-in that the integrations page started: waiting for the browser at the provider's authorization `url`, or why it failed. */
 export type SignInState = { phase: "waiting"; url: string } | { phase: "failed"; error: string } | null;
@@ -174,51 +174,4 @@ export type McpIntegration<Id extends McpIntegrationId = McpIntegrationId> = {
 /** `GET /api/integrations[?fresh]`: every MCP integration by its id. */
 export interface IntegrationsAnswer {
 	integrations: { [K in McpIntegrationId]: McpIntegration<K> };
-}
-
-/** A calendar shown in your Google Calendar, which the Calendar page reads unless you unchecked it there. */
-export interface GoogleCalendar {
-	/** Google's id for it: your email for your main calendar, else an address Google made. */
-	id: string;
-	/** Its name in your calendar list. */
-	name: string;
-	/** Its color in your calendar list, `#rrggbb`. */
-	color: string;
-	/** Google Calendar's group for it: `mine` for a calendar you own, `other` for one you subscribed to or that others share. */
-	group: "mine" | "other";
-	/** Whether the Calendar page shows its events; `false` once you uncheck it in the page's sidebar. */
-	shown: boolean;
-	/** Why the last read of its events failed; `null` once one works. */
-	error: string | null;
-}
-
-/** `GET /api/google` and what `PUT /api/google/calendars` answers: the calendars checked in Google Calendar's own list. */
-export interface GoogleStatus {
-	calendars: GoogleCalendar[];
-}
-
-/** `PUT /api/google/calendars`: show or hide one calendar's events on the Calendar page. */
-export interface CalendarShownInput {
-	id: string;
-	shown: boolean;
-}
-
-/** An event of one of your Google calendars, read-only. */
-export interface CalendarEvent {
-	/** The calendar's id, a slash, and the event's; each repeat has its own event id. */
-	id: string;
-	title: string;
-	/** The calendar's name, as {@link GoogleCalendar} has it. */
-	calendar: string;
-	/** The calendar's color, `#rrggbb`. */
-	color: string;
-	/** The event in Google Calendar. */
-	url: string;
-	/** An all-day event's first and last days, `YYYY-MM-DD`, or a timed event's start and end, epoch milliseconds. */
-	when: { allDay: true; firstDay: string; lastDay: string } | { allDay: false; start: number; end: number };
-}
-
-/** `GET /api/calendar/events?from=<ISO time>&to=<ISO time>[&fresh]`: the events of your shown calendars that overlap that span. */
-export interface CalendarEventsAnswer {
-	events: CalendarEvent[];
 }

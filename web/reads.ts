@@ -1,7 +1,8 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
 import { useEffect, useMemo, useState } from "react";
 import { isObject } from "../src/json";
-import { type CalendarEventsAnswer, type GoogleStatus, type IntegrationsAnswer, MCP_INTEGRATIONS } from "../src/shared/accounts";
+import { callable, type IntegrationsAnswer, MCP_INTEGRATIONS } from "../src/shared/accounts";
+import type { CalendarEventsAnswer, GoogleCalendar, GoogleStatus, LocalEventsAnswer } from "../src/shared/calendar";
 import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
 import type { PullRequestList, RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
@@ -170,10 +171,10 @@ export const integrationsStore = createPolledStore<IntegrationsAnswer>({
 export const googleStore = createPolledStore<GoogleStatus>({
 	cacheKey: "omp-agents.google-cache",
 	url: (_, fresh) => `/api/google${fresh ? "?fresh" : ""}`,
-	// A read an older version kept has no `shown`, which would show every calendar unchecked until the first poll.
+	// A read an older version kept has no `shown` or `writable`, which would show every calendar unchecked, or none to add events to, until the first poll.
 	isValid: (value): value is GoogleStatus => {
 		const calendars = isObject(value) ? value.calendars : null;
-		return Array.isArray(calendars) && calendars.every(calendar => isObject(calendar) && typeof calendar.shown === "boolean");
+		return Array.isArray(calendars) && calendars.every(calendar => isObject(calendar) && typeof calendar.shown === "boolean" && typeof calendar.writable === "boolean");
 	},
 });
 
@@ -182,6 +183,24 @@ export const calendarEventsStore = createPolledStore<CalendarEventsAnswer>({
 	cacheKey: "omp-agents.calendar-events-cache",
 	url: (span, fresh) => `/api/calendar/events?${span}${fresh ? "&fresh" : ""}`,
 	isValid: (value): value is CalendarEventsAnswer => Array.isArray((value as Partial<CalendarEventsAnswer> | null)?.events),
+});
+
+/**
+ * Whether the dashboard can call Google Calendar, and the calendars checked in your Google Calendar's list, read every
+ * minute while it can; `calendars` is `null` while it cannot or before the first read.
+ */
+export function useGoogleCalendars(): { connected: boolean; calendars: GoogleCalendar[] | null } {
+	const connection = integrationsStore.usePolling().read?.data.integrations["google-calendar"].connection;
+	const connected = connection !== undefined && callable(connection);
+	const calendars = googleStore.usePolling(null, connected).read?.data.calendars ?? null;
+	return { connected, calendars: connected ? calendars : null };
+}
+
+/** Every event kept on this computer, which the Calendar page reads with or without Google Calendar. */
+export const localEventsStore = createPolledStore<LocalEventsAnswer>({
+	cacheKey: "omp-agents.local-events-cache",
+	url: () => "/api/calendar/local",
+	isValid: (value): value is LocalEventsAnswer => Array.isArray((value as Partial<LocalEventsAnswer> | null)?.events),
 });
 
 /** The {@link calendarEventsStore} scope of the month of `year` and `month` (0 for January), from its first local midnight to the next month's. */

@@ -1,6 +1,7 @@
 /** What the Routines page says about a routine, and the editor's form and how it becomes a routine to save. */
 import { nonEmpty } from "../src/json";
 import { MAX_COMMAND_LENGTH, nextDueAt, type CommandRun, type Routine, type RoutineChange, type RoutineRun, type RoutineTask, type Schedule, type Weekday } from "../src/routines";
+import { minutesOfTimeInput, timeInputValue } from "./days";
 
 /** What the editor saves: a routine without what the server keeps. */
 export type RoutineSpec = Extract<RoutineChange, { op: "save" }>["routine"];
@@ -179,7 +180,7 @@ function scheduleDraft(schedule: Schedule): ScheduleDraft {
 		return { ...blank, kind: "every", amount: String(every.amount), unit: every.unit };
 	}
 	const { hour, minute } = schedule.time;
-	return { ...blank, kind: "weekly", days: [...schedule.days], time: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}` };
+	return { ...blank, kind: "weekly", days: [...schedule.days], time: timeInputValue(hour * 60 + minute) };
 }
 
 /** `routine`'s form, its other task's fields at their defaults. */
@@ -244,7 +245,7 @@ function scheduleOf(draft: ScheduleDraft, index: number | null): { ok: Schedule 
 		return { ok: { kind: "every", minutes: amount * UNIT_MINUTES[draft.unit] } };
 	}
 	if (draft.days.length === 0) return { fix: `${which}Pick at least one day.` };
-	const match = /^(\d{2}):(\d{2})$/.exec(draft.time);
-	if (!match) return { fix: `${which}Set the time it runs at.` };
-	return { ok: { kind: "weekly", days: WEEK.filter(day => draft.days.includes(day)), time: { hour: Number(match[1]), minute: Number(match[2]) } } };
+	const minutes = minutesOfTimeInput(draft.time);
+	if (minutes === null) return { fix: `${which}Set the time it runs at.` };
+	return { ok: { kind: "weekly", days: WEEK.filter(day => draft.days.includes(day)), time: { hour: Math.floor(minutes / 60), minute: minutes % 60 } } };
 }
