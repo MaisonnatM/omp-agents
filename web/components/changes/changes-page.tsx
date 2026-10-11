@@ -1,11 +1,11 @@
-import { ArrowLeft, FolderTree, RotateCw } from "lucide-react";
+import { ArrowLeft, RotateCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { SessionChanges } from "../../../src/shared/changes";
 import { hashForSession, type PastSession, type RosterHost } from "../../../src/shared/sessions";
 import { useChangedFiles } from "../../pane-store";
 import { hostLabel, pastLabel } from "../../labels";
 import { useRead } from "../../reads";
-import { hashForChanges, hashForRepo } from "../../routing";
+import { hashForChanges } from "../../routing";
 import { Button } from "@/components/ui/button";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -69,15 +69,6 @@ export function ChangesPage({ sessionId, path, host, past }: ChangesPageProps) {
 						</TabsList>
 					</Tabs>
 				</SizeProvider>
-				{changes && changes.root !== null && (
-					<Tooltip content="Browse all files" side="bottom">
-						<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Browse all files" asChild>
-							<a href={hashForRepo(changes.root)}>
-								<FolderTree />
-							</a>
-						</Button>
-					</Tooltip>
-				)}
 				<Tooltip content="Read the changes again" side="bottom">
 					<Button variant="ghost" size="icon-compact" className="text-muted-foreground" aria-label="Read the changes again" loading={list.refreshing} onClick={() => setReads(count => count + 1)}>
 						<RotateCw />

@@ -21,8 +21,6 @@ export interface PageShortcutInput {
 	linearCallable: boolean;
 	/** The right sidebar has a session to show. */
 	hasDetails: boolean;
-	/** The directory whose checkout the repository page's shortcut opens: the focused session's, else the workspace's. */
-	repoDir: string;
 	palette: PaletteState | null;
 	dispatchPalette: Dispatch<PaletteEvent>;
 	setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
@@ -108,11 +106,6 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				const { page, navigate } = latest.current;
 				if (page?.kind === "projects" && page.target.kind === "list") return false;
 				navigate({ kind: "projects", target: { kind: "list" } });
-			},
-			repo: () => {
-				const { page, repoDir, navigate } = latest.current;
-				if (page?.kind === "repo" && page.dir === repoDir) return false;
-				navigate({ kind: "repo", dir: repoDir, path: null });
 			},
 			restore: () => {
 				const { maximized, layout, show } = latest.current;

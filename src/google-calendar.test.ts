@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { GoogleCalendarClient } from "./google-calendar";
 import type { GoogleFetch } from "./integrations";
+import { ApiError } from "./omp/mcp";
 
 const OCTOBER = [new Date("2026-10-01T00:00:00+02:00"), new Date("2026-11-01T00:00:00+01:00")] as const;
 
@@ -53,14 +54,34 @@ const TEAM_EVENTS = {
 	items: [{ id: "retro", status: "confirmed", summary: "Retro", htmlLink: "https://www.google.com/calendar/event?eid=retro", start: { dateTime: "2026-10-09T15:00:00+02:00" }, end: { dateTime: "2026-10-09T16:00:00+02:00" } }],
 };
 
-/** A client over `answers`, by the path and `pageToken` of each address, that leaves out the `hidden` calendars, with the addresses it read and what it posted. */
-function clientOf(answers: Record<string, unknown>, hidden: ReadonlySet<string> = new Set()): { client: GoogleCalendarClient; reads: string[]; posts: { url: string; body: unknown }[] } {
+/**
+ * A client over `answers`, by the path and `pageToken` of each address, that leaves out the `hidden` calendars, with the
+ * addresses it read, what it posted, and the addresses it deleted; a delete throws the error `answers` holds for `DELETE <path>`.
+ */
+function clientOf(
+	answers: Record<string, unknown>,
+	hidden: ReadonlySet<string> = new Set(),
+): { client: GoogleCalendarClient; reads: string[]; posts: { url: string; body: unknown }[]; deletes: string[] } {
 	const reads: string[] = [];
 	const posts: { url: string; body: unknown }[] = [];
+	const deletes: string[] = [];
 	const fetch: GoogleFetch = async (url, init) => {
-		if (init) {
-			posts.push({ url, body: init.body });
-			return { id: "created" };
+		switch (init?.method) {
+			case "POST":
+				posts.push({ url, body: init.body });
+				return { id: "created" };
+			case "DELETE": {
+				deletes.push(url);
+				const failure = answers[`DELETE ${new URL(url).pathname}`];
+				if (failure instanceof Error) throw failure;
+				return null;
+			}
+			case undefined:
+				break;
+			default: {
+				const unhandled: never = init;
+				return unhandled;
+			}
 		}
 		reads.push(url);
 		const { pathname, searchParams } = new URL(url);
@@ -70,7 +91,7 @@ function clientOf(answers: Record<string, unknown>, hidden: ReadonlySet<string> 
 		if (answer === undefined) throw new Error(`unexpected read ${key}`);
 		return answer;
 	};
-	return { client: new GoogleCalendarClient(fetch, () => hidden), reads, posts };
+	return { client: new GoogleCalendarClient(fetch, () => hidden), reads, posts, deletes };
 }
 
 const LIST = "/calendar/v3/users/me/calendarList";
@@ -81,9 +102,9 @@ test("the shown calendars' events keep each repeat, link to the event, end all-d
 	const { client, reads } = clientOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: { items: [] } });
 	expect(await client.events(...OCTOBER)).toEqual({
 		events: [
-			{ id: "max@example.com/standup_20261005T073000Z", title: "Standup", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=standup1", when: { allDay: false, start: Date.parse("2026-10-05T07:30:00Z"), end: Date.parse("2026-10-05T08:00:00Z") } },
-			{ id: "max@example.com/standup_20261026T083000Z", title: "Standup", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=standup2", when: { allDay: false, start: Date.parse("2026-10-26T08:30:00Z"), end: Date.parse("2026-10-26T09:00:00Z") } },
-			{ id: "max@example.com/offsite", title: "Offsite", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=offsite", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" } },
+			{ calendarId: "max@example.com", eventId: "standup_20261005T073000Z", writable: true, title: "Standup", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=standup1", when: { allDay: false, start: Date.parse("2026-10-05T07:30:00Z"), end: Date.parse("2026-10-05T08:00:00Z") } },
+			{ calendarId: "max@example.com", eventId: "standup_20261026T083000Z", writable: true, title: "Standup", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=standup2", when: { allDay: false, start: Date.parse("2026-10-26T08:30:00Z"), end: Date.parse("2026-10-26T09:00:00Z") } },
+			{ calendarId: "max@example.com", eventId: "offsite", writable: true, title: "Offsite", calendar: "max@example.com", color: "#9fe1e7", url: "https://www.google.com/calendar/event?eid=offsite", when: { allDay: true, firstDay: "2026-10-14", lastDay: "2026-10-15" } },
 		],
 	});
 	const work = new URL(reads.find(url => url.includes("max%40example.com"))!);
@@ -100,7 +121,7 @@ test("a long calendar list and event list are read to their last page", async ()
 		[TEAM]: { items: [] },
 	});
 	expect((await client.status()).calendars.map(calendar => calendar.name)).toEqual(["max@example.com", "Eng team"]);
-	expect((await client.events(...OCTOBER)).events.map(event => event.id)).toEqual(["max@example.com/standup_20261005T073000Z", "max@example.com/standup_20261026T083000Z"]);
+	expect((await client.events(...OCTOBER)).events.map(event => event.eventId)).toEqual(["standup_20261005T073000Z", "standup_20261026T083000Z"]);
 });
 
 test("a calendar that cannot be read keeps its error for the settings while the others answer, and fails the read only when none can", async () => {
@@ -122,7 +143,7 @@ test("a calendar unchecked on the Calendar page is not read and its events are l
 	const { client, reads } = clientOf({ [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: TEAM_EVENTS }, hidden);
 	expect(await client.events(...OCTOBER)).toEqual({
 		events: [
-			{ id: "team@group.calendar.google.com/retro", title: "Retro", calendar: "Eng team", color: "#b99aff", url: "https://www.google.com/calendar/event?eid=retro", when: { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") } },
+			{ calendarId: "team@group.calendar.google.com", eventId: "retro", writable: false, title: "Retro", calendar: "Eng team", color: "#b99aff", url: "https://www.google.com/calendar/event?eid=retro", when: { allDay: false, start: Date.parse("2026-10-09T13:00:00Z"), end: Date.parse("2026-10-09T14:00:00Z") } },
 		],
 	});
 	expect(reads.some(url => url.includes("max%40example.com"))).toBe(false);
@@ -132,7 +153,7 @@ test("a calendar unchecked on the Calendar page is not read and its events are l
 	]);
 
 	hidden.delete("max@example.com");
-	expect((await client.events(...OCTOBER)).events.map(event => event.id)).toEqual([
+	expect((await client.events(...OCTOBER)).events.map(event => `${event.calendarId}/${event.eventId}`)).toEqual([
 		"max@example.com/standup_20261005T073000Z",
 		"max@example.com/standup_20261026T083000Z",
 		"max@example.com/offsite",
@@ -166,7 +187,7 @@ test("a new event posts to its calendar, all day with Google's exclusive end or 
 	]);
 
 	answers[WORK] = { items: [WORK_EVENTS.items[5]] };
-	expect((await client.events(...OCTOBER)).events.map(event => event.id)).toEqual(["max@example.com/offsite"]);
+	expect((await client.events(...OCTOBER)).events.map(event => event.eventId)).toEqual(["offsite"]);
 });
 
 test("a new event in a calendar you may only read, or one not checked in your list, is refused before Google is asked", async () => {
@@ -175,4 +196,38 @@ test("a new event in a calendar you may only read, or one not checked in your li
 	await expect(client.create("team@group.calendar.google.com", "Retro", when)).rejects.toThrow("You may only read Eng team, so it takes no new events.");
 	await expect(client.create("hidden@group.calendar.google.com", "Retro", when)).rejects.toThrow("That calendar is not checked in your Google Calendar's list.");
 	expect(posts).toEqual([]);
+});
+
+test("deleting a repeat of an event in a calendar you may write to deletes only that repeat, and the next read of that calendar asks Google again", async () => {
+	const answers: Record<string, unknown> = { [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: { items: [] } };
+	const { client, deletes } = clientOf(answers);
+	expect((await client.events(...OCTOBER)).events.map(event => event.eventId)).toEqual(["standup_20261005T073000Z", "standup_20261026T083000Z", "offsite"]);
+
+	await client.delete("max@example.com", "standup_20261005T073000Z");
+	expect(deletes).toEqual(["https://www.googleapis.com/calendar/v3/calendars/max%40example.com/events/standup_20261005T073000Z"]);
+
+	answers[WORK] = { items: WORK_EVENTS.items.filter(item => item.id !== "standup_20261005T073000Z") };
+	expect((await client.events(...OCTOBER)).events.map(event => event.eventId)).toEqual(["standup_20261026T083000Z", "offsite"]);
+});
+
+test("deleting an event of a calendar you may only read, or of one not checked in your list, is refused before Google is asked", async () => {
+	const { client, deletes } = clientOf({ [LIST]: CALENDARS });
+	await expect(client.delete("team@group.calendar.google.com", "retro")).rejects.toThrow("You may only read Eng team, so its events cannot be deleted here.");
+	await expect(client.delete("hidden@group.calendar.google.com", "party")).rejects.toThrow("That calendar is not checked in your Google Calendar's list. Check it there to delete its events.");
+	expect(deletes).toEqual([]);
+});
+
+test("deleting an event Google already deleted counts as deleted, and the next read of that calendar asks Google again", async () => {
+	const answers: Record<string, unknown> = { [LIST]: CALENDARS, [WORK]: WORK_EVENTS, [TEAM]: { items: [] }, [`DELETE ${WORK}/offsite`]: new ApiError("Resource has been deleted", 410) };
+	const { client } = clientOf(answers);
+	expect((await client.events(...OCTOBER)).events.map(event => event.eventId)).toEqual(["standup_20261005T073000Z", "standup_20261026T083000Z", "offsite"]);
+
+	await client.delete("max@example.com", "offsite");
+	answers[WORK] = { items: WORK_EVENTS.items.filter(item => item.id !== "offsite") };
+	expect((await client.events(...OCTOBER)).events.map(event => event.eventId)).toEqual(["standup_20261005T073000Z", "standup_20261026T083000Z"]);
+});
+
+test("a delete Google refuses for another reason fails with Google's message", async () => {
+	const { client } = clientOf({ [LIST]: CALENDARS, [`DELETE ${WORK}/offsite`]: new ApiError("Forbidden", 403) });
+	await expect(client.delete("max@example.com", "offsite")).rejects.toThrow("Forbidden");
 });

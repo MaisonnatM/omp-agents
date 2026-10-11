@@ -225,29 +225,51 @@ async function request(server: McpServer, method: string, params: Record<string,
 	return response.result;
 }
 
-/** A POST of `body` as JSON, for {@link callWithMcpSignIn}. */
-export interface JsonPost {
-	method: "POST";
-	body: unknown;
+/** A POST of `body` as JSON, or a DELETE, for {@link callWithMcpSignIn}. */
+export type ApiWrite = { method: "POST"; body: unknown } | { method: "DELETE" };
+
+/** `init` as a request with `headers` added: a POST sends its body as JSON, and a DELETE sends nothing. */
+function requestOf(init: ApiWrite, headers: Record<string, string>): RequestInit {
+	switch (init.method) {
+		case "POST":
+			return { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(init.body) };
+		case "DELETE":
+			return { method: "DELETE", headers };
+		default: {
+			const never: never = init;
+			return never;
+		}
+	}
+}
+
+/** An API called with omp's sign-in answered HTTP `status`, other than 401, with the API's own `error.message` when it gave one. */
+export class ApiError extends Error {
+	constructor(
+		message: string,
+		readonly status: number,
+	) {
+		super(message);
+	}
 }
 
 /**
  * The JSON at `url`, an API of the service behind `server` that takes the same OAuth token, called with omp's sign-in:
- * a GET, or with `init` a POST of its body as JSON. Throws {@link McpRefused} on 401, and the API's own `error.message` on another failure.
+ * a GET, or with `init` a POST of its body as JSON or a DELETE. An empty answer, such as a 204, is `null`. Throws
+ * {@link McpRefused} on 401, and {@link ApiError} on another failure.
  */
-export async function callWithMcpSignIn(server: McpServer, url: string, init?: JsonPost): Promise<unknown> {
+export async function callWithMcpSignIn(server: McpServer, url: string, init?: ApiWrite): Promise<unknown> {
 	const headers: Record<string, string> = { Authorization: `Bearer ${await tokenOf(server.credentialId)}` };
-	const call: RequestInit = init ? { method: init.method, headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify(init.body) } : { headers };
+	const call: RequestInit = init ? requestOf(init, headers) : { headers };
 	const response = await fetch(url, { ...call, signal: AbortSignal.timeout(TIMEOUT_MS) });
 	if (response.status === 401) throw refused(server);
 	const text = await response.text();
-	if (response.ok) return toolJson(new URL(url).host, "API", text);
+	if (response.ok) return text ? toolJson(new URL(url).host, "API", text) : null;
 	let message: string | undefined;
 	try {
 		const parsed: unknown = JSON.parse(text);
 		message = isObject(parsed) && isObject(parsed.error) ? str(parsed.error.message) : undefined;
 	} catch {}
-	throw new Error(message ?? `${new URL(url).host} answered HTTP ${response.status}`);
+	throw new ApiError(message ?? `${new URL(url).host} answered HTTP ${response.status}`, response.status);
 }
 
 /** The text that `tool` answers for `args` on `server`; the server's own message thrown when the call fails. */

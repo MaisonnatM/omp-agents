@@ -1,6 +1,6 @@
 /** What the Calendar page shows on each day of a month: Google events and events kept on this computer, routine runs, past and planned, and todos and tickets on the day they are due. */
 import { nextDueAt, type Routine, type RoutineRun } from "../src/routines";
-import type { CalendarEvent, EventWhen, LocalEvent } from "../src/shared/calendar";
+import type { CalendarEvent, EventWhen, GoogleEventRef, LocalEvent, LocalEventRef } from "../src/shared/calendar";
 import type { Ticket, TicketStatusType } from "../src/shared/tickets";
 import type { UserTodoList } from "../src/user-todos-shared";
 import { daysBetween, localDay } from "./days";
@@ -10,6 +10,7 @@ const LOCAL_EVENT_COLOR = "#64748b";
 
 /** An event as the page shows it, from one of your Google calendars or kept on this computer. */
 export interface ShownEvent {
+	/** Unique among the shown events: a Google event's calendar id, a slash, and its own, or a kept event's id. */
 	id: string;
 	title: string;
 	when: EventWhen;
@@ -17,8 +18,11 @@ export interface ShownEvent {
 	color: string;
 	/** Where it lives: its Google calendar's name, or `This computer`. */
 	place: string;
-	/** A Google event's page in Google Calendar, or the id that removes an event kept on this computer. */
-	source: { kind: "google"; url: string } | { kind: "local"; id: string };
+	/**
+	 * Where it lives: a Google event's page in Google Calendar, or this computer, with the `ref` that deletes it; `null`
+	 * for an event of a Google calendar you may only read.
+	 */
+	source: { kind: "google"; url: string; ref: GoogleEventRef | null } | { kind: "local"; ref: LocalEventRef };
 }
 
 /** One thing on one day; `day` is the local day, `YYYY-MM-DD`, and `at` its time, `null` for one without. */
@@ -93,8 +97,15 @@ export function calendarEntries({ routines, todos, tickets, events, localEvents 
 	const last = localDay(to - 1);
 	const inMonth = (day: string | null): day is string => day !== null && day >= first && day < end;
 	const shown: ShownEvent[] = [
-		...(events ?? []).map(({ id, title, when, color, calendar, url }): ShownEvent => ({ id, title, when, color, place: calendar, source: { kind: "google", url } })),
-		...(localEvents ?? []).map(({ id, title, when }): ShownEvent => ({ id, title, when, color: LOCAL_EVENT_COLOR, place: "This computer", source: { kind: "local", id } })),
+		...(events ?? []).map(({ calendarId, eventId, writable, title, when, color, calendar, url }): ShownEvent => ({
+			id: `${calendarId}/${eventId}`,
+			title,
+			when,
+			color,
+			place: calendar,
+			source: { kind: "google", url, ref: writable ? { kind: "google", calendarId, eventId } : null },
+		})),
+		...(localEvents ?? []).map(({ id, title, when }): ShownEvent => ({ id, title, when, color: LOCAL_EVENT_COLOR, place: "This computer", source: { kind: "local", ref: { kind: "local", id } } })),
 	];
 	const entries: CalendarEntry[] = [
 		...routines.flatMap(routine => routineEntries(routine, from, to, now)),

@@ -6,7 +6,6 @@ import {
 	closePane,
 	endSession,
 	hashForChanges,
-	hashForRepo,
 	hashForPullRequests,
 	hashForLayout,
 	hashForPage,
@@ -195,16 +194,6 @@ describe("layout hash", () => {
 		expect(routeFromHash("#changesx").kind).toBe("panes");
 	});
 
-	test("the repo hash opens a checkout's files or one by path, its directory's tilde and slashes kept, and is not read as a layout", () => {
-		expect(hashForRepo("~/x")).toBe("#repo/~%2Fx");
-		expect(routeFromHash(hashForRepo("~/x"))).toEqual({ kind: "page", page: { kind: "repo", dir: "~/x", path: null } });
-		for (const path of ["web/components/a b.tsx", "README.md"]) {
-			expect(routeFromHash(hashForRepo("/abs/dir", path))).toEqual({ kind: "page", page: { kind: "repo", dir: "/abs/dir", path } });
-		}
-		expect(routeFromHash(hashForRepo("~/my code", "docs/a b/c.md"))).toEqual({ kind: "page", page: { kind: "repo", dir: "~/my code", path: "docs/a b/c.md" } });
-		expect(routeFromHash("#repox").kind).toBe("panes");
-	});
-
 	test("every page hash names its page and route, and a session or layout hash names none", () => {
 		expect(routeFromHash(hashForSettings("files", "/work/app"))).toEqual({ kind: "page", page: { kind: "settings", section: "files", cwd: "/work/app" } });
 		expect(routeFromHash(hashForPullRequests(null))).toEqual({ kind: "page", page: { kind: "pull-requests", target: null } });
@@ -229,7 +218,6 @@ describe("layout hash", () => {
 		expect(routeFromHash("#new/%E0?todo=t1")).toEqual(page({ kind: "new", cwd: null, todoId: "t1" }));
 		expect(routeFromHash("#pull-requests/acme/web/1/files/%E0")).toEqual(page({ kind: "pull-requests", target: { owner: "acme", repo: "web", number: 1 }, files: { path: null } }));
 		expect(routeFromHash("#changes/s1/%E0")).toEqual(page({ kind: "changes", sessionId: "s1", path: null }));
-		expect(routeFromHash("#repo/~%2Fx/%E0")).toEqual(page({ kind: "repo", dir: "~/x", path: null }));
 		expect(routeFromHash("#session/%E0")).toEqual({ kind: "panes", layout: { panes: [], focus: 0, maximized: false } });
 		expect(routeFromHash("#a,past/%zz,b/%E0,c@1")).toEqual({ kind: "panes", layout: { panes: [live("a"), live("c")], focus: 1, maximized: false } });
 	});

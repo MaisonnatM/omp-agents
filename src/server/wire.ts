@@ -7,7 +7,7 @@
 import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
 import { GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
-import { type CalendarShownInput, type EventWhen, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar } from "../shared/calendar";
+import { type CalendarShownInput, type EventRef, type EventWhen, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar } from "../shared/calendar";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
@@ -479,8 +479,13 @@ export function parseNewEvent(body: unknown): Parsed<NewEvent> {
 	return title.length <= MAX_EVENT_TITLE && when && calendar ? { ok: { title, when, calendar } } : null;
 }
 
-/** The body of `PUT /api/calendar/local/remove`: `{ id }` of an event kept on this computer. */
-export const parseLocalEventId = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.id) ? { ok: body.id } : null);
+/** The body of `PUT /api/calendar/events/delete`: an event kept on this computer by its id, or a Google event by its calendar's id and its own. */
+export function parseEventRef(body: unknown): Parsed<EventRef> {
+	if (!isObject(body)) return null;
+	if (body.kind === "local") return isNonEmpty(body.id) ? { ok: { kind: "local", id: body.id } } : null;
+	if (body.kind === "google") return isNonEmpty(body.calendarId) && isNonEmpty(body.eventId) ? { ok: { kind: "google", calendarId: body.calendarId, eventId: body.eventId } } : null;
+	return null;
+}
 
 const validPort = (port: unknown): port is number => typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
 

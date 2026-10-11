@@ -1,12 +1,13 @@
 /**
  * Google Calendar: the calendars checked in your Google Calendar's list and their events, which the Calendar page lists
- * unless you unchecked a calendar there, and the events it adds to the calendars you may write to. It calls Google's
- * Calendar API with the token omp holds for its Google Calendar MCP server, the same sign-in and scopes: the server's own
- * tools answer only for OAuth clients in Google's Developer Preview Program.
+ * unless you unchecked a calendar there, and the events it adds to and deletes from the calendars you may write to. It
+ * calls Google's Calendar API with the token omp holds for its Google Calendar MCP server, the same sign-in and scopes:
+ * the server's own tools answer only for OAuth clients in Google's Developer Preview Program.
  */
 import { type Cache, createCache } from "./cache";
 import type { GoogleFetch } from "./integrations";
 import { errorText, isObject, nonEmptyStr, str } from "./json";
+import { ApiError } from "./omp/mcp";
 import type { CalendarEvent, CalendarEventsAnswer, EventWhen, GoogleCalendar, GoogleStatus } from "./shared/calendar";
 
 const API = "https://www.googleapis.com/calendar/v3";
@@ -17,6 +18,12 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 /** A calendar list entry as Google Calendar lists it, before the Calendar page's own checkbox and last read. */
 type ListedCalendar = Omit<GoogleCalendar, "shown" | "error">;
+
+/** What a write says when its calendar is not checked in your Google Calendar's list, or is one named `name` you may only read. */
+interface WriteRefusals {
+	unlisted: string;
+	readOnly: (name: string) => string;
+}
 
 /** A calendar list entry as the page shows it, or `null` for one unchecked in Google Calendar or without an id. */
 function calendarOf(item: unknown): ListedCalendar | null {
@@ -51,12 +58,14 @@ const googleTimes = (when: EventWhen): { start: GoogleTime; end: GoogleTime } =>
  */
 function eventOf(item: unknown, calendar: ListedCalendar): CalendarEvent | null {
 	if (!isObject(item) || item.status === "cancelled" || item.eventType === "workingLocation") return null;
-	const id = nonEmptyStr(item.id);
-	if (!id || !isObject(item.start) || !isObject(item.end)) return null;
+	const eventId = nonEmptyStr(item.id);
+	if (!eventId || !isObject(item.start) || !isObject(item.end)) return null;
 	const attendees = Array.isArray(item.attendees) ? item.attendees : [];
 	if (attendees.some(attendee => isObject(attendee) && attendee.self === true && attendee.responseStatus === "declined")) return null;
 	const event = {
-		id: `${calendar.id}/${id}`,
+		calendarId: calendar.id,
+		eventId,
+		writable: calendar.writable,
 		title: nonEmptyStr(item.summary) ?? "(No title)",
 		calendar: calendar.name,
 		color: calendar.color,
@@ -75,7 +84,7 @@ function eventOf(item: unknown, calendar: ListedCalendar): CalendarEvent | null 
 
 /**
  * The calendars your Google Calendar shows, and the events of those the Calendar page shows, each read at most once a
- * minute, and the events it adds.
+ * minute, and the events it adds and deletes.
  */
 export class GoogleCalendarClient {
 	readonly #fetch: GoogleFetch;
@@ -167,14 +176,47 @@ export class GoogleCalendarClient {
 	}
 
 	/**
+	 * Calls `write` with the address of calendar `calendarId`'s events, once the calendar is checked in your Google
+	 * Calendar's list and one you may write to, else throws what `refusals` says, then forgets that calendar's kept event
+	 * reads, so the next read asks Google again.
+	 */
+	async #write(calendarId: string, refusals: WriteRefusals, write: (events: string) => Promise<unknown>): Promise<void> {
+		const calendar = (await this.#calendars(false)).find(listed => listed.id === calendarId);
+		if (!calendar) throw new Error(refusals.unlisted);
+		if (!calendar.writable) throw new Error(refusals.readOnly(calendar.name));
+		await write(`${API}/calendars/${encodeURIComponent(calendarId)}/events`);
+		this.#reads.delete(calendarId);
+	}
+
+	/**
 	 * Adds an event titled `title` to calendar `calendarId`, which must be checked in your Google Calendar's list and one you
 	 * may write to. The next read of that calendar's events asks Google again, so it shows the event.
 	 */
 	async create(calendarId: string, title: string, when: EventWhen): Promise<void> {
-		const calendar = (await this.#calendars(false)).find(listed => listed.id === calendarId);
-		if (!calendar) throw new Error("That calendar is not checked in your Google Calendar's list. Check it there to add events to it.");
-		if (!calendar.writable) throw new Error(`You may only read ${calendar.name}, so it takes no new events. Pick a calendar you own or may edit.`);
-		await this.#fetch(`${API}/calendars/${encodeURIComponent(calendarId)}/events`, { method: "POST", body: { summary: title, ...googleTimes(when) } });
-		this.#reads.delete(calendarId);
+		const refusals: WriteRefusals = {
+			unlisted: "That calendar is not checked in your Google Calendar's list. Check it there to add events to it.",
+			readOnly: name => `You may only read ${name}, so it takes no new events. Pick a calendar you own or may edit.`,
+		};
+		await this.#write(calendarId, refusals, events => this.#fetch(events, { method: "POST", body: { summary: title, ...googleTimes(when) } }));
+	}
+
+	/**
+	 * Deletes event `eventId` of calendar `calendarId`, which must be checked in your Google Calendar's list and one you may
+	 * write to; a repeat's id deletes only that repeat, and an event already gone counts as deleted. The next read of that
+	 * calendar's events asks Google again, so it no longer shows the event.
+	 */
+	async delete(calendarId: string, eventId: string): Promise<void> {
+		const refusals: WriteRefusals = {
+			unlisted: "That calendar is not checked in your Google Calendar's list. Check it there to delete its events.",
+			readOnly: name => `You may only read ${name}, so its events cannot be deleted here.`,
+		};
+		await this.#write(calendarId, refusals, async events => {
+			try {
+				await this.#fetch(`${events}/${encodeURIComponent(eventId)}`, { method: "DELETE" });
+			} catch (err) {
+				// Google answers 410 for an event deleted a moment ago and 404 once it is purged; the calendar is listed, so the address is right.
+				if (!(err instanceof ApiError && (err.status === 404 || err.status === 410))) throw err;
+			}
+		});
 	}
 }

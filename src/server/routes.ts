@@ -21,7 +21,6 @@ import { directoryOf } from "../paths";
 import { loadPullRequestOptions, savePullRequest } from "../pull-request-edit";
 import { listPullRequestChanges, readPullRequestFile } from "../pull-request-files";
 import { loadPullRequestStack } from "../pull-request-stack";
-import { listRepoFiles, readRepoFile } from "../repo-files";
 import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings";
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
@@ -37,10 +36,10 @@ import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
-import { answer, answerOr404, fail, type Guards } from "./http";
+import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { listNotes } from "./project-notes";
-import { type Parsed, parseCalendarShown, parseGoogleClient, parseIntegrationId, parseLocalEventId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
+import { type Parsed, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
@@ -234,11 +233,13 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	});
 
 	/** `GET /api/changes/file?session=<id>&path=<path>`: one file of that list in full, with its diff; only a path the list holds. */
-	const changedFile = get(params => {
+	const changedFile = get(async params => {
 		const place = sessionPlace(params);
 		if (place instanceof Response) return place;
 		const path = params.get("path") ?? "";
-		return answerOr404(() => readChangedFile(place, path), `The session changed no file ${path}`);
+		const file = await readChangedFile(place, path).catch((err: unknown) => fail(500, errorText(err)));
+		if (file instanceof Response) return file;
+		return file ? Response.json(file) : fail(404, `The session changed no file ${path}`);
 	});
 
 	/** `GET /api/project-notes?id=<project id>`: the project's notes directory and the Markdown files in it, which the file dialog opens. */
@@ -356,7 +357,7 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 	};
 }
 
-/** Google Calendar's calendars and events, the events the Calendar page adds, and the events kept on this computer. */
+/** Google Calendar's calendars and events, the events the Calendar page adds and deletes, and the events kept on this computer. */
 function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Routes {
 	const { google, localEvents } = env;
 
@@ -402,12 +403,22 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 		},
 	);
 
-	/** `PUT /api/calendar/local/remove` `{ id }`: removes an event kept on this computer, if it is still there; answers `{}`. */
-	const localEventRemove = write(
-		body => checked(parseLocalEventId(body), "Expected { id } naming an event kept on this computer"),
-		async id => {
-			localEvents.remove(id);
-			return {};
+	/** `PUT /api/calendar/events/delete`: `EventRef`, deletes an event kept on this computer or of a Google calendar you may write to; answers `{}`. */
+	const eventDelete = write(
+		body => checked(parseEventRef(body), 'Expected { kind: "local", id } or { kind: "google", calendarId, eventId } naming an event'),
+		async (event): Promise<object> => {
+			switch (event.kind) {
+				case "local":
+					localEvents.remove(event.id);
+					return {};
+				case "google":
+					await google.delete(event.calendarId, event.eventId);
+					return {};
+				default: {
+					const unhandled: never = event;
+					return unhandled;
+				}
+			}
 		},
 	);
 
@@ -416,8 +427,8 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 		"/api/google/calendars": { PUT: calendarShown },
 		"/api/calendar/events": { GET: calendarEvents },
 		"/api/calendar/events/new": { PUT: eventCreate },
+		"/api/calendar/events/delete": { PUT: eventDelete },
 		"/api/calendar/local": { GET: localCalendarEvents },
-		"/api/calendar/local/remove": { PUT: localEventRemove },
 	};
 }
 
@@ -459,9 +470,11 @@ function pullRequestRoutes({ get, write }: RouteKit): Routes {
 	const pullRequestFiles = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => listPullRequestChanges(pr)));
 
 	/** `GET /api/pull-request/file?owner=<o>&repo=<r>&number=<n>&path=<path>`: one file of that list in full, with its diff; only a path the list holds. */
-	const pullRequestFile = pullRequestGet("Expected ?owner=&repo=&number=&path=", (pr, params) => {
+	const pullRequestFile = pullRequestGet("Expected ?owner=&repo=&number=&path=", async (pr, params) => {
 		const path = params.get("path") ?? "";
-		return answerOr404(() => readPullRequestFile(pr, path), `${prKey(pr)} changes no file ${path}`);
+		const file = await readPullRequestFile(pr, path).catch((err: unknown) => fail(500, errorText(err)));
+		if (file instanceof Response) return file;
+		return file ? Response.json(file) : fail(404, `${prKey(pr)} changes no file ${path}`);
 	});
 
 	return {
@@ -534,20 +547,6 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		return read.ok ? Response.json(read.file) : fail(read.status, read.error);
 	});
 
-	/** `GET /api/repo?cwd=<dir>`: `RepoFiles`, every file of the git checkout `cwd` is in, tracked and untracked but not ignored. */
-	const repo = get(async params => {
-		const cwd = await dirParam(params);
-		return cwd instanceof Response ? cwd : answerOr404(() => listRepoFiles(cwd), `Not a git checkout: ${cwd}`);
-	});
-
-	/** `GET /api/repo/file?cwd=<dir>&path=<path>`: one file of that list in full, every line unchanged; only a path git lists. */
-	const repoFile = get(async params => {
-		const cwd = await dirParam(params);
-		if (cwd instanceof Response) return cwd;
-		const path = params.get("path") ?? "";
-		return answerOr404(() => readRepoFile(cwd, path), `The checkout of ${cwd} holds no file ${path}`);
-	});
-
 	return {
 		"/api/git": { GET: git },
 		"/api/worktrees": { GET: worktreeInventory },
@@ -558,8 +557,6 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 		"/api/image": { GET: image },
 		"/api/attachment/document": { PUT: promptDocument },
 		"/api/file": { GET: textFile },
-		"/api/repo": { GET: repo },
-		"/api/repo/file": { GET: repoFile },
 	};
 }
 
