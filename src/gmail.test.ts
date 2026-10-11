@@ -204,7 +204,7 @@ test("a conversation reads each message's people, arrival, unread state, snippet
 				at: 1791000000000,
 				unread: false,
 				snippet: "Hi Jane & Bob",
-				body: { kind: "html", html: "<p>Hi <b>Jane</b></p>" },
+				body: { kind: "html" },
 				attachments: [],
 			},
 			{
@@ -241,7 +241,7 @@ test("a mixed message reads as its nested body, and lists every named file as an
 	});
 	const [message] = (await threadClient(fullMessage("m1", { From: "a@example.com" }, ["INBOX"], "1791000000000", payload)).client.thread("18f2a")).messages;
 	expect([message?.body, message?.attachments]).toEqual([
-		{ kind: "html", html: "<p>Report attached.</p>" },
+		{ kind: "html" },
 		[
 			{ name: "notes.txt", type: "text/plain", size: 13 },
 			{ name: "Q3 report.pdf", type: "application/pdf", size: 52341 },
@@ -281,4 +281,15 @@ test("a conversation reuses the inbox's signed-in address, a second open within 
 	expect(reads).toHaveLength(5);
 	await client.thread("18f2a", true);
 	expect(reads.slice(5).map(url => new URL(url).pathname)).toEqual([THREAD]);
+});
+
+test("a message's HTML comes from the conversation's kept read, and is undefined for a plain text message or one the conversation does not hold", async () => {
+	const { client, reads } = threadClient(
+		fullMessage("m1", { From: "a@example.com" }, ["INBOX"], "1791000000000", part("multipart/alternative", { parts: [part("text/plain", { text: "Hi" }), part("text/html", { text: "<p>Hi</p>" })] })),
+		fullMessage("m2", { From: "b@example.com" }, ["INBOX"], "1791000000001", part("text/plain", { text: "Plain" })),
+	);
+	await client.thread("18f2a");
+	expect(reads.map(url => new URL(url).pathname)).toEqual(["/gmail/v1/users/me/profile", THREAD]);
+	expect([await client.messageHtml("18f2a", "m1"), await client.messageHtml("18f2a", "m2"), await client.messageHtml("18f2a", "m9")]).toEqual(["<p>Hi</p>", undefined, undefined]);
+	expect(reads).toHaveLength(2);
 });

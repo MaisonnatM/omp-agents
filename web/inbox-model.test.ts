@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { MailMessage } from "../src/shared/gmail";
-import { type FoldEvent, type Folds, foldMessages, foldsAfter, linkParts, mailDocument, NO_FOLDS, recipientsLine } from "./inbox-model";
+import { type FoldEvent, type Folds, foldMessages, foldsAfter, linkParts, NO_FOLDS, recipientsLine } from "./inbox-model";
 
 const message = (id: string, unread = false): MailMessage => ({
 	id,
@@ -83,12 +83,4 @@ test("web addresses in plain text become links without the punctuation that ends
 	]);
 	expect(linkParts("no links here")).toEqual([{ kind: "text", text: "no links here" }]);
 	expect(linkParts("ftp://old.example")).toEqual([{ kind: "text", text: "ftp://old.example" }]);
-});
-
-test("a message's HTML renders after a policy that allows only images, styles, and fonts, and sends no referrer", () => {
-	const document = mailDocument("<p>Hi</p>");
-	const head = document.slice(0, document.indexOf("<body>"));
-	expect(head).toContain(`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data:; style-src 'unsafe-inline' https:; font-src https: data:">`);
-	expect(head).toContain(`<meta name="referrer" content="no-referrer">`);
-	expect(document.endsWith("<body><p>Hi</p></body></html>")).toBe(true);
 });

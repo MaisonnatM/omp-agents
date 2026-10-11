@@ -98,17 +98,3 @@ export function linkParts(text: string): TextPart[] {
 	if (end < text.length) parts.push({ kind: "text", text: text.slice(end) });
 	return parts;
 }
-
-/**
- * What a message's frame may load: images, styles, and fonts over HTTPS or inline, and nothing else. Its sandbox already
- * stops scripts, forms, and popups; this also stops a message from fetching, framing, or embedding anything.
- */
-const MAIL_POLICY = "default-src 'none'; img-src https: data:; style-src 'unsafe-inline' https:; font-src https: data:";
-
-/** The look a message without styles of its own gets, on the white it was written for in either theme. */
-const MAIL_STYLE =
-	":root{color-scheme:light}body{margin:0;padding:16px;background:#fff;color:#1f1f1f;font:14px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;overflow-wrap:anywhere}img{max-width:100%}pre{white-space:pre-wrap}";
-
-/** The document a message's HTML renders in: the policy and the referrer rule come first, so the message's own markup cannot precede them. */
-export const mailDocument = (html: string): string =>
-	`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${MAIL_POLICY}"><meta name="referrer" content="no-referrer"><style>${MAIL_STYLE}</style></head><body>${html}</body></html>`;

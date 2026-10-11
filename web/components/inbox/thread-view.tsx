@@ -1,6 +1,6 @@
 import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw } from "lucide-react";
 import { useEffect, useReducer } from "react";
-import type { MailAttachment, MailBody, MailMessage, MailThread } from "../../../src/shared/gmail";
+import type { MailAttachment, MailMessage, MailThread } from "../../../src/shared/gmail";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -41,13 +41,14 @@ function Attachments({ attachments }: { attachments: MailAttachment[] }) {
 	);
 }
 
-function Body({ body, title }: { body: MailBody; title: string }) {
+function Body({ message, thread, title }: { message: MailMessage; thread: string; title: string }) {
+	const { body } = message;
 	switch (body.kind) {
 		case "html":
 			return (
 				// Mail is written for white paper, so it stays white in the dark theme too.
 				<div className="overflow-hidden rounded-md bg-white">
-					<MailFrame html={body.html} title={title} />
+					<MailFrame thread={thread} id={message.id} title={title} />
 				</div>
 			);
 		case "text":
@@ -77,13 +78,15 @@ const ROW = "flex w-full min-w-0 items-center gap-3 rounded-md px-3 text-left ou
 
 interface MessageProps {
 	message: MailMessage;
+	/** The conversation's id, which with the message's own addresses its HTML. */
+	thread: string;
 	/** The inbox's own address, which reads as `me`. */
 	address: string | null;
 	onToggle: () => void;
 }
 
 /** A message in full: its sender and date over whom it went to, its attachments, and its body; the header closes it. */
-function OpenMessage({ message, address, onToggle }: MessageProps) {
+function OpenMessage({ message, thread, address, onToggle }: MessageProps) {
 	const sender = senderLabel(message, address);
 	const recipients = recipientsLine(message, address);
 	return (
@@ -98,7 +101,7 @@ function OpenMessage({ message, address, onToggle }: MessageProps) {
 			<div className="space-y-3 px-3">
 				{recipients && <p className="truncate text-xs text-muted-foreground">{recipients}</p>}
 				{message.attachments.length > 0 && <Attachments attachments={message.attachments} />}
-				<Body body={message.body} title={`Message from ${sender}`} />
+				<Body message={message} thread={thread} title={`Message from ${sender}`} />
 			</div>
 		</article>
 	);
@@ -204,7 +207,7 @@ export function ThreadDetail({ id, listed, previous, next, address }: ThreadDeta
 								const Message = row.kind === "open" ? OpenMessage : ClosedMessage;
 								return (
 									<li key={row.message.id}>
-										<Message message={row.message} address={address} onToggle={() => fold({ kind: "toggle", id: row.message.id })} />
+										<Message message={row.message} thread={id} address={address} onToggle={() => fold({ kind: "toggle", id: row.message.id })} />
 									</li>
 								);
 							}

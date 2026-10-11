@@ -32,8 +32,11 @@ export interface MailPerson {
 	address: string;
 }
 
-/** What a message reads as: its HTML part, else its plain text part, else nothing the page can show. */
-export type MailBody = { kind: "html"; html: string } | { kind: "text"; text: string } | { kind: "empty" };
+/**
+ * What a message reads as: its HTML part, else its plain text part, else nothing the page can show. The HTML stays on the
+ * server, and the page loads it from `GET /api/gmail/message` as a document of its own.
+ */
+export type MailBody = { kind: "html" } | { kind: "text"; text: string } | { kind: "empty" };
 
 /** A file a message carries, which the page names but does not download. */
 export interface MailAttachment {

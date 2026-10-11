@@ -150,13 +150,16 @@ function textOf({ data, charset }: MimePart): string {
 	}
 }
 
-const NO_BODY: MailBody = { kind: "empty" };
+/** A body as read, with the HTML that the page's {@link MailBody} leaves out. */
+type ReadBody = Exclude<MailBody, { kind: "html" }> | { kind: "html"; html: string };
+
+const NO_BODY: ReadBody = { kind: "empty" };
 
 /**
  * What `part` reads as. Of `multipart/alternative`'s versions the HTML one wins over the plain text one, as Gmail shows
  * it; any other multipart reads as its first part with a body, such as the text before `multipart/mixed`'s attachments.
  */
-function bodyOf(part: MimePart): MailBody {
+function bodyOf(part: MimePart): ReadBody {
 	if (part.filename) return NO_BODY;
 	if (part.mimeType === "text/html") {
 		const html = textOf(part);
@@ -178,23 +181,39 @@ const attachmentsOf = (part: MimePart): MailAttachment[] => [
 	...part.parts.flatMap(attachmentsOf),
 ];
 
-/** A message as the Inbox page's details show it, or `null` for one without an id or an arrival time. */
-function messageOf(message: Record<string, unknown>): MailMessage | null {
+/** A message as read: what the Inbox page's details show, and its HTML when that is its body. */
+interface ReadMessage {
+	message: MailMessage;
+	html: string | undefined;
+}
+
+/** A message as the Inbox page's details show it, with its HTML, or `null` for one without an id or an arrival time. */
+function messageOf(message: Record<string, unknown>): ReadMessage | null {
 	const id = nonEmptyStr(message.id);
 	const at = arrivalOf(message);
 	if (!id || !Number.isFinite(at)) return null;
 	const payload = partOf(message.payload);
+	const body = bodyOf(payload);
 	return {
-		id,
-		from: peopleOf(headerOf(message, "From"))[0] ?? { name: "", address: "" },
-		to: peopleOf(headerOf(message, "To")),
-		cc: peopleOf(headerOf(message, "Cc")),
-		at,
-		unread: hasLabel(message, "UNREAD"),
-		snippet: decodeEntities(str(message.snippet) ?? ""),
-		body: bodyOf(payload),
-		attachments: attachmentsOf(payload),
+		message: {
+			id,
+			from: peopleOf(headerOf(message, "From"))[0] ?? { name: "", address: "" },
+			to: peopleOf(headerOf(message, "To")),
+			cc: peopleOf(headerOf(message, "Cc")),
+			at,
+			unread: hasLabel(message, "UNREAD"),
+			snippet: decodeEntities(str(message.snippet) ?? ""),
+			body: body.kind === "html" ? { kind: "html" } : body,
+			attachments: attachmentsOf(payload),
+		},
+		html: body.kind === "html" ? body.html : undefined,
 	};
+}
+
+/** A conversation as read: what the Inbox page's details get, and the HTML of each message whose body is HTML, by message id. */
+interface ReadThread {
+	answer: ThreadAnswer;
+	html: Map<string, string>;
 }
 
 /** Your Gmail inbox's latest conversations, and each conversation in full, each read at most once a minute. */
@@ -202,7 +221,7 @@ export class GmailClient {
 	readonly #fetch: GoogleFetch;
 	readonly #inbox = createCache<InboxAnswer>(KEPT_MS);
 	readonly #address = createCache<string>(KEPT_MS);
-	readonly #threads = createCache<ThreadAnswer>(KEPT_MS);
+	readonly #threads = createCache<ReadThread>(KEPT_MS);
 
 	constructor(fetch: GoogleFetch) {
 		this.#fetch = fetch;
@@ -217,8 +236,16 @@ export class GmailClient {
 	}
 
 	/** Conversation `id` with its messages in full, oldest first and drafts left out. `fresh` reads it again. */
-	thread(id: string, fresh = false): Promise<ThreadAnswer> {
-		return this.#threads.get(id, () => this.#readThread(id), fresh);
+	async thread(id: string, fresh = false): Promise<ThreadAnswer> {
+		return (await this.#threads.get(id, () => this.#readThread(id), fresh)).answer;
+	}
+
+	/**
+	 * The HTML of message `id` of conversation `thread`, from the read {@link thread} keeps, so opening a conversation asks
+	 * Gmail nothing more; `undefined` when the conversation holds no such message or its body is not HTML.
+	 */
+	async messageHtml(thread: string, id: string): Promise<string | undefined> {
+		return (await this.#threads.get(thread, () => this.#readThread(thread))).html.get(id);
 	}
 
 	/** The address you signed in with, which a link into Gmail names; the inbox's read keeps it for a conversation's. */
@@ -252,17 +279,21 @@ export class GmailClient {
 		return { address, threads: threads.filter(thread => thread !== null) };
 	}
 
-	async #readThread(id: string): Promise<ThreadAnswer> {
+	async #readThread(id: string): Promise<ReadThread> {
 		const url = new URL(`${API}/threads/${encodeURIComponent(id)}`);
 		url.searchParams.set("format", "full");
 		const [address, thread] = await Promise.all([this.#signedIn(false), this.#fetch(url.toString())]);
 		if (!isObject(thread) || !Array.isArray(thread.messages)) throw new Error("Gmail answered something other than a conversation");
 		const kept = thread.messages.filter(isObject).filter(message => !hasLabel(message, "DRAFT"));
+		const read = kept.map(messageOf).filter(message => message !== null);
 		return {
-			id,
-			subject: kept[0] ? headerOf(kept[0], "Subject").trim() : "",
-			url: threadUrl(address, id),
-			messages: kept.map(messageOf).filter(message => message !== null),
+			answer: {
+				id,
+				subject: kept[0] ? headerOf(kept[0], "Subject").trim() : "",
+				url: threadUrl(address, id),
+				messages: read.map(({ message }) => message),
+			},
+			html: new Map(read.flatMap(({ message, html }): [string, string][] => (html === undefined ? [] : [[message.id, html]]))),
 		};
 	}
 }

@@ -736,6 +736,7 @@ The Inbox page and its sidebar tab read it through `gmailStore` in `web/reads.ts
 `GET /api/gmail/thread?id=<thread id>[&fresh]` answers a `ThreadAnswer`, `{ id, subject, url, messages }`, from `GmailClient.thread`, which reads `threads/<id>?format=full`; a request without an id is a 400.
 Drafts are left out as the inbox leaves them out, the subject is the first message's, and the link is the inbox's.
 Each `MailMessage` holds its id, the people its `From`, `To`, and `Cc` headers name, split at commas outside quoted names and angle brackets, its `internalDate`, its `UNREAD` label, its snippet with entities decoded, its body, and its attachments.
+An HTML body is only `{ kind: "html" }` in the answer: `GmailClient` keeps the HTML beside the conversation's read, by message id, and the page loads it on its own, so the conversation's JSON stays small.
 The body comes from a walk of the message's MIME tree: in `multipart/alternative` the `text/html` version wins over `text/plain`, any other multipart reads as its first part with a body, and a part that names a file is never a body.
 Each text part is decoded from base64url in the `charset` its `Content-Type` names, and in UTF-8 when no decoder knows that charset.
 Every part that names a file becomes an attachment, with its name, MIME type, and size; nothing downloads it.
@@ -743,10 +744,17 @@ A message without an id or an arrival time is left out, and each conversation is
 The page keeps the conversations it read in memory only, by id, through `readMailThread` and `useMailThread` in `web/reads.ts`, since bodies are large and private.
 It reads a conversation once, reads the next and previous ones of the list ahead while one shows, and reads one again from Gmail on **Refresh**, or when the inbox lists a message that arrived after the last read.
 
-A message's HTML renders in an `iframe` whose `srcdoc` is built by `mailDocument` in `web/inbox-model.ts`, with `sandbox="allow-same-origin"` and nothing else.
+`GET /api/gmail/message?thread=<thread id>&id=<message id>` serves a message's HTML as a document of its own, built by `mailDocument` in `src/server/mail-document.ts`, from `GmailClient.messageHtml`, which reads the conversation's kept read, so opening a conversation asks Gmail nothing more.
+A request without both ids is a 400, and a message the conversation does not hold, or whose body is not HTML, is a 404.
+The page frames that address, not a `srcdoc`: a `srcdoc` document inherits the page's `Content-Security-Policy` from `web/index.html`, whose `img-src` no message can widen, so a message's images never loaded.
+Widening the page's own policy is no answer, since it guards the whole dashboard, rendered transcripts too.
+The frame keeps `sandbox="allow-same-origin"` and nothing else.
 Without `allow-scripts` the message's scripts and event handlers never run, and the sandbox also blocks its forms, its popups, and a `<meta http-equiv="refresh">`, so it cannot navigate the frame.
 That makes `allow-same-origin` safe, and the page needs it to size the frame to the message, to open the message's links in a new tab with no opener or referrer, and to pass keys pressed inside it on to the page's shortcuts.
-The document's head comes before the message's markup, with the policy `default-src 'none'; img-src https: data:; style-src 'unsafe-inline' https:; font-src https: data:` and `<meta name="referrer" content="no-referrer">`, so a message loads images, styles, and fonts and nothing else, and sends no referrer.
+The document's response carries the policy `sandbox allow-same-origin; default-src 'none'; img-src https: data:; style-src 'unsafe-inline' https:; font-src https: data:`, so a message loads images, styles, and fonts and nothing else.
+Its `sandbox` directive keeps scripts off even when the address opens in a tab of its own.
+The response also sends `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, and `Cache-Control: private, no-store`, and the document's head, which comes before the message's markup, holds `<meta name="referrer" content="no-referrer">` too.
+The frame's request is a same-origin GET with the login cookie, so it passes the API's guards like any other read.
 Remote images still load, so a sender who tracks opens with them sees the dashboard's request, without a referrer.
 The frame sits on white in both themes, since mail is written for white.
 
@@ -862,6 +870,7 @@ The server lives in `src/`:
   `src/server/calendars-file.ts` keeps the ids of the calendars unchecked in the Calendar tab's sidebar in `calendars.json` beside the access token, and moves a file it cannot read to `calendars.json.invalid`.
   `src/server/local-events-file.ts` keeps the events added to **This computer** in `events.json` beside the access token, and moves a file it cannot read to `events.json.invalid`; see [New and local events](#new-and-local-events).
 - `src/gmail.ts`: `GmailClient`, the latest conversations of your Gmail inbox and one conversation in full, read from Google's Gmail API with omp's Gmail sign-in, and the walk of a message's MIME tree; see [Gmail](#gmail).
+  `src/server/mail-document.ts` serves a message's HTML as a document of its own, under its own policy, for the Inbox page's frame.
 - `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout behind `src/integrations.ts`.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the pull request list's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
 - `src/user-todos-shared.ts`: the Todo page's types, which the server, the page, and the extension that reads `todos.json` all follow: `UserTodoList`, `UserTodo`, `UserTodoLink`, `UserTodoChange`, and the statuses (`TODO_STATUSES`, `isClosed`), priorities (`TODO_PRIORITIES`, Linear's scale, as tickets use), and assignees (`TODO_ASSIGNEES`: `user` or `agent`).
