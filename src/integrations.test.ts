@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { connectionOf, type McpProbes } from "./integrations";
-import { type McpServer, McpRefused } from "./omp/mcp";
+import { ApiError, type McpServer, McpRefused } from "./omp/mcp";
 
 const found: McpServer = { name: "linear", url: "https://mcp.linear.app/mcp", credentialId: "mcp:linear" };
 const server = { name: "linear", url: "https://mcp.linear.app/mcp", host: "mcp.linear.app" };
@@ -25,13 +25,23 @@ describe("connectionOf", () => {
 			}),
 		);
 		expect(refused).toEqual({ kind: "refused", server, error: "refused omp's sign-in" });
-		const failing = await connectionOf(
+		const timedOut = await connectionOf(
 			found,
 			probes(true, async () => {
-				throw new Error("HTTP 502");
+				throw new Error("The operation timed out.");
 			}),
 		);
-		expect(failing).toEqual({ kind: "failing", server, error: "HTTP 502" });
+		expect(timedOut).toEqual({ kind: "failing", server, error: "The operation timed out.", status: null });
+	});
+
+	test("a failing server keeps the HTTP status it answered", async () => {
+		const forbidden = await connectionOf(
+			found,
+			probes(true, async () => {
+				throw new ApiError('The "linear" MCP server answered HTTP 403', 403);
+			}),
+		);
+		expect(forbidden).toEqual({ kind: "failing", server, error: 'The "linear" MCP server answered HTTP 403', status: 403 });
 	});
 });
 

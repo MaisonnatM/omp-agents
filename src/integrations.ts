@@ -7,6 +7,7 @@ import { errorText } from "./json";
 import { clientSetups, type ClientSave, planGoogleSave, planSlackSave } from "./mcp-clients";
 import {
 	addMcpServer,
+	ApiError,
 	type ApiWrite,
 	callWithMcpSignIn,
 	checkMcpServer,
@@ -70,7 +71,8 @@ export async function connectionOf(found: McpServer | null, probes: McpProbes): 
 	try {
 		return { kind: "ready", server, tools: await probes.tools(found) };
 	} catch (err) {
-		return { kind: err instanceof McpRefused ? "refused" : "failing", server, error: errorText(err) };
+		if (err instanceof McpRefused) return { kind: "refused", server, error: errorText(err) };
+		return { kind: "failing", server, error: errorText(err), status: err instanceof ApiError ? err.status : null };
 	}
 }
 

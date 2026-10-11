@@ -105,6 +105,15 @@ export const googleRedirectUri = (callbackPort: number): string => `http://local
 /** A Google OAuth client ID, as the Google Cloud console shows it. */
 export const GOOGLE_CLIENT_ID = /^[\w-]+\.apps\.googleusercontent\.com$/;
 
+/**
+ * Google's page that turns on the API behind MCP server `host` in the Cloud project of OAuth client `clientId`, whose
+ * ID starts with the project's number; `null` for an ID that does not.
+ */
+export function googleMcpEnableUrl(host: string, clientId: string): string | null {
+	const project = /^(\d+)-/.exec(clientId)?.[1];
+	return project ? `https://console.developers.google.com/apis/api/${host}/overview?project=${project}` : null;
+}
+
 /** Slack app settings the integrations page can show. The client secret stays in omp's config. */
 export interface SlackSetup {
 	clientId: string | null;
@@ -150,14 +159,15 @@ export interface McpServerRef {
 
 /**
  * Where omp stands with a service's MCP server: no server in omp's config, a server without a sign-in, or what listing
- * its tools with the sign-in found: the tools, the server refusing the sign-in, or another failure.
+ * its tools with the sign-in found: the tools, the server refusing the sign-in, or another failure, with the HTTP status
+ * the server answered, or `null` when it answered none, such as a timeout.
  */
 export type McpConnection =
 	| { kind: "absent" }
 	| { kind: "signed-out"; server: McpServerRef }
 	| { kind: "ready"; server: McpServerRef; tools: string[] }
 	| { kind: "refused"; server: McpServerRef; error: string }
-	| { kind: "failing"; server: McpServerRef; error: string };
+	| { kind: "failing"; server: McpServerRef; error: string; status: number | null };
 
 /** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and its tab, Linear's Tickets or Gmail's Inbox, shows. */
 export const signedIn = (connection: McpConnection): boolean => connection.kind !== "absent" && connection.kind !== "signed-out";

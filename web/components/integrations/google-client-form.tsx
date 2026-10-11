@@ -7,10 +7,13 @@ import { integrationsStore } from "../../reads";
 import { describedBy, External, Field, FIELD, Step } from "./client-form";
 import { Callout } from "./integration-row";
 
-/** What the form says for each Google service: the API to turn on, its page in Google's API library, and what Google asks you to grant. */
-const GOOGLE_TEXT: Record<GoogleService, { api: string; library: string; grant: string }> = {
-	"google-calendar": { api: "Google Calendar API", library: "calendar-json.googleapis.com", grant: "see and edit the events on your calendars" },
-	gmail: { api: "Gmail API", library: "gmail.googleapis.com", grant: "read your email" },
+/**
+ * What the integrations page says for each Google service: the API to turn on, its page in Google's API library, what
+ * Google asks you to grant, and the API its MCP server needs, as Google's console names each.
+ */
+export const GOOGLE_TEXT: Record<GoogleService, { api: string; library: string; grant: string; mcpApi: string }> = {
+	"google-calendar": { api: "Google Calendar API", library: "calendar-json.googleapis.com", grant: "see and edit the events on your calendars", mcpApi: "Calendar MCP API" },
+	gmail: { api: "Gmail API", library: "gmail.googleapis.com", grant: "read your email", mcpApi: "Gmail MCP API" },
 };
 
 const FIELD_ORDER = ["clientId", "clientSecret", "callbackPort"] as const;

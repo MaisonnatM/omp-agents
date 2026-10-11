@@ -207,6 +207,16 @@ function toolError(text: string): string {
 /** The server refused omp's sign-in, so only a new sign-in helps. */
 export class McpRefused extends Error {}
 
+/** A server or API called with omp's sign-in answered HTTP `status`, other than 401, with its own error message when it gave one. */
+export class ApiError extends Error {
+	constructor(
+		message: string,
+		readonly status: number,
+	) {
+		super(message);
+	}
+}
+
 /** Forgets `server`'s token and tool list once a service refused the token, and the error that says so. */
 function refused(server: McpServer): McpRefused {
 	tokens.drop(server.credentialId);
@@ -219,7 +229,7 @@ async function request(server: McpServer, method: string, params: Record<string,
 	const response = await mcpRpc.callMCP(server.url, method, params, {
 		headers: { Authorization: `Bearer ${await tokenOf(server.credentialId)}` },
 		signal: AbortSignal.timeout(TIMEOUT_MS),
-		onHttpError: ({ status }) => (status === 401 ? refused(server) : new Error(`The "${server.name}" MCP server answered HTTP ${status}`)),
+		onHttpError: ({ status }) => (status === 401 ? refused(server) : new ApiError(`The "${server.name}" MCP server answered HTTP ${status}`, status)),
 	});
 	if (response.error) throw new Error(response.error.message || "The MCP server answered an error");
 	return response.result;
@@ -239,16 +249,6 @@ function requestOf(init: ApiWrite, headers: Record<string, string>): RequestInit
 			const never: never = init;
 			return never;
 		}
-	}
-}
-
-/** An API called with omp's sign-in answered HTTP `status`, other than 401, with the API's own `error.message` when it gave one. */
-export class ApiError extends Error {
-	constructor(
-		message: string,
-		readonly status: number,
-	) {
-		super(message);
 	}
 }
 
