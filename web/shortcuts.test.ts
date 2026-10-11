@@ -95,6 +95,7 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	expect(shortcutsFor(keyEvent("Escape", "Escape"), null, false)).toEqual([
 		{ id: "restore", scope: "anywhere" },
 		{ id: "todoClose", scope: "outside-fields" },
+		{ id: "inboxBack", scope: "outside-fields" },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere" }]);
@@ -105,9 +106,9 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
 });
 
-test("↓ and ↑ step through pull requests, todos, and changed files, ↑ also takes back a queued message, and J and K step through nothing", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["nextPullRequest", "todoNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "previousPullRequest", "todoPrevious", "previousChangedFile"]);
+test("↓ and ↑ step through pull requests, todos, conversations, and changed files, ↑ also takes back a queued message, and J and K step through nothing", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["nextPullRequest", "todoNext", "inboxNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "previousPullRequest", "todoPrevious", "inboxPrevious", "previousChangedFile"]);
 	expect(press("j", "KeyJ")).toEqual([]);
 	expect(press("k", "KeyK")).toEqual([]);
 });

@@ -237,3 +237,64 @@ test("useRead is refreshing while a new version reads over the last answer, unti
 		{ n: null, error: null, refreshing: false },
 	]);
 });
+
+const mailThreadScenario = String.raw`
+import { act, createElement } from "react";
+
+const noop = () => {};
+const document = { addEventListener: noop, removeEventListener: noop };
+const container = { nodeType: 1, nodeName: "DIV", tagName: "DIV", namespaceURI: "http://www.w3.org/1999/xhtml", ownerDocument: document, addEventListener: noop, removeEventListener: noop };
+document.documentElement = container;
+Object.assign(globalThis, { window: globalThis, document, HTMLIFrameElement: class {}, IS_REACT_ACT_ENVIRONMENT: true });
+const requests = [];
+globalThis.fetch = url => {
+	const { promise, resolve } = Promise.withResolvers();
+	requests.push({ url, resolve });
+	return promise;
+};
+const { createRoot } = await import("react-dom/client");
+const { readMailThread, useMailThread } = await import("./reads.ts");
+
+const seen = [];
+function Probe({ arrived }) {
+	const { read, loading } = useMailThread("18f2a", arrived);
+	const state = JSON.stringify({ subject: read?.data.subject ?? null, loading });
+	if (seen.at(-1) !== state) seen.push(state);
+	return null;
+}
+const root = createRoot(container);
+const render = arrived => act(async () => root.render(createElement(Probe, { arrived })));
+const answer = (index, subject) => act(async () => requests[index].resolve(Response.json({ id: "18f2a", subject, url: "", messages: [] })));
+await render(null);
+readMailThread("18f2a");
+await answer(0, "first");
+await render(0);
+readMailThread("18f2a");
+await act(async () => {
+	readMailThread("18f2a", true);
+	readMailThread("18f2a", true);
+});
+await answer(2, "newest");
+await answer(1, "superseded");
+await render(Date.now() + 60_000);
+await answer(3, "after a reply");
+console.log(JSON.stringify({ urls: requests.map(({ url }) => url), seen: seen.map(state => JSON.parse(state)) }));
+`;
+
+test("a conversation is read once, a fresh read supersedes one in flight, and a reply listed after the read reads it again", async () => {
+	const child = Bun.spawn([process.execPath, "--eval", mailThreadScenario], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe" });
+	const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
+	expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" });
+	expect(JSON.parse(stdout)).toEqual({
+		urls: ["/api/gmail/thread?id=18f2a", "/api/gmail/thread?id=18f2a&fresh", "/api/gmail/thread?id=18f2a&fresh", "/api/gmail/thread?id=18f2a&fresh"],
+		seen: [
+			{ subject: null, loading: false },
+			{ subject: null, loading: true },
+			{ subject: "first", loading: false },
+			{ subject: "first", loading: true },
+			{ subject: "newest", loading: false },
+			{ subject: "newest", loading: true },
+			{ subject: "after a reply", loading: false },
+		],
+	});
+});

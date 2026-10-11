@@ -48,6 +48,10 @@ export type ShortcutId =
 	| "todoNew"
 	| "todoClose"
 	| "calendarNewEvent"
+	| "inboxNext"
+	| "inboxPrevious"
+	| "inboxBack"
+	| "inboxOnGmail"
 	| "nextChangedFile"
 	| "previousChangedFile"
 	| "moveUp"
@@ -176,6 +180,10 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoNew", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "calendarNewEvent", label: "Calendar: add an event", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "inboxNext", label: "Inbox: move to the next conversation, or open it while a conversation shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
+	{ id: "inboxPrevious", label: "Inbox: move to the previous conversation, or open it while a conversation shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{ id: "inboxBack", label: "Inbox: go back from a conversation to the list", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
+	{ id: "inboxOnGmail", label: "Inbox: open the conversation in Gmail", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
 	{ id: "nextChangedFile", label: "Changes: open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "moveUp", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
