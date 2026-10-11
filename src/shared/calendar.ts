@@ -34,8 +34,12 @@ export type EventWhen = { allDay: true; firstDay: string; lastDay: string } | { 
 
 /** An event of one of your Google calendars. */
 export interface CalendarEvent {
-	/** The calendar's id, a slash, and the event's; each repeat has its own event id. */
-	id: string;
+	/** Its calendar's id, as {@link GoogleCalendar} has it. */
+	calendarId: string;
+	/** Google's id for it; each repeat has its own, as Google lists them with `singleEvents`. */
+	eventId: string;
+	/** Whether you may delete it: its calendar's `writable`. */
+	writable: boolean;
 	title: string;
 	/** The calendar's name, as {@link GoogleCalendar} has it. */
 	calendar: string;
@@ -80,3 +84,12 @@ export interface LocalEvent {
 export interface LocalEventsAnswer {
 	events: LocalEvent[];
 }
+
+/** An event kept on this computer, by its id. */
+export type LocalEventRef = { kind: "local"; id: string };
+
+/** An event of one of your Google calendars, by its calendar's id and its own; a repeat's `eventId` names only that one day's repeat. */
+export type GoogleEventRef = { kind: "google"; calendarId: string; eventId: string };
+
+/** The event `PUT /api/calendar/events/delete` deletes: one kept on this computer, or one of a Google calendar you may write to. */
+export type EventRef = LocalEventRef | GoogleEventRef;

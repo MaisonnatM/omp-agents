@@ -6,7 +6,7 @@
 import { createCache } from "./cache";
 import { dataOf, FILE_STATUS, ghGraphql, ghRest } from "./github";
 import { isObject, num, str } from "./json";
-import { type ChangedEntry, type ChangedFileText, MAX_CHANGED_FILE_BYTES, patchRows, tooLargeNote } from "./shared/changes";
+import { type ChangedEntry, type ChangedFileText, MAX_CHANGED_FILE_BYTES, patchRows } from "./shared/changes";
 import { type PullRequest, type PullRequestChanges, prKey } from "./shared/github";
 
 /** A file of the list with what its read needs: GitHub's patch and the blob it names at the head. */
@@ -75,7 +75,7 @@ export function parseBlobAnswer(answer: unknown): { text: string } | { note: str
 	const data = dataOf(answer);
 	const blob = isObject(data.repository) && isObject(data.repository.object) ? data.repository.object : {};
 	const size = num(blob.byteSize);
-	if (size !== undefined && size > MAX_CHANGED_FILE_BYTES) return { note: tooLargeNote(size) };
+	if (size !== undefined && size > MAX_CHANGED_FILE_BYTES) return { note: `Too large to show: ${Math.round(size / 1024)} KB` };
 	if (blob.isBinary === true) return { note: "Binary file" };
 	const text = str(blob.text);
 	// A submodule names a commit of another repository, which this one does not hold.

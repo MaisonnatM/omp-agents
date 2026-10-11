@@ -2,7 +2,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { errorText } from "../../../src/json";
 import type { Routine } from "../../../src/routines";
-import type { LocalEvent } from "../../../src/shared/calendar";
+import type { EventRef, LocalEvent } from "../../../src/shared/calendar";
 import type { UserTodoList } from "../../../src/user-todos-shared";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -187,24 +187,24 @@ function CellEntry({ entry, onSelect }: { entry: CalendarEntry; onSelect: () => 
 	);
 }
 
-/** Removes event `id` kept on this computer, named `title` in what it says when it cannot. */
-type RemoveLocal = (id: string, title: string) => Promise<void>;
+/** Deletes the event `eventRef` names, named `title` in what it says when it cannot. */
+type DeleteEventHandler = (eventRef: EventRef, title: string) => Promise<void>;
 
-/** The button that removes event `id` kept on this computer, busy until `onRemove` settles. */
-function RemoveLocalEvent({ id, title, onRemove }: { id: string; title: string; onRemove: RemoveLocal }) {
-	const [removing, setRemoving] = useState(false);
+/** The button that deletes the event `eventRef` names, busy until `onDelete` settles. */
+function DeleteEvent({ eventRef, title, onDelete }: { eventRef: EventRef; title: string; onDelete: DeleteEventHandler }) {
+	const [deleting, setDeleting] = useState(false);
 	return (
-		<Tooltip content="Remove this event" side="left">
+		<Tooltip content="Delete this event" side="left">
 			<Button
 				variant="ghost"
 				size="icon-compact"
 				className="mt-0.5 shrink-0"
-				aria-label={`Remove ${title}`}
-				loading={removing}
+				aria-label={`Delete ${title}`}
+				loading={deleting}
 				onClick={async () => {
-					setRemoving(true);
-					await onRemove(id, title);
-					setRemoving(false);
+					setDeleting(true);
+					await onDelete(eventRef, title);
+					setDeleting(false);
 				}}
 			>
 				<Trash2 />
@@ -213,8 +213,11 @@ function RemoveLocalEvent({ id, title, onRemove }: { id: string; title: string; 
 	);
 }
 
-/** A day's entries, each with what it is, as the day's list and a day's hover card show them; with `onRemove`, an event kept on this computer has a remove button. */
-function DayEntries({ entries, onRemove }: { entries: CalendarEntry[]; onRemove?: RemoveLocal }) {
+/**
+ * A day's entries, each with what it is, as the day's list and a day's hover card show them; with `onDelete`, an event
+ * kept on this computer or of a Google calendar you may write to has a delete button.
+ */
+function DayEntries({ entries, onDelete }: { entries: CalendarEntry[]; onDelete?: DeleteEventHandler }) {
 	return (
 		<ul className="space-y-px">
 			{entries.map(entry => (
@@ -226,7 +229,7 @@ function DayEntries({ entries, onRemove }: { entries: CalendarEntry[]; onRemove?
 							<span className="block truncate text-xs text-muted-foreground">{entryDetail(entry)}</span>
 						</span>
 					</EntryLink>
-					{onRemove && entry.kind === "event" && entry.event.source.kind === "local" && <RemoveLocalEvent id={entry.event.source.id} title={entry.event.title} onRemove={onRemove} />}
+					{onDelete && entry.kind === "event" && entry.event.source.ref && <DeleteEvent eventRef={entry.event.source.ref} title={entry.event.title} onDelete={onDelete} />}
 				</li>
 			))}
 		</ul>
@@ -244,12 +247,12 @@ function DayHeading({ day, count, className }: { day: Date; count: number; class
 }
 
 /** The chosen day's entries beside the month. */
-function DayList({ day, entries, onRemove }: { day: Date | null; entries: CalendarEntry[]; onRemove: RemoveLocal }) {
+function DayList({ day, entries, onDelete }: { day: Date | null; entries: CalendarEntry[]; onDelete: DeleteEventHandler }) {
 	if (day === null) return <p className="px-2 text-sm text-muted-foreground">Choose a day to list everything on it.</p>;
 	return (
 		<section aria-label={day.toDateString()} className="space-y-2 lg:sticky lg:top-0 lg:self-start">
 			<DayHeading day={day} count={entries.length} className="px-2" />
-			{entries.length === 0 ? <p className="px-2 text-sm text-muted-foreground">Nothing on this day.</p> : <DayEntries entries={entries} onRemove={onRemove} />}
+			{entries.length === 0 ? <p className="px-2 text-sm text-muted-foreground">Nothing on this day.</p> : <DayEntries entries={entries} onDelete={onDelete} />}
 		</section>
 	);
 }
@@ -327,7 +330,7 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 	const [selected, setSelected] = useState<Date | null>(() => new Date(now));
 	/** The day the new-event dialog opened on, while it is open. */
 	const [newEventDay, setNewEventDay] = useState<string | null>(null);
-	const [removeError, setRemoveError] = useState<string | null>(null);
+	const [deleteError, setDeleteError] = useState<string | null>(null);
 	const tickets = ticketsStore.usePolling(null, ticketsShown).read?.data.tickets ?? null;
 	const { connected } = useGoogleCalendars();
 	const span = monthSpan(year, month);
@@ -357,15 +360,27 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 	const openNewEvent = (): void => setNewEventDay(current => current ?? shownDay ?? todayKey);
 	// Claims C even while the dialog is open, so the page's key never falls through to the App's Create ticket.
 	useShortcuts({ calendarNewEvent: openNewEvent });
-	const removeLocal = async (id: string, title: string): Promise<void> => {
-		setRemoveError(null);
+	/** Deletes the event `eventRef` names, then shows the day without it: an event kept on this computer at once, and a Google event once its month is read again. */
+	const deleteEvent = async (eventRef: EventRef, title: string): Promise<void> => {
+		setDeleteError(null);
 		try {
-			await putJson<object>("/api/calendar/local/remove", { id });
+			await putJson<object>("/api/calendar/events/delete", eventRef);
 		} catch (err) {
-			setRemoveError(`Cannot remove ${title}: ${errorText(err)}`);
+			setDeleteError(`Cannot delete ${title}: ${errorText(err)}`);
 			return;
 		}
-		localEventsStore.update(answer => ({ events: answer.events.filter(event => event.id !== id) }));
+		switch (eventRef.kind) {
+			case "local":
+				localEventsStore.update(answer => ({ events: answer.events.filter(event => event.id !== eventRef.id) }));
+				break;
+			case "google":
+				await calendarEventsStore.refresh(span);
+				break;
+			default: {
+				const unhandled: never = eventRef;
+				return unhandled;
+			}
+		}
 	};
 	/** Shows a new event, which starts on `day`: one kept on this computer at once, and one added to Google Calendar once its month is read again. */
 	const created = (day: string, kept: LocalEvent | null): void => {
@@ -379,7 +394,7 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 	const failures: string[] = [];
 	if (connected && eventsRead.error) failures.push(`Cannot read Google Calendar: ${eventsRead.error}`);
 	if (localRead.error) failures.push(`Cannot read the events on this computer: ${localRead.error}`);
-	if (removeError) failures.push(removeError);
+	if (deleteError) failures.push(deleteError);
 	return (
 		<PageFrame title="Calendar" meta={["Routine runs", connected && "Google events", "events on this computer", "due todos", ticketsShown && "Linear tickets"].filter(Boolean).join(", ")}>
 			{failures.map(failure => (
@@ -427,7 +442,7 @@ export function CalendarPage({ routines, todos, ticketsShown }: CalendarPageProp
 						})}
 					</div>
 				</CalendarProvider>
-				<DayList day={shownDay === null ? null : selected} entries={shownDay === null ? [] : (byDay.get(shownDay) ?? [])} onRemove={removeLocal} />
+				<DayList day={shownDay === null ? null : selected} entries={shownDay === null ? [] : (byDay.get(shownDay) ?? [])} onDelete={deleteEvent} />
 			</div>
 			{newEventDay !== null && <NewEventDialog day={newEventDay} onClose={() => setNewEventDay(null)} onCreated={created} />}
 		</PageFrame>

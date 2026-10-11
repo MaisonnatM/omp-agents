@@ -1,5 +1,58 @@
-/** The changes page's pure layout: the diff's folds and the file view's gutter marks. */
-import type { DiffRow } from "../src/shared/changes";
+/** The changes page's pure layout: the explorer's tree, the diff's folds, and the file view's gutter marks. */
+import type { ChangedEntry, DiffRow } from "../src/shared/changes";
+
+export interface TreeDir {
+	/** Its name in its parent, which joins a chain of single-directory folders: `src/server`. */
+	name: string;
+	/** Its path from the root, which keys its open state. */
+	path: string;
+	dirs: TreeDir[];
+	files: ChangedEntry[];
+}
+
+/**
+ * The files as folders, directories first and each level by name; a folder holding one folder and no file joins it.
+ * An absolute path, a file the session changed outside its checkout, hangs under a `/` folder.
+ */
+export function fileTree(files: readonly ChangedEntry[]): TreeDir {
+	type Building = { name: string; path: string; dirs: Map<string, Building>; files: ChangedEntry[] };
+	const root: Building = { name: "", path: "", dirs: new Map(), files: [] };
+	for (const file of files) {
+		let node = root;
+		const parts = file.path.split("/").slice(0, -1);
+		if (parts[0] === "") parts[0] = "/";
+		for (const part of parts) {
+			let next = node.dirs.get(part);
+			if (!next) {
+				next = { name: part, path: node.path ? `${node.path}/${part}` : part, dirs: new Map(), files: [] };
+				node.dirs.set(part, next);
+			}
+			node = next;
+		}
+		node.files.push(file);
+	}
+	const settle = (node: Building): TreeDir => {
+		const dirs = [...node.dirs.values()].map(settle).sort((a, b) => a.name.localeCompare(b.name));
+		const files = node.files.toSorted((a, b) => a.path.localeCompare(b.path));
+		const only = dirs[0];
+		if (node.name && files.length === 0 && dirs.length === 1 && only) return { ...only, name: `${node.name === "/" ? "" : node.name}/${only.name}` };
+		return { name: node.name, path: node.path, dirs, files };
+	};
+	return settle(root);
+}
+
+/** The files in the explorer's order, which ↓ and ↑ walk. */
+export const treeOrder = (dir: TreeDir): ChangedEntry[] => [...dir.dirs.flatMap(treeOrder), ...dir.files];
+
+/** The paths of the folders that hold `path`, outermost first, which must be open for its row to show; `null` when no folder holds it. */
+export function foldersAbove(dir: TreeDir, path: string): string[] | null {
+	if (dir.files.some(file => file.path === path)) return [];
+	for (const child of dir.dirs) {
+		const above = foldersAbove(child, path);
+		if (above) return [child.path, ...above];
+	}
+	return null;
+}
 
 /** Unchanged lines the diff keeps on each side of a change. */
 export const DIFF_CONTEXT = 3;

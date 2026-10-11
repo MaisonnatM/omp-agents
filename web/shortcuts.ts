@@ -31,7 +31,6 @@ export type ShortcutId =
 	| "inbox"
 	| "routines"
 	| "projects"
-	| "repo"
 	| "workspace"
 	| "nextPullRequest"
 	| "previousPullRequest"
@@ -160,7 +159,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "routines", label: "Go to your routines", command: "Go to routines", keys: [{ goTo: "r" }] },
 	// After a G, P is also the Todo page's `todoPriority`: the page outranks the App, so the priority wins while a todo is focused or open, and its handler declines otherwise.
 	{ id: "projects", label: "Go to your projects", command: "Go to projects", keys: [{ goTo: "p" }] },
-	{ id: "repo", label: "Browse the files of the focused session's checkout, else the workspace's", command: "Browse files", keys: [{ goTo: "f" }] },
 	{ id: "workspace", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
 	{ id: "nextPullRequest", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousPullRequest", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },

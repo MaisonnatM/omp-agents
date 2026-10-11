@@ -4,7 +4,7 @@ import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseCalendarShown, parseClientMsg, parseGoogleClient, parseIntegrationId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
+import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -420,6 +420,26 @@ describe("parseNewEvent", () => {
 		expect(parseNewEvent({ title: "Trip", when: { allDay: "yes", firstDay: "2026-10-14", lastDay: "2026-10-15" }, calendar: local })).toBeNull();
 		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "google", calendarId: "" } })).toBeNull();
 		expect(parseNewEvent({ title: "Retro", when: timed, calendar: { kind: "outlook" } })).toBeNull();
+	});
+});
+
+describe("parseEventRef", () => {
+	test("names an event kept on this computer by its id, or a Google event by its calendar's id and its own", () => {
+		expect(parseEventRef({ kind: "local", id: "e1", extra: 1 })?.ok).toEqual({ kind: "local", id: "e1" });
+		expect(parseEventRef({ kind: "google", calendarId: "max@example.com", eventId: "standup_20261005T073000Z" })?.ok).toEqual({
+			kind: "google",
+			calendarId: "max@example.com",
+			eventId: "standup_20261005T073000Z",
+		});
+	});
+
+	test("refuses an empty id, a Google event without both ids, or another kind", () => {
+		expect(parseEventRef({ kind: "local", id: "" })).toBeNull();
+		expect(parseEventRef({ id: "e1" })).toBeNull();
+		expect(parseEventRef({ kind: "google", calendarId: "max@example.com" })).toBeNull();
+		expect(parseEventRef({ kind: "google", calendarId: "", eventId: "e1" })).toBeNull();
+		expect(parseEventRef({ kind: "outlook", id: "e1" })).toBeNull();
+		expect(parseEventRef("e1")).toBeNull();
 	});
 });
 

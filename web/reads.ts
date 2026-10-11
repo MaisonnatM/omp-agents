@@ -183,7 +183,11 @@ export const googleStore = createPolledStore<GoogleStatus>({
 export const calendarEventsStore = createPolledStore<CalendarEventsAnswer>({
 	cacheKey: "omp-agents.calendar-events-cache",
 	url: (span, fresh) => `/api/calendar/events?${span}${fresh ? "&fresh" : ""}`,
-	isValid: (value): value is CalendarEventsAnswer => Array.isArray((value as Partial<CalendarEventsAnswer> | null)?.events),
+	// Events cached before they carried `calendarId` would share one id until the first read replaces them.
+	isValid: (value): value is CalendarEventsAnswer => {
+		const events = (value as Partial<CalendarEventsAnswer> | null)?.events;
+		return Array.isArray(events) && events.every(event => typeof event?.calendarId === "string");
+	},
 });
 
 /**

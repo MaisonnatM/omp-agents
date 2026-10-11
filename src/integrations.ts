@@ -7,10 +7,10 @@ import { errorText } from "./json";
 import { clientSetups, type ClientSave, planGoogleSave, planSlackSave } from "./mcp-clients";
 import {
 	addMcpServer,
+	type ApiWrite,
 	callWithMcpSignIn,
 	checkMcpServer,
 	findMcpServer,
-	type JsonPost,
 	type McpServer,
 	McpRefused,
 	mcpSignedIn,
@@ -47,8 +47,11 @@ export async function integrationServer(id: McpIntegrationId): Promise<McpServer
 	return server;
 }
 
-/** Calls a Google API address with your sign-in: reads its JSON, or with `init` posts its body as JSON and reads the answer. */
-export type GoogleFetch = (url: string, init?: JsonPost) => Promise<unknown>;
+/**
+ * Calls a Google API address with your sign-in: reads its JSON, or with `init` posts its body as JSON or deletes it, and
+ * reads the answer, `null` when empty. Another failure than a refused sign-in throws `ApiError` with Google's status.
+ */
+export type GoogleFetch = (url: string, init?: ApiWrite) => Promise<unknown>;
 
 /** {@link GoogleFetch} with omp's sign-in to Google service `id`. */
 export const googleFetch = (id: GoogleService): GoogleFetch => async (url, init) => callWithMcpSignIn(await integrationServer(id), url, init);
