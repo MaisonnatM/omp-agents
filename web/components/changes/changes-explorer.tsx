@@ -1,20 +1,60 @@
-import { ChevronRight } from "lucide-react";
-import { Fragment, useMemo } from "react";
+import { useMemo } from "react";
 import type { ChangedEntry, ChangedFileText } from "../../../src/shared/changes";
-import { fileTree, treeOrder } from "../../changes-model";
+import { fileTree, treeOrder } from "../../file-tree";
 import { useRead } from "../../reads";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
+import { cn } from "@/lib/utils";
+import { CodeView } from "../code-view";
+import { type FileDecoration, FileTree, PathCrumbs } from "../file-tree";
 import { LineCounts } from "../line-counts";
-import { CodeView } from "./code-view";
-import { FileTree, StatusLetter, statusLabel } from "./file-tree";
 
 /** Diff shows the changes with unchanged runs folded; File shows the whole file as it is now, its changes marked in the gutter. */
 const MODES = ["diff", "file"] as const;
 type Mode = (typeof MODES)[number];
 const MODE_KEY = "omp-agents.changes-mode";
+
+const STATUS = {
+	added: { letter: "A", tone: "text-emerald-600 dark:text-emerald-400", label: "Added" },
+	untracked: { letter: "U", tone: "text-emerald-600 dark:text-emerald-400", label: "Untracked" },
+	modified: { letter: "M", tone: "text-amber-600 dark:text-amber-400", label: "Modified" },
+	deleted: { letter: "D", tone: "text-red-600 dark:text-red-400", label: "Deleted" },
+	renamed: { letter: "R", tone: "text-violet-600 dark:text-violet-400", label: "Renamed" },
+	// Outside the checkout, or changed back to the base: git lists no change.
+	unlisted: { letter: "S", tone: "text-sky-600 dark:text-sky-400", label: "Changed by this session; git shows no change against the base" },
+} as const;
+
+/** What happened to `file`, and whether this session's own calls changed it. */
+function statusLabel(file: ChangedEntry): string {
+	const { label } = STATUS[file.status ?? "unlisted"];
+	return file.session && file.status !== null ? `${label}; this session edited it` : label;
+}
+
+function StatusLetter({ file }: { file: ChangedEntry }) {
+	const look = STATUS[file.status ?? "unlisted"];
+	return (
+		<span title={statusLabel(file)} className={cn("w-3 shrink-0 text-center font-mono text-[11px] font-semibold", look.tone)}>
+			{look.letter}
+		</span>
+	);
+}
+
+/** A changed file's row in the explorer: struck through once deleted, then a dot when a session's own calls changed it, its lines added and removed, and its status letter. */
+function changeDecoration(file: ChangedEntry): FileDecoration {
+	return {
+		title: `${file.path}: ${statusLabel(file)}`,
+		nameClassName: file.status === "deleted" ? "line-through opacity-70" : undefined,
+		trailing: (
+			<>
+				{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}
+				<LineCounts added={file.added} removed={file.removed} />
+				<StatusLetter file={file} />
+			</>
+		),
+	};
+}
 
 interface ChangesExplorerProps {
 	/** The changed files, at least one. */
@@ -58,21 +98,14 @@ export function ChangesExplorer({ files, path, hrefFor, onPick, fileUrl, version
 					<kbd>{shortcutLabels("nextChangedFile")[0]}</kbd> and <kbd>{shortcutLabels("previousChangedFile")[0]}</kbd> step through the files
 				</p>
 				<div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
-					<FileTree tree={tree} open={entry?.path ?? null} hrefFor={hrefFor} onPick={onPick} />
+					<FileTree tree={tree} open={entry?.path ?? null} hrefFor={hrefFor} onPick={onPick} decorate={changeDecoration} />
 				</div>
 			</nav>
 			{entry && (
 				<section aria-label={entry.path} className="flex min-w-0 flex-1 flex-col">
 					<div className="flex items-center gap-3 border-b border-border px-4 py-1.5">
 						<StatusLetter file={entry} />
-						<p className="flex min-w-0 flex-1 items-center gap-1 font-mono text-xs text-muted-foreground" title={`${entry.path}: ${statusLabel(entry)}`}>
-							{entry.path.split("/").map((part, index, parts) => (
-								<Fragment key={index}>
-									{index > 0 && <ChevronRight aria-hidden className="size-3 shrink-0" />}
-									<span className={index === parts.length - 1 ? "truncate text-foreground" : "shrink-0"}>{part}</span>
-								</Fragment>
-							))}
-						</p>
+						<PathCrumbs path={entry.path} title={`${entry.path}: ${statusLabel(entry)}`} />
 						<LineCounts added={entry.added} removed={entry.removed} />
 						<SizeProvider size="compact">
 							<Tabs value={mode} onValueChange={value => setMode(value as Mode)}>

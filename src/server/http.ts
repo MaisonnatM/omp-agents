@@ -16,6 +16,17 @@ export async function answer(run: () => Promise<unknown>, refuse?: (err: unknown
 	}
 }
 
+/** The JSON of `run`'s result, or a 404 saying `missing` when it is `null`; a 500 with its text when it throws. */
+export async function answerOr404(run: () => Promise<object | null>, missing: string): Promise<Response> {
+	let result: object | null;
+	try {
+		result = await run();
+	} catch (err) {
+		return fail(500, errorText(err));
+	}
+	return result === null ? fail(404, missing) : Response.json(result);
+}
+
 /** How a request shows it holds the access token: a login cookie, or the `?token=` of the printed URL. */
 export type Credential = "cookie" | "login";
 

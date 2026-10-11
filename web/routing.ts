@@ -96,6 +96,12 @@ export interface ChangesRoute {
 	path: string | null;
 }
 
+/** The files of the git checkout `dir` is in (absolute or `~/…`), and the one open, by its path from the checkout's root. */
+export interface RepoRoute {
+	dir: string;
+	path: string | null;
+}
+
 /** A page that covers the panes. */
 export type Page =
 	| ({ kind: "settings" } & SettingsRoute)
@@ -107,7 +113,8 @@ export type Page =
 	| { kind: "calendar" }
 	| { kind: "inbox" }
 	| ({ kind: "new" } & NewSessionRoute)
-	| ({ kind: "changes" } & ChangesRoute);
+	| ({ kind: "changes" } & ChangesRoute)
+	| ({ kind: "repo" } & RepoRoute);
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
 export type Route = { kind: "page"; page: Page } | { kind: "session"; sessionId: string } | { kind: "panes"; layout: Layout };
@@ -130,6 +137,13 @@ function decodeSegment(raw: string): string | null {
 /** The settings page and the new-session draft both name an optional directory, encoded so it keeps its slashes and tilde. */
 const decodeCwd = (rest: string | null): string | null => (rest === null ? null : decodeSegment(rest));
 const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : encodeURIComponent(cwd));
+
+/** The changes page and the repository page both name a segment, then optionally a path, each encoded: `<segment>[/<path>]`. A segment missing or malformed reads `""`. */
+function segmentAndPath(rest: string | null): [string, string | null] {
+	const [segment = "", path] = (rest ?? "").split("/");
+	return [decodeSegment(segment) ?? "", path ? decodeSegment(path) : null];
+}
+const restOf = (segment: string, path: string | null): string => `${encodeURIComponent(segment)}${path === null ? "" : `/${encodeURIComponent(path)}`}`;
 
 /** The Todo page's lists that are not a category, by the hash segment that names them. Category ids are random, so none reads as one. */
 const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents: { kind: "agents" }, archive: { kind: "archive" } } as const satisfies Record<string, TodoListView>;
@@ -154,6 +168,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   with that project's coordinator, workers, and notes. Project ids are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  * - `#inbox` opens the Inbox page, your Gmail inbox's latest conversations.
+ * - `#repo/<dir>` opens every file of the git checkout that directory is in, read only, and `#repo/<dir>/<path>` the file at that path; both are encoded.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	settings: rest => {
@@ -183,8 +198,12 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	calendar: () => ({ kind: "calendar" }),
 	inbox: () => ({ kind: "inbox" }),
 	changes: rest => {
-		const [sessionId = "", path] = (rest ?? "").split("/");
-		return { kind: "changes", sessionId: decodeSegment(sessionId) ?? "", path: path ? decodeSegment(path) : null };
+		const [sessionId, path] = segmentAndPath(rest);
+		return { kind: "changes", sessionId, path };
+	},
+	repo: rest => {
+		const [dir, path] = segmentAndPath(rest);
+		return { kind: "repo", dir, path };
 	},
 };
 
@@ -215,7 +234,9 @@ function restOfPage(page: Page): string | null {
 		case "inbox":
 			return null;
 		case "changes":
-			return `${encodeURIComponent(page.sessionId)}${page.path === null ? "" : `/${encodeURIComponent(page.path)}`}`;
+			return restOf(page.sessionId, page.path);
+		case "repo":
+			return restOf(page.dir, page.path);
 		default: {
 			const never: never = page;
 			return never;
@@ -238,6 +259,7 @@ function queryOfPage(page: Page): string | null {
 		case "calendar":
 		case "inbox":
 		case "changes":
+		case "repo":
 			return null;
 		default: {
 			const never: never = page;
@@ -264,6 +286,7 @@ export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection, cwd: string | null): string => hashForPage({ kind: "settings", section, cwd });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForChanges = (sessionId: string, path: string | null = null): string => hashForPage({ kind: "changes", sessionId, path });
+export const hashForRepo = (dir: string, path: string | null = null): string => hashForPage({ kind: "repo", dir, path });
 
 /**
  * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives

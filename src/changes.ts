@@ -9,7 +9,7 @@ import { git } from "./git";
 import { LineReader } from "./line-reader";
 import { displayPath } from "./paths";
 import { run } from "./proc";
-import { type ChangedEntry, type ChangedFileText, type ChangeStatus, contextRows, MAX_CHANGED_FILE_BYTES, parseFullDiff, type SessionChanges } from "./shared/changes";
+import { type ChangedEntry, type ChangedFileText, type ChangeStatus, MAX_CHANGED_FILE_BYTES, parseFullDiff, type SessionChanges, tooLargeNote, wholeFileRows } from "./shared/changes";
 import { Work } from "./work";
 
 /** Where a session works: its transcript, and the directory its checkout is read from (its worktree, else its cwd). */
@@ -162,16 +162,6 @@ export async function listChanges(place: SessionPlace): Promise<SessionChanges> 
 	return (await lists.get(placeKey(place), () => scan(place), true)).changes;
 }
 
-/** Bytes of a side as UTF-8 text, or why it does not show. */
-function decode(bytes: Uint8Array): { text: string } | { note: string } {
-	if (bytes.includes(0)) return { note: "Binary file" };
-	try {
-		return { text: new TextDecoder("utf-8", { fatal: true }).decode(bytes) };
-	} catch {
-		return { note: "Not UTF-8 text" };
-	}
-}
-
 /** The file of the list at `path`, with every line of its diff; `null` when the list holds no such path. The list is the one `listChanges` last made, up to three seconds old. */
 export async function readChangedFile(place: SessionPlace, path: string): Promise<ChangedFileText | null> {
 	const { changes, files } = await lists.get(placeKey(place), () => scan(place));
@@ -180,7 +170,7 @@ export async function readChangedFile(place: SessionPlace, path: string): Promis
 	const shown = (rows: ChangedFileText["rows"], note: string | null = null): ChangedFileText => ({ path, rows, note });
 	const current = Bun.file(entry.absolute);
 	const exists = await current.exists();
-	if (exists && current.size > MAX_CHANGED_FILE_BYTES) return shown(null, `Too large to show: ${Math.round(current.size / 1024)} KB`);
+	if (exists && current.size > MAX_CHANGED_FILE_BYTES) return shown(null, tooLargeNote(current.size));
 	if (changes.root && changes.base && entry.status !== null) {
 		const argv =
 			entry.status === "untracked"
@@ -193,6 +183,5 @@ export async function readChangedFile(place: SessionPlace, path: string): Promis
 		return shown(parseFullDiff(diff.stdout));
 	}
 	if (!exists) return shown(null, "Deleted");
-	const read = decode(await current.bytes());
-	return "text" in read ? shown(contextRows(read.text)) : shown(null, read.note);
+	return { path, ...wholeFileRows(await current.bytes()) };
 }

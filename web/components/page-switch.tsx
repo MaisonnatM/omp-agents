@@ -18,6 +18,7 @@ import { PullRequestDetailPage } from "./pull-requests/pr-page";
 import { NewSession } from "./new-session";
 import { PaneGrid } from "./pane-grid";
 import { ProjectsPage } from "./projects/projects-page";
+import { RepoPage } from "./repo/repo-page";
 import { RoutinesPage } from "./routines/routines-page";
 import { SettingsPage } from "./settings/settings-page";
 import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
@@ -215,6 +216,9 @@ export const PageSwitch = memo(function PageSwitch({
 					past={past.find(session => session.sessionId === page.sessionId) ?? null}
 				/>
 			);
+		case "repo":
+			// Keyed by its directory, so another checkout's page starts with its filter empty and its folders closed.
+			return <RepoPage key={page.dir} dir={page.dir} path={page.path} />;
 		case undefined:
 			if (layout.panes.length > 0) {
 				return (

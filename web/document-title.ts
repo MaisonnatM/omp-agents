@@ -31,6 +31,8 @@ function contextOf(page: Page | null, view: View | null, host: RosterHost | null
 			return "Inbox";
 		case "changes":
 			return page.path ? `${page.path.split("/").pop()} · Changes` : "Changes";
+		case "repo":
+			return page.path ? `${page.path.split("/").pop()} · Files` : "Files";
 		case undefined: {
 			if (view?.kind === "past") return past ? pastLabel(past) : null;
 			if (view?.kind !== "live") return null;

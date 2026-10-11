@@ -193,6 +193,26 @@ An action that fails shows its error, and its control becomes available again.
 - The page reads the changes again each time the session's own calls change a file, and when a turn starts or ends, since a shell command or a subagent changes files without telling the dashboard; the round arrow in the header reads them again now.
   A link names the open file by its path, so a reload returns to it.
 
+## Repository files
+
+- G then F, or **Browse files** in the command menu, shows every file of the git checkout the focused session works in, its worktree else its directory, or else the workspace's, in place of the panes.
+  The folder button in a session's changes page header, **Browse all files**, opens the files of that session's checkout.
+  A `#repo/<dir>` address names the checkout by any directory in it, absolute or `~/…`, and `#repo/<dir>/<path>` a file in it by its path from the checkout's root.
+- The page is read only.
+  It lists the tracked files and the untracked ones git does not ignore.
+  The header names the checkout's folder, its branch, or `detached HEAD`, how many files it holds, and its root; a directory outside git shows `Not a git checkout` instead.
+  The round arrow in the header reads the files and the open file again.
+- The explorer on the left shows the files as folders, all closed at first, a folder holding only one folder joined with it.
+  Click a folder to open or close it; opening a file, through its link or its address, opens the folders above it.
+- The search field above the explorer keeps only the files whose path holds every word typed, in any order and any case, with every folder open.
+  It shows at most 500 of them, then how many more match; type more to narrow.
+  Esc clears it.
+- The editor shows the open file whole, its path above it, with its line numbers and the code colored by its language, and nothing marked.
+  A binary file, a file that is not UTF-8, a file over 1 MB, a file deleted since the list was read, and an entry that is not a file, such as a submodule, show why instead.
+  So does a link that leads out of the checkout or into a directory that holds sign-ins and config, which never opens here.
+  With no file open, the editor asks you to pick one.
+  ↓ and ↑ scroll the code; they do not step through the files.
+
 ## Panes, splits, and links
 
 - Select a row to open it.
@@ -1152,6 +1172,7 @@ Alt is Option on macOS.
 | G then I | Outside text fields | Go to your Gmail inbox, when connected |
 | G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Go to your projects |
+| G then F | Outside text fields | Browse the files of the focused session's checkout, else the workspace's |
 | G then W | Outside text fields | Choose the sidebar's workspace |
 | ↓ | Pull requests page, outside text fields | Move to the next pull request, or show its details while one shows |
 | ↑ | Pull requests page, outside text fields | Move to the previous pull request, or show its details while one shows |
