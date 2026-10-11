@@ -24,7 +24,8 @@ interface AppSidebarProps {
 	panes: View[];
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
-	ticketsShown: boolean;
+	/** The tabs that do not show. */
+	hiddenTabs: ReadonlySet<SidebarTab>;
 	/** The server has sent the session lists. */
 	listed: boolean;
 	userTodos: UserTodoList | null;
@@ -55,7 +56,7 @@ export const AppSidebar = memo(function AppSidebar({
 	panes,
 	tab,
 	onTab,
-	ticketsShown,
+	hiddenTabs,
 	listed,
 	userTodos,
 	hosts,
@@ -98,7 +99,7 @@ export const AppSidebar = memo(function AppSidebar({
 			onTogglePin={togglePin}
 			open={page ? NO_VIEWS : panes}
 			newSessionOpen={page?.kind === "new"}
-			ticketsShown={ticketsShown}
+			hiddenTabs={hiddenTabs}
 			tab={tab}
 			onTab={onTab}
 			userTodos={userTodos}

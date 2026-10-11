@@ -27,7 +27,7 @@ import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
 import { integrationsStore } from "./reads";
-import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, type TodoListView } from "./routing";
+import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, type SidebarTab, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
 import { startOf } from "./starts";
@@ -62,13 +62,23 @@ export function App() {
 	const terminal = useTerminalPanel();
 	useNoticeToasts(state.notices, state.connected, send);
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
-	const linear = integrationsStore.usePolling().read?.data.integrations.linear ?? null;
-	/** The Tickets tab and its shortcut show once omp holds a sign-in to Linear, even one Linear refuses, which the tickets page then offers to reconnect. */
-	const ticketsShown = linear !== null && signedIn(linear.connection);
+	const integrations = integrationsStore.usePolling().read?.data.integrations;
+	const linear = integrations?.linear ?? null;
+	const gmail = integrations?.gmail ?? null;
+	const linearSignedIn = linear !== null && signedIn(linear.connection);
+	const gmailSignedIn = gmail !== null && signedIn(gmail.connection);
+	/**
+	 * The tabs that do not show, nor their shortcuts: Tickets until omp holds a sign-in to Linear, and Inbox until it holds one to Gmail,
+	 * even one the service refuses, which the page then offers to reconnect.
+	 */
+	const hiddenTabs = useMemo(
+		() => new Set<SidebarTab>([...(linearSignedIn ? [] : ["tickets" as const]), ...(gmailSignedIn ? [] : ["inbox" as const])]),
+		[linearSignedIn, gmailSignedIn],
+	);
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
 	const settings = useMemo(() => settingsRoute(page, focused.cwd), [page, focused.cwd]);
-	const { tab, showTab } = useSidebarTab({ page, ticketsShown, layout, settings, navigate, show });
+	const { tab, showTab } = useSidebarTab({ page, hiddenTabs, layout, settings, navigate, show });
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
@@ -126,7 +136,7 @@ export function App() {
 		settings,
 		listed: sessions.listed,
 		view: focused.view,
-		ticketsShown,
+		hiddenTabs,
 		linearCallable,
 		hasDetails: detailsView !== null,
 		palette: overlays.palette,
@@ -183,7 +193,7 @@ export function App() {
 								panes={layout.panes}
 								tab={tab}
 								onTab={showTab}
-								ticketsShown={ticketsShown}
+								hiddenTabs={hiddenTabs}
 								listed={state.listed}
 								userTodos={state.userTodos}
 								hosts={state.hosts}
@@ -233,6 +243,7 @@ export function App() {
 													routinesTarget={routinesTarget}
 													linear={linear}
 													linearCallable={linearCallable}
+													gmail={gmail}
 													maximized={maximized}
 													hasDetails={detailsView !== null}
 													rightOpen={sidebars.panels.right.open}

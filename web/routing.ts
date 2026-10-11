@@ -12,10 +12,11 @@ export const SIDEBAR_TABS = [
 	{ value: "sessions", label: "Sessions", icon: PAGE_ICON.sessions },
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
+	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox },
 	{ value: "settings", label: "Settings", icon: PAGE_ICON.settings },
 ] as const;
 
-/** The sidebar's tab; the tickets, todo, calendar, and settings tabs go with their pages, the sessions and pull requests tabs with the panes. */
+/** The sidebar's tab; the tickets, todo, calendar, inbox, and settings tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
 
 const PAST_PREFIX = "past/";
@@ -99,6 +100,7 @@ export type Page =
 	| ({ kind: "routines" } & RoutinesRoute)
 	| ({ kind: "projects" } & ProjectsRoute)
 	| { kind: "calendar" }
+	| { kind: "inbox" }
 	| ({ kind: "new" } & NewSessionRoute)
 	| ({ kind: "changes" } & ChangesRoute);
 
@@ -146,6 +148,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  * - `#projects` opens the Projects page with every project, `#projects/new` with the New project form, and `#projects/<id>`
  *   with that project's coordinator, workers, and notes. Project ids are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
+ * - `#inbox` opens the Inbox page, your Gmail inbox's latest conversations.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	settings: rest => {
@@ -173,6 +176,7 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		return { kind: "projects", target: rest === "new" ? { kind: "new" } : id ? { kind: "project", id } : { kind: "list" } };
 	},
 	calendar: () => ({ kind: "calendar" }),
+	inbox: () => ({ kind: "inbox" }),
 	changes: rest => {
 		const [sessionId = "", path] = (rest ?? "").split("/");
 		return { kind: "changes", sessionId: decodeSegment(sessionId) ?? "", path: path ? decodeSegment(path) : null };
@@ -203,6 +207,7 @@ function restOfPage(page: Page): string | null {
 		case "projects":
 			return page.target.kind === "list" ? null : page.target.kind === "new" ? "new" : encodeURIComponent(page.target.id);
 		case "calendar":
+		case "inbox":
 			return null;
 		case "changes":
 			return `${encodeURIComponent(page.sessionId)}${page.path === null ? "" : `/${encodeURIComponent(page.path)}`}`;
@@ -226,6 +231,7 @@ function queryOfPage(page: Page): string | null {
 		case "routines":
 		case "projects":
 		case "calendar":
+		case "inbox":
 		case "changes":
 			return null;
 		default: {

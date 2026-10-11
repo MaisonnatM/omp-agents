@@ -15,8 +15,8 @@ export interface PageShortcutInput {
 	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through. */
 	listed: View[];
 	view: View | null;
-	/** omp is signed in to Linear, so the Tickets shortcut applies. */
-	ticketsShown: boolean;
+	/** The sidebar tabs that do not show, whose shortcuts then do not apply: Tickets without a sign-in to Linear, Inbox without one to Gmail. */
+	hiddenTabs: ReadonlySet<SidebarTab>;
 	/** The dashboard can create Linear issues, so the new-ticket shortcut applies. */
 	linearCallable: boolean;
 	/** The right sidebar has a session to show. */
@@ -78,8 +78,8 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				latest.current.showTab("pull-requests");
 			},
 			tickets: () => {
-				const { ticketsShown, page } = latest.current;
-				if (!ticketsShown) return false;
+				const { hiddenTabs, page } = latest.current;
+				if (hiddenTabs.has("tickets")) return false;
 				if (page?.kind === "tickets") return;
 				latest.current.showTab("tickets");
 			},
@@ -101,6 +101,12 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (latest.current.page?.kind === "calendar") return;
 				latest.current.showTab("calendar");
 			},
+			inbox: () => {
+				const { hiddenTabs, page } = latest.current;
+				if (hiddenTabs.has("inbox")) return false;
+				if (page?.kind === "inbox") return;
+				latest.current.showTab("inbox");
+			},
 			routines: () => {
 				const { page, navigate } = latest.current;
 				if (page?.kind === "routines") return false;
@@ -120,16 +126,16 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 		};
 	}, []);
 	useShortcuts(handlers);
-	const { ticketsShown, linearCallable, hasDetails } = input;
+	const { hiddenTabs, linearCallable, hasDetails } = input;
 	/** Commands that would do nothing now. */
 	const unavailable = useMemo(
 		() =>
 			new Set<ShortcutId>([
-				...(ticketsShown ? [] : ["tickets" as const]),
+				...hiddenTabs,
 				...(linearCallable ? [] : ["newTicket" as const]),
 				...(hasDetails ? [] : ["detailsSidebar" as const]),
 			]),
-		[ticketsShown, linearCallable, hasDetails],
+		[hiddenTabs, linearCallable, hasDetails],
 	);
 	return { handlers, unavailable };
 }

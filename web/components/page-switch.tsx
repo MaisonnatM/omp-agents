@@ -1,5 +1,5 @@
 import { memo } from "react";
-import type { McpIntegration } from "../../src/shared/accounts";
+import { callable, type McpIntegration } from "../../src/shared/accounts";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { DashboardState } from "../dashboard-state";
 import { SPLIT_CLICK } from "../labels";
@@ -11,6 +11,7 @@ import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
 import { ChangesPage } from "./changes/changes-page";
 import { useDashboardActions } from "./dashboard-context";
+import { InboxDisconnected, InboxPage } from "./inbox/inbox-page";
 import { PullRequestsPage } from "./pull-requests/pull-requests-page";
 import { PullRequestDetailPage } from "./pull-requests/pr-page";
 import { NewSession } from "./new-session";
@@ -74,6 +75,7 @@ interface PageSwitchProps extends PageState {
 	linear: McpIntegration | null;
 	/** The dashboard reads and writes Linear. */
 	linearCallable: boolean;
+	gmail: McpIntegration | null;
 	maximized: boolean;
 	/** The right sidebar shows the focused session's details. */
 	hasDetails: boolean;
@@ -109,6 +111,7 @@ export const PageSwitch = memo(function PageSwitch({
 	routinesTarget,
 	linear,
 	linearCallable,
+	gmail,
 	maximized,
 	hasDetails,
 	rightOpen,
@@ -201,6 +204,9 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		case "calendar":
 			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} />;
+		case "inbox":
+			if (gmail && !callable(gmail.connection)) return <InboxDisconnected gmail={gmail} />;
+			return <InboxPage />;
 		case "changes":
 			return (
 				<ChangesPage

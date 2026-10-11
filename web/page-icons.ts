@@ -1,4 +1,4 @@
-import { CalendarClock, FolderKanban, GitPullRequest, ListTodo, type LucideIcon, MessagesSquare, Settings, SquareKanban } from "lucide-react";
+import { CalendarClock, FolderKanban, GitPullRequest, Inbox, ListTodo, type LucideIcon, MessagesSquare, Settings, SquareKanban } from "lucide-react";
 
 /** The icon of each page of the dashboard: its sidebar tab shows it, and so does every link that opens something on it. */
 export const PAGE_ICON = {
@@ -7,6 +7,7 @@ export const PAGE_ICON = {
 	sessions: MessagesSquare,
 	todo: ListTodo,
 	calendar: CalendarClock,
+	inbox: Inbox,
 	projects: FolderKanban,
 	settings: Settings,
 } as const satisfies Record<string, LucideIcon>;

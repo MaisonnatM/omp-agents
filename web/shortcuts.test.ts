@@ -120,10 +120,12 @@ test("Cmd+[ and Cmd+] step through sessions, and Alt+Shift+arrows move a todo", 
 	expect(press("ArrowDown", "ArrowDown", { alt: true, shift: true })).toEqual(["moveDown"]);
 });
 
-test("G then R, P, or W goes to a page only right after a plain G, and P alone picks a todo's priority", () => {
+test("G then R, P, W, or I goes to a page only right after a plain G, and P alone picks a todo's priority", () => {
 	const after = (previous: string | null, key: string, mods: Mods = {}) => pressOn(false, key, `Key${key.toUpperCase()}`, mods, previous);
 	expect(after("g", "r")).toEqual(["routines"]);
 	expect(after("g", "w")).toEqual(["workspace"]);
+	expect(after("g", "i")).toEqual(["inbox"]);
+	expect(after(null, "i")).toEqual([]);
 	expect(after(null, "w")).toEqual([]);
 	expect(after("h", "w")).toEqual([]);
 	expect(after("g", "W", { shift: true })).toEqual([]);

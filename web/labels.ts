@@ -136,6 +136,8 @@ export const readTime = (at: number): string =>
 /** A day as the lists show it: `Oct 5`. */
 export const DAY_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 const MONTH_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric" });
+const FULL_DAY_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+const CLOCK_FORMAT = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
 
 /** A `2026-10-05` date as `Oct 5`, read as a local date so it does not shift a day west of UTC. */
 export const dateLabel = (date: string): string => DAY_FORMAT.format(new Date(`${date}T00:00`));
@@ -144,6 +146,13 @@ export const dateLabel = (date: string): string => DAY_FORMAT.format(new Date(`$
 export function dayLabel(at: string, now = new Date()): string {
 	const date = new Date(at);
 	return (date.getFullYear() === now.getFullYear() ? DAY_FORMAT : MONTH_FORMAT).format(date);
+}
+
+/** When mail arrived, as Gmail's list dates it: `2:05 PM` on `now`'s day, `Oct 9` earlier in its year, `Oct 9, 2025` before. */
+export function mailTime(at: number, now = new Date()): string {
+	const date = new Date(at);
+	if (date.toDateString() === now.toDateString()) return CLOCK_FORMAT.format(date);
+	return (date.getFullYear() === now.getFullYear() ? DAY_FORMAT : FULL_DAY_FORMAT).format(date);
 }
 
 /** A size in bytes, in the largest unit under 1024: `1536` reads `1.5 KB`. */
