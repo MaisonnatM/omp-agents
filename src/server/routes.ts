@@ -436,7 +436,12 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 function gmailRoutes({ get }: RouteKit, gmail: GmailClient): Routes {
 	/** `GET /api/gmail/inbox[?fresh]`: the signed-in address and its inbox's latest conversations. */
 	const inbox = get(params => answer(() => gmail.inbox(params.has("fresh"))));
-	return { "/api/gmail/inbox": { GET: inbox } };
+	/** `GET /api/gmail/thread?id=<id>[&fresh]`: that conversation in full, for the Inbox page's details. */
+	const thread = get(params => {
+		const id = params.get("id");
+		return id ? answer(() => gmail.thread(id, params.has("fresh"))) : fail(400, "Expected ?id= naming a Gmail conversation");
+	});
+	return { "/api/gmail/inbox": { GET: inbox }, "/api/gmail/thread": { GET: thread } };
 }
 
 /** GitHub pull requests in full: details, stack, options, edits, and their changed files. */
