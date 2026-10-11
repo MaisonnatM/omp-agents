@@ -230,11 +230,11 @@ export type MailThreadRead = PolledEntry<ThreadAnswer>;
  */
 export function useMailThread(id: string, arrived: number | null): MailThreadRead {
 	const entry = mailThreadStore.use(id);
-	const stale = arrived !== null && entry.read !== null && entry.read.at < arrived;
+	const readAt = entry.read?.at ?? null;
 	useEffect(() => {
-		if (stale) void mailThreadStore.refresh(id, { fresh: true });
-		else if (entry.read === null) mailThreadStore.ensure(id);
-	}, [id, stale]);
+		if (readAt === null) mailThreadStore.ensure(id);
+		else if (arrived !== null && readAt < arrived) void mailThreadStore.refresh(id, { fresh: true });
+	}, [id, readAt, arrived]);
 	return entry;
 }
 

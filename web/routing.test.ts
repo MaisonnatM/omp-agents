@@ -7,7 +7,6 @@ import {
 	endSession,
 	hashForChanges,
 	hashForInbox,
-	hashForRepo,
 	hashForPullRequests,
 	hashForLayout,
 	hashForPage,
