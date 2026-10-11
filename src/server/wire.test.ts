@@ -371,6 +371,7 @@ describe("parseIntegrationId", () => {
 		expect(parseIntegrationId({ id: "linear" })?.ok).toBe("linear");
 		expect(parseIntegrationId({ id: "slack" })?.ok).toBe("slack");
 		expect(parseIntegrationId({ id: "google-calendar" })?.ok).toBe("google-calendar");
+		expect(parseIntegrationId({ id: "gmail" })?.ok).toBe("gmail");
 		expect(parseIntegrationId({ id: "Linear" })).toBeNull();
 		expect(parseIntegrationId({ id: "google" })).toBeNull();
 		expect(parseIntegrationId({})).toBeNull();

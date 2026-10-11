@@ -24,7 +24,7 @@ import { loadOmpSettings, Rejected, saveOmpFile, saveRouting } from "../settings
 import { attachToTicket, createTicket, loadTeams, loadTicketDetail, loadTicketMedia, loadTicketOptions, loadTickets, saveTicket } from "../tickets";
 import { isUploadPath } from "../linear-uploads";
 import { ClientConfigError } from "../mcp-clients";
-import type { McpIntegration, McpIntegrationId } from "../shared/accounts";
+import type { GoogleService, McpIntegration, McpIntegrationId } from "../shared/accounts";
 import type { LocalEventsAnswer, NewEventAnswer } from "../shared/calendar";
 import { isAnalyticsRange } from "../shared/analytics";
 import { type PullRequest, prKey, type Repo } from "../shared/github";
@@ -286,11 +286,14 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 	/** `PUT /api/integrations/sign-out`: removes the sign-ins omp manages for the integration's server, as `/mcp unauth` does; its config stays. */
 	const integrationSignOut = integrationWrite(signOutIntegration);
 
-	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app; a client the MCP config cannot take is a 400. */
-	const slackClient = write(body => checked(parseSlackClient(body)), saveSlackClient, err => (err instanceof ClientConfigError ? fail(400, err.message) : null));
+	/** A client the MCP config cannot take is a 400. */
+	const refuseClient = (err: unknown): Response | null => (err instanceof ClientConfigError ? fail(400, err.message) : null);
 
-	/** `PUT /api/integrations/google-calendar/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client; a client the MCP config cannot take is a 400. */
-	const googleClient = write(body => checked(parseGoogleClient(body)), saveGoogleClient, err => (err instanceof ClientConfigError ? fail(400, err.message) : null));
+	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app. */
+	const slackClient = write(body => checked(parseSlackClient(body)), saveSlackClient, refuseClient);
+
+	/** `PUT /api/integrations/<google-calendar|gmail>/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client for that service. */
+	const googleClient = (id: GoogleService): Handler => write(body => checked(parseGoogleClient(body)), input => saveGoogleClient(id, input), refuseClient);
 
 	/** `GET /api/tickets[?fresh]`: the viewer's assigned Linear issues, or why they could not be read. */
 	const tickets = get(params => answer(() => loadTickets(params.has("fresh"))));
@@ -342,7 +345,8 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
 		"/api/integrations/sign-out": { PUT: integrationSignOut },
 		"/api/integrations/slack/client": { PUT: slackClient },
-		"/api/integrations/google-calendar/client": { PUT: googleClient },
+		"/api/integrations/google-calendar/client": { PUT: googleClient("google-calendar") },
+		"/api/integrations/gmail/client": { PUT: googleClient("gmail") },
 		"/api/tickets": { GET: tickets },
 		"/api/linear/teams": { GET: teams },
 		"/api/ticket": { GET: ticket, PUT: ticketWrite },

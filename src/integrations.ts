@@ -19,6 +19,7 @@ import {
 } from "./omp/mcp";
 import {
 	type GoogleClientInput,
+	type GoogleService,
 	type IntegrationsAnswer,
 	MCP_INTEGRATIONS,
 	MCP_SERVICES,
@@ -83,9 +84,12 @@ export async function loadIntegrations(fresh: boolean): Promise<IntegrationsAnsw
 	return { integrations: Object.fromEntries(loaded.map(integration => [integration.id, integration])) as IntegrationsAnswer["integrations"] };
 }
 
+const GOOGLE_SETUP_ERROR = "Set up the Google OAuth client before connecting. Save its client ID, client secret, and callback port.";
+
 const SETUP_ERROR: Record<Exclude<McpIntegrationId, "linear">, string> = {
 	slack: "Set up the Slack app before connecting. Save a client ID, client secret, HTTPS redirect, callback port, and at least one supported scope.",
-	"google-calendar": "Set up the Google OAuth client before connecting. Save its client ID, client secret, and callback port.",
+	"google-calendar": GOOGLE_SETUP_ERROR,
+	gmail: GOOGLE_SETUP_ERROR,
 };
 
 /**
@@ -118,7 +122,7 @@ async function saveClient(id: Exclude<McpIntegrationId, "linear">, plan: (path: 
 
 export const saveSlackClient = (input: SlackClientInput): Promise<McpIntegration> => saveClient("slack", path => planSlackSave(path, input));
 
-export const saveGoogleClient = (input: GoogleClientInput): Promise<McpIntegration> => saveClient("google-calendar", path => planGoogleSave(path, input));
+export const saveGoogleClient = (id: GoogleService, input: GoogleClientInput): Promise<McpIntegration> => saveClient(id, path => planGoogleSave(path, id, input));
 
 /** Abandons a sign-in to `id` under way and signs omp out of its server, which stays in omp's config. */
 export async function signOutIntegration(id: McpIntegrationId): Promise<McpIntegration> {

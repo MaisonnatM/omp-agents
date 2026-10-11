@@ -9,8 +9,8 @@ import { errorText, putJson } from "../../api";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
-import { type BrandLogo, GOOGLE_CALENDAR_LOGO, LINEAR_LOGO, SLACK_LOGO } from "./brand-logos";
-import { GoogleClientForm } from "./google-calendar";
+import { type BrandLogo, GMAIL_LOGO, GOOGLE_CALENDAR_LOGO, LINEAR_LOGO, SLACK_LOGO } from "./brand-logos";
+import { GoogleClientForm } from "./google-client-form";
 import { Callout, IntegrationRow, MetaDot } from "./integration-row";
 import { SlackAppForm } from "./slack-app-form";
 
@@ -35,6 +35,11 @@ const SERVICES: Record<McpIntegrationId, Service> = {
 	"google-calendar": {
 		logo: GOOGLE_CALENDAR_LOGO,
 		gives: "Your calendars' events on the Calendar tab, and Google Calendar's tools in every omp session.",
+		client: "Your Google OAuth client",
+	},
+	gmail: {
+		logo: GMAIL_LOGO,
+		gives: "Your inbox on the Inbox tab, read only, and Gmail's read tools in every omp session.",
 		client: "Your Google OAuth client",
 	},
 };
@@ -299,7 +304,9 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 		>
 			{callout}
 			{formOpen && integration.id === "slack" && <SlackAppForm setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />}
-			{formOpen && integration.id === "google-calendar" && <GoogleClientForm setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />}
+			{formOpen && (integration.id === "google-calendar" || integration.id === "gmail") && (
+				<GoogleClientForm id={integration.id} setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />
+			)}
 			{children}
 			{connection.kind === "ready" && toolsOpen && <ToolList id={toolsId} tools={connection.tools} server={connection.server} />}
 		</IntegrationRow>

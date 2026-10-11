@@ -4,7 +4,7 @@
 export type SignInState = { phase: "waiting"; url: string } | { phase: "failed"; error: string } | null;
 
 /** The services whose MCP server the integrations page signs omp in to. */
-export const MCP_INTEGRATIONS = ["linear", "slack", "google-calendar"] as const;
+export const MCP_INTEGRATIONS = ["linear", "slack", "google-calendar", "gmail"] as const;
 export type McpIntegrationId = (typeof MCP_INTEGRATIONS)[number];
 
 /**
@@ -72,17 +72,25 @@ export const MCP_SERVICES: Record<McpIntegrationId, McpService> = {
 	linear: { label: "Linear", host: "mcp.linear.app", url: "https://mcp.linear.app/mcp", serverName: "linear" },
 	slack: { label: "Slack", host: "mcp.slack.com", url: "https://mcp.slack.com/mcp", serverName: "slack" },
 	"google-calendar": { label: "Google Calendar", host: "calendarmcp.googleapis.com", url: "https://calendarmcp.googleapis.com/mcp/v1", serverName: "google-calendar" },
+	gmail: { label: "Gmail", host: "gmailmcp.googleapis.com", url: "https://gmailmcp.googleapis.com/mcp/v1", serverName: "gmail" },
 };
 
+/** The services that sign in with a Google OAuth client of your own. */
+export type GoogleService = "google-calendar" | "gmail";
+
 /**
- * What the Google Calendar sign-in asks for: events, to read them here and let omp sessions write them, the calendar
- * list, to know which calendars you show, and free/busy, which the MCP server's scheduling tool reads.
+ * What each Google sign-in asks for. Google Calendar: events, to read them here and let omp sessions write them, the
+ * calendar list, to know which calendars you show, and free/busy, which the MCP server's scheduling tool reads.
+ * Gmail: reading your mail, for the Inbox page, and nothing that sends, labels, or marks it read.
  */
-export const GOOGLE_CALENDAR_SCOPES = [
-	"https://www.googleapis.com/auth/calendar.events",
-	"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
-	"https://www.googleapis.com/auth/calendar.events.freebusy",
-] as const;
+export const GOOGLE_SCOPES: Record<GoogleService, readonly string[]> = {
+	"google-calendar": [
+		"https://www.googleapis.com/auth/calendar.events",
+		"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
+		"https://www.googleapis.com/auth/calendar.events.freebusy",
+	],
+	gmail: ["https://www.googleapis.com/auth/gmail.readonly"],
+};
 
 /** The port omp listens on for Google's redirect unless the setup names another. */
 export const DEFAULT_GOOGLE_CALLBACK_PORT = 3119;
@@ -113,7 +121,7 @@ export interface SlackClientInput {
 	scope: string;
 }
 
-/** Google Calendar's OAuth client settings the integrations page can show. The client secret stays in omp's config. */
+/** A Google service's OAuth client settings the integrations page can show. The client secret stays in omp's config. */
 export interface GoogleSetup {
 	clientId: string | null;
 	hasClientSecret: boolean;
@@ -122,7 +130,7 @@ export interface GoogleSetup {
 	configured: boolean;
 }
 
-/** `PUT /api/integrations/google-calendar/client`. An omitted or empty `clientSecret` keeps the saved secret for the same client ID. */
+/** `PUT /api/integrations/<google-calendar|gmail>/client`. An omitted or empty `clientSecret` keeps the saved secret for the same client ID. */
 export interface GoogleClientInput {
 	clientId: string;
 	clientSecret?: string;
@@ -158,6 +166,7 @@ export interface McpSetups {
 	linear: null;
 	slack: SlackSetup;
 	"google-calendar": GoogleSetup;
+	gmail: GoogleSetup;
 }
 
 /** One service of `GET /api/integrations`, and what `PUT /api/integrations/sign-in`, `/sign-out`, and `/<id>/client` answer. */
