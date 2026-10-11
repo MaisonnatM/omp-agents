@@ -1,5 +1,5 @@
 /** The server reads that components hold: one-off reads by URL, and the polled stores a sidebar list and its page share. */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { isObject } from "../src/json";
 import { callable, type IntegrationsAnswer, MCP_INTEGRATIONS, type McpIntegration } from "../src/shared/accounts";
 import type { CalendarEventsAnswer, GoogleCalendar, GoogleStatus, LocalEventsAnswer } from "../src/shared/calendar";
@@ -230,11 +230,14 @@ export type MailThreadRead = PolledEntry<ThreadAnswer>;
  */
 export function useMailThread(id: string, arrived: number | null): MailThreadRead {
 	const entry = mailThreadStore.use(id);
-	const readAt = entry.read?.at ?? null;
+	const lastSeen = useRef<{ id: string; arrived: number | null } | null>(null);
 	useEffect(() => {
-		if (readAt === null) mailThreadStore.ensure(id);
-		else if (arrived !== null && readAt < arrived) void mailThreadStore.refresh(id, { fresh: true });
-	}, [id, readAt, arrived]);
+		const prior = lastSeen.current;
+		if (prior !== null && prior.id === id && prior.arrived === arrived) return;
+		lastSeen.current = { id, arrived };
+		if (entry.read === null) mailThreadStore.ensure(id);
+		else if (arrived !== null && entry.read.at < arrived) void mailThreadStore.refresh(id, { fresh: true });
+	}, [id, arrived, entry.read]);
 	return entry;
 }
 
