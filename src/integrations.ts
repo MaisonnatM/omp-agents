@@ -12,6 +12,7 @@ import {
 	checkMcpServer,
 	findMcpServer,
 	type McpServer,
+	McpNeedsFix,
 	McpRefused,
 	mcpSignedIn,
 	signInMcp,
@@ -29,6 +30,7 @@ import {
 	type McpConnection,
 	type McpIntegration,
 	type McpIntegrationId,
+	type McpServerRef,
 	type SlackClientInput,
 } from "./shared/accounts";
 import { createSignIn, type SignIn } from "./sign-in";
@@ -70,7 +72,10 @@ export async function connectionOf(found: McpServer | null, probes: McpProbes): 
 	try {
 		return { kind: "ready", server, tools: await probes.tools(found) };
 	} catch (err) {
-		return { kind: err instanceof McpRefused ? "refused" : "failing", server, error: errorText(err) };
+		if (err instanceof McpRefused) return { kind: "refused", server, error: errorText(err) };
+		const failing: { kind: "failing"; server: McpServerRef; error: string; fix?: { url: string } } = { kind: "failing", server, error: errorText(err) };
+		if (err instanceof McpNeedsFix) failing.fix = err.fix;
+		return failing;
 	}
 }
 

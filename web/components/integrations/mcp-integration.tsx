@@ -229,16 +229,18 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 			</Callout>
 		);
 	} else if (connection.kind === "failing") {
+		const fix = connection.fix;
+		const action = fix ? (
+			<Button variant="secondary" size="compact" leadingIcon={ExternalLink} render={<a href={fix.url} target="_blank" rel="noreferrer" />}>
+				Open the fix
+			</Button>
+		) : (
+			<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={refreshing} onClick={() => void integrationsStore.refresh(null, { fresh: true })}>
+				Check again
+			</Button>
+		);
 		callout = (
-			<Callout
-				tone="warning"
-				icon={WifiOff}
-				action={
-					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={refreshing} onClick={() => void integrationsStore.refresh(null, { fresh: true })}>
-						Check again
-					</Button>
-				}
-			>
+			<Callout tone="warning" icon={WifiOff} action={action}>
 				{connection.error}
 			</Callout>
 		);

@@ -207,6 +207,25 @@ function toolError(text: string): string {
 /** The server refused omp's sign-in, so only a new sign-in helps. */
 export class McpRefused extends Error {}
 
+/** The server's answer named a one-step fix the user can take; the link opens the page that does it. */
+export class McpNeedsFix extends Error {
+	constructor(
+		message: string,
+		readonly fix: { url: string },
+	) {
+		super(message);
+	}
+}
+
+/** The MCP error text Google returns when the project that owns the OAuth client has the matching API disabled, naming the enable page. */
+export const GOOGLE_API_ENABLE = /Enable it by visiting (https?:\/\/console\.developers\.google\.com\/apis\/api\/[\w.-]+\/overview\?project=\d+)/;
+
+/** The link the user opens to fix a failing connection, or `null` when `text` names no fix. */
+export function fixLinkOf(text: string): { url: string } | null {
+	const match = GOOGLE_API_ENABLE.exec(text);
+	return match ? { url: match[1] } : null;
+}
+
 /** Forgets `server`'s token and tool list once a service refused the token, and the error that says so. */
 function refused(server: McpServer): McpRefused {
 	tokens.drop(server.credentialId);
@@ -214,12 +233,25 @@ function refused(server: McpServer): McpRefused {
 	return new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it in Settings › Integrations, or run /mcp reauth ${server.name} in omp.`);
 }
 
+/** Forgets `server`'s tool list when a 403 carries a fix link, so a follow-up `fresh` check re-runs after the user clicks it. */
+function dropChecks(server: McpServer): void {
+	checks.drop(server.credentialId);
+}
+
 /** `method`'s result on `server`, called with omp's sign-in for it; the server's own message thrown when it answers an error. */
 async function request(server: McpServer, method: string, params: Record<string, unknown>): Promise<unknown> {
 	const response = await mcpRpc.callMCP(server.url, method, params, {
 		headers: { Authorization: `Bearer ${await tokenOf(server.credentialId)}` },
 		signal: AbortSignal.timeout(TIMEOUT_MS),
-		onHttpError: ({ status }) => (status === 401 ? refused(server) : new Error(`The "${server.name}" MCP server answered HTTP ${status}`)),
+		onHttpError: (resp, body) => {
+			if (resp.status === 401) return refused(server);
+			const fix = fixLinkOf(body);
+			if (fix) {
+				dropChecks(server);
+				return new McpNeedsFix(`The "${server.name}" MCP server needs the API enabled in its Google Cloud project.`, fix);
+			}
+			return new Error(`The "${server.name}" MCP server answered HTTP ${resp.status}`);
+		},
 	});
 	if (response.error) throw new Error(response.error.message || "The MCP server answered an error");
 	return response.result;

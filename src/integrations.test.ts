@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { connectionOf, type McpProbes } from "./integrations";
-import { type McpServer, McpRefused } from "./omp/mcp";
+import { type McpServer, McpNeedsFix, McpRefused } from "./omp/mcp";
 
 const found: McpServer = { name: "linear", url: "https://mcp.linear.app/mcp", credentialId: "mcp:linear" };
 const server = { name: "linear", url: "https://mcp.linear.app/mcp", host: "mcp.linear.app" };
@@ -32,6 +32,17 @@ describe("connectionOf", () => {
 			}),
 		);
 		expect(failing).toEqual({ kind: "failing", server, error: "HTTP 502" });
+	});
+
+	test("a failing server whose error carries a fix link surfaces the link on the connection", async () => {
+		const fix = { url: "https://console.developers.google.com/apis/api/calendarmcp.googleapis.com/overview?project=30887206948" };
+		const failing = await connectionOf(
+			found,
+			probes(true, async () => {
+				throw new McpNeedsFix("Enable the API.", fix);
+			}),
+		);
+		expect(failing).toEqual({ kind: "failing", server, error: "Enable the API.", fix });
 	});
 });
 

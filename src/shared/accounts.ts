@@ -148,16 +148,22 @@ export interface McpServerRef {
 	host: string;
 }
 
+/** A link that resolves the connection, surfaced as a button on the row. */
+export interface McpConnectionFix {
+	url: string;
+}
+
 /**
  * Where omp stands with a service's MCP server: no server in omp's config, a server without a sign-in, or what listing
- * its tools with the sign-in found: the tools, the server refusing the sign-in, or another failure.
+ * its tools with the sign-in found: the tools, the server refusing the sign-in, or another failure. A failure may carry
+ * a `fix`, a one-click step the user can take to make the connection work.
  */
 export type McpConnection =
 	| { kind: "absent" }
 	| { kind: "signed-out"; server: McpServerRef }
 	| { kind: "ready"; server: McpServerRef; tools: string[] }
 	| { kind: "refused"; server: McpServerRef; error: string }
-	| { kind: "failing"; server: McpServerRef; error: string };
+	| { kind: "failing"; server: McpServerRef; error: string; fix?: McpConnectionFix };
 
 /** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and its tab, Linear's Tickets or Gmail's Inbox, shows. */
 export const signedIn = (connection: McpConnection): boolean => connection.kind !== "absent" && connection.kind !== "signed-out";
