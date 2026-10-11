@@ -96,6 +96,12 @@ export interface ChangesRoute {
 	path: string | null;
 }
 
+/** The files of the git checkout `dir` is in (absolute or `~/…`), and the one open, by its path from the checkout's root. */
+export interface RepoRoute {
+	dir: string;
+	path: string | null;
+}
+
 /** A page that covers the panes. */
 export type Page =
 	| ({ kind: "settings" } & SettingsRoute)
@@ -107,7 +113,8 @@ export type Page =
 	| { kind: "calendar" }
 	| { kind: "inbox" }
 	| ({ kind: "new" } & NewSessionRoute)
-	| ({ kind: "changes" } & ChangesRoute);
+	| ({ kind: "changes" } & ChangesRoute)
+	| ({ kind: "repo" } & RepoRoute);
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
 export type Route = { kind: "page"; page: Page } | { kind: "session"; sessionId: string } | { kind: "panes"; layout: Layout };
@@ -154,6 +161,7 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  *   with that project's coordinator, workers, and notes. Project ids are UUIDs, so none reads as `new`.
  * - `#calendar` opens the Calendar page, a month of routine runs, due todos, and due tickets.
  * - `#inbox` opens the Inbox page, your Gmail inbox's latest conversations.
+ * - `#repo/<dir>` opens every file of the git checkout that directory is in, read only, and `#repo/<dir>/<path>` the file at that path; both are encoded.
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	settings: rest => {
@@ -186,6 +194,10 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 		const [sessionId = "", path] = (rest ?? "").split("/");
 		return { kind: "changes", sessionId: decodeSegment(sessionId) ?? "", path: path ? decodeSegment(path) : null };
 	},
+	repo: rest => {
+		const [dir = "", path] = (rest ?? "").split("/");
+		return { kind: "repo", dir: decodeSegment(dir) ?? "", path: path ? decodeSegment(path) : null };
+	},
 };
 
 const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, head);
@@ -216,6 +228,8 @@ function restOfPage(page: Page): string | null {
 			return null;
 		case "changes":
 			return `${encodeURIComponent(page.sessionId)}${page.path === null ? "" : `/${encodeURIComponent(page.path)}`}`;
+		case "repo":
+			return `${encodeURIComponent(page.dir)}${page.path === null ? "" : `/${encodeURIComponent(page.path)}`}`;
 		default: {
 			const never: never = page;
 			return never;
@@ -238,6 +252,7 @@ function queryOfPage(page: Page): string | null {
 		case "calendar":
 		case "inbox":
 		case "changes":
+		case "repo":
 			return null;
 		default: {
 			const never: never = page;
@@ -264,6 +279,7 @@ export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection, cwd: string | null): string => hashForPage({ kind: "settings", section, cwd });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 export const hashForChanges = (sessionId: string, path: string | null = null): string => hashForPage({ kind: "changes", sessionId, path });
+export const hashForRepo = (dir: string, path: string | null = null): string => hashForPage({ kind: "repo", dir, path });
 
 /**
  * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives

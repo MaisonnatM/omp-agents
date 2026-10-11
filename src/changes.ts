@@ -162,8 +162,8 @@ export async function listChanges(place: SessionPlace): Promise<SessionChanges> 
 	return (await lists.get(placeKey(place), () => scan(place), true)).changes;
 }
 
-/** Bytes of a side as UTF-8 text, or why it does not show. */
-function decode(bytes: Uint8Array): { text: string } | { note: string } {
+/** Bytes of a side as UTF-8 text, or why it does not show; the repository page's file read shares it. */
+export function decode(bytes: Uint8Array): { text: string } | { note: string } {
 	if (bytes.includes(0)) return { note: "Binary file" };
 	try {
 		return { text: new TextDecoder("utf-8", { fatal: true }).decode(bytes) };

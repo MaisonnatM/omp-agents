@@ -17,6 +17,11 @@ describe("documentTitle", () => {
 		expect(documentTitle({ kind: "tickets", target: null }, null, null, null, [])).toBe("Tickets · omp agents");
 	});
 
+	test("the repository page names its open file, else the files", () => {
+		expect(documentTitle({ kind: "repo", dir: "~/code/webapp", path: "src/server/routes.ts" }, null, null, null, [])).toBe("routes.ts · Files · omp agents");
+		expect(documentTitle({ kind: "repo", dir: "~/code/webapp", path: null }, null, null, null, [])).toBe("Files · omp agents");
+	});
+
 	test("a project's page names the project, and the list, or a project not listed, names the projects", () => {
 		const projects = [{ id: "p1", name: "Launch" }] as Project[];
 		expect(documentTitle({ kind: "projects", target: { kind: "project", id: "p1" } }, null, null, null, projects)).toBe("Launch · omp agents");

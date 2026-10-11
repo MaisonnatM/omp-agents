@@ -132,6 +132,7 @@ export function App() {
 		hiddenTabs,
 		linearCallable,
 		hasDetails: detailsView !== null,
+		filesDir: focused.workDir ?? defaultWorkspace,
 		palette: overlays.palette,
 		dispatchPalette,
 		setShortcutsOpen,
