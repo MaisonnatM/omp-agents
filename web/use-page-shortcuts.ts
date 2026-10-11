@@ -15,7 +15,7 @@ export interface PageShortcutInput {
 	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through. */
 	listed: View[];
 	view: View | null;
-	/** The sidebar tabs that do not show, whose shortcuts then do not apply: Tickets without a sign-in to Linear, Inbox without one to Gmail. */
+	/** The sidebar tabs that do not show; their shortcuts do not apply. */
 	hiddenTabs: ReadonlySet<SidebarTab>;
 	/** The dashboard can create Linear issues, so the new-ticket shortcut applies. */
 	linearCallable: boolean;

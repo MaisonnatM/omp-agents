@@ -2,7 +2,7 @@ import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuBadge, Sidebar
 import { useGmailInbox } from "../../reads";
 import { hashForPage } from "../../routing";
 
-/** The Inbox tab of the sidebar: the signed-in address over the Inbox, with its unread count. The tab shows only with the Inbox page. */
+/** The Inbox tab of the sidebar: the signed-in address over the Inbox, with its unread count. */
 export function InboxNav() {
 	const read = useGmailInbox().inbox.read?.data;
 	const unread = read?.threads.filter(thread => thread.unread).length ?? 0;

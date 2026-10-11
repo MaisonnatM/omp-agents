@@ -10,7 +10,7 @@ import { ListPage, PageFrame } from "../list-page";
 const TITLE = "Inbox";
 const META = "Your Gmail inbox";
 
-/** A conversation as Gmail's list shows it, which opens in Gmail: an unread one bold behind a dot. */
+/** A conversation as Gmail's list shows it, which opens in Gmail. */
 function ThreadRow({ thread }: { thread: MailThread }) {
 	return (
 		<li className="rounded-md hover:bg-muted has-[:focus-visible]:bg-muted">
@@ -41,7 +41,7 @@ function ThreadRow({ thread }: { thread: MailThread }) {
 	);
 }
 
-/** Your Gmail inbox's latest conversations, newest first, each opening in Gmail; the page only reads. */
+/** Your Gmail inbox's latest conversations, newest first, each opening in Gmail. */
 export function InboxPage() {
 	const { inbox } = useGmailInbox();
 	const read = inbox.read?.data;

@@ -1,8 +1,7 @@
 /** The Inbox page's mail: the latest conversations of your Gmail inbox, read only. */
 
-/** One conversation in your Gmail inbox, as the Inbox page lists it, newest first. */
+/** One conversation in your Gmail inbox, as the Inbox page lists it. */
 export interface MailThread {
-	/** Gmail's thread id. */
 	id: string;
 	/** Who sent the thread's last message: their display name, else their address. */
 	from: string;
@@ -14,7 +13,7 @@ export interface MailThread {
 	at: number;
 	/** Whether any of its messages is unread. */
 	unread: boolean;
-	/** How many messages it holds. */
+	/** How many messages it holds, drafts left out. */
 	count: number;
 	/** The thread in Gmail, signed in as the inbox's address. */
 	url: string;

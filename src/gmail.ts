@@ -42,7 +42,7 @@ function headerOf(message: Record<string, unknown>, name: string): string {
 	return (isObject(header) && str(header.value)) || "";
 }
 
-/** A thread as the Inbox page lists it, or `null` for one without an id, a message other than a draft, or an arrival time. Drafts count for nothing: no one sent them yet. */
+/** A thread as the Inbox page lists it, or `null` for one without an id, a message other than a draft, or an arrival time. */
 function threadOf(thread: unknown, snippet: string, address: string): MailThread | null {
 	if (!isObject(thread) || !Array.isArray(thread.messages)) return null;
 	const id = nonEmptyStr(thread.id);
@@ -74,7 +74,7 @@ export class GmailClient {
 
 	/**
 	 * The signed-in address and its inbox's latest conversations, in Gmail's order. `fresh` reads them again.
-	 * A thread that cannot be read fails the whole read rather than leaving a gap in the list.
+	 * One failed thread read fails the whole read.
 	 */
 	inbox(fresh = false): Promise<InboxAnswer> {
 		return this.#inbox.get("", () => this.#read(), fresh);

@@ -24,7 +24,6 @@ interface AppSidebarProps {
 	panes: View[];
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
-	/** The tabs that do not show. */
 	hiddenTabs: ReadonlySet<SidebarTab>;
 	/** The server has sent the session lists. */
 	listed: boolean;

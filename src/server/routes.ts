@@ -87,7 +87,6 @@ export interface RouteEnv {
 	guards: Guards;
 	sessions: SessionRoutesEnv;
 	calendar: CalendarRoutesEnv;
-	/** Your Gmail inbox, which the Inbox page lists. */
 	gmail: GmailClient;
 	files: FileRoutesEnv;
 }
@@ -289,7 +288,6 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 	/** `PUT /api/integrations/sign-out`: removes the sign-ins omp manages for the integration's server, as `/mcp unauth` does; its config stays. */
 	const integrationSignOut = integrationWrite(signOutIntegration);
 
-	/** A client the MCP config cannot take is a 400. */
 	const refuseClient = (err: unknown): Response | null => (err instanceof ClientConfigError ? fail(400, err.message) : null);
 
 	/** `PUT /api/integrations/slack/client`: `{ clientId, clientSecret?, redirectUri, callbackPort, scope }` of your Slack app. */

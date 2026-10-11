@@ -153,7 +153,6 @@ interface RosterProps {
 	open: View[];
 	/** The new-session draft is open. */
 	newSessionOpen: boolean;
-	/** The tabs that do not show: Tickets without a sign-in to Linear, Inbox without one to Gmail. */
 	hiddenTabs: ReadonlySet<SidebarTab>;
 	/** The sidebar's tab, selected by the page or kept over the panes. */
 	tab: SidebarTab;
