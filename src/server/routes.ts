@@ -37,7 +37,7 @@ import { SystemLoadReader } from "../system-load";
 import { readTextFile } from "../text-file";
 import type { Terminals } from "../terminals";
 import type { Worktrees } from "../worktrees";
-import { answer, fail, type Guards } from "./http";
+import { answer, answerOr404, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { listNotes } from "./project-notes";
 import { type Parsed, parseCalendarShown, parseGoogleClient, parseIntegrationId, parseLocalEventId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
@@ -234,13 +234,11 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	});
 
 	/** `GET /api/changes/file?session=<id>&path=<path>`: one file of that list in full, with its diff; only a path the list holds. */
-	const changedFile = get(async params => {
+	const changedFile = get(params => {
 		const place = sessionPlace(params);
 		if (place instanceof Response) return place;
 		const path = params.get("path") ?? "";
-		const file = await readChangedFile(place, path).catch((err: unknown) => fail(500, errorText(err)));
-		if (file instanceof Response) return file;
-		return file ? Response.json(file) : fail(404, `The session changed no file ${path}`);
+		return answerOr404(() => readChangedFile(place, path), `The session changed no file ${path}`);
 	});
 
 	/** `GET /api/project-notes?id=<project id>`: the project's notes directory and the Markdown files in it, which the file dialog opens. */
@@ -461,11 +459,9 @@ function pullRequestRoutes({ get, write }: RouteKit): Routes {
 	const pullRequestFiles = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => listPullRequestChanges(pr)));
 
 	/** `GET /api/pull-request/file?owner=<o>&repo=<r>&number=<n>&path=<path>`: one file of that list in full, with its diff; only a path the list holds. */
-	const pullRequestFile = pullRequestGet("Expected ?owner=&repo=&number=&path=", async (pr, params) => {
+	const pullRequestFile = pullRequestGet("Expected ?owner=&repo=&number=&path=", (pr, params) => {
 		const path = params.get("path") ?? "";
-		const file = await readPullRequestFile(pr, path).catch((err: unknown) => fail(500, errorText(err)));
-		if (file instanceof Response) return file;
-		return file ? Response.json(file) : fail(404, `${prKey(pr)} changes no file ${path}`);
+		return answerOr404(() => readPullRequestFile(pr, path), `${prKey(pr)} changes no file ${path}`);
 	});
 
 	return {
@@ -541,20 +537,15 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 	/** `GET /api/repo?cwd=<dir>`: `RepoFiles`, every file of the git checkout `cwd` is in, tracked and untracked but not ignored. */
 	const repo = get(async params => {
 		const cwd = await dirParam(params);
-		if (cwd instanceof Response) return cwd;
-		const files = await listRepoFiles(cwd).catch((err: unknown) => fail(500, errorText(err)));
-		if (files instanceof Response) return files;
-		return files ? Response.json(files) : fail(404, `Not a git checkout: ${cwd}`);
+		return cwd instanceof Response ? cwd : answerOr404(() => listRepoFiles(cwd), `Not a git checkout: ${cwd}`);
 	});
 
-	/** `GET /api/repo/file?cwd=<dir>&path=<path>`: one file of that list in full, every line unchanged; only a path the list holds. */
+	/** `GET /api/repo/file?cwd=<dir>&path=<path>`: one file of that list in full, every line unchanged; only a path git lists. */
 	const repoFile = get(async params => {
 		const cwd = await dirParam(params);
 		if (cwd instanceof Response) return cwd;
 		const path = params.get("path") ?? "";
-		const file = await readRepoFile(cwd, path).catch((err: unknown) => fail(500, errorText(err)));
-		if (file instanceof Response) return file;
-		return file ? Response.json(file) : fail(404, `The checkout of ${cwd} holds no file ${path}`);
+		return answerOr404(() => readRepoFile(cwd, path), `The checkout of ${cwd} holds no file ${path}`);
 	});
 
 	return {

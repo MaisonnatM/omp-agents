@@ -1,8 +1,8 @@
 import { ChevronsUpDown } from "lucide-react";
 import { Fragment, useMemo, useRef, useState } from "react";
-import type { ChangedFileText, DiffRow } from "../../../src/shared/changes";
-import { type FileLine, fileLines, foldDiff } from "../../changes-model";
-import { highlightRows, type Token } from "../../code-highlight";
+import type { ChangedFileText, DiffRow } from "../../src/shared/changes";
+import { type FileLine, fileLines, foldDiff } from "../changes-model";
+import { highlightRows, type Token } from "../code-highlight";
 import { cn } from "@/lib/utils";
 
 const ROW_TONE = { "+": "bg-emerald-500/12", "-": "bg-red-500/12", " ": "" } as const;

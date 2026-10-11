@@ -63,8 +63,11 @@ describe("readRepoFile", () => {
 		});
 	});
 
-	test("reads only a path the list holds", async () => {
+	test("reads only a path git lists by that exact name, so no directory, ignored file, or path out of the checkout", async () => {
 		const { root } = await repo();
+		expect(await readRepoFile(root, "src")).toBe(null);
+		expect(await readRepoFile(root, "")).toBe(null);
+		expect(await readRepoFile(root, "src/../src/a.ts")).toBe(null);
 		expect(await readRepoFile(root, "debug.log")).toBe(null);
 		expect(await readRepoFile(root, "missing.ts")).toBe(null);
 		expect(await readRepoFile(root, "../secret.txt")).toBe(null);

@@ -1,13 +1,22 @@
 import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
-import { foldersAbove, type TreeDir } from "../../changes-model";
+import { foldersAbove, type TreeDir } from "../file-tree";
 import { cn } from "@/lib/utils";
 
-/** What a file's row shows besides its name: its tooltip, whether its name is struck through, and what follows the name. */
+/** What a file's row shows besides its name: its tooltip, a class for its name, and what follows the name. */
 export interface FileDecoration {
 	title: string;
-	struck: boolean;
-	trailing: ReactNode;
+	nameClassName?: string;
+	trailing?: ReactNode;
+}
+
+const plain = (file: { path: string }): FileDecoration => ({ title: file.path });
+
+/** `set` with each of `paths` added when it is missing and dropped when it is there. */
+function flipped(set: ReadonlySet<string>, paths: readonly string[]): ReadonlySet<string> {
+	const next = new Set(set);
+	for (const path of paths) if (!next.delete(path)) next.add(path);
+	return next;
 }
 
 interface FileTreeProps<F extends { path: string }> {
@@ -20,38 +29,37 @@ interface FileTreeProps<F extends { path: string }> {
 	onPick?: (path: string) => void;
 	/** Every folder starts closed, for a list too long to show whole; otherwise every folder starts open. */
 	startClosed?: boolean;
-	decorate: (file: F) => FileDecoration;
+	/** By default a row's tooltip is its path and nothing follows its name. */
+	decorate?: (file: F) => FileDecoration;
 }
 
 /** Files as folders, each folder open or closed until you click it, and opened when a file in it opens. */
-export function FileTree<F extends { path: string }>({ tree, open, hrefFor, onPick, startClosed = false, decorate }: FileTreeProps<F>) {
+export function FileTree<F extends { path: string }>({ tree, open, hrefFor, onPick, startClosed = false, decorate = plain }: FileTreeProps<F>) {
 	// The folders clicked away from how they start.
 	const [toggled, setToggled] = useState<ReadonlySet<string>>(new Set());
+	// The `startClosed` that `toggled` is relative to; a new one starts every folder over.
+	const [togglesFrom, setTogglesFrom] = useState(startClosed);
 	// `null` at first, so a file open from the start opens its folders too.
 	const [revealed, setRevealed] = useState<string | null>(null);
-	if (revealed !== open) {
+	const isShut = (path: string): boolean => startClosed !== toggled.has(path);
+	if (togglesFrom !== startClosed) {
+		setTogglesFrom(startClosed);
+		setToggled(new Set());
+		setRevealed(null);
+	} else if (revealed !== open) {
 		setRevealed(open);
-		const shut = (open === null ? [] : (foldersAbove(tree, open) ?? [])).filter(path => startClosed !== toggled.has(path));
-		if (shut.length > 0) {
-			const next = new Set(toggled);
-			for (const path of shut) if (!next.delete(path)) next.add(path);
-			setToggled(next);
-		}
+		const shut = (open === null ? [] : (foldersAbove(tree, open) ?? [])).filter(isShut);
+		if (shut.length > 0) setToggled(flipped(toggled, shut));
 	}
 	const openRow = useRef<HTMLAnchorElement>(null);
 	useEffect(() => {
 		openRow.current?.scrollIntoView({ block: "nearest" });
 	}, [open]);
-	const toggle = (path: string): void =>
-		setToggled(prev => {
-			const next = new Set(prev);
-			if (!next.delete(path)) next.add(path);
-			return next;
-		});
+	const toggle = (path: string): void => setToggled(prev => flipped(prev, [path]));
 	const level = (dir: TreeDir<F>, depth: number) => (
 		<>
 			{dir.dirs.map(child => {
-				const shut = startClosed !== toggled.has(child.path);
+				const shut = isShut(child.path);
 				const Chevron = shut ? ChevronRight : ChevronDown;
 				return (
 					<Fragment key={child.path}>
@@ -74,7 +82,7 @@ export function FileTree<F extends { path: string }>({ tree, open, hrefFor, onPi
 			})}
 			{dir.files.map(file => {
 				const current = file.path === open;
-				const { title, struck, trailing } = decorate(file);
+				const { title, nameClassName, trailing } = decorate(file);
 				return (
 					<li key={file.path}>
 						<a
@@ -94,7 +102,7 @@ export function FileTree<F extends { path: string }>({ tree, open, hrefFor, onPi
 							style={{ paddingLeft: depth * 12 + 20 }}
 						>
 							<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-							<span className={cn("min-w-0 flex-1 truncate", struck && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
+							<span className={cn("min-w-0 flex-1 truncate", nameClassName)}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
 							{trailing}
 						</a>
 					</li>

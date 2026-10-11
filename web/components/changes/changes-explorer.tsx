@@ -1,15 +1,15 @@
 import { useMemo } from "react";
 import type { ChangedEntry, ChangedFileText } from "../../../src/shared/changes";
-import { fileTree, treeOrder } from "../../changes-model";
+import { fileTree, treeOrder } from "../../file-tree";
 import { useRead } from "../../reads";
 import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { cn } from "@/lib/utils";
+import { CodeView } from "../code-view";
+import { type FileDecoration, FileTree, PathCrumbs } from "../file-tree";
 import { LineCounts } from "../line-counts";
-import { CodeView } from "./code-view";
-import { type FileDecoration, FileTree, PathCrumbs } from "./file-tree";
 
 /** Diff shows the changes with unchanged runs folded; File shows the whole file as it is now, its changes marked in the gutter. */
 const MODES = ["diff", "file"] as const;
@@ -45,7 +45,7 @@ function StatusLetter({ file }: { file: ChangedEntry }) {
 function changeDecoration(file: ChangedEntry): FileDecoration {
 	return {
 		title: `${file.path}: ${statusLabel(file)}`,
-		struck: file.status === "deleted",
+		nameClassName: file.status === "deleted" ? "line-through opacity-70" : undefined,
 		trailing: (
 			<>
 				{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}

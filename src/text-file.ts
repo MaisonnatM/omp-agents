@@ -1,8 +1,8 @@
 /** Reads the text file that a path in agent text names, for the page's file dialog (`GET /api/file`). */
 import { realpath, stat } from "node:fs/promises";
-import { dirname, extname, isAbsolute, join, resolve, sep } from "node:path";
+import { dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { agentDir } from "./omp/config";
-import { HOME, tokenFile } from "./paths";
+import { HOME, tokenFile, within } from "./paths";
 import { MAX_TEXT_FILE_BYTES, TEXT_FILE_EXTENSIONS, type TextFile } from "./shared/transcript";
 
 export type TextFileRead = { ok: true; file: TextFile } | { ok: false; status: 400 | 403 | 404 | 415; error: string };
@@ -26,14 +26,9 @@ export const DENIED_DIRS: readonly DeniedDir[] = [
 
 const refuse = (status: 400 | 403 | 404 | 415, error: string): TextFileRead => ({ ok: false, status, error });
 
-/** Whether real path `real` is `dir`, or inside it, once `dir` is real too; a directory that does not exist yet is compared as named. */
-export async function within(dir: string, real: string): Promise<boolean> {
-	const root = await realpath(dir).catch(() => resolve(dir));
-	return real === root || real.startsWith(root.endsWith(sep) ? root : `${root}${sep}`);
-}
-
-/** The dir of `denied` that refuses real path `real`, a file whose extension is `extension`; `null` when none does. */
-export async function deniedDirOf(real: string, extension: string, denied: readonly DeniedDir[] = DENIED_DIRS): Promise<string | null> {
+/** The dir of `denied` that refuses real path `real`, unless it opens the file's extension; `null` when none does. */
+export async function deniedDirOf(real: string, denied: readonly DeniedDir[] = DENIED_DIRS): Promise<string | null> {
+	const extension = extname(real).slice(1).toLowerCase();
 	for (const { dir, opens } of denied) {
 		if (!opens.includes(extension) && (await within(dir, real))) return dir;
 	}
@@ -55,7 +50,7 @@ export async function readTextFile(path: string, denied: readonly DeniedDir[] = 
 	if (!TEXT_FILE_EXTENSIONS.includes(extension)) {
 		return refuse(415, `Only text files open here: ${TEXT_FILE_EXTENSIONS.map(ext => `.${ext}`).join(", ")}`);
 	}
-	const refusing = await deniedDirOf(real, extension, denied);
+	const refusing = await deniedDirOf(real, denied);
 	if (refusing !== null) return refuse(403, `${named} is in ${refusing}, which holds sign-ins and config and does not open here`);
 	const truncated = info.size > MAX_TEXT_FILE_BYTES;
 	const bytes = await Bun.file(real).slice(0, MAX_TEXT_FILE_BYTES).bytes();

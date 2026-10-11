@@ -138,6 +138,13 @@ function decodeSegment(raw: string): string | null {
 const decodeCwd = (rest: string | null): string | null => (rest === null ? null : decodeSegment(rest));
 const encodeCwd = (cwd: string | null): string | null => (cwd === null ? null : encodeURIComponent(cwd));
 
+/** The changes page and the repository page both name a segment, then optionally a path, each encoded: `<segment>[/<path>]`. A segment missing or malformed reads `""`. */
+function segmentAndPath(rest: string | null): [string, string | null] {
+	const [segment = "", path] = (rest ?? "").split("/");
+	return [decodeSegment(segment) ?? "", path ? decodeSegment(path) : null];
+}
+const restOf = (segment: string, path: string | null): string => `${encodeURIComponent(segment)}${path === null ? "" : `/${encodeURIComponent(path)}`}`;
+
 /** The Todo page's lists that are not a category, by the hash segment that names them. Category ids are random, so none reads as one. */
 const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents: { kind: "agents" }, archive: { kind: "archive" } } as const satisfies Record<string, TodoListView>;
 
@@ -191,12 +198,12 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	calendar: () => ({ kind: "calendar" }),
 	inbox: () => ({ kind: "inbox" }),
 	changes: rest => {
-		const [sessionId = "", path] = (rest ?? "").split("/");
-		return { kind: "changes", sessionId: decodeSegment(sessionId) ?? "", path: path ? decodeSegment(path) : null };
+		const [sessionId, path] = segmentAndPath(rest);
+		return { kind: "changes", sessionId, path };
 	},
 	repo: rest => {
-		const [dir = "", path] = (rest ?? "").split("/");
-		return { kind: "repo", dir: decodeSegment(dir) ?? "", path: path ? decodeSegment(path) : null };
+		const [dir, path] = segmentAndPath(rest);
+		return { kind: "repo", dir, path };
 	},
 };
 
@@ -227,9 +234,9 @@ function restOfPage(page: Page): string | null {
 		case "inbox":
 			return null;
 		case "changes":
-			return `${encodeURIComponent(page.sessionId)}${page.path === null ? "" : `/${encodeURIComponent(page.path)}`}`;
+			return restOf(page.sessionId, page.path);
 		case "repo":
-			return `${encodeURIComponent(page.dir)}${page.path === null ? "" : `/${encodeURIComponent(page.path)}`}`;
+			return restOf(page.dir, page.path);
 		default: {
 			const never: never = page;
 			return never;

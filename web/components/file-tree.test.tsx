@@ -1,14 +1,12 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { fileTree } from "../../changes-model";
+import { fileTree } from "../file-tree";
 import { FileTree } from "./file-tree";
 
 const tree = fileTree(["README.md", "docs/usage.md", "src/server/routes.ts", "src/web/app.tsx"].map(path => ({ path })));
 
 const shown = (open: string | null, startClosed?: boolean): string =>
-	renderToStaticMarkup(
-		<FileTree tree={tree} open={open} hrefFor={path => `#repo/x/${path}`} startClosed={startClosed} decorate={file => ({ title: file.path, struck: false, trailing: null })} />,
-	);
+	renderToStaticMarkup(<FileTree tree={tree} open={open} hrefFor={path => `#repo/x/${path}`} startClosed={startClosed} />);
 
 test("every folder starts open unless the tree starts closed", () => {
 	const open = shown(null);

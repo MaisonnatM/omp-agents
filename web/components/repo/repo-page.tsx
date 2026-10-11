@@ -3,25 +3,19 @@ import { useMemo, useState } from "react";
 import type { ChangedFileText } from "../../../src/shared/changes";
 import { everyWord } from "../../../src/shared/every-word";
 import type { RepoFiles } from "../../../src/shared/repo-files";
-import { fileTree } from "../../changes-model";
+import { fileTree } from "../../file-tree";
 import { folderName } from "../../labels";
 import { useRead } from "../../reads";
 import { hashForRepo } from "../../routing";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { CodeView } from "../changes/code-view";
-import { type FileDecoration, FileTree, PathCrumbs } from "../changes/file-tree";
+import { CodeView } from "../code-view";
+import { FileTree, PathCrumbs } from "../file-tree";
 import { Header } from "../page-header";
 import { SidebarSearch } from "../sidebar-search";
 
 /** The most files a filter shows, so a short query over a large checkout does not draw tens of thousands of rows. */
 const MAX_FOUND = 500;
-
-interface RepoFile {
-	path: string;
-}
-
-const plainFile = (file: RepoFile): FileDecoration => ({ title: file.path, struck: false, trailing: null });
 
 interface RepoPageProps {
 	/** A directory of the checkout, absolute or `~/…`. */
@@ -40,15 +34,15 @@ export function RepoPage({ dir, path }: RepoPageProps) {
 	const list = useRead<RepoFiles>(`/api/repo?cwd=${encodeURIComponent(dir)}`, reads);
 	const read = useRead<ChangedFileText>(path === null ? null : `/api/repo/file?cwd=${encodeURIComponent(dir)}&path=${encodeURIComponent(path)}`, reads);
 	const repo = list.data;
-	const files = useMemo(() => (repo?.files ?? []).map((file): RepoFile => ({ path: file })), [repo]);
+	const files = useMemo(() => (repo?.files ?? []).map(file => ({ path: file })), [repo]);
 	const filtering = query.trim() !== "";
-	const matched = useMemo(() => {
-		if (!filtering) return files;
+	const shown = useMemo(() => {
+		if (!filtering) return { files, hidden: 0 };
 		const holds = everyWord(query);
-		return files.filter(file => holds(file.path));
+		const matched = files.filter(file => holds(file.path));
+		return { files: matched.slice(0, MAX_FOUND), hidden: Math.max(matched.length - MAX_FOUND, 0) };
 	}, [files, query, filtering]);
-	const tree = useMemo(() => fileTree(filtering ? matched.slice(0, MAX_FOUND) : matched), [matched, filtering]);
-	const hidden = filtering ? Math.max(matched.length - MAX_FOUND, 0) : 0;
+	const tree = useMemo(() => fileTree(shown.files), [shown.files]);
 
 	const meta = repo && (
 		<>
@@ -78,13 +72,12 @@ export function RepoPage({ dir, path }: RepoPageProps) {
 							<SidebarSearch label="Filter the files" placeholder="Search files" query={query} onQuery={setQuery} />
 						</div>
 						<div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
-							{filtering && matched.length === 0 ? (
+							{filtering && shown.files.length === 0 ? (
 								<p className="px-2 py-2 text-xs text-muted-foreground">{`No files match “${query.trim()}”`}</p>
 							) : (
-								// Keyed by whether a filter shows, so folders clicked in one mode keep no meaning in the other.
-								<FileTree key={String(filtering)} tree={tree} open={path} hrefFor={file => hashForRepo(dir, file)} startClosed={!filtering} decorate={plainFile} />
+								<FileTree tree={tree} open={path} hrefFor={file => hashForRepo(dir, file)} startClosed={!filtering} />
 							)}
-							{hidden > 0 && <p className="px-2 py-2 text-xs text-muted-foreground">{`${hidden} more match; type more to narrow`}</p>}
+							{shown.hidden > 0 && <p className="px-2 py-2 text-xs text-muted-foreground">{`${shown.hidden} more match; type more to narrow`}</p>}
 						</div>
 					</nav>
 					{path === null ? (

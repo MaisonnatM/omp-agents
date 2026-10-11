@@ -1,6 +1,6 @@
-import { stat } from "node:fs/promises";
+import { realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 export const HOME = homedir();
 
@@ -58,4 +58,10 @@ export async function directoryOf(input: string): Promise<string | null> {
 	const cwd = raw === "~" || raw.startsWith("~/") ? join(HOME, raw.slice(1)) : resolve(HOME, raw);
 	const found = await stat(cwd).catch(() => null);
 	return found?.isDirectory() ? cwd : null;
+}
+
+/** Whether real path `real` is `dir`, or inside it, once `dir` is real too; a directory that does not exist yet is compared as named. */
+export async function within(dir: string, real: string): Promise<boolean> {
+	const root = await realpath(dir).catch(() => resolve(dir));
+	return real === root || real.startsWith(root.endsWith(sep) ? root : `${root}${sep}`);
 }

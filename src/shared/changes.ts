@@ -44,6 +44,9 @@ export interface ChangedFileText {
 /** The most bytes of a side that the changes view reads. */
 export const MAX_CHANGED_FILE_BYTES = 1024 * 1024;
 
+/** Why a side of `size` bytes, past {@link MAX_CHANGED_FILE_BYTES}, does not show. */
+export const tooLargeNote = (size: number): string => `Too large to show: ${Math.round(size / 1024)} KB`;
+
 /**
  * The rows of `git diff --unified=<every line>`: the header lines before the first `@@` are skipped, and so is the
  * `\ No newline at end of file` marker. A diff with no hunk, an unchanged file, has no rows.
@@ -84,8 +87,18 @@ const linesOf = (text: string): string[] => {
 };
 
 /** A file's text as rows that changed nothing, for a file with no base to compare. */
-export function contextRows(text: string): DiffRow[] {
+function contextRows(text: string): DiffRow[] {
 	return linesOf(text).map((line, index) => ({ sign: " ", old: index + 1, new: index + 1, text: line }));
+}
+
+/** A whole file's bytes as {@link contextRows}, or why they do not show: a NUL byte marks a binary file, and the text must be UTF-8. */
+export function wholeFileRows(bytes: Uint8Array): Pick<ChangedFileText, "rows" | "note"> {
+	if (bytes.includes(0)) return { rows: null, note: "Binary file" };
+	try {
+		return { rows: contextRows(new TextDecoder("utf-8", { fatal: true }).decode(bytes)), note: null };
+	} catch {
+		return { rows: null, note: "Not UTF-8 text" };
+	}
 }
 
 /**

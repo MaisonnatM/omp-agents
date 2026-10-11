@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import type { ChangedEntry, DiffRow } from "../src/shared/changes";
-import { type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, treeOrder } from "./changes-model";
+import type { DiffRow } from "../src/shared/changes";
+import { type DiffItem, fileLines, foldDiff } from "./changes-model";
 
 const same = (count: number, from = 1): DiffRow[] => Array.from({ length: count }, (_, at) => ({ sign: " ", old: from + at, new: from + at, text: "" }));
 const added: DiffRow = { sign: "+", old: null, new: 0, text: "" };
 const removed: DiffRow = { sign: "-", old: 0, new: null, text: "" };
-const entry = (path: string): ChangedEntry => ({ path, status: "modified", added: 1, removed: 0, session: false });
 const shown = (items: DiffItem[]) => items.map(item => (item.kind === "row" ? item.index : `fold ${item.from}-${item.to}`));
 
 describe("foldDiff", () => {
@@ -46,24 +45,5 @@ describe("fileLines", () => {
 
 	test("removed lines before an unchanged line hang on it unmarked", () => {
 		expect(fileLines([removed, ...same(1)]).lines).toEqual([{ index: 1, mark: null, removed: [0], run: 1 }]);
-	});
-});
-
-describe("fileTree", () => {
-	test("joins chains of single folders, lists folders before files, and orders ↓ and ↑ by the tree", () => {
-		const tree = fileTree([entry("README.md"), entry("web/components/changes/a.tsx"), entry("web/components/changes/b.tsx"), entry("src/z.ts"), entry("src/server/a.ts")]);
-		expect(tree.dirs.map(dir => dir.name)).toEqual(["src", "web/components/changes"]);
-		expect(tree.dirs[1]!.path).toBe("web/components/changes");
-		expect(treeOrder(tree).map(file => file.path)).toEqual(["src/server/a.ts", "src/z.ts", "web/components/changes/a.tsx", "web/components/changes/b.tsx", "README.md"]);
-		// ↓ or ↑ opening a file reopens the folders above it, a joined chain by its full path.
-		expect(foldersAbove(tree, "src/server/a.ts")).toEqual(["src", "src/server"]);
-		expect(foldersAbove(tree, "web/components/changes/b.tsx")).toEqual(["web/components/changes"]);
-		expect(foldersAbove(tree, "README.md")).toEqual([]);
-	});
-
-	test("an absolute path hangs under one `/` folder, joined with its single folders", () => {
-		const tree = fileTree([entry("/tmp/x/notes.md"), entry("a.ts")]);
-		expect(tree.dirs.map(dir => dir.name)).toEqual(["/tmp/x"]);
-		expect(treeOrder(tree).map(file => file.path)).toEqual(["/tmp/x/notes.md", "a.ts"]);
 	});
 });
