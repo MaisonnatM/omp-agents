@@ -2,15 +2,11 @@
 import { complete } from "../commands";
 import { errorText } from "../json";
 import { directoryOf } from "../paths";
-import type { RoutineChange } from "../routines";
 import type { NoticeOp } from "../shared/notices";
-import type { PinChange } from "../shared/pins";
-import type { ProjectEdit } from "../shared/projects";
-import type { ScheduledChange } from "../shared/scheduled";
 import type { ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
-import type { UserTodoChange } from "../user-todos-shared";
 import type { LiveSessions } from "./live-sessions";
+import type { ListRegistry } from "./list-registry";
 import type { ProjectSpec } from "./project-runner";
 import type { Peer, Run } from "./request-ledger";
 import type { Views } from "./views";
@@ -22,26 +18,17 @@ export interface SocketEnv {
 	start(request: StartRequest): Promise<StartResult>;
 	/** Create a project in `spec.cwd` and start its coordinator on `spec.prompt`, ready once the coordinator is. */
 	createProject(spec: ProjectSpec): Promise<StartResult>;
-	/** Apply `change` to the projects and send every socket the projects after it, or, when it changes nothing, send `peer` the projects it missed. */
-	changeProject(peer: Peer, change: ProjectEdit): void;
+	lists: ListRegistry;
 	/** End live session `instanceId` as **End session** does, then remove the git worktree it worked in. */
 	end(instanceId: string): Promise<void>;
 	/** Move interrupted session `sessionId` to the past sessions. */
 	dismissInterrupted(sessionId: string): void;
 	/** Whether interrupted session `sessionId` stopped while its turn ran. */
 	stoppedMidTurn(sessionId: string): boolean;
-	/** Apply `change` to the Todo page's list and send every socket the list after it, or, when it changes nothing, send `peer` the list it missed. */
-	changeTodo(peer: Peer, change: UserTodoChange): void;
-	/** Apply `change` to the routines and send every socket the routines after it, or, when it changes nothing, send `peer` the routines it missed. */
-	changeRoutine(peer: Peer, change: Exclude<RoutineChange, { op: "run-now" }>): void;
 	/** Run routine `id` now, whatever its schedule. */
 	runRoutine(id: string): Promise<void>;
-	/** Apply `change` to the scheduled sends and send every socket the sends after it, or, when it changes nothing, send `peer` the sends it missed. */
-	changeScheduled(peer: Peer, change: Exclude<ScheduledChange, { op: "send-now" }>): void;
 	/** Send scheduled send `id` now, whatever its time, or try a failed one again. */
 	sendScheduledNow(id: string): Promise<void>;
-	/** Apply `change` to the pins; every socket then gets the pins as they are after, and `peer` gets them even when nothing changed. */
-	changePins(peer: Peer, change: PinChange): void;
 	/** Act on notices `ids`; every socket then gets the notices as they are after. */
 	changeNotices(ids: string[], op: NoticeOp): Promise<void>;
 }
@@ -141,11 +128,11 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	"set-thinking": ({ sessions }, _peer, { instanceId, level }) => sessions.started(instanceId)?.setThinking(level),
 	"set-fast": ({ sessions }, _peer, { instanceId, enabled }) => sessions.started(instanceId)?.setFast(enabled),
 	answer: ({ sessions }, _peer, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
-	"user-todo": ({ changeTodo }, peer, { change }) => changeTodo(peer, change),
-	routine: ({ changeRoutine, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : changeRoutine(peer, change)),
-	schedule: ({ changeScheduled, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : changeScheduled(peer, change)),
-	pin: ({ changePins }, peer, { change }) => changePins(peer, change),
-	project: ({ changeProject }, peer, { change }) => changeProject(peer, change),
+	"user-todo": ({ lists }, peer, { change }) => void lists.apply("user-todos", change, peer),
+	routine: ({ lists, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : void lists.apply("routines", change, peer)),
+	schedule: ({ lists, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : void lists.apply("scheduled", change, peer)),
+	pin: ({ lists }, peer, { change }) => void lists.apply("pins", change, peer),
+	project: ({ lists }, peer, { change }) => void lists.apply("projects", change, peer),
 	notice: ({ changeNotices }, _peer, { ids, op }) => changeNotices(ids, op),
 };
 

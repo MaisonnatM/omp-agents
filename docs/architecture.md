@@ -283,6 +283,14 @@ A prompt that fails comes back to the composer with its files and a note, and a 
 A handler's error goes to the server's log once, with its message type, on the run that threw.
 A page loaded before page ids tags its requests with no `floor`, so the server drops them until the page reloads.
 
+`ListRegistry` in `src/server/list-registry.ts` owns the whole-list snapshots for todos, routines, scheduled sends, workspaces, pins, projects, and notices.
+`Dashboard` registers each typed message builder once, beside its store's edit function when it has synchronous edits.
+`Broadcasts.open` iterates these registrations, so a new list needs no separate opening-snapshot or push method.
+`Broadcasts.pushList(kind)` uses that same builder and suppresses an identical whole-list message; roster and past messages still send their row-level deltas.
+Socket edits, workspace HTTP edits, todo inbox changes, and routine pin changes go through the registry's typed `apply`.
+An edit that changes the list publishes it to every listener; one that changes nothing instead resends the authoritative snapshot to its requesting peer, if there is one.
+Routine and scheduled runner actions and asynchronous notice actions remain separate, publishing their list through `pushList` when they change it.
+
 ## Desktop shell
 
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
@@ -358,6 +366,7 @@ omp-stats' `getTimeRangeConfig` gives each range's cutoff and bucket, except `to
 `web/components/settings/provider-trend.tsx` renders Recharts stacked bars, bucket details, and an optional data table from that provider breakdown.
 The page and an Analytics API read with no range default to `24h`.
 `analyticsStore` in `web/reads.ts` uses `createPolledStore` to keep each range's last successful answer in memory and localStorage, discarding incompatible saved shapes.
+Polled stores opt into persistence with one `cache: { key, isValid }` configuration; the key and shape guard are required together, and omitting `cache` keeps reads only in memory.
 `AnalyticsTab` shows that answer while refreshing on activation or a range change, and every two seconds during indexing or 30 seconds otherwise while active.
 A failed refresh keeps the last successful answer and reports its error without replacing another range's data.
 The displayed cost is omp's API-equivalent list price, not the user's subscription bill.
