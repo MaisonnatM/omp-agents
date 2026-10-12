@@ -74,6 +74,8 @@ function builderConfig(): Record<string, unknown> {
 	return {
 		appId: JSON.parse(readFileSync(join(DESKTOP, "package.json"), "utf8")).build.appId,
 		productName: "omp agents",
+		// Without spaces, so GitHub's asset names match the URLs in `latest-mac.yml`.
+		artifactName: "omp-agents-${version}-${arch}.${ext}",
 		directories: { output: join(DESKTOP, "release") },
 		files: ["dist/main.cjs", "icon.png", "package.json"],
 		extraResources: [
