@@ -21,6 +21,7 @@ import { contextVariants, levelLabel, modelMatch, providerQuota } from "../model
 import type { ModelList } from "../reads";
 import { shortcutLabels } from "../shortcuts";
 import { CommandResults, type PickerGroup, type PickerList } from "./command-picker";
+import { ComposerEditor } from "./composer";
 import { OrgIcon } from "./org-icon";
 import { NO_PLANS, Plans } from "./plan-usage";
 
@@ -162,7 +163,10 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 	const contextWindow = variants.find(model => selectorOf(model) === current)?.contextWindow ?? null;
 	const levels = effort.levels ?? [];
 	const effortValue = pending ? "Switching…" : effort.levels === null ? "Unavailable" : levels.length === 0 ? "None" : effort.current ? levelLabel(effort.current) : "Default";
+	const composer = useContext(ComposerEditor);
+	const picked = useRef(false);
 	const pick = ({ provider, id }: ModelOption): void => {
+		picked.current = true;
 		onOpenChange(null);
 		if (!disabled && !pending && `${provider}/${id}` !== current) onPick({ provider, id });
 	};
@@ -190,7 +194,17 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 					</span>
 				</DropdownMenuTrigger>
 			</Tooltip>
-			<DropdownMenuContent side="top" className="w-64">
+			<DropdownMenuContent
+				side="top"
+				className="w-64"
+				finalFocus={() => {
+					const refocus = picked.current && composer !== null;
+					picked.current = false;
+					if (!refocus) return true;
+					composer.current?.focus();
+					return false;
+				}}
+			>
 				{fast && (
 					<MenuSwitchItem
 						checked={fast.state?.enabled ?? false}
@@ -229,7 +243,13 @@ export function ModelPicker({ current, unset = "Choose model", list, open, onOpe
 						Effort
 					</MenuSubmenuTrigger>
 					<MenuSubmenuContent>
-						<MenuRadioGroup value={effort.current ?? DEFAULT_LEVEL} onValueChange={(level: string) => effort.onPick(level === DEFAULT_LEVEL ? null : level)}>
+						<MenuRadioGroup
+							value={effort.current ?? DEFAULT_LEVEL}
+							onValueChange={(level: string) => {
+								picked.current = true;
+								effort.onPick(level === DEFAULT_LEVEL ? null : level);
+							}}
+						>
 							{effort.allowDefault && (
 								<MenuRadioItem value={DEFAULT_LEVEL} closeOnClick>
 									Default

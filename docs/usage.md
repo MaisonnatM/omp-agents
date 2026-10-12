@@ -1272,6 +1272,7 @@ Alt is Option on macOS.
   `/` or Cmd+I puts the cursor in the focused pane's composer.
 - Cmd+Alt+/ opens the model picker, and Shift+Tab in a composer moves to the next thinking level, in sessions that the dashboard started and in the new-session draft.
   Cmd+Alt+P (Option+Cmd+P on macOS) opens the directory picker in the new-session draft and, between turns, in sessions that the dashboard started.
+  Choosing a model, an effort, a directory, or a branch in a composer's picker puts the cursor back in that composer, and so does a click on its send or Stop button; Esc leaves the focus on the picker's button.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in this browser.

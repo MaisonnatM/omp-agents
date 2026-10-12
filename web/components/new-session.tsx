@@ -17,7 +17,7 @@ import { useGitCheckout } from "../use-git-checkout";
 import { useDefaultModel } from "../use-default-model";
 import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
-import { blockedShortcut, ComposerNote, EmptyConversation } from "./composer";
+import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from "./composer";
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import type { PromptEditorHandle } from "./prompt-editor";
@@ -147,53 +147,55 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			</EmptyConversation>
 			<div className="relative mx-auto w-full max-w-3xl px-3 pb-5">
 				{completion.popup}
-				<InputMessage
-					editorRef={editorRef}
-					value={draft}
-					onValueChange={completion.onValueChange}
-					onSend={text => {
-						if (directCommand) return;
-						completion.close();
-						attachments.read(text, (prompt, images) => onStart({ prompt, images, branch: choice, model, thinking, skill: skipSkill ? null : pinnedSkill }));
-					}}
-					placeholder="Message this session…"
-					files={attachments.files}
-					onFilesChange={attachments.onFilesChange}
-					accept={ATTACH_ACCEPT}
-					leftSlot={
-						<>
-							<ModelPicker
-								current={shownSelector}
-								unset="Default model"
-								list={modelsRead}
-								open={modelsOpen}
-								onOpenChange={openModels}
-								onPick={next => {
-									setModel(next);
-									setPickedThinking(null);
-								}}
-								effort={{ current: thinking, levels: modelsRead.error === null ? levels : [], onPick: pickThinking, allowDefault: true }}
-								disabled={starting || !connected}
-							/>
-							<DirectoryPicker
-								cwd={cwd}
-								workspaces={workspaces}
-								disabled={starting}
-								shortcut="directory"
-								open={directoriesOpen}
-								onOpenChange={setDirectoriesOpen}
-								onPick={onPickCwd}
-							/>
-							{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
-							{pinnedSkill !== null && <PinnedSkillToggle name={pinnedSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
-						</>
-					}
-					rightSlot={({ openFilePicker }) => <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
-					disabled={starting || !connected}
-					sendLabel={starting ? "Starting session" : "Start session"}
-					sending={starting}
-					editorProps={{ ...completion.editorProps, onKeyDown, autoFocus: true }}
-				/>
+				<ComposerEditor value={editorRef}>
+					<InputMessage
+						editorRef={editorRef}
+						value={draft}
+						onValueChange={completion.onValueChange}
+						onSend={text => {
+							if (directCommand) return;
+							completion.close();
+							attachments.read(text, (prompt, images) => onStart({ prompt, images, branch: choice, model, thinking, skill: skipSkill ? null : pinnedSkill }));
+						}}
+						placeholder="Message this session…"
+						files={attachments.files}
+						onFilesChange={attachments.onFilesChange}
+						accept={ATTACH_ACCEPT}
+						leftSlot={
+							<>
+								<ModelPicker
+									current={shownSelector}
+									unset="Default model"
+									list={modelsRead}
+									open={modelsOpen}
+									onOpenChange={openModels}
+									onPick={next => {
+										setModel(next);
+										setPickedThinking(null);
+									}}
+									effort={{ current: thinking, levels: modelsRead.error === null ? levels : [], onPick: pickThinking, allowDefault: true }}
+									disabled={starting || !connected}
+								/>
+								<DirectoryPicker
+									cwd={cwd}
+									workspaces={workspaces}
+									disabled={starting}
+									shortcut="directory"
+									open={directoriesOpen}
+									onOpenChange={setDirectoriesOpen}
+									onPick={onPickCwd}
+								/>
+								{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
+								{pinnedSkill !== null && <PinnedSkillToggle name={pinnedSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
+							</>
+						}
+						rightSlot={({ openFilePicker }) => <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
+						disabled={starting || !connected}
+						sendLabel={starting ? "Starting session" : "Start session"}
+						sending={starting}
+						editorProps={{ ...completion.editorProps, onKeyDown, autoFocus: true }}
+					/>
+				</ComposerEditor>
 				{directCommand && <ComposerNote text={directCommand} />}
 				{attachments.note && <ComposerNote text={attachments.note} />}
 			</div>
