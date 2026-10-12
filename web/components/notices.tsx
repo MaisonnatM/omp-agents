@@ -15,7 +15,7 @@ import { providerLabel, providerOrg } from "../labels";
 import { hashForCalendar, hashForPullRequests, hashForSettings } from "../routing";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
-import { SLACK_LOGO } from "./integrations/brand-logos";
+import { BrandMark, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
 import { toasts } from "./toaster";
 
@@ -287,9 +287,7 @@ function Face({ notice }: { notice: Notice }) {
 		person = { name: notice.from, avatarUrl: notice.avatarUrl };
 		badge = (
 			<span className={cn(BADGE, "bg-popover")}>
-				<svg aria-hidden viewBox="0 0 24 24" className="size-3" fill={SLACK_LOGO.color}>
-					<path d={SLACK_LOGO.path} />
-				</svg>
+				<BrandMark logo={SLACK_LOGO} className="size-3" />
 			</span>
 		);
 	}

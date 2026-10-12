@@ -13,7 +13,7 @@ import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { Callout, IntegrationRow, MarkTile, MetaDot } from "./integration-row";
 import { SERVICES, STATUS as INTEGRATION_STATUS, ToolList, ToolsToggle } from "./mcp-integration";
-import { MCP_LOGOS } from "./mcp-logo-paths";
+import { MCP_LOGOS } from "./mcp-logos";
 
 const refresh = (): Promise<void> => mcpServersStore.refresh();
 

@@ -8,7 +8,7 @@ import { errorText, putJson } from "../../api";
 import { mcpServersStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MarkTile } from "./integration-row";
-import { MCP_LOGOS } from "./mcp-logo-paths";
+import { MCP_LOGOS } from "./mcp-logos";
 
 const refresh = (): Promise<void> => mcpServersStore.refresh();
 
