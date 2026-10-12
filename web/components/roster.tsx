@@ -18,8 +18,8 @@ import { pullRequestsStore, ticketsStore } from "../reads";
 import { hashForTickets, type SettingsRoute, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
-import { shortcutLabels, tabShortcutLabels, useShortcuts } from "../shortcuts";
-import { TAB_ROWS } from "../sidebar-tabs";
+import { shortcutLabels, useShortcuts } from "../shortcuts";
+import { TAB_ROWS, tabShortcutLabels } from "../sidebar-tabs";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
@@ -143,8 +143,6 @@ const SIDEBAR_TAB_FIT = {
 	},
 } satisfies Record<number, TabFit>;
 
-const hasTabFit = (count: number): count is keyof typeof SIDEBAR_TAB_FIT => count in SIDEBAR_TAB_FIT;
-
 interface RosterProps {
 	/** The workspaces, as {@link listWorkspaces} lists them. */
 	workspaces: Workspace[];
@@ -234,8 +232,7 @@ export function Roster({
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
-	const fitCount = Math.max(tabs.length, 5);
-	const fit = SIDEBAR_TAB_FIT[hasTabFit(fitCount) ? fitCount : 7];
+	const fit = SIDEBAR_TAB_FIT[tabs.length <= 5 ? 5 : tabs.length === 6 ? 6 : 7];
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-0">

@@ -48,10 +48,11 @@ import { age, folderName, hostLabel, pastLabel } from "../../labels";
 import { PAGE_ICON } from "../../page-icons";
 import { conversationItems, recordItems } from "../../palette-records";
 import { useConversationHits, useSearchSources } from "../../reads";
-import { hashForProjects, type OpenMode } from "../../routing";
+import { hashForProjects, type OpenMode, type SidebarTab } from "../../routing";
 import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
-import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels, tabShortcutLabels } from "../../shortcuts";
+import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
+import { tabShortcutLabels } from "../../sidebar-tabs";
 import { useStoredState } from "../../stored-state";
 import { quickAddTodo } from "../../todo-quick-add";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
@@ -101,7 +102,7 @@ interface CommandPaletteProps {
 	/** Commands that do nothing now, which the palette leaves out. */
 	unavailable: ReadonlySet<ShortcutId>;
 	/** The tabs the sidebar shows, in order, whose position keys the tab commands show. */
-	tabs: readonly ShortcutId[];
+	tabs: readonly SidebarTab[];
 	/** The todo list's categories, which a typed `#category` files a new todo under; `null` while the list cannot be edited. */
 	todoCategories: readonly UserTodoCategory[] | null;
 	/** The todo list's top-level todos, which a search lists. */

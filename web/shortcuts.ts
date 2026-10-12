@@ -3,6 +3,8 @@ import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRe
 /** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the sidebar shows, whichever it is. */
 export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7"] as const;
 
+export type TabShortcut = (typeof TAB_SHORTCUTS)[number];
+
 export type ShortcutId =
 	| "interrupt"
 	| "steer"
@@ -60,7 +62,7 @@ export type ShortcutId =
 	| "moveUp"
 	| "moveDown"
 	| "terminal"
-	| (typeof TAB_SHORTCUTS)[number];
+	| TabShortcut;
 
 /**
  * Where a binding fires. `composer`: from the composer's text field, before any page-wide binding sees the key.
@@ -109,7 +111,11 @@ export interface Shortcut {
 	command?: string;
 }
 
-/** Every dashboard shortcut, in the order a key tries them. The reference dialog lists exactly these, by category. */
+/**
+ * Every dashboard shortcut, in the order a key tries them: every binding the key listeners match, and the commands the
+ * palette lists. The reference dialog shows `shortcutRows` in `web/sidebar-tabs.ts`, by category: these as the tabs the
+ * sidebar shows take the position keys.
+ */
 export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "interrupt", category: "sessions", label: "Stop the running turn", keys: [{ chord: { key: "Backspace", mod: true, shift: true }, scope: "composer" }] },
 	{
@@ -180,6 +186,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "i", mod: true }, scope: "anywhere" },
 		],
 	},
+	// No one reads these rows' labels, by design: the dialog lists each position key on the tab it goes to, and the palette lists no command for them.
 	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
 	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
 	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
@@ -313,26 +320,23 @@ for (const { id, keys } of SHORTCUTS) {
 	LABELS[id] = keys.map(bindingLabel);
 }
 
+/** Every key that runs `id`: `[{ goTo: "i" }]`. */
+export const shortcutBindings = (id: ShortcutId): readonly Binding[] => KEYS[id];
+
 /** Every key that runs `id`, one label each, as a tooltip's chips draw them: `["⌘/", "?"]`. */
 export const shortcutLabels = (id: ShortcutId): readonly string[] => LABELS[id];
 
 /** Every key that runs `id`, as prose names them: `⌘/ or ?`. */
 export const shortcutKeys = (id: ShortcutId): string => EITHER.format(shortcutLabels(id));
 
-/** The keys that run `id` while the sidebar shows `tabs`: the position key of its place there, if any, then its own keys. */
-export function tabBindings(id: ShortcutId, tabs: readonly ShortcutId[]): readonly Binding[] {
-	const position: (typeof TAB_SHORTCUTS)[number] | undefined = TAB_SHORTCUTS[tabs.indexOf(id)];
-	return position === undefined ? KEYS[id] : [...KEYS[position], ...KEYS[id]];
-}
-
-/** {@link tabBindings}, one label each, as a tooltip's chips draw them: `["⌘6", "G then I"]`. */
-export const tabShortcutLabels = (id: ShortcutId, tabs: readonly ShortcutId[]): readonly string[] => tabBindings(id, tabs).map(bindingLabel);
-
 const typing = (target: EventTarget | null): boolean =>
 	target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
-/** What to do for each shortcut. Returning `false` means the action does not apply now, so the key keeps its usual meaning. */
-export type ShortcutHandlers = Partial<Record<ShortcutId, () => boolean | void>>;
+/** What one shortcut does. Returning `false` means the action does not apply now, so the key keeps its usual meaning. */
+export type ShortcutHandler = () => boolean | void;
+
+/** What to do for each shortcut. */
+export type ShortcutHandlers = Partial<Record<ShortcutId, ShortcutHandler>>;
 
 type HandledEvent = KeyEvent & Pick<KeyboardEvent, "defaultPrevented" | "preventDefault">;
 

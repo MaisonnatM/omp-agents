@@ -1,12 +1,16 @@
-/** The sidebar's tab bar as the user arranged it in Settings › Preferences: the tabs' order, and which ones it leaves out. */
+/** The sidebar's tab bar as the user arranged it in Settings › Preferences: the tabs' order, which ones it leaves out, and the keys they take. */
+import { useMemo } from "react";
 import { isObject } from "../src/json";
 import { type IntegrationsAnswer, signedIn } from "../src/shared/accounts";
+import { integrationsStore } from "./reads";
 import { SIDEBAR_TABS, type SidebarTab } from "./routing";
-import { TAB_SHORTCUTS } from "./shortcuts";
+import { type Binding, bindingLabel, SHORTCUTS, type ShortcutCategory, type ShortcutHandler, type ShortcutId, shortcutBindings, TAB_SHORTCUTS, type TabShortcut } from "./shortcuts";
 import { useStoredState } from "./stored-state";
 
 // Every tab the bar shows takes a position key, so a tab added to `SIDEBAR_TABS` needs one more `TAB_SHORTCUTS` entry.
 TAB_SHORTCUTS.length satisfies (typeof SIDEBAR_TABS)["length"];
+// A tab's own shortcut, the command the palette lists for it and the row the dialog shows, has the tab's id.
+SIDEBAR_TABS satisfies readonly { value: ShortcutId }[];
 
 const KEY = "omp-agents.sidebar-tabs";
 
@@ -15,11 +19,11 @@ export type TabLayout = readonly { tab: SidebarTab; hidden: boolean }[];
 
 export const DEFAULT_TAB_LAYOUT: TabLayout = SIDEBAR_TABS.map(({ value }) => ({ tab: value, hidden: false }));
 
-/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, and the integration it waits on. */
+/** Each tab's row of {@link SIDEBAR_TABS}: its label, icon, the integration it waits on, and whether it is pinned. */
 export const TAB_ROWS = Object.fromEntries(SIDEBAR_TABS.map(row => [row.value, row])) as Record<SidebarTab, (typeof SIDEBAR_TABS)[number]>;
 
 /**
- * The layout stored as `raw`. It keeps each known tab once and never hides Settings, which leads back to the others.
+ * The layout stored as `raw`. It keeps each known tab once and never hides a pinned tab.
  * A tab missing from what is stored, such as one added since, takes its default place; anything unreadable gives the default.
  */
 export function decodeTabLayout(raw: string | null): TabLayout {
@@ -35,7 +39,7 @@ export function decodeTabLayout(raw: string | null): TabLayout {
 		if (!isObject(entry)) continue;
 		const tab = SIDEBAR_TABS.find(({ value }) => value === entry.tab)?.value;
 		if (tab === undefined || layout.some(kept => kept.tab === tab)) continue;
-		layout.push({ tab, hidden: tab !== "settings" && entry.hidden === true });
+		layout.push({ tab, hidden: !("pinned" in TAB_ROWS[tab]) && entry.hidden === true });
 	}
 	for (const [index, { value }] of SIDEBAR_TABS.entries()) {
 		if (!layout.some(kept => kept.tab === value)) layout.splice(Math.min(index, layout.length), 0, { tab: value, hidden: false });
@@ -55,9 +59,9 @@ export function moveTab(layout: TabLayout, tab: SidebarTab, by: -1 | 1): TabLayo
 	return next;
 }
 
-/** `layout` with `tab` hidden or shown; Settings always shows. */
+/** `layout` with `tab` hidden or shown; a pinned tab always shows. */
 export function hideTab(layout: TabLayout, tab: SidebarTab, hidden: boolean): TabLayout {
-	if (tab === "settings") return layout;
+	if ("pinned" in TAB_ROWS[tab]) return layout;
 	return layout.map(entry => (entry.tab === tab ? { tab, hidden } : entry));
 }
 
@@ -66,8 +70,71 @@ export const shownTabs = (layout: TabLayout, signedOut: ReadonlySet<SidebarTab>)
 	layout.filter(({ tab, hidden }) => !hidden && !signedOut.has(tab)).map(({ tab }) => tab);
 
 /** The tabs whose service omp holds no sign-in to, which then neither show nor take their shortcuts; all of them until the integrations answer. */
-export const signedOutTabs = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>
+export const tabsSignedOut = (integrations: IntegrationsAnswer["integrations"] | undefined): SidebarTab[] =>
 	SIDEBAR_TABS.flatMap(row => ("integration" in row && !(integrations && signedIn(integrations[row.integration].connection)) ? [row.value] : []));
 
-/** The tab layout, kept in this browser; every component that holds it sees a change at once. */
-export const useTabLayout = () => useStoredState(KEY, decodeTabLayout, encodeTabLayout);
+/**
+ * The tab layout, kept in this browser, and the tabs it shows; every component that holds it sees a change at once.
+ * `signedOut` stays the same set until a tab's service signs in or out, whatever the integrations' polls answer, and
+ * `shown`, which Cmd+1 through Cmd+7 go to, stays with it until the layout changes.
+ */
+export function useSidebarTabs(): {
+	layout: TabLayout;
+	setLayout: (next: TabLayout | ((prev: TabLayout) => TabLayout)) => void;
+	signedOut: ReadonlySet<SidebarTab>;
+	shown: readonly SidebarTab[];
+} {
+	const [layout, setLayout] = useStoredState(KEY, decodeTabLayout, encodeTabLayout);
+	const names = tabsSignedOut(integrationsStore.usePolling().read?.data.integrations);
+	const namesKey = names.join();
+	const signedOut = useMemo((): ReadonlySet<SidebarTab> => new Set(names), [namesKey]);
+	const shown = useMemo(() => shownTabs(layout, signedOut), [layout, signedOut]);
+	return { layout, setLayout, signedOut, shown };
+}
+
+/** The position key `id` takes while the sidebar shows `shown`: Cmd+1 for the first tab; none for a tab not shown or a shortcut that is no tab. */
+export function positionKey(id: ShortcutId, shown: readonly SidebarTab[]): TabShortcut | undefined {
+	const ids: readonly ShortcutId[] = shown;
+	return TAB_SHORTCUTS[ids.indexOf(id)];
+}
+
+/** The keys that run `id` while the sidebar shows `shown`: its {@link positionKey}, if any, then its own keys. */
+function tabBindings(id: ShortcutId, shown: readonly SidebarTab[]): readonly Binding[] {
+	const position = positionKey(id, shown);
+	return position === undefined ? shortcutBindings(id) : [...shortcutBindings(position), ...shortcutBindings(id)];
+}
+
+/** {@link tabBindings} as a tooltip's chips draw them: `["⌘5", "G then I"]`. */
+export const tabShortcutLabels = (id: ShortcutId, shown: readonly SidebarTab[]): readonly string[] => tabBindings(id, shown).map(bindingLabel);
+
+const positions: readonly ShortcutId[] = TAB_SHORTCUTS;
+
+/** One row of the reference dialog: the shortcut, the dialog tab that lists it, what it does, and the keys that run it. */
+export interface ShortcutRow {
+	id: ShortcutId;
+	category: ShortcutCategory;
+	label: string;
+	keys: readonly Binding[];
+}
+
+/**
+ * Every shortcut's row of the reference dialog while the sidebar shows `shown`, in {@link SHORTCUTS} order: each tab's
+ * row carries the position key it takes, so the position keys have no rows of their own, and a row left with no key is out.
+ */
+export const shortcutRows = (shown: readonly SidebarTab[]): ShortcutRow[] =>
+	SHORTCUTS.flatMap(({ id, category, label }) => {
+		const keys = positions.includes(id) ? [] : tabBindings(id, shown);
+		return keys.length > 0 ? [{ id, category, label, keys }] : [];
+	});
+
+/** A handler for each position key: it runs `goTo`'s handler for the tab at that place in `shown()`, and declines past the last tab. */
+export const positionHandlers = (shown: () => readonly SidebarTab[], goTo: Record<SidebarTab, ShortcutHandler>): Record<TabShortcut, ShortcutHandler> =>
+	Object.fromEntries(
+		TAB_SHORTCUTS.map((id, index) => [
+			id,
+			(): boolean | void => {
+				const tab: SidebarTab | undefined = shown()[index];
+				return tab === undefined ? false : goTo[tab]();
+			},
+		]),
+	) as Record<TabShortcut, ShortcutHandler>;

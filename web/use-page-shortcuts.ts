@@ -2,7 +2,8 @@ import { type Dispatch, type SetStateAction, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
 import type { PaletteEvent, PaletteState } from "./command-palette";
 import { adjacentSession, type Layout, type Page, type SettingsRoute, type SidebarTab } from "./routing";
-import { type ShortcutHandlers, type ShortcutId, TAB_SHORTCUTS, useShortcuts } from "./shortcuts";
+import { type ShortcutHandler, type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
+import { positionHandlers } from "./sidebar-tabs";
 
 /** What the page-wide shortcuts read when a key arrives, and what they call. */
 export interface PageShortcutInput {
@@ -54,13 +55,13 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			if (next) open(next, "replace");
 			else if (!listed.length) return false;
 		};
-		const goToTab = (tab: Exclude<SidebarTab, "sessions" | "settings" | "pull-requests">) => (): boolean | void => {
+		const goToTab = (tab: Exclude<SidebarTab, "sessions" | "settings" | "pull-requests">): ShortcutHandler => () => {
 			const { signedOutTabs, page, showTab } = latest.current;
 			if (signedOutTabs.has(tab)) return false;
 			if (page?.kind === tab) return;
 			showTab(tab);
 		};
-		const goTo: Record<SidebarTab, () => boolean | void> = {
+		const goTo: Record<SidebarTab, ShortcutHandler> = {
 			settings: () => {
 				const { page, layout, settings, navigate, show } = latest.current;
 				if (page?.kind === "settings") show(layout);
@@ -82,18 +83,8 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			calendar: goToTab("calendar"),
 			inbox: goToTab("inbox"),
 		};
-		const positions = Object.fromEntries(
-			TAB_SHORTCUTS.map((id, index) => [
-				id,
-				(): boolean | void => {
-					const tab: SidebarTab | undefined = latest.current.tabs[index];
-					return tab === undefined ? false : goTo[tab]();
-				},
-			]),
-		);
+		const positions = positionHandlers(() => latest.current.tabs, goTo);
 		return {
-			...goTo,
-			...positions,
 			help: () => latest.current.setShortcutsOpen(open => !open),
 			switcher: () => latest.current.dispatchPalette(latest.current.palette ? { type: "close" } : { type: "open" }),
 			newSession: () => latest.current.openNewSession(),
@@ -107,11 +98,19 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (!latest.current.hasDetails) return false;
 				latest.current.toggleSidebar("right");
 			},
+			settings: goTo.settings,
+			"pull-requests": goTo["pull-requests"],
+			tickets: goTo.tickets,
 			newTicket: () => {
 				const { linearCallable, setNewTicket } = latest.current;
 				if (!linearCallable) return false;
 				setNewTicket(current => current ?? "");
 			},
+			sessions: goTo.sessions,
+			todo: goTo.todo,
+			calendar: goTo.calendar,
+			inbox: goTo.inbox,
+			...positions,
 			routines: () => {
 				const { page, navigate } = latest.current;
 				if (page?.kind === "routines") return false;

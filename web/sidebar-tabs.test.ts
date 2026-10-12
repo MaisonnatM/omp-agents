@@ -1,6 +1,18 @@
 import { expect, test } from "bun:test";
-import { IS_MAC, tabShortcutLabels } from "./shortcuts";
-import { DEFAULT_TAB_LAYOUT, decodeTabLayout, encodeTabLayout, hideTab, moveTab, shownTabs, signedOutTabs, type TabLayout } from "./sidebar-tabs";
+import { bindingLabel, IS_MAC } from "./shortcuts";
+import {
+	DEFAULT_TAB_LAYOUT,
+	decodeTabLayout,
+	encodeTabLayout,
+	hideTab,
+	moveTab,
+	positionKey,
+	shortcutRows,
+	shownTabs,
+	tabsSignedOut,
+	tabShortcutLabels,
+	type TabLayout,
+} from "./sidebar-tabs";
 
 const DEFAULT: TabLayout = [
 	{ tab: "pull-requests", hidden: false },
@@ -22,7 +34,7 @@ test("nothing stored, or anything unreadable, decodes to the default", () => {
 	}
 });
 
-test("decoding keeps each known tab once, never hides Settings, and puts a missing tab at its default place", () => {
+test("decoding keeps each known tab once, never hides a pinned tab, and puts a missing tab at its default place", () => {
 	const raw = JSON.stringify([
 		{ tab: "settings", hidden: true },
 		{ tab: "inbox", hidden: true },
@@ -54,7 +66,7 @@ test("moveTab swaps a tab with its neighbor and leaves a tab at either end where
 	expect(moveTab(DEFAULT_TAB_LAYOUT, "pull-requests", 1).map(({ tab }) => tab)).toEqual(["tickets", "pull-requests", "sessions", "todo", "calendar", "inbox", "settings"]);
 });
 
-test("hideTab hides and shows a tab, but never Settings", () => {
+test("hideTab hides and shows a tab, but never a pinned one", () => {
 	expect(hideTab(DEFAULT_TAB_LAYOUT, "settings", true)).toBe(DEFAULT_TAB_LAYOUT);
 	expect(hideTab(DEFAULT_TAB_LAYOUT, "todo", true)[3]).toEqual({ tab: "todo", hidden: true });
 	expect(hideTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "todo", false)).toEqual(DEFAULT);
@@ -66,17 +78,33 @@ test("shownTabs drops hidden and signed-out tabs and keeps the order", () => {
 });
 
 test("until the integrations answer, the tabs that wait on one are signed out", () => {
-	expect(signedOutTabs(undefined)).toEqual(["tickets", "inbox"]);
+	expect(tabsSignedOut(undefined)).toEqual(["tickets", "inbox"]);
 });
 
-test("the Nth tab shown takes Cmd+N, a hidden one none, and Inbox keeps G then I after its own", () => {
-	const tabs = shownTabs(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), new Set(["tickets"]));
-	expect(tabShortcutLabels("pull-requests", tabs)).toEqual([IS_MAC ? "⌘1" : "Ctrl+1"]);
-	expect(tabShortcutLabels("sessions", tabs)).toEqual([IS_MAC ? "⌘2" : "Ctrl+2"]);
-	expect(tabShortcutLabels("inbox", tabs)).toEqual([IS_MAC ? "⌘4" : "Ctrl+4", "G then I"]);
-	expect(tabShortcutLabels("settings", tabs)).toEqual([IS_MAC ? "⌘5" : "Ctrl+5"]);
-	expect(tabShortcutLabels("todo", tabs)).toEqual([]);
-	expect(tabShortcutLabels("tickets", tabs)).toEqual([]);
-	expect(tabShortcutLabels("inbox", [])).toEqual(["G then I"]);
-	expect(tabShortcutLabels("help", tabs)).toEqual(["?"]);
+test("positionKey takes the position among the shown tabs, or none", () => {
+	const tabs = shownTabs(moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "settings", -1), new Set(["tickets"]));
+	expect(positionKey("pull-requests", tabs)).toBe("tab1");
+	expect(positionKey("sessions", tabs)).toBe("tab2");
+	expect(positionKey("calendar", tabs)).toBe("tab3");
+	expect(positionKey("settings", tabs)).toBe("tab4");
+	expect(positionKey("inbox", tabs)).toBe("tab5");
+	expect(positionKey("todo", tabs)).toBeUndefined();
+	expect(positionKey("tickets", tabs)).toBeUndefined();
+});
+
+test("shortcutRows folds each shown tab's position key into its row, drops the position rows and a hidden tab with no key, and keeps every other shortcut", () => {
+	const tabs = shownTabs(moveTab(hideTab(DEFAULT_TAB_LAYOUT, "todo", true), "settings", -1), new Set(["tickets"]));
+	const rows = shortcutRows(tabs);
+	const keysOf = (id: string) => rows.find(row => row.id === id)?.keys.map(bindingLabel);
+	const mod = IS_MAC ? "⌘" : "Ctrl+";
+	expect(keysOf("settings")).toEqual([`${mod}4`]);
+	expect(keysOf("pull-requests")).toEqual([`${mod}1`]);
+	expect(keysOf("sessions")).toEqual([`${mod}2`]);
+	expect(keysOf("calendar")).toEqual([`${mod}3`]);
+	expect(keysOf("inbox")).toEqual([`${mod}5`, "G then I"]);
+	expect(keysOf("todo")).toBeUndefined();
+	expect(keysOf("tickets")).toBeUndefined();
+	expect(keysOf("tab1")).toBeUndefined();
+	expect(keysOf("switcher")).toEqual([IS_MAC ? "⌘K" : "Ctrl+K"]);
+	expect(tabShortcutLabels("inbox", tabs)).toEqual([`${mod}5`, "G then I"]);
 });

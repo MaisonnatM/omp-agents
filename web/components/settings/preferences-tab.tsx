@@ -5,9 +5,8 @@ import { type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
 import { type ComponentProps, useContext } from "react";
 import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { usePinnedSkill } from "../../pinned-skill";
-import { integrationsStore } from "../../reads";
-import { type ShortcutId, shortcutKeys, TAB_SHORTCUTS } from "../../shortcuts";
-import { hideTab, moveTab, shownTabs, signedOutTabs, TAB_ROWS, useTabLayout } from "../../sidebar-tabs";
+import { type ShortcutId, shortcutKeys } from "../../shortcuts";
+import { hideTab, moveTab, positionKey, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
 import { type Theme, THEMES, useTheme } from "../../theme";
 import { useSkills } from "../../use-skills";
 import { SkillPicker } from "../skill-picker";
@@ -41,13 +40,11 @@ function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string;
 	);
 }
 
-const SETTINGS_SHOWS = "Always shows, so you can show the other tabs again.";
+const PINNED_SHOWS = "Always shows, so you can show the other tabs again.";
 
 /** The sidebar's tabs in the order the bar shows them, each with the key it takes now, a switch to hide it, and buttons to move it. */
 function SidebarTabs() {
-	const [layout, setLayout] = useTabLayout();
-	const signedOut = new Set(signedOutTabs(integrationsStore.usePolling().read?.data.integrations));
-	const shown = shownTabs(layout, signedOut);
+	const { layout, setLayout, signedOut, shown } = useSidebarTabs();
 	return (
 		<Section
 			title="Sidebar tabs"
@@ -56,7 +53,7 @@ function SidebarTabs() {
 			<ol className="space-y-1 text-sm">
 				{layout.map(({ tab, hidden }, index) => {
 					const row = TAB_ROWS[tab];
-					const position = shown.indexOf(tab);
+					const position = positionKey(tab, shown);
 					return (
 						<li key={tab} className="flex items-center gap-2">
 							<row.icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
@@ -65,12 +62,12 @@ function SidebarTabs() {
 								{"integration" in row && signedOut.has(tab) && (
 									<p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
 								)}
-								{tab === "settings" && <p className="text-xs text-muted-foreground">{SETTINGS_SHOWS}</p>}
+								{"pinned" in row && <p className="text-xs text-muted-foreground">{PINNED_SHOWS}</p>}
 							</div>
-							<span className="w-12 shrink-0 text-right text-xs text-muted-foreground">{position === -1 ? null : shortcutKeys(TAB_SHORTCUTS[position])}</span>
+							<span className="w-12 shrink-0 text-right text-xs text-muted-foreground">{position === undefined ? null : shortcutKeys(position)}</span>
 							<PreferenceSwitch
 								checked={!hidden}
-								disabled={tab === "settings"}
+								disabled={"pinned" in row}
 								onCheckedChange={checked => setLayout(prev => hideTab(prev, tab, !checked))}
 								aria-label={`Show ${row.label}`}
 							/>

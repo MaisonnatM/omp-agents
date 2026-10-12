@@ -31,6 +31,8 @@ interface SidebarTabInput {
 /**
  * The tab the sidebar shows, and the way to show another: a page selects its tab, and `#pull-requests` picks the Pull requests tab, which
  * stays while you work in the panes until you choose Sessions. `showTab` keeps its identity across renders.
+ * A page whose tab the user hid in Preferences still selects that tab, so its panel, such as the Todo lists, shows with no trigger
+ * in the bar; a page whose service is signed out keeps the tab the panes had.
  */
 export function useSidebarTab({ page, signedOutTabs, layout, settings, navigate, show }: SidebarTabInput): { tab: SidebarTab; showTab: (tab: SidebarTab) => void } {
 	const onPullRequests = page?.kind === "pull-requests";

@@ -4,18 +4,11 @@ import { Fragment, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
-import { type Binding, bindingLabel, type Scope, SHORTCUT_CATEGORIES, type ShortcutCategory, type ShortcutId, scopeOf, SHORTCUTS, TAB_SHORTCUTS, tabBindings } from "../shortcuts";
+import type { SidebarTab } from "../routing";
+import { bindingLabel, type Scope, SHORTCUT_CATEGORIES, scopeOf } from "../shortcuts";
+import { type ShortcutRow, shortcutRows } from "../sidebar-tabs";
 
 const LIST = new Intl.ListFormat("en", { type: "conjunction" });
-
-const POSITIONS: ReadonlySet<ShortcutId> = new Set(TAB_SHORTCUTS);
-
-interface ShortcutRow {
-	id: ShortcutId;
-	category: ShortcutCategory;
-	label: string;
-	keys: readonly Binding[];
-}
 
 function ShortcutTable({ rows }: { rows: readonly ShortcutRow[] }) {
 	return (
@@ -47,20 +40,9 @@ function ShortcutTable({ rows }: { rows: readonly ShortcutRow[] }) {
 	);
 }
 
-/**
- * Every dashboard shortcut, from the table the key listeners read, one tab per category. A tab's row shows the position
- * key it takes among `tabs`, the tabs the sidebar shows, so the position keys have no rows of their own, and a row with
- * no key left is out.
- */
-export function ShortcutsDialog({ open, onOpenChange, tabs }: { open: boolean; onOpenChange: (open: boolean) => void; tabs: readonly ShortcutId[] }) {
-	const rows = useMemo(
-		() =>
-			SHORTCUTS.flatMap(({ id, category, label }): ShortcutRow[] => {
-				const keys = POSITIONS.has(id) ? [] : tabBindings(id, tabs);
-				return keys.length > 0 ? [{ id, category, label, keys }] : [];
-			}),
-		[tabs],
-	);
+/** Every dashboard shortcut, from the table the key listeners read, as {@link shortcutRows} lists it while the sidebar shows `tabs`, one tab per category. */
+export function ShortcutsDialog({ open, onOpenChange, tabs }: { open: boolean; onOpenChange: (open: boolean) => void; tabs: readonly SidebarTab[] }) {
+	const rows = useMemo(() => shortcutRows(tabs), [tabs]);
 	const keysIn = (scope: Scope): string => LIST.format(rows.flatMap(({ keys }) => keys.filter(binding => scopeOf(binding) === scope).map(bindingLabel)));
 
 	return (

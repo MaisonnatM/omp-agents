@@ -27,10 +27,10 @@ import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
 import { integrationsStore } from "./reads";
-import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, type SidebarTab, type TodoListView } from "./routing";
+import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
-import { shownTabs, signedOutTabs as signedOutOf, useTabLayout } from "./sidebar-tabs";
+import { useSidebarTabs } from "./sidebar-tabs";
 import { startOf } from "./starts";
 import { useDashboard } from "./use-dashboard";
 import { useFocusedSession } from "./use-focused-session";
@@ -65,13 +65,7 @@ export function App() {
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const linear = integrations?.linear ?? null;
-	const signedOut = signedOutOf(integrations);
-	const signedOutKey = signedOut.join();
-	/** The tabs whose service omp holds no sign-in to, which neither show nor take their shortcuts: the same set until one signs in or out, whatever the integrations' polls answer. */
-	const signedOutTabs = useMemo((): ReadonlySet<SidebarTab> => new Set(signedOut), [signedOutKey]);
-	const [tabLayout] = useTabLayout();
-	/** The tabs the sidebar shows, in order, which Cmd+1 through Cmd+7 go to. */
-	const tabs = useMemo(() => shownTabs(tabLayout, signedOutTabs), [tabLayout, signedOutTabs]);
+	const { signedOut: signedOutTabs, shown: tabs } = useSidebarTabs();
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
 	const settings = useMemo(() => settingsRoute(page, focused.cwd), [page, focused.cwd]);
