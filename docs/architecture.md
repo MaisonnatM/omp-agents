@@ -804,6 +804,8 @@ Widening the page's own policy is no answer, since it guards the whole dashboard
 The frame keeps `sandbox="allow-same-origin"` and nothing else.
 Without `allow-scripts` the message's scripts and event handlers never run, and the sandbox also blocks its forms, its popups, and a `<meta http-equiv="refresh">`, so it cannot navigate the frame.
 That makes `allow-same-origin` safe, and the page needs it to size the frame to the message, to open the message's links in a new tab with no opener or referrer, and to pass keys pressed inside it on to the page's shortcuts.
+`MailFrame` sizes the frame once the message's document is parsed, not on `load`, which waits for every image: a tracking pixel whose server never answers kept a message zero pixels tall.
+A `ResizeObserver` then grows the frame as images arrive.
 The document's response carries the policy `sandbox allow-same-origin; default-src 'none'; img-src https: data:; style-src 'unsafe-inline' https:; font-src https: data:`, so a message loads images, styles, and fonts and nothing else.
 Its `sandbox` directive keeps scripts off even when the address opens in a tab of its own.
 The response also sends `Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff`, and `Cache-Control: private, no-store`, and the document's head, which comes before the message's markup, holds `<meta name="referrer" content="no-referrer">` too.
