@@ -30,7 +30,7 @@ export const OVER_TRAY = "relative z-10";
 
 /** The strip tucked under the composer's frame: where the session works on the left, its context counter on the right. */
 export const ComposerTray = ({ start, end }: { start: ReactNode; end?: ReactNode }) => (
-	<div className="mx-3 -mt-4 flex min-h-12 items-center justify-between gap-2 rounded-b-xl bg-muted px-1.5 pt-4 pb-1">
+	<div className="mx-3 -mt-4 flex min-h-12 items-center justify-between gap-2 rounded-b-xl bg-muted px-1.5 pt-6 pb-1">
 		<div className="flex min-w-0 items-center gap-1">{start}</div>
 		{end && <div className="flex shrink-0 items-center gap-1">{end}</div>}
 	</div>
