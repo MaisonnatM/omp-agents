@@ -1,4 +1,3 @@
-/** `ShipStep`, a small tag showing a session's /ship stage, as `3/7 · Draft PR`. */
 import { SHIP_STAGES, type ShipProgress } from "../../src/shared/sessions";
 import { Tooltip } from "@/components/ui/tooltip";
 

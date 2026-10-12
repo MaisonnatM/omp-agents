@@ -1,4 +1,3 @@
-/** The right sidebar's Files tab: the files a session's agent changed, each opening the session changes dialog at it. */
 import { FileDiff, FileMinus, FilePen, FilePlus, type LucideIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { type ChangedFile, type FileChange, type FileChangeKind, type FileStatus, fileStatus, lineTotals, parseDiffLine } from "../../src/shared/transcript";

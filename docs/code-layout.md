@@ -9,8 +9,6 @@ For the server's design, protocols, and HTTP API, see [How omp-agents works](arc
 - [Starter kit and docs](#starter-kit-and-docs): `templates/omp/` and `docs/`.
 - [Desktop](#desktop): `desktop/`.
 
-The server is `src/` and the page is `web/`: search `web/` for anything you see on screen.
-
 ## Interface map
 
 Each part of the screen, by the name you would call it, with the component that draws it.
@@ -19,7 +17,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
 - Composer, the box you type a prompt in: `InputMessage` in `web/components/ui/input-message.tsx`, with its text field, `PromptEditor`, in `web/components/prompt-editor.tsx`.
   A live session mounts it in `web/components/conversation.tsx`, and the new-session page in `web/components/new-session.tsx`.
 - Gray strip under the composer, with the directory and the context ring: `ComposerTray` in `web/components/composer.tsx`; the ring is `ContextRing` in `web/components/context-ring.tsx`.
-- Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question in `web/components/question-card.tsx`.
+- Rows above the composer: queued prompts in `web/components/composer-queue.tsx`, suggested prompts in `web/components/composer-suggestions.tsx`, scheduled sends in `web/components/scheduled.tsx`, and the open question, `UserRequestCard` in `web/components/user-request.tsx`, drawn by `question-card.tsx`.
 - `/` and `@` menus: `CompletionPopup` in `web/components/completion-popup.tsx`, over `web/mentions.ts`.
 - Model and thinking switch: `ModelSlot` in `web/components/model-slot.tsx`, whose menu is `web/components/model-picker.tsx`.
 - Conversation pane: `web/components/pane.tsx`, laid out by `PaneGrid` in `web/components/pane-grid.tsx`, with the panes' divider in `web/components/split-resize-handle.tsx`.
@@ -45,7 +43,7 @@ Start a UI change here, then read that file's entry under [Page](#page).
   - Inbox: `web/components/inbox/inbox-page.tsx`.
   - Routines: `web/components/routines/routines-page.tsx`.
   - Projects: `web/components/projects/projects-page.tsx`.
-  - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS`.
+  - Settings: `web/components/settings/settings-page.tsx`, one `*-tab.tsx` per section listed in `SETTINGS_SECTIONS` in `web/routing.ts`.
 - List on the left with the open item on the right, split by a line you drag: `ListSplit` in `web/components/list-split.tsx`, over `web/components/drag-separator.tsx`.
 - Shared primitives (buttons, menus, dialogs, tooltips): `web/components/ui/`, from the Fluid registry; change them only as `web/components/ui/PATCHES.md` describes.
 

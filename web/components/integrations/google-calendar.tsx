@@ -1,4 +1,3 @@
-/** `GoogleCalendarList`: the Google calendars the integration reads, each with why its last read failed. */
 import { CircleAlert } from "lucide-react";
 import type { GoogleStatus } from "../../../src/shared/calendar";
 import { cn } from "@/lib/utils";

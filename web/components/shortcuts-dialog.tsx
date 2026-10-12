@@ -1,4 +1,3 @@
-/** The keyboard shortcuts dialog: every shortcut in tables, tabbed by category. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { type CSSProperties, Fragment, useMemo } from "react";

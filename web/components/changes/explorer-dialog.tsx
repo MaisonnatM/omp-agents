@@ -1,4 +1,3 @@
-/** `ExplorerDialog`: the near full-size overlay that holds a changes explorer, with a title bar, actions, and close. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";

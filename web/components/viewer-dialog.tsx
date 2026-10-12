@@ -1,4 +1,3 @@
-/** `ViewerDialog`, a large dialog that shows one thing to read under a header with its title and actions. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { type LucideIcon, X } from "lucide-react";
 import { type ReactNode, useRef } from "react";

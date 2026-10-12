@@ -1,4 +1,3 @@
-/** `McpServersTab`: Settings › MCP servers, every server omp loads, plus the catalog and form to add more. */
 import { Plus, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { McpServerRow, McpServersAnswer } from "../../../src/shared/mcp-servers";

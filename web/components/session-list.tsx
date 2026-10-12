@@ -1,4 +1,3 @@
-/** The left sidebar's Sessions tab: running and past sessions grouped by project, with search and Show more. */
 import { ListRestart, Loader, Plus } from "lucide-react";
 import { useState } from "react";
 import type { View } from "../../src/shared/sessions";

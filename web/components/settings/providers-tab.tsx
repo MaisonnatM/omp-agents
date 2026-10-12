@@ -1,4 +1,3 @@
-/** `ProvidersTab`: the model providers omp signs in to, their accounts, and sign-ins under way. */
 import { CircleAlert, CircleCheck, ExternalLink, LoaderCircle, LogOut, Plus, RefreshCw } from "lucide-react";
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";

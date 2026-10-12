@@ -1,4 +1,3 @@
-/** `InboxPage`: the Gmail inbox's conversation list beside the open conversation or a new mail. */
 import { Mail, SquarePen } from "lucide-react";
 import { useEffect } from "react";
 import { callable } from "../../../src/shared/accounts";

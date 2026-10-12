@@ -1,4 +1,3 @@
-/** The dialog that shows a text file a path in agent text opened, as markdown, a CSV or TSV table, or plain text. */
 import { Check, Copy } from "lucide-react";
 import { useMemo, useState } from "react";
 import { MAX_TEXT_FILE_BYTES, type TextFile } from "../../src/shared/transcript";

@@ -1,4 +1,3 @@
-/** A live session's pane body: its transcript and the composer that sends to it, with queue, suggestions, and model menu. */
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Delivery, LiveView, RosterHost } from "../../src/shared/sessions";
 import type { ChangedFile } from "../../src/shared/transcript";

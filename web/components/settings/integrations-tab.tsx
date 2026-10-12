@@ -1,4 +1,3 @@
-/** `IntegrationsTab`: Settings › Integrations, the services omp connects to through MCP servers. */
 import { RefreshCw } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";

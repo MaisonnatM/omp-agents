@@ -15,8 +15,8 @@ const docs = scan(["*.md", "docs/**/*.md", "templates/omp/**/*.md"]);
 const repoDocs = scan(["*.md", "docs/**/*.md"]);
 
 describe("docs stay readable by agents", () => {
-	test.each(docs)("%s", async file => {
-		const lines = (await Bun.file(join(root, file)).text()).split("\n");
+	test.each(docs)("%s", file => {
+		const lines = readFileSync(join(root, file), "utf8").split("\n");
 		const problems = lines.flatMap((line, i) => {
 			if (line.length > MAX_LINE) return [`line ${i + 1}: ${line.length} characters; put one sentence on each line`];
 			if (line.trimEnd().endsWith("…")) return [`line ${i + 1}: ends in a tool's truncation mark "…"; restore the cut text`];
@@ -29,16 +29,28 @@ describe("docs stay readable by agents", () => {
 /** A backticked path from the repository root, such as `web/app.tsx`; spaces, globs, and `<placeholders>` never match. */
 const REPO_PATH = /`((?:src|web|desktop|scripts|templates|docs)\/[^`\s*<>{}]*)`/g;
 /** Build output the checkout does not hold until a build. */
-const BUILD_OUTPUT = ["desktop/dist/", "desktop/release", "desktop/node_modules"];
-/** A relative Markdown link outside a code span: its file, else the current file, and its anchor. */
-const LINK = /\]\((?!https?:|mailto:)([^)#\s]*)(?:#([^)\s]+))?\)/g;
+const BUILD_OUTPUT = ["desktop/dist", "desktop/release", "desktop/node_modules"];
+/** A relative Markdown link outside a code span: its file, else the current file, and its anchor; a link with a scheme is not relative. */
+const LINK = /\]\((?![a-z][a-z0-9+.-]*:)([^)#\s]*)(?:#([^)\s]+))?\)/g;
 const CODE_SPAN = /(`+)[^`].*?\1/g;
+
+/** `lines` with each line of a fenced code block, fences included, blanked, so a shell comment is no heading and an example no claim. */
+function prose(lines: string[]): string[] {
+	let fenced = false;
+	return lines.map(line => {
+		if (/^\s*```/.test(line)) {
+			fenced = !fenced;
+			return "";
+		}
+		return fenced ? "" : line;
+	});
+}
 
 /** GitHub's heading anchors: lowercase, punctuation dropped, spaces to hyphens, repeats numbered. */
 function anchorsOf(text: string): Set<string> {
 	const anchors = new Set<string>();
 	const seen = new Map<string, number>();
-	for (const [, heading] of text.matchAll(/^#{1,6} (.+)$/gm)) {
+	for (const [, heading] of prose(text.split("\n")).join("\n").matchAll(/^#{1,6} (.+)$/gm)) {
 		const slug = heading.toLowerCase().replace(/[^\p{L}\p{N} _-]/gu, "").replaceAll(" ", "-");
 		const count = seen.get(slug) ?? 0;
 		seen.set(slug, count + 1);
@@ -59,12 +71,12 @@ function anchorsIn(file: string): Set<string> {
 
 describe("docs name files and headings that exist", () => {
 	test.each(repoDocs)("%s", file => {
-		const lines = readFileSync(join(root, file), "utf8").split("\n");
+		const lines = prose(readFileSync(join(root, file), "utf8").split("\n"));
 		const problems = lines.flatMap((line, i) => {
 			const found: string[] = [];
 			for (const [, path] of line.matchAll(REPO_PATH)) {
 				const bare = path.replace(/:\d+(?:-\d+)?$/, "");
-				if (BUILD_OUTPUT.some(prefix => bare.startsWith(prefix))) continue;
+				if (BUILD_OUTPUT.some(dir => bare === dir || bare.startsWith(`${dir}/`))) continue;
 				if (!existsSync(join(root, bare))) found.push(`line ${i + 1}: \`${path}\` does not exist`);
 			}
 			for (const [, target, anchor] of line.replace(CODE_SPAN, "").matchAll(LINK)) {

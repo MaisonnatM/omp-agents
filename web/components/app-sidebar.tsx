@@ -1,4 +1,3 @@
-/** The left sidebar, `AppSidebar`: the roster wired to the page, with the notices bell and the sidebar toggle. */
 import { type Dispatch, type SetStateAction, memo, useCallback, useMemo } from "react";
 import type { Notice } from "../../src/shared/notices";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";

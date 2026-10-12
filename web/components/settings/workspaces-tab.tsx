@@ -1,4 +1,3 @@
-/** `WorkspacesTab`: Settings › Workspaces, the directories offered, a field to add one, and hidden ones. */
 import { Eye, EyeOff, FolderPlus } from "lucide-react";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";

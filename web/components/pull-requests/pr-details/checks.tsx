@@ -1,4 +1,3 @@
-/** `ChecksSummary`: a pull request's checks at a glance on its tab bar, with the full list in a popover. */
 import { CircleCheck, CircleDashed, CircleSlash, CircleX, type LucideIcon } from "lucide-react";
 import type { CheckRunState, PullRequestCheck } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";

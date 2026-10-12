@@ -1,4 +1,3 @@
-/** `AddToTodo`: the button that adds a todo linking to what its row shows. */
 import { Check, ListPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { addTodo } from "../../../src/user-todos";

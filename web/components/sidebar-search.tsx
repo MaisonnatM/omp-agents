@@ -1,4 +1,3 @@
-/** `SidebarSearch`, the search field at the top of a sidebar list. */
 import { Search } from "lucide-react";
 import { SidebarInput } from "@/components/ui/sidebar";
 

@@ -1,4 +1,3 @@
-/** The right sidebar's Media tab: the images a session's tools returned, as thumbnails that open large. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { ChevronLeft, ChevronRight, ExternalLink, MessageSquare, X } from "lucide-react";
 import { useState } from "react";

@@ -1,4 +1,3 @@
-/** The window's bottom bar: plan usage on the left, and the Terminal button with the machine's CPU, memory, and disk on the right. */
 import { Cpu, HardDrive, MemoryStick, SquareTerminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { SystemLoad } from "../../src/shared/system";

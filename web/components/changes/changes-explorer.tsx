@@ -1,4 +1,3 @@
-/** `ChangesExplorer`: changed files as folders beside the open file's diff or whole text, for session changes and pull requests. */
 import { ChevronRight } from "lucide-react";
 import { Fragment, useMemo } from "react";
 import type { ChangedEntry, ChangedFileText } from "../../../src/shared/changes";

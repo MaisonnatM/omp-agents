@@ -1,4 +1,3 @@
-/** How long ago a time was, as `Age`, which counts up each minute on its own. */
 import { age } from "../labels";
 import { useMinute } from "../use-minute";
 

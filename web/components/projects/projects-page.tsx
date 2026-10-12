@@ -1,4 +1,3 @@
-/** `ProjectsPage`: your projects, one project's coordinator, workers, updates, and notes, or the new-project form. */
 import { Archive, ArrowLeft, Pencil, Plus } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
 import { type ConnectedModels, type ModelOption, selectorOf } from "../../../src/shared/models";

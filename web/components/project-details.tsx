@@ -1,4 +1,3 @@
-/** The right sidebar for a project's coordinator: tabs for its outline, workers, notes, and pull requests. */
 import { GitPullRequest, NotebookText, TableOfContents, Users } from "lucide-react";
 import { type LinkedPullRequest, samePullRequest } from "../../src/shared/github";
 import type { Project } from "../../src/shared/projects";

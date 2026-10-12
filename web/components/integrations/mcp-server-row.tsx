@@ -1,4 +1,3 @@
-/** `McpServerItem`: one MCP server omp loads in Settings › MCP servers, with its status, sign-in, and config changes. */
 import { type LucideIcon, CircleAlert, ExternalLink, LoaderCircle, LogOut, Power, PowerOff, RefreshCw, Trash2, WifiOff } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { MCP_SERVICES, type McpIntegrationId, type SignInState } from "../../../src/shared/accounts";

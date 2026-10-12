@@ -1,4 +1,3 @@
-/** The Calendar page: a month grid of events, routine runs, todos, and tickets by day, with the selected day's list. */
 import { Plus, Trash2 } from "lucide-react";
 import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { errorText } from "../../../src/json";

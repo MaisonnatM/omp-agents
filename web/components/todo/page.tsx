@@ -1,4 +1,3 @@
-/** `TodoPage`: your todos by status, nested two deep, beside the open todo's details. */
 import { ListTodo, ListX, Plus, Trash2 } from "lucide-react";
 import { Fragment, type ReactNode, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";

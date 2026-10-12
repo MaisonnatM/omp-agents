@@ -1,4 +1,3 @@
-/** `TodoSearch`: the Todo page's search field, focused by `/` and cleared by Esc. */
 import { Search } from "lucide-react";
 import { useRef } from "react";
 import { useShortcuts } from "../../shortcuts";

@@ -1,4 +1,3 @@
-/** `McpServerForm`: adds a remote MCP server by address, with an optional header, to omp's user `mcp.json`. */
 import { CircleAlert } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
 import { REMOTE_TRANSPORTS, type McpServerRow, type RemoteTransport } from "../../../src/shared/mcp-servers";

@@ -1,4 +1,3 @@
-/** A pull request's Code tab: the changes explorer on the page, or the file list in the sidebar. */
 import { useState } from "react";
 import type { PullRequest, PullRequestChanges, PullRequestDetail } from "../../../../src/shared/github";
 import { useRead } from "../../../reads";

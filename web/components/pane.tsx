@@ -1,4 +1,3 @@
-/** One pane of the pane grid: a live or past session's conversation with its maximize and close controls. */
 import { Maximize2, Minimize2, X } from "lucide-react";
 import { memo, useCallback, useMemo } from "react";
 import type { LiveView, PastSession, RosterHost, View } from "../../src/shared/sessions";

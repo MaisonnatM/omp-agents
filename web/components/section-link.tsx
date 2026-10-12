@@ -1,4 +1,3 @@
-/** `SectionLink`, a sidebar link with a count that scrolls a page to one of its sections. */
 import { SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import type { SectionTarget } from "../section";
 

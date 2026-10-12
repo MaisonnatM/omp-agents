@@ -1,4 +1,3 @@
-/** `SkillPicker`, a searchable list for choosing one skill or none. */
 import { Sparkles } from "lucide-react";
 import type { SkillOption } from "../../src/shared/sessions";
 import type { ReadState } from "../reads";

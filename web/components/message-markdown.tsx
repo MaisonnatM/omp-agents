@@ -1,4 +1,3 @@
-/** `MessageMarkdown`, which renders agent and prompt text as markdown with highlighted code, memoized per text. */
 import { type ComponentProps, memo } from "react";
 import ReactMarkdown, { type Components, defaultUrlTransform } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";

@@ -1,4 +1,3 @@
-/** `ModelsTab`: Settings' model routing, the roles, per-model chains, provider order, and retries. */
 import { Plus, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { type CatalogModel, type ModelChain, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit, splitSelector } from "../../../src/shared/models";

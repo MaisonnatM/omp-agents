@@ -1,4 +1,3 @@
-/** `RenderBoundary`, which keeps a render error inside one pane or page and shows its message there. */
 import { Component, type ReactNode } from "react";
 
 interface RenderBoundaryProps {

@@ -1,4 +1,3 @@
-/** The right sidebar's Outline tab: a session's turns as a list that scrolls the transcript to the one clicked. */
 import { useReducedMotion } from "framer-motion";
 import { Bot, Check, ChevronDown, ListChecks, Loader, type LucideIcon, Play, User } from "lucide-react";
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
