@@ -83,12 +83,23 @@ async function openLiveStats(): Promise<Database> {
 	return db;
 }
 
+const HOUR_MS = 60 * 60_000;
+
+/** The range's cutoff and series bucket; `today` starts at local midnight with hourly buckets. */
+function windowOf(range: AnalyticsRange, now: number): { cutoff: number | null; bucketMs: number } {
+	if (range !== "today") return statsAggregator.getTimeRangeConfig(range);
+	const midnight = new Date(now);
+	midnight.setHours(0, 0, 0, 0);
+	return { cutoff: midnight.getTime(), bucketMs: HOUR_MS };
+}
+
 /** omp-stats' dashboard and tool stats over `range`, its sync state, and each session file's usage by model. */
 export async function readStats(range: AnalyticsRange): Promise<StatsRead> {
 	const db = await openLiveStats();
 	const now = Date.now();
-	const { cutoff, bucketMs } = statsAggregator.getTimeRangeConfig(range);
-	const [dashboard, tools] = await Promise.all([statsAggregator.getDashboardStats(range), statsAggregator.getToolDashboardStats(range)]);
+	const { cutoff, bucketMs } = windowOf(range, now);
+	const dashboard = { overall: statsRollup.getOverallStats(cutoff), byModel: statsRollup.getStatsByModel(cutoff), byAgentType: statsRollup.getStatsByAgentType(cutoff) };
+	const tools = { byTool: statsRollup.getToolStats(cutoff) };
 	const rows = db.query<SessionModelRow, [number]>(SESSION_MODEL_ROWS).all(cutoff ?? 0);
 	const window = { cutoff, bucketMs, now };
 	return { window, dashboard, tools, sync: statsLive.statsLive().status().sync, rows, providerSeries: statsRollup.getProviderTimeSeries(window) };

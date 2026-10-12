@@ -1,7 +1,7 @@
 /** The Analytics tab's ranges and token usage. */
 
-/** The time ranges the Analytics tab reads, shortest first; `all` has no start. */
-export const ANALYTICS_RANGES = ["24h", "7d", "30d", "90d", "all"] as const;
+/** The time ranges the Analytics tab reads, shortest first; `today` starts at local midnight and `all` has no start. */
+export const ANALYTICS_RANGES = ["today", "24h", "7d", "30d", "90d", "all"] as const;
 
 export type AnalyticsRange = (typeof ANALYTICS_RANGES)[number];
 
@@ -43,7 +43,7 @@ export interface Analytics {
 	totals: Usage;
 	/** Recorded request providers, most tokens first, then lexical provider order. */
 	providers: AnalyticsProviderUsage[];
-	/** Oldest first: an hour each over 24h, else a UTC day. Provider entries are sparse, with no order guarantee. */
+	/** Oldest first: an hour each over today or 24h, else a UTC day. Provider entries are sparse, with no order guarantee. */
 	series: { start: number; tokens: number; cost: number; requests: number; providers: AnalyticsProviderUsage[] }[];
 	/** Most tokens first. `selector` is `provider/model`; `tokensPerSecond` is the mean output rate, null when unmeasured. */
 	models: (Usage & { selector: string; tokensPerSecond: number | null })[];

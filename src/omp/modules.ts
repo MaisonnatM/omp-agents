@@ -429,8 +429,6 @@ export interface StatsToolDashboard {
 }
 /** omp-stats' aggregator (src/aggregator.ts). Ranges it does not know read as `24h`. */
 export interface StatsAggregatorModule {
-	getDashboardStats(range: string): Promise<StatsDashboard>;
-	getToolDashboardStats(range: string): Promise<StatsToolDashboard>;
 	/** `cutoff` is null for all time. */
 	getTimeRangeConfig(range: string): { cutoff: number | null; bucketMs: number };
 }
@@ -442,8 +440,12 @@ export interface StatsProviderPoint {
 	cost: number;
 	requests: number;
 }
-/** omp-stats' rollup-aware provider series (src/rollup.ts). */
+/** omp-stats' rollup-aware queries (src/rollup.ts), each over requests since `cutoff` (null for all time). */
 export interface StatsRollupModule {
+	getOverallStats(cutoff: number | null): StatsDashboard["overall"];
+	getStatsByModel(cutoff: number | null): StatsDashboard["byModel"];
+	getStatsByAgentType(cutoff: number | null): StatsDashboard["byAgentType"];
+	getToolStats(cutoff: number | null): StatsToolDashboard["byTool"];
 	getProviderTimeSeries(window: { cutoff: number | null; bucketMs: number }): StatsProviderPoint[];
 }
 /** omp-stats' `LiveSyncStatus` (src/shared-types.ts). */
@@ -618,12 +620,14 @@ export const mcpConfigWriter = await load<McpConfigWriterModule>(join(srcDir, "m
 });
 
 const statsSrc = join(dirname(packageDir), "omp-stats", "src");
-export const statsAggregator = await load<StatsAggregatorModule>(join(statsSrc, "aggregator.ts"), {
-	getDashboardStats: "function",
-	getToolDashboardStats: "function",
-	getTimeRangeConfig: "function",
+export const statsAggregator = await load<StatsAggregatorModule>(join(statsSrc, "aggregator.ts"), { getTimeRangeConfig: "function" });
+export const statsRollup = await load<StatsRollupModule>(join(statsSrc, "rollup.ts"), {
+	getOverallStats: "function",
+	getStatsByModel: "function",
+	getStatsByAgentType: "function",
+	getToolStats: "function",
+	getProviderTimeSeries: "function",
 });
-export const statsRollup = await load<StatsRollupModule>(join(statsSrc, "rollup.ts"), { getProviderTimeSeries: "function" });
 export const statsLive = await load<StatsLiveModule>(join(statsSrc, "live.ts"), { statsLive: "function" });
 export const statsDb = await load<StatsDbModule>(join(statsSrc, "db.ts"), { initDb: "function" });
 export const rateLimit = await load<RateLimitModule>(join(dirname(packageDir), "pi-ai", "src", "error", "rate-limit.ts"), { is402BillingCapBody: "function" });

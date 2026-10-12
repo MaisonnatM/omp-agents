@@ -300,7 +300,8 @@ It keeps a report's `resetCredits` as omp's `availableCount`, which counts banke
 
 omp-stats owns the request history in `~/.omp/stats.db`, under omp's config root.
 `src/omp/stats.ts` starts `statsLive()` on its first read, which the provider check (see [Notifications](#notifications)) makes at startup; it syncs every session transcript, watches for changes, and resyncs every five minutes until the server stops it on shutdown.
-The dashboard calls omp-stats' aggregate and tool reads for the selected range, then groups request rows by session file for the top sessions.
+The dashboard calls omp-stats' rollup-aware total, model, agent-type, and tool reads from the selected range's cutoff, then groups request rows by session file for the top sessions.
+omp-stats' `getTimeRangeConfig` gives each range's cutoff and bucket, except `today`, which starts at the server's local midnight with hourly buckets.
 `src/analytics.ts` folds nested subagent and advisor files into their top-level session, assigns the session's working directory from the saved-session index, and orders models, workspaces, and sessions by token usage.
 `src/omp/stats.ts` reads time buckets by recorded provider through omp-stats' rollup-aware `getProviderTimeSeries`, using the same source as the totals cards.
 `src/analytics.ts` derives chart totals and provider totals from those rows, fills missing buckets with zeros, and starts all time at the first request.
@@ -499,7 +500,7 @@ Each file carries the SHA-256 of its text.
 `GET /api/models` runs `omp models --json` for the pickers.
 
 `GET /api/analytics?range=<range>` answers `Analytics` from omp-stats, defaulting to `7d`.
-The accepted ranges are `24h`, `7d`, `30d`, `90d`, and `all`; an unknown range returns 400.
+The accepted ranges are `today`, `24h`, `7d`, `30d`, `90d`, and `all`; an unknown range returns 400.
 The answer includes totals, time buckets with per-provider usage, provider totals, models, workspaces, agent types, tools, the 20 sessions with the most tokens, and live indexing status.
 
 Edits go through two endpoints, each taking the same `?cwd=` and answering with the settings as they load after the write:

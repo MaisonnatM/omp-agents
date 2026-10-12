@@ -13,7 +13,7 @@ import { compact, dollars, full } from "./analytics-format";
 import { ProviderTrend } from "./provider-trend";
 
 const percent = new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 1 });
-const rangeLabel: Record<AnalyticsRange, string> = { "24h": "24h", "7d": "7d", "30d": "30d", "90d": "90d", all: "All" };
+const rangeLabel: Record<AnalyticsRange, string> = { today: "Today", "24h": "24h", "7d": "7d", "30d": "30d", "90d": "90d", all: "All" };
 
 /** How many of a session's models its row names before `+N`. */
 const SESSION_MODELS = 3;

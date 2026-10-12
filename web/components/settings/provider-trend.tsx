@@ -83,20 +83,21 @@ export function ProviderTrend({ series, providers, range }: { series: Analytics[
 		providers: new Map(bucket.providers.map(usage => [usage.provider, usage])),
 	})), [series]);
 	const byStart = useMemo(() => new Map(buckets.map(bucket => [bucket.start, bucket])), [buckets]);
+	const hourly = range === "today" || range === "24h";
 	const dates = useMemo(() => ({
-		tick: new Intl.DateTimeFormat(undefined, range === "24h"
+		tick: new Intl.DateTimeFormat(undefined, hourly
 			? { month: "short", day: "numeric", hour: "numeric" }
 			: { month: "short", day: "numeric", timeZone: "UTC" }),
-		detail: new Intl.DateTimeFormat(undefined, range === "24h"
+		detail: new Intl.DateTimeFormat(undefined, hourly
 			? { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }
 			: { year: "numeric", month: "short", day: "numeric", timeZone: "UTC", timeZoneName: "short" }),
-	}), [range]);
+	}), [hourly]);
 	const hasTokens = series.some(bucket => bucket.tokens > 0);
 	return (
 		<section className="space-y-3" aria-labelledby={`${id}-title`}>
 			<div className="flex flex-wrap items-baseline justify-between gap-2">
 				<h3 id={`${id}-title`} className="text-sm font-semibold">Token usage over time</h3>
-				<span className="text-xs text-muted-foreground">{range === "24h" ? "Hourly · local time" : "Daily · UTC"}</span>
+				<span className="text-xs text-muted-foreground">{hourly ? "Hourly · local time" : "Daily · UTC"}</span>
 			</div>
 			<div className="min-w-0 rounded-md border border-border p-3">
 				<ul aria-label="Providers" className="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-xs">
