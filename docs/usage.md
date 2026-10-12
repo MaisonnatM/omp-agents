@@ -87,11 +87,11 @@ An action that fails shows its error, and its control becomes available again.
   Each sidebar's width, and whether it is hidden, is saved in the browser's localStorage.
 - The left sidebar's session rows leave out the full working directory and the model; hover the workspace in the pane header to see the directory, and the composer shows the model.
 - A strip along the bottom of the window, under both sidebars, shows how much quota is left on each plan that `omp usage` reports, the plans side by side: each plan's provider logo, from [svgl](https://svgl.app), then each window, for example `5h 66%  7d 68%` for Anthropic.
-  Hover the logo to see the plan's name and account.
+  Hover the logo to see the plan's name and account, and how many reset credits the plan holds with when the soonest one expires, such as `3 reset credits, next expires Oct 22.`; a reset credit, which omp redeems, clears a used-up window.
   A provider without a logo shows the plan's name instead.
   A window is named by its length plus its model tier (`7d fable`).
   Two limits that would share a name, like Cursor's monthly limits, show omp's label instead.
-  Amber means less than 20% is left, and red means none.
+  Amber means less than 20% is left, and red means the window is used up, as omp reports it.
   Hover or focus a window to see omp's full limit name and when it resets.
   The server runs `omp usage --json` at startup and every minute after that.
 - The strip's right side shows the machine's CPU, the percent of every core's time spent busy since the last read, the memory available, which macOS reads as `memory_pressure`'s free percentage of the physical memory, and the disk space free on the volume that holds your home directory; hover any of them for its full reading.
@@ -1133,7 +1133,7 @@ An action that fails shows its error, and its control becomes available again.
 ## Notifications
 
 - The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists what waits on you, newest first, and its badge counts the notices you have not read, up to `9+`.
-- Three sources feed it.
+- Four sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
     Every two minutes while a page is open, and as soon as a page opens after none was, the server reads the pull requests of the workspaces that the Pull requests page covers.
@@ -1144,14 +1144,19 @@ An action that fails shows its error, and its control becomes available again.
       Turning off omp's `startup.checkUpdate` setting turns this check off too.
     - A newer Claude or OpenAI model than one that your model roles or fallback chains name, from the same provider and the same line, such as Claude Opus 5.5 to Claude Opus 5.6.
       Only models that `omp models` lists on a connected provider count, and dated snapshots are left out.
-- **All**, **GitHub**, **Slack**, and **Updates** filter the list, each with its count of unread notices.
+  - **Providers**: a provider that stopped serving, checked after each `omp usage` run, every minute.
+    - A plan window that `omp usage` reports used up, such as Cursor's `Other Models`, with when it resets and how many reset credits the plan holds.
+      The notice goes once the window resets.
+    - A provider whose prepaid credits ran out, such as OpenRouter answering `402 Insufficient credits`: a request to it failed for that in the last day, and none has worked since; the notice counts those failures since the first one.
+      A request to the provider that works ends it, and a failure of another kind, such as a dropped connection, neither ends nor counts toward it.
+- **All**, **GitHub**, **Slack**, **Providers**, and **Updates** filter the list, each with its count of unread notices.
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
-- A notice you open is read: a pull request's opens its details on the Pull requests page, and a Slack message's opens it in Slack in a new tab.
+- A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in a new tab, and a provider's opens **Settings › Providers**.
   Selecting an update's notice marks it read.
   The check mark in the header marks every notice in the filter read.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge on GitHub** for one ready to merge.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
-  A pull request's or Slack message's toast shows only within 15 minutes of its news, closes after a few seconds, and **Open** opens what it is about.
+  A pull request's, Slack message's, or provider's toast shows only within 15 minutes of its news, closes after a few seconds, and **Open** opens what it is about.
   An update's toast stays until you dismiss it.
 - **Update**, on the toast or in the bell, runs the update; the notice shows its progress, then what changed or why it failed, and a failed update can run again.
   - For omp, it runs `omp update`, which installs the newest release.
@@ -1160,7 +1165,7 @@ An action that fails shows its error, and its control becomes available again.
   - For a model, it puts the new model in place of the old one in every role and fallback chain of `~/.omp/agent/config.yml` that names it, and keeps each role's thinking level, as **Settings › Models** would save it.
     A chain keyed by the old model keeps its key, and a workspace's `.omp/config.yml` stays as it was.
 - **×** clears a notice from the bell.
-  A cleared update comes back with a newer version, a cleared pull request notice when the pull request comes back to the move after a while, and a cleared Slack notice with a newer message.
+  A cleared update comes back with a newer version, a cleared pull request notice when the pull request comes back to the move after a while, a cleared Slack notice with a newer message, a cleared plan notice when the window runs out again a while after it reset, and a cleared credits notice when the credits run out again a while after a request worked.
 - The server keeps which notices were seen, read, and cleared in `notices.json` beside its access token.
 
 ## Keyboard shortcuts

@@ -462,6 +462,10 @@ export interface StatsLiveModule {
 export interface StatsDbModule {
 	initDb(): Promise<Database>;
 }
+/** omp's request-error classifier (pi-ai src/error/rate-limit.ts): whether a 402's body names a billing cap, as its credential rotation decides. */
+export interface RateLimitModule {
+	is402BillingCapBody(message: string | undefined): boolean;
+}
 
 type Kind = "function" | "number";
 
@@ -622,3 +626,4 @@ export const statsAggregator = await load<StatsAggregatorModule>(join(statsSrc, 
 export const statsRollup = await load<StatsRollupModule>(join(statsSrc, "rollup.ts"), { getProviderTimeSeries: "function" });
 export const statsLive = await load<StatsLiveModule>(join(statsSrc, "live.ts"), { statsLive: "function" });
 export const statsDb = await load<StatsDbModule>(join(statsSrc, "db.ts"), { initDb: "function" });
+export const rateLimit = await load<RateLimitModule>(join(dirname(packageDir), "pi-ai", "src", "error", "rate-limit.ts"), { is402BillingCapBody: "function" });

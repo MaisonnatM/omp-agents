@@ -2,7 +2,7 @@
 import { isObject, num, str } from "./json";
 import { ompCommand } from "./omp/install";
 import { run } from "./proc";
-import type { PlanUsage, PlanWindow } from "./shared/models";
+import type { PlanUsage, PlanWindow, ResetCredits } from "./shared/models";
 
 const TIMEOUT_MS = 30_000;
 
@@ -29,12 +29,28 @@ function parseLimit(raw: unknown): PlanWindow | null {
 	const window = str(raw.window.id) || str(raw.window.label);
 	if (remaining === undefined || !window) return null;
 	const tier = isObject(raw.scope) ? str(raw.scope.tier) : undefined;
+	const left = Math.min(1, Math.max(0, remaining));
+	const status = str(raw.status);
 	return {
+		id: str(raw.id) || window,
 		label: tier ? `${window} ${tier}` : window,
 		title: str(raw.label) || window,
-		remaining: Math.min(1, Math.max(0, remaining)),
+		remaining: left,
 		resetsAt: num(raw.window.resetsAt) ?? null,
+		exhausted: status === "exhausted" || ((!status || status === "unknown") && left <= 0),
 	};
+}
+
+function parseResetCredits(raw: unknown): ResetCredits | null {
+	if (!isObject(raw)) return null;
+	const count = num(raw.availableCount) ?? 0;
+	if (count <= 0) return null;
+	const expiries = (Array.isArray(raw.credits) ? (raw.credits as unknown[]) : [])
+		.filter(isObject)
+		.filter(credit => !["expired", "redeemed"].includes(str(credit.status) ?? "") && (num(credit.remainingCount) ?? 1) > 0)
+		.map(credit => Date.parse(str(credit.expiresAt) ?? ""))
+		.filter(at => !Number.isNaN(at));
+	return { count, nextExpiresAt: expiries.length ? Math.min(...expiries) : null };
 }
 
 /**
@@ -63,6 +79,7 @@ export function parsePlanUsage(stdout: string): PlanUsage[] {
 			windows: windows.map(window =>
 				windows.some(other => other !== window && other.label === window.label) ? { ...window, label: window.title } : window,
 			),
+			resetCredits: parseResetCredits(report.resetCredits),
 		});
 	}
 	return plans;

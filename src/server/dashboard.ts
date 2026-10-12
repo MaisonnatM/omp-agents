@@ -19,7 +19,7 @@ import { callWithMcpSignIn, findMcpServer, mcpSignedIn } from "../omp/mcp";
 import { type HostSnapshot, listHosts } from "../omp/collab";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
-import { stopStats } from "../omp/stats";
+import { readCreditRuns, stopStats } from "../omp/stats";
 import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { runShell } from "../proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
@@ -28,6 +28,7 @@ import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
 import type { PinChange } from "../shared/pins";
 import type { ProjectEdit } from "../shared/projects";
+import type { ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
@@ -42,7 +43,7 @@ import { InterruptedSessions } from "./interrupted";
 import { LocalEventsFile } from "./local-events-file";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops } from "./loops";
-import { ACTIVITY_KINDS, Notices, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, Notices, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
 import { seedNotes } from "./project-notes";
@@ -103,6 +104,7 @@ export class Dashboard {
 	#registryFresh = false;
 	/** Whether the activity was checked since the last activity tick found no listener. */
 	#activityFresh = false;
+	#usage: Extract<ServerMsg, { t: "usage" }> | null = null;
 
 	constructor(port: number) {
 		// An older version kept the workspace list in `projects.json`, so it moves before the projects load from that name.
@@ -136,6 +138,12 @@ export class Dashboard {
 					const slack = await findMcpServer(MCP_SERVICES.slack.host);
 					return slack && (await mcpSignedIn(slack)) ? waitingOnYou(url => callWithMcpSignIn(slack, url), Date.now()) : [];
 				},
+				plans: async () => {
+					if (this.#usage === null) throw new Error("omp usage has not run yet");
+					if (this.#usage.error !== null) throw new Error(this.#usage.error);
+					return this.#usage.plans;
+				},
+				creditRuns: () => readCreditRuns(Date.now()),
 				now: Date.now,
 			},
 			() => this.#broadcasts.pushNotices(),
@@ -237,7 +245,10 @@ export class Dashboard {
 				if (await files.refresh()) this.#onFilesChanged();
 			},
 			onRescanTick: () => this.#rescanFiles(),
-			onUsageTick: () => broadcasts.refreshUsage(),
+			onUsageTick: async () => {
+				this.#usage = await broadcasts.refreshUsage();
+				await notices.check(PROVIDER_KINDS);
+			},
 			onMinuteTick: async () => {
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();

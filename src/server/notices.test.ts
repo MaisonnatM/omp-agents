@@ -3,10 +3,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { PullRequestList, PullRequestSummary } from "../shared/github";
+import type { PlanUsage, PlanWindow } from "../shared/models";
 import type { AgentState } from "../shared/moves";
-import type { ModelUpdate, Notice } from "../shared/notices";
+import type { CreditsSubject, ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
-import { ACTIVITY_KINDS, Notices, type NoticeSources, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, Notices, type NoticeSources, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -60,6 +61,9 @@ interface State {
 	githubError?: string;
 	agents?: Record<number, AgentState>;
 	slack?: SlackFound[];
+	plans?: PlanUsage[];
+	usageError?: string;
+	creditRuns?: Omit<CreditsSubject, "kind">[];
 	now?: number;
 }
 
@@ -88,6 +92,11 @@ function sources(state: State): NoticeSources {
 			return { list, agent: ({ number }) => state.agents?.[number] ?? null };
 		},
 		slack: async () => state.slack ?? [],
+		plans: async () => {
+			if (state.usageError) throw new Error(state.usageError);
+			return state.plans ?? [];
+		},
+		creditRuns: async () => state.creditRuns ?? [],
 		now: () => state.now ?? 0,
 	};
 }
@@ -252,5 +261,36 @@ describe("Notices", () => {
 			["pull-request:acme/webapp#2:review", 54 * MINUTE],
 			["pull-request:acme/webapp#1:merge", 1_000],
 		]);
+	});
+
+	test("a used-up window is a notice until it resets, kept through a failed omp usage, and a credits run comes and goes on its own", async () => {
+		const window = (id: string, exhausted: boolean): PlanWindow => ({ id, label: id, title: id, remaining: exhausted ? 0 : 0.5, resetsAt: 9 * MINUTE, exhausted });
+		const cursor = (exhausted: boolean): PlanUsage => ({
+			provider: "cursor",
+			name: "Cursor",
+			account: "me@example.com",
+			windows: [window("cursor:usd:individual-auto", false), window("cursor:usd:individual-api", exhausted)],
+			resetCredits: { count: 2, nextExpiresAt: null },
+		});
+		const run = { provider: "openrouter", model: "openai/gpt-5.5", failures: 3, since: 7 * MINUTE, error: "402 Insufficient credits" };
+		const PLAN_ID = "plan:cursor/me@example.com:cursor:usd:individual-api";
+		const state: State = { latest: null, installed: "18.8.0", models: [], plans: [cursor(true)], now: 10 * MINUTE };
+		const notices = new Notices(noticesPath(), sources(state), () => {});
+		await notices.check(PROVIDER_KINDS);
+		expect(notices.list.map(notice => (notice.kind === "plan" ? [notice.id, notice.at, notice.resetCredits] : null))).toEqual([[PLAN_ID, 10 * MINUTE, 2]]);
+
+		state.usageError = "omp usage timed out";
+		state.creditRuns = [run];
+		await notices.check(PROVIDER_KINDS);
+		expect(notices.list.map(({ id, at }) => [id, at])).toEqual([
+			[PLAN_ID, 10 * MINUTE],
+			["credits:openrouter", 7 * MINUTE],
+		]);
+
+		state.usageError = undefined;
+		state.plans = [cursor(false)];
+		state.creditRuns = [];
+		await notices.check(PROVIDER_KINDS);
+		expect(notices.list).toEqual([]);
 	});
 });

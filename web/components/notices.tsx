@@ -1,4 +1,4 @@
-import { Bell, CheckCheck, CircleX, Eye, GitCompareArrows, GitMerge, type LucideIcon, MessageSquare, Sparkles, X } from "lucide-react";
+import { Bell, CheckCheck, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, type LucideIcon, MessageSquare, Sparkles, Wallet, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type Person, pullRequestUrl } from "../../src/shared/github";
 import type { YourMove } from "../../src/shared/moves";
@@ -11,31 +11,53 @@ import { cn } from "@/lib/utils";
 import { moveAction } from "../pull-requests-model";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
-import { hashForPullRequests } from "../routing";
+import { providerLabel, providerOrg } from "../labels";
+import { hashForPullRequests, hashForSettings } from "../routing";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { SLACK_LOGO } from "./integrations/brand-logos";
+import { OrgIcon } from "./org-icon";
 import { toasts } from "./toaster";
 
 type Send = (msg: ClientMsg) => void;
 type UpdateNotice = Extract<Notice, { status: unknown }>;
 
 /** The bell's filters, each a source of notices. */
-type Source = "github" | "slack" | "updates";
+type Source = "github" | "slack" | "providers" | "updates";
 
-const sourceOf = (notice: Notice): Source => (notice.kind === "pull-request" ? "github" : notice.kind === "slack" ? "slack" : "updates");
+function sourceOf(notice: Notice): Source {
+	switch (notice.kind) {
+		case "pull-request":
+			return "github";
+		case "slack":
+			return "slack";
+		case "plan":
+		case "credits":
+			return "providers";
+		default:
+			return "updates";
+	}
+}
 
 const FILTERS: [Source | "all", string][] = [
 	["all", "All"],
 	["github", "GitHub"],
 	["slack", "Slack"],
+	["providers", "Providers"],
 	["updates", "Updates"],
 ];
 
-/** A pull request toast or Slack toast shows only while its news is this fresh, so a check after a long gap does not toast what you missed. */
+/** A pull request, Slack, or provider toast shows only while its news is this fresh, so a check after a long gap does not toast what you missed. */
 const TOAST_FRESH_MS = 15 * 60_000;
-/** How long a pull request toast or Slack toast stays; an update's stays until dismissed. */
+/** How long a pull request, Slack, or provider toast stays; an update's stays until dismissed. */
 const TOAST_MS = 6_000;
+
+const SAME_DAY = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+const OTHER_DAY = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+const timeLabel = (at: number): string => (new Date(at).toDateString() === new Date().toDateString() ? SAME_DAY : OTHER_DAY).format(at);
+
+const creditsClause = (count: number): string => (count === 1 ? "The plan holds 1 reset credit." : `The plan holds ${count} reset credits.`);
 
 /** Each of your moves as the bell words it, with the icon and colours of the Pull requests page's badge for it. */
 const MOVE_NOTICE: Record<YourMove, { headline: string; icon: LucideIcon; tone: string }> = {
@@ -72,6 +94,10 @@ function headlineOf(notice: Notice): string {
 			if (notice.type === "mention") return `${notice.from} mentioned you in #${notice.channel}`;
 			if (notice.type === "group-dm") return `${notice.from} wrote in a group message`;
 			return notice.count === 1 ? `${notice.from} sent you a message` : `${notice.from} sent you ${notice.count} messages`;
+		case "plan":
+			return `${notice.name} ${notice.windowTitle} is used up`;
+		case "credits":
+			return `${providerLabel(notice.provider)} is out of credits`;
 		default:
 			return updateTitle(notice);
 	}
@@ -84,15 +110,37 @@ function previewOf(notice: Notice): string {
 			return notice.pr.title;
 		case "slack":
 			return notice.text;
+		case "plan": {
+			const said = [notice.resetsAt === null ? "" : `Resets ${timeLabel(notice.resetsAt)}.`, notice.resetCredits > 0 ? creditsClause(notice.resetCredits) : ""].filter(Boolean).join(" ");
+			return [notice.account, said].filter(Boolean).join(": ");
+		}
+		case "credits":
+			return `${notice.failures === 1 ? "A request" : `${notice.failures} requests`} to ${notice.model} failed since ${timeLabel(notice.since)}: ${notice.error}`;
 		default:
 			return updateDetail(notice);
 	}
 }
 
-/** Opens what a pull request notice or Slack notice is about: the pull request on the Pull requests page, or the message in Slack. */
+function hrefOf(notice: Notice): string | null {
+	switch (notice.kind) {
+		case "pull-request":
+			return hashForPullRequests(notice.pr);
+		case "slack":
+			return notice.permalink;
+		case "plan":
+		case "credits":
+			return hashForSettings("providers", null);
+		default:
+			return null;
+	}
+}
+
+/** Opens what a notice is about: a Slack message in Slack, anything else in the dashboard. */
 function follow(notice: Notice): void {
-	if (notice.kind === "pull-request") location.hash = hashForPullRequests(notice.pr);
-	else if (notice.kind === "slack") window.open(notice.permalink, "_blank", "noopener,noreferrer");
+	const href = hrefOf(notice);
+	if (href === null) return;
+	if (notice.kind === "slack") window.open(href, "_blank", "noopener,noreferrer");
+	else location.hash = href;
 }
 
 /** Whether **Update** is enabled: before the update runs, and again after it failed. */
@@ -100,8 +148,8 @@ const updatable = (notice: UpdateNotice): boolean => notice.status.state === "av
 
 /**
  * Shows each notice the user has not seen as a toast; closing it marks the notice seen, so it toasts once across reloads
- * and pages. An update's toast stays until dismissed and keeps its text and **Update** in step with the notice. A pull
- * request's or Slack message's toast shows only while its news is fresh, closes itself, and opens what it is about.
+ * and pages. An update's toast stays until dismissed and keeps its text and **Update** in step with the notice. Any
+ * other notice's toast shows only while its news is fresh, closes itself, and opens what it is about.
  */
 export function useNoticeToasts(notices: Notice[], connected: boolean, send: Send): void {
 	const open = useRef(new Set<string>());
@@ -117,7 +165,7 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: Sen
 			const onClose = () => {
 				if (open.current.delete(id)) send({ t: "notice", ids: [id], op: "seen" });
 			};
-			if (notice.kind === "pull-request" || notice.kind === "slack") {
+			if (!("status" in notice)) {
 				if (open.current.has(id)) {
 					if (notice.read) close(id);
 					continue;
@@ -177,12 +225,23 @@ function actorOf(notice: Extract<Notice, { kind: "pull-request" }>): Person | nu
 
 const BADGE = "absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full ring-2 ring-popover";
 
-/** A notice's picture: who it comes from with a badge for its source, or for an update or a move nobody made, the source's tile. */
+/** A notice's picture: who it comes from with a badge for its source; an update's or a move nobody made's source tile; or a provider's logo with a warning badge. */
 function Face({ notice }: { notice: Notice }) {
 	if (notice.kind === "omp" || notice.kind === "model") {
 		return (
 			<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-violet-500/10">
 				<Sparkles aria-hidden className="m-auto size-4 text-violet-600 dark:text-violet-400" />
+			</span>
+		);
+	}
+	if (notice.kind === "plan" || notice.kind === "credits") {
+		const Icon = notice.kind === "plan" ? Gauge : Wallet;
+		return (
+			<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
+				<OrgIcon org={providerOrg(notice.provider)} className="m-auto size-4" fallback={<Icon aria-hidden className="m-auto size-4 text-muted-foreground" />} />
+				<span className={cn(BADGE, "bg-red-500 text-white")}>
+					<Icon aria-hidden className="size-2.5" strokeWidth={2.5} />
+				</span>
 			</span>
 		);
 	}
@@ -232,7 +291,7 @@ function Face({ notice }: { notice: Notice }) {
 function NoticeAction({ notice, send, onDone }: { notice: Notice; send: Send; onDone: () => void }) {
 	const { start } = useDashboardActions();
 	const { connected, starts } = useDashboardStatus();
-	if (notice.kind === "slack") return null;
+	if (notice.kind === "slack" || notice.kind === "plan" || notice.kind === "credits") return null;
 	if (notice.kind === "omp" || notice.kind === "model") {
 		if (notice.status.state === "updated") return null;
 		return (
@@ -288,7 +347,7 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 	const read = () => {
 		if (!notice.read) send({ t: "notice", ids: [notice.id], op: "read" });
 	};
-	const href = notice.kind === "pull-request" ? hashForPullRequests(notice.pr) : notice.kind === "slack" ? notice.permalink : null;
+	const href = hrefOf(notice);
 	const label = `${notice.read ? "" : "Unread: "}${headline}`;
 	return (
 		<li className="group relative flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/70 has-[>a:focus-visible]:bg-muted/70">
@@ -421,7 +480,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 								<Bell aria-hidden className="size-4 text-muted-foreground" />
 							</span>
 							<p className="text-sm font-medium">You're all caught up</p>
-							<p className="text-xs text-muted-foreground">Pull requests that wait on you, Slack messages for you, and updates land here.</p>
+							<p className="text-xs text-muted-foreground">Pull requests that wait on you, Slack messages for you, providers that stop serving, and updates land here.</p>
 						</div>
 					) : (
 						<>

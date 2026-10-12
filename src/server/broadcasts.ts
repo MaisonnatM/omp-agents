@@ -95,13 +95,16 @@ export class Broadcasts {
 		if (this.listening()) this.#syncPast();
 	}
 
-	/** Run `omp usage` and publish its report, or why it failed. */
-	async refreshUsage(): Promise<void> {
+	/** Run `omp usage`, publish its report or why it failed, and answer with that report. */
+	async refreshUsage(): Promise<Extract<ServerMsg, { t: "usage" }>> {
+		let usage: Extract<ServerMsg, { t: "usage" }>;
 		try {
-			this.#publishChanged({ t: "usage", plans: await fetchPlanUsage(), error: null });
+			usage = { t: "usage", plans: await fetchPlanUsage(), error: null };
 		} catch (err) {
-			this.#publishChanged({ t: "usage", plans: [], error: errorText(err) });
+			usage = { t: "usage", plans: [], error: errorText(err) };
 		}
+		this.#publishChanged(usage);
+		return usage;
 	}
 
 	pushUserTodos(): void {

@@ -33,7 +33,8 @@ describe("providerQuota", () => {
 		provider,
 		name: provider,
 		account,
-		windows: remaining.map((left, index) => ({ label: `w${index}`, title: `Window ${index}`, remaining: left, resetsAt: null })),
+		windows: remaining.map((left, index) => ({ id: `w${index}`, label: `w${index}`, title: `Window ${index}`, remaining: left, resetsAt: null, exhausted: left <= 0 })),
+		resetCredits: null,
 	});
 
 	test("the tightest window of the account with the most left, and that account's windows", () => {

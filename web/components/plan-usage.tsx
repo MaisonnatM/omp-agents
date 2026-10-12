@@ -1,9 +1,9 @@
 import { createContext } from "react";
-import type { PlanUsage, PlanWindow } from "../../src/shared/models";
+import type { PlanUsage, PlanWindow, ResetCredits } from "../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { DashboardState } from "../dashboard-state";
-import { providerOrg } from "../labels";
+import { DAY_FORMAT, providerOrg } from "../labels";
 import { OrgIcon } from "./org-icon";
 
 /** Below this fraction left, a window reads as running low. */
@@ -17,12 +17,12 @@ function WindowLeft({ window }: { window: PlanWindow }) {
 	const percent = Math.round(window.remaining * 100);
 	const reset = window.resetsAt === null ? "" : ` Resets ${new Date(window.resetsAt).toLocaleString()}.`;
 	return (
-		<Tooltip content={`${window.title}: ${percent}% left.${reset}`}>
+		<Tooltip content={`${window.title}: ${window.exhausted ? "used up" : `${percent}% left`}.${reset}`}>
 			<span
 				tabIndex={0}
 				className={cn(
 					"whitespace-nowrap rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
-					window.remaining <= 0
+					window.exhausted
 						? "text-red-600 dark:text-red-400"
 						: window.remaining < LOW
 							? "text-amber-600 dark:text-amber-400"
@@ -35,8 +35,14 @@ function WindowLeft({ window }: { window: PlanWindow }) {
 	);
 }
 
+function creditsLine({ count, nextExpiresAt }: ResetCredits): string {
+	const credits = count === 1 ? "1 reset credit" : `${count} reset credits`;
+	return nextExpiresAt === null ? `${credits}.` : `${credits}, ${count === 1 ? "expires" : "next expires"} ${DAY_FORMAT.format(nextExpiresAt)}.`;
+}
+
 function PlanRow({ plan }: { plan: PlanUsage }) {
-	const label = plan.account ? `${plan.name} · ${plan.account}` : plan.name;
+	const name = plan.account ? `${plan.name} · ${plan.account}` : plan.name;
+	const label = plan.resetCredits ? `${name}. ${creditsLine(plan.resetCredits)}` : name;
 	return (
 		<li className="flex items-center gap-2 border-border not-first:border-l not-first:pl-2.5">
 			<Tooltip content={label}>

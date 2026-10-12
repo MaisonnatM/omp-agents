@@ -1,6 +1,6 @@
 /**
- * What the bell lists: a newer omp or routed model, a pull request whose next move is yours, and a Slack message that
- * waits on you.
+ * What the bell lists: a newer omp or routed model, a pull request whose next move is yours, a Slack message that
+ * waits on you, and a provider that stopped serving: a used-up plan window or prepaid credits that ran out.
  */
 import type { PullRequestSummary } from "./github";
 import type { YourMove } from "./moves";
@@ -51,7 +51,33 @@ export type SlackSubject = { kind: "slack"; from: string; text: string; permalin
 	| { type: "dm" | "group-dm"; count: number }
 );
 
-export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject;
+/** A plan window `omp usage` reports used up; `resetCredits` counts the credits the plan holds. */
+export interface PlanSubject {
+	kind: "plan";
+	provider: string;
+	name: string;
+	account: string | null;
+	windowTitle: string;
+	resetsAt: number | null;
+	resetCredits: number;
+}
+
+/**
+ * A provider whose latest requests failed because its prepaid credits ran out (a billing 402), since the first such
+ * failure after its last request that worked: `failures` requests, the latest to `model` with `error`.
+ */
+export interface CreditsSubject {
+	kind: "credits";
+	provider: string;
+	model: string;
+	failures: number;
+	since: number;
+	error: string;
+}
+
+export type ProviderSubject = PlanSubject | CreditsSubject;
+
+export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject;
 
 export type NoticeKind = NoticeSubject["kind"];
 
@@ -61,7 +87,12 @@ export type NoticeKind = NoticeSubject["kind"];
  * ms since the epoch. `seen` is set once its toast showed or the user started its update, so it toasts once; `read`
  * once the user opened it or marked it read, which takes it out of the bell's unread count.
  */
-export type Notice = { id: string; at: number; seen: boolean; read: boolean } & ((UpdateSubject & { status: NoticeStatus }) | PullRequestSubject | SlackSubject);
+export type Notice = { id: string; at: number; seen: boolean; read: boolean } & (
+	| (UpdateSubject & { status: NoticeStatus })
+	| PullRequestSubject
+	| SlackSubject
+	| ProviderSubject
+);
 
 /** `update` installs the release or rewrites the routing; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */
 export const NOTICE_OPS = ["update", "seen", "read", "clear"] as const;

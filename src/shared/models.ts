@@ -2,6 +2,8 @@
 
 /** One quota window of a provider plan. */
 export interface PlanWindow {
+	/** omp's id for the limit, e.g. `anthropic:7d:fable`; the window id when omp gives none. */
+	id: string;
 	/** Short name: the window id (`5h`, `7d`, `monthly`) plus its model tier, else omp's label when that is ambiguous. */
 	label: string;
 	/** omp's name for the limit, e.g. `Claude 7 Day (Fable)`. */
@@ -9,6 +11,14 @@ export interface PlanWindow {
 	/** Fraction of the window's quota left, 0 to 1. */
 	remaining: number;
 	resetsAt: number | null;
+	/** Whether the window is used up: omp's `exhausted` status, else nothing left when omp's status is missing or `unknown`. */
+	exhausted: boolean;
+}
+
+/** The reset credits a plan can redeem to clear a used-up window; `nextExpiresAt` is the soonest one's expiry. */
+export interface ResetCredits {
+	count: number;
+	nextExpiresAt: number | null;
 }
 
 /** A provider account that `omp usage` reports plan limits for. */
@@ -17,6 +27,8 @@ export interface PlanUsage {
 	name: string;
 	account: string | null;
 	windows: PlanWindow[];
+	/** `null` when the plan has no credit to redeem. */
+	resetCredits: ResetCredits | null;
 }
 
 /** A model a session can switch to; `provider/id` is omp's model selector. */

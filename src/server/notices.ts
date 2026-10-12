@@ -6,7 +6,8 @@ import { JsonFile } from "../fs";
 import { errorText, isObject } from "../json";
 import { type PullRequestList, prKey, repoKey } from "../shared/github";
 import { type AgentOn, moveOf, YOUR_MOVES, type YourMove } from "../shared/moves";
-import type { ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject } from "../shared/notices";
+import type { PlanUsage } from "../shared/models";
+import type { CreditsSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject } from "../shared/notices";
 import { usesClause } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
 
@@ -23,6 +24,10 @@ export interface NoticeSources {
 	pullRequests(): Promise<{ list: PullRequestList; agent: AgentOn }>;
 	/** The Slack messages that wait on you; none while Slack is not connected. */
 	slack(): Promise<SlackFound[]>;
+	/** The plans the last `omp usage` reported; rejects when it failed. */
+	plans(): Promise<PlanUsage[]>;
+	/** Each provider whose prepaid credits ran out, as its latest requests failed. */
+	creditRuns(): Promise<Omit<CreditsSubject, "kind">[]>;
 	now(): number;
 }
 
@@ -30,6 +35,8 @@ export interface NoticeSources {
 export const UPDATE_KINDS = ["omp", "model"] as const satisfies readonly NoticeKind[];
 /** The kinds the activity check looks for. */
 export const ACTIVITY_KINDS = ["pull-request", "slack"] as const satisfies readonly NoticeKind[];
+/** The kinds the provider check looks for. */
+export const PROVIDER_KINDS = ["plan", "credits"] as const satisfies readonly NoticeKind[];
 
 const MARKS = ["seen", "read", "cleared"] as const;
 type Mark = (typeof MARKS)[number];
@@ -57,7 +64,14 @@ interface Checked {
 const AVAILABLE: NoticeStatus = { state: "available" };
 
 /** What a failed check's log line says it looked for. */
-const LOOKED_FOR: Record<NoticeKind, string> = { omp: "a newer omp", model: "newer models", "pull-request": "your pull requests' moves", slack: "Slack messages" };
+const LOOKED_FOR: Record<NoticeKind, string> = {
+	omp: "a newer omp",
+	model: "newer models",
+	"pull-request": "your pull requests' moves",
+	slack: "Slack messages",
+	plan: "used-up plans",
+	credits: "providers out of credits",
+};
 
 const isIds = (value: unknown): value is string[] => Array.isArray(value) && value.every(id => typeof id === "string");
 
@@ -87,6 +101,28 @@ function pullRequestNotices(list: PullRequestList, agent: AgentOn): Checked {
 	);
 	const answered = list.repos.flatMap(repo => ("error" in repo ? [] : [repoKey(repo)]));
 	return { found, unchecked: id => failed.has(repoOf(id)), scopeOf: repoOf, answered, dated: false };
+}
+
+/**
+ * A notice for each used-up window of `plans`. Its id leaves out the reset time, which some providers report a little
+ * differently on each poll.
+ */
+function planNotices(plans: PlanUsage[], at: number): Found[] {
+	return plans.flatMap(({ provider, name, account, windows, resetCredits }) =>
+		windows
+			.filter(window => window.exhausted)
+			.map(window => ({
+				id: `plan:${provider}/${account ?? ""}:${window.id}`,
+				at,
+				kind: "plan" as const,
+				provider,
+				name,
+				account,
+				windowTitle: window.title,
+				resetsAt: window.resetsAt,
+				resetCredits: resetCredits?.count ?? 0,
+			})),
+	);
 }
 
 export class Notices {
@@ -189,6 +225,13 @@ export class Notices {
 			}
 			case "slack":
 				return all(await this.#sources.slack(), true);
+			case "plan":
+				return all(planNotices(await this.#sources.plans(), this.#sources.now()), false);
+			case "credits":
+				return all(
+					(await this.#sources.creditRuns()).map(run => ({ id: `credits:${run.provider}`, at: run.since, kind: "credits", ...run })),
+					true,
+				);
 		}
 	}
 

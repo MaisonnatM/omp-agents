@@ -15,8 +15,8 @@ describe("parsePlanUsage", () => {
 				{
 					provider: "anthropic",
 					limits: [
-						limit("Claude 5 Hour", "5h", { remainingFraction: 0.69 }),
-						limit("Claude 7 Day (Fable)", "7d", { remainingFraction: 1 }, { scope: { tier: "fable" } }),
+						limit("Claude 5 Hour", "5h", { remainingFraction: 0.69 }, { id: "anthropic:5h" }),
+						limit("Claude 7 Day (Fable)", "7d", { remainingFraction: 1 }, { id: "anthropic:7d:fable", scope: { tier: "fable" } }),
 					],
 					metadata: { email: "me@example.com" },
 				},
@@ -35,19 +35,67 @@ describe("parsePlanUsage", () => {
 				name: "Anthropic",
 				account: "me@example.com",
 				windows: [
-					{ label: "5h", title: "Claude 5 Hour", remaining: 0.69, resetsAt: 1790870400000 },
-					{ label: "7d fable", title: "Claude 7 Day (Fable)", remaining: 1, resetsAt: 1790870400000 },
+					{ id: "anthropic:5h", label: "5h", title: "Claude 5 Hour", remaining: 0.69, resetsAt: 1790870400000, exhausted: false },
+					{ id: "anthropic:7d:fable", label: "7d fable", title: "Claude 7 Day (Fable)", remaining: 1, resetsAt: 1790870400000, exhausted: false },
 				],
+				resetCredits: null,
 			},
 			{
 				provider: "cursor",
 				name: "Cursor",
 				account: null,
 				windows: [
-					{ label: "Cursor Models", title: "Cursor Models", remaining: 0.6, resetsAt: 1790870400000 },
-					{ label: "Other Models", title: "Other Models", remaining: 0, resetsAt: 1790870400000 },
+					{ id: "monthly", label: "Cursor Models", title: "Cursor Models", remaining: 0.6, resetsAt: 1790870400000, exhausted: false },
+					{ id: "monthly", label: "Other Models", title: "Other Models", remaining: 0, resetsAt: 1790870400000, exhausted: true },
 				],
+				resetCredits: null,
 			},
+		]);
+	});
+
+	test("takes omp's status over the amount left, so an allowed overdraft is not used up", () => {
+		const stdout = JSON.stringify({
+			reports: [
+				{
+					provider: "openai-codex",
+					limits: [
+						limit("5 Hour", "5h", { remainingFraction: 0 }, { id: "openai-codex:primary", status: "warning" }),
+						limit("7 Day", "7d", { remainingFraction: 0.01 }, { id: "openai-codex:secondary", status: "exhausted" }),
+					],
+				},
+			],
+		});
+		expect(parsePlanUsage(stdout)[0]?.windows.map(({ id, exhausted }) => [id, exhausted])).toEqual([
+			["openai-codex:primary", false],
+			["openai-codex:secondary", true],
+		]);
+	});
+
+	test("counts the banked reset credits and dates the soonest one omp counts, usable now or not", () => {
+		const report = (resetCredits: unknown) => ({ provider: "openai-codex", limits: [limit("5 Hour", "5h", { remainingFraction: 1 })], resetCredits });
+		const stdout = JSON.stringify({
+			reports: [
+				report({
+					availableCount: 3,
+					credits: [
+						{ expiresAt: "2026-10-01T00:00:00Z", status: "redeemed" },
+						{ expiresAt: "2026-10-05T00:00:00Z", status: "expired" },
+						{ expiresAt: "2026-10-08T00:00:00Z", status: "unavailable", remainingCount: 0 },
+						{ expiresAt: "2026-10-29T00:00:00Z", status: "available" },
+						{ expiresAt: "2026-10-15T00:00:00Z", status: "paused" },
+						{ expiresAt: "2026-10-22T00:00:00Z" },
+					],
+				}),
+				report({ availableCount: 0, credits: [{ expiresAt: "2026-10-22T00:00:00Z", status: "redeemed" }] }),
+				report({ availableCount: 1 }),
+				report(null),
+			],
+		});
+		expect(parsePlanUsage(stdout).map(plan => plan.resetCredits)).toEqual([
+			{ count: 3, nextExpiresAt: Date.parse("2026-10-15T00:00:00Z") },
+			null,
+			{ count: 1, nextExpiresAt: null },
+			null,
 		]);
 	});
 
@@ -64,7 +112,8 @@ describe("parsePlanUsage", () => {
 				provider: "kimi-code",
 				name: "Kimi Code",
 				account: null,
-				windows: [{ label: "7d", title: "Weekly", remaining: 0, resetsAt: 1790870400000 }],
+				windows: [{ id: "7d", label: "7d", title: "Weekly", remaining: 0, resetsAt: 1790870400000, exhausted: true }],
+				resetCredits: null,
 			},
 		]);
 	});
