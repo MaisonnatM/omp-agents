@@ -1,5 +1,9 @@
 import { MessageCircle } from "lucide-react";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, type RefObject } from "react";
+import type { PromptEditorHandle } from "./prompt-editor";
+
+/** The text field of the composer around a picker, which takes the focus back once a choice closes the picker; `null` outside a composer. */
+export const ComposerEditor = createContext<RefObject<PromptEditorHandle | null> | null>(null);
 
 /** Where a draft goes: a session this dashboard started, which runs `!` over RPC; a draft that starts one; or a Collab room or a subagent. */
 export type ShellReach = "rpc" | "new" | "none";

@@ -520,6 +520,11 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
                 <Button
                   type="button"
                   size="icon-sm"
+                  // The button turns disabled once the draft is sent, which would drop the focus to the page.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    editorHandle.current?.focus();
+                  }}
                   onClick={buttonMode === "stop" ? handleStop : handleSend}
                   disabled={buttonMode === "stop" ? disabled : !canSend}
                   loading={buttonMode === "stop" ? stopping : sending}

@@ -1,5 +1,5 @@
 import { Check, ChevronsUpDown } from "lucide-react";
-import { type KeyboardEvent, type ReactNode, type Ref, useState } from "react";
+import { type KeyboardEvent, type ReactNode, type Ref, useContext, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -8,6 +8,7 @@ import type { IconComponent } from "@/lib/icon-context";
 import { cn } from "@/lib/utils";
 import type { ReadState } from "../reads";
 import { type ShortcutId, shortcutLabels } from "../shortcuts";
+import { ComposerEditor } from "./composer";
 
 export interface PickerItem {
 	/** What cmdk filters and keys on; unique across the picker. */
@@ -143,6 +144,8 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 		if (open === undefined) setInner(next);
 		onOpenChange?.(next);
 	};
+	const composer = useContext(ComposerEditor);
+	const picked = useRef(false);
 	const button = (
 		<PopoverTrigger asChild>
 			<Button
@@ -171,8 +174,29 @@ export function CommandPicker({ trigger, icon, chevron = true, ariaLabel, toolti
 				button
 			)}
 			{/* A click in the list must not reach the composer around a picker, which would take the focus back to its text box. */}
-			<PopoverContent side={side} align="start" className={cn(WIDTH[width], "min-w-0 max-h-[var(--radix-popover-content-available-height)] overflow-x-hidden overflow-y-auto overscroll-contain p-0")} onMouseDown={event => event.stopPropagation()}>
-				<CommandResults search={search} list={list} empty={empty} disabled={disabled} onClose={() => change(false)} />
+			<PopoverContent
+				side={side}
+				align="start"
+				className={cn(WIDTH[width], "min-w-0 max-h-[var(--radix-popover-content-available-height)] overflow-x-hidden overflow-y-auto overscroll-contain p-0")}
+				onMouseDown={event => event.stopPropagation()}
+				onCloseAutoFocus={event => {
+					const refocus = picked.current && composer !== null;
+					picked.current = false;
+					if (!refocus) return;
+					event.preventDefault();
+					composer.current?.focus();
+				}}
+			>
+				<CommandResults
+					search={search}
+					list={list}
+					empty={empty}
+					disabled={disabled}
+					onClose={() => {
+						picked.current = true;
+						change(false);
+					}}
+				/>
 			</PopoverContent>
 		</Popover>
 	);

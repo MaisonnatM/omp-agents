@@ -20,6 +20,7 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - The send button shows its current action and Enter in a tooltip; Stop keeps its caller-provided shortcut.
 - Send button mode: while `status` is `"streaming"`, the button is Stop only when the draft is empty, and a draft sends at once.
   The dashboard steers a running turn with it.
+- Pressing the send or Stop button keeps the focus in the text field, since the button turns disabled once the draft is gone and the focus would fall to the page.
 - The built-in queue (`queue`, `onQueueChange`, `showQueue`, `QueuedRow`, the auto-dispatch on the streaming-to-idle edge, the Queue button mode, and `onSend`'s `meta`), history recall (`history`), the Tab-filled `placeholderSuggestion`, and the built-in `suggestions` list are removed.
   The dashboard renders its own queue and suggestions in `beforeEditor` and `afterActions`.
 - `clickToFocus`, `maxFiles`, and `filePreviewSize` are removed, since the dashboard never set them: a click on the frame always focuses the text field, any number of files attach, and previews are 80px.
