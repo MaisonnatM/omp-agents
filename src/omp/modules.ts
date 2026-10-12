@@ -172,15 +172,49 @@ export interface SessionSettingsModule {
 export interface ModelSettingsModule {
 	cfgModelProviderOrder: SettingsReader<string[]>;
 }
+/** Where a provider's credential comes from (pi-ai src/auth/types.ts `CredentialOrigin`). */
+export interface CredentialOrigin {
+	kind: "runtime" | "config" | "oauth" | "api_key" | "env";
+	/** The variable's name when `kind` is `env` and one variable holds the key. */
+	envVar?: string;
+}
+/** One stored credential row (pi-ai src/auth/types.ts `StoredAuthCredential`); the credential's fields stay omp's. */
+export interface StoredCredential {
+	id: number;
+	provider: string;
+	credential: { type: "oauth" | "api_key" };
+}
+/** What a provider's sign-in asks the page for (pi-ai src/registry/oauth/types.ts `OAuthPrompt`). */
+export interface OAuthPrompt {
+	message: string;
+	placeholder?: string;
+	allowEmpty?: boolean;
+	secret?: boolean;
+}
+/** The callbacks a provider's sign-in drives (pi-ai src/auth/types.ts `OAuthLoginController`). */
+export interface OAuthLoginController {
+	onAuth(info: { url: string; launchUrl?: string; instructions?: string }): void;
+	onProgress(message: string): void;
+	onPrompt(prompt: OAuthPrompt): Promise<string>;
+	onBrowserSession?(request: unknown, signal?: AbortSignal): Promise<string>;
+	signal: AbortSignal;
+}
+/** The account a sign-in stored (pi-ai src/auth/types.ts `OAuthLoginIdentity`). */
+export interface OAuthLoginIdentity {
+	type: "oauth" | "api_key";
+}
 /** Subset of omp's `AuthStorage` (pi-ai src/auth-storage.ts) this app reads and writes. */
 export interface AuthStorage {
 	/** Where `provider`'s credential comes from (a login, a stored key, an environment variable), `undefined` with none. */
-	keys: { source(provider: string): unknown };
+	keys: { source(provider: string): CredentialOrigin | undefined };
 	/** The stored credential rows, by provider id; an MCP server's sign-in is filed under its credential id. */
 	credentials: {
 		hasOAuth(provider: string): boolean;
+		list(provider: string): StoredCredential[];
 		set(provider: string, credential: Record<string, unknown> & { type: "oauth" }): Promise<void>;
 	};
+	/** Runs `provider`'s `/login` flow and stores what it returns; `undefined` when it stored nothing. */
+	oauth: { login(provider: string, controller: OAuthLoginController): Promise<OAuthLoginIdentity | undefined> };
 	close(): void;
 }
 export interface AuthModule {
@@ -188,8 +222,26 @@ export interface AuthModule {
 	discoverAuthStorage(): Promise<AuthStorage>;
 }
 export interface OAuthModule {
-	/** Every provider omp's `/login` offers. */
-	getOAuthProviders(): { id: string }[];
+	/** Every provider omp's `/login` offers; `storeCredentialsAs` names the provider its credential is filed under when that differs from `id`. */
+	getOAuthProviders(): { id: string; name: string; available: boolean; storeCredentialsAs?: string }[];
+}
+/** omp's model registry (src/config/model-registry.ts), built over a credential store. */
+export interface ModelRegistryModule {
+	ModelRegistry: new (storage: AuthStorage) => { refreshProvider(provider: string, strategy: "online"): Promise<void> };
+}
+/** What `/logout` shows and removes (src/slash-commands/helpers/logout.ts). */
+export interface LogoutModule {
+	toLogoutAccounts(provider: string, credentials: StoredCredential[]): { credentialId: number; label: string; detail: string; type: "oauth" | "api_key" }[];
+	/** Removes credential row `credentialId` of `loginProvider` and refreshes its models; `removed` is false when it was already gone. */
+	logoutCredential(registry: InstanceType<ModelRegistryModule["ModelRegistry"]>, loginProvider: string, credentialId: number, sessionId: string): Promise<{ removed: boolean }>;
+}
+export interface OAuthTerminalModule {
+	/** `email (org)`, `email`, or `org` for an OAuth sign-in; `undefined` for an API key or a sign-in that named no account. */
+	formatLoginIdentity(identity: OAuthLoginIdentity | undefined): string | undefined;
+}
+export interface BrowserSessionModule {
+	/** Opens an isolated Chromium for a sign-in that reads a cookie, as `/login` does for Perplexity. */
+	captureBrowserSession(request: unknown, signal?: AbortSignal): Promise<string>;
 }
 /** The fields of omp's `Model` (pi-ai src/types.ts) that decide its service tiers. */
 export interface ServiceTierModel {
@@ -511,6 +563,16 @@ export const auth = await load<AuthModule>(join(srcDir, "session", "auth-broker-
 export const oauth = await load<OAuthModule>(join(dirname(packageDir), "pi-ai", "src", "registry", "oauth", "index.ts"), {
 	getOAuthProviders: "function",
 });
+export const modelRegistry = await load<ModelRegistryModule>(join(srcDir, "config", "model-registry.ts"), {
+	ModelRegistry: "function",
+	"ModelRegistry.prototype.refreshProvider": "function",
+});
+export const logout = await load<LogoutModule>(join(srcDir, "slash-commands", "helpers", "logout.ts"), {
+	toLogoutAccounts: "function",
+	logoutCredential: "function",
+});
+export const oauthTerminal = await load<OAuthTerminalModule>(join(srcDir, "cli", "oauth-terminal.ts"), { formatLoginIdentity: "function" });
+export const browserSession = await load<BrowserSessionModule>(join(srcDir, "utils", "browser-session.ts"), { captureBrowserSession: "function" });
 export const serviceTiers = await load<ServiceTierModule>(join(dirname(packageDir), "pi-ai", "src", "types.ts"), {
 	serviceTierFamily: "function",
 	shouldSendServiceTier: "function",

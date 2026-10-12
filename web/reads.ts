@@ -9,6 +9,7 @@ import type { PullRequestList, RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
 import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/sessions";
 import type { Ticket, TicketsAnswer } from "../src/shared/tickets";
+import type { ProvidersAnswer } from "../src/shared/providers";
 import { errorText, getJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
 
@@ -167,6 +168,9 @@ export const integrationsStore = createPolledStore<IntegrationsAnswer>({
 		return isObject(integrations) && MCP_INTEGRATIONS.every(id => isObject(integrations[id]));
 	},
 });
+
+/** The model providers omp signs in to and the sign-in Settings › Providers runs; kept in memory only, as it names your accounts. */
+export const providersStore = createPolledStore<ProvidersAnswer>({ url: () => "/api/providers" });
 
 /** The calendars checked in your Google Calendar's list, which the Calendar page reads unless you unchecked one in its sidebar. */
 export const googleStore = createPolledStore<GoogleStatus>({

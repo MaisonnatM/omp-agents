@@ -12,6 +12,7 @@ import type { Catalog, Editing } from "./editor";
 import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
 import { PreferencesTab } from "./preferences-tab";
+import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
@@ -104,6 +105,7 @@ export function SettingsPage({ route, workspaces, workspaceList, pins }: { route
 	const panels: Record<SettingsSection, ReactNode> = {
 		...ompPanels(settings, cwd, editing),
 		analytics: <AnalyticsTab active={section === "analytics"} />,
+		providers: <ProvidersTab active={section === "providers"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
 		integrations: <IntegrationsTab active={section === "integrations"} />,
 		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} />,

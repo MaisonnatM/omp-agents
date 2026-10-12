@@ -30,6 +30,7 @@ The main ones:
 - Credentials: `pi-coding-agent/src/session/auth-broker-config.ts` (`discoverAuthStorage`) and `pi-ai/src/registry/oauth/index.ts` (`getOAuthProviders`).
   `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`.
   It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.
+  Settings › Providers runs omp's own `/login` and `/logout` through `src/omp/providers.ts`: `AuthStorage.oauth.login` (`pi-ai/src/auth-storage.ts`) with `captureBrowserSession` from `pi-coding-agent/src/utils/browser-session.ts` for a cookie sign-in, `formatLoginIdentity` from `pi-coding-agent/src/cli/oauth-terminal.ts`, `ModelRegistry.refreshProvider` from `pi-coding-agent/src/config/model-registry.ts` afterwards, as `omp login` does, and `toLogoutAccounts` and `logoutCredential` from `pi-coding-agent/src/slash-commands/helpers/logout.ts`.
 - Model roles: `pi-coding-agent/src/config/model-resolver.ts` (`expandRoleAlias`, `resolveRoleChain`), whose `@role` aliases `resolveRoles` in `src/omp/models.ts` follows for `GET /api/models/roles`.
   `modelEntries` reads each role and fallback selector with `parseRetryFallbackSelector` and maps it to a listed model with `resolveProviderModelReference`, which follows retired variant ids such as `grok-4.7-high` and dotted spellings such as `claude-fable-5.1`.
 - MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `oauth-credentials.ts` (`removeManagedMcpOAuthCredentials`), `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`, `updateMCPServer`, `readMCPConfigFile`), which `src/omp/mcp.ts` wraps for the tickets page and Settings › Integrations.
@@ -681,6 +682,24 @@ A failure, or no return within five minutes, shows as `signIn: { phase: "failed"
 A sign-in that omp does not manage stays, and the route answers an error that says so.
 `parseIntegrationId` in `src/server/wire.ts` checks both bodies.
 
+### Providers
+
+`GET /api/providers` answers `ProvidersAnswer` from `src/shared/providers.ts`: `providers`, one `ModelProvider` for each provider omp files `/login` credentials under, and `login`, the sign-in the page last started.
+`listProviders` in `src/omp/providers.ts` groups omp's available `getOAuthProviders` entries by `storeCredentialsAs ?? id`, so `openai-codex-device` joins `openai-codex` and `zai-coding-plan` joins `zai` as further `methods`.
+Each provider's `accounts` are its stored credential rows as `/logout` lists them, and `envKey` names the environment variable omp reads its key from when `keys.source` finds nothing stored.
+The store opens and closes on each read, so a `/login` in a terminal shows at the next one; the page reads every minute, and every second while a sign-in runs.
+
+`PUT /api/providers/login`, with `{ method }`, the `/login` entry, starts that sign-in on the server and answers the providers and the new `login`.
+`createProviderLogins` in `src/provider-logins.ts` keeps one sign-in at a time: a new one aborts the one under way, and one not done within five minutes fails.
+While it runs, `login` is `{ phase: "running", url, instructions, progress, prompt }`, from the flow's `onAuth`, `onProgress`, and `onPrompt` callbacks; the page shows the address as a link rather than opening it, since a device-code sign-in shows its code first.
+`prompt` is `{ id, message, placeholder, secret, allowEmpty }`, and `PUT /api/providers/login/answer`, with `{ prompt, value }`, resolves the `onPrompt` call that asked it, or answers 409 once the flow no longer waits on that question.
+For the paste-code providers, omp asks for the code or redirect address while its local callback also listens, and whichever comes first finishes the sign-in.
+A sign-in ends as `{ phase: "done", identity }`, after `ModelRegistry.refreshProvider` re-reads the provider's models, or `{ phase: "failed", error }`, and stays until the next one starts or `PUT /api/providers/login/cancel`, which also aborts one under way.
+A flow that stores nothing, such as Ollama's with an empty key, fails, as `omp login` reports it.
+
+`PUT /api/providers/sign-out`, with `{ provider, credentialId }`, removes that row through omp's `logoutCredential`, which refreshes the provider's models, and answers the providers after.
+`parseLoginMethod`, `parseLoginAnswer`, and `parseProviderSignOut` in `src/server/wire.ts` check the bodies.
+
 ### Google Calendar
 
 `src/google-calendar.ts` reads and writes Google Calendar's REST API (`https://www.googleapis.com/calendar/v3`) with the token omp holds for its Google Calendar MCP server, so the Calendar page needs no sign-in of its own.
@@ -798,7 +817,7 @@ The server lives in `src/`:
 - `src/server/http.ts`: the request checks (`Host`, `Origin`, `Sec-Fetch-Site`, the token cookie) and the JSON answer helpers.
   `/api/` requests and sockets are admitted by the cookie alone, so a stray `?token=` on a signed-in request changes nothing; only `/` reads `?token=`, to set the cookie.
   `src/server/auth.ts` keeps the token file and parses the cookie, `src/server/address.ts` names the port, host, and listening line that the desktop shell shares, and `src/server/page.ts` bundles `web/index.html` in memory and serves it only to a signed-in browser.
-- `src/server/routes.ts`: the `/api/` endpoints, in six groups (sessions, integrations, calendar, Gmail, pull requests, and files), each handed only its part of `RouteEnv`.
+- `src/server/routes.ts`: the `/api/` endpoints, in seven groups (sessions, integrations, providers, calendar, Gmail, pull requests, and files), each handed only its part of `RouteEnv`.
   Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.
   `src/server/wire.ts` parses every socket message and request body into typed values; every parser returns a `Parsed<T>`, `{ ok }` or `null`, and the two OAuth client parsers `{ error }` in place of `null`, a reason the page shows.
 - `src/terminals.ts`: the terminal panel's shells, each in a pseudo-terminal with its scrollback; `src/server/terminal-socket.ts` handles the `/ws/terminal` sockets that attach to them, and `src/shared/terminals.ts` holds the shapes and messages the page shares.
@@ -866,6 +885,7 @@ The server lives in `src/`:
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/mcp-clients.ts` plans a Slack, Google Calendar, or Gmail OAuth client save, the setup each form shows and the server entry the save writes, from omp's MCP servers that `src/omp/mcp.ts` reads and writes.
   `src/integrations.ts` finds omp's server for each MCP integration, checks it, and runs the sign-ins and sign-outs that Settings › Integrations starts; see [Integrations](#integrations).
+  `src/providers.ts` lists the model providers and runs the sign-ins and sign-outs that Settings › Providers starts, with `src/provider-logins.ts` holding the one sign-in under way, and `src/omp/providers.ts` calling omp for them; `src/shared/providers.ts` holds the shapes the page shares; see [Providers](#providers).
 - `src/google-calendar.ts`: `GoogleCalendarClient`, the calendars checked in your Google Calendar and the events in a span of those the Calendar page shows, read from Google's Calendar API with omp's Google Calendar sign-in, and the events it adds to and deletes from the calendars you may write to.
   `src/server/calendars-file.ts` keeps the ids of the calendars unchecked in the Calendar tab's sidebar in `calendars.json` beside the access token, and moves a file it cannot read to `calendars.json.invalid`.
   `src/server/local-events-file.ts` keeps the events added to **This computer** in `events.json` beside the access token, and moves a file it cannot read to `events.json.invalid`; see [New and local events](#new-and-local-events).
@@ -1083,6 +1103,7 @@ The page lives in `web/`.
   `web/components/integrations/` holds the integration rows that the Settings page's Integrations section, `web/components/settings/integrations-tab.tsx`, sorts into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which `DisconnectedPage` in `disconnected-page.tsx` shows on the tickets and Inbox pages while Linear or Gmail is not connected, and takes what shows below it as children, such as the calendars `google-calendar.tsx` lists under Google Calendar's row.
   Rows lay out through `integration-row.tsx` and draw their brand marks from `brand-logos.tsx`; `mcp-integration.tsx` starts its sign-ins with `web/use-sign-in.ts`, and its `SignOutConfirm` asks before a sign-out and shows its failure.
   `slack-app-form.tsx` holds Slack's confidential-app setup, field errors, and scope selection, `google-client-form.tsx` the OAuth client form of a Google service, Google Calendar or Gmail, with each one's API and grant in `GOOGLE_TEXT`, and `client-form.tsx` the steps, fields, and outside links both forms share; the generic MCP row owns its connection and sign-in controls.
+  `web/components/settings/providers-tab.tsx` is the Providers section, whose rows reuse `IntegrationList` and `Callout` from `integration-row.tsx`; it reads `providersStore` in `web/reads.ts`, kept in memory only since it names your accounts.
   `web/components/more-actions-menu.tsx` is the ⋯ menu of a row's rarer actions, which the integration rows and the Routines page share.
   `web/components/pull-requests/pull-requests-board.tsx` holds `usePullRequestsBoard`, the logic that the sidebar list and the page share: its sections, folds, order, drag, keys, and rows, with the sort menu and the keys line.
   It lays the board out only when the pull request list, its order, or its folds change, and fills in each row's drag, sessions, pending start, and open menu in a second pass; the sessions come from one pass over the roster, `sessionsByPullRequest` in `pr-row.tsx`, and the board keeps a pull request's list the same array while its chips hold, so a memoized row draws again only when what it shows changes.

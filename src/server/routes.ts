@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, Linear tickets and their files, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, and the text files agent text names through.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, and the text files agent text names through.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { join } from "node:path";
@@ -13,6 +13,7 @@ import type { GoogleCalendarClient } from "../google-calendar";
 import type { GmailClient } from "../gmail";
 import { loadPullRequests, loadPullRequestDetail } from "../pull-requests";
 import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
+import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
 import { sessionsDir } from "../omp/sessions";
@@ -40,7 +41,7 @@ import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
-import { type Parsed, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
+import { type Parsed, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
@@ -575,12 +576,30 @@ function fileRoutes({ get, write }: RouteKit, env: FileRoutesEnv): Routes {
 	};
 }
 
+/** The model providers omp's `/login` signs in to. */
+function providerRoutes({ get, write }: RouteKit): Routes {
+	const refuse = (err: unknown): Response | null => (err instanceof Rejected ? fail(err.status, err.message) : null);
+	return {
+		/** Every provider with its stored accounts, and the sign-in the page last started. */
+		"/api/providers": { GET: get(() => answer(loadProviders)) },
+		/** `{ method }`: starts that `/login` entry, abandoning a sign-in under way. */
+		"/api/providers/login": { PUT: write(body => checked(parseLoginMethod(body), "Expected { method } naming a /login provider"), startProviderLogin, refuse) },
+		/** `{ prompt, value }`: answers the sign-in's open question; 409 once it no longer waits on it. */
+		"/api/providers/login/answer": { PUT: write(body => checked(parseLoginAnswer(body), "Expected { prompt, value }"), answerProviderLogin, refuse) },
+		/** Abandons the sign-in under way, or dismisses how the last one ended. */
+		"/api/providers/login/cancel": { PUT: write(() => ({ ok: null }), cancelProviderLogin) },
+		/** `{ provider, credentialId }`: removes that stored credential, as `/logout` does. */
+		"/api/providers/sign-out": { PUT: write(body => checked(parseProviderSignOut(body), "Expected { provider, credentialId }"), signOutProvider) },
+	};
+}
+
 /** Every `/api/*` route, by path and method. */
 export function createRoutes(env: RouteEnv): Routes {
 	const kit = routeKit(env.guards);
 	return {
 		...sessionRoutes(kit, env.sessions),
 		...integrationRoutes(kit),
+		...providerRoutes(kit),
 		...calendarRoutes(kit, env.calendar),
 		...gmailRoutes(kit, env.gmail),
 		...pullRequestRoutes(kit),

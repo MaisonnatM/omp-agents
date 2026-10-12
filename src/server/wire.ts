@@ -17,6 +17,7 @@ import type { ModelOption } from "../shared/models";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import type { ProjectEdit } from "../shared/projects";
+import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
@@ -449,6 +450,19 @@ const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
 /** The body of `PUT /api/integrations/sign-in` and `/sign-out`: `{ id }` naming an MCP integration. */
 export const parseIntegrationId = (body: unknown): Parsed<McpIntegrationId> => (isObject(body) && isMcpIntegration(body.id) ? { ok: body.id } : null);
+
+/** The body of `PUT /api/providers/login`: `{ method }`, the `/login` entry to run. */
+export const parseLoginMethod = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.method) ? { ok: body.method } : null);
+
+/** The body of `PUT /api/providers/login/answer`: `{ prompt, value }`, the question's id and its answer. */
+export const parseLoginAnswer = (body: unknown): Parsed<{ prompt: number; value: string }> =>
+	isObject(body) && Number.isSafeInteger(body.prompt) && typeof body.value === "string" && body.value.length <= MAX_LOGIN_ANSWER
+		? { ok: { prompt: body.prompt as number, value: body.value } }
+		: null;
+
+/** The body of `PUT /api/providers/sign-out`: `{ provider, credentialId }`, one stored credential of that provider. */
+export const parseProviderSignOut = (body: unknown): Parsed<{ provider: string; credentialId: number }> =>
+	isObject(body) && isNonEmpty(body.provider) && Number.isSafeInteger(body.credentialId) ? { ok: { provider: body.provider, credentialId: body.credentialId as number } } : null;
 
 /** The body of `PUT /api/google/calendars`: `{ id, shown }`, a Google calendar's id and whether the Calendar page shows it. */
 export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>
