@@ -82,10 +82,8 @@ export interface Chord {
 /** A chord, or G then a key, as GitHub, Gmail, and Linear go to a page. Both keys of a pair type text, so pairs work only outside text fields. */
 export type Binding = { chord: Chord; scope: Scope } | { goTo: string };
 
-export type ShortcutCategory = "general" | "sessions" | "pull-requests" | "todo" | "inbox" | "calendar" | "changes";
-
 /** The shortcuts dialog's tabs, in order. */
-export const SHORTCUT_CATEGORIES: readonly { id: ShortcutCategory; label: string }[] = [
+export const SHORTCUT_CATEGORIES = [
 	{ id: "general", label: "General" },
 	{ id: "sessions", label: "Sessions" },
 	{ id: "pull-requests", label: "Pull requests" },
@@ -93,7 +91,9 @@ export const SHORTCUT_CATEGORIES: readonly { id: ShortcutCategory; label: string
 	{ id: "inbox", label: "Inbox" },
 	{ id: "calendar", label: "Calendar" },
 	{ id: "changes", label: "Changes" },
-];
+] as const;
+
+export type ShortcutCategory = (typeof SHORTCUT_CATEGORIES)[number]["id"];
 
 export interface Shortcut {
 	id: ShortcutId;
@@ -209,8 +209,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "inboxOnGmail", category: "inbox", label: "Open the conversation in Gmail", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
 	{ id: "nextChangedFile", category: "changes", label: "Open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", category: "changes", label: "Open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
-	{ id: "moveUp", category: "general", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
-	{ id: "moveDown", category: "general", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
+	{ id: "moveDown", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "terminal", category: "general", label: "Show or hide the terminal", command: "Toggle terminal", keys: [{ chord: { key: "`", ctrl: true }, scope: "anywhere" }] },
 ];
 
