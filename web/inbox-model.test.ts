@@ -78,12 +78,16 @@ test("participants lists each sender once in the order they first wrote, the inb
 	expect(participants([], null)).toEqual([]);
 });
 
-test("an avatar's initial is the first letter of the name, else of the address, past emoji and quotes, accents kept", () => {
+test("an avatar's initial is the first letter of the name, else of the address, past emoji and quotes, accents kept, and past a leading article", () => {
 	expect(initialOf({ name: "", address: "hello@example.com" })).toBe("H");
 	expect(initialOf({ name: '"bob"', address: "x@example.com" })).toBe("B");
 	expect(initialOf({ name: "😀 Zoë", address: "x@example.com" })).toBe("Z");
 	expect(initialOf({ name: "e\u0301mile", address: "x@example.com" })).toBe("É");
 	expect(initialOf({ name: "张伟", address: "x@example.com" })).toBe("张");
+	expect(initialOf({ name: "The Bradery", address: "hello@thebradery.com" })).toBe("B");
+	expect(initialOf({ name: "A Boutique", address: "a@example.com" })).toBe("B");
+	expect(initialOf({ name: "An Apple", address: "an@example.com" })).toBe("A");
+	expect(initialOf({ name: "The", address: "hello@example.com" })).toBe("H");
 	expect(initialOf({ name: "", address: "" })).toBe("?");
 });
 

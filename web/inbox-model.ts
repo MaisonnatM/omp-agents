@@ -85,10 +85,11 @@ export const participants = (messages: readonly MailMessage[], address: string |
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
+const LEADING_ARTICLE = /^(?:the|a|an)\b[\s'".,!?-]*/i;
 
-/** The letter on someone's avatar: the first letter or digit of their name, else of their address, in capitals; `?` when neither has one. */
+/** The letter on someone's avatar: the first letter or digit of their name past a leading article, else of their address, in capitals; `?` when neither has one. */
 export function initialOf({ name, address }: MailPerson): string {
-	for (const text of [name, address]) {
+	for (const text of [name.replace(LEADING_ARTICLE, ""), address]) {
 		for (const { segment } of graphemes.segment(text)) if (LETTER_OR_DIGIT.test(segment)) return segment.normalize("NFC").toUpperCase();
 	}
 	return "?";
