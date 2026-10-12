@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createShortcutStack, IS_MAC, pairing, type ShortcutHandlers, shortcutsFor } from "./shortcuts";
+import { createShortcutStack, IS_MAC, pairing, SHORTCUT_CATEGORIES, SHORTCUTS, type ShortcutHandlers, shortcutsFor } from "./shortcuts";
 
 type Mods = { ctrl?: boolean; alt?: boolean; meta?: boolean; shift?: boolean };
 const keyEvent = (key: string, code: string, mods: Mods = {}) => ({
@@ -249,4 +249,9 @@ test("a key something nearer already handled is left alone", () => {
 	event.preventDefault();
 	stack.dispatch(event, true, null);
 	expect(calls).toEqual([]);
+});
+
+test("every tab of the shortcuts dialog lists at least one shortcut", () => {
+	const empty = SHORTCUT_CATEGORIES.filter(({ id }) => !SHORTCUTS.some(({ category }) => category === id)).map(({ id }) => id);
+	expect(empty).toEqual([]);
 });
