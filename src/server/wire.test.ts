@@ -3,6 +3,7 @@ import type { ClientFrame } from "../shared/protocol";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
+import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
 
@@ -169,6 +170,26 @@ describe("parseClientMsg", () => {
 			expect(save({ task: longest })).toMatchObject({ change: { routine: { task: longest } } });
 			expect(save({ task: { kind: "command", command: "x".repeat(10_001) } })).toBeNull();
 		});
+	});
+
+	test("schedule adds a message to a session or a new session's start without images, and removes or sends one by id", () => {
+		const change = (value: unknown) => msg({ t: "schedule", change: value });
+		const message = { kind: "message", sessionId: "s1", text: "carry on" } as const;
+		const add = (fields: Record<string, unknown>) => change({ op: "add", send: { id: "a", at: 1_800_000_000_000, reset: "Anthropic 5h", target: message, ...fields } });
+		expect(add({ createdAt: 1, state: { phase: "sending" } })).toEqual({ t: "schedule", change: { op: "add", send: { id: "a", at: 1_800_000_000_000, reset: "Anthropic 5h", target: message } } });
+		const request = newSessionRequest("~/code", "Pick up the migration.");
+		expect(add({ reset: null, target: { kind: "start", request } })).toMatchObject({ change: { send: { reset: null, target: { kind: "start", request } } } });
+		expect(change({ op: "send-now", id: "a" })).toEqual({ t: "schedule", change: { op: "send-now", id: "a" } });
+		expect(change({ op: "remove", id: "a" })).toEqual({ t: "schedule", change: { op: "remove", id: "a" } });
+
+		expect(add({ target: { kind: "start", request: { ...request, images: [{ data: "aGVsbG8=", mimeType: "image/png" }] } } })).toBeNull();
+		expect(add({ target: { kind: "start", request: { ...request, prompt: " " } } })).toBeNull();
+		expect(add({ target: { kind: "start", request: { kind: "resume", sessionId: "s1" } } })).toBeNull();
+		expect(add({ target: { ...message, text: "" } })).toBeNull();
+		expect(add({ target: { ...message, text: "x".repeat(MAX_SCHEDULED_TEXT + 1) } })).toBeNull();
+		expect(add({ at: "tomorrow" })).toBeNull();
+		expect(add({ reset: "" })).toBeNull();
+		expect(change({ op: "remove", id: "" })).toBeNull();
 	});
 
 	test("pin takes one or more session ids to pin or unpin, and refuses an empty list, an unknown op, or a blank id", () => {

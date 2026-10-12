@@ -26,6 +26,8 @@ export const userTodoInboxDir = join(configDir, "todo-inbox");
 export const sessionEndInboxDir = join(configDir, "end-inbox");
 /** The routines, their runs, and the pull request heads their sessions took, beside {@link tokenFile}. */
 export const routinesFile = join(configDir, "routines.json");
+/** The messages and session starts that wait for their time, beside {@link tokenFile}. */
+export const scheduledFile = join(configDir, "scheduled.json");
 /** The directories Settings → Workspaces added and hid, beside {@link tokenFile}. */
 export const workspacesFile = join(configDir, "workspaces.json");
 /**

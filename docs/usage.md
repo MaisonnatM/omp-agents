@@ -398,6 +398,28 @@ An action that fails shows its error, and its control becomes available again.
   omp saves a new session only with its first reply, so a new session cannot start with a `!` command.
   `!!`, which keeps the output out of the agent's context, needs the omp terminal, because omp's RPC mode has no such option.
 
+## Send later
+
+- The clock button beside the attach button sends the composer's message later instead of now, in a live session or in the new-session draft.
+  Its menu offers each plan window that resets later, such as **When Anthropic 5h resets**, used-up windows first, then **In 1 hour**, **Tomorrow morning** at 9:00, and a date and time field with **Schedule**.
+  A reset sends one minute after the window resets, so the provider counts the new window when the message arrives.
+  The plans are the ones the status bar shows; see [Plan quota](architecture.md#plan-quota).
+- Scheduling saves the message on the server and clears the composer.
+  The send goes whether or not a page is open, as long as the dashboard runs.
+- A message scheduled in a session shows above its composer, with its time, or the plan window and the time it resets.
+  **Send now** sends it at once, **Edit** puts it back in the composer and takes it off the schedule, and **Cancel** drops it.
+- When the time comes, the message goes to the session as a follow-up while a turn runs, else as a prompt.
+  A session that is no longer live resumes first, as **Resume** would.
+- A scheduled new session starts as the draft's **Start session** would: in the same directory, on the same branch choice, model, thinking level, and skill, and linked to the draft's todo.
+  It opens in no pane; it shows in the sidebar once it starts.
+- The sidebar's **Scheduled** group, such as **2 scheduled**, sits above the projects and lists every scheduled send, new sessions too, with its time; it hides while nothing is scheduled.
+  A message's row opens its session, and each row's menu has **Send now** and **Cancel**.
+- A send that fails, such as a session that cannot resume, stays listed in red with the error, and **Try again** or **Dismiss** in place of **Send now** and **Cancel**.
+  It never tries again on its own.
+- A scheduled message carries text only: the clock button is off while the draft holds attached files or starts with a `!` or `$` command.
+- Sends go on the dashboard's minute tick, so a send can go up to a minute after its time.
+  A send whose time passed while the dashboard was closed goes at the first tick after it starts.
+
 ## Questions
 
 - A question that a session asks appears above the composer: a step of omp's `ask` tool, or a dialog from an extension (a select, a yes or no confirm, a one-line input, or a text editor).

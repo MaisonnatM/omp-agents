@@ -6,6 +6,7 @@ import type { RoutineChange } from "../routines";
 import type { NoticeOp } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import type { ProjectEdit } from "../shared/projects";
+import type { ScheduledChange } from "../shared/scheduled";
 import type { ClientMsg, ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { UserTodoChange } from "../user-todos-shared";
@@ -35,6 +36,10 @@ export interface SocketEnv {
 	changeRoutine(peer: Peer, change: Exclude<RoutineChange, { op: "run-now" }>): void;
 	/** Run routine `id` now, whatever its schedule. */
 	runRoutine(id: string): Promise<void>;
+	/** Apply `change` to the scheduled sends and send every socket the sends after it, or, when it changes nothing, send `peer` the sends it missed. */
+	changeScheduled(peer: Peer, change: Exclude<ScheduledChange, { op: "send-now" }>): void;
+	/** Send scheduled send `id` now, whatever its time, or try a failed one again. */
+	sendScheduledNow(id: string): Promise<void>;
 	/** Apply `change` to the pins; every socket then gets the pins as they are after, and `peer` gets them even when nothing changed. */
 	changePins(peer: Peer, change: PinChange): void;
 	/** Act on notices `ids`; every socket then gets the notices as they are after. */
@@ -137,6 +142,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 	answer: ({ sessions }, _peer, { instanceId, requestId, answer }) => sessions.get(instanceId)?.answer(requestId, answer),
 	"user-todo": ({ changeTodo }, peer, { change }) => changeTodo(peer, change),
 	routine: ({ changeRoutine, runRoutine }, peer, { change }) => (change.op === "run-now" ? runRoutine(change.id) : changeRoutine(peer, change)),
+	schedule: ({ changeScheduled, sendScheduledNow }, peer, { change }) => (change.op === "send-now" ? sendScheduledNow(change.id) : changeScheduled(peer, change)),
 	pin: ({ changePins }, peer, { change }) => changePins(peer, change),
 	project: ({ changeProject }, peer, { change }) => changeProject(peer, change),
 	notice: ({ changeNotices }, _peer, { ids, op }) => changeNotices(ids, op),

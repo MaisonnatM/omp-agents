@@ -19,6 +19,7 @@ function setup(initial: PastSession[]) {
 		past: () => sessions,
 		userTodosMsg: () => ({ t: "user-todos" }) as unknown as Extract<ServerMsg, { t: "user-todos" }>,
 		routinesMsg: () => ({ t: "routines" }) as unknown as Extract<ServerMsg, { t: "routines" }>,
+		scheduledMsg: () => ({ t: "scheduled", sends: [] }),
 		workspacesMsg: () => ({ t: "workspaces", list: { added: [], hidden: [] } }),
 		pinsMsg: () => ({ t: "pins", sessionIds: [] }),
 		projectsMsg: () => ({ t: "projects", projects: [] }),

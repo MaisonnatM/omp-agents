@@ -20,7 +20,7 @@ import { type HostSnapshot, listHosts } from "../omp/collab";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, sessionEndInboxDir, serverLockFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { runShell } from "../proc";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { modelUpdates, upgradeModel } from "../settings";
@@ -51,6 +51,8 @@ import { ProjectRunner, projectsExtensionArgs, type RunnerSession } from "./proj
 import { ProjectsFile } from "./projects-file";
 import { RoutineRunner } from "./routine-runner";
 import { RoutinesFile } from "./routines-file";
+import { ScheduledFile } from "./scheduled-file";
+import { ScheduledRunner } from "./scheduled-runner";
 import { createRoutes, type Routes } from "./routes";
 import { endSession } from "./session-end";
 import { SessionFiles } from "./session-files";
@@ -72,6 +74,7 @@ export class Dashboard {
 	readonly #interrupted = new InterruptedSessions(interruptedFile);
 	readonly #todos = new UserTodosFile(userTodosFile);
 	readonly #routines = new RoutinesFile(routinesFile);
+	readonly #scheduled = new ScheduledFile(scheduledFile);
 	readonly #workspaces: WorkspacesFile;
 	readonly #projects: ProjectsFile;
 	readonly #pins = new PinsFile(pinsFile);
@@ -94,6 +97,7 @@ export class Dashboard {
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
 	readonly #endInbox: EndInbox;
 	readonly #runner: RoutineRunner;
+	readonly #scheduledRunner: ScheduledRunner;
 	readonly #projectRunner: ProjectRunner;
 	readonly #loops: Loops;
 	readonly #requests: RequestLedger;
@@ -115,6 +119,7 @@ export class Dashboard {
 		const files = this.#files;
 		const todos = this.#todos;
 		const routines = this.#routines;
+		const scheduled = this.#scheduled;
 		const pins = this.#pins;
 		const interrupted = this.#interrupted;
 		const ownerLock = (this.#ownerLock = new OwnerLock(serverLockFile, port));
@@ -154,6 +159,7 @@ export class Dashboard {
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
 			userTodosMsg: () => ({ t: "user-todos", list: todos.list }),
 			routinesMsg: () => ({ t: "routines", routines: routines.routines }),
+			scheduledMsg: () => ({ t: "scheduled", sends: scheduled.sends }),
 			workspacesMsg: () => {
 				const [added, hidden] = [workspaces.list.added, workspaces.list.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
 				return { t: "workspaces", list: { added, hidden } };
@@ -216,6 +222,14 @@ export class Dashboard {
 			onChange: () => broadcasts.pushRoutines(),
 			changePins: change => void this.#applyPinChange(change),
 		}));
+		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
+			file: scheduled,
+			start: startSession,
+			bySessionId: sessionId => sessions.bySessionId(sessionId) ?? null,
+			session: instanceId => sessions.get(instanceId) ?? null,
+			now: Date.now,
+			onChange: () => broadcasts.pushScheduled(),
+		}));
 		const runnerSession = (session: LiveSession | undefined): RunnerSession | null => {
 			if (!session) return null;
 			const { status, requests } = session.row();
@@ -251,8 +265,12 @@ export class Dashboard {
 				await notices.check(PROVIDER_KINDS);
 			},
 			onMinuteTick: async () => {
+				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
+				scheduled.reload();
+				broadcasts.pushScheduled();
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
+				await scheduledRunner.tick();
 				await runner.tick();
 			},
 			onNoticeTick: () => notices.check(UPDATE_KINDS),
@@ -282,6 +300,11 @@ export class Dashboard {
 				if (routines.apply(change, Date.now())) broadcasts.pushRoutines();
 				else peer.send({ t: "routines", routines: routines.routines });
 			},
+			changeScheduled(peer, change) {
+				if (scheduled.apply(change, Date.now())) broadcasts.pushScheduled();
+				else peer.send({ t: "scheduled", sends: scheduled.sends });
+			},
+			sendScheduledNow: id => scheduledRunner.sendNow(id),
 			changePins: (peer, change) => {
 				if (!this.#applyPinChange(change)) peer.send({ t: "pins", sessionIds: pins.sessionIds });
 			},
@@ -337,6 +360,7 @@ export class Dashboard {
 		this.#loops.watch();
 		if (this.#ownerLock.acquire()) {
 			this.#runner.recover();
+			this.#scheduledRunner.recover();
 		} else {
 			const owner = this.#ownerLock.holder();
 			console.log(`omp-agents: the server on port ${owner?.port ?? "?"} (pid ${owner?.pid ?? "?"}) runs routines and the todo inbox; this one takes over when it exits.`);
@@ -488,6 +512,7 @@ export class Dashboard {
 			this.#broadcasts.pushUserTodos();
 			this.#broadcasts.pushProjects();
 			this.#runner.recover();
+			this.#scheduledRunner.recover();
 			void this.#todoInbox.drain();
 		}
 		return owns;

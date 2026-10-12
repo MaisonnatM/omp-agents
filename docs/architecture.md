@@ -221,7 +221,7 @@ omp saves the prompt as that text, so `userPrompt` in `src/transcript.ts` splits
 ## Socket requests
 
 A page tags a message it waits on with an `ack`, counted per page load, and the server answers it with `done`, carrying the error its handler threw or `null`.
-`request` in `web/use-dashboard.ts` sends that way prompts, answers to questions, starts and **Resume all**, interrupts, ends, edited prompts, thinking and fast switches, subagent cancels, and a routine's **Run now**.
+`request` in `web/use-dashboard.ts` sends that way prompts, answers to questions, starts and **Resume all**, interrupts, ends, edited prompts, thinking and fast switches, subagent cancels, a routine's **Run now**, and each change to the scheduled sends.
 A message the page does not tag, such as a pin, a todo change, a model switch, or a queued row's **Send now**, is dropped when the socket is down, as before.
 
 A socket can close after the server got a request and before its answer reached the page, and the page cannot tell that from a request the server never got, so it may not simply send it again: a prompt would reach the session twice.
@@ -370,11 +370,39 @@ Routines, the todo inbox, and the daily clean-up of checked todos write that dir
 A server creates it whole through a draft file and a hard link, so a reader never sees half of it, and it takes over a lock whose process is gone or whose content is not a lock.
 A process id that another program reused keeps the lock held; delete `server.lock` to release it.
 At startup a server that does not own the lock logs once which port does, and the minute tick tries again.
-On a takeover the server logs it, reads `routines.json`, `todos.json`, and `projects.json` again, since the previous owner kept saving them, fails the runs that were running, and drains the todo inbox.
+On a takeover the server logs it, reads `routines.json`, `todos.json`, and `projects.json` again, since the previous owner kept saving them, fails the runs that were running and the scheduled sends left sending, and drains the todo inbox.
 A server that exits normally deletes its lock.
-The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, or **Run now**; only the minute tick, the todo inbox, and the end inbox's requests for sessions started in a terminal are left to the owner.
+The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, or **Run now**; only the minute tick's routines and scheduled sends, the todo inbox, and the end inbox's requests for sessions started in a terminal are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
 `projects.json` is the exception: every server runs its own project runner, which writes on every worker turn, so `ProjectsFile.apply` reads the file again before it applies a change, and a change made on one server keeps what another saved.
+`scheduled.json` reads again the same way, before every change, so a send added on any server reaches the owner.
+
+## Scheduled sends
+
+A scheduled send is one message to a session, or one new session's start, that waits for a time; see [Send later](usage.md#send-later) for what the user sees.
+`src/shared/scheduled.ts` holds its shapes, `ScheduledSend`, `ScheduledTarget`, and `ScheduledChange`, and the rules the server applies, `applyScheduled` and `isDueSend`.
+A target is `{ kind: "message", sessionId, text }` or `{ kind: "start", request }`, where `request` is the `NewSessionRequest` that the new-session draft's **Start session** would send, without images.
+The page resolves a plan window's reset to a time before it sends the change: `at` is the window's `resetsAt` plus `RESET_MARGIN_MS`, one minute, and `reset` only names the window for the lists.
+So a send never moves when `omp usage` later reports another reset time.
+
+`src/server/scheduled-file.ts` keeps the sends in `scheduled.json` beside the access token, as `{ sends }`, soonest first, and moves a file that holds anything else to `scheduled.json.invalid`.
+A send's `state` is `waiting`, `sending` from its claim until it reaches omp, or `failed` with the error and its time; a send that reaches omp leaves the file.
+
+`src/server/scheduled-runner.ts` sends them.
+Its `tick` runs on the minute tick, before the routine runner's, only on the server that owns the unattended work, and sends each due waiting send in turn.
+`sendNow` sends one at once on whichever server the page talks to, a failed one too.
+Either way the runner first claims the send and writes `sending` to the file at once, so a second tick or another server never sends it twice.
+A message goes to the live session with that session id through `followUp`, a follow-up while its turn runs and a prompt otherwise, as a project's updates go; with no live session, the runner resumes it through the same `start` the page uses, then sends.
+A start goes through `start` as the page's would, so the todo it names is linked the same way.
+A failure, such as a session that cannot resume or a start that fails, saves the error on the send, which waits for **Try again** or **Dismiss**.
+A send that a stopped server left `sending` may have reached its session, so the owner fails it at its start or takeover (`ScheduledRunner.recover`) rather than sending it again.
+
+A `schedule` socket message carries one `ScheduledChange`: `add`, whose `id` the page picks so an add sent twice adds once, `remove`, which cancels a waiting send or dismisses a failed one and leaves one under way, or `send-now`, which answers once the send went or failed.
+`parseScheduledChange` in `src/server/wire.ts` holds a message's text and a start's prompt to `MAX_SCHEDULED_TEXT`, a million characters, and refuses images, an empty text, and a start that resumes.
+Every socket hears the sends after each change and each claim, send, or failure as a `scheduled` message on the roster topic, also sent when a socket opens; a change that changes nothing sends them back to its own socket alone.
+Each server also reads the file and sends the list on its minute tick, so pages on a server that does not send see what the owner did.
+A send is at most a minute late, and one whose time passed while no server ran goes at the first tick after one starts.
+A message whose session runs live on a server that does not own the unattended work goes to a resumed copy on the owner, since each server reaches only the dashboard sessions it started.
 
 ## Projects
 
@@ -883,7 +911,8 @@ The server lives in `src/`:
   `prompt-files.ts` holds the files a prompt carries as text: `withFiles` and `splitFiles`, which put them after the typed text and take them back off, `plainText`, which tells a text file, and the limits and body of `PUT /api/attachment/document`.
 - `src/omp/`: the facades over omp's modules: `modules.ts` loads them, `install.ts` finds the package and its CLI and reads its `package.json` with `readManifest`, and `collab.ts`, `rpc.ts`, `sessions.ts`, `stats.ts`, `config.ts`, `discovery.ts`, `mcp.ts`, `models.ts`, `model-updates.ts`, `release.ts`, `prompts.ts`, and `documents.ts` wrap one area each.
 - `src/analytics.ts`: folds omp-stats' per-file request rows into sessions and workspaces, joining saved-session titles and working directories without reading transcripts.
-- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `workspaces.json`, `pins.json`, `calendars.json`, `events.json`, `projects.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits; `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
+- `src/proc.ts` runs subprocesses, and `runShell` a routine's shell command, `src/json.ts` narrows untyped JSON (`isObject`, `str`, `oneOf`, `isTexts`, `errorText`), `src/fs.ts` replaces a file through a temporary one beside it and holds `JsonFile`, the load/save store behind `interrupted.json`, `todos.json`, `routines.json`, `scheduled.json`, `workspaces.json`, `pins.json`, `calendars.json`, `events.json`, `projects.json`, and `notices.json`, whose `save` writes once per event-loop turn however many changes arrive in it, and which `flushJsonFiles` writes at once as the server stops or exits.
+  `src/paths.ts` names these files beside the access token, and the old `google.json` the server deletes.
 - `src/dashboard-session.ts`: drives one session that the dashboard started, over RPC, including serialized model changes and state refreshes.
 - `src/guest.ts`: runs one Collab guest per terminal session.
   `src/subagents.ts` parses the host's subagent registry and its lifecycle and progress frames (`parseAgents`, `parseSubagentFrame`) for both transports, finds each subagent's transcript file, and lists every subagent transcript under a transcript's artifacts directory (`artifactsDir`, `subagentFiles`).
@@ -977,6 +1006,9 @@ The server lives in `src/`:
   `attachToTicket` (`PUT /api/ticket/attachment`) attaches a file in base64 to an existing issue: Linear's `prepare_attachment_upload` signs a storage URL, the server sends the bytes there with the signed headers, then `create_attachment_from_upload` links the file to the issue.
 - `src/routines.ts`: the routine types and the rules of routines: `nextRunAt`, `nextDueAt`, `isDue`, `applyRoutine`, which applies an edit, and a command's length, time, and output limits; see [Routines](#routines).
   `src/server/routines-file.ts` keeps them in `routines.json`, and `src/server/routine-runner.ts` claims their runs, starts and ends their sessions, and runs their commands.
+- `src/shared/scheduled.ts`: the scheduled send shapes and `applyScheduled`; see [Scheduled sends](#scheduled-sends).
+  `src/server/scheduled-file.ts` keeps them in `scheduled.json`, and `src/server/scheduled-runner.ts` claims and delivers them.
+  `web/scheduled-model.ts` lists the times the **Send later** menu offers, and `web/components/scheduled.tsx` holds the menu, the rows above the composer, and the sidebar's group.
 - `src/shared/projects.ts`: the project shapes the page reads, `ProjectEdit`, and `workerPhase`; see [Projects](#projects).
   `src/server/projects-file.ts` holds the server's rules, `ProjectChange` and `applyProject`, and keeps the projects in `projects.json`, `src/server/project-runner.ts` starts the coordinators and workers through `ProjectLaunch`, follows their sessions, and delivers the workers' updates, `src/server/project-tools.ts` holds the coordinator's host tools and the update message, and `src/server/project-notes.ts` seeds and lists a project's notes for `GET /api/project-notes`.
   `templates/omp/agent/extensions/projects.ts` is the omp extension that tells a project's session its role and keeps the coordinator's edits to the notes.

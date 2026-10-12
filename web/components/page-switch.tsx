@@ -1,5 +1,6 @@
 import { memo } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
+import { newSessionRequest } from "../../src/shared/sessions";
 import type { UserTodoList } from "../../src/user-todos-shared";
 import type { DashboardState } from "../dashboard-state";
 import { SPLIT_CLICK } from "../labels";
@@ -19,6 +20,7 @@ import { PaneGrid } from "./pane-grid";
 import { ProjectsPage } from "./projects/projects-page";
 import { RoutinesPage } from "./routines/routines-page";
 import { SettingsPage } from "./settings/settings-page";
+import { useScheduleSend } from "./scheduled";
 import { TICKETS_META, TICKETS_TITLE, TicketsPage } from "./tickets/tickets-page";
 import { TodoPage } from "./todo/page";
 
@@ -117,6 +119,7 @@ export const PageSwitch = memo(function PageSwitch({
 	toggleSidebar,
 }: PageSwitchProps) {
 	const { send, start, dismissStart, changeTodo } = useDashboardActions();
+	const scheduleSend = useScheduleSend();
 	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
 		case "new": {
@@ -138,6 +141,7 @@ export const PageSwitch = memo(function PageSwitch({
 						location.hash = hashForNewSession(next, page.todoId);
 					}}
 					onStart={op => start({ kind: "new", cwd, ...op, todoId: seed && page.todoId })}
+					onSchedule={(op, when) => scheduleSend({ kind: "start", request: newSessionRequest(cwd, op.prompt, { ...op, todoId: seed && page.todoId }) }, when)}
 					todo={seed}
 				/>
 			);

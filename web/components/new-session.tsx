@@ -12,9 +12,11 @@ import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
 import { useRead } from "../reads";
 import { useShortcuts } from "../shortcuts";
+import type { ScheduleWhen } from "../scheduled-model";
 import type { NewOp, StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
 import { useDefaultModel } from "../use-default-model";
+import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from "./composer";
@@ -23,6 +25,7 @@ import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-atta
 import type { PromptEditorHandle } from "./prompt-editor";
 import { type ModelMenuOpen, ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
+import { ScheduleButton } from "./scheduled";
 import { SessionTrail } from "./session-meta";
 import { DirectoryPicker } from "./workspace-picker";
 
@@ -41,6 +44,8 @@ interface NewSessionProps {
 	onPickCwd: (cwd: string) => void;
 	/** Start omp with the first message: in `cwd`, or on `branch` when it names one; on `model`, else on omp's default; at `thinking` when it names a level; through `skill` when it names one. */
 	onStart: (op: Omit<NewOp, "kind" | "cwd" | "todoId">) => void;
+	/** Start the same session at `when` instead, with no page open; resolves once the server saved it. */
+	onSchedule: (op: Omit<NewOp, "kind" | "cwd" | "todoId" | "images">, when: ScheduleWhen) => Promise<void>;
 	/** The todo the session works on, whose title and notes start the draft; `null` for none. */
 	todo: { text: string; prompt: string } | null;
 }
@@ -51,7 +56,7 @@ interface NewSessionProps {
  * The composer picks the directory, the model, and in a git checkout the branch; another branch than `cwd`'s runs in its own worktree.
  * A skill pinned in the settings shows as a toggle, on until you turn it off for this session.
  */
-export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, todo }: NewSessionProps) {
+export function NewSession({ cwd, workspaces, launch, connected, completions, onComplete, onPickCwd, onStart, onSchedule, todo }: NewSessionProps) {
 	const editorRef = useRef<PromptEditorHandle>(null);
 	const [draft, setDraft] = useState(todo?.prompt ?? "");
 	const attachments = usePromptAttachments(true);
@@ -128,6 +133,11 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 		}
 	};
 	const directCommand = blockedShortcut(draft, "new");
+	const schedule = useAction(async (when: ScheduleWhen) => {
+		const prompt = draft.trim();
+		await onSchedule({ prompt, branch: choice, model, thinking, skill: skipSkill ? null : pinnedSkill }, when);
+		setDraft(current => (current.trim() === prompt ? "" : current));
+	}, "Could not schedule the session");
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
 	const name = folderName(target.dir) ?? target.dir;
 	const title = <SessionTrail cwdDisplay={cwd} worktree={target.dir === cwd ? null : target.dir} path={["New session"]} />;
@@ -189,7 +199,12 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 								{pinnedSkill !== null && <PinnedSkillToggle name={pinnedSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 							</>
 						}
-						rightSlot={({ openFilePicker }) => <AttachButton onClick={() => openFilePicker()} disabled={starting} />}
+						rightSlot={({ openFilePicker }) => (
+							<>
+								<ScheduleButton draft={draft} files={attachments.files.length} disabled={starting || !connected} pending={schedule.pending} onSchedule={schedule.run} />
+								<AttachButton onClick={() => openFilePicker()} disabled={starting} />
+							</>
+						)}
 						disabled={starting || !connected}
 						sendLabel={starting ? "Starting session" : "Start session"}
 						sending={starting}

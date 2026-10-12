@@ -5,6 +5,7 @@ import type { ModelEntry, ModelOption, PlanUsage } from "./models";
 import type { Notice, NoticeOp } from "./notices";
 import type { PinChange } from "./pins";
 import type { Project, ProjectEdit } from "./projects";
+import type { ScheduledChange, ScheduledSend } from "./scheduled";
 import type { CompletionItem, CompletionScope, Delivery, LiveView, MessageQueue, PastSession, PromptImage, RosterHost, StartRequest, StartResult, UserAnswer, View, WithdrawnMessage } from "./sessions";
 import type { AgentMedia, ChangedFile, Item } from "./transcript";
 import type { Workspace, WorkspaceList } from "./workspaces";
@@ -36,6 +37,8 @@ export type ServerMsg =
 	| { t: "user-todos"; list: UserTodoList }
 	/** Every routine, whole, sent when a socket opens and after every change, including each run's progress. */
 	| { t: "routines"; routines: Routine[] }
+	/** Every scheduled send, whole, soonest first, sent when a socket opens and after every change. */
+	| { t: "scheduled"; sends: ScheduledSend[] }
 	/** The directories Settings → Workspaces added and hid, whole, sent when a socket opens and after every change. */
 	| { t: "workspaces"; list: WorkspaceList<Workspace> }
 	/** The pinned sessions' ids, whole, sent when a socket opens and after every change. */
@@ -93,6 +96,8 @@ export type ClientMsg =
 	| { t: "user-todo"; change: UserTodoChange }
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
 	| { t: "routine"; change: RoutineChange }
+	/** Schedule a message or a session start, cancel one, or send one now; every socket then gets the scheduled sends as they are after. */
+	| { t: "schedule"; change: ScheduledChange }
 	/** Pin or unpin sessions; every socket then gets the pins as they are after. */
 	| { t: "pin"; change: PinChange }
 	/** Rename or archive a project; every socket then gets the projects as they are after. */

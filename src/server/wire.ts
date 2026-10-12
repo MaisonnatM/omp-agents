@@ -17,6 +17,7 @@ import type { ModelOption } from "../shared/models";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import type { ProjectEdit } from "../shared/projects";
+import { MAX_SCHEDULED_TEXT, type ScheduledChange, type ScheduledTarget } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
@@ -253,6 +254,40 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 	}
 }
 
+function parseScheduledTarget(value: unknown): Parsed<ScheduledTarget> {
+	if (!isObject(value)) return null;
+	if (value.kind === "message") {
+		const { sessionId, text } = value;
+		return isNonEmpty(sessionId) && isNonEmpty(text) && text.length <= MAX_SCHEDULED_TEXT ? { ok: { kind: "message", sessionId, text } } : null;
+	}
+	if (value.kind !== "start" || !isObject(value.request) || value.request.kind !== "new") return null;
+	const request = parseStartRequest(value.request);
+	if (request?.ok.kind !== "new" || request.ok.images.length > 0 || !request.ok.prompt.trim() || request.ok.prompt.length > MAX_SCHEDULED_TEXT) return null;
+	return { ok: { kind: "start", request: request.ok } };
+}
+
+/** What the page sends of a scheduled send: all but its creation time and its state, which the server keeps. */
+export type ScheduledSpec = Extract<ScheduledChange, { op: "add" }>["send"];
+
+/** A scheduled send as the page adds it: a text message to a session, or a new session's start without images; other fields drop. */
+export function parseScheduledSpec(value: unknown): Parsed<ScheduledSpec> {
+	if (!isObject(value)) return null;
+	const { id, at, reset } = value;
+	const target = parseScheduledTarget(value.target);
+	if (!isNonEmpty(id) || !isTime(at) || (reset !== null && !isNonEmpty(reset)) || !target) return null;
+	return { ok: { id, at, reset, target: target.ok } };
+}
+
+function parseScheduledChange(value: unknown): Parsed<ScheduledChange> {
+	if (!isObject(value)) return null;
+	const { op } = value;
+	if (op === "add") {
+		const send = parseScheduledSpec(value.send);
+		return send && { ok: { op, send: send.ok } };
+	}
+	return (op === "remove" || op === "send-now") && isNonEmpty(value.id) ? { ok: { op, id: value.id } } : null;
+}
+
 /** Each socket message's parser, by its `t`. */
 const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) => Parsed<MsgOf<T>> } = {
 	watch(value) {
@@ -353,6 +388,10 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 	routine(value) {
 		const change = parseRoutineChange(value.change);
 		return change ? { ok: { t: "routine", change: change.ok } } : null;
+	},
+	schedule(value) {
+		const change = parseScheduledChange(value.change);
+		return change && { ok: { t: "schedule", change: change.ok } };
 	},
 	pin(value) {
 		const change = parsePinChange(value.change);

@@ -4,6 +4,7 @@ import type { Notice } from "../src/shared/notices";
 import type { ServerMsg } from "../src/shared/protocol";
 import { applyPins, type PinChange } from "../src/shared/pins";
 import type { Project } from "../src/shared/projects";
+import type { ScheduledSend } from "../src/shared/scheduled";
 import { type LiveView, newestPastFirst, type PastSession, type RosterHost, type View } from "../src/shared/sessions";
 import type { Workspace, WorkspaceList } from "../src/shared/workspaces";
 import type { Routine } from "../src/routines";
@@ -45,6 +46,8 @@ export interface DashboardState {
 	userTodos: UserTodoList | null;
 	/** Every routine, empty until the server first sends them. */
 	routines: Routine[];
+	/** The messages and session starts that wait for a time, soonest first, empty until the server first sends them. */
+	scheduled: ScheduledSend[];
 	/** The directories Settings → Workspaces added and hid, empty until the server first sends them. */
 	workspaceList: WorkspaceList<Workspace>;
 	/** The pinned sessions' ids, empty until the server first sends them; a change shows here before the server answers. */
@@ -58,7 +61,7 @@ export interface DashboardState {
 }
 
 /** The server messages the reducer takes as they come; the socket router sends the rest to the pane store. */
-export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "workspaces" | "pins" | "projects" | "notices" }>;
+export type ServerAction = Extract<ServerMsg, { t: "roster" | "past" | "started" | "resumed-all" | "usage" | "models" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" }>;
 
 export type Action =
 	| { t: "connected"; connected: boolean }
@@ -173,6 +176,8 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 			return { ...state, userTodos: action.list };
 		case "routines":
 			return { ...state, routines: action.routines };
+		case "scheduled":
+			return { ...state, scheduled: action.sends };
 		case "workspaces":
 			return { ...state, workspaceList: action.list };
 		case "pins":
@@ -213,6 +218,7 @@ export function initialState(route: Route): DashboardState {
 		models: new Map(),
 		userTodos: null,
 		routines: [],
+		scheduled: [],
 		workspaceList: { added: [], hidden: [] },
 		pins: [],
 		projects: [],

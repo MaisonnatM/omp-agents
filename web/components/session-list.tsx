@@ -9,6 +9,7 @@ import { shortcutLabels } from "../shortcuts";
 import { useStoredKeys } from "../stored-state";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ProjectSessions } from "./project-group";
+import { ScheduledGroup } from "./scheduled";
 import { HostRow, PastRow } from "./session-row";
 import { SidebarSearch } from "./sidebar-search";
 
@@ -34,7 +35,7 @@ interface SessionListProps {
 	newSessionLabel: string;
 }
 
-/** The Sessions tab: New session, the search field, then the projects, and the pinned, idle, running, interrupted, and past groups. */
+/** The Sessions tab: New session, the search field, then the scheduled sends, the projects, and the pinned, idle, running, interrupted, and past groups. */
 export function SessionList({ lists, query, onQuery, onTogglePin, open, showWorkspace, newSessionOpen, newSessionLabel }: SessionListProps) {
 	const { start, dismissStart, openNewSession } = useDashboardActions();
 	const { connected, starts: { resumeAll } } = useDashboardStatus();
@@ -71,6 +72,7 @@ export function SessionList({ lists, query, onQuery, onTogglePin, open, showWork
 				{filtering && projects.length + pinned.hosts.length + pinned.past.length + idle.length + running.length + interrupted.length + ended.length === 0 && (
 					<p className="px-4 py-2 text-xs text-muted-foreground">{`No sessions match “${query.trim()}”`}</p>
 				)}
+				{!filtering && <ScheduledGroup open={!collapsed.has("scheduled")} onOpenChange={() => toggleGroup("scheduled")} />}
 				{(!filtering || projects.length > 0) && (
 					<SidebarGroup
 						collapsible

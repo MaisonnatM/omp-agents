@@ -17,6 +17,7 @@ import { PageSwitch } from "./components/page-switch";
 import { NO_PLANS, Plans } from "./components/plan-usage";
 import { useNoticeToasts } from "./components/notices";
 import { RenderBoundary } from "./components/render-boundary";
+import { ScheduledSends } from "./components/scheduled";
 import { SessionDetails } from "./components/session-details";
 import { ShortcutsDialog } from "./components/shortcuts-dialog";
 import { DashboardSidebar, useSidebarPanels } from "./components/sidebar-panel";
@@ -185,119 +186,121 @@ export function App() {
 	return (
 		<DashboardActionsContext.Provider value={actions}>
 			<DashboardStatusContext.Provider value={status}>
-				<div className="flex h-svh flex-col">
-					<SidebarProvider className="min-h-0 flex-1">
-						<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
-							<AppSidebar
-								scope={scope}
-								sessions={sessions}
-								page={page}
-								panes={layout.panes}
-								tab={tab}
-								onTab={showTab}
-								tabs={tabs}
-								listed={state.listed}
-								userTodos={state.userTodos}
-								hosts={state.hosts}
-								notices={state.notices}
-								past={state.past}
-								routines={state.routines}
-								todoView={todoView}
-								routinesTarget={routinesTarget}
-								settings={settings}
-								sectionTarget={sectionTarget}
-								onSectionTarget={setSectionTarget}
-								onPickWorkspace={switchWorkspace}
-								dispatchPalette={dispatchPalette}
-								setShortcutsOpen={setShortcutsOpen}
-								toggleSidebar={toggleSidebar}
-							/>
-						</DashboardSidebar>
-						<SidebarInset>
-							<Plans value={state.usage?.plans ?? NO_PLANS}>
-								<ActivityVisibility.Provider value={display.activityVisibility}>
-									<ToolsExpanded value={display.toolsExpanded}>
-										<MentionListsContext.Provider value={mentionLists}>
-											<RenderBoundary resetKey={page ? hashForPage(page) : hashForLayout(layout)}>
-												<PageSwitch
-													page={page}
-													hosts={state.hosts}
-													past={state.past}
-													lastHosts={state.lastHosts}
-													layout={layout}
-													draft={state.draft}
-													models={state.models}
-													userTodos={state.userTodos}
-													routines={state.routines}
-													projects={state.projects}
-													workspaceList={state.workspaceList}
-													pins={state.pins}
-													newSessionCompletions={state.newSessionCompletions}
-													connected={state.connected}
-													listed={state.listed}
-													rosterError={state.rosterError}
-													newStart={startOf(state.starts, "new")}
-													projectStart={startOf(state.starts, "project")}
-													scope={scope}
-													defaultWorkspace={defaultWorkspace}
-													sectionTarget={sectionTarget}
-													todoView={todoView}
-													routinesTarget={routinesTarget}
-													linear={linear}
-													linearCallable={linearCallable}
-													maximized={maximized}
-													hasDetails={detailsView !== null}
-													rightOpen={sidebars.panels.right.open}
-													show={show}
-													toggleSidebar={toggleSidebar}
-												/>
-											</RenderBoundary>
-										</MentionListsContext.Provider>
-									</ToolsExpanded>
-								</ActivityVisibility.Provider>
-							</Plans>
-							<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
-						</SidebarInset>
-						{detailsView && (
-							<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
-								<SessionDetails
-									key={hashForView(detailsView)}
-									view={detailsView}
-									working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
-									sessionId={focused.sessionId}
-									cwd={focused.cwd ?? null}
-									pullRequests={focused.row?.pullRequests ?? []}
-									workspace={workspace}
-									hosts={visible.hosts}
+				<ScheduledSends.Provider value={state.scheduled}>
+					<div className="flex h-svh flex-col">
+						<SidebarProvider className="min-h-0 flex-1">
+							<DashboardSidebar side="left" panel={sidebars.panels.left} onResize={width => sidebars.resize("left", width)} onToggle={() => toggleSidebar("left")}>
+								<AppSidebar
+									scope={scope}
+									sessions={sessions}
+									page={page}
+									panes={layout.panes}
+									tab={tab}
+									onTab={showTab}
+									tabs={tabs}
+									listed={state.listed}
+									userTodos={state.userTodos}
+									hosts={state.hosts}
+									notices={state.notices}
+									past={state.past}
+									routines={state.routines}
+									todoView={todoView}
+									routinesTarget={routinesTarget}
+									settings={settings}
+									sectionTarget={sectionTarget}
+									onSectionTarget={setSectionTarget}
+									onPickWorkspace={switchWorkspace}
+									dispatchPalette={dispatchPalette}
+									setShortcutsOpen={setShortcutsOpen}
+									toggleSidebar={toggleSidebar}
 								/>
 							</DashboardSidebar>
-						)}
-						<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={tabs} />
-						{overlays.filePath !== null && <FileDialog key={overlays.filePath} path={overlays.filePath} onClose={() => setFilePath(null)} />}
-						{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
-						<CommandPalette
-							state={overlays.palette}
-							dispatch={dispatchPalette}
-							hosts={visible.hosts}
-							past={visible.past}
-							workspaces={workspaces}
-							workspace={workspace}
-							onOpenSession={openFromPalette}
-							onPickWorkspace={switchWorkspace}
-							pinned={sessions.pinned}
-							onTogglePin={sessions.togglePin}
-							handlers={handlers}
-							unavailable={unavailable}
-							tabs={tabs}
-							todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
-							todos={mentionLists.todos}
-							linearConnected={linearCallable}
-							projects={state.projects}
-							onCreateTicket={setNewTicket}
-						/>
-					</SidebarProvider>
-					<StatusBar usage={state.usage} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
-				</div>
+							<SidebarInset>
+								<Plans value={state.usage?.plans ?? NO_PLANS}>
+									<ActivityVisibility.Provider value={display.activityVisibility}>
+										<ToolsExpanded value={display.toolsExpanded}>
+											<MentionListsContext.Provider value={mentionLists}>
+												<RenderBoundary resetKey={page ? hashForPage(page) : hashForLayout(layout)}>
+													<PageSwitch
+														page={page}
+														hosts={state.hosts}
+														past={state.past}
+														lastHosts={state.lastHosts}
+														layout={layout}
+														draft={state.draft}
+														models={state.models}
+														userTodos={state.userTodos}
+														routines={state.routines}
+														projects={state.projects}
+														workspaceList={state.workspaceList}
+														pins={state.pins}
+														newSessionCompletions={state.newSessionCompletions}
+														connected={state.connected}
+														listed={state.listed}
+														rosterError={state.rosterError}
+														newStart={startOf(state.starts, "new")}
+														projectStart={startOf(state.starts, "project")}
+														scope={scope}
+														defaultWorkspace={defaultWorkspace}
+														sectionTarget={sectionTarget}
+														todoView={todoView}
+														routinesTarget={routinesTarget}
+														linear={linear}
+														linearCallable={linearCallable}
+														maximized={maximized}
+														hasDetails={detailsView !== null}
+														rightOpen={sidebars.panels.right.open}
+														show={show}
+														toggleSidebar={toggleSidebar}
+													/>
+												</RenderBoundary>
+											</MentionListsContext.Provider>
+										</ToolsExpanded>
+									</ActivityVisibility.Provider>
+								</Plans>
+								<TerminalPanel panel={terminal} cwd={focused.workDir ?? workspace ?? "~"} />
+							</SidebarInset>
+							{detailsView && (
+								<DashboardSidebar side="right" panel={sidebars.panels.right} onResize={width => sidebars.resize("right", width)} onToggle={() => toggleSidebar("right")}>
+									<SessionDetails
+										key={hashForView(detailsView)}
+										view={detailsView}
+										working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
+										sessionId={focused.sessionId}
+										cwd={focused.cwd ?? null}
+										pullRequests={focused.row?.pullRequests ?? []}
+										workspace={workspace}
+										hosts={visible.hosts}
+									/>
+								</DashboardSidebar>
+							)}
+							<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={tabs} />
+							{overlays.filePath !== null && <FileDialog key={overlays.filePath} path={overlays.filePath} onClose={() => setFilePath(null)} />}
+							{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
+							<CommandPalette
+								state={overlays.palette}
+								dispatch={dispatchPalette}
+								hosts={visible.hosts}
+								past={visible.past}
+								workspaces={workspaces}
+								workspace={workspace}
+								onOpenSession={openFromPalette}
+								onPickWorkspace={switchWorkspace}
+								pinned={sessions.pinned}
+								onTogglePin={sessions.togglePin}
+								handlers={handlers}
+								unavailable={unavailable}
+								tabs={tabs}
+								todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
+								todos={mentionLists.todos}
+								linearConnected={linearCallable}
+								projects={state.projects}
+								onCreateTicket={setNewTicket}
+							/>
+						</SidebarProvider>
+						<StatusBar usage={state.usage} terminalOpen={terminal.open} onToggleTerminal={terminal.toggle} />
+					</div>
+				</ScheduledSends.Provider>
 			</DashboardStatusContext.Provider>
 		</DashboardActionsContext.Provider>
 	);

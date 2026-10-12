@@ -14,6 +14,7 @@ import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
 import { useAction } from "../use-action";
 import type { Dashboard } from "../use-dashboard";
+import type { ScheduleWhen } from "../scheduled-model";
 import { useCompletion } from "./completion-popup";
 import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from "./composer";
 import { QueuedMessages, useQueue } from "./composer-queue";
@@ -21,10 +22,11 @@ import { useSuggestions } from "./composer-suggestions";
 import type { PromptEditorHandle } from "./prompt-editor";
 import { ContextRing } from "./context-ring";
 import { ConversationHeader } from "./conversation-header";
-import { useDashboardActions } from "./dashboard-context";
+import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import type { ModelMenuOpen } from "./model-picker";
 import { ModelSlot } from "./model-slot";
+import { ScheduleButton, ScheduledMessages, useScheduleSend } from "./scheduled";
 import { type Subject, subjectOf } from "./subject";
 import { Transcript } from "./transcript";
 import { UserRequestCard } from "./user-request";
@@ -107,6 +109,8 @@ function LiveConversation({
 	const thinking = shown?.thinkingLevel ?? null;
 	const instanceId = view.instanceId;
 	const { request } = useDashboardActions();
+	const { connected } = useDashboardStatus();
+	const scheduleSend = useScheduleSend();
 	const editPrompt = useCallback((entryId: string, text: string) => request({ t: "edit-prompt", instanceId, entryId, text }), [instanceId, request]);
 	const completion = useCompletion({
 		editorRef,
@@ -121,16 +125,18 @@ function LiveConversation({
 	const thinkingChange = useAction((level: string) => request({ t: "set-thinking", instanceId, level }), "Could not change the thinking level");
 	const fastChange = useAction((enabled: boolean) => request({ t: "set-fast", instanceId, enabled }), "Could not switch fast mode");
 	const switching = (!!switchable && switchable.switching) || thinkingChange.pending || fastChange.pending;
+	const restoreDraft = (text: string): void => {
+		setDraft(current => (current ? `${text}\n${current}` : text));
+		editorRef.current?.focus();
+	};
 	const { queued, take, interrupt } = useQueue({
 		waiting: subject.queue,
 		withdrawn,
 		dequeue: (reqId, queue, text) => send({ t: "dequeue", reqId, view, queue, text }),
 		interrupt: stop.run,
 		restore: messages => {
-			const text = messages.map(message => message.text).join("\n");
-			setDraft(current => (current ? `${text}\n${current}` : text));
+			restoreDraft(messages.map(message => message.text).join("\n"));
 			attachments.restore(messages.flatMap(message => message.images));
-			editorRef.current?.focus();
 		},
 	});
 	// The focused pane's composer takes the keyboard once it can be typed in: when the view opens, and when it goes live, not when focus moves.
@@ -153,6 +159,13 @@ function LiveConversation({
 	const directCommand = blockedShortcut(draft, shell);
 	const steerable = writable && (draft.trim() !== "" || attachments.files.length > 0) && !directCommand;
 	const steerDraft = (): void => submit(draft.trim(), "steer");
+	const sessionId = session ? (shown?.sessionId ?? null) : null;
+	const schedule = useAction(async (when: ScheduleWhen) => {
+		const text = draft.trim();
+		if (sessionId === null) return;
+		await scheduleSend({ kind: "message", sessionId, text }, when);
+		setDraft(current => (current.trim() === text ? "" : current));
+	}, "Could not schedule the message");
 	// What the finished turn suggests sending next, offered once nothing else waits on the user. Filtered to none the composer would hold back.
 	const turnSuggestions = useNextSuggestions(view, working);
 	const suggestions = useSuggestions({
@@ -307,6 +320,9 @@ function LiveConversation({
 									</Tooltip>
 								)}
 								{session && shown?.context && <ContextRing context={shown.context} />}
+								{sessionId !== null && writable && (
+									<ScheduleButton draft={draft} files={attachments.files.length} disabled={!connected} pending={schedule.pending} onSchedule={schedule.run} />
+								)}
 								{writable && <AttachButton onClick={() => openFilePicker()} />}
 							</>
 						)}
@@ -318,14 +334,17 @@ function LiveConversation({
 						stopShortcut={shortcutLabels("interrupt")}
 						sendLabel={working && subject.followUps ? "Queue a follow-up" : `${working ? "Steer" : "Send to"} ${agent ? "subagent" : "session"}`}
 						beforeEditor={
-							<QueuedMessages
-								entries={queued}
-								onSendNow={entry =>
-									send(entry.queue === "followUp" ? { t: "promote", view, text: entry.item.text } : { t: "flush", instanceId: view.instanceId })
-								}
-								onEdit={entry => take(entry, true)}
-								onRemove={entry => take(entry, false)}
-							/>
+							<>
+								<ScheduledMessages sessionId={sessionId} onEdit={restoreDraft} />
+								<QueuedMessages
+									entries={queued}
+									onSendNow={entry =>
+										send(entry.queue === "followUp" ? { t: "promote", view, text: entry.item.text } : { t: "flush", instanceId: view.instanceId })
+									}
+									onEdit={entry => take(entry, true)}
+									onRemove={entry => take(entry, false)}
+								/>
+							</>
 						}
 						afterActions={suggestions.list}
 					/>
