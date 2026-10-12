@@ -1072,7 +1072,7 @@ An action that fails shows its error, and its control becomes available again.
   Focus the chart and use Left or Right to move between buckets; Escape closes the details.
   **View bucket data** shows the same numbers in a table, including empty buckets and requests that recorded no tokens.
   The **Today** and **24h** charts label local hours; daily charts label UTC dates.
-  Models and workspaces are ordered by tokens, followed by the token split among main agents, subagents, and advisors, and by tool calls.
+  Models and workspaces that used tokens in the range are ordered by tokens, followed by the token split among main agents, subagents, and advisors, and by tool calls.
   The top 20 sessions include their subagents' usage; select a session to open it.
   omp keeps the usage of a session whose transcript you deleted, so it stays listed as **Deleted session**, without a link.
   It covers every session whatever workspace the header picks.

@@ -45,9 +45,9 @@ export interface Analytics {
 	providers: AnalyticsProviderUsage[];
 	/** Oldest first: an hour each over today or 24h, else a UTC day. Provider entries are sparse, with no order guarantee. */
 	series: { start: number; tokens: number; cost: number; requests: number; providers: AnalyticsProviderUsage[] }[];
-	/** Most tokens first. `selector` is `provider/model`; `tokensPerSecond` is the mean output rate, null when unmeasured. */
+	/** Models that used tokens, most first. `selector` is `provider/model`; `tokensPerSecond` is the mean output rate, null when unmeasured. */
 	models: (Usage & { selector: string; tokensPerSecond: number | null })[];
-	/** By working directory, most tokens first. */
+	/** By working directory, those that used tokens, most first. */
 	workspaces: (Usage & { cwd: string })[];
 	/** Total tokens by who sent the request. */
 	agents: Record<"main" | "subagent" | "advisor", number>;

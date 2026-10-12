@@ -37,7 +37,7 @@ describe("analytics session usage", () => {
 		]);
 	});
 
-	test("the payload sorts models and workspaces by tokens and keeps only the 20 heaviest sessions", () => {
+	test("the payload sorts models and workspaces by tokens, drops those that used none, and keeps only the 20 heaviest sessions", () => {
 		const model = (provider: string, model: string, tokens: number) => ({
 			provider, model, totalRequests: 1, failedRequests: 0, totalInputTokens: tokens / 2, totalOutputTokens: tokens / 2,
 			totalCacheReadTokens: 0, totalCacheWriteTokens: 0, cacheRate: 0, totalCost: 0.5, avgTokensPerSecond: 20,
@@ -45,11 +45,12 @@ describe("analytics session usage", () => {
 		const rows = Array.from({ length: 22 }, (_, index) =>
 			row(`${root}/-work-other/2026-10-06T08-12-02-078Z_${index}.jsonl`, "openai/gpt-a", index + 1, index));
 		rows.push(row(`${parent}.jsonl`, "anthropic/claude-b", 100, 100));
+		rows.push(row(`${root}/-work-idle/2026-10-06T08-12-02-078Z_idle.jsonl`, "google/gemini-c", 0, 0));
 		const read: StatsRead = {
 			window: { cutoff: 1_000, bucketMs: 1_000, now: 1_500 },
 			dashboard: {
 				overall: model("", "", 353),
-				byModel: [model("openai", "gpt-a", 253), model("anthropic", "claude-b", 100)],
+				byModel: [model("openai", "gpt-a", 253), model("google", "gemini-c", 0), model("anthropic", "claude-b", 100)],
 				byAgentType: [{ agentType: "main", totalInputTokens: 176.5, totalOutputTokens: 176.5, totalCacheReadTokens: 0, totalCacheWriteTokens: 0 }],
 			},
 			tools: { byTool: [{ tool: "read", calls: 7, errors: 1, totalTokensShare: 125 }] },

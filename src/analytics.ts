@@ -95,7 +95,7 @@ export function foldSessions(rows: readonly SessionModelRow[], root: string, fac
 		.sort((a, b) => b.usage.tokens.total - a.usage.tokens.total || b.lastAt - a.lastAt);
 }
 
-/** Usage by working directory, most tokens first. */
+/** Usage by working directory, most tokens first; a directory that used no tokens is left out. */
 export function workspacesOf(sessions: readonly AnalyticsSession[]): Analytics["workspaces"] {
 	const workspaces = new Map<string, Usage & { cwd: string }>();
 	for (const { cwd, usage } of sessions) {
@@ -103,7 +103,7 @@ export function workspacesOf(sessions: readonly AnalyticsSession[]): Analytics["
 		addUsage(workspace, usage.requests, usage.failed, usage.tokens, usage.cost);
 		workspaces.set(cwd, workspace);
 	}
-	return [...workspaces.values()].sort((a, b) => b.tokens.total - a.tokens.total);
+	return [...workspaces.values()].filter(workspace => workspace.tokens.total > 0).sort((a, b) => b.tokens.total - a.tokens.total);
 }
 
 /** Most buckets the series carries, so a stray ancient timestamp cannot stretch all time into decades of empty days. */
@@ -162,6 +162,7 @@ export function buildAnalytics(range: AnalyticsRange, read: StatsRead, root: str
 		...chartOf(read.providerSeries, read.window),
 		models: dashboard.byModel
 			.map(model => ({ selector: `${model.provider}/${model.model}`, tokensPerSecond: model.avgTokensPerSecond, ...usageOf(model) }))
+			.filter(model => model.tokens.total > 0)
 			.sort((a, b) => b.tokens.total - a.tokens.total),
 		workspaces: workspacesOf(sessions),
 		agents,
