@@ -1,3 +1,4 @@
+/** `DetailHeader`: a pull request's name, author, branches, and size, with the Next move button and the `⋯` menu. */
 import { ArrowLeft, Check, Copy, Ellipsis, ExternalLink, FileDiff, GitMerge, Layers, Zap } from "lucide-react";
 import { type ReactNode, type RefObject, useState } from "react";
 import { Radio } from "@base-ui/react/radio";

@@ -1,3 +1,4 @@
+/** `MailEditor`: the Inbox's mail composer with recipient chips, subject, formatted body, and a saved draft. */
 import { HistoryExtension } from "@lexical/history";
 import { $generateHtmlFromNodes } from "@lexical/html";
 import { $isLinkNode, AutoLinkExtension, autoLinkUrlMatcher, LinkExtension, TOGGLE_LINK_COMMAND } from "@lexical/link";

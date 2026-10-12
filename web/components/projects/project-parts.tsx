@@ -1,3 +1,4 @@
+/** Pieces the Projects page and the coordinator's sidebar share: worker phase labels and the project's notes list. */
 import { FileText } from "lucide-react";
 import type { Project, ProjectNote, WorkerPhase } from "../../../src/shared/projects";
 import { useRead } from "../../reads";

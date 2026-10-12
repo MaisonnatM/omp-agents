@@ -1,3 +1,4 @@
+/** The sidebar's Todo tab: the todo views and categories, with counts left to do (`TodoCategories`). */
 import { Ellipsis, Pencil, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import type { UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";

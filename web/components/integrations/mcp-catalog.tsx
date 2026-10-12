@@ -1,3 +1,4 @@
+/** `McpCatalog`: the searchable catalog of MCP servers to add, by category, marking ones already added. */
 import { Check, ExternalLink, Plus } from "lucide-react";
 import { useId, useState } from "react";
 import { MCP_CATALOG, MCP_CATEGORIES, type McpCatalogEntry, type McpCategory } from "../../../src/shared/mcp-catalog";

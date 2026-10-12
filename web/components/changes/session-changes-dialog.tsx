@@ -1,3 +1,4 @@
+/** `SessionChangesDialog`: a session's changed files over the page, against its branch base and by its own calls. */
 import { RotateCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { SessionChanges } from "../../../src/shared/changes";

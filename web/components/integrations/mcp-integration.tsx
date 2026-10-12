@@ -1,3 +1,4 @@
+/** `McpIntegrationRow`: one MCP-backed service in Settings › Integrations, with its status, sign-in, and tool list. */
 import { ChevronRight, CircleAlert, ExternalLink, KeyRound, LoaderCircle, LogOut, RefreshCw, WifiOff } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import {

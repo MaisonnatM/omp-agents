@@ -1,3 +1,4 @@
+/** `NewTicketDialog`: the Linear-style dialog that creates a Linear issue with its fields and attachments. */
 import { Box, ChevronRight, CircleUser, Maximize2, Minimize2, Paperclip, Tag, UsersRound, X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { errorText } from "../../../src/json";

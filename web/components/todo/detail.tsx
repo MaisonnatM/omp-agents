@@ -1,3 +1,4 @@
+/** `TodoDetail`: the open todo beside the Todo page, with its properties, notes, sub-todos, agent, and links. */
 import { ChevronDown, ChevronRight, Play, Plus, Ticket } from "lucide-react";
 import { useState } from "react";
 import { errorText } from "../../../src/json";

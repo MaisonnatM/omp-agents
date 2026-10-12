@@ -1,3 +1,4 @@
+/** `terminalSender`: sends commands to a terminal's WebSocket, keeping a close asked for before it connects. */
 import type { TerminalClientMsg } from "../../../src/shared/terminals";
 
 /** Sends commands to a terminal socket, retaining a close requested before it connects. */

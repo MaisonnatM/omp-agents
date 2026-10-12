@@ -1,3 +1,4 @@
+/** People and state on pull requests: avatars, reviewer pictures marked by their review, and icon tooltips. */
 import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft, type LucideIcon } from "lucide-react";
 import type { Person, PullRequestDetail, Reviewer, ReviewerState } from "../../../src/shared/github";
 import { Tooltip } from "@/components/ui/tooltip";

@@ -1,3 +1,4 @@
+/** What the Settings editors share: the edit-then-save hook, the Edit/Save bar, save errors, and sections. */
 import { ArrowDown, ArrowUp, Pencil, X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";

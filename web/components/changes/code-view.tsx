@@ -1,3 +1,4 @@
+/** `CodeView`: the changes explorer's open file, as a folded diff or the whole file with changes marked in the gutter. */
 import { ChevronsUpDown } from "lucide-react";
 import { Fragment, useMemo, useRef, useState } from "react";
 import type { ChangedFileText, DiffRow } from "../../../src/shared/changes";

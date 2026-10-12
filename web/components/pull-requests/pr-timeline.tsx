@@ -1,3 +1,4 @@
+/** `Timeline`: a pull request's commits, comments, reviews, and threads as a Slack-like list by day. */
 import { ArrowDownUp, GitCommitHorizontal, MessageSquare } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { type Person, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestThread, prKey } from "../../../src/shared/github";

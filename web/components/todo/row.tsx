@@ -1,3 +1,4 @@
+/** The Todo page's rows: a todo's row, an archived todo's row, and a new todo's draft row. */
 import { Archive, GripVertical, NotebookText, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import type { UserTodo, UserTodoCategory, UserTodoChange, UserTodoLeaf } from "../../../src/user-todos-shared";
 import { Badge } from "@/components/ui/badge";

@@ -1,3 +1,4 @@
+/** The building blocks of an integration row: its brand tile, the list surface, the row itself, and its callouts. */
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";

@@ -1,3 +1,4 @@
+/** `WorktreesTab`: Settings › Worktrees, the Git worktrees of repositories omp sessions ran in. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Copy, RefreshCw, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";

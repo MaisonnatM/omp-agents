@@ -1,3 +1,4 @@
+/** `SettingsPage`: the main area for the selected Settings section. */
 import { FolderOpen } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";

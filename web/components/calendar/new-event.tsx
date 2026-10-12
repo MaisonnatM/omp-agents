@@ -1,3 +1,4 @@
+/** The Calendar page's new-event dialog: title, all day or start and end, and the Google calendar or this computer it goes in. */
 import { useState } from "react";
 import { errorText } from "../../../src/json";
 import { type EventWhen, type GoogleCalendar, type LocalEvent, MAX_EVENT_TITLE, type NewEvent, type NewEventAnswer, type NewEventCalendar } from "../../../src/shared/calendar";

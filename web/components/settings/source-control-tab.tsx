@@ -1,3 +1,4 @@
+/** `SourceControlTab`: Settings › Source control, the GitHub and Graphite CLIs, automatic pulls, and merge method. */
 import { Switch } from "@base-ui/react/switch";
 import { RefreshCw } from "lucide-react";
 import { useState } from "react";

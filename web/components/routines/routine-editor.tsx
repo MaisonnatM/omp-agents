@@ -1,3 +1,4 @@
+/** `RoutineEditor`: the form for a routine's name, workspace, task, schedules, and skill. */
 import { type ReactNode, useId, useState } from "react";
 import { COMMAND_TIME_LIMIT, type Weekday } from "../../../src/routines";
 import type { Workspace } from "../../../src/shared/workspaces";

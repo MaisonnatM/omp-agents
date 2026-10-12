@@ -1,3 +1,4 @@
+/** `TerminalView`: one terminal tab's xterm, joined to its shell by a `/ws/terminal` socket. */
 import { FitAddon } from "@xterm/addon-fit";
 import { type ITheme, Terminal } from "@xterm/xterm";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";

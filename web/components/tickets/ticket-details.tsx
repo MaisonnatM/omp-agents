@@ -1,3 +1,4 @@
+/** `TicketDetailContent`: a Linear issue's details, its title, description, and comments beside the side column. */
 import { GitPullRequest, Link2 } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { pullRequestOfUrl } from "../../../src/shared/github";

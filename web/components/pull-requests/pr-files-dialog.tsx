@@ -1,3 +1,4 @@
+/** `PullRequestFilesDialog`: a pull request's changed files over the page, opened at one file. */
 import { useState } from "react";
 import type { PullRequest, PullRequestChanges } from "../../../src/shared/github";
 import { useRead } from "../../reads";

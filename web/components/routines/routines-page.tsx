@@ -1,3 +1,4 @@
+/** `RoutinesPage`: your routines, one routine's settings and runs, or the routine editor. */
 import { ArrowLeft, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Routine, RoutineChange, RoutineRun, RoutineTask } from "../../../src/routines";

@@ -1,3 +1,4 @@
+/** `TerminalPanel`: the resizable panel under the panes holding the terminal tabs, and its shown/height state. */
 import { ChevronDown, LoaderIcon, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TerminalInfo } from "../../../src/shared/terminals";

@@ -1,3 +1,4 @@
+/** `TicketRow`: a Linear issue's row on the Tickets page, with its status and priority icons and chips. */
 import {
 	Box,
 	Calendar,

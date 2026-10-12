@@ -1,3 +1,4 @@
+/** The sidebar's Settings tab: the global sections, then those the workspace picker scopes. */
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { hashForSettings, SETTINGS_SECTIONS, type SettingsRoute } from "../../routing";
 

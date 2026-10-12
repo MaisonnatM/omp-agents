@@ -1,3 +1,4 @@
+/** `DisconnectedPage`: what a page shows while omp cannot read its service, its integration row to connect from. */
 import { MCP_SERVICES, type McpIntegration } from "../../../src/shared/accounts";
 import { PageFrame } from "../list-page";
 import { IntegrationList } from "./integration-row";

@@ -1,3 +1,4 @@
+/** The sidebar's Inbox tab: the signed-in Gmail address over the Inbox link and its unread count. */
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { useGmailInbox } from "../../reads";
 import { hashForInbox } from "../../routing";

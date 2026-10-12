@@ -1,3 +1,4 @@
+/** `useTodoEditing`: the Todo page's typing state, which title or draft has the input, its keys, and delete with Undo. */
 import { useState } from "react";
 import { applyUserTodo } from "../../../src/user-todos";
 import type { TodoStatus, UserTodoChange, UserTodoLeaf, UserTodoList } from "../../../src/user-todos-shared";

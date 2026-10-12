@@ -1,3 +1,4 @@
+/** `PreferencesTab`: the dashboard's own choices kept in this browser, such as sidebar tabs and the session skill. */
 import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { Switch } from "@base-ui/react/switch";

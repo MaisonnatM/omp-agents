@@ -1,3 +1,4 @@
+/** `CommandPalette`: the ⌘K dialog that searches sessions, projects, commands, workspaces, todos, tickets, and pull requests. */
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Command as CommandPrimitive } from "cmdk";
 import {

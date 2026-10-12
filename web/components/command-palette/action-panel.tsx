@@ -1,3 +1,4 @@
+/** The command palette's Actions button and ⌘K panel listing every action of the highlighted item. */
 import { Command as CommandPrimitive, defaultFilter } from "cmdk";
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect } from "react";
 import { cn } from "@/lib/utils";

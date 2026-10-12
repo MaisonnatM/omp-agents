@@ -1,3 +1,4 @@
+/** `MailFrame`: a sandboxed, script-free iframe that shows one Gmail message's HTML at its full height. */
 import { useEffect, useRef, useState } from "react";
 
 const WEB_LINK = /^(?:https?|mailto):/i;

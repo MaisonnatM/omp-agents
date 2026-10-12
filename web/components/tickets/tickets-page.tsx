@@ -1,3 +1,4 @@
+/** `TicketsPage`: your assigned Linear issues grouped by workflow state, as Linear's My issues lists them. */
 import { Plus } from "lucide-react";
 import { useRef, useState } from "react";
 import type { RosterHost, View } from "../../../src/shared/sessions";

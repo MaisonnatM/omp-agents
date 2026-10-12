@@ -1,3 +1,4 @@
+/** A pull request's stack on a rail (`StackSection`), and the session's other pull requests outside it. */
 import { GitPullRequest, Layers } from "lucide-react";
 import { type LinkedPullRequest, type PullRequest, prKey, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import { cn } from "@/lib/utils";

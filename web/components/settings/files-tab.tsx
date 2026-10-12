@@ -1,3 +1,4 @@
+/** The Settings Files section: omp's config files by group, each viewed and edited in place (`Files`). */
 import { useState } from "react";
 import type { FileEdit, OmpFile, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
