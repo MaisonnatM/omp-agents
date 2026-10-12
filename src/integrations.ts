@@ -4,7 +4,7 @@
  * user-level MCP config when omp has none.
  */
 import { errorText } from "./json";
-import { clientSetups, type ClientSave, planGoogleSave, planSlackSave } from "./mcp-clients";
+import { clientSetups, type ClientSave, planGoogleSave, planGoogleScope, planSlackSave } from "./mcp-clients";
 import {
 	addMcpServer,
 	ApiError,
@@ -23,6 +23,7 @@ import {
 import {
 	type ClientService,
 	type GoogleClientInput,
+	GOOGLE_SERVICES,
 	type GoogleService,
 	type IntegrationsAnswer,
 	MCP_INTEGRATIONS,
@@ -106,6 +107,8 @@ const SETUP_ERROR: Record<ClientService, string> = {
 	gmail: GOOGLE_SETUP_ERROR,
 };
 
+const isGoogleService = (id: McpIntegrationId): id is GoogleService => (GOOGLE_SERVICES as readonly string[]).includes(id);
+
 /**
  * Starts a sign-in to `id`, abandoning any under way, and answers once it has the service's authorization address or
  * has failed. It signs in to omp's server for the service, else adds one once the browser comes back.
@@ -113,8 +116,12 @@ const SETUP_ERROR: Record<ClientService, string> = {
 export async function startIntegrationSignIn(id: McpIntegrationId): Promise<McpIntegration> {
 	const service = MCP_SERVICES[id];
 	await signIns[id].start(async (signal, waiting) => {
-		const found = await findServer(id);
 		if (id !== "linear" && !(await clientSetups())[id].configured) throw new Error(SETUP_ERROR[id]);
+		if (isGoogleService(id)) {
+			const rescoped = await planGoogleScope(userMcpConfigPath(), id);
+			if (rescoped) await writeMcpServer(userMcpConfigPath(), rescoped.name, rescoped.server);
+		}
+		const found = await findServer(id);
 		await signInMcp(found ?? { url: service.url }, { onAuth: waiting, signal, requireRefresh: id === "slack" });
 		if (!found) await addMcpServer(service.serverName, service.url);
 	});

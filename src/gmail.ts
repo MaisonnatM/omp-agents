@@ -1,14 +1,15 @@
 /**
- * Gmail: the latest conversations of your inbox, which the Inbox page lists, and one conversation in full, which its
- * details show. It calls Google's Gmail API with the token omp holds for its Gmail MCP server, the same sign-in and
- * read-only scope: the server's own tools answer only for OAuth clients in Google's Developer Preview Program. It only
- * reads: nothing here sends, labels, or marks mail read.
+ * Gmail: the latest conversations of your inbox, which the Inbox page lists, one conversation in full, which its details
+ * show, and the mail, replies, and trashing its actions send. It calls Google's Gmail API with the token omp holds for its Gmail
+ * MCP server, the same sign-in and scope: the server's own tools answer only for OAuth clients in Google's Developer
+ * Preview Program. Reading a conversation here never marks it read.
  */
 import { createCache } from "./cache";
 import type { GoogleFetch } from "./integrations";
 import { isObject, nonEmptyStr, str } from "./json";
+import { ApiError } from "./omp/mcp";
 import { mapLimit } from "./map-limit";
-import type { InboxAnswer, MailAttachment, MailBody, MailMessage, MailPerson, MailThread, ThreadAnswer } from "./shared/gmail";
+import type { InboxAnswer, MailAttachment, MailBody, MailDraft, MailMessage, MailPerson, MailReply, MailThread, ThreadAnswer } from "./shared/gmail";
 import { threadUrl } from "./shared/gmail";
 
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -198,6 +199,7 @@ function messageOf(message: Record<string, unknown>): ReadMessage | null {
 			from: peopleOf(headerOf(message, "From"))[0] ?? { name: "", address: "" },
 			to: peopleOf(headerOf(message, "To")),
 			cc: peopleOf(headerOf(message, "Cc")),
+			replyTo: peopleOf(headerOf(message, "Reply-To")),
 			at,
 			unread: hasLabel(message, "UNREAD"),
 			snippet: decodeEntities(str(message.snippet) ?? ""),
@@ -212,6 +214,72 @@ function messageOf(message: Record<string, unknown>): ReadMessage | null {
 interface ReadThread {
 	answer: ThreadAnswer;
 	html: Map<string, string>;
+}
+
+/** `write`, with Google's refusal for a sign-in made before the dashboard sent mail turned into what to do about it. */
+async function writing<T>(write: Promise<T>): Promise<T> {
+	try {
+		return await write;
+	} catch (err) {
+		if (err instanceof ApiError && err.status === 403 && /insufficient.*scope/i.test(err.message)) {
+			throw new Error("Your Gmail sign-in only lets the dashboard read mail. Sign in to Gmail again in Settings › Integrations to reply and delete.");
+		}
+		throw err;
+	}
+}
+
+/** The headers a reply reads from the message it answers, to thread itself after it. */
+const REPLY_HEADERS = ["Subject", "Message-ID", "References"];
+
+/** `text` as a header value: as is when it is printable ASCII, else one RFC 2047 encoded word. */
+const headerText = (text: string): string => (/^[\x20-\x7e]*$/.test(text) ? text : `=?UTF-8?B?${Buffer.from(text).toString("base64")}?=`);
+
+/** `person` as a mailbox of an address header, its name quoted or encoded. */
+function mailboxOf({ name, address }: MailPerson): string {
+	if (!name) return address;
+	const shown = /^[\x20-\x7e]*$/.test(name) ? `"${name.replace(/["\\]/g, "\\$&")}"` : headerText(name);
+	return `${shown} <${address}>`;
+}
+
+/**
+ * The RFC 2822 message, CRLF-separated, that sends `draft` from `me` under `subject`, with `threading` headers placed after
+ * its subject: one multipart/alternative of its plain text and its HTML, both UTF-8.
+ */
+export function mailOf(me: string, draft: Omit<MailDraft, "subject">, subject: string, threading: string[] = []): string {
+	if (draft.to.length + draft.cc.length + draft.bcc.length === 0) throw new Error("The mail names no one to send it to");
+	const boundary = `omp-agents-${crypto.randomUUID()}`;
+	const people = (header: string, list: MailPerson[]): string[] => (list.length > 0 ? [`${header}: ${list.map(mailboxOf).join(", ")}`] : []);
+	const part = (type: string, body: string): string[] => [
+		`--${boundary}`,
+		`Content-Type: ${type}; charset=UTF-8`,
+		"Content-Transfer-Encoding: base64",
+		"",
+		Buffer.from(body).toString("base64").replace(/.{76}/g, "$&\r\n"),
+	];
+	return [
+		`From: ${me}`,
+		...people("To", draft.to),
+		...people("Cc", draft.cc),
+		...people("Bcc", draft.bcc),
+		`Subject: ${headerText(subject)}`,
+		...threading,
+		"MIME-Version: 1.0",
+		`Content-Type: multipart/alternative; boundary="${boundary}"`,
+		"",
+		...part("text/plain", draft.text.replace(/\r?\n/g, "\r\n")),
+		...part("text/html", draft.html),
+		`--${boundary}--`,
+		"",
+	].join("\r\n");
+}
+
+/** What a reply to `message` sends: `draft` under its `Re:` subject, threaded after it by `In-Reply-To` and `References`. */
+export function replyOf(message: Record<string, unknown>, me: string, draft: Omit<MailDraft, "subject">): string {
+	const subject = headerOf(message, "Subject").trim();
+	const messageId = headerOf(message, "Message-ID").trim();
+	const references = [headerOf(message, "References").trim(), messageId].filter(Boolean).join(" ");
+	const threading = messageId ? [`In-Reply-To: ${messageId}`, `References: ${references}`] : [];
+	return mailOf(me, draft, /^re:/i.test(subject) ? subject : `Re: ${subject}`, threading);
 }
 
 /** Your Gmail inbox's latest conversations, and each conversation in full, each read at most once a minute. */
@@ -244,6 +312,39 @@ export class GmailClient {
 	 */
 	async messageHtml(thread: string, id: string): Promise<string | undefined> {
 		return (await this.#threads.get(thread, () => this.#readThread(thread))).html.get(id);
+	}
+
+	/** Sends `reply` in its conversation, read again first so it answers the conversation's latest message. */
+	async reply({ thread, ...draft }: MailReply): Promise<void> {
+		const url = new URL(`${API}/threads/${encodeURIComponent(thread)}`);
+		url.searchParams.set("format", "metadata");
+		for (const header of REPLY_HEADERS) url.searchParams.append("metadataHeaders", header);
+		const [me, read] = await Promise.all([this.#signedIn(false), this.#fetch(url.toString())]);
+		if (!isObject(read) || !Array.isArray(read.messages)) throw new Error("Gmail answered something other than a conversation");
+		const last = read.messages.filter(isObject).filter(message => !hasLabel(message, "DRAFT")).at(-1);
+		if (!last) throw new Error("The conversation holds no message to reply to");
+		const raw = Buffer.from(replyOf(last, me, draft)).toString("base64url");
+		await writing(this.#fetch(`${API}/messages/send`, { method: "POST", body: { raw, threadId: thread } }));
+		this.#changed(thread);
+	}
+
+	/** Sends `draft` as a new mail, which starts a conversation of its own. */
+	async send(draft: MailDraft): Promise<void> {
+		const raw = Buffer.from(mailOf(await this.#signedIn(false), draft, draft.subject)).toString("base64url");
+		await writing(this.#fetch(`${API}/messages/send`, { method: "POST", body: { raw } }));
+		this.#inbox.drop("");
+	}
+
+	/** Moves conversation `thread` to Gmail's Trash. */
+	async trash(thread: string): Promise<void> {
+		await writing(this.#fetch(`${API}/threads/${encodeURIComponent(thread)}/trash`, { method: "POST", body: {} }));
+		this.#changed(thread);
+	}
+
+	/** Forgets what was read of the inbox and of conversation `thread`, which a write changed. */
+	#changed(thread: string): void {
+		this.#inbox.drop("");
+		this.#threads.drop(thread);
 	}
 
 	/** The address you signed in with, which a link into Gmail names; the inbox's read keeps it for a conversation's. */

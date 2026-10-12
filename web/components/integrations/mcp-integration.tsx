@@ -49,7 +49,7 @@ const SERVICES: Record<McpIntegrationId, Service> = {
 	},
 	gmail: {
 		logo: GMAIL_LOGO,
-		gives: "Your inbox on the Inbox tab, read only, and Gmail's read tools in every omp session.",
+		gives: "Your inbox on the Inbox tab, with replies and Delete, and Gmail's tools in every omp session.",
 		client: "Your Google OAuth client",
 	},
 };

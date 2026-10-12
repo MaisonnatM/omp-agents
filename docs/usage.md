@@ -814,7 +814,8 @@ An action that fails shows its error, and its control becomes available again.
 - Gmail shows **Not set up** and **Set up** until its OAuth client is saved, and its form is Google Calendar's.
   In a [Google Cloud project](https://console.cloud.google.com/apis/library/gmail.googleapis.com), turn on the Gmail API.
   Under [Credentials](https://console.cloud.google.com/apis/credentials), create an OAuth client ID of type **Web application**, and add `http://localhost:3119/callback`, with your callback port, as an authorized redirect URI; the client you made for Google Calendar works too.
-  Paste the client ID and secret, then **Connect**; Google asks you to grant reading your email, and nothing that sends, deletes, or changes it.
+  Paste the client ID and secret, then **Connect**; Google asks you to grant reading, sending, and deleting your email, which lets the Inbox page reply and move conversations to Trash.
+  A Gmail sign-in made before the Inbox page could reply only reads mail; **Reconnect** asks Google for the wider grant.
   omp stores the secret in the Gmail server's entry in `~/.omp/agent/mcp.json`, apart from Google Calendar's, and the secret, client-change, and **Replace OAuth client** rules are Slack's.
   Gmail's MCP tools also need the Gmail MCP API on in that project; the row links to it when Google refuses them.
   The Inbox page reads Google's Gmail API and does not need the MCP API.
@@ -973,9 +974,10 @@ An action that fails shows its error, and its control becomes available again.
   With none open, the panel says how to open one.
   Drag the line between the list and the panel to size the list, which keeps that width; a page too narrow for both shows the panel in place of the list.
   With no conversation open, ↓ and ↑ outside text fields focus the next and previous row, and O opens the focused row's conversation in Gmail in a new tab, signed in as the inbox's address.
-- An open conversation's panel has a bar along its top with where the conversation sits in the list, **3 of 50**, and icon buttons, each naming itself and its key on hover: previous and next conversation, **Expand all** while a message is folded, **Refresh**, which spins while it reads, **Open in Gmail**, and **Close**.
+- An open conversation's panel has a bar along its top with where the conversation sits in the list, **3 of 50**, and icon buttons, each naming itself and its key on hover: previous and next conversation, **Reply**, **Reply all**, **Delete**, **Expand all** while a message is folded, **Refresh**, which spins while it reads, **Open in Gmail**, and **Close**.
   Under the bar come its subject in large type and, on a muted line, how many messages it holds, drafts left out, and each person who wrote in it once, `me` for your own address.
   Opening another conversation scrolls the panel back to its top.
+  The conversation fills the panel's width, and an HTML message grows with it.
 - Messages follow each other with a thin line between them, each with a round avatar of the first letter of its sender's name past a leading `the`, `a`, or `an`, in a colour that sender's address always takes.
   As in Gmail, the last message and every unread one show in full and earlier ones on one line with their avatar, sender, snippet, and date, the sender bold while unread; three or more of those in a row after the first fold into a line with an **N older messages** pill on it.
   Click a line or the pill to unfold it, click a full message's header to fold it again, and **Expand all** unfolds every message.
@@ -987,7 +989,16 @@ An action that fails shows its error, and its control becomes available again.
   Esc or **Close** closes the panel with that conversation's row focused, and O opens the focused row's conversation in Gmail, else the open one.
   The keys work after a click inside an HTML message too.
   **Refresh** reads it from Gmail again, and the page also does once the list shows a message that arrived after it read the conversation.
-- The page only reads your mail: it never sends, deletes, labels, or marks a conversation read, so opening one here leaves it unread, in Gmail and in the list, until you read it in Gmail.
+- **Reply**, the **Reply to…** line under the messages, or R outside text fields, docks an editor at the bottom of the conversation, which scrolls above it, to answer its last message: to its `Reply-To` or sender, or, for a message you sent, to whom you sent it.
+  **Reply all**, or A, also copies everyone else that message named; your own address is left out of both.
+  The recipients are chips you can edit: type an address and press Enter, a comma, a semicolon, or Tab to add it, Backspace in an empty field to remove the last, and **Cc** or **Bcc** to show those rows.
+  The editor writes rich text: its toolbar and Cmd+B, Cmd+I, and Cmd+U make bold, italic, and underline, a link, bulleted and numbered lists, and a quote, and a pasted web address becomes a link.
+  The expand button grows the editor over the conversation, and shrinks it back.
+  Cmd+Enter or **Send** sends the mail as HTML with a plain text copy, in the conversation, which then shows in the conversation and the list.
+  Esc closes the editor and keeps the draft in the browser, per conversation, until you reopen it; **Discard draft** drops it.
+- **Compose**, in the header, or C outside text fields, opens a new mail at `#inbox/new` in the panel, in the same editor, with a **Subject** row, focused on **To**; it keeps its draft the same way, and sending it goes back to the list.
+- **Delete**, or #, moves the conversation to Gmail's Trash, where Gmail keeps it 30 days, with no confirmation, and opens the next conversation of the list, else the previous one.
+- The page never labels a conversation or marks it read, so opening one here leaves it unread, in Gmail and in the list, until you read it in Gmail.
 - The page reads Gmail again every minute while it is open, and **Refresh** asks Gmail at once; the server keeps each read for a minute.
   While Gmail is not connected, or its sign-in stops working, the page shows Gmail's row from **Settings › Integrations** to connect from there.
 
@@ -1240,7 +1251,7 @@ Alt is Option on macOS.
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
 | Cmd+1 … Cmd+7 | Anywhere | Go to the first … seventh tab the sidebar shows |
-| C | Outside text fields, except on the Todo and Calendar pages | Create a Linear ticket, when connected |
+| C | Outside text fields, except on the Todo, Calendar, and Inbox pages | Create a Linear ticket, when connected |
 | G then I | Outside text fields | Go to your Gmail inbox, when connected |
 | G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Go to your projects |
@@ -1263,6 +1274,9 @@ Alt is Option on macOS.
 | ↓ / ↑ | Inbox page, outside text fields | Focus the next or previous conversation, or open it while one is open |
 | Esc | Inbox page, outside text fields | Close the open conversation |
 | O | Inbox page, outside text fields | Open the focused or open conversation in Gmail |
+| R / A | Inbox page, outside text fields | Reply, or reply to all, to the open conversation's last message |
+| # | Inbox page, outside text fields | Move the open conversation to Gmail's Trash |
+| C | Inbox page, outside text fields | Write a new mail |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
@@ -1270,7 +1284,7 @@ Alt is Option on macOS.
   The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Inbox, Calendar, and Changes.
   Its header states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
   Each tab's column headings stay pinned while its list scrolls, and rows fade in under them.
-  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Inbox conversation's **Open in Gmail**.
+  Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Inbox conversation's **Reply**, **Reply all**, **Delete**, and **Open in Gmail**.
 - Cmd+1 through Cmd+7 go to the first through seventh tab the sidebar shows, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers follow the order the sidebar shows, which **Settings › Preferences** sets: a tab you hide, or Tickets or Inbox without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.
   A number with no tab keeps its browser behavior.

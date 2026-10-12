@@ -8,6 +8,7 @@ import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
 import { GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
 import { type CalendarShownInput, type EventRef, type EventWhen, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar } from "../shared/calendar";
+import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest, PROMPT_IMAGE_TYPES } from "../shared/sessions";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
@@ -568,6 +569,46 @@ export function parseEventRef(body: unknown): Parsed<EventRef> {
 	if (body.kind === "google") return isNonEmpty(body.calendarId) && isNonEmpty(body.eventId) ? { ok: { kind: "google", calendarId: body.calendarId, eventId: body.eventId } } : null;
 	return null;
 }
+
+/** The most people one field of a sent mail names. */
+const MAX_RECIPIENTS = 100;
+
+/** A body's `key` as people to write to: each `{ name, address }` with an address holding an `@`, else `null`. */
+function peopleIn(body: Record<string, unknown>, key: string): MailPerson[] | null {
+	const list = body[key];
+	if (!Array.isArray(list) || list.length > MAX_RECIPIENTS) return null;
+	const people = list.flatMap(item =>
+		isObject(item) && typeof item.name === "string" && typeof item.address === "string" && /^[^\s@<>,]+@[^\s@<>,]+$/.test(item.address)
+			? [{ name: item.name.replace(/[\r\n]/g, " "), address: item.address }]
+			: [],
+	);
+	return people.length === list.length ? people : null;
+}
+
+/** A body's draft without its subject, `null` when a field is missing or too long, or it names no one to write to. */
+function draftIn(body: Record<string, unknown>): Omit<MailDraft, "subject"> | null {
+	if (typeof body.html !== "string" || !isNonEmpty(body.text) || body.text.length > MAX_MAIL_BODY || body.html.length > MAX_MAIL_BODY) return null;
+	const [to, cc, bcc] = [peopleIn(body, "to"), peopleIn(body, "cc"), peopleIn(body, "bcc")];
+	if (!to || !cc || !bcc || to.length + cc.length + bcc.length === 0) return null;
+	return { to, cc, bcc, html: body.html, text: body.text };
+}
+
+/** The body of `PUT /api/gmail/reply`: the conversation to answer and the reply. */
+export function parseMailReply(body: unknown): Parsed<MailReply> {
+	if (!isObject(body) || !isNonEmpty(body.thread)) return null;
+	const draft = draftIn(body);
+	return draft && { ok: { ...draft, thread: body.thread } };
+}
+
+/** The body of `PUT /api/gmail/send`: a new mail, its subject on one line. */
+export function parseMailSend(body: unknown): Parsed<MailSend> {
+	if (!isObject(body) || typeof body.subject !== "string" || body.subject.length > 1000) return null;
+	const draft = draftIn(body);
+	return draft && { ok: { ...draft, subject: body.subject.replace(/[\r\n]/g, " ") } };
+}
+
+/** The body of `PUT /api/gmail/trash`: the conversation to move to Trash. */
+export const parseMailTrash = (body: unknown): Parsed<MailTrash> => (isObject(body) && isNonEmpty(body.thread) ? { ok: { thread: body.thread } } : null);
 
 const validPort = (port: unknown): port is number => typeof port === "number" && Number.isSafeInteger(port) && port >= 1 && port <= 65535;
 

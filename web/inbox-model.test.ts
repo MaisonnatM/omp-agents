@@ -7,6 +7,7 @@ const message = (id: string, unread = false): MailMessage => ({
 	from: { name: "Alice Doe", address: "alice@example.com" },
 	to: [],
 	cc: [],
+	replyTo: [],
 	at: 1791000000000,
 	unread,
 	snippet: `snippet ${id}`,

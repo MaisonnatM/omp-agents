@@ -85,7 +85,7 @@ export type ClientService = Exclude<McpIntegrationId, "linear">;
 /**
  * What each Google sign-in asks for. Google Calendar: events, to read them here and let omp sessions write them, the
  * calendar list, to know which calendars you show, and free/busy, which the MCP server's scheduling tool reads.
- * Gmail: reading your mail, for the Inbox page, and nothing that sends, labels, or marks it read.
+ * Gmail: reading your mail, for the Inbox page, and sending replies and moving conversations to Trash from it; it cannot delete mail for good.
  */
 export const GOOGLE_SCOPES: Record<GoogleService, readonly string[]> = {
 	"google-calendar": [
@@ -93,7 +93,7 @@ export const GOOGLE_SCOPES: Record<GoogleService, readonly string[]> = {
 		"https://www.googleapis.com/auth/calendar.calendarlist.readonly",
 		"https://www.googleapis.com/auth/calendar.events.freebusy",
 	],
-	gmail: ["https://www.googleapis.com/auth/gmail.readonly"],
+	gmail: ["https://www.googleapis.com/auth/gmail.modify"],
 };
 
 /** The port omp listens on for Google's redirect unless the setup names another. */

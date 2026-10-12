@@ -1,6 +1,8 @@
 import { expect, test } from "bun:test";
-import { GmailClient } from "./gmail";
+import { GmailClient, mailOf, replyOf } from "./gmail";
+import { recipientsOf, type MailMessage } from "./shared/gmail";
 import type { GoogleFetch } from "./integrations";
+import { ApiError } from "./omp/mcp";
 
 const PROFILE = { emailAddress: "max+work@example.com", messagesTotal: 1204, threadsTotal: 873, historyId: "9921" };
 
@@ -201,6 +203,7 @@ test("a conversation reads each message's people, arrival, unread state, snippet
 					{ name: "", address: "bob@example.com" },
 				],
 				cc: [{ name: 'Max "the" Dev', address: "max+work@example.com" }],
+				replyTo: [],
 				at: 1791000000000,
 				unread: false,
 				snippet: "Hi Jane & Bob",
@@ -212,6 +215,7 @@ test("a conversation reads each message's people, arrival, unread state, snippet
 				from: { name: "", address: "bob@example.com" },
 				to: [{ name: "Alice Doe", address: "alice@example.com" }],
 				cc: [],
+				replyTo: [],
 				at: 1791003600000,
 				unread: true,
 				snippet: "a snippet",
@@ -292,4 +296,95 @@ test("a message's HTML comes from the conversation's kept read, and is undefined
 	expect(reads.map(url => new URL(url).pathname)).toEqual(["/gmail/v1/users/me/profile", THREAD]);
 	expect([await client.messageHtml("18f2a", "m1"), await client.messageHtml("18f2a", "m2"), await client.messageHtml("18f2a", "m9")]).toEqual(["<p>Hi</p>", undefined, undefined]);
 	expect(reads).toHaveLength(2);
+});
+
+/** A message as `threads.get` answers it with `format=metadata` and `headers`. */
+const headed = (id: string, headers: Record<string, string>, labelIds: string[] = ["INBOX"]) => ({
+	id,
+	labelIds,
+	internalDate: "1791000000000",
+	payload: { headers: Object.entries(headers).map(([name, value]) => ({ name, value })) },
+});
+
+const ASK = headed("m1", {
+	From: '"Alice Doe" <alice@example.com>',
+	Subject: "Draft review",
+	"Message-ID": "<m1@example.com>",
+	References: "<m0@example.com>",
+});
+
+const person = (address: string, name = "") => ({ name, address });
+const DRAFT = { to: [person("alice@example.com", "Alice Doe")], cc: [], bcc: [person("boss@example.com")], html: "<p>Looks <b>good</b>.</p>", text: "Looks good.\nShip it." };
+
+/** The headers of `raw`, an RFC 2822 multipart/alternative message, and the decoded body of each part by its type. */
+function parsed(raw: string): { headers: Record<string, string>; parts: Record<string, string> } {
+	const [head, ...rest] = raw.split("\r\n\r\n");
+	const headers = Object.fromEntries(head!.split("\r\n").map(line => [line.slice(0, line.indexOf(":")), line.slice(line.indexOf(":") + 2)]));
+	const boundary = /boundary="([^"]+)"/.exec(headers["Content-Type"]!)![1]!;
+	const parts = Object.fromEntries(
+		rest.join("\r\n\r\n").split(`--${boundary}`).slice(1, -1).map(part => {
+			const [partHead, body] = part.trim().split("\r\n\r\n");
+			return [/Content-Type: ([^;]+)/.exec(partHead!)![1]!, Buffer.from(body!.replace(/\r\n/g, ""), "base64").toString()];
+		}),
+	);
+	return { headers, parts };
+}
+
+test("a reply sends its text and HTML under the conversation's Re: subject, threaded after the message it answers", () => {
+	const { headers, parts } = parsed(replyOf(ASK, "max+work@example.com", DRAFT));
+	expect(headers).toMatchObject({ To: '"Alice Doe" <alice@example.com>', Bcc: "boss@example.com", Subject: "Re: Draft review", "In-Reply-To": "<m1@example.com>", References: "<m0@example.com> <m1@example.com>" });
+	expect(headers.Cc).toBeUndefined();
+	expect(parts).toEqual({ "text/plain": "Looks good.\r\nShip it.", "text/html": "<p>Looks <b>good</b>.</p>" });
+	expect(parsed(replyOf(headed("m", { Subject: "RE: Café" }), "me@example.com", DRAFT)).headers.Subject).toBe(`=?UTF-8?B?${Buffer.from("RE: Café").toString("base64")}?=`);
+});
+
+test("a new mail encodes a name outside ASCII, and one that names no one is refused", () => {
+	const { headers } = parsed(mailOf("me@example.com", { ...DRAFT, to: [person("zoe@example.com", "Zoë")], bcc: [] }, "Hello"));
+	expect(headers).toMatchObject({ To: `=?UTF-8?B?${Buffer.from("Zoë").toString("base64")}?= <zoe@example.com>`, Subject: "Hello" });
+	expect(() => mailOf("me@example.com", { ...DRAFT, to: [], bcc: [] }, "Hello")).toThrow("names no one");
+});
+
+const said = (from: string, to: string[], extra: Partial<MailMessage> = {}) => ({ from: person(from), to: to.map(address => person(address)), cc: [], replyTo: [], ...extra });
+
+test("a reply goes to Reply-To over the sender, to your own message's recipients, and replying to all copies everyone else it named but you", () => {
+	const ask = said("alice@example.com", ["MAX+work@example.com", "bob@example.com"], { cc: [person("carol@example.com"), person("alice@example.com")] });
+	const all = recipientsOf(ask, "max+work@example.com", true);
+	expect([all.to.map(p => p.address), all.cc.map(p => p.address)]).toEqual([["alice@example.com"], ["bob@example.com", "carol@example.com"]]);
+	expect(recipientsOf(ask, "max+work@example.com", false).cc).toEqual([]);
+	expect(recipientsOf(said("list@example.com", [], { replyTo: [person("team@example.com")] }), "me@example.com", false).to).toEqual([person("team@example.com")]);
+	expect(recipientsOf(said("me@example.com", ["zoe@example.com"]), "me@example.com", false).to).toEqual([person("zoe@example.com")]);
+});
+
+test("a reply sends to the last message other than a draft, and a trash moves the conversation; each reads the inbox and the conversation again", async () => {
+	const writes: { url: string; body: unknown }[] = [];
+	const answers = twoThreads();
+	answers[`${INBOX}/18f2a`] = { id: "18f2a", messages: [ASK, headed("d", { From: "max+work@example.com", To: "alice@example.com" }, ["DRAFT"])] };
+	let reads = 0;
+	const fetch: GoogleFetch = async (url, init) => {
+		if (init) {
+			writes.push({ url: new URL(url).pathname, body: init.method === "POST" ? init.body : null });
+			return {};
+		}
+		if (new URL(url).pathname === INBOX) reads++;
+		return answers[new URL(url).pathname];
+	};
+	const client = new GmailClient(fetch);
+	await client.inbox();
+	await client.reply({ thread: "18f2a", ...DRAFT });
+	await client.send({ ...DRAFT, subject: "New" });
+	await client.trash("18e07");
+	await client.inbox();
+	expect(writes.map(write => write.url)).toEqual(["/gmail/v1/users/me/messages/send", "/gmail/v1/users/me/messages/send", "/gmail/v1/users/me/threads/18e07/trash"]);
+	const [reply, mail] = writes.map(write => write.body as { raw: string; threadId?: string });
+	expect(reply!.threadId).toBe("18f2a");
+	expect(parsed(Buffer.from(reply!.raw, "base64url").toString()).headers["In-Reply-To"]).toBe("<m1@example.com>");
+	expect(mail!.threadId).toBeUndefined();
+	expect(reads).toBe(2);
+});
+
+test("Google's refusal of a read-only sign-in says to sign in again", async () => {
+	const fetch: GoogleFetch = async () => {
+		throw new ApiError("Request had insufficient authentication scopes.", 403);
+	};
+	await expect(new GmailClient(fetch).trash("18f2a")).rejects.toThrow("Sign in to Gmail again");
 });

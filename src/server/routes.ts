@@ -41,7 +41,7 @@ import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
-import { type Parsed, parseAutoPullChange, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
+import { type Parsed, parseAutoPullChange, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
 import type { AutoPullChange, SourceControlAnswer } from "../shared/source-control";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
@@ -451,8 +451,8 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 	};
 }
 
-/** Your Gmail inbox, read only. */
-function gmailRoutes({ get }: RouteKit, gmail: GmailClient): Routes {
+/** Your Gmail inbox: its conversations, and the replies and trashing the Inbox page sends. */
+function gmailRoutes({ get, write }: RouteKit, gmail: GmailClient): Routes {
 	/** `GET /api/gmail/inbox[?fresh]`: the signed-in address and its inbox's latest conversations. */
 	const inbox = get(params => answer(() => gmail.inbox(params.has("fresh"))));
 	/** `GET /api/gmail/thread?id=<id>[&fresh]`: that conversation in full, for the Inbox page's details. */
@@ -469,7 +469,30 @@ function gmailRoutes({ get }: RouteKit, gmail: GmailClient): Routes {
 		if (html instanceof Response) return html;
 		return html === undefined ? fail(404, `Conversation ${threadId} holds no HTML message ${id}`) : mailDocument(html);
 	});
-	return { "/api/gmail/inbox": { GET: inbox }, "/api/gmail/thread": { GET: thread }, "/api/gmail/message": { GET: message } };
+	const DRAFT = "{ to, cc, bcc } of { name, address } naming someone, html, and text that is not blank";
+	/** `PUT /api/gmail/reply`: `MailReply`, sent in its conversation; answers `{}`. */
+	const reply = write(
+		body => checked(parseMailReply(body), `Expected { thread } naming a Gmail conversation, with ${DRAFT}`),
+		async input => (await gmail.reply(input), {}),
+	);
+	/** `PUT /api/gmail/send`: `MailSend`, sent as a new mail; answers `{}`. */
+	const send = write(
+		body => checked(parseMailSend(body), `Expected { subject }, with ${DRAFT}`),
+		async input => (await gmail.send(input), {}),
+	);
+	/** `PUT /api/gmail/trash`: `MailTrash`, moved to Gmail's Trash; answers `{}`. */
+	const trash = write(
+		body => checked(parseMailTrash(body), "Expected { thread } naming a Gmail conversation"),
+		async ({ thread }) => (await gmail.trash(thread), {}),
+	);
+	return {
+		"/api/gmail/inbox": { GET: inbox },
+		"/api/gmail/thread": { GET: thread },
+		"/api/gmail/message": { GET: message },
+		"/api/gmail/reply": { PUT: reply },
+		"/api/gmail/send": { PUT: send },
+		"/api/gmail/trash": { PUT: trash },
+	};
 }
 
 /** GitHub pull requests in full: details, stack, options, edits, and their changed files. */

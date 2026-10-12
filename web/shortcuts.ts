@@ -57,6 +57,10 @@ export type ShortcutId =
 	| "inboxPrevious"
 	| "inboxClose"
 	| "inboxOnGmail"
+	| "inboxReply"
+	| "inboxReplyAll"
+	| "inboxTrash"
+	| "inboxCompose"
 	| "nextChangedFile"
 	| "previousChangedFile"
 	| "moveUp"
@@ -190,11 +194,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
 	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
 	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
-	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo and Calendar pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo, Calendar, and Inbox pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
 	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
 	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
 	{ id: "inbox", category: "general", label: "Go to your Gmail inbox", command: "Open inbox", keys: [{ goTo: "i" }] },
+	// After a G, R is also the Inbox page's `inboxReply`: the page outranks the App, so G then R replies while a conversation is open.
 	{ id: "routines", category: "general", label: "Go to your routines", command: "Go to routines", keys: [{ goTo: "r" }] },
 	// After a G, P is also the Todo page's `todoPriority`: the page outranks the App, so the priority wins while a todo is focused or open, and its handler declines otherwise.
 	{ id: "projects", category: "general", label: "Go to your projects", command: "Go to projects", keys: [{ goTo: "p" }] },
@@ -219,6 +224,10 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "inboxPrevious", category: "inbox", label: "Inbox: focus the previous conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "inboxClose", category: "inbox", label: "Inbox: close the open conversation", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
 	{ id: "inboxOnGmail", category: "inbox", label: "Inbox: open the focused or open conversation in Gmail", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
+	{ id: "inboxReply", category: "inbox", label: "Inbox: reply to the open conversation's last message", keys: [{ chord: { key: "r" }, scope: "outside-fields" }] },
+	{ id: "inboxReplyAll", category: "inbox", label: "Inbox: reply to everyone on the open conversation's last message", keys: [{ chord: { key: "a" }, scope: "outside-fields" }] },
+	{ id: "inboxTrash", category: "inbox", label: "Inbox: move the open conversation to Gmail's Trash", keys: [{ chord: { key: "#" }, scope: "outside-fields" }] },
+	{ id: "inboxCompose", category: "inbox", label: "Inbox: write a new mail", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "nextChangedFile", category: "changes", label: "Changes: open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "previousChangedFile", category: "changes", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },

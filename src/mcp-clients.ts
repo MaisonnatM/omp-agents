@@ -121,3 +121,15 @@ export const planGoogleSave = (filePath: string, id: GoogleService, input: Googl
 		redirectUri: googleRedirectUri(input.callbackPort),
 		callbackPort: input.callbackPort,
 	});
+
+/**
+ * The server entry of Google service `id` with its scope set to the one the dashboard now needs, or `null` when the
+ * saved entry already asks for it or there is none. A sign-in writes it first, so a client saved before the dashboard
+ * needed more of Google, such as Gmail before it sent replies, asks for the wider grant once you sign in again.
+ */
+export async function planGoogleScope(filePath: string, id: GoogleService): Promise<{ name: string; server: McpServerConfig } | null> {
+	const current = serverOnHost(await readMcpServers(filePath), MCP_SERVICES[id].host);
+	const scope = GOOGLE_SCOPES[id].join(" ");
+	if (!current?.config.oauth || current.config.oauth.scope === scope) return null;
+	return { name: current.name, server: { ...current.config, oauth: { ...current.config.oauth, scope } } };
+}

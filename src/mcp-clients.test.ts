@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type ClientSave, googleSetupFrom, planGoogleSave, planSlackSave, slackSetupFrom } from "./mcp-clients";
+import { type ClientSave, googleSetupFrom, planGoogleSave, planGoogleScope, planSlackSave, slackSetupFrom } from "./mcp-clients";
 import { writeMcpServer } from "./omp/mcp";
 
 const dirs: string[] = [];
@@ -122,7 +122,7 @@ test("a Google client save asks for consent and the calendar scopes, redirects t
 	expect(replaced.credential).toEqual({ name: "calendar", url: "https://calendarmcp.googleapis.com/mcp/v1", credentialId: "cal-id" });
 });
 
-test("a Gmail client save adds its own gmail server that asks only to read mail, beside the calendar's", async () => {
+test("a Gmail client save adds its own gmail server that asks to read, send, and trash mail, beside the calendar's", async () => {
 	const path = configPath();
 	writeFileSync(path, JSON.stringify({ mcpServers: { calendar: { type: "http", url: "https://calendarmcp.googleapis.com/mcp/v1", oauth: { clientId: "1-a.apps.googleusercontent.com", clientSecret: "cal-secret" } } } }));
 	const saved = await planGoogleSave(path, "gmail", { clientId: "1-a.apps.googleusercontent.com", clientSecret: "mail-secret", callbackPort: 3121 });
@@ -134,7 +134,7 @@ test("a Gmail client save adds its own gmail server that asks only to read mail,
 			oauth: {
 				clientId: "1-a.apps.googleusercontent.com",
 				clientSecret: "mail-secret",
-				scope: "https://www.googleapis.com/auth/gmail.readonly",
+				scope: "https://www.googleapis.com/auth/gmail.modify",
 				prompt: "consent",
 				redirectUri: "http://localhost:3121/callback",
 				callbackPort: 3121,
@@ -144,6 +144,16 @@ test("a Gmail client save adds its own gmail server that asks only to read mail,
 		credential: null,
 	});
 	await expect(planGoogleSave(path, "gmail", { clientId: "1-a.apps.googleusercontent.com", callbackPort: 3121 })).rejects.toThrow("Gmail needs the app's client secret.");
+});
+
+test("a Gmail server saved with an older scope gets the current one and keeps the rest of its client; a current one needs no change", async () => {
+	const path = configPath();
+	const oauth = { clientId: "1-a.apps.googleusercontent.com", clientSecret: "s", scope: "https://www.googleapis.com/auth/gmail.readonly", callbackPort: 3121 };
+	writeFileSync(path, JSON.stringify({ mcpServers: { mail: { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1", oauth } } }));
+	const rescoped = await planGoogleScope(path, "gmail");
+	expect(rescoped).toEqual({ name: "mail", server: { type: "http", url: "https://gmailmcp.googleapis.com/mcp/v1", oauth: { ...oauth, scope: "https://www.googleapis.com/auth/gmail.modify" } } });
+	await writeMcpServer(path, rescoped!.name, rescoped!.server);
+	expect(await planGoogleScope(path, "gmail")).toBeNull();
 });
 
 test("a Google client without a saved callback port is not set up, since omp would listen on another port", () => {

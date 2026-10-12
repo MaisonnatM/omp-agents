@@ -1,14 +1,18 @@
-import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw } from "lucide-react";
-import { useEffect, useReducer } from "react";
-import type { MailAttachment, MailMessage, MailPerson, MailThread } from "../../../src/shared/gmail";
+import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw, Reply, ReplyAll, Trash2 } from "lucide-react";
+import { useMemo, useReducer, useState } from "react";
+import type { MailAttachment, MailMessage, MailPerson, MailReply, MailThread } from "../../../src/shared/gmail";
+import { recipientsOf } from "../../../src/shared/gmail";
+import { MailEditor } from "./mail-editor";
+import { errorText } from "../../../src/json";
+import { putJson } from "../../api";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { colorIndex, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, personLabel, recipientsLine } from "../../inbox-model";
 import { formatBytes, mailTime } from "../../labels";
-import { mailThreadStore, useMailThread } from "../../reads";
+import { gmailStore, mailThreadStore, useMailThread } from "../../reads";
 import { hashForInbox } from "../../routing";
-import { shortcutLabels } from "../../shortcuts";
+import { shortcutLabels, useShortcuts } from "../../shortcuts";
 import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, type BarAction } from "../list-split";
 import { LoadNote } from "../sheet-details";
 import { MailFrame } from "./mail-frame";
@@ -150,6 +154,26 @@ function ClosedMessage({ message, address, onToggle }: MessageProps) {
 	);
 }
 
+/** The bottom of a conversation with no reply open: a line that starts a reply to the last sender, and Reply all. */
+function ReplyPrompt({ to, disabled, onReply }: { to: string; disabled: boolean; onReply: (all: boolean) => void }) {
+	return (
+		<div className="flex items-center gap-2 rounded-xl border border-border bg-background p-1.5 shadow-sm">
+			<button
+				type="button"
+				disabled={disabled}
+				onClick={() => onReply(false)}
+				className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm text-muted-foreground outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+			>
+				<Reply className="size-4 shrink-0" />
+				<span className="truncate">Reply to {to}…</span>
+			</button>
+			<Button type="button" variant="ghost" size="compact" leadingIcon={ReplyAll} disabled={disabled} onClick={() => onReply(true)}>
+				Reply all
+			</Button>
+		</div>
+	);
+}
+
 interface ThreadDetailProps {
 	id: string;
 	/** The conversation as the inbox lists it, which titles the panel until its read arrives; `null` when the list does not hold it. */
@@ -162,20 +186,57 @@ interface ThreadDetailProps {
 	onNext?: () => void;
 	/** The inbox's own address, which reads as `me`. */
 	address: string | null;
+	/** Called once the conversation moved to Trash, to open another. */
+	onTrashed: () => void;
 }
 
 /**
- * A conversation in full, as Superhuman shows one: a bar with where it sits in the list and its actions, its subject and
- * who wrote in it, then its messages, folded as Gmail folds them: the last message and the unread ones open, earlier ones
- * on one line, and a long run of those folded into one row. Reading it here does not mark it read, since the dashboard
- * reads Gmail read only.
+ * A conversation as a page of its own, as Front shows one: a bar with where it sits in the list and its actions, its
+ * subject and who wrote in it, then its messages, folded as Gmail folds them: the last message and the unread ones open,
+ * earlier ones on one line, and a long run of those folded into one row. A reply is written at the bottom of the page,
+ * under the messages, and can grow to fill it. Delete moves the conversation to Gmail's Trash. Reading it here does not
+ * mark it read.
  */
-export function ThreadDetail({ id, listed, position, onPrevious, onNext, address }: ThreadDetailProps) {
+export function ThreadDetail({ id, listed, position, onPrevious, onNext, address, onTrashed }: ThreadDetailProps) {
 	const { read, error, refreshing } = useMailThread(id, listed?.at ?? null);
 	const thread = read?.data ?? null;
 	const messages = thread?.messages ?? [];
 	const [folds, fold] = useReducer(foldsAfter, NO_FOLDS);
 	const url = thread?.url ?? listed?.url ?? null;
+	const [composing, setComposing] = useState<{ all: boolean } | null>(null);
+	const [expanded, setExpanded] = useState(false);
+	const [trashing, setTrashing] = useState(false);
+	const [actionError, setActionError] = useState<string | null>(null);
+	const last = messages.at(-1);
+	const canReply = last !== undefined && !trashing;
+	const all = composing?.all ?? false;
+	const recipients = useMemo(() => ({ ...(last ? recipientsOf(last, address ?? "", all) : { to: [], cc: [] }), bcc: [] }), [last, address, all]);
+
+	const compose = (all: boolean): boolean => {
+		if (!canReply) return false;
+		setComposing({ all });
+		return true;
+	};
+	const trash = async (): Promise<void> => {
+		setTrashing(true);
+		setActionError(null);
+		try {
+			await putJson<object>("/api/gmail/trash", { thread: id });
+			onTrashed();
+			void gmailStore.refresh(null, { fresh: true });
+		} catch (err) {
+			setActionError(`Cannot delete the conversation: ${errorText(err)}`);
+			setTrashing(false);
+		}
+	};
+	useShortcuts({
+		inboxReply: () => compose(false),
+		inboxReplyAll: () => compose(true),
+		inboxTrash: () => {
+			if (trashing) return false;
+			void trash();
+		},
+	});
 
 	const rows = foldMessages(messages, folds);
 	const subject = thread?.subject ?? listed?.subject ?? null;
@@ -188,13 +249,28 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 	const next: BarAction = { label: "Next conversation", icon: CH_NEXT, shortcut: "inboxNext", onClick: onNext };
 	const close: BarAction = { label: "Close", icon: CH_CLOSE, shortcut: "inboxClose", href: hashForInbox(null) };
 	return (
-		<section aria-label={subject || "Conversation"} className="flex min-w-0 flex-col">
+		<section aria-label={subject || "Conversation"} className="flex h-full min-h-0 min-w-0 flex-col">
 			<DetailBar
 				leading={position && <span className="tabular-nums">{position.at + 1} of {position.of}</span>}
 				previous={previous}
 				next={next}
 				close={close}
 			>
+				<Tooltip content="Reply" shortcut={shortcutLabels("inboxReply")} disabled={!canReply}>
+					<Button variant="ghost" size="icon-compact" aria-label="Reply" disabled={!canReply} onClick={() => compose(false)}>
+						<Reply />
+					</Button>
+				</Tooltip>
+				<Tooltip content="Reply all" shortcut={shortcutLabels("inboxReplyAll")} disabled={!canReply}>
+					<Button variant="ghost" size="icon-compact" aria-label="Reply all" disabled={!canReply} onClick={() => compose(true)}>
+						<ReplyAll />
+					</Button>
+				</Tooltip>
+				<Tooltip content="Delete" shortcut={shortcutLabels("inboxTrash")} disabled={trashing}>
+					<Button variant="ghost" size="icon-compact" aria-label="Delete" disabled={trashing} onClick={() => void trash()}>
+						<Trash2 />
+					</Button>
+				</Tooltip>
 				{expandAll && (
 					<Button variant="ghost" size="icon-compact" aria-label="Expand all" onClick={() => fold({ kind: "expand-all", messages })}>
 						<ChevronsUpDown />
@@ -211,7 +287,7 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 					</Button>
 				</Tooltip>
 			</DetailBar>
-			<div className="w-full max-w-3xl space-y-4 px-8 py-6">
+			<div className={cn("min-h-0 w-full flex-1 space-y-4 overflow-y-auto px-8 py-6", expanded && composing && "hidden")}>
 				{subject !== null && (
 					<header className="space-y-1.5">
 						<h2 className="break-words text-2xl font-semibold leading-tight tracking-tight">{subject || "(no subject)"}</h2>
@@ -220,6 +296,7 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 				)}
 				{!thread && <LoadNote loading="Asking Gmail for the conversation…" error={error && `Cannot load the conversation: ${error}`} />}
 				{thread && error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the conversation: {error}</p>}
+				{actionError && <p role="alert" className="text-xs text-red-600 dark:text-red-400">{actionError}</p>}
 				{thread && messages.length === 0 && <p className="text-sm text-muted-foreground">This conversation holds only drafts.</p>}
 				{rows.length > 0 && (
 					<ol aria-label="Messages" className="-mx-2">
@@ -257,6 +334,36 @@ export function ThreadDetail({ id, listed, position, onPrevious, onNext, address
 					</ol>
 				)}
 			</div>
+			{last && (
+				<div className={cn("flex shrink-0 flex-col px-6 pb-4", expanded && composing && "min-h-0 flex-1 pt-4")}>
+					{composing ? (
+						<MailEditor
+							draftKey={`thread.${id}`}
+							toLabel={composing.all ? "Reply all" : "Reply to"}
+							recipients={recipients}
+							subject={null}
+							expanded={expanded}
+							onExpand={setExpanded}
+							onSend={async draft => {
+								const { subject: _, ...body } = draft;
+								await putJson<object>("/api/gmail/reply", { ...body, thread: id } satisfies MailReply);
+							}}
+							onClose={() => {
+								setComposing(null);
+								setExpanded(false);
+							}}
+							onDone={() => {
+								setComposing(null);
+								setExpanded(false);
+								void mailThreadStore.refresh(id, { fresh: true });
+								void gmailStore.refresh(null, { fresh: true });
+							}}
+						/>
+					) : (
+						<ReplyPrompt to={senderLabel(last, address)} disabled={!canReply} onReply={compose} />
+					)}
+				</div>
+			)}
 		</section>
 	);
 }

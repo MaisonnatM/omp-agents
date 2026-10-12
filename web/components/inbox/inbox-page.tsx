@@ -1,19 +1,26 @@
-import { Mail } from "lucide-react";
+import { Mail, SquarePen } from "lucide-react";
 import { useEffect } from "react";
 import { callable } from "../../../src/shared/accounts";
 import type { MailThread } from "../../../src/shared/gmail";
-import { threadUrl } from "../../../src/shared/gmail";
+import { threadUrl, type MailSend } from "../../../src/shared/gmail";
+import { putJson } from "../../api";
 import { cn } from "@/lib/utils";
 import { gmailStore, mailThreadStore, useGmailInbox } from "../../reads";
 import { hashForInbox } from "../../routing";
-import { shortcutKeys, useShortcuts } from "../../shortcuts";
+import { shortcutKeys, shortcutLabels, useShortcuts } from "../../shortcuts";
 import { DisconnectedPage } from "../integrations/disconnected-page";
 import { focusRow, PolledPageFrame, PolledContent, stepRows, useReturnFocus } from "../list-page";
 import { ListSplit } from "../list-split";
+import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
+import { MailEditor } from "./mail-editor";
 import { MailTime, ThreadDetail } from "./thread-view";
 
 const TITLE = "Inbox";
 const META = "Your Gmail inbox";
+
+/** The target of `#inbox/new`, the page that writes a new mail; Gmail's thread ids are hex, so none reads as it. */
+const COMPOSE = "new";
 
 const rowId = (threadId: string): string => `inbox-row-${threadId}`;
 const rowOf = (thread: MailThread): HTMLElement | null => document.getElementById(rowId(thread.id));
@@ -49,6 +56,36 @@ function ThreadRow({ thread, open }: { thread: MailThread; open: boolean }) {
 		</li>
 	);
 }
+
+/** A new mail in the panel beside the list; sending it or throwing it away goes back to the inbox. */
+function ComposePage({ address }: { address: string | null }) {
+	const back = (): void => {
+		location.hash = hashForInbox(null);
+	};
+	return (
+		<div className="flex h-full min-h-0 flex-col p-4">
+			<MailEditor
+				draftKey="new"
+				toLabel="To"
+				recipients={NO_ONE}
+				subject=""
+				focusPeople
+				expanded
+				onSend={async draft => {
+					await putJson<object>("/api/gmail/send", draft satisfies MailSend);
+				}}
+				onClose={back}
+				onDone={() => {
+					back();
+					void gmailStore.refresh(null, { fresh: true });
+				}}
+			/>
+			{address && <p className="mt-2 px-1 text-xs text-muted-foreground">From {address}</p>}
+		</div>
+	);
+}
+
+const NO_ONE = { to: [], cc: [], bcc: [] };
 
 /**
  * Your Gmail inbox's latest conversations, newest first, beside the conversation `target` names, or Gmail's integration
@@ -88,10 +125,14 @@ export function InboxPage({ target }: { target: string | null }) {
 		return true;
 	};
 	useShortcuts({
+		inboxCompose: () => {
+			if (target === COMPOSE) return false;
+			location.hash = hashForInbox(COMPOSE);
+		},
 		inboxNext: () => step(1),
 		inboxPrevious: () => step(-1),
 		inboxClose: () => {
-			if (target === null) return false;
+			if (target === null || target === COMPOSE) return false;
 			location.hash = hashForInbox(null);
 		},
 		inboxOnGmail: () => {
@@ -109,12 +150,19 @@ export function InboxPage({ target }: { target: string | null }) {
 			meta={read ? `${read.data.address} · ${unread} unread` : META}
 			poll={inbox}
 			onRefresh={() => void gmailStore.refresh(null, { fresh: true })}
+			actions={
+				<Tooltip content="New mail" shortcut={shortcutLabels("inboxCompose")}>
+					<Button variant="secondary" size="compact" leadingIcon={SquarePen} render={<a href={hashForInbox(COMPOSE)} />}>
+						Compose
+					</Button>
+				</Tooltip>
+			}
 		>
 			{() => (
 				<ListSplit
 					widthKey="omp-agents.inbox-list-width"
 					resizeLabel="Resize the conversation list"
-					detailLabel="Open conversation"
+					detailLabel={target === COMPOSE ? "New mail" : "Open conversation"}
 					empty={{ icon: Mail, title: "No conversation open", hint: `Click one, or focus one with ${shortcutKeys("inboxNext")} and press Enter.` }}
 					list={
 						<div className="space-y-2 p-2">
@@ -134,7 +182,9 @@ export function InboxPage({ target }: { target: string | null }) {
 						</div>
 					}
 					detail={
-						target === null ? null : (
+						target === null ? null : target === COMPOSE ? (
+							<ComposePage address={address} />
+						) : (
 							<ThreadDetail
 								key={target}
 								id={target}
@@ -143,6 +193,11 @@ export function InboxPage({ target }: { target: string | null }) {
 								onPrevious={previous ? () => open(previous) : undefined}
 								onNext={next ? () => open(next) : undefined}
 								address={address}
+								onTrashed={() => {
+									const after = next ?? previous;
+									if (after) open(after);
+									else location.hash = hashForInbox(null);
+								}}
 							/>
 						)
 					}
