@@ -703,7 +703,7 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Providers
 
-- **Providers** is a section of [Settings](#settings), at `#settings/providers`: a row for each model provider that omp's `/login` offers, such as Anthropic, ChatGPT (Codex), GitHub Copilot, OpenRouter, or Ollama.
+- **Providers** is a section of [Settings](#settings), at `#settings/providers`: a row for each model provider that omp's `/login` offers, such as Anthropic, ChatGPT (Codex), GitHub Copilot, OpenRouter, or Ollama, with the provider's logo, or its initial when the dashboard has no logo for it.
   **Connected** lists the providers omp holds a credential for, and **Available** lists the rest, with **Search** to filter them by name or id.
   The section reads omp's credentials every minute while it is open, so a `/login` from a terminal shows there too, and **Refresh** reads them at once.
 - **Connect** runs the provider's `/login` flow on the dashboard's server and saves the credential in omp's credential store, so every new omp session can use the provider's models.

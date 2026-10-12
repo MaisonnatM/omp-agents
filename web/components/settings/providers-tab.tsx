@@ -11,6 +11,7 @@ import { MoreActionsMenu } from "../more-actions-menu";
 import { LoadNote } from "../sheet-details";
 import { Callout, IntegrationList, MetaDot } from "../integrations/integration-row";
 import { Section } from "./editor";
+import { ProviderLogo } from "./provider-logos";
 
 /** How often the page asks again while a sign-in runs, so its page, code, and question show soon after the provider names them. */
 const LOGIN_POLL_MS = 1_000;
@@ -236,6 +237,7 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 	return (
 		<li className="px-4 py-3">
 			<div className="flex items-center gap-3">
+				<ProviderLogo id={provider.id} name={provider.name} />
 				<div className="min-w-0 flex-1">
 					<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
 						<h3 className="truncate text-[13px] font-medium">{provider.name}</h3>
@@ -264,7 +266,7 @@ function ProviderRow({ provider, login }: { provider: ModelProvider; login: Prov
 				<div className="flex shrink-0 items-center gap-1.5">{actions}</div>
 			</div>
 			{hasDetails && (
-				<div className="mt-2.5 space-y-2.5">
+				<div className="mt-2.5 space-y-2.5 ps-11">
 					{provider.accounts.map(account => (
 						<AccountLine key={account.credentialId} provider={provider} account={account} />
 					))}
