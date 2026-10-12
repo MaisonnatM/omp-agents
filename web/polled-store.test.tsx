@@ -24,9 +24,8 @@ function store() {
 	const cacheKey = `test.polled.${keys.length}`;
 	keys.push(cacheKey);
 	return createPolledStore<{ n: number }>({
-		cacheKey,
 		url: scope => `/polled/${scope ?? ""}`,
-		isValid: (value): value is { n: number } => typeof (value as { n?: unknown } | null)?.n === "number",
+		cache: { key: cacheKey, isValid: (value): value is { n: number } => typeof (value as { n?: unknown } | null)?.n === "number" },
 	});
 }
 
@@ -209,17 +208,15 @@ describe("polled store", () => {
 			}),
 		);
 		const polled = createPolledStore<{ n: number }>({
-			cacheKey,
 			url: () => "/polled",
-			isValid: (value): value is { n: number } => typeof (value as { n?: unknown } | null)?.n === "number",
+			cache: { key: cacheKey, isValid: (value): value is { n: number } => typeof (value as { n?: unknown } | null)?.n === "number" },
 		});
 		expect(text(polled, "ok")).toBe("<span>4:still:</span>");
 		expect(text(polled, "bad")).toBe("<span>-:still:</span>");
 		localStorage.setItem(cacheKey, "{");
 		const again = createPolledStore<{ n: number }>({
-			cacheKey,
 			url: () => "/polled",
-			isValid: (value): value is { n: number } => typeof (value as { n?: unknown } | null)?.n === "number",
+			cache: { key: cacheKey, isValid: (value): value is { n: number } => typeof (value as { n?: unknown } | null)?.n === "number" },
 		});
 		expect(text(again, "ok")).toBe("<span>-:still:</span>");
 	});
