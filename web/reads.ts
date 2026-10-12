@@ -66,29 +66,33 @@ export function useReplaceableRead<T>(url: string | null, version?: unknown): Re
 /** The open pull requests by workspace `cwd`, which the sidebar and the Pull requests page share; `null` reads every workspace. */
 export const pullRequestsStore = createPolledStore<PullRequestList>({
 	// Keeps its name from before the page was called Pull requests, so the browser's cached list survives.
-	cacheKey: "omp-agents.inbox-cache",
 	url: (cwd, fresh) => {
 		const params = new URLSearchParams();
 		if (cwd !== null) params.set("cwd", cwd);
 		if (fresh) params.set("fresh", "");
 		return `/api/pull-requests${params.size ? `?${params}` : ""}`;
 	},
-	isValid: (value): value is PullRequestList => {
-		const list = value as Partial<PullRequestList> | null;
-		// A read saved before the list carried each PR's diff size reads GitHub again.
-		const current = (repo: RepoPullRequests): boolean => "error" in repo || repo.pullRequests.every(pr => typeof pr.additions === "number");
-		return Array.isArray(list?.repos) && Array.isArray(list.unmatched) && list.repos.every(current);
+	cache: {
+		key: "omp-agents.inbox-cache",
+		isValid: (value): value is PullRequestList => {
+			const list = value as Partial<PullRequestList> | null;
+			// A read saved before the list carried each PR's diff size reads GitHub again.
+			const current = (repo: RepoPullRequests): boolean => "error" in repo || repo.pullRequests.every(pr => typeof pr.additions === "number");
+			return Array.isArray(list?.repos) && Array.isArray(list.unmatched) && list.repos.every(current);
+		},
 	},
 });
 
 /** The Linear issues assigned to you, which the sidebar and the tickets page share; Linear is not per workspace, so there is one entry. */
 export const ticketsStore = createPolledStore<TicketsAnswer>({
-	cacheKey: "omp-agents.tickets-cache",
 	url: (_, fresh) => `/api/tickets${fresh ? "?fresh" : ""}`,
-	isValid: (value): value is TicketsAnswer => {
-		const answer = value as Partial<TicketsAnswer> | null;
-		// A read saved before tickets carried their opening date reads Linear again.
-		return Array.isArray(answer?.tickets) && answer.tickets.every(ticket => typeof ticket.createdAt === "string");
+	cache: {
+		key: "omp-agents.tickets-cache",
+		isValid: (value): value is TicketsAnswer => {
+			const answer = value as Partial<TicketsAnswer> | null;
+			// A read saved before tickets carried their opening date reads Linear again.
+			return Array.isArray(answer?.tickets) && answer.tickets.every(ticket => typeof ticket.createdAt === "string");
+		},
 	},
 });
 
@@ -125,48 +129,52 @@ export function useConversationHits(query: string): ConversationHit[] {
 }
 
 export const analyticsStore = createPolledStore<Analytics>({
-	cacheKey: "omp-agents.analytics-cache",
 	url: range => `/api/analytics?range=${range ?? "24h"}`,
-	isValid: (value): value is Analytics => {
-		const numbers = (item: unknown, fields: string[]): boolean =>
-			isObject(item) && fields.every(field => typeof item[field] === "number");
-		const usage = (item: unknown): boolean =>
-			isObject(item) && numbers(item, ["requests", "failed", "cost", "cacheRate"])
-			&& numbers(item.tokens, ["input", "output", "cacheRead", "cacheWrite", "total"]);
-		const provider = (item: unknown): boolean =>
-			isObject(item) && typeof item.provider === "string" && numbers(item, ["tokens", "cost", "requests"]);
-		if (!isObject(value) || typeof value.range !== "string" || !isAnalyticsRange(value.range)) return false;
-		const { sync } = value;
-		return isObject(sync) && typeof sync.phase === "string" && ["idle", "syncing", "error"].includes(sync.phase)
-			&& numbers(sync, ["current", "total"]) && (sync.lastSyncedAt === null || typeof sync.lastSyncedAt === "number")
-			&& (sync.error === null || typeof sync.error === "string")
-			&& usage(value.totals) && numbers(value.agents, ["main", "subagent", "advisor"])
-			&& Array.isArray(value.providers) && value.providers.every(provider)
-			&& Array.isArray(value.series) && value.series.every(bucket =>
-				isObject(bucket) && numbers(bucket, ["start", "tokens", "cost", "requests"])
-				&& Array.isArray(bucket.providers) && bucket.providers.every(provider))
-			&& Array.isArray(value.models) && value.models.every(model =>
-				isObject(model) && typeof model.selector === "string" && usage(model)
-				&& (model.tokensPerSecond === null || typeof model.tokensPerSecond === "number"))
-			&& Array.isArray(value.workspaces) && value.workspaces.every(workspace =>
-				isObject(workspace) && typeof workspace.cwd === "string" && usage(workspace))
-			&& Array.isArray(value.tools) && value.tools.every(tool =>
-				isObject(tool) && typeof tool.name === "string" && numbers(tool, ["calls", "errors", "tokenShare"]))
-			&& Array.isArray(value.sessions) && value.sessions.every(session =>
-				isObject(session) && typeof session.sessionId === "string" && typeof session.cwd === "string"
-				&& (session.title === null || typeof session.title === "string") && typeof session.listed === "boolean"
-				&& usage(session.usage) && numbers(session, ["subagentTokens", "lastAt"])
-				&& Array.isArray(session.models) && session.models.every(model => typeof model === "string"));
+	cache: {
+		key: "omp-agents.analytics-cache",
+		isValid: (value): value is Analytics => {
+			const numbers = (item: unknown, fields: string[]): boolean =>
+				isObject(item) && fields.every(field => typeof item[field] === "number");
+			const usage = (item: unknown): boolean =>
+				isObject(item) && numbers(item, ["requests", "failed", "cost", "cacheRate"])
+				&& numbers(item.tokens, ["input", "output", "cacheRead", "cacheWrite", "total"]);
+			const provider = (item: unknown): boolean =>
+				isObject(item) && typeof item.provider === "string" && numbers(item, ["tokens", "cost", "requests"]);
+			if (!isObject(value) || typeof value.range !== "string" || !isAnalyticsRange(value.range)) return false;
+			const { sync } = value;
+			return isObject(sync) && typeof sync.phase === "string" && ["idle", "syncing", "error"].includes(sync.phase)
+				&& numbers(sync, ["current", "total"]) && (sync.lastSyncedAt === null || typeof sync.lastSyncedAt === "number")
+				&& (sync.error === null || typeof sync.error === "string")
+				&& usage(value.totals) && numbers(value.agents, ["main", "subagent", "advisor"])
+				&& Array.isArray(value.providers) && value.providers.every(provider)
+				&& Array.isArray(value.series) && value.series.every(bucket =>
+					isObject(bucket) && numbers(bucket, ["start", "tokens", "cost", "requests"])
+					&& Array.isArray(bucket.providers) && bucket.providers.every(provider))
+				&& Array.isArray(value.models) && value.models.every(model =>
+					isObject(model) && typeof model.selector === "string" && usage(model)
+					&& (model.tokensPerSecond === null || typeof model.tokensPerSecond === "number"))
+				&& Array.isArray(value.workspaces) && value.workspaces.every(workspace =>
+					isObject(workspace) && typeof workspace.cwd === "string" && usage(workspace))
+				&& Array.isArray(value.tools) && value.tools.every(tool =>
+					isObject(tool) && typeof tool.name === "string" && numbers(tool, ["calls", "errors", "tokenShare"]))
+				&& Array.isArray(value.sessions) && value.sessions.every(session =>
+					isObject(session) && typeof session.sessionId === "string" && typeof session.cwd === "string"
+					&& (session.title === null || typeof session.title === "string") && typeof session.listed === "boolean"
+					&& usage(session.usage) && numbers(session, ["subagentTokens", "lastAt"])
+					&& Array.isArray(session.models) && session.models.every(model => typeof model === "string"));
+		},
 	},
 });
 
 /** Where omp stands with each MCP integration, which the sidebar's tabs, the tickets page, and the integrations page share. */
 export const integrationsStore = createPolledStore<IntegrationsAnswer>({
-	cacheKey: "omp-agents.integrations-cache",
 	url: (_scope, fresh) => (fresh ? "/api/integrations?fresh" : "/api/integrations"),
-	isValid: (value): value is IntegrationsAnswer => {
-		const integrations = isObject(value) ? value.integrations : null;
-		return isObject(integrations) && MCP_INTEGRATIONS.every(id => isObject(integrations[id]));
+	cache: {
+		key: "omp-agents.integrations-cache",
+		isValid: (value): value is IntegrationsAnswer => {
+			const integrations = isObject(value) ? value.integrations : null;
+			return isObject(integrations) && MCP_INTEGRATIONS.every(id => isObject(integrations[id]));
+		},
 	},
 });
 
@@ -178,23 +186,27 @@ export const providersStore = createPolledStore<ProvidersAnswer>({ url: () => "/
 
 /** The calendars checked in your Google Calendar's list, which the Calendar page reads unless you unchecked one in its sidebar. */
 export const googleStore = createPolledStore<GoogleStatus>({
-	cacheKey: "omp-agents.google-cache",
 	url: (_, fresh) => `/api/google${fresh ? "?fresh" : ""}`,
-	// A read an older version kept has no `shown` or `writable`, which would show every calendar unchecked, or none to add events to, until the first poll.
-	isValid: (value): value is GoogleStatus => {
-		const calendars = isObject(value) ? value.calendars : null;
-		return Array.isArray(calendars) && calendars.every(calendar => isObject(calendar) && typeof calendar.shown === "boolean" && typeof calendar.writable === "boolean");
+	cache: {
+		key: "omp-agents.google-cache",
+		// A read an older version kept has no `shown` or `writable`, which would show every calendar unchecked, or none to add events to, until the first poll.
+		isValid: (value): value is GoogleStatus => {
+			const calendars = isObject(value) ? value.calendars : null;
+			return Array.isArray(calendars) && calendars.every(calendar => isObject(calendar) && typeof calendar.shown === "boolean" && typeof calendar.writable === "boolean");
+		},
 	},
 });
 
 /** Your Google events over a span, by its `from` and `to` query, which the Calendar page reads a month at a time. */
 export const calendarEventsStore = createPolledStore<CalendarEventsAnswer>({
-	cacheKey: "omp-agents.calendar-events-cache",
 	url: (span, fresh) => `/api/calendar/events?${span}${fresh ? "&fresh" : ""}`,
-	// Events cached before they carried `calendarId` would share one id until the first read replaces them.
-	isValid: (value): value is CalendarEventsAnswer => {
-		const events = (value as Partial<CalendarEventsAnswer> | null)?.events;
-		return Array.isArray(events) && events.every(event => typeof event?.calendarId === "string");
+	cache: {
+		key: "omp-agents.calendar-events-cache",
+		// Events cached before they carried `calendarId` would share one id until the first read replaces them.
+		isValid: (value): value is CalendarEventsAnswer => {
+			const events = (value as Partial<CalendarEventsAnswer> | null)?.events;
+			return Array.isArray(events) && events.every(event => typeof event?.calendarId === "string");
+		},
 	},
 });
 
@@ -211,9 +223,11 @@ export function useGoogleCalendars(): { connected: boolean; calendars: GoogleCal
 
 /** Your Gmail inbox's latest conversations, which the Inbox page and its sidebar tab share. */
 export const gmailStore = createPolledStore<InboxAnswer>({
-	cacheKey: "omp-agents.gmail-cache",
 	url: (_, fresh) => `/api/gmail/inbox${fresh ? "?fresh" : ""}`,
-	isValid: (value): value is InboxAnswer => isObject(value) && typeof value.address === "string" && Array.isArray(value.threads),
+	cache: {
+		key: "omp-agents.gmail-cache",
+		isValid: (value): value is InboxAnswer => isObject(value) && typeof value.address === "string" && Array.isArray(value.threads),
+	},
 });
 
 /** Gmail's integration, `null` before the first read, and your inbox with its unread conversations, read every minute while the dashboard can call Gmail. */
@@ -250,9 +264,11 @@ export function useMailThread(id: string, arrived: number | null): MailThreadRea
 
 /** Every event kept on this computer, which the Calendar page reads with or without Google Calendar. */
 export const localEventsStore = createPolledStore<LocalEventsAnswer>({
-	cacheKey: "omp-agents.local-events-cache",
 	url: () => "/api/calendar/local",
-	isValid: (value): value is LocalEventsAnswer => Array.isArray((value as Partial<LocalEventsAnswer> | null)?.events),
+	cache: {
+		key: "omp-agents.local-events-cache",
+		isValid: (value): value is LocalEventsAnswer => Array.isArray((value as Partial<LocalEventsAnswer> | null)?.events),
+	},
 });
 
 /** The {@link calendarEventsStore} scope of the month of `year` and `month` (0 for January), from its first local midnight to the next month's. */

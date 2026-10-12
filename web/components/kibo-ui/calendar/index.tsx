@@ -47,11 +47,11 @@ const CalendarContext = createContext<CalendarContextProps>({
   locale: "en-US",
 });
 
-type ComboboxProps = {
-  value: string;
-  setValue: (value: string) => void;
+type ComboboxProps<T extends number> = {
+  value: T;
+  setValue: (value: T) => void;
   data: {
-    value: string;
+    value: T;
     label: string;
   }[];
   labels: {
@@ -91,13 +91,13 @@ export const daysForLocale = (
   return weekdays;
 };
 
-const Combobox = ({
+const Combobox = <T extends number,>({
   value,
   setValue,
   data,
   labels,
   className,
-}: ComboboxProps) => {
+}: ComboboxProps<T>) => {
   const [open, setOpen] = useState(false);
 
   return (
@@ -109,15 +109,13 @@ const Combobox = ({
           trailingIcon={ChevronDown}
           variant="ghost"
         >
-          {value
-            ? data.find((item) => item.value === value)?.label
-            : labels.button}
+          {data.find((item) => item.value === value)?.label}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-40 p-0">
         <Command
           filter={(value, search) => {
-            const label = data.find((item) => item.value === value)?.label;
+            const label = data.find((item) => item.value.toString() === value)?.label;
 
             return label?.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
           }}
@@ -130,11 +128,11 @@ const Combobox = ({
                 <CommandItem
                   className="capitalize"
                   key={item.value}
-                  onSelect={(currentValue) => {
-                    setValue(currentValue === value ? "" : currentValue);
+                  onSelect={() => {
+                    setValue(item.value);
                     setOpen(false);
                   }}
-                  value={item.value}
+                  value={item.value.toString()}
                 >
                   <Check
                     className={cn(
@@ -175,11 +173,12 @@ export const CalendarMonthPicker = ({
   const [month, setMonth] = useCalendarMonth();
   const { locale } = useContext(CalendarContext);
 
-  // Memoize month data to avoid recalculating date formatting
   const monthData = useMemo(() => {
-    return monthsForLocale(locale).map((month, index) => ({
-      value: index.toString(),
-      label: month,
+    const months: CalendarState["month"][] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    const labels = monthsForLocale(locale);
+    return months.map(month => ({
+      value: month,
+      label: labels[month],
     }));
   }, [locale]);
 
@@ -192,10 +191,8 @@ export const CalendarMonthPicker = ({
         empty: "No month found",
         search: "Search month",
       }}
-      setValue={(value) =>
-        setMonth(Number.parseInt(value, 10) as CalendarState["month"])
-      }
-      value={month.toString()}
+      setValue={setMonth}
+      value={month}
     />
   );
 };
@@ -217,7 +214,7 @@ export const CalendarYearPicker = ({
     <Combobox
       className={className}
       data={Array.from({ length: end - start + 1 }, (_, i) => ({
-        value: (start + i).toString(),
+        value: start + i,
         label: (start + i).toString(),
       }))}
       labels={{
@@ -225,8 +222,8 @@ export const CalendarYearPicker = ({
         empty: "No year found",
         search: "Search year",
       }}
-      setValue={(value) => setYear(Number.parseInt(value, 10))}
-      value={year.toString()}
+      setValue={setYear}
+      value={year}
     />
   );
 };

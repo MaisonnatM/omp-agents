@@ -73,27 +73,25 @@ export function TodoRow({ section, entry, siblings, category, day, sessions, dis
 					onLeave={text => editing.leaveEdit(todo, text)}
 				/>
 			) : (
-				<Tooltip content="Open; double-click to rename">
-					<button
-						type="button"
-						data-todo-row
-						onClick={() => onOpen(todo.id)}
-						onDoubleClick={() => {
-							if (!disabled) editing.edit(todo.id);
-						}}
-						onKeyDown={event => {
-							if (event.key === "Escape") event.currentTarget.blur();
-						}}
-						className="flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					>
-						<span className={cn("truncate", closed ? "text-muted-foreground line-through" : "text-foreground")}>{todo.text}</span>
-						{children.length > 0 && (
-							<span className="shrink-0 text-xs tabular-nums text-muted-foreground" aria-label={`${childrenDone} of ${children.length} done`}>
-								{childrenDone}/{children.length}
-							</span>
-						)}
-					</button>
-				</Tooltip>
+				<button
+					type="button"
+					data-todo-row
+					onClick={() => onOpen(todo.id)}
+					onDoubleClick={() => {
+						if (!disabled) editing.edit(todo.id);
+					}}
+					onKeyDown={event => {
+						if (event.key === "Escape") event.currentTarget.blur();
+					}}
+					className="flex min-w-0 flex-1 items-center gap-2 self-stretch rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<span className={cn("truncate", closed ? "text-muted-foreground line-through" : "text-foreground")}>{todo.text}</span>
+					{children.length > 0 && (
+						<span className="shrink-0 text-xs tabular-nums text-muted-foreground" aria-label={`${childrenDone} of ${children.length} done`}>
+							{childrenDone}/{children.length}
+						</span>
+					)}
+				</button>
 			)}
 			{top && !closed && <TodoWorkPill state={workStateOf(top, sessions)} compact />}
 			{category && (
@@ -161,12 +159,10 @@ export function ArchivedRow({ todo, disabled, open, onOpen, onChange }: Archived
 	return (
 		<li data-todo-id={todo.id} className={cn("group/todo flex h-8 items-center gap-2 rounded-md px-2 text-sm hover:bg-accent/50", open && "bg-accent")}>
 			<Archive aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-			<Tooltip content="Open">
-				<button type="button" onClick={() => onOpen(todo.id)} className="min-w-0 flex-1 truncate text-left text-muted-foreground">
-					{todo.text}
-					{todo.children.length > 0 && <span className="ml-2 text-xs tabular-nums">{todo.children.length} under it</span>}
-				</button>
-			</Tooltip>
+			<button type="button" onClick={() => onOpen(todo.id)} className="min-w-0 flex-1 truncate text-left text-muted-foreground">
+				{todo.text}
+				{todo.children.length > 0 && <span className="ml-2 text-xs tabular-nums">{todo.children.length} under it</span>}
+			</button>
 			{todo.doneAt && <span className="shrink-0 text-xs text-muted-foreground">{DAY_FORMAT.format(new Date(todo.doneAt))}</span>}
 			{!disabled && (
 				<span className="flex shrink-0 gap-1 opacity-0 group-hover/todo:opacity-100 focus-within:opacity-100 [&_svg]:size-3.5">

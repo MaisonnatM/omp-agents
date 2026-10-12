@@ -124,7 +124,7 @@ interface PolledPageFrameProps<Data> {
 	poll: PolledEntry<Data>;
 	onRefresh: () => void;
 	actions?: ReactNode;
-	children: (data: Data) => ReactNode;
+	children: ReactNode;
 }
 
 /** A polled page's frame: its title and `meta` (with the time of the last read once there is one), its `actions`, a Refresh button, and its `children`. */
@@ -141,7 +141,7 @@ export function PolledPageFrame<Data>({ title, meta, poll, onRefresh, actions, c
 				</>
 			}
 		>
-			{children(read?.data ?? (null as unknown as Data))}
+			{children}
 		</PageFrame>
 	);
 }
@@ -150,16 +150,14 @@ export function PolledPageFrame<Data>({ title, meta, poll, onRefresh, actions, c
 export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, className, actions, children }: ListPageProps<Data>) {
 	return (
 		<PolledPageFrame title={title} meta={meta} poll={poll} onRefresh={onRefresh} actions={actions}>
-			{() => (
-				<TooltipProvider>
-					<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", className)}>
-						{notice}
-						<PolledContent noun={noun} loading={loading} poll={poll}>
-							{children}
-						</PolledContent>
-					</div>
-				</TooltipProvider>
-			)}
+			<TooltipProvider>
+				<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", className)}>
+					{notice}
+					<PolledContent noun={noun} loading={loading} poll={poll}>
+						{children}
+					</PolledContent>
+				</div>
+			</TooltipProvider>
 		</PolledPageFrame>
 	);
 }

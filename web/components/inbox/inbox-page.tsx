@@ -158,51 +158,49 @@ export function InboxPage({ target }: { target: string | null }) {
 				</Tooltip>
 			}
 		>
-			{() => (
-				<ListSplit
-					widthKey="omp-agents.inbox-list-width"
-					resizeLabel="Resize the conversation list"
-					detailLabel={target === COMPOSE ? "New mail" : "Open conversation"}
-					empty={{ icon: Mail, title: "No conversation open", hint: `Click one, or focus one with ${shortcutKeys("inboxNext")} and press Enter.` }}
-					list={
-						<div className="space-y-2 p-2">
-							<PolledContent noun="your inbox" loading="Asking Gmail for your inbox…" poll={inbox}>
-								{answer =>
-									answer.threads.length === 0 ? (
-										<p className="px-3 text-sm text-muted-foreground">Your inbox is empty.</p>
-									) : (
-										<ul aria-label="Conversations" className="space-y-0.5">
-											{answer.threads.map(thread => (
-												<ThreadRow key={thread.id} thread={thread} open={thread.id === target} />
-											))}
-										</ul>
-									)
-								}
-							</PolledContent>
-						</div>
-					}
-					detail={
-						target === null ? null : target === COMPOSE ? (
-							<ComposePage address={address} />
-						) : (
-							<ThreadDetail
-								key={target}
-								id={target}
-								listed={threads[at] ?? null}
-								position={at >= 0 ? { at, of: threads.length } : null}
-								onPrevious={previous ? () => open(previous) : undefined}
-								onNext={next ? () => open(next) : undefined}
-								address={address}
-								onTrashed={() => {
-									const after = next ?? previous;
-									if (after) open(after);
-									else location.hash = hashForInbox(null);
-								}}
-							/>
-						)
-					}
-				/>
-			)}
+			<ListSplit
+				widthKey="omp-agents.inbox-list-width"
+				resizeLabel="Resize the conversation list"
+				detailLabel={target === COMPOSE ? "New mail" : "Open conversation"}
+				empty={{ icon: Mail, title: "No conversation open", hint: `Click one, or focus one with ${shortcutKeys("inboxNext")} and press Enter.` }}
+				list={
+					<div className="space-y-2 p-2">
+						<PolledContent noun="your inbox" loading="Asking Gmail for your inbox…" poll={inbox}>
+							{answer =>
+								answer.threads.length === 0 ? (
+									<p className="px-3 text-sm text-muted-foreground">Your inbox is empty.</p>
+								) : (
+									<ul aria-label="Conversations" className="space-y-0.5">
+										{answer.threads.map(thread => (
+											<ThreadRow key={thread.id} thread={thread} open={thread.id === target} />
+										))}
+									</ul>
+								)
+							}
+						</PolledContent>
+					</div>
+				}
+				detail={
+					target === null ? null : target === COMPOSE ? (
+						<ComposePage address={address} />
+					) : (
+						<ThreadDetail
+							key={target}
+							id={target}
+							listed={threads[at] ?? null}
+							position={at >= 0 ? { at, of: threads.length } : null}
+							onPrevious={previous ? () => open(previous) : undefined}
+							onNext={next ? () => open(next) : undefined}
+							address={address}
+							onTrashed={() => {
+								const after = next ?? previous;
+								if (after) open(after);
+								else location.hash = hashForInbox(null);
+							}}
+						/>
+					)
+				}
+			/>
 		</PolledPageFrame>
 	);
 }

@@ -977,6 +977,7 @@ An action that fails shows its error, and its control becomes available again.
 - Click an entry to open its routine, its todo beside its list, or its ticket; a Google event opens in Google Calendar in a new tab.
   An event on this computer has no page of its own, so clicking it in a day cell lists its day.
 - The arrows move a month at a time, the month and year menus jump to any month, and **Today** goes back to the current month.
+  Choosing the selected month or year keeps it selected; neither menu clears the calendar's date.
 - **New event**, beside **Today**, or C outside a text field, adds an event on the day listed beside the month, or today when none is.
   Type its title, then either check **All day** and pick its first and last days, or pick its day and its start and end times.
   A timed event starts at the next whole hour on today and at 9:00 on another day, and lasts an hour; moving its start moves its end with it, and an end at or before the start shows an error and keeps **Create event** off.
