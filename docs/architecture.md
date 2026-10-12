@@ -495,10 +495,11 @@ Each server keeps its own copy in memory, as with the workspaces, so a routine's
 ## Notifications
 
 `src/server/notices.ts` owns the bell's notices: what the last checks found, the status of each update a page started, and which notices the user saw, read, or cleared, which it keeps in `notices.json` beside the access token.
-Each kind has its own check, and `src/server/loops.ts` runs three of them.
+Each kind has its own check, and `src/server/loops.ts` runs four of them.
 The update check (`UPDATE_KINDS`) runs at startup and every six hours, whether or not a page is connected, and again after each update that succeeds.
 The activity check (`ACTIVITY_KINDS`) runs every two minutes while a socket listens, and when a socket opens unless it ran since the last tick that found none.
 The provider check (`PROVIDER_KINDS`) runs after each `omp usage` run, at startup and every minute, whether or not a page is connected.
+The event check (`EVENT_KINDS`) runs on the minute tick, whether or not a page is connected.
 
 - `latestOmp` in `src/omp/release.ts` asks `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts` for the newest release on omp's `update.channel`, unless `startup.checkUpdate` is off.
   `installedOmp` reads the version from the installed package's `package.json` on each check, so the check is right after an update, before a restart.
@@ -517,11 +518,13 @@ The provider check (`PROVIDER_KINDS`) runs after each `omp usage` run, at startu
 - `readCreditRuns` in `src/omp/stats.ts` reads the last day's requests, in order, of each provider that had an error naming `402` then, aborted requests left out.
   `creditRuns` starts a run at a failure whose error names `402` and that `is402BillingCapBody` reads as a billing cap, counts each such failure after it, and ends it at the provider's next request that worked; another error neither starts nor ends a run.
   A provider with a run open is a notice.
+- The events come from `LocalEventsFile` and, once Google Calendar is signed in, `GoogleCalendarClient.events` over the next ten minutes (`EVENT_LEAD_MS`), each timed event a notice from that lead before its start until its end, dated at that lead.
+  Google's events and the local ones are separate scopes: a Google read that fails keeps Google's notices as they were, and the Calendar page shows why.
 
 A check that fails keeps what the last one found for its kind, and the marks for it, and logs each distinct error once.
 A repository GitHub did not answer for keeps its pull requests' notices the same way.
 A notice whose update runs or ran stays after a check stops finding it, so the page shows how the update ended.
-A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `pull-request:<owner>/<repo>#<number>:<move>`, `slack:<channel>:<ts>` of the newest message, `plan:<provider>/<account>:<limit id>`, or `credits:<provider>`.
+A notice's id names what it is about, so it is a new notice when that changes, even after the user cleared the last one: `omp:<latest>`, `model:<provider>/<from>><to>`, `pull-request:<owner>/<repo>#<number>:<move>`, `slack:<channel>:<ts>` of the newest message, `plan:<provider>/<account>:<limit id>`, `credits:<provider>`, or `event:local/<id>:<start>` and `event:google/<calendar id>/<event id>:<start>`, so a moved event is news again.
 A plan notice's id leaves out the reset time, which a provider may report a little differently on each run, and a credits notice's leaves out its first failure, which moves once that failure is older than the day the check reads; the window's reset or a request that works ends the notice, and the next time it comes after its marks lapse is news.
 A Slack notice dates from its message, and a credits notice from the first failure the check reads.
 A pull request notice dates from the check that found it, since the pull request's last update on GitHub may predate the move, except on its repository's first answer since startup, which dates each from that update, so a workspace found later or a repository GitHub answers again does not bring old pull requests as news.

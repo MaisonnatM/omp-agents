@@ -7,7 +7,7 @@ import type { PlanUsage, PlanWindow } from "../shared/models";
 import type { AgentState } from "../shared/moves";
 import type { CreditsSubject, ModelUpdate, Notice } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
-import { ACTIVITY_KINDS, Notices, type NoticeSources, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, EVENT_KINDS, type FoundEvent, Notices, type NoticeSources, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -64,6 +64,9 @@ interface State {
 	plans?: PlanUsage[];
 	usageError?: string;
 	creditRuns?: Omit<CreditsSubject, "kind">[];
+	localEvents?: FoundEvent[];
+	googleEvents?: FoundEvent[];
+	googleError?: string;
 	now?: number;
 }
 
@@ -97,6 +100,11 @@ function sources(state: State): NoticeSources {
 			return state.plans ?? [];
 		},
 		creditRuns: async () => state.creditRuns ?? [],
+		localEvents: () => state.localEvents ?? [],
+		googleEvents: async () => {
+			if (state.googleError) throw new Error(state.googleError);
+			return state.googleEvents ?? [];
+		},
 		now: () => state.now ?? 0,
 	};
 }
@@ -292,5 +300,38 @@ describe("Notices", () => {
 		state.creditRuns = [];
 		await notices.check(PROVIDER_KINDS);
 		expect(notices.list).toEqual([]);
+	});
+
+	test("an event is a notice from ten minutes before it starts until it ends, dated then, and Google failing keeps only Google's", async () => {
+		const event = (ref: string, start: number): FoundEvent => ({ ref, title: ref, start, end: start + 30 * MINUTE, calendar: null, color: null, url: null });
+		const state: State = { latest: null, installed: "18.8.0", models: [], localEvents: [event("local/a", 100 * MINUTE)], googleEvents: [event("google/work/b", 105 * MINUTE)] };
+		const notices = new Notices(noticesPath(), sources(state), () => {});
+		const ids = () => notices.list.map(({ id, at }) => [id, at]);
+
+		state.now = 89 * MINUTE;
+		await notices.check(EVENT_KINDS);
+		expect(ids()).toEqual([]);
+
+		state.now = 90 * MINUTE;
+		await notices.check(EVENT_KINDS);
+		expect(ids()).toEqual([[`event:local/a:${100 * MINUTE}`, 90 * MINUTE]]);
+
+		state.now = 96 * MINUTE;
+		await notices.check(EVENT_KINDS);
+		expect(ids()).toEqual([
+			[`event:google/work/b:${105 * MINUTE}`, 95 * MINUTE],
+			[`event:local/a:${100 * MINUTE}`, 90 * MINUTE],
+		]);
+
+		state.googleError = "offline";
+		state.localEvents = [];
+		state.now = 97 * MINUTE;
+		await notices.check(EVENT_KINDS);
+		expect(ids()).toEqual([[`event:google/work/b:${105 * MINUTE}`, 95 * MINUTE]]);
+
+		state.googleError = undefined;
+		state.now = 135 * MINUTE;
+		await notices.check(EVENT_KINDS);
+		expect(ids()).toEqual([]);
 	});
 });

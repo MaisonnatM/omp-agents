@@ -1,4 +1,4 @@
-import { Bell, CheckCheck, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, type LucideIcon, MessageSquare, Sparkles, Wallet, X } from "lucide-react";
+import { Bell, CalendarClock, CheckCheck, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, type LucideIcon, MessageSquare, Sparkles, Wallet, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type Person, pullRequestUrl } from "../../src/shared/github";
 import type { YourMove } from "../../src/shared/moves";
@@ -12,7 +12,7 @@ import { moveAction } from "../pull-requests-model";
 import { readPinnedSkill } from "../pinned-skill";
 import { pendingOf, pullRequestStart, QUICK_ACTIONS } from "../quick-actions";
 import { providerLabel, providerOrg } from "../labels";
-import { hashForPullRequests, hashForSettings } from "../routing";
+import { hashForCalendar, hashForPullRequests, hashForSettings } from "../routing";
 import { Age } from "./age";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { SLACK_LOGO } from "./integrations/brand-logos";
@@ -23,7 +23,7 @@ type Send = (msg: ClientMsg) => void;
 type UpdateNotice = Extract<Notice, { status: unknown }>;
 
 /** The bell's filters, each a source of notices. */
-type Source = "github" | "slack" | "providers" | "updates";
+type Source = "github" | "slack" | "providers" | "calendar" | "updates";
 
 function sourceOf(notice: Notice): Source {
 	switch (notice.kind) {
@@ -34,6 +34,8 @@ function sourceOf(notice: Notice): Source {
 		case "plan":
 		case "credits":
 			return "providers";
+		case "event":
+			return "calendar";
 		default:
 			return "updates";
 	}
@@ -44,12 +46,13 @@ const FILTERS: [Source | "all", string][] = [
 	["github", "GitHub"],
 	["slack", "Slack"],
 	["providers", "Providers"],
+	["calendar", "Calendar"],
 	["updates", "Updates"],
 ];
 
-/** A pull request, Slack, or provider toast shows only while its news is this fresh, so a check after a long gap does not toast what you missed. */
+/** A pull request, Slack, provider, or event toast shows only while its news is this fresh, so a check after a long gap does not toast what you missed. */
 const TOAST_FRESH_MS = 15 * 60_000;
-/** How long a pull request, Slack, or provider toast stays; an update's stays until dismissed. */
+/** How long a pull request, Slack, or provider toast stays; an update's or an event's stays until dismissed. */
 const TOAST_MS = 6_000;
 
 const SAME_DAY = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
@@ -98,6 +101,8 @@ function headlineOf(notice: Notice): string {
 			return `${notice.name} ${notice.windowTitle} is used up`;
 		case "credits":
 			return `${providerLabel(notice.provider)} is out of credits`;
+		case "event":
+			return `${notice.title} ${notice.start > Date.now() ? "starts" : "started"} at ${SAME_DAY.format(notice.start)}`;
 		default:
 			return updateTitle(notice);
 	}
@@ -116,6 +121,8 @@ function previewOf(notice: Notice): string {
 		}
 		case "credits":
 			return `${notice.failures === 1 ? "A request" : `${notice.failures} requests`} to ${notice.model} failed since ${timeLabel(notice.since)}: ${notice.error}`;
+		case "event":
+			return `${SAME_DAY.format(notice.start)} – ${SAME_DAY.format(notice.end)} · ${notice.calendar ?? "This computer"}`;
 		default:
 			return updateDetail(notice);
 	}
@@ -130,16 +137,21 @@ function hrefOf(notice: Notice): string | null {
 		case "plan":
 		case "credits":
 			return hashForSettings("providers");
+		case "event":
+			return notice.url ?? hashForCalendar();
 		default:
 			return null;
 	}
 }
 
-/** Opens what a notice is about: a Slack message in Slack, anything else in the dashboard. */
+/** Whether a notice opens outside the dashboard, in a new tab: a Slack message in Slack, a Google event in Google Calendar. */
+const opensElsewhere = (notice: Notice): boolean => notice.kind === "slack" || (notice.kind === "event" && notice.url !== null);
+
+/** Opens what a notice is about: in a new tab when {@link opensElsewhere}, else in the dashboard. */
 function follow(notice: Notice): void {
 	const href = hrefOf(notice);
 	if (href === null) return;
-	if (notice.kind === "slack") window.open(href, "_blank", "noopener,noreferrer");
+	if (opensElsewhere(notice)) window.open(href, "_blank", "noopener,noreferrer");
 	else location.hash = href;
 }
 
@@ -149,7 +161,8 @@ const updatable = (notice: UpdateNotice): boolean => notice.status.state === "av
 /**
  * Shows each notice the user has not seen as a toast; closing it marks the notice seen, so it toasts once across reloads
  * and pages. An update's toast stays until dismissed and keeps its text and **Update** in step with the notice. Any
- * other notice's toast shows only while its news is fresh, closes itself, and opens what it is about.
+ * other notice's toast shows only while its news is fresh and opens what it is about; an event's stays until dismissed
+ * or the event ends, and any other closes itself.
  */
 export function useNoticeToasts(notices: Notice[], connected: boolean, send: Send): void {
 	const open = useRef(new Set<string>());
@@ -174,7 +187,7 @@ export function useNoticeToasts(notices: Notice[], connected: boolean, send: Sen
 				open.current.add(id);
 				toasts.add({
 					id,
-					timeout: TOAST_MS,
+					timeout: notice.kind === "event" ? 0 : TOAST_MS,
 					onClose,
 					title: headlineOf(notice),
 					description: <span className="line-clamp-2">{previewOf(notice)}</span>,
@@ -231,6 +244,13 @@ function Face({ notice }: { notice: Notice }) {
 		return (
 			<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-violet-500/10">
 				<Sparkles aria-hidden className="m-auto size-4 text-violet-600 dark:text-violet-400" />
+			</span>
+		);
+	}
+	if (notice.kind === "event") {
+		return (
+			<span className="relative mt-0.5 flex size-8 shrink-0 rounded-lg bg-muted">
+				<CalendarClock aria-hidden className="m-auto size-4" style={{ color: notice.color ?? undefined }} />
 			</span>
 		);
 	}
@@ -291,7 +311,7 @@ function Face({ notice }: { notice: Notice }) {
 function NoticeAction({ notice, send, onDone }: { notice: Notice; send: Send; onDone: () => void }) {
 	const { start } = useDashboardActions();
 	const { connected, starts } = useDashboardStatus();
-	if (notice.kind === "slack" || notice.kind === "plan" || notice.kind === "credits") return null;
+	if (notice.kind === "slack" || notice.kind === "plan" || notice.kind === "credits" || notice.kind === "event") return null;
 	if (notice.kind === "omp" || notice.kind === "model") {
 		if (notice.status.state === "updated") return null;
 		return (
@@ -354,8 +374,8 @@ function NoticeRow({ notice, send, onDone }: { notice: Notice; send: Send; onDon
 			{href ? (
 				<a
 					href={href}
-					target={notice.kind === "slack" ? "_blank" : undefined}
-					rel={notice.kind === "slack" ? "noreferrer" : undefined}
+					target={opensElsewhere(notice) ? "_blank" : undefined}
+					rel={opensElsewhere(notice) ? "noreferrer" : undefined}
 					aria-label={label}
 					className="absolute inset-0 rounded-lg focus-visible:outline-none"
 					onClick={() => {
@@ -480,7 +500,7 @@ export function NoticesBell({ notices }: { notices: Notice[] }) {
 								<Bell aria-hidden className="size-4 text-muted-foreground" />
 							</span>
 							<p className="text-sm font-medium">You're all caught up</p>
-							<p className="text-xs text-muted-foreground">Pull requests that wait on you, Slack messages for you, providers that stop serving, and updates land here.</p>
+							<p className="text-xs text-muted-foreground">Pull requests that wait on you, Slack messages for you, providers that stop serving, events about to start, and updates land here.</p>
 						</div>
 					) : (
 						<>

@@ -1,6 +1,7 @@
 /**
  * What the bell lists: a newer omp or routed model, a pull request whose next move is yours, a Slack message that
- * waits on you, and a provider that stopped serving: a used-up plan window or prepaid credits that ran out.
+ * waits on you, a provider that stopped serving: a used-up plan window or prepaid credits that ran out, and a calendar
+ * event that starts soon.
  */
 import type { PullRequestSummary } from "./github";
 import type { YourMove } from "./moves";
@@ -78,7 +79,25 @@ export interface CreditsSubject {
 
 export type ProviderSubject = PlanSubject | CreditsSubject;
 
-export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject;
+/**
+ * A timed event of the Calendar page that starts within {@link EVENT_LEAD_MS} or runs now, from `start` to `end` in epoch
+ * ms. `calendar`, `color`, and `url` are its Google calendar's name and color and the event in Google Calendar, each
+ * `null` for an event kept on this computer.
+ */
+export interface EventSubject {
+	kind: "event";
+	title: string;
+	start: number;
+	end: number;
+	calendar: string | null;
+	color: string | null;
+	url: string | null;
+}
+
+/** How long before an event starts its notice comes. */
+export const EVENT_LEAD_MS = 10 * 60_000;
+
+export type NoticeSubject = UpdateSubject | PullRequestSubject | SlackSubject | ProviderSubject | EventSubject;
 
 export type NoticeKind = NoticeSubject["kind"];
 
@@ -93,6 +112,7 @@ export type Notice = { id: string; at: number; seen: boolean; read: boolean } & 
 	| PullRequestSubject
 	| SlackSubject
 	| ProviderSubject
+	| EventSubject
 );
 
 /** `update` installs the release or rewrites the routing; `seen` stops its toast; `read` takes it out of the unread count; `clear` hides it until its state changes. */
