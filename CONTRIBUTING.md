@@ -24,6 +24,6 @@ The server does not reload on change; restart `bun start` after editing `src/` o
 ## Pull requests
 
 [CODING_STANDARDS.md](CODING_STANDARDS.md) lists what a pull request needs: the checks to run, the tests and docs to update, and the code conventions.
-[docs/architecture.md](docs/architecture.md#code-layout) says where each part of the code lives.
+[docs/code-layout.md](docs/code-layout.md) says where each part of the code lives.
 
 By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).
