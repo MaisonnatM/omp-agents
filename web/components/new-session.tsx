@@ -155,7 +155,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 					: "It starts when you send the first message, so leaving this draft leaves nothing running."}
 				{todo && ` Your todo “${todo.text}” links to the session once it starts.`}
 			</EmptyConversation>
-			<div className="relative mx-auto w-full max-w-3xl px-3 pb-5">
+			<div className="relative mx-auto w-full max-w-3xl px-3 pb-8">
 				{completion.popup}
 				<ComposerEditor value={editorRef}>
 					<InputMessage
