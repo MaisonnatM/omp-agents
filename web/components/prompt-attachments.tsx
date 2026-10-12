@@ -1,3 +1,4 @@
+/** The composer's attach button and the hook that reads attached files into a prompt's images and text. */
 import { Paperclip } from "lucide-react";
 import { useRef, useState } from "react";
 import { MAX_PROMPT_DOCUMENT_BYTES, MAX_PROMPT_FILE_CHARS, plainText, type PromptDocument, type PromptFile, withFiles } from "../../src/shared/prompt-files";

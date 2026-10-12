@@ -1,3 +1,4 @@
+/** The React contexts that hand the dashboard's stable actions and changing status to the sidebar, panes, and pages. */
 import { createContext, useContext } from "react";
 import type { MentionLists } from "../mentions";
 import type { StartOf } from "../starts";

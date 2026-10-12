@@ -1,3 +1,4 @@
+/** What a pane talks to, a session or one of its subagents, as the facts the header and composer need. */
 import type { AgentRow, ControlPhase, LiveView, MessageQueue, RosterHost, UserRequest } from "../../src/shared/sessions";
 import type { ShellReach } from "./composer";
 

@@ -1,3 +1,4 @@
+/** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Timeline, and Code tabs. */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import type { RosterHost, View } from "../../../../src/shared/sessions";

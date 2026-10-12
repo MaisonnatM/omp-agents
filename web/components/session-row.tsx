@@ -1,3 +1,4 @@
+/** `HostRow` and `PastRow`, a running or past session's row in the sidebar, with its status, age, and actions menu. */
 import { Ellipsis, Loader } from "lucide-react";
 import { Fragment, memo, type ReactElement, type ReactNode, useState } from "react";
 import type { PullRequest } from "../../src/shared/github";

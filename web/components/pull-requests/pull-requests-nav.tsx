@@ -1,3 +1,4 @@
+/** The sidebar's Pull requests tab: the workspace's pull requests by repository and whose move it is. */
 import { RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import { repoKey } from "../../../src/shared/github";

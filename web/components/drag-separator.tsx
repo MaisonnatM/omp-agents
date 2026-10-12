@@ -1,3 +1,4 @@
+/** `Separator` and `useDragSeparator`: a resize line moved by pointer drag, arrow keys, or double-click to reset. */
 import { type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode, useRef } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";

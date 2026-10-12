@@ -1,3 +1,4 @@
+/** `FileTree`: the changes explorer's folder tree of changed files, each with its status letter. */
 import { ChevronDown, ChevronRight, FileText, Folder } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { ChangedEntry } from "../../../src/shared/changes";

@@ -2,6 +2,34 @@
 
 The full reference for the dashboard's interface.
 For installation, see the [README](../README.md); for a first session and each integration's setup, see [Getting started](getting-started.md).
+For which file draws each part of the screen, see the [Interface map](code-layout.md#interface-map).
+
+- [Sessions sidebar](#sessions-sidebar)
+- [Terminal](#terminal)
+- [Session details sidebar](#session-details-sidebar)
+- [Session changes](#session-changes)
+- [Panes, splits, and links](#panes-splits-and-links)
+- [Conversations](#conversations)
+- [Composer](#composer)
+- [Send later](#send-later)
+- [Questions](#questions)
+- [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
+- [Pull requests](#pull-requests)
+- [Linear tickets](#linear-tickets)
+- [Providers](#providers)
+- [Integrations](#integrations)
+- [MCP servers](#mcp-servers)
+- [Todo list](#todo-list)
+  - [Todos from agents](#todos-from-agents)
+- [Calendar](#calendar)
+- [Inbox](#inbox)
+- [Routines](#routines)
+- [Projects](#projects)
+- [Settings](#settings)
+- [Notifications](#notifications)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [Desktop app](#desktop-app)
+- [Limitations](#limitations)
 
 A filled button marks the main action of its surface: Send, Finish, Resume on a past session, Run now on a routine, and **Work on it** on an open todo.
 Suggested prompts, other quick actions, forking, and menu items stay quiet, so they never compete with it.
@@ -9,25 +37,6 @@ Actions that wait for the server show a spinner or a progress label and block re
 Starting a session, stopping a turn, switching model settings, resending a prompt, canceling a subagent, and running a routine use this state.
 Refresh controls and workspace saves do too.
 An action that fails shows its error, and its control becomes available again.
-
-- [Sessions sidebar](#sessions-sidebar)
-- [Session details sidebar](#session-details-sidebar)
-- [Panes, splits, and links](#panes-splits-and-links)
-- [Conversations](#conversations)
-- [Composer](#composer)
-- [Questions](#questions)
-- [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
-- [Pull requests](#pull-requests)
-- [Integrations](#integrations)
-- [MCP servers](#mcp-servers)
-- [Todo list](#todo-list)
-- [Calendar](#calendar)
-- [Routines](#routines)
-- [Settings](#settings)
-- [Notifications](#notifications)
-- [Keyboard shortcuts](#keyboard-shortcuts)
-- [Desktop app](#desktop-app)
-- [Limitations](#limitations)
 
 ## Sessions sidebar
 

@@ -1,3 +1,4 @@
+/** A pull request's editable fields in its details: state, reviewers, and labels, saved to GitHub. */
 import { Tag, UserPlus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { type PullRequestChange, type PullRequestDetail, type PullRequestLabel, type PullRequestOptions, type Reviewer, SETTABLE_STATES } from "../../../src/shared/github";

@@ -5,7 +5,7 @@ Every check starts with [Server lifecycle and authentication](#server-lifecycle-
 ## Server lifecycle and authentication
 
 `bun start` serves `http://127.0.0.1:4317`, where the user's own dashboard usually runs.
-Other agent sessions run smoke servers at the same time, so pick a smoke port between 4400 and 4899 for the whole session.
+Other agent sessions run smoke servers at the same time, so pick a random smoke port between 20000 and 39999 for the whole session, and check it is free with `lsof -nP -iTCP:<port> -sTCP:LISTEN`, which prints nothing for a free port.
 Start the server with `bash` as a named service: `command: "PORT=<port> bun src/server.ts"`, `name: "<unique-name>"`, and `ready: {log: "Sign in at"}`.
 Service calls omit `async` and `timeout`; a readiness deadline belongs in `ready.timeout`.
 Finite checks use `async: true` when needed, without `name` or `ready`.
@@ -57,7 +57,7 @@ Besides a live session's own hash, the routes are:
 The desktop shell opens a real window on the user's screen.
 After `bun run build` in `desktop/`, start a named service on your smoke port with `PORT=<port> bun launch.ts --remote-debugging-port=<page port> --inspect=<main port>`.
 Wait for its `Sign in at` line when it starts its own server.
-Pick both debugging ports between 9400 and 9899.
+Pick both debugging ports the same way as the smoke port, each free.
 Drive the window through the Chrome DevTools Protocol: `osascript` keys go to the user's frontmost app, not the target window.
 
 - Page: `http://127.0.0.1:<page port>/json` lists it; `Runtime.evaluate` runs JS and `Page.captureScreenshot` captures it.

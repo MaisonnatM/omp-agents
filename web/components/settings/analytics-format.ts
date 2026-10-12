@@ -1,3 +1,5 @@
+/** Number and dollar formatters for the Settings analytics tab and its provider trends. */
+
 export const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 export const full = new Intl.NumberFormat("en-US");
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });

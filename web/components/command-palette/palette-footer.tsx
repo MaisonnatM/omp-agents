@@ -1,3 +1,4 @@
+/** The command palette's bottom bar, with its key chips (`Kbd`) and footer buttons. */
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "@/lib/utils";

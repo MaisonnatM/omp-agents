@@ -1,3 +1,4 @@
+/** The sidebar's Calendar tab: the calendar, the Google calendars it can show, and every routine (`CalendarNav`). */
 import { Check } from "lucide-react";
 import { useState } from "react";
 import type { Routine } from "../../../src/routines";

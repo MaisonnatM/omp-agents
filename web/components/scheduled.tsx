@@ -1,3 +1,4 @@
+/** Scheduled sends: the sidebar group listing them, their edit menu, and the context that holds and adds them. */
 import { AlarmClock, Ellipsis, Pencil, Send, X } from "lucide-react";
 import { createContext, useContext, useState } from "react";
 import { promptLabel } from "../../src/shared/prompt-files";

@@ -1,3 +1,4 @@
+/** A pull request's Summary tab: status, description, stack, reviewers, labels, and linked sessions. */
 import { Bot, Check, CircleDashed, CircleDot, CircleX, type LucideIcon, MessageSquare, Tag, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import type { LinkedPullRequest, PullRequest, PullRequestDetail, Reviewer, ReviewerState, StackedPullRequest } from "../../../../src/shared/github";

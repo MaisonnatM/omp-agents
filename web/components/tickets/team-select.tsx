@@ -1,3 +1,4 @@
+/** `TeamSelect`: the Linear team picker for a new issue, remembering the last team used. */
 import type { TicketChoice } from "../../../src/shared/tickets";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 

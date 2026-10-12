@@ -1,3 +1,4 @@
+/** `TodoInput`: the input a todo's title or a new todo is typed into, and the keys it acts on. */
 import { type KeyboardEvent, useRef, useState } from "react";
 
 /** The keys a todo's input acts on, beyond typing. */

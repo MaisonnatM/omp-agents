@@ -1,3 +1,4 @@
+/** `TicketFields`: a Linear issue's status, priority, assignee, due date, labels, and project pickers. */
 import { Box, CircleUser, Tag } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Ticket, TicketDetail, TicketFieldValues, TicketOptions, TicketPriority } from "../../../src/shared/tickets";

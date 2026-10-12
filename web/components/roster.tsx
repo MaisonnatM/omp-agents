@@ -1,3 +1,4 @@
+/** The left sidebar's tabbed roster: sessions, pull requests, tickets, todos, and more, under the workspace picker. */
 import { Folder, Keyboard, Search } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { RosterHost, View } from "../../src/shared/sessions";

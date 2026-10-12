@@ -1,3 +1,4 @@
+/** `SessionChip`, a small chip naming a session on a pull request or issue that opens it on click. */
 import { Bot } from "lucide-react";
 import type { MouseEvent } from "react";
 import type { HostStatus, RosterHost, View } from "../../src/shared/sessions";

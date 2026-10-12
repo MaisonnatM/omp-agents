@@ -9,7 +9,7 @@ Then read the section for the work: [omp imports](#omp-imports), [omp internals]
 - Add or update tests for behavior you change.
 - Run `bun test` and `bun run typecheck` and fix what they report.
   After you change `desktop/`, run `bun install --cwd desktop --frozen-lockfile` once and `bun run --cwd desktop typecheck`.
-- Update `docs/usage.md` when the interface changes, and `docs/architecture.md` when the server, a protocol, or the code layout changes.
+- Update `docs/usage.md` when the interface changes, `docs/architecture.md` when the server or a protocol changes, and `docs/code-layout.md` when you add, move, or remove a file, or change what one does, including its [Interface map](docs/code-layout.md#interface-map) entry.
   The README holds only features, installation, and configuration.
 - Bump the Bun and omp versions in `.github/workflows/checks.yml` together with the README's tested versions.
 
@@ -39,5 +39,5 @@ Tools that read a doc cut a line at 768 characters, and an edit that copies the 
 
 ## Template sync
 
-After you edit an installed file under `~/.omp/agent/` that `templates/omp/` also holds, copy it into the matching file there; [Code layout](docs/architecture.md#code-layout) says which of `agent/` and `maintainer/` holds it.
+After you edit an installed file under `~/.omp/agent/` that `templates/omp/` also holds, copy it into the matching file there; [Starter kit and docs](docs/code-layout.md#starter-kit-and-docs) says which of `agent/` and `maintainer/` holds it.
 `bun run omp-template --dry-run` lists a copy that has drifted as `keep yours`.

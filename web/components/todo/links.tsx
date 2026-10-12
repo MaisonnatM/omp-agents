@@ -1,3 +1,4 @@
+/** Chips for what a todo points to: links into the dashboard, its work state, and the session that added it. */
 import { Bot, X } from "lucide-react";
 import { hashForSession, type PastSession, type RosterHost } from "../../../src/shared/sessions";
 import type { UserTodoLink } from "../../../src/user-todos-shared";

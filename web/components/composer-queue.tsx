@@ -1,3 +1,4 @@
+/** The messages queued above the composer while a turn runs, steering and follow-up, which ↑ takes back to edit. */
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useEffect, useRef } from "react";
 import { promptLabel } from "../../src/shared/prompt-files";

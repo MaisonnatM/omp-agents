@@ -1,3 +1,4 @@
+/** `GoogleClientForm`: the steps to a Google OAuth client and the fields for its ID, secret, and redirect port. */
 import { CircleAlert } from "lucide-react";
 import { type FormEvent, useId, useRef, useState } from "react";
 import { GOOGLE_CLIENT_ID, type GoogleClientInput, type GoogleService, type GoogleSetup, googleRedirectUri, MCP_SERVICES, type McpIntegration } from "../../../src/shared/accounts";

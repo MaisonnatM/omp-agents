@@ -1,3 +1,4 @@
+/** The Inbox's open conversation: its action bar, subject, messages folded as Gmail folds them, and the reply. */
 import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw, Reply, ReplyAll, Trash2 } from "lucide-react";
 import { useMemo, useReducer, useState } from "react";
 import type { MailAttachment, MailMessage, MailPerson, MailReply, MailThread } from "../../../src/shared/gmail";

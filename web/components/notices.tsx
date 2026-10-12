@@ -1,3 +1,4 @@
+/** The sidebar's notices bell: pull request, Slack, provider, calendar, and update notices in a popover, filtered by source, with their toasts and actions. */
 import { Bell, CalendarClock, CheckCheck, CircleX, Eye, Gauge, GitCompareArrows, GitMerge, type LucideIcon, MessageSquare, Sparkles, Wallet, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type Person, pullRequestUrl } from "../../src/shared/github";

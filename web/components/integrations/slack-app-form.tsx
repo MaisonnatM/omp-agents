@@ -1,3 +1,4 @@
+/** `SlackAppForm`: the steps to a Slack app and the fields for its client ID, secret, and user scopes. */
 import { CircleAlert } from "lucide-react";
 import { type FormEvent, type RefObject, useId, useRef, useState } from "react";
 import { normalizeSlackScope, SLACK_USER_SCOPES, type SlackClientInput, type SlackSetup, slackRedirectError, type McpIntegration } from "../../../src/shared/accounts";

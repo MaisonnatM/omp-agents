@@ -1,3 +1,4 @@
+/** `PullRequestDetailPage`: one pull request in the main area, with the quick actions that start a session on it. */
 import { ArrowLeft } from "lucide-react";
 import { type PullRequestActionId, pullRequestActions } from "../../../src/pull-request-actions";
 import { type PullRequestList, type PullRequestSummary, type LinkedPullRequest, type PullRequest, repoKey } from "../../../src/shared/github";

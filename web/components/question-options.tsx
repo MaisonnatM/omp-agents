@@ -1,3 +1,4 @@
+/** `QuestionOptions`, the pickable rows of a question card, with keyboard moves and a sliding hover highlight. */
 import { AnimatePresence, motion } from "framer-motion";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";

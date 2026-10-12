@@ -207,7 +207,7 @@ flowchart LR
 The server imports these protocols from your installed omp instead of reimplementing them.
 Joining a terminal session makes it count `omp-agents` as one more participant and send its transcript snapshot and live events through its Collab relay (`collab.relayUrl`); see [why](docs/architecture.md#why-the-server-joins-every-terminal-session).
 
-See [docs/architecture.md](docs/architecture.md) for the design, the HTTP API, and the code layout.
+See [docs/architecture.md](docs/architecture.md) for the design and the HTTP API, and [docs/code-layout.md](docs/code-layout.md) for where each file lives.
 
 ## Security
 

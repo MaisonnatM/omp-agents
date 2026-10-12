@@ -1,3 +1,4 @@
+/** How much of each provider plan's usage windows is left, shown in the status bar and the model menu. */
 import { createContext } from "react";
 import type { PlanUsage, PlanWindow, ResetCredits } from "../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";

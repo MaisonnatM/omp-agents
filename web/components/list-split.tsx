@@ -1,3 +1,4 @@
+/** `ListSplit`, a page's list on the left and its open item on the right with a draggable divider, plus the item's top bar. */
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useLayoutEffect, useRef } from "react";
