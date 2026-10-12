@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { callable, signedIn } from "../src/shared/accounts";
+import { callable } from "../src/shared/accounts";
 import type { View } from "../src/shared/sessions";
 import { SidebarInset, SidebarProvider, type SidebarSide } from "@/components/ui/sidebar";
 import { errorText } from "./api";
@@ -27,9 +27,10 @@ import { TerminalPanel, useTerminalPanel } from "./components/terminal/terminal-
 import { ActivityVisibility, ToolsExpanded } from "./components/transcript";
 import { toasts } from "./components/toaster";
 import { integrationsStore } from "./reads";
-import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "./routing";
+import { endSession, hashForLayout, hashForPage, hashForView, type OpenMode, type TodoListView } from "./routing";
 import type { SectionTarget } from "./section";
 import { defaultCwd, workspaceSession, workspaceSwitch } from "./sessions";
+import { useSidebarTabs } from "./sidebar-tabs";
 import { startOf } from "./starts";
 import { useDashboard } from "./use-dashboard";
 import { useFocusedSession } from "./use-focused-session";
@@ -64,14 +65,11 @@ export function App() {
 	const [sectionTarget, setSectionTarget] = useState<SectionTarget | null>(null);
 	const integrations = integrationsStore.usePolling().read?.data.integrations;
 	const linear = integrations?.linear ?? null;
-	const hidden = SIDEBAR_TABS.flatMap(row => ("integration" in row && !(integrations && signedIn(integrations[row.integration].connection)) ? [row.value] : []));
-	const hiddenKey = hidden.join();
-	/** The tabs that do not show, nor their shortcuts: the same set until one hides or shows, whatever the integrations' polls answer. */
-	const hiddenTabs = useMemo((): ReadonlySet<SidebarTab> => new Set(hidden), [hiddenKey]);
+	const { signedOut: signedOutTabs, shown: tabs } = useSidebarTabs();
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
 	const settings = useMemo(() => settingsRoute(page, focused.cwd), [page, focused.cwd]);
-	const { tab, showTab } = useSidebarTab({ page, hiddenTabs, layout, settings, navigate, show });
+	const { tab, showTab } = useSidebarTab({ page, signedOutTabs, layout, settings, navigate, show });
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
 	const detailsView = page || (layout.panes.length > 1 && !maximized) ? null : focused.view;
@@ -129,7 +127,8 @@ export function App() {
 		settings,
 		listed: sessions.listed,
 		view: focused.view,
-		hiddenTabs,
+		signedOutTabs,
+		tabs,
 		linearCallable,
 		hasDetails: detailsView !== null,
 		palette: overlays.palette,
@@ -186,7 +185,7 @@ export function App() {
 								panes={layout.panes}
 								tab={tab}
 								onTab={showTab}
-								hiddenTabs={hiddenTabs}
+								tabs={tabs}
 								listed={state.listed}
 								userTodos={state.userTodos}
 								hosts={state.hosts}
@@ -262,7 +261,7 @@ export function App() {
 								/>
 							</DashboardSidebar>
 						)}
-						<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} />
+						<ShortcutsDialog open={overlays.shortcutsOpen} onOpenChange={setShortcutsOpen} tabs={tabs} />
 						{overlays.filePath !== null && <FileDialog key={overlays.filePath} path={overlays.filePath} onClose={() => setFilePath(null)} />}
 						{overlays.newTicket !== null && <NewTicketDialog title={overlays.newTicket} onClose={() => setNewTicket(null)} />}
 						<CommandPalette
@@ -278,6 +277,7 @@ export function App() {
 							onTogglePin={sessions.togglePin}
 							handlers={handlers}
 							unavailable={unavailable}
+							tabs={tabs}
 							todoCategories={state.connected && state.userTodos ? state.userTodos.categories : null}
 							todos={mentionLists.todos}
 							linearConnected={linearCallable}

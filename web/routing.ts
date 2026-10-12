@@ -9,7 +9,8 @@ import { PAGE_ICON } from "./page-icons";
 
 /**
  * The sidebar's tabs, in order. A tab with an `integration` shows, and its shortcut applies, only while omp holds a
- * sign-in to that service, even one the service refuses, which the page then offers to reconnect.
+ * sign-in to that service, even one the service refuses, which the page then offers to reconnect. A `pinned` tab always
+ * shows, whatever the user hides: Settings, which leads back to the others.
  */
 export const SIDEBAR_TABS = [
 	{ value: "pull-requests", label: "Pull requests", icon: PAGE_ICON["pull-requests"] },
@@ -18,8 +19,8 @@ export const SIDEBAR_TABS = [
 	{ value: "todo", label: "Todo", icon: PAGE_ICON.todo },
 	{ value: "calendar", label: "Calendar", icon: PAGE_ICON.calendar },
 	{ value: "inbox", label: "Inbox", icon: PAGE_ICON.inbox, integration: "gmail" },
-	{ value: "settings", label: "Settings", icon: PAGE_ICON.settings },
-] as const satisfies readonly { value: string; label: string; icon: LucideIcon; integration?: McpIntegrationId }[];
+	{ value: "settings", label: "Settings", icon: PAGE_ICON.settings, pinned: true },
+] as const satisfies readonly { value: string; label: string; icon: LucideIcon; integration?: McpIntegrationId; pinned?: true }[];
 
 /** The sidebar's tab; the tickets, todo, calendar, inbox, and settings tabs go with their pages, the sessions and pull requests tabs with the panes. */
 export type SidebarTab = (typeof SIDEBAR_TABS)[number]["value"];
