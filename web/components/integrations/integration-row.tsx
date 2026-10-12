@@ -3,13 +3,16 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { BrandLogo } from "./brand-logos";
 
-/** A row's mark on its tile: a brand's 24×24 path, in its color or the text color, else `name`'s first letter. */
+/** A row's mark on its tile: a brand's paths, in its colors or the text color, else `name`'s first letter. */
 export function MarkTile({ logo, name }: { logo: BrandLogo | null; name: string }) {
 	return (
 		<span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-5 text-foreground shadow-surface-2">
 			{logo ? (
-				<svg viewBox="0 0 24 24" className="size-5" fill={logo.color}>
-					<path d={logo.path} />
+				<svg viewBox={logo.viewBox ?? "0 0 24 24"} className="size-5">
+					<path fill={logo.color} d={logo.path} />
+					{logo.layers?.map((layer) => (
+						<path key={layer.path} fill={layer.color} d={layer.path} />
+					))}
 				</svg>
 			) : (
 				<span className="text-sm font-medium text-muted-foreground">{name.charAt(0).toUpperCase()}</span>

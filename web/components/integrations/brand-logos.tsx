@@ -1,7 +1,10 @@
-/** A brand's mark from Simple Icons (CC0), drawn on a 24-unit square in the brand's color. */
+/** A brand's mark in the brand's color: Simple Icons' (CC0) 24-unit square unless `viewBox` says otherwise. */
 export interface BrandLogo {
 	path: string;
 	color: string;
+	viewBox?: string;
+	/** Paths in other colors, drawn over `path` in order, for a multicolor mark. */
+	layers?: readonly { path: string; color: string }[];
 }
 
 export const LINEAR_LOGO: BrandLogo = {
