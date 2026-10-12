@@ -18,7 +18,7 @@ import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import type { ProjectEdit } from "../shared/projects";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
-import type { ClientFrame, ClientMsg } from "../shared/protocol";
+import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues } from "../shared/tickets";
@@ -367,7 +367,16 @@ const clientParsers: { [T in ClientMsg["t"]]: (value: Record<string, unknown>) =
 
 const isClientMsgType = (t: unknown): t is ClientMsg["t"] => typeof t === "string" && Object.hasOwn(clientParsers, t);
 
-/** A socket message from the page; `null` when it is not valid JSON, not one of {@link ClientMsg}, or tagged with an `ack` that is not a counter. */
+function parseFrame(value: unknown): Parsed<ClientMsg | AckedFrame> {
+	if (!isObject(value) || !isClientMsgType(value.t)) return null;
+	const msg = clientParsers[value.t](value);
+	if (!msg) return null;
+	const { ack, floor } = value;
+	if (ack === undefined && floor === undefined) return msg;
+	return isCounter(ack) && isCounter(floor) && floor <= ack ? { ok: { ...msg.ok, ack, floor } } : null;
+}
+
+/** A socket message from the page; `null` when it is not valid JSON or not a valid {@link ClientFrame}. */
 export function parseClientMsg(raw: string | Buffer): Parsed<ClientFrame> {
 	let value: unknown;
 	try {
@@ -375,13 +384,21 @@ export function parseClientMsg(raw: string | Buffer): Parsed<ClientFrame> {
 	} catch {
 		return null;
 	}
-	if (!isObject(value) || !isClientMsgType(value.t)) return null;
-	const { ack } = value;
-	if (ack !== undefined && !isCounter(ack)) return null;
-	const msg = clientParsers[value.t](value);
-	if (!msg) return null;
-	return { ok: ack === undefined ? msg.ok : { ...msg.ok, ack } };
+	if (!isObject(value) || value.t !== "resume") return parseFrame(value);
+	if (!Array.isArray(value.frames)) return null;
+	const frames: AckedFrame[] = [];
+	for (const item of value.frames) {
+		const frame = parseFrame(item);
+		if (!frame || !("ack" in frame.ok)) return null;
+		frames.push(frame.ok);
+	}
+	return { ok: { t: "resume", frames } };
 }
+
+const PAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** The `page` of a `/ws` address: the id a page load picks once, `crypto.randomUUID()`; `null` when absent or not one. */
+export const parsePageId = (value: string | null): string | null => (value !== null && PAGE_ID.test(value) ? value : null);
 
 /** A terminal's columns or rows: xterm's own bounds. */
 const isTerminalSide = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 1000;

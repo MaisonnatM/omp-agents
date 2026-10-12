@@ -10,6 +10,7 @@ import { fail, guardsFor } from "./server/http";
 import { buildPage, servePage } from "./server/page";
 import { terminalFor, type TerminalSocket, type TerminalSocketData, terminalSocket } from "./server/terminal-socket";
 import type { Socket, SocketData } from "./server/views";
+import { parsePageId } from "./server/wire";
 
 const PORT = portFromEnv();
 const token = loadToken(tokenFile);
@@ -26,7 +27,9 @@ const NOT_A_WEBSOCKET = (): Response => new Response("expected a websocket", { s
 function upgrade(req: Request, srv: Server<AnySocketData>): Response | undefined {
 	const refused = guards.admitSocket(req);
 	if (refused) return refused;
-	return srv.upgrade(req, { data: { views: new Map() } }) ? undefined : NOT_A_WEBSOCKET();
+	// A page loaded before page ids connects with none; its views still update, and its tagged requests, which carry no `floor`, are dropped until it reloads.
+	const pageId = parsePageId(new URL(req.url).searchParams.get("page")) ?? crypto.randomUUID();
+	return srv.upgrade(req, { data: { views: new Map(), pageId } }) ? undefined : NOT_A_WEBSOCKET();
 }
 
 async function upgradeTerminal(req: Request, srv: Server<AnySocketData>): Promise<Response | undefined> {

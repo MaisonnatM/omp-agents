@@ -313,6 +313,9 @@ An action that fails shows its error, and its control becomes available again.
   It does nothing once the agent has already taken the steer, and a follow-up still waits.
   When omp cannot hold a follow-up for a subagent, Enter steers instead.
   An idle session takes either key as a new prompt.
+- A prompt sent while the dashboard is disconnected from its server comes back to the composer with its files and a note saying why.
+  A prompt, answer, or start sent just before the connection drops reaches the session once when the page reconnects, never twice.
+  If the server restarted, or the page stayed disconnected for over an hour, before the server answered, the page says so, and the session's transcript shows whether the prompt took effect.
 - Messages that wait on the turn show above the text field, each tagged **Steer** or **Follow-up**, as Cursor lists its queue.
   Hovering a row, or focusing it, shows three buttons; a touch screen shows them always.
   **Send now** (↑ icon, or Cmd+Enter on the focused row) turns a follow-up into a steer, which the running turn takes at its next step; on a steer it stops the turn so omp runs its held steers at once.

@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import type { ClientMsg } from "../shared/protocol";
+import type { ClientFrame } from "../shared/protocol";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
 
-const msg = (value: unknown): ClientMsg | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
+const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
 
 describe("parseClientMsg", () => {
@@ -17,14 +17,25 @@ describe("parseClientMsg", () => {
 		expect(msg({ t: "no-such-message" })).toBeNull();
 	});
 
-	test("an ack rides along with any message, and one that is not a counter rejects the message", () => {
-		const frame = (ack: unknown) => parseClientMsg(JSON.stringify({ t: "end", instanceId: "i1", ack }))?.ok ?? null;
-		expect(frame(7)).toEqual({ t: "end", instanceId: "i1", ack: 7 });
+	test("an ack rides along with any message with a floor not above it, and either one not a counter rejects the message", () => {
+		const frame = (ack: unknown, floor: unknown = ack): unknown => parseClientMsg(JSON.stringify({ t: "end", instanceId: "i1", ack, floor }))?.ok ?? null;
+		expect(frame(7, 3)).toEqual({ t: "end", instanceId: "i1", ack: 7, floor: 3 });
 		expect(frame(undefined)).toEqual({ t: "end", instanceId: "i1" });
+		expect(parseClientMsg(JSON.stringify({ t: "end", instanceId: "i1", ack: 7 }))).toBeNull();
+		expect(frame(3, 7)).toBeNull();
 		expect(frame(1.5)).toBeNull();
 		expect(frame(-1)).toBeNull();
 		expect(frame("7")).toBeNull();
 		expect(frame(null)).toBeNull();
+	});
+
+	test("a resume carries only tagged messages, and one bad message rejects the whole resume", () => {
+		const end = { t: "end", instanceId: "i1", ack: 2, floor: 1 } as const;
+		expect(parseClientMsg(JSON.stringify({ t: "resume", frames: [end] }))?.ok).toEqual({ t: "resume", frames: [end] });
+		expect(parseClientMsg(JSON.stringify({ t: "resume", frames: [] }))?.ok).toEqual({ t: "resume", frames: [] });
+		expect(parseClientMsg(JSON.stringify({ t: "resume", frames: [end, { t: "end", instanceId: "i1" }] }))).toBeNull();
+		expect(parseClientMsg(JSON.stringify({ t: "resume", frames: [{ t: "resume", frames: [], ack: 3, floor: 3 }] }))).toBeNull();
+		expect(parseClientMsg(JSON.stringify({ t: "resume" }))).toBeNull();
 	});
 
 	test("watch takes only well-formed views, and one bad view rejects the whole set", () => {

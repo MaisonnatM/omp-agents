@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { PinChange } from "../src/shared/pins";
-import type { ClientFrame, ClientMsg, ServerMsg } from "../src/shared/protocol";
+import type { AckedFrame, ClientMsg, ResumeFrame, ServerMsg } from "../src/shared/protocol";
 import type { View } from "../src/shared/sessions";
 import type { UserTodoChange } from "../src/user-todos-shared";
-import { socketUrl } from "./api";
+import { errorText, socketUrl } from "./api";
 import { type DashboardState, initialState, reduce, type ServerAction } from "./dashboard-state";
 import { applyPaneMessage, retainPanes } from "./pane-store";
 import {
@@ -22,7 +22,7 @@ import { messageOf, pendingStart, type StartKind, type StartOp } from "./starts"
 
 const NO_VIEWS: View[] = [];
 
-const CONNECTION_LOST = "Lost the connection to the server before it answered.";
+const PAGE_ID = crypto.randomUUID();
 
 /** Where an older page kept the pins, in each browser's localStorage, before the server kept them. */
 const STORED_PINS_KEY = "omp-agents.pinned-sessions";
@@ -47,7 +47,10 @@ export interface Dashboard {
 	/** The page covering the panes; `null` while the panes show. */
 	page: Page | null;
 	send: (msg: ClientMsg) => void;
-	/** Send `msg` and settle once the server has handled it: rejects with the server's error, or at once while disconnected. */
+	/**
+	 * Send `msg` and settle once the server has handled it: rejects with the server's error, or at once while
+	 * disconnected. It waits across a reconnect, which sends it again for the server to answer, never to run twice.
+	 */
 	request: (msg: ClientMsg) => Promise<void>;
 	/** End live session `instanceId`, which counts as ending until the server answers; rejects with why it could not. */
 	end: (instanceId: string) => Promise<void>;
@@ -99,22 +102,21 @@ export function useDashboard(): Dashboard {
 		if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 	}, []);
 
-	const acks = useRef(new Map<number, { resolve: () => void; reject: (error: Error) => void }>());
+	const outbox = useRef(new Map<number, { frame: AckedFrame; resolve: () => void; reject: (error: Error) => void }>());
 	const nextAck = useRef(0);
-	const request = useCallback(
-		(msg: ClientMsg) =>
-			new Promise<void>((resolve, reject) => {
-				const ws = socketRef.current;
-				if (ws?.readyState !== WebSocket.OPEN) {
-					reject(new Error("Not connected to the server."));
-					return;
-				}
-				const ack = nextAck.current++;
-				acks.current.set(ack, { resolve, reject });
-				ws.send(JSON.stringify({ ...msg, ack } satisfies ClientFrame));
-			}),
-		[],
-	);
+	const request = useCallback((msg: ClientMsg) => {
+		const { promise, resolve, reject } = Promise.withResolvers<void>();
+		const ws = socketRef.current;
+		if (ws?.readyState !== WebSocket.OPEN) {
+			reject(new Error("Not connected to the server."));
+			return promise;
+		}
+		const ack = nextAck.current++;
+		const frame: AckedFrame = { ...msg, ack, floor: Math.min(ack, ...outbox.current.keys()) };
+		outbox.current.set(ack, { frame, resolve, reject });
+		ws.send(JSON.stringify(frame));
+		return promise;
+	}, []);
 
 	const end = useCallback(
 		async (instanceId: string) => {
@@ -148,11 +150,6 @@ export function useDashboard(): Dashboard {
 	const focus = useCallback((index: number) => replace({ ...layoutRef.current, focus: index }), [replace]);
 
 	useEffect(() => {
-		const pending = acks.current;
-		const abandon = (): void => {
-			for (const { reject } of pending.values()) reject(new Error(CONNECTION_LOST));
-			pending.clear();
-		};
 		// A start's answer settles it, then the panes follow the start as it was before.
 		const answer = (msg: ServerAction, layout: Layout | null): void => {
 			dispatch(msg);
@@ -162,12 +159,13 @@ export function useDashboard(): Dashboard {
 		let timer: number | undefined;
 		let disposed = false;
 		const connect = (): void => {
-			const ws = new WebSocket(socketUrl("/ws"));
+			const ws = new WebSocket(socketUrl(`/ws?page=${PAGE_ID}`));
 			socketRef.current = ws;
 			ws.onopen = () => {
 				retryMs = 500;
 				dispatch({ t: "connected", connected: true });
 				ws.send(JSON.stringify({ t: "watch", views: watchedRef.current } satisfies ClientMsg));
+				ws.send(JSON.stringify({ t: "resume", frames: [...outbox.current.values()].map(entry => entry.frame) } satisfies ResumeFrame));
 			};
 			ws.onmessage = event => {
 				const msg = JSON.parse(String(event.data)) as ServerMsg;
@@ -202,8 +200,8 @@ export function useDashboard(): Dashboard {
 						dispatch(msg);
 						return;
 					case "done": {
-						const waiting = pending.get(msg.ack);
-						pending.delete(msg.ack);
+						const waiting = outbox.current.get(msg.ack);
+						outbox.current.delete(msg.ack);
 						if (msg.error === null) waiting?.resolve();
 						else waiting?.reject(new Error(msg.error));
 						return;
@@ -220,7 +218,6 @@ export function useDashboard(): Dashboard {
 			};
 			ws.onclose = () => {
 				if (disposed) return;
-				abandon();
 				dispatch({ t: "connected", connected: false });
 				timer = window.setTimeout(connect, retryMs);
 				retryMs = Math.min(retryMs * 2, 5000);
@@ -231,7 +228,6 @@ export function useDashboard(): Dashboard {
 			disposed = true;
 			clearTimeout(timer);
 			socketRef.current?.close();
-			abandon();
 		};
 	}, [show]);
 
@@ -267,9 +263,9 @@ export function useDashboard(): Dashboard {
 		(op: StartOp) => {
 			const reqId = nextReqId.current++;
 			dispatch({ t: "start", reqId, op });
-			send(messageOf(op, reqId));
+			request(messageOf(op, reqId)).catch((error: unknown) => dispatch({ t: "start-failed", reqId, error: errorText(error) }));
 		},
-		[send],
+		[request],
 	);
 	const changeTodo = useCallback(
 		(change: UserTodoChange) => {
