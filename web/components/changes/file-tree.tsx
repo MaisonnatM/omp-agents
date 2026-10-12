@@ -30,15 +30,16 @@ export function StatusLetter({ file }: { file: ChangedEntry }) {
 	);
 }
 
-interface FileTreeProps {
+/** How a file opens: through its address, which a plain click may skip with `onPick`, or in place alone. */
+export type FileOpen =
+	| { hrefFor: (path: string) => string; onPick?: (path: string) => void }
+	| { hrefFor?: undefined; onPick: (path: string) => void };
+
+type FileTreeProps = FileOpen & {
 	tree: TreeDir;
 	/** The open file's path, highlighted and kept in view. */
 	open: string | null;
-	/** The address that opens the file at `path`. */
-	hrefFor: (path: string) => string;
-	/** Opens the file at `path` in place on a plain click, which then leaves the address alone. */
-	onPick?: (path: string) => void;
-}
+};
 
 /**
  * The changed files as folders, each folder open until you close it, and opened again when a file in it opens. A dot
@@ -52,7 +53,7 @@ export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 		const above = new Set(open === null ? [] : (foldersAbove(tree, open) ?? []));
 		if ([...closed].some(path => above.has(path))) setClosed(new Set([...closed].filter(path => !above.has(path))));
 	}
-	const openRow = useRef<HTMLAnchorElement>(null);
+	const openRow = useRef<HTMLElement | null>(null);
 	useEffect(() => {
 		openRow.current?.scrollIntoView({ block: "nearest" });
 	}, [open]);
@@ -88,30 +89,44 @@ export function FileTree({ tree, open, hrefFor, onPick }: FileTreeProps) {
 			})}
 			{dir.files.map(file => {
 				const current = file.path === open;
+				const look = {
+					ref: current ? (row: HTMLElement | null) => void (openRow.current = row) : undefined,
+					title: `${file.path}: ${statusLabel(file)}`,
+					"aria-current": current ? ("page" as const) : undefined,
+					className: cn("flex w-full items-center gap-1.5 rounded-md py-0.5 pr-1 text-left text-xs hover:bg-muted", current && "bg-muted font-medium"),
+					style: { paddingLeft: depth * 12 + 20 },
+				};
+				const body = (
+					<>
+						<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+						<span className={cn("min-w-0 flex-1 truncate", file.status === "deleted" && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
+						{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}
+						<LineCounts added={file.added} removed={file.removed} />
+						<StatusLetter file={file} />
+					</>
+				);
 				return (
 					<li key={file.path}>
-						<a
-							ref={current ? openRow : undefined}
-							href={hrefFor(file.path)}
-							title={`${file.path}: ${statusLabel(file)}`}
-							onClick={
-								onPick &&
-								(event => {
-									if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-									event.preventDefault();
-									onPick(file.path);
-								})
-							}
-							aria-current={current ? "page" : undefined}
-							className={cn("flex w-full items-center gap-1.5 rounded-md py-0.5 pr-1 text-left text-xs hover:bg-muted", current && "bg-muted font-medium")}
-							style={{ paddingLeft: depth * 12 + 20 }}
-						>
-							<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-							<span className={cn("min-w-0 flex-1 truncate", file.status === "deleted" && "line-through opacity-70")}>{file.path.slice(file.path.lastIndexOf("/") + 1)}</span>
-							{file.session && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-sky-500" />}
-							<LineCounts added={file.added} removed={file.removed} />
-							<StatusLetter file={file} />
-						</a>
+						{hrefFor ? (
+							<a
+								{...look}
+								href={hrefFor(file.path)}
+								onClick={
+									onPick &&
+									(event => {
+										if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+										event.preventDefault();
+										onPick(file.path);
+									})
+								}
+							>
+								{body}
+							</a>
+						) : (
+							<button type="button" {...look} onClick={() => onPick(file.path)}>
+								{body}
+							</button>
+						)}
 					</li>
 				);
 			})}

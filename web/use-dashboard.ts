@@ -87,13 +87,8 @@ export function useDashboard(): Dashboard {
 	const startsRef = useRef(state.starts);
 	startsRef.current = state.starts;
 	const page = state.cover?.kind === "page" ? state.cover.page : null;
-	// A page covering the panes shows none of them, so the server stops streaming them until the panes return. The
-	// Changes page of a live session watches that session, whose `work` tells the page when its calls changed a file.
-	const changesOf = page?.kind === "changes" ? (state.hosts.find(host => host.sessionId === page.sessionId)?.instanceId ?? null) : null;
-	const watched = useMemo<View[]>(
-		() => (changesOf !== null ? [{ kind: "live", instanceId: changesOf, agentId: null }] : page ? NO_VIEWS : state.layout.panes),
-		[changesOf, page, state.layout.panes],
-	);
+	// A page covering the panes shows none of them, so the server stops streaming them until the panes return.
+	const watched = useMemo<View[]>(() => (page ? NO_VIEWS : state.layout.panes), [page, state.layout.panes]);
 	const watchedRef = useRef(watched);
 	watchedRef.current = watched;
 

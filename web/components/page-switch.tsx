@@ -9,7 +9,6 @@ import type { SectionTarget } from "../section";
 import type { StartOf } from "../starts";
 import type { WorkspaceScope } from "../use-workspace-scope";
 import { CalendarPage } from "./calendar/calendar-page";
-import { ChangesPage } from "./changes/changes-page";
 import { useDashboardActions } from "./dashboard-context";
 import { InboxPage } from "./inbox/inbox-page";
 import { DisconnectedPage } from "./integrations/disconnected-page";
@@ -205,16 +204,6 @@ export const PageSwitch = memo(function PageSwitch({
 			return <CalendarPage routines={routines} todos={userTodos} ticketsShown={linearCallable} />;
 		case "inbox":
 			return <InboxPage target={page.target} />;
-		case "changes":
-			return (
-				<ChangesPage
-					key={page.sessionId}
-					sessionId={page.sessionId}
-					path={page.path}
-					host={hosts.find(host => host.sessionId === page.sessionId) ?? null}
-					past={past.find(session => session.sessionId === page.sessionId) ?? null}
-				/>
-			);
 		case undefined:
 			if (layout.panes.length > 0) {
 				return (

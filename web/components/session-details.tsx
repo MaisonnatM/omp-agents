@@ -6,6 +6,7 @@ import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { useChangedFiles, useMedia, useTurnCount } from "../pane-store";
 import { useStoredState } from "../stored-state";
+import { FileBaseContext } from "./file-link";
 import { FilesTab } from "./files-tab";
 import { MediaTab } from "./media-tab";
 import { OutlineTab } from "./outline-tab";
@@ -35,8 +36,10 @@ interface SessionDetailsProps {
 	view: View;
 	/** Marks the last turn as still running; a change also reads the shown pull request again. */
 	working: boolean;
-	/** The session whose changes page the Files tab links to; `null` for a subagent's view and for a live session not yet in the roster. */
+	/** The session whose changes the Files tab opens; `null` for a subagent's view and for a live session not yet in the roster. */
 	sessionId: string | null;
+	/** The session's directory, which relative paths in the outline and the Files tab resolve against. */
+	cwd: string | null;
 	/** What the view's session and its subagents submitted or worked on, the session's own first. */
 	pullRequests: LinkedPullRequest[];
 	/** The sidebar's workspace `cwd`, or `null` for every workspace. */
@@ -48,44 +51,46 @@ interface SessionDetailsProps {
  * The right sidebar's content for the focused view: an outline of its conversation's turns, the files its agent changed,
  * the images its agents' tools returned, and its session's pull requests, each tab apart.
  */
-export function SessionDetails({ view, working, sessionId, pullRequests, workspace, hosts }: SessionDetailsProps) {
+export function SessionDetails({ view, working, sessionId, cwd, pullRequests, workspace, hosts }: SessionDetailsProps) {
 	const files = useChangedFiles(view);
 	const media = useMedia(view);
 	const turnCount = useTurnCount(view);
 	const [tab, setTab] = useStoredState<DetailsTab>(TAB_KEY, raw => DETAILS_TABS.find(tab => tab === raw) ?? "outline");
 	return (
-		<Tabs value={tab} onValueChange={value => setTab(value as DetailsTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
-			<SidebarHeader className="h-(--page-header-height) flex-row items-center gap-2 border-b border-border px-2 py-0">
-				<h2 className="sr-only">Session details</h2>
-				<SizeProvider size="compact">
-					<TabsList aria-label="Session details">
-						<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", turnCount)} />
-						<TabItem value="files" icon={FileDiff} className={TAB_CLASS} {...tabLabel("Files", files?.length ?? 0)} />
-						<TabItem value="media" icon={Images} className={TAB_CLASS} {...tabLabel("Media", media?.length ?? 0)} />
-						<TabItem value="pull-requests" icon={GitPullRequest} className={TAB_CLASS} {...tabLabel("PRs", pullRequests.length)} />
-					</TabsList>
-				</SizeProvider>
-			</SidebarHeader>
-			<TabPanel value="outline" asChild>
-				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-					<OutlineTab view={view} working={working} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="files" asChild>
-				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-					<FilesTab files={files} sessionId={sessionId} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="media" asChild>
-				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-					<MediaTab media={media} view={view} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="pull-requests" asChild>
-				<SidebarContent viewportClassName={PINNED_VIEWPORT}>
-					<SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />
-				</SidebarContent>
-			</TabPanel>
-		</Tabs>
+		<FileBaseContext.Provider value={cwd}>
+			<Tabs value={tab} onValueChange={value => setTab(value as DetailsTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
+				<SidebarHeader className="h-(--page-header-height) flex-row items-center gap-2 border-b border-border px-2 py-0">
+					<h2 className="sr-only">Session details</h2>
+					<SizeProvider size="compact">
+						<TabsList aria-label="Session details">
+							<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", turnCount)} />
+							<TabItem value="files" icon={FileDiff} className={TAB_CLASS} {...tabLabel("Files", files?.length ?? 0)} />
+							<TabItem value="media" icon={Images} className={TAB_CLASS} {...tabLabel("Media", media?.length ?? 0)} />
+							<TabItem value="pull-requests" icon={GitPullRequest} className={TAB_CLASS} {...tabLabel("PRs", pullRequests.length)} />
+						</TabsList>
+					</SizeProvider>
+				</SidebarHeader>
+				<TabPanel value="outline" asChild>
+					<SidebarContent viewportClassName={PANEL_VIEWPORT}>
+						<OutlineTab view={view} working={working} />
+					</SidebarContent>
+				</TabPanel>
+				<TabPanel value="files" asChild>
+					<SidebarContent viewportClassName={PANEL_VIEWPORT}>
+						<FilesTab files={files} sessionId={sessionId} cwd={cwd} working={working} />
+					</SidebarContent>
+				</TabPanel>
+				<TabPanel value="media" asChild>
+					<SidebarContent viewportClassName={PANEL_VIEWPORT}>
+						<MediaTab media={media} view={view} />
+					</SidebarContent>
+				</TabPanel>
+				<TabPanel value="pull-requests" asChild>
+					<SidebarContent viewportClassName={PINNED_VIEWPORT}>
+						<SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />
+					</SidebarContent>
+				</TabPanel>
+			</Tabs>
+		</FileBaseContext.Provider>
 	);
 }

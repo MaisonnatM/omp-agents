@@ -255,6 +255,7 @@ export function App() {
 									view={detailsView}
 									working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
 									sessionId={focused.sessionId}
+									cwd={focused.cwd ?? null}
 									pullRequests={focused.row?.pullRequests ?? []}
 									workspace={workspace}
 									hosts={visible.hosts}

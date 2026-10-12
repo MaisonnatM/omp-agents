@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { ChangedEntry, DiffRow } from "../src/shared/changes";
-import { type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, treeOrder } from "./changes-model";
+import { changesPathOf, type DiffItem, fileLines, fileTree, foldDiff, foldersAbove, treeOrder } from "./changes-model";
 
 const same = (count: number, from = 1): DiffRow[] => Array.from({ length: count }, (_, at) => ({ sign: " ", old: from + at, new: from + at, text: "" }));
 const added: DiffRow = { sign: "+", old: null, new: 0, text: "" };
@@ -65,5 +65,16 @@ describe("fileTree", () => {
 		const tree = fileTree([entry("/tmp/x/notes.md"), entry("a.ts")]);
 		expect(tree.dirs.map(dir => dir.name)).toEqual(["/tmp/x"]);
 		expect(treeOrder(tree).map(file => file.path)).toEqual(["/tmp/x/notes.md", "a.ts"]);
+	});
+});
+describe("changesPathOf", () => {
+	const files = [entry("web/app.tsx"), entry("~/notes/plan.md"), entry("app.tsx")];
+	test("finds the Files tab's path in the changes list, from a subdirectory, outside the checkout, or by its tail under ~", () => {
+		expect(changesPathOf("app.tsx", "/repo/web", "/repo", files)).toBe("web/app.tsx");
+		expect(changesPathOf("app.tsx", "/repo", "/repo", files)).toBe("app.tsx");
+		expect(changesPathOf("~/notes/plan.md", "/repo", "/repo", files)).toBe("~/notes/plan.md");
+		expect(changesPathOf("~/code/wt/web/app.tsx", "/repo", "/Users/me/code/wt", files)).toBe("web/app.tsx");
+		expect(changesPathOf("gone.ts", "/repo", "/repo", files)).toBeNull();
+		expect(changesPathOf("web/app.tsx", "/elsewhere", null, files)).toBe("web/app.tsx");
 	});
 });

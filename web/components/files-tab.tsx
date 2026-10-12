@@ -6,7 +6,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { everyWord } from "../../src/shared/every-word";
 import { age, readTime } from "../labels";
-import { hashForChanges } from "../routing";
+import { SessionChangesDialog } from "./changes/session-changes-dialog";
 import { LineCounts } from "./line-counts";
 import { SidebarSearch } from "./sidebar-search";
 import { ViewerDialog } from "./viewer-dialog";
@@ -163,24 +163,42 @@ function ChangedFiles({ files, onOpen }: { files: ChangedFile[]; onOpen: (path: 
 	);
 }
 
-/** The files the view's agent changed, in first-touch order, each opening its changes in a dialog, then a link to the session's changes page. */
-export function FilesTab({ files, sessionId }: { files: ChangedFile[] | null; sessionId: string | null }) {
-	const [shownPath, setShownPath] = useState<string | null>(null);
-	const shown = shownPath === null ? undefined : files?.find(file => file.path === shownPath);
+/** What the tab shows over the page: the session's changes, opened at a file or at the first, or one file's recorded changes for a subagent. */
+type Shown = { kind: "changes"; path: string | null } | { kind: "history"; path: string } | null;
+
+interface FilesTabProps {
+	files: ChangedFile[] | null;
+	/** The session's id; `null` for a subagent, which has no changes of its own checkout. */
+	sessionId: string | null;
+	cwd: string | null;
+	working: boolean;
+}
+
+/**
+ * The files the view's agent changed, in first-touch order. On a session, a file opens the session's changes at it; on a
+ * subagent, omp's recorded diffs of it.
+ */
+export function FilesTab({ files, sessionId, cwd, working }: FilesTabProps) {
+	const [shown, setShown] = useState<Shown>(null);
+	const history = shown?.kind === "history" ? files?.find(file => file.path === shown.path) : undefined;
 	return (
 		<>
 			{files &&
-				(files.length === 0 ? <p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p> : <ChangedFiles files={files} onOpen={setShownPath} />)}
-			{shown && <FileChangesDialog file={shown} onClose={() => setShownPath(null)} />}
+				(files.length === 0 ? (
+					<p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p>
+				) : (
+					<ChangedFiles files={files} onOpen={path => setShown({ kind: sessionId === null ? "history" : "changes", path })} />
+				))}
+			{history && <FileChangesDialog file={history} onClose={() => setShown(null)} />}
+			{sessionId !== null && shown?.kind === "changes" && (
+				<SessionChangesDialog sessionId={sessionId} cwd={cwd} path={shown.path} work={files} working={working} onClose={() => setShown(null)} />
+			)}
 			{sessionId !== null && (
 				<SidebarGroup>
 					<SidebarMenu>
 						<SidebarMenuItem>
-							<SidebarMenuButton asChild>
-								<a href={hashForChanges(sessionId)}>
-									<FileDiff />
-									<span>Open the session's changes</span>
-								</a>
+							<SidebarMenuButton icon={FileDiff} aria-haspopup="dialog" onClick={() => setShown({ kind: "changes", path: null })}>
+								Open the session's changes
 							</SidebarMenuButton>
 						</SidebarMenuItem>
 					</SidebarMenu>

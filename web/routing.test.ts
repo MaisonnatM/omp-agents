@@ -5,7 +5,6 @@ import {
 	adjacentSession,
 	closePane,
 	endSession,
-	hashForChanges,
 	hashForInbox,
 	hashForPullRequests,
 	hashForLayout,
@@ -192,15 +191,6 @@ describe("layout hash", () => {
 		expect(routeFromHash("#projectsx").kind).toBe("panes");
 	});
 
-	test("the changes hash opens a session's first file or one by path, slashes and absolute paths kept, and is not read as a layout", () => {
-		expect(hashForChanges("01a0f6a5-181e")).toBe("#changes/01a0f6a5-181e");
-		expect(routeFromHash("#changes/01a0f6a5-181e")).toEqual({ kind: "page", page: { kind: "changes", sessionId: "01a0f6a5-181e", path: null } });
-		for (const path of ["web/components/a b.tsx", "~/.omp/agent/AGENTS.md"]) {
-			expect(routeFromHash(hashForChanges("01a0f6a5-181e", path))).toEqual({ kind: "page", page: { kind: "changes", sessionId: "01a0f6a5-181e", path } });
-		}
-		expect(routeFromHash("#changesx").kind).toBe("panes");
-	});
-
 	test("every page hash names its page and route, and a session or layout hash names none", () => {
 		expect(routeFromHash(hashForSettings("files", "/work/app"))).toEqual({ kind: "page", page: { kind: "settings", section: "files", cwd: "/work/app" } });
 		expect(routeFromHash(hashForPullRequests(null))).toEqual({ kind: "page", page: { kind: "pull-requests", target: null } });
@@ -224,7 +214,6 @@ describe("layout hash", () => {
 		expect(routeFromHash("#settings/models/%E0")).toEqual(page({ kind: "settings", section: "models", cwd: null }));
 		expect(routeFromHash("#new/%E0?todo=t1")).toEqual(page({ kind: "new", cwd: null, todoId: "t1" }));
 		expect(routeFromHash("#pull-requests/acme/web/1/files/%E0")).toEqual(page({ kind: "pull-requests", target: { owner: "acme", repo: "web", number: 1 }, files: { path: null } }));
-		expect(routeFromHash("#changes/s1/%E0")).toEqual(page({ kind: "changes", sessionId: "s1", path: null }));
 		expect(routeFromHash("#session/%E0")).toEqual({ kind: "panes", layout: { panes: [], focus: 0, maximized: false } });
 		expect(routeFromHash("#a,past/%zz,b/%E0,c@1")).toEqual({ kind: "panes", layout: { panes: [live("a"), live("c")], focus: 1, maximized: false } });
 	});

@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { Layout, Page, SettingsRoute, SidebarTab } from "./routing";
 
 /** The sidebar tab that goes with each page; the panes keep the one you chose. A session's changes and the projects go with the sessions. */
-const PAGE_TAB: Partial<Record<Page["kind"], SidebarTab>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", calendar: "calendar", routines: "calendar", inbox: "inbox", settings: "settings", changes: "sessions", projects: "sessions" };
+const PAGE_TAB: Partial<Record<Page["kind"], SidebarTab>> = { "pull-requests": "pull-requests", tickets: "tickets", todo: "todo", calendar: "calendar", routines: "calendar", inbox: "inbox", settings: "settings", projects: "sessions" };
 
 /** The page each tab shows, but for Sessions, which shows the panes, and Settings, which keeps its section and workspace. */
 const TAB_PAGE: Record<Exclude<SidebarTab, "sessions" | "settings">, Page> = {

@@ -136,19 +136,21 @@ An action that fails shows its error, and its control becomes available again.
   A later prompt that invoked a skill shows the skill's name in an outlined chip first, a prompt of files alone reads as their names, and a prompt of images alone reads as how many it holds, such as `2 images`.
   The turn still running shows **Working…** where its reply will go.
   Click a prompt, a reply, **Request**, or **Plan** to scroll the pane's transcript to that message; the page stays where it is.
+  A file's path in the **Request** or a **Plan**, relative to the session's directory or not, opens the file in the file dialog.
   The turn you are reading carries a shaded background, and moves as you scroll the transcript; the outline scrolls to keep it in view.
   After you click a turn it stays marked until you scroll the transcript yourself, since the last turns may never reach the top of the transcript.
   The list follows the conversation as it goes.
 - **Files** lists the files the agent's `edit` and `write` calls changed, in the order it first touched them.
   Each row shows whether the session created, edited, or deleted the file, how many times it changed it, how long ago the last change was, and the lines added and removed, which the list's heading totals.
-  As on the changes page, a count of zero is left out, so a file the agent only added to shows `+12` alone.
+  As in the session's changes, a count of zero is left out, so a file the agent only added to shows `+12` alone.
   A path inside the session's working directory shows relative to it.
-  Click a file to open its changes in a dialog over the page, newest first: each with its kind, its time, its lines added and removed, and its diff as omp recorded it with line numbers.
-  The dialog follows the file while the agent keeps editing it, and Esc closes it.
+  Click a file to open the [session's changes](#session-changes) in a dialog over the page, at that file.
+  A subagent has no changes of its own checkout, so on a subagent's Files tab a click opens the file's changes as omp recorded them instead, newest first: each with its kind, its time, its lines added and removed, and its diff with line numbers.
+  That dialog follows the file while the agent keeps editing it, and Esc closes it.
   A write replaces the whole file and records no diff, so it shows how many lines it wrote instead.
   A write counts as creating the file when the session had not read or changed that path before, since omp does not record whether the file existed; a created file counts every line it wrote as added, and a later write over it counts none.
   A failed call, and a write to something other than a file, such as an `agent://` message, count for nothing.
-  **Open the session's changes**, under the list, opens the session's [changes page](#session-changes); a subagent's Files tab has no such link.
+  **Open the session's changes**, under the list, opens the same dialog at the first file; a subagent's Files tab has no such button.
   The search field above the list keeps the files whose path holds every word typed, in any order and any case, and the heading then counts and totals those, as in `2 of 9 files changed`; Esc clears it.
   Opening another session clears the search.
 - Subagents are not listed here; open one from its link in the transcript, under the call that spawned it.
@@ -170,9 +172,8 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Session changes
 
-- **Open the session's changes** in the sidebar's **Files** tab or a `#changes/<session id>` address shows the files the session changed as an editor does, in place of the panes.
-  The sidebar stays on **Sessions**, and the arrow before the title goes back to the session.
-- The page lists two sets of files at once.
+- **Open the session's changes** in the sidebar's **Files** tab, or a click on one of its files, shows the files the session changed as an editor does, in a dialog over the page; Esc or the close button closes it.
+- The dialog lists two sets of files at once.
   One is what the session's git checkout changed: its worktree, else its directory, against the commit its branch forked from the remote's default branch, else against `HEAD`, else against nothing before the first commit, with uncommitted and untracked files included.
   The other is what the session's own `edit` and `write` calls changed, from its transcript, including files outside the checkout and files changed back to how they were.
   The header names the branch and the base it compares against, and totals the files and the lines added and removed.
@@ -190,8 +191,8 @@ An action that fails shows its error, and its control becomes available again.
 - Both views color the code by its language.
   A binary file, a file over 1 MB, and a file git cannot compare show why instead.
   A file only the session's calls name shows whole, with nothing marked, since there is no base to compare it with.
-- The page reads the changes again each time the session's own calls change a file, and when a turn starts or ends, since a shell command or a subagent changes files without telling the dashboard; the round arrow in the header reads them again now.
-  A link names the open file by its path, so a reload returns to it.
+- The dialog reads the changes again each time the session's own calls change a file, and when a turn starts or ends, since a shell command or a subagent changes files without telling the dashboard; the round arrow in the header reads them again now.
+  Clicking a file in the explorer, or ↓ and ↑, opens it in place.
 
 ## Panes, splits, and links
 
@@ -609,7 +610,7 @@ An action that fails shows its error, and its control becomes available again.
   An unresolved review thread shows its first comment, under the file and line it is on, which link to the file on the **Code** tab; its replies fold behind a bar that shows who replied, how many replies, and when the last came.
   A red **New** line sits under what happened since you last opened the pull request's timeline in this browser, which its localStorage keeps for 30 days.
   Above the list, the counts of comments and commits, and **Newest first**, which flips the order.
-- **Code** shows the pull request's files as the [session changes](#session-changes) page shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and the open file in **Diff** or **File**, with ↓ and ↑ to step through them.
+- **Code** shows the pull request's files as the [session changes](#session-changes) dialog shows a session's: the explorer with every file the pull request changes, up to GitHub's 3000, and the open file in **Diff** or **File**, with ↓ and ↑ to step through them.
   A renamed file shows **R**, and a copied one **A**.
   It reads the files from GitHub, so it needs no checkout of the repository; a file GitHub shows no diff for, such as a binary one or one with a very large diff, shows why instead.
   Opening the tab reads the list from GitHub again, and the files you open within 30 seconds read from that list.
