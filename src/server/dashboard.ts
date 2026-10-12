@@ -27,20 +27,18 @@ import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
 import { agentOn } from "../shared/moves";
-import type { PinChange } from "../shared/pins";
-import type { ProjectEdit } from "../shared/projects";
 import type { ServerMsg } from "../shared/protocol";
 import type { StartRequest, StartResult, View } from "../shared/sessions";
 import { waitingOnYou } from "../slack-messages";
 import { Terminals } from "../terminals";
 import { DONE_KEPT_HOURS, startChanges } from "../user-todos";
-import type { UserTodoChange } from "../user-todos-shared";
 import { Worktrees } from "../worktrees";
 import { Broadcasts } from "./broadcasts";
 import { CalendarsFile } from "./calendars-file";
 import { EndInbox } from "./end-inbox";
 import type { Guards } from "./http";
 import { InterruptedSessions } from "./interrupted";
+import { ListRegistry } from "./list-registry";
 import { LocalEventsFile } from "./local-events-file";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops } from "./loops";
@@ -57,7 +55,7 @@ import { ScheduledRunner } from "./scheduled-runner";
 import { createRoutes, type Routes } from "./routes";
 import { endSession } from "./session-end";
 import { SessionFiles } from "./session-files";
-import { type Peer, RequestLedger } from "./request-ledger";
+import { RequestLedger } from "./request-ledger";
 import { createClientHandler } from "./socket";
 import { createStarter, type Starter } from "./start";
 import { TodoInbox } from "./todo-inbox";
@@ -94,6 +92,7 @@ export class Dashboard {
 	readonly #views: Views;
 	readonly #notices: Notices;
 	readonly #broadcasts: Broadcasts;
+	readonly #lists: ListRegistry;
 	readonly #todoInbox: TodoInbox;
 	readonly #worktrees: Worktrees;
 	readonly #startSession: (request: StartRequest) => Promise<StartResult>;
@@ -168,34 +167,40 @@ export class Dashboard {
 				},
 				now: Date.now,
 			},
-			() => this.#broadcasts.pushNotices(),
+			() => this.#broadcasts.pushList("notices"),
 		));
+		const lists = (this.#lists = new ListRegistry({
+			"user-todos": { msg: () => ({ t: "user-todos", list: todos.list }), apply: change => todos.apply(change) },
+			routines: { msg: () => ({ t: "routines", routines: routines.routines }), apply: change => routines.apply(change, Date.now()) },
+			scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.sends }), apply: change => scheduled.apply(change, Date.now()) },
+			workspaces: {
+				msg: () => {
+					const [added, hidden] = [workspaces.list.added, workspaces.list.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
+					return { t: "workspaces", list: { added, hidden } };
+				},
+				apply: change => workspaces.apply(change),
+			},
+			pins: { msg: () => ({ t: "pins", sessionIds: pins.sessionIds }), apply: change => pins.apply(change) },
+			projects: { msg: () => ({ t: "projects", projects: projects.projects }), apply: change => projects.apply(change) },
+			notices: { msg: () => ({ t: "notices", list: notices.list }) },
+		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
 			roster: () => ({ hosts: sessions.rows(files.factsOf), error: this.#rosterError }),
 			past: () => files.past(sessions.sessionIds(), id => interrupted.has(id)),
-			userTodosMsg: () => ({ t: "user-todos", list: todos.list }),
-			routinesMsg: () => ({ t: "routines", routines: routines.routines }),
-			scheduledMsg: () => ({ t: "scheduled", sends: scheduled.sends }),
-			workspacesMsg: () => {
-				const [added, hidden] = [workspaces.list.added, workspaces.list.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
-				return { t: "workspaces", list: { added, hidden } };
-			},
-			pinsMsg: () => ({ t: "pins", sessionIds: pins.sessionIds }),
-			projectsMsg: () => ({ t: "projects", projects: projects.projects }),
-			noticesMsg: () => ({ t: "notices", list: notices.list }),
+			lists,
 			publish: (topic, json) => void this.#publisher?.publish(topic, json),
 			subscriberCount: topic => this.#publisher?.subscriberCount(topic) ?? 0,
 			beforeRosterPush: () => views.sync(),
 			saveRunning: () => interrupted.setRunning(sessions.startedHere()),
 		}));
-		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => this.#applyTodo(change), { active: () => ownerLock.held });
+		this.#todoInbox = new TodoInbox(userTodoInboxDir, change => lists.apply("user-todos", change), { active: () => ownerLock.held });
 		const starter = createStarter({
 			sessions,
 			pathFor,
 			savedFile: files.pathOf,
 			onStarted: () => broadcasts.syncRoster(),
 			linkTodo: (todoId, sessionId) => {
-				for (const change of startChanges(todos.list, todoId, sessionId, new Date().toISOString())) this.#applyTodo(change);
+				for (const change of startChanges(todos.list, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
 			projects: { launchFor: (request, project) => this.#projectRunner.launchFor(request, project) },
 		});
@@ -235,8 +240,8 @@ export class Dashboard {
 				if (!dir) throw new Error(`${cwd.trim()} is not a directory.`);
 				return runShell(command, dir, { timeoutMs: COMMAND_TIMEOUT_MS, maxOutput: MAX_COMMAND_OUTPUT, signal: stopping });
 			},
-			onChange: () => broadcasts.pushRoutines(),
-			changePins: change => void this.#applyPinChange(change),
+			onChange: () => broadcasts.pushList("routines"),
+			changePins: change => void lists.apply("pins", change),
 		}));
 		const scheduledRunner = (this.#scheduledRunner = new ScheduledRunner({
 			file: scheduled,
@@ -244,7 +249,7 @@ export class Dashboard {
 			bySessionId: sessionId => sessions.bySessionId(sessionId) ?? null,
 			session: instanceId => sessions.get(instanceId) ?? null,
 			now: Date.now,
-			onChange: () => broadcasts.pushScheduled(),
+			onChange: () => broadcasts.pushList("scheduled"),
 		}));
 		const runnerSession = (session: LiveSession | undefined): RunnerSession | null => {
 			if (!session) return null;
@@ -261,7 +266,7 @@ export class Dashboard {
 			seedNotes: (id, name, goal) => seedNotes(projectNotesDir(id), name, goal),
 			now: Date.now,
 			newId: randomUUID,
-			onChange: () => broadcasts.pushProjects(),
+			onChange: () => broadcasts.pushList("projects"),
 		}));
 		this.#loops = new Loops(sessionsDir, {
 			onRegistryTick: async () => {
@@ -283,7 +288,7 @@ export class Dashboard {
 			onMinuteTick: async () => {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
-				broadcasts.pushScheduled();
+				broadcasts.pushList("scheduled");
 				await notices.check(EVENT_KINDS);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
@@ -304,7 +309,7 @@ export class Dashboard {
 			views,
 			start: startSession,
 			createProject: spec => projectRunner.create(spec),
-			changeProject: (peer, change) => this.#changeProject(peer, change),
+			lists,
 			end: async instanceId => {
 				const session = sessions.get(instanceId);
 				if (session) await this.#endLive(session);
@@ -313,21 +318,7 @@ export class Dashboard {
 				if (interrupted.dismiss(sessionId)) broadcasts.pushPast();
 			},
 			stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
-			changeTodo: (peer, change) => {
-				if (!this.#applyTodo(change)) peer.send({ t: "user-todos", list: todos.list });
-			},
-			changeRoutine(peer, change) {
-				if (routines.apply(change, Date.now())) broadcasts.pushRoutines();
-				else peer.send({ t: "routines", routines: routines.routines });
-			},
-			changeScheduled(peer, change) {
-				if (scheduled.apply(change, Date.now())) broadcasts.pushScheduled();
-				else peer.send({ t: "scheduled", sends: scheduled.sends });
-			},
 			sendScheduledNow: id => scheduledRunner.sendNow(id),
-			changePins: (peer, change) => {
-				if (!this.#applyPinChange(change)) peer.send({ t: "pins", sessionIds: pins.sessionIds });
-			},
 			runRoutine: id => runner.runNow(id),
 			changeNotices: (ids, op) => notices.apply(ids, op),
 			}),
@@ -345,9 +336,7 @@ export class Dashboard {
 			sessions: {
 				knownCwds: () => this.knownCwds(),
 				addedCwds: () => this.#workspaces.list.added,
-				changeWorkspaces: change => {
-					if (this.#workspaces.apply(change)) broadcasts.pushWorkspaces();
-				},
+				changeWorkspaces: change => void this.#lists.apply("workspaces", change),
 				savedOf: files.savedOf,
 				placeOf(sessionId) {
 					const file = files.pathOf(sessionId);
@@ -497,29 +486,9 @@ export class Dashboard {
 		}
 	}
 
-	/** Applies `change` to the list, and sends every socket the list when it changed; whether it did. */
-	#applyTodo(change: UserTodoChange): boolean {
-		const changed = this.#todos.apply(change);
-		if (changed) this.#broadcasts.pushUserTodos();
-		return changed;
-	}
-
 	/** Moves todos checked over {@link DONE_KEPT_HOURS} ago to the archive. */
 	#clearOldDone(): void {
-		this.#applyTodo({ op: "clear-done", categoryId: null, before: new Date(Date.now() - DONE_KEPT_HOURS * 3_600_000).toISOString() });
-	}
-
-	/** Applies `change` to the pins, and sends every socket the pins when they changed; whether they did. */
-	#applyPinChange(change: PinChange): boolean {
-		const changed = this.#pins.apply(change);
-		if (changed) this.#broadcasts.pushPins();
-		return changed;
-	}
-
-	/** Applies `change` to the projects and sends every socket the projects after it, or sends `peer` the ones it missed when nothing changed. */
-	#changeProject(peer: Peer, change: ProjectEdit): void {
-		if (this.#projects.apply(change)) this.#broadcasts.pushProjects();
-		else peer.send({ t: "projects", projects: this.#projects.projects });
+		this.#lists.apply("user-todos", { op: "clear-done", categoryId: null, before: new Date(Date.now() - DONE_KEPT_HOURS * 3_600_000).toISOString() });
 	}
 
 	/** Ends `session` as **End session** does, then removes the linked worktree it worked in: the one its bash calls last ran in, else its own directory's. */
@@ -540,9 +509,9 @@ export class Dashboard {
 			this.#routines.reload();
 			this.#todos.reload();
 			this.#projects.reload();
-			this.#broadcasts.pushRoutines();
-			this.#broadcasts.pushUserTodos();
-			this.#broadcasts.pushProjects();
+			this.#broadcasts.pushList("routines");
+			this.#broadcasts.pushList("user-todos");
+			this.#broadcasts.pushList("projects");
 			this.#runner.recover();
 			this.#scheduledRunner.recover();
 			void this.#todoInbox.drain();

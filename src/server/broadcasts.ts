@@ -8,25 +8,20 @@ import { errorText } from "../json";
 import type { ServerMsg } from "../shared/protocol";
 import type { PastSession, RosterHost } from "../shared/sessions";
 import { fetchPlanUsage } from "../usage";
+import type { ListKind, ListMessage, ListRegistry } from "./list-registry";
 import { type Socket, send } from "./views";
 
 const TOPIC = "roster";
 /** Coalesce bursts of subagent progress into one roster push. */
 const ROSTER_PUSH_MS = 150;
 
-type Broadcast = Extract<ServerMsg, { t: "usage" | "user-todos" | "routines" | "scheduled" | "workspaces" | "pins" | "projects" | "notices" }>;
+type Broadcast = Extract<ServerMsg, { t: "usage" }> | ListMessage;
 
 export interface BroadcastDeps {
 	/** The rows of the live sessions, and why the registry could not be listed, if it could not. */
 	roster(): { hosts: RosterHost[]; error: string | null };
 	past(): PastSession[];
-	userTodosMsg(): Extract<ServerMsg, { t: "user-todos" }>;
-	routinesMsg(): Extract<ServerMsg, { t: "routines" }>;
-	scheduledMsg(): Extract<ServerMsg, { t: "scheduled" }>;
-	workspacesMsg(): Extract<ServerMsg, { t: "workspaces" }>;
-	pinsMsg(): Extract<ServerMsg, { t: "pins" }>;
-	projectsMsg(): Extract<ServerMsg, { t: "projects" }>;
-	noticesMsg(): Extract<ServerMsg, { t: "notices" }>;
+	lists: ListRegistry;
 	/** Publishes `json` on the `roster` topic. */
 	publish(topic: string, json: string): void;
 	subscriberCount(topic: string): number;
@@ -39,7 +34,7 @@ export interface BroadcastDeps {
 export class Broadcasts {
 	readonly #deps: BroadcastDeps;
 	/** The last message of each kind published, empty for usage until `omp usage` first answers, and for the todos, routines, scheduled sends, workspaces, pins, projects, and notices until they first change. */
-	readonly #last: Record<Broadcast["t"], string> = { usage: "", "user-todos": "", routines: "", scheduled: "", workspaces: "", pins: "", projects: "", notices: "" };
+	readonly #last = new Map<Broadcast["t"], string>();
 	/** The roster as the listeners last heard it, and its registry error. */
 	readonly #roster = new HeardList<RosterHost>(host => host.instanceId);
 	#rosterError: string | null = null;
@@ -64,14 +59,9 @@ export class Broadcasts {
 		ws.subscribe(TOPIC);
 		send(ws, roster);
 		send(ws, { t: "past", reset: true, sessions: past, removed: [] });
-		if (this.#last.usage) ws.send(this.#last.usage);
-		send(ws, this.#deps.userTodosMsg());
-		send(ws, this.#deps.routinesMsg());
-		send(ws, this.#deps.scheduledMsg());
-		send(ws, this.#deps.workspacesMsg());
-		send(ws, this.#deps.pinsMsg());
-		send(ws, this.#deps.projectsMsg());
-		send(ws, this.#deps.noticesMsg());
+		const usage = this.#last.get("usage");
+		if (usage) ws.send(usage);
+		for (const msg of this.#deps.lists.messages()) send(ws, msg);
 	}
 
 	/** A dashboard session started or exited: save which run, then push the roster and the past list. */
@@ -109,32 +99,9 @@ export class Broadcasts {
 		return usage;
 	}
 
-	pushUserTodos(): void {
-		this.#publishChanged(this.#deps.userTodosMsg());
-	}
-
-	pushRoutines(): void {
-		this.#publishChanged(this.#deps.routinesMsg());
-	}
-
-	pushScheduled(): void {
-		this.#publishChanged(this.#deps.scheduledMsg());
-	}
-
-	pushWorkspaces(): void {
-		this.#publishChanged(this.#deps.workspacesMsg());
-	}
-
-	pushPins(): void {
-		this.#publishChanged(this.#deps.pinsMsg());
-	}
-
-	pushProjects(): void {
-		this.#publishChanged(this.#deps.projectsMsg());
-	}
-
-	pushNotices(): void {
-		this.#publishChanged(this.#deps.noticesMsg());
+	/** Publish a registered whole list only when its message changed. */
+	pushList(kind: ListKind): void {
+		this.#publishChanged(this.#deps.lists.message(kind));
 	}
 
 	/** Also stands in for a pending debounced push: a burst of roster updates costs one sync and one push. */
@@ -170,8 +137,8 @@ export class Broadcasts {
 
 	#publishChanged(msg: Broadcast): void {
 		const json = JSON.stringify(msg);
-		if (json === this.#last[msg.t]) return;
-		this.#last[msg.t] = json;
+		if (json === this.#last.get(msg.t)) return;
+		this.#last.set(msg.t, json);
 		this.#deps.publish(TOPIC, json);
 	}
 }
