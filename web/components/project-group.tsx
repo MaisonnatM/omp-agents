@@ -1,8 +1,5 @@
-import { FolderKanban } from "lucide-react";
 import type { View } from "../../src/shared/sessions";
-import { SidebarGroup, SidebarGroupAction, SidebarGroupActions, SidebarGroupLabel, SidebarMenu } from "@/components/ui/sidebar";
-import { Tooltip } from "@/components/ui/tooltip";
-import { hashForProjects } from "../routing";
+import { SidebarGroup, SidebarGroupLabel, SidebarMenu } from "@/components/ui/sidebar";
 import { type ProjectGroup, waitsOnYou } from "../sessions";
 import { HostRow, PastRow } from "./session-row";
 
@@ -24,24 +21,7 @@ interface ProjectSessionsProps {
 export function ProjectSessions({ group: { project, members }, open, onOpenChange, isOpen, showWorkspace, onTogglePin }: ProjectSessionsProps) {
 	const waiting = members.filter(({ row }) => row.kind === "live" && waitsOnYou(row.host)).length;
 	return (
-		// The Projects group's padding already insets it, so the actions move by that padding to stay on the rows' axis.
-		<SidebarGroup
-			className="p-0"
-			collapsible
-			open={open}
-			onOpenChange={onOpenChange}
-			headerActions={
-				<SidebarGroupActions className="top-0 right-1.5">
-					<Tooltip content="Open project">
-						<SidebarGroupAction asChild>
-							<a href={hashForProjects({ kind: "project", id: project.id })} aria-label={`Open project ${project.name}`}>
-								<FolderKanban />
-							</a>
-						</SidebarGroupAction>
-					</Tooltip>
-				</SidebarGroupActions>
-			}
-		>
+		<SidebarGroup className="p-0" collapsible open={open} onOpenChange={onOpenChange}>
 			<SidebarGroupLabel>{waiting > 0 ? `${project.name} · ${waiting} waiting` : project.name}</SidebarGroupLabel>
 			<SidebarMenu aria-label={`Sessions of project ${project.name}`}>
 				{members.map(({ worker, row, pinned }) => {
