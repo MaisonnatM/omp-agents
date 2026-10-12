@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { connectionOf, type McpProbes } from "./integrations";
-import { ApiError, type McpServer, McpRefused } from "./omp/mcp";
+import { ApiError, type McpServer, McpRefused, McpUnauthorized } from "./omp/mcp";
 
-const found: McpServer = { name: "linear", url: "https://mcp.linear.app/mcp", credentialId: "mcp:linear" };
+const found: McpServer = { name: "linear", url: "https://mcp.linear.app/mcp", credentialId: "mcp:linear", config: { type: "http", url: "https://mcp.linear.app/mcp" } };
 const server = { name: "linear", url: "https://mcp.linear.app/mcp", host: "mcp.linear.app" };
 
 const probes = (signedIn: boolean, tools: () => Promise<string[]>): McpProbes => ({ signedIn: async () => signedIn, tools });
@@ -25,6 +25,9 @@ describe("connectionOf", () => {
 			}),
 		);
 		expect(refused).toEqual({ kind: "refused", server, error: "refused omp's sign-in" });
+		expect(await connectionOf(found, probes(true, async () => {
+			throw new McpUnauthorized("linear answered 401 Unauthorized");
+		}))).toEqual({ kind: "refused", server, error: "linear answered 401 Unauthorized" });
 		const timedOut = await connectionOf(
 			found,
 			probes(true, async () => {
