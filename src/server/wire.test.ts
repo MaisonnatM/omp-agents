@@ -5,7 +5,7 @@ import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationId, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
+import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationId, parseMcpServerAdd, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -588,5 +588,29 @@ describe("parsePromptDocument", () => {
 		expect(parsePromptDocument({ ...document, name: "" })).toBeNull();
 		expect(parsePromptDocument({ ...document, data: "not base64!" })).toBeNull();
 		expect(parsePromptDocument({ ...document, data: "A".repeat(Math.ceil(MAX_PROMPT_DOCUMENT_BYTES / 3) * 4 + 4) })).toBeNull();
+	});
+});
+
+describe("parseMcpServerAdd", () => {
+	const server = { name: "docs", url: "https://mcp.example.com/mcp" };
+
+	test("takes a catalog entry by id, or a server by name and address with HTTP as its default transport", () => {
+		expect(parseMcpServerAdd({ catalog: "sentry" })).toEqual({ ok: { kind: "catalog", id: "sentry" } });
+		expect(parseMcpServerAdd({ ...server, name: " docs " })).toEqual({ ok: { kind: "custom", ...server, transport: "http", header: null } });
+		expect(parseMcpServerAdd({ ...server, transport: "sse" })).toMatchObject({ ok: { transport: "sse" } });
+		expect(parseMcpServerAdd({ ...server, transport: "stdio" })).toEqual({ error: "Expected transport http or sse." });
+	});
+
+	test("refuses plain HTTP off this computer, so a sign-in never crosses the network in the clear", () => {
+		const refused = { error: "Enter the server's https:// address." };
+		expect(parseMcpServerAdd({ ...server, url: "http://mcp.example.com/mcp" })).toEqual(refused);
+		expect(parseMcpServerAdd({ ...server, url: "mcp.example.com" })).toEqual(refused);
+		for (const host of ["localhost:3845", "127.0.0.1", "[::1]:8000"]) expect(parseMcpServerAdd({ ...server, url: `http://${host}/mcp` })).toHaveProperty("ok");
+	});
+
+	test("takes a header only with a token name and a value", () => {
+		expect(parseMcpServerAdd({ ...server, header: { name: "Authorization", value: " Bearer k " } })).toMatchObject({ ok: { header: { name: "Authorization", value: "Bearer k" } } });
+		expect(parseMcpServerAdd({ ...server, header: { name: "Bad Name", value: "k" } })).toEqual({ error: "Enter the header's name, such as Authorization." });
+		expect(parseMcpServerAdd({ ...server, header: { name: "X-Api-Key", value: " " } })).toEqual({ error: "Enter the header's value." });
 	});
 });

@@ -7,6 +7,7 @@
 import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
 import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
 import { GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
+import { type McpServerAdd, type McpServerInput, REMOTE_TRANSPORTS } from "../shared/mcp-servers";
 import { type CalendarShownInput, type EventRef, type EventWhen, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
 import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest, PROMPT_IMAGE_TYPES } from "../shared/sessions";
@@ -519,6 +520,45 @@ const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
 
 /** The body of `PUT /api/integrations/sign-in` and `/sign-out`: `{ id }` naming an MCP integration. */
 export const parseIntegrationId = (body: unknown): Parsed<McpIntegrationId> => (isObject(body) && isMcpIntegration(body.id) ? { ok: body.id } : null);
+
+/** The body of `PUT /api/mcp-servers/sign-in`, `/sign-out`, and `/remove`: `{ name }` naming a server omp loads. */
+export const parseMcpServerName = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.name) ? { ok: body.name } : null);
+
+/** The body of `PUT /api/mcp-servers/enabled`: `{ name, enabled }`. */
+export const parseMcpServerEnabled = (body: unknown): Parsed<{ name: string; enabled: boolean }> =>
+	isObject(body) && isNonEmpty(body.name) && typeof body.enabled === "boolean" ? { ok: { name: body.name, enabled: body.enabled } } : null;
+
+const isRemoteTransport = oneOf(REMOTE_TRANSPORTS);
+/** An HTTP header name, as RFC 9110 spells a token. */
+const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]"];
+
+/**
+ * The body of `PUT /api/mcp-servers/add`: `{ catalog }` naming a catalog entry, or `{ name, url, transport?, header? }`.
+ * The address must be HTTPS, or HTTP on this computer, so a sign-in's token never crosses the network in the clear.
+ */
+export function parseMcpServerAdd(body: unknown): Parsed<McpServerAdd, { error: string }> {
+	if (!isObject(body)) return { error: "Expected { catalog } or { name, url } for the MCP server." };
+	if (body.catalog !== undefined) return isNonEmpty(body.catalog) ? { ok: { kind: "catalog", id: body.catalog } } : { error: "Expected { catalog } naming a catalog entry." };
+	const name = typeof body.name === "string" ? body.name.trim() : "";
+	if (!name) return { error: "Enter a name for the server." };
+	const url = typeof body.url === "string" ? body.url.trim() : "";
+	const parsed = URL.canParse(url) ? new URL(url) : null;
+	if (!parsed || !(parsed.protocol === "https:" || (parsed.protocol === "http:" && LOOPBACK_HOSTS.includes(parsed.hostname)))) {
+		return { error: "Enter the server's https:// address." };
+	}
+	const transport = body.transport ?? "http";
+	if (!isRemoteTransport(transport)) return { error: "Expected transport http or sse." };
+	let header: McpServerInput["header"] = null;
+	if (body.header !== undefined && body.header !== null) {
+		const headerName = isObject(body.header) && typeof body.header.name === "string" ? body.header.name.trim() : "";
+		const value = isObject(body.header) && typeof body.header.value === "string" ? body.header.value.trim() : "";
+		if (!HEADER_NAME.test(headerName)) return { error: "Enter the header's name, such as Authorization." };
+		if (!value) return { error: "Enter the header's value." };
+		header = { name: headerName, value };
+	}
+	return { ok: { kind: "custom", name, url, transport, header } };
+}
 
 /** The body of `PUT /api/providers/login`: `{ method }`, the `/login` entry to run. */
 export const parseLoginMethod = (body: unknown): Parsed<string> => (isObject(body) && isNonEmpty(body.method) ? { ok: body.method } : null);

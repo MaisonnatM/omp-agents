@@ -10,6 +10,7 @@ import type { ModelEntry } from "../src/shared/models";
 import type { ConversationHit, ConversationSearchAnswer } from "../src/shared/sessions";
 import type { Ticket, TicketsAnswer } from "../src/shared/tickets";
 import type { ProvidersAnswer } from "../src/shared/providers";
+import type { McpServersAnswer } from "../src/shared/mcp-servers";
 import { errorText, getJson } from "./api";
 import { createPolledStore, type PolledEntry } from "./polled-store";
 
@@ -168,6 +169,9 @@ export const integrationsStore = createPolledStore<IntegrationsAnswer>({
 		return isObject(integrations) && MCP_INTEGRATIONS.every(id => isObject(integrations[id]));
 	},
 });
+
+/** Every MCP server omp loads for you, for Settings › MCP servers; kept in memory only, as the providers' are. */
+export const mcpServersStore = createPolledStore<McpServersAnswer>({ url: (_scope, fresh) => (fresh ? "/api/mcp-servers?fresh" : "/api/mcp-servers") });
 
 /** The model providers omp signs in to and the sign-in Settings › Providers runs; kept in memory only, as it names your accounts. */
 export const providersStore = createPolledStore<ProvidersAnswer>({ url: () => "/api/providers" });

@@ -34,7 +34,7 @@ The main ones:
   Settings › Providers runs omp's own `/login` and `/logout` through `src/omp/providers.ts`: `AuthStorage.oauth.login` (`pi-ai/src/auth-storage.ts`) with `captureBrowserSession` from `pi-coding-agent/src/utils/browser-session.ts` for a cookie sign-in, `formatLoginIdentity` from `pi-coding-agent/src/cli/oauth-terminal.ts`, `ModelRegistry.refreshProvider` from `pi-coding-agent/src/config/model-registry.ts` afterwards, as `omp login` does, and `toLogoutAccounts` and `logoutCredential` from `pi-coding-agent/src/slash-commands/helpers/logout.ts`.
 - Model roles: `pi-coding-agent/src/config/model-resolver.ts` (`expandRoleAlias`, `resolveRoleChain`), whose `@role` aliases `resolveRoles` in `src/omp/models.ts` follows for `GET /api/models/roles`.
   `modelEntries` reads each role and fallback selector with `parseRetryFallbackSelector` and maps it to a listed model with `resolveProviderModelReference`, which follows retired variant ids such as `grok-4.7-high` and dotted spellings such as `claude-fable-5.1`.
-- MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `oauth-credentials.ts` (`removeManagedMcpOAuthCredentials`), `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`, `updateMCPServer`, `readMCPConfigFile`), which `src/omp/mcp.ts` wraps for the tickets page and Settings › Integrations.
+- MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `client.ts` (`connectToServer`, `listTools`, `disconnectServer`), `oauth-credentials.ts` (`removeManagedMcpOAuthCredentials`), `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`, `updateMCPServer`, `removeMCPServer`, `setMcpServerEnabled`, `validateServerName`, `readMCPConfigFile`), which `src/omp/mcp.ts` wraps for the tickets page, Settings › Integrations, and Settings › MCP servers.
   The MCP sign-ins and sign-outs read and write omp's credential store through the same `discoverAuthStorage`, opened and closed on each call.
   `pi-coding-agent/src/commands/token.ts` uses `refreshStoredManagedMcpOAuthCredential` from `oauth-credentials.ts` to refresh a managed token and persist its rotated refresh token before printing the access token.
 - Completions: `pi-tui/src/autocomplete.ts`, and the skills and slash commands in `pi-coding-agent/src/extensibility/`.
@@ -782,6 +782,26 @@ A failure, or no return within five minutes, shows as `signIn: { phase: "failed"
 A sign-in that omp does not manage stays, and the route answers an error that says so.
 `parseIntegrationId` in `src/server/wire.ts` checks both bodies.
 
+### MCP servers
+
+`GET /api/mcp-servers` answers `McpServersAnswer` from `src/shared/mcp-servers.ts`: `servers`, one `McpServerRow` for every server omp loads for you, and `configPath`, omp's user `mcp.json`.
+`listMcpServers` in `src/omp/mcp.ts` reads them with `loadAllMCPConfigs`, project configs off, and adds the servers omp's user file disables, which that call drops.
+Each row has the server's name, transport, URL with `${VAR}` references expanded, host, command, `source` (the config file and whether the page may change it: only omp's own user file), whether omp holds a sign-in for its URL, `status`, `signIn`, and `catalogId`, the catalog entry on its host.
+
+`status` is `disabled`, `integration` for a server on one of `MCP_SERVICES`' hosts, whose status [Integrations](#integrations) reads, `local` for a command, which only an omp session starts, or the outcome of listing the server's tools.
+`listMcpTools` in `src/omp/mcp.ts` connects through omp's own client, `connectToServer` and `listTools`, so streamable HTTP and SSE servers both work, with the server's headers and a Bearer token when omp holds a sign-in, then disconnects; it keeps each list for a minute, `?fresh` lists again, and a sign-in or sign-out drops it.
+A 401, a `http_status` failure from the HTTP transport or an `HTTP 401:` error from the SSE one, throws `McpUnauthorized`, which `statusOf` in `src/mcp-servers.ts` reads as `signed-out` when omp holds no sign-in and `refused` when it does; any other failure is `failing` with its message.
+While a server's sign-in waits on the browser, its status is the one last answered.
+
+`PUT /api/mcp-servers/add` takes `{ catalog }`, an id in `MCP_CATALOG` from `src/shared/mcp-catalog.ts`, or `{ name, url, transport?, header? }`, checked by `parseMcpServerAdd` in `src/server/wire.ts`: the address must be HTTPS or loopback HTTP, the transport `http` or `sse`, and a header a token name with a value.
+A catalog entry refuses a server already on its host and takes its id as the name, or the first of `id-2`, `id-3`, … that is free; an OAuth entry then starts its sign-in, and the route answers the new row, whose `signIn` the page opens.
+A server by address must have a name omp's `validateServerName` accepts and no other server has, and is written with its header in `headers`; it starts no sign-in.
+Both go through omp's `addMCPServer` into the user `mcp.json`.
+
+`PUT /api/mcp-servers/sign-in` and `PUT /api/mcp-servers/sign-out`, with `{ name }`, sign in and out as the integrations' routes do, with a `createSignIn` per server name; they refuse a local server and an integration's.
+`PUT /api/mcp-servers/enabled`, with `{ name, enabled }`, calls omp's `setMcpServerEnabled`, as `/mcp enable` and `/mcp disable` do, and `PUT /api/mcp-servers/remove`, with `{ name }`, calls `removeMCPServer`, as `/mcp remove` does, keeping omp's sign-in; both refuse a server from any file but omp's user `mcp.json`.
+A refusal, such as a taken name, is `McpServerRejected`, which the routes answer as a 400 with its message.
+
 ### Providers
 
 `GET /api/providers` answers `ProvidersAnswer` from `src/shared/providers.ts`: `providers`, one `ModelProvider` for each provider omp files `/login` credentials under, and `login`, the sign-in the page last started.
@@ -956,6 +976,7 @@ The server lives in `src/`:
   It applies a session's starting prompt to that session's main view with each of its live events, so a live user message and the removal of the prompt it replaces go out together.
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
   `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and pull request list shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations and their OAuth client setups; `calendar.ts` the Google calendars, their events, a new event, and the events kept on this computer; `git.ts` the checkouts and branches; `repo-files.ts` the repository page's file list; `models.ts` the models, routing, plan usage, and omp's files; `notices.ts` the bell's notices; and `analytics.ts` the Analytics section.
+  `mcp-servers.ts` holds the rows and bodies of Settings › MCP servers, and `mcp-catalog.ts` the catalog of remote servers it offers.
   `gmail.ts` holds `MailThread` and `InboxAnswer`, the Inbox page's conversations, and `ThreadAnswer` with its `MailMessage`, `MailPerson`, `MailBody`, and `MailAttachment`, one conversation in full.
   `newSessionRequest` in `sessions.ts` builds a new-session start with every option not given defaulted, for the socket's parser, the routine runner, and their tests.
   The routine shapes (`Routine`, `RoutineRun`, `RoutineChange`) live in `src/routines.ts`, which the socket messages import.
@@ -1005,13 +1026,14 @@ The server lives in `src/`:
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/mcp-clients.ts` plans a Slack, Google Calendar, or Gmail OAuth client save, the setup each form shows and the server entry the save writes, from omp's MCP servers that `src/omp/mcp.ts` reads and writes.
   `src/integrations.ts` finds omp's server for each MCP integration, checks it, and runs the sign-ins and sign-outs that Settings › Integrations starts; see [Integrations](#integrations).
+  `src/mcp-servers.ts` lists every MCP server omp loads with where omp stands with each, and runs the adds, sign-ins, sign-outs, enables, disables, and removals that Settings › MCP servers starts; see [MCP servers](#mcp-servers).
   `src/providers.ts` lists the model providers and runs the sign-ins and sign-outs that Settings › Providers starts, with `src/provider-logins.ts` holding the one sign-in under way, and `src/omp/providers.ts` calling omp for them; `src/shared/providers.ts` holds the shapes the page shares; see [Providers](#providers).
 - `src/google-calendar.ts`: `GoogleCalendarClient`, the calendars checked in your Google Calendar and the events in a span of those the Calendar page shows, read from Google's Calendar API with omp's Google Calendar sign-in, and the events it adds to and deletes from the calendars you may write to.
   `src/server/calendars-file.ts` keeps the ids of the calendars unchecked in the Calendar tab's sidebar in `calendars.json` beside the access token, and moves a file it cannot read to `calendars.json.invalid`.
   `src/server/local-events-file.ts` keeps the events added to **This computer** in `events.json` beside the access token, and moves a file it cannot read to `events.json.invalid`; see [New and local events](#new-and-local-events).
 - `src/gmail.ts`: `GmailClient`, the latest conversations of your Gmail inbox and one conversation in full, read from Google's Gmail API with omp's Gmail sign-in, and the walk of a message's MIME tree; see [Gmail](#gmail).
   `src/server/mail-document.ts` serves a message's HTML as a document of its own, under its own policy, for the Inbox page's frame.
-- `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout behind `src/integrations.ts`.
+- `src/sign-in.ts`: `createSignIn`, the one-at-a-time sign-in with a five-minute timeout behind `src/integrations.ts` and `src/mcp-servers.ts`.
 - `src/cache.ts`: keeps answers for a time to live, 30 seconds for the pull request list's and the tickets', so several tabs share one query; `dropWhere` forgets the keys a predicate names, which `src/commands.ts` uses when a session ends.
 - `src/user-todos-shared.ts`: the Todo page's types, which the server, the page, and the extension that reads `todos.json` all follow: `UserTodoList`, `UserTodo`, `UserTodoLink`, `UserTodoChange`, and the statuses (`TODO_STATUSES`, `isClosed`), priorities (`TODO_PRIORITIES`, Linear's scale, as tickets use), and assignees (`TODO_ASSIGNEES`: `user` or `agent`).
   `templates/omp/agent/extensions/todos.ts` cannot import them, so it declares the shape it reads by hand.
@@ -1147,6 +1169,7 @@ The page lives in `web/`.
   A URL change never returns the previous URL's answer.
   `useReplaceableRead` shows the version a save answered until that URL is read again.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the pull requests, with one entry per workspace, one for the tickets, with one entry, since Linear is not per workspace, one for the MCP integrations, one for the Google calendars shown, one for the Calendar page's Google events, with one entry per month, one for its events kept on this computer, with one entry, and one for the Gmail inbox, with one entry.
+  `mcpServersStore`, for Settings › MCP servers, and `providersStore` are polled stores kept in memory only.
   `useGoogleCalendars` there tells whether Google Calendar is connected and reads its calendars, for the Calendar tab's sidebar, the Calendar page, and the new-event dialog, and `useGmailInbox` answers Gmail's integration and the inbox with its unread count, read through `gmailStore` while Gmail is connected, for the Inbox page and its tab.
   A read in flight belongs to its entry: a new read of an entry replaces only the read of that entry in flight, and the components that poll one entry share one timer, which starts with the first and stops with the last.
   Its `update` applies a saved change to the current answer and aborts older reads before they can replace that answer.
@@ -1227,8 +1250,10 @@ The page lives in `web/`.
   `web/components/line-counts.tsx` draws the lines added and removed, `+12 −3`, that the changes dialog and the Files tab share.
 - `web/components/pull-requests/`, `web/components/tickets/`, `web/components/settings/`, `web/components/integrations/`, and `web/components/new-session.tsx`: the other pages.
   `web/components/integrations/` holds the integration rows that the Settings page's Integrations section, `web/components/settings/integrations-tab.tsx`, sorts into **Connected** and **Available**: `mcp-integration.tsx` is an MCP integration's row, which `DisconnectedPage` in `disconnected-page.tsx` shows on the tickets and Inbox pages while Linear or Gmail is not connected, and takes what shows below it as children, such as the calendars `google-calendar.tsx` lists under Google Calendar's row.
-  Rows lay out through `integration-row.tsx` and draw their brand marks from `brand-logos.tsx`; `mcp-integration.tsx` starts its sign-ins with `web/use-sign-in.ts`, and its `SignOutConfirm` asks before a sign-out and shows its failure.
+  Rows lay out through `integration-row.tsx`, whose `MarkTile` draws a brand mark from `brand-logos.tsx` or a name's first letter; `mcp-integration.tsx` starts its sign-ins with `web/use-sign-in.ts`, and its `SignOutConfirm` asks before a sign-out and shows its failure.
   `slack-app-form.tsx` holds Slack's confidential-app setup, field errors, and scope selection, `google-client-form.tsx` the OAuth client form of a Google service, Google Calendar or Gmail, with each one's API and grant in `GOOGLE_TEXT`, and `client-form.tsx` the steps, fields, and outside links both forms share; the generic MCP row owns its connection and sign-in controls.
+  `web/components/settings/mcp-servers-tab.tsx` is the MCP servers section: `mcp-server-row.tsx` draws each installed server, reusing `ToolList`, `ToolsToggle`, and the integrations' status labels from `mcp-integration.tsx`, `mcp-catalog.tsx` the **Discover** cards, whose OAuth **Add** signs in through `useSignIn`, and `mcp-server-form.tsx` **Add server**.
+  `mcp-logo-paths.ts` holds the catalog vendors' Simple Icons marks (CC0), drawn in the text color.
   `web/components/settings/providers-tab.tsx` is the Providers section, whose rows reuse `IntegrationList` and `Callout` from `integration-row.tsx`; it reads `providersStore` in `web/reads.ts`, kept in memory only since it names your accounts.
   `provider-logos.tsx` draws each row's mark, keyed by `/login` id: Lobe Icons' monochrome marks (MIT) in the text color, Simple Icons' (CC0) for GitLab and Xiaomi, and the name's first letter for a provider neither has.
   `web/components/more-actions-menu.tsx` is the ⋯ menu of a row's rarer actions, which the integration rows and the Routines page share.

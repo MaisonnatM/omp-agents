@@ -7,7 +7,6 @@ import {
 	type McpConnection,
 	type McpIntegration,
 	type McpIntegrationId,
-	type McpServerRef,
 	type SignInState,
 	signedIn,
 } from "../../../src/shared/accounts";
@@ -21,7 +20,7 @@ import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { type BrandLogo, GMAIL_LOGO, GOOGLE_CALENDAR_LOGO, LINEAR_LOGO, SLACK_LOGO } from "./brand-logos";
 import { GOOGLE_TEXT, GoogleClientForm } from "./google-client-form";
-import { Callout, IntegrationRow, MetaDot } from "./integration-row";
+import { Callout, IntegrationRow, MarkTile, MetaDot } from "./integration-row";
 import { SlackAppForm } from "./slack-app-form";
 
 interface Service {
@@ -32,7 +31,7 @@ interface Service {
 	client?: string;
 }
 
-const SERVICES: Record<McpIntegrationId, Service> = {
+export const SERVICES: Record<McpIntegrationId, Service> = {
 	linear: {
 		logo: LINEAR_LOGO,
 		gives: "Your assigned issues on the Tickets tab, and Linear's tools in every omp session.",
@@ -54,7 +53,7 @@ const SERVICES: Record<McpIntegrationId, Service> = {
 	},
 };
 
-const STATUS: Record<McpConnection["kind"], { label: string; color: BadgeColor }> = {
+export const STATUS: Record<McpConnection["kind"], { label: string; color: BadgeColor }> = {
 	absent: { label: "Not connected", color: "gray" },
 	"signed-out": { label: "Signed out", color: "gray" },
 	ready: { label: "Connected", color: "green" },
@@ -62,14 +61,14 @@ const STATUS: Record<McpConnection["kind"], { label: string; color: BadgeColor }
 	failing: { label: "Unreachable", color: "amber" },
 };
 
-/** The tools omp sessions can call, sorted for scanning, and the server they come from. */
-function ToolList({ id, tools, server }: { id: string; tools: string[]; server: McpServerRef }) {
+/** The tools omp sessions can call, sorted for scanning, each description on hover, and the server they come from. */
+export function ToolList({ id, tools, server }: { id: string; tools: readonly { name: string; description: string | null }[]; server: { name: string; url: string } }) {
 	return (
 		<div id={id} className="rounded-lg bg-muted/60 p-3">
 			<ul aria-label="Tools" className="grid max-h-60 grid-cols-1 gap-x-6 gap-y-1 overflow-y-auto font-mono text-xs text-muted-foreground sm:grid-cols-2">
-				{tools.toSorted().map(tool => (
-					<li key={tool} className="truncate" title={tool}>
-						{tool}
+				{tools.toSorted((a, b) => a.name.localeCompare(b.name)).map(tool => (
+					<li key={tool.name} className="truncate" title={tool.description ? `${tool.name}: ${tool.description}` : tool.name}>
+						{tool.name}
 					</li>
 				))}
 			</ul>
@@ -77,6 +76,22 @@ function ToolList({ id, tools, server }: { id: string; tools: string[]; server: 
 				From omp's <code className="font-mono text-foreground">{server.name}</code> MCP server at <span className="font-mono">{server.url}</span>
 			</p>
 		</div>
+	);
+}
+
+/** The meta fact that counts a server's tools and opens their {@link ToolList}. */
+export function ToolsToggle({ count, open, controls, onToggle }: { count: number; open: boolean; controls: string; onToggle: () => void }) {
+	return (
+		<button
+			type="button"
+			aria-expanded={open}
+			aria-controls={open ? controls : undefined}
+			onClick={onToggle}
+			className="-mx-1 inline-flex items-center gap-0.5 rounded px-1 hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:outline-none"
+		>
+			<span className="tabular-nums">{count}</span> tools
+			<ChevronRight aria-hidden className={cn("size-3 transition-transform duration-150 ease-out", open && "rotate-90")} />
+		</button>
 	);
 }
 
@@ -272,7 +287,7 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 	return (
 		<IntegrationRow
 			name={label}
-			logo={service.logo}
+			mark={<MarkTile logo={service.logo} name={label} />}
 			summary={service.gives}
 			status={
 				<Badge variant="dot" size="compact" color={status.color}>
@@ -311,16 +326,7 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 					{connection.kind === "ready" && (
 						<>
 							<MetaDot />
-							<button
-								type="button"
-								aria-expanded={toolsOpen}
-								aria-controls={toolsOpen ? toolsId : undefined}
-								onClick={() => setToolsOpen(open => !open)}
-								className="-mx-1 inline-flex items-center gap-0.5 rounded px-1 hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:outline-none"
-							>
-								<span className="tabular-nums">{connection.tools.length}</span> tools
-								<ChevronRight aria-hidden className={cn("size-3 transition-transform duration-150 ease-out", toolsOpen && "rotate-90")} />
-							</button>
+							<ToolsToggle count={connection.tools.length} open={toolsOpen} controls={toolsId} onToggle={() => setToolsOpen(open => !open)} />
 						</>
 					)}
 				</>
@@ -333,7 +339,7 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 				<GoogleClientForm id={integration.id} setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />
 			)}
 			{children}
-			{connection.kind === "ready" && toolsOpen && <ToolList id={toolsId} tools={connection.tools} server={connection.server} />}
+			{connection.kind === "ready" && toolsOpen && <ToolList id={toolsId} tools={connection.tools.map(name => ({ name, description: null }))} server={connection.server} />}
 		</IntegrationRow>
 	);
 }

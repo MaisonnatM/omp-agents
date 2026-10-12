@@ -10,7 +10,11 @@ import {
 	auth,
 	dirs,
 	discoveryHelpers,
+	mcpClient,
+	type McpConnection,
 	type McpServerConfig,
+	type McpSourceMeta,
+	type McpToolDefinition,
 	mcpConfig,
 	mcpConfigWriter,
 	mcpCredentials,
@@ -19,7 +23,7 @@ import {
 	mcpRpc,
 } from "./modules";
 
-export type { McpServerConfig };
+export type { McpServerConfig, McpSourceMeta, McpToolDefinition };
 
 const TIMEOUT_MS = 20_000;
 /** How long an `omp token` answer serves later calls; omp refreshes it before handing it out. */
@@ -56,9 +60,14 @@ const tokenOf = (credentialId: string): Promise<string> =>
 
 /** Whether omp holds an OAuth sign-in for `server`. The store opens on each call, so a sign-in from a terminal counts at once. */
 export async function mcpSignedIn(server: McpServer): Promise<boolean> {
+	return (await mcpSignedInIds([server.credentialId])).has(server.credentialId);
+}
+
+/** Which of `credentialIds` omp holds an OAuth sign-in under, read from one opening of the store. */
+export async function mcpSignedInIds(credentialIds: readonly string[]): Promise<Set<string>> {
 	const storage = await auth.discoverAuthStorage();
 	try {
-		return storage.credentials.hasOAuth(server.credentialId);
+		return new Set(credentialIds.filter(id => storage.credentials.hasOAuth(id)));
 	} finally {
 		storage.close();
 	}
@@ -146,9 +155,81 @@ export async function signOutMcp(server: McpServer): Promise<void> {
 	}
 }
 
-/** Adds an HTTP server to omp's user-level MCP config, which new omp sessions load. */
-export const addMcpServer = (name: string, url: string): Promise<void> =>
-	mcpConfigWriter.addMCPServer(dirs.getMCPConfigPath("user"), name, { type: "http", url });
+/** Adds `config` as `name` to omp's user-level MCP config, which new omp sessions load. */
+export const addMcpServer = (name: string, config: McpServerConfig): Promise<void> => mcpConfigWriter.addMCPServer(dirs.getMCPConfigPath("user"), name, config);
+
+/** Removes `name` from omp's user-level MCP config. */
+export const removeMcpServer = (name: string): Promise<void> => mcpConfigWriter.removeMCPServer(dirs.getMCPConfigPath("user"), name);
+
+/** Enables or disables `name` as `/mcp enable` and `/mcp disable` do, in omp's user-level MCP config. */
+export const setMcpServerEnabled = (name: string, enabled: boolean): Promise<void> =>
+	mcpConfigWriter.setMcpServerEnabled({ userPath: dirs.getMCPConfigPath("user"), name, enabled });
+
+/** Why omp refuses `name` as a server name, or `undefined`. */
+export const mcpServerNameError = (name: string): string | undefined => mcpConfigWriter.validateServerName(name);
+
+/** A server omp loads for you, and the file that names it; `enabled: false` for one your user config turns off. */
+export interface ConfiguredMcpServer {
+	name: string;
+	config: McpServerConfig;
+	source: McpSourceMeta;
+	enabled: boolean;
+}
+
+/**
+ * Every user-level server omp loads, from its own `mcp.json` and the other tools' configs it reads, then the servers
+ * omp's `mcp.json` defines but turns off. Project configs are left out: they differ by workspace.
+ */
+export async function listMcpServers(): Promise<ConfiguredMcpServer[]> {
+	const userPath = userMcpConfigPath();
+	const [{ configs, sources }, file] = await Promise.all([
+		mcpConfig.loadAllMCPConfigs(process.cwd(), { enableProjectConfig: false }),
+		mcpConfigWriter.readMCPConfigFile(userPath),
+	]);
+	const native: McpSourceMeta = { provider: "native", providerName: "OMP", path: userPath, level: "user" };
+	const loaded = Object.entries(configs).map(([name, config]) => ({ name, config, source: sources[name] ?? native, enabled: true }));
+	const off = Object.entries(file.mcpServers ?? {})
+		.filter(([name]) => !(name in configs))
+		.map(([name, config]) => ({ name, config, source: native, enabled: false }));
+	return [...loaded, ...off];
+}
+
+/** A server answered 401 to the request omp sent: it wants a sign-in omp lacks, or refused the one omp sent. */
+export class McpUnauthorized extends Error {}
+
+const toolLists = createCache<McpToolDefinition[]>(CHECK_MS);
+
+/**
+ * Every tool remote server `name` offers, read by connecting with omp's own client: its configured headers, and
+ * `credentialId`'s token when given. The list serves a minute unless `fresh`; a failure is not kept. Throws
+ * {@link McpUnauthorized} on a 401, and the client's error on any other failure.
+ */
+export const listMcpTools = (name: string, config: McpServerConfig, credentialId: string | null, fresh: boolean): Promise<McpToolDefinition[]> =>
+	toolLists.get(
+		name,
+		async () => {
+			const expanded = discoveryHelpers.expandEnvVarsDeep(config);
+			const headers = { ...expanded.headers, ...(credentialId ? { Authorization: `Bearer ${await tokenOf(credentialId)}` } : {}) };
+			const signal = AbortSignal.timeout(TIMEOUT_MS);
+			let connection: McpConnection | undefined;
+			try {
+				connection = await mcpClient.connectToServer(name, { ...expanded, headers }, { signal });
+				return await mcpClient.listTools(connection, { signal });
+			} catch (err) {
+				// omp's HTTP transport throws `MCPTransportError`, `failure: "http_status"` with the status as `code`, on a refused
+				// request; its legacy SSE transport throws a plain `HTTP 401: <body>` error.
+				const unauthorized = isObject(err) && err.failure === "http_status" ? err.code === 401 : err instanceof Error && err.message.startsWith("HTTP 401:");
+				if (unauthorized) throw new McpUnauthorized(`${name} answered 401 Unauthorized`);
+				throw err;
+			} finally {
+				if (connection) await mcpClient.disconnectServer(connection).catch(() => {});
+			}
+		},
+		fresh,
+	);
+
+/** Forgets server `name`'s tool list, after a change to its config or sign-in. */
+export const forgetMcpTools = (name: string): void => toolLists.drop(name);
 
 /** omp's user-level MCP config path. Slack's and Google Calendar's app settings live in that file, not in a second store. */
 export const userMcpConfigPath = (): string => dirs.getMCPConfigPath("user");

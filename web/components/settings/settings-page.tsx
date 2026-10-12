@@ -11,6 +11,7 @@ import { AnalyticsTab } from "./analytics-tab";
 import type { Catalog, Editing } from "./editor";
 import { Files } from "./files-tab";
 import { IntegrationsTab } from "./integrations-tab";
+import { McpServersTab } from "./mcp-servers-tab";
 import { PreferencesTab } from "./preferences-tab";
 import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
@@ -129,6 +130,7 @@ export function SettingsPage({
 		providers: <ProvidersTab active={section === "providers"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
 		integrations: <IntegrationsTab active={section === "integrations"} />,
+		"mcp-servers": <McpServersTab active={section === "mcp-servers"} />,
 		"source-control": <SourceControlTab active={section === "source-control"} />,
 		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} pins={pins} />,

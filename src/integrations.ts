@@ -123,7 +123,7 @@ export async function startIntegrationSignIn(id: McpIntegrationId): Promise<McpI
 		}
 		const found = await findServer(id);
 		await signInMcp(found ?? { url: service.url }, { onAuth: waiting, signal, requireRefresh: id === "slack" });
-		if (!found) await addMcpServer(service.serverName, service.url);
+		if (!found) await addMcpServer(service.serverName, { type: "http", url: service.url });
 	});
 	return loadIntegration(id, await findServer(id), false);
 }

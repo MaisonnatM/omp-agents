@@ -3,6 +3,21 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { BrandLogo } from "./brand-logos";
 
+/** A row's mark on its tile: a brand's 24×24 path, in its color or the text color, else `name`'s first letter. */
+export function MarkTile({ logo, name }: { logo: BrandLogo | null; name: string }) {
+	return (
+		<span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-5 text-foreground shadow-surface-2">
+			{logo ? (
+				<svg viewBox="0 0 24 24" className="size-5" fill={logo.color}>
+					<path d={logo.path} />
+				</svg>
+			) : (
+				<span className="text-sm font-medium text-muted-foreground">{name.charAt(0).toUpperCase()}</span>
+			)}
+		</span>
+	);
+}
+
 /** Integration rows on one raised surface, a hairline between rows. */
 export function IntegrationList({ label, children }: { label: string; children: ReactNode }) {
 	return (
@@ -14,10 +29,11 @@ export function IntegrationList({ label, children }: { label: string; children: 
 
 interface IntegrationRowProps {
 	name: string;
-	logo: BrandLogo;
+	/** The row's {@link MarkTile}. */
+	mark: ReactNode;
 	status: ReactNode;
 	/** What connecting it gives you. */
-	summary: string;
+	summary: ReactNode;
 	/** Where the connection lives, as short facts under the summary. */
 	meta: ReactNode;
 	actions: ReactNode;
@@ -26,15 +42,11 @@ interface IntegrationRowProps {
 }
 
 /** One integration: its brand mark, name, status, and buttons, then whatever it has to say under them. */
-export function IntegrationRow({ name, logo, status, summary, meta, actions, children }: IntegrationRowProps) {
+export function IntegrationRow({ name, mark, status, summary, meta, actions, children }: IntegrationRowProps) {
 	return (
 		<li className="p-4">
 			<div className="flex items-start gap-3.5">
-				<span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-surface-5 shadow-surface-2">
-					<svg viewBox="0 0 24 24" className="size-5" fill={logo.color}>
-						<path d={logo.path} />
-					</svg>
-				</span>
+				{mark}
 				<div className="min-w-0 flex-1">
 					<div className="flex flex-wrap items-center gap-x-2 gap-y-1">
 						<h3 className="text-[13px] font-medium">{name}</h3>

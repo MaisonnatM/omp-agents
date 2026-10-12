@@ -333,9 +333,33 @@ export interface McpServerConfig {
 		prompt?: string;
 	};
 }
+/** Subset of omp's `SourceMeta` (src/capability/types.ts): where omp found a server's config. */
+export interface McpSourceMeta {
+	/** `native` for omp's own `mcp.json`, else the tool whose config named it, such as `claude`. */
+	provider: string;
+	providerName: string;
+	path: string;
+	level: "user" | "project" | "native";
+}
 export interface McpConfigModule {
-	/** The MCP servers omp would start in `cwd`: disabled ones (`disabledServers`, `enabled: false`) left out, `url` env vars not yet expanded. */
-	loadAllMCPConfigs(cwd: string, options?: { enableProjectConfig?: boolean }): Promise<{ configs: Record<string, McpServerConfig> }>;
+	/** The MCP servers omp would start in `cwd`, with where each was found: disabled ones (`disabledServers`, `enabled: false`) left out, `url` env vars not yet expanded. */
+	loadAllMCPConfigs(cwd: string, options?: { enableProjectConfig?: boolean }): Promise<{ configs: Record<string, McpServerConfig>; sources: Record<string, McpSourceMeta> }>;
+}
+/** Subset of omp's `MCPToolDefinition` (src/mcp/types.ts). */
+export interface McpToolDefinition {
+	name: string;
+	description?: string;
+}
+/** omp's `MCPServerConnection` (src/mcp/types.ts), opaque here: a connected server's transport. */
+export interface McpConnection {
+	name: string;
+}
+export interface McpClientModule {
+	/** Connects and initializes `config` as omp's sessions do, over its HTTP, SSE, or stdio transport. */
+	connectToServer(name: string, config: McpServerConfig, options?: { signal?: AbortSignal }): Promise<McpConnection>;
+	/** Every tool the connected server offers, following its cursor. */
+	listTools(connection: McpConnection, options?: { signal?: AbortSignal }): Promise<McpToolDefinition[]>;
+	disconnectServer(connection: McpConnection): Promise<void>;
 }
 export interface McpCredentialsModule {
 	/** The credential ids omp looks a server's OAuth sign-in up under when its config names none. */
@@ -392,12 +416,21 @@ export interface McpConfigFile {
 	disabledServers?: string[];
 }
 export interface McpConfigWriterModule {
-	/** Adds a server to an MCP config file; throws when the file already has one by that name. */
-	addMCPServer(filePath: string, name: string, config: { type: "http"; url: string }): Promise<void>;
+	/** Adds a server to an MCP config file; throws when the file already has one by that name or omp rejects the name or config. */
+	addMCPServer(filePath: string, name: string, config: McpServerConfig): Promise<void>;
 	/** Replaces one server, or adds it, under the config file lock. The file mode stays owner-only. */
 	updateMCPServer(filePath: string, name: string, config: McpServerConfig): Promise<void>;
+	/** Removes a server from an MCP config file; throws when the file has none by that name. */
+	removeMCPServer(filePath: string, name: string): Promise<void>;
+	/**
+	 * Enables or disables `name` as omp's `/mcp enable` and `/mcp disable` do: writes `enabled` on the first of the paths that
+	 * defines it, else adds it to the user file's `disabledServers` or `enabledServers` list.
+	 */
+	setMcpServerEnabled(options: { userPath: string; projectPath?: string; sourcePath?: string; name: string; enabled: boolean }): Promise<void>;
 	/** The parsed MCP file, or `{ mcpServers: {} }` when it is not there yet. */
 	readMCPConfigFile(filePath: string): Promise<McpConfigFile>;
+	/** Why omp refuses `name` as a server name, or `undefined` when it accepts it. */
+	validateServerName(name: string): string | undefined;
 }
 
 export interface DiscoveryHelpersModule {
@@ -605,6 +638,11 @@ export const configFiles = await load<ConfigFilesModule>(join(srcDir, "config.ts
 export const markit = await load<MarkitModule>(join(srcDir, "utils", "markit.ts"), { convertBufferWithMarkit: "function" });
 export const mcpRpc = await load<McpRpcModule>(join(srcDir, "mcp", "json-rpc.ts"), { callMCP: "function" });
 export const mcpConfig = await load<McpConfigModule>(join(srcDir, "mcp", "config.ts"), { loadAllMCPConfigs: "function" });
+export const mcpClient = await load<McpClientModule>(join(srcDir, "mcp", "client.ts"), {
+	connectToServer: "function",
+	listTools: "function",
+	disconnectServer: "function",
+});
 export const mcpCredentials = await load<McpCredentialsModule>(join(srcDir, "mcp", "oauth-credentials.ts"), {
 	mcpOAuthCredentialIdsForServerUrl: "function",
 	removeManagedMcpOAuthCredentials: "function",
@@ -617,7 +655,10 @@ export const mcpOAuthFlow = await load<McpOAuthFlowModule>(join(srcDir, "mcp", "
 export const mcpConfigWriter = await load<McpConfigWriterModule>(join(srcDir, "mcp", "config-writer.ts"), {
 	addMCPServer: "function",
 	updateMCPServer: "function",
+	removeMCPServer: "function",
+	setMcpServerEnabled: "function",
 	readMCPConfigFile: "function",
+	validateServerName: "function",
 });
 
 const statsSrc = join(dirname(packageDir), "omp-stats", "src");

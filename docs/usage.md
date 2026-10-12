@@ -19,6 +19,7 @@ An action that fails shows its error, and its control becomes available again.
 - [Starting, ending, resuming, and forking](#starting-ending-resuming-and-forking)
 - [Pull requests](#pull-requests)
 - [Integrations](#integrations)
+- [MCP servers](#mcp-servers)
 - [Todo list](#todo-list)
 - [Calendar](#calendar)
 - [Routines](#routines)
@@ -820,6 +821,30 @@ An action that fails shows its error, and its control becomes available again.
   Gmail's MCP tools also need the Gmail MCP API on in that project; the row links to it when Google refuses them.
   The Inbox page reads Google's Gmail API and does not need the MCP API.
 
+## MCP servers
+
+- **MCP servers** is a section of [Settings](#settings), at `#settings/mcp-servers`: every MCP server omp loads for you, then **Discover**, a catalog of remote servers to add.
+  It lists the servers in omp's user `~/.omp/agent/mcp.json` and the user-level servers omp reads from other tools' configs, but not a project's `.mcp.json`.
+  The section checks the servers every minute while it is open, and **Refresh** checks at once.
+- **Installed** shows each server with its vendor's mark, or its initial, its transport, and its host or command.
+  A remote server shows whether omp can use it, by listing its tools with omp's sign-in: **Connected** with the number of tools, which unfolds to their names, each with its description on hover, **Signed out** with **Connect** when it asks for a sign-in omp lacks, **Needs reconnecting** when it refuses omp's sign-in, or **Unreachable** with its error and **Check again**.
+  A local server, which runs a command, says **Not checked**, as only an omp session starts it.
+  A server whose config lives in another tool's file says **From** that tool, and the section does not change it.
+  Linear, Slack, Google Calendar, and Gmail show the status that [Integrations](#integrations) reads, and **Open** goes there to sign in or out.
+- **Connect** and **Reconnect** sign in the way omp's `/mcp reauth` does, in a new tab, and the row waits for you there as an integration's does.
+  The **⋯** menu holds **Reconnect** and **Sign out** for a server omp holds a sign-in for, and **Disable** and **Remove** for a server in omp's own file.
+  **Disable** keeps the server in `mcp.json` but stops new omp sessions loading it, as `/mcp disable` does, and **Enable** turns it back on.
+  **Remove** asks first, then deletes the server from `mcp.json`, as `/mcp remove` does; omp keeps its sign-in.
+- **Discover** lists vetted remote servers, each its vendor's own, by category, with **Search** to filter them.
+  Each card says whether the server signs in with OAuth or needs no sign-in.
+  **Add** writes the server to `mcp.json` under the card's name, such as `sentry`, or `sentry-2` when that name is taken; for an OAuth server it opens the vendor's sign-in in a new tab at once.
+  A card whose server is already installed, matched by its host, says **Added as** with the server's name instead.
+- **Add server** adds a remote server by its name and address, over streamable HTTP or the older SSE transport.
+  The address must be `https://`, or `http://` on this computer.
+  An optional header, such as `Authorization: Bearer …`, goes into the server's entry in `mcp.json`; write `${VAR}` as its value to read it from your environment instead.
+  A server added this way does not start a sign-in; when it asks for one, its row says **Signed out** with **Connect**.
+- New omp sessions load the servers added here, and a running session loads them after `/mcp reload`.
+
 ## Todo list
 
 - The **Todo** tab, or a `#todo` address, opens todos of your own, not tied to a session or a workspace, in place of the panes.
@@ -1099,8 +1124,8 @@ An action that fails shows its error, and its control becomes available again.
 - **Settings** is the last sidebar tab by default, after **Calendar** and, once Gmail is connected, **Inbox**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
-  The sidebar lists nine sections in two groups.
-  **General** holds **Analytics**, **Preferences**, **Providers**, **Integrations**, **Source control providers**, and **Workspaces**, which are the same whatever the workspace.
+  The sidebar lists ten sections in two groups.
+  **General** holds **Analytics**, **Preferences**, **Providers**, **Integrations**, **MCP servers**, **Source control providers**, and **Workspaces**, which are the same whatever the workspace.
   **This workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the sidebar's workspace loads them; only these sections show the workspace picker.
   It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
@@ -1166,6 +1191,7 @@ An action that fails shows its error, and its control becomes available again.
   Choose **None** to unpin.
 - **Providers** signs omp in to the model providers its sessions call, as `/login` and `omp login` do; see [Providers](#providers).
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar and Gmail; see [Integrations](#integrations).
+- **MCP servers** lists every MCP server omp loads and adds more from a catalog or by address; see [MCP servers](#mcp-servers).
 - **Source control providers** shows whether the `gh` and `gt` command-line tools are installed and signed in; **Check again** reads them again.
   **Automatically pull** keeps the default branch current when the checkout has no local changes or commits; it is off by default, and the server checks every five minutes and right after a change.
   Each repository your workspaces use lists its last pull and an override, **Default**, **On**, or **Off**; the server keeps both in `source-control.json` beside its access token.

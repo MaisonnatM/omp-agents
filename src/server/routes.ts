@@ -13,6 +13,7 @@ import type { GoogleCalendarClient } from "../google-calendar";
 import type { GmailClient } from "../gmail";
 import { loadPullRequests, loadPullRequestDetail } from "../pull-requests";
 import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
+import { addMcpServerFrom, loadMcpServers, McpServerRejected, removeMcpServerNamed, setMcpServerEnabledFrom, signOutMcpServer, startMcpServerSignIn } from "../mcp-servers";
 import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
 import { blobsDir } from "../omp/config";
 import { connectedModels, connectedRoles, listModels } from "../omp/models";
@@ -41,7 +42,7 @@ import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
-import { type Parsed, parseAutoPullChange, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
+import { type Parsed, parseAutoPullChange, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
 import type { AutoPullChange, SourceControlAnswer } from "../shared/source-control";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
@@ -292,7 +293,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 	};
 }
 
-/** The MCP integrations and Linear tickets. */
+/** The MCP integrations, the other MCP servers omp loads, and Linear tickets. */
 function integrationRoutes({ get, write }: RouteKit): Routes {
 	/** `GET /api/integrations[?fresh]`: where omp stands with each MCP integration's server, and the sign-in the page last started. */
 	const integrations = get(params => answer(() => loadIntegrations(params.has("fresh"))));
@@ -314,6 +315,31 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 
 	/** `PUT /api/integrations/<google-calendar|gmail>/client`: `{ clientId, clientSecret?, callbackPort }` of your Google OAuth client for that service. */
 	const googleClient = (id: GoogleService): Handler => write(body => checked(parseGoogleClient(body)), input => saveGoogleClient(id, input), refuseClient);
+
+	/** `GET /api/mcp-servers[?fresh]`: every user-level MCP server omp loads, where omp stands with each, and its sign-in under way. */
+	const mcpServers = get(params => answer(() => loadMcpServers(params.has("fresh"))));
+
+	const refuseMcp = (err: unknown): Response | null => (err instanceof McpServerRejected ? fail(400, err.message) : null);
+
+	/** A write of `{ name }` naming an MCP server, answered with what `act` answers. */
+	const mcpServerWrite = (act: (name: string) => Promise<unknown>): Handler =>
+		write(body => checked(parseMcpServerName(body), "Expected { name } naming an MCP server"), act, refuseMcp);
+
+	/** `PUT /api/mcp-servers/add`: a catalog entry or a server by its address, added to omp's user `mcp.json`; answers its row. */
+	const mcpServerAdd = write(body => checked(parseMcpServerAdd(body)), addMcpServerFrom, refuseMcp);
+
+	/** `PUT /api/mcp-servers/enabled`: `{ name, enabled }`, as `/mcp enable` and `/mcp disable` do; answers the row. */
+	const mcpServerEnabled = write(
+		body => checked(parseMcpServerEnabled(body), "Expected { name, enabled } naming an MCP server"),
+		({ name, enabled }) => setMcpServerEnabledFrom(name, enabled),
+		refuseMcp,
+	);
+
+	/** `PUT /api/mcp-servers/remove`: removes the server from omp's user `mcp.json`, as `/mcp remove` does; answers `{}`. */
+	const mcpServerRemove = mcpServerWrite(async name => {
+		await removeMcpServerNamed(name);
+		return {};
+	});
 
 	/** `GET /api/tickets[?fresh]`: the viewer's assigned Linear issues, or why they could not be read. */
 	const tickets = get(params => answer(() => loadTickets(params.has("fresh"))));
@@ -364,6 +390,12 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 		"/api/integrations": { GET: integrations },
 		"/api/integrations/sign-in": { PUT: integrationSignIn },
 		"/api/integrations/sign-out": { PUT: integrationSignOut },
+		"/api/mcp-servers": { GET: mcpServers },
+		"/api/mcp-servers/add": { PUT: mcpServerAdd },
+		"/api/mcp-servers/sign-in": { PUT: mcpServerWrite(startMcpServerSignIn) },
+		"/api/mcp-servers/sign-out": { PUT: mcpServerWrite(signOutMcpServer) },
+		"/api/mcp-servers/enabled": { PUT: mcpServerEnabled },
+		"/api/mcp-servers/remove": { PUT: mcpServerRemove },
 		"/api/integrations/slack/client": { PUT: slackClient },
 		...Object.fromEntries(GOOGLE_SERVICES.map(id => [`/api/integrations/${id}/client`, { PUT: googleClient(id) }])),
 		"/api/tickets": { GET: tickets },
