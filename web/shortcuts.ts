@@ -55,7 +55,7 @@ export type ShortcutId =
 	| "calendarNewEvent"
 	| "inboxNext"
 	| "inboxPrevious"
-	| "inboxBack"
+	| "inboxClose"
 	| "inboxOnGmail"
 	| "nextChangedFile"
 	| "previousChangedFile"
@@ -199,12 +199,12 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	// After a G, P is also the Todo page's `todoPriority`: the page outranks the App, so the priority wins while a todo is focused or open, and its handler declines otherwise.
 	{ id: "projects", category: "general", label: "Go to your projects", command: "Go to projects", keys: [{ goTo: "p" }] },
 	{ id: "workspace", category: "general", label: "Choose the sidebar's workspace", keys: [{ goTo: "w" }] },
-	{ id: "nextPullRequest", category: "pull-requests", label: "Move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "previousPullRequest", category: "pull-requests", label: "Move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
-	{ id: "pullRequestOnGitHub", category: "pull-requests", label: "Open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
-	{ id: "pullRequestActions", category: "pull-requests", label: "Open the pull request's quick actions", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
-	{ id: "giveToAgent", category: "pull-requests", label: "Give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
-	{ id: "todoSearch", category: "todo", label: "Search the todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
+	{ id: "nextPullRequest", category: "pull-requests", label: "Pull requests: move to the next pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
+	{ id: "previousPullRequest", category: "pull-requests", label: "Pull requests: move to the previous pull request, or show its details while one shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{ id: "pullRequestOnGitHub", category: "pull-requests", label: "Pull requests: open the pull request on GitHub", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
+	{ id: "pullRequestActions", category: "pull-requests", label: "Pull requests: open the pull request's quick actions", keys: [{ chord: { key: "." }, scope: "outside-fields" }] },
+	{ id: "giveToAgent", category: "pull-requests", label: "Pull requests: give the pull request's next move to an agent, through its quick action", keys: [{ chord: { key: "e" }, scope: "outside-fields" }] },
+	{ id: "todoSearch", category: "todo", label: "Search the Todo page's todos", keys: [{ chord: { key: "/" }, scope: "outside-fields" }] },
 	{ id: "todoNext", category: "todo", label: "Focus the next todo, or open it while a todo is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
 	{ id: "todoPrevious", category: "todo", label: "Focus the previous todo, or open it while a todo is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "todoCheck", category: "todo", label: "Mark the focused or open todo Done, or a closed one Todo again", keys: [{ chord: { key: "x" }, scope: "outside-fields" }] },
@@ -214,13 +214,13 @@ export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "todoDue", category: "todo", label: "Change the focused or open todo's due day", keys: [{ chord: { key: "d", shift: true }, scope: "outside-fields" }] },
 	{ id: "todoNew", category: "todo", label: "Add a todo to the Todo group", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
 	{ id: "todoClose", category: "todo", label: "Close the open todo", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
-	{ id: "calendarNewEvent", category: "calendar", label: "Add an event", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "inboxNext", category: "inbox", label: "Move to the next conversation, or open it while a conversation shows", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "inboxPrevious", category: "inbox", label: "Move to the previous conversation, or open it while a conversation shows", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
-	{ id: "inboxBack", category: "inbox", label: "Go back from a conversation to the list", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
-	{ id: "inboxOnGmail", category: "inbox", label: "Open the conversation in Gmail", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
-	{ id: "nextChangedFile", category: "changes", label: "Open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
-	{ id: "previousChangedFile", category: "changes", label: "Open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{ id: "calendarNewEvent", category: "calendar", label: "Calendar: add an event", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
+	{ id: "inboxNext", category: "inbox", label: "Inbox: focus the next conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
+	{ id: "inboxPrevious", category: "inbox", label: "Inbox: focus the previous conversation, or open it while a conversation is open", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
+	{ id: "inboxClose", category: "inbox", label: "Inbox: close the open conversation", keys: [{ chord: { key: "Escape" }, scope: "outside-fields" }] },
+	{ id: "inboxOnGmail", category: "inbox", label: "Inbox: open the focused or open conversation in Gmail", keys: [{ chord: { key: "o" }, scope: "outside-fields" }] },
+	{ id: "nextChangedFile", category: "changes", label: "Changes: open the next changed file", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
+	{ id: "previousChangedFile", category: "changes", label: "Changes: open the previous changed file", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "moveUp", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, up", keys: [{ chord: { key: "ArrowUp", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "moveDown", category: "todo", label: "Move the focused todo, or the focused repository, section, or pull request of the pull request list, down", keys: [{ chord: { key: "ArrowDown", alt: true, shift: true }, scope: "anywhere" }] },
 	{ id: "terminal", category: "general", label: "Show or hide the terminal", command: "Toggle terminal", keys: [{ chord: { key: "`", ctrl: true }, scope: "anywhere" }] },

@@ -25,6 +25,9 @@ export interface InboxAnswer {
 	threads: MailThread[];
 }
 
+/** The conversation `id` in Gmail, signed in as `address`, whichever account the browser signed in first. */
+export const threadUrl = (address: string, id: string): string => `https://mail.google.com/mail/?authuser=${encodeURIComponent(address)}#inbox/${id}`;
+
 /** Someone an address header names. */
 export interface MailPerson {
 	/** Their display name; `""` when the header gives none. */

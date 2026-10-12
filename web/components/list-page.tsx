@@ -47,7 +47,7 @@ interface DetailPageProps {
 	className?: string;
 }
 
-/** A page for one item of a list, a pull request, an issue, or a conversation: the frame with a back arrow to the list, `notice`, and the item's content. */
+/** A page for one item of a list, a pull request or an issue: the frame with a back arrow to the list, `notice`, and the item's content. */
 export function DetailPage({ title, meta, backHref, backLabel, notice, actions, children, className }: DetailPageProps) {
 	const back = (
 		<Tooltip content={backLabel} side="bottom">
@@ -88,20 +88,48 @@ interface ListPageProps<Data> {
 	children: (data: Data) => ReactNode;
 }
 
-/** A page of lists read from GitHub or Linear with a Refresh button, `notice`, and the lists once the first read loads. */
-export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, className, actions, children }: ListPageProps<Data>) {
-	const { read, error, refreshing } = poll;
-	let body: ReactNode;
-	if (!read) body = <LoadNote loading={loading} error={error && `Cannot load ${noun}: ${error}`} />;
-	else {
-		body = (
-			<>
-				{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh {noun}: {error}</p>}
-				{children(read.data)}
-			</>
-		);
-	}
+/** A page header's Refresh button, which reads the page's data again now. */
+function RefreshButton({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) {
+	return (
+		<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={onRefresh}>
+			{refreshing ? "Refreshing…" : "Refresh"}
+		</Button>
+	);
+}
 
+interface PolledContentProps<Data> {
+	/** What the load and refresh errors call the data: "the tickets". */
+	noun: string;
+	/** What shows while the first read loads. */
+	loading: string;
+	poll: PolledEntry<Data>;
+	children: (data: Data) => ReactNode;
+}
+
+/** The load note until `poll`'s first read arrives, then its data under why the latest refresh failed, if it did. */
+export function PolledContent<Data>({ noun, loading, poll: { read, error }, children }: PolledContentProps<Data>) {
+	if (!read) return <LoadNote loading={loading} error={error && `Cannot load ${noun}: ${error}`} />;
+	return (
+		<>
+			{error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh {noun}: {error}</p>}
+			{children(read.data)}
+		</>
+	);
+}
+
+interface PolledPageFrameProps<Data> {
+	title: string;
+	/** What the page lists, under its title; the time of the last read follows it once there is one. */
+	meta: string;
+	poll: PolledEntry<Data>;
+	onRefresh: () => void;
+	actions?: ReactNode;
+	children: (data: Data) => ReactNode;
+}
+
+/** A polled page's frame: its title and `meta` (with the time of the last read once there is one), its `actions`, a Refresh button, and its `children`. */
+export function PolledPageFrame<Data>({ title, meta, poll, onRefresh, actions, children }: PolledPageFrameProps<Data>) {
+	const { read, refreshing } = poll;
 	return (
 		<PageFrame
 			title={title}
@@ -109,19 +137,30 @@ export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, no
 			actions={
 				<>
 					{actions}
-					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={onRefresh}>
-						{refreshing ? "Refreshing…" : "Refresh"}
-					</Button>
+					<RefreshButton refreshing={refreshing} onRefresh={onRefresh} />
 				</>
 			}
 		>
-			<TooltipProvider>
-				<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", className)}>
-					{notice}
-					{body}
-				</div>
-			</TooltipProvider>
+			{children(read?.data ?? (null as unknown as Data))}
 		</PageFrame>
+	);
+}
+
+/** A page of lists read from GitHub or Linear with a Refresh button, `notice`, and the lists once the first read loads. */
+export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, className, actions, children }: ListPageProps<Data>) {
+	return (
+		<PolledPageFrame title={title} meta={meta} poll={poll} onRefresh={onRefresh} actions={actions}>
+			{() => (
+				<TooltipProvider>
+					<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", className)}>
+						{notice}
+						<PolledContent noun={noun} loading={loading} poll={poll}>
+							{children}
+						</PolledContent>
+					</div>
+				</TooltipProvider>
+			)}
+		</PolledPageFrame>
 	);
 }
 
@@ -136,9 +175,13 @@ export function stepRows<T>(items: readonly T[], rowOf: (item: T) => HTMLElement
 	const next = at >= 0 ? items[at + by] : entersList ? items[by === 1 ? 0 : items.length - 1] : undefined;
 	if (!next) return at >= 0;
 	const row = rowOf(next);
-	if (!row) return at >= 0;
-	const link = row.querySelector("a") as HTMLElement | null;
-	if (!link) return at >= 0;
+	return (row !== null && focusRow(row)) || at >= 0;
+}
+
+/** Focuses `row`'s link and scrolls the row into view in its list. Returns `false` when the row holds no link. */
+export function focusRow(row: HTMLElement): boolean {
+	const link = row.querySelector("a");
+	if (!link) return false;
 	link.focus({ preventScroll: true });
 	row.scrollIntoView({ block: "nearest" });
 	return true;

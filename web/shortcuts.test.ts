@@ -95,7 +95,7 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	expect(shortcutsFor(keyEvent("Escape", "Escape"), null, false)).toEqual([
 		{ id: "restore", scope: "anywhere" },
 		{ id: "todoClose", scope: "outside-fields" },
-		{ id: "inboxBack", scope: "outside-fields" },
+		{ id: "inboxClose", scope: "outside-fields" },
 	]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true }), null, false)).toEqual([]);
 	expect(shortcutsFor(keyEvent("/", "Slash", { ctrl: true, alt: true }), null, false)).toEqual([{ id: "model", scope: "anywhere" }]);

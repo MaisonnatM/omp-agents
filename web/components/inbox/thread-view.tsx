@@ -1,15 +1,15 @@
 import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw } from "lucide-react";
 import { useEffect, useReducer } from "react";
-import type { MailAttachment, MailMessage, MailThread } from "../../../src/shared/gmail";
+import type { MailAttachment, MailMessage, MailPerson, MailThread } from "../../../src/shared/gmail";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { foldMessages, foldsAfter, linkParts, NO_FOLDS, personLabel, recipientsLine } from "../../inbox-model";
+import { colorIndex, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, personLabel, recipientsLine } from "../../inbox-model";
 import { formatBytes, mailTime } from "../../labels";
 import { mailThreadStore, useMailThread } from "../../reads";
 import { hashForInbox } from "../../routing";
-import { shortcutLabels, useShortcuts } from "../../shortcuts";
-import { DetailPage } from "../list-page";
+import { shortcutLabels } from "../../shortcuts";
+import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, type BarAction } from "../list-split";
 import { LoadNote } from "../sheet-details";
 import { MailFrame } from "./mail-frame";
 
@@ -74,7 +74,33 @@ function Body({ message, thread, title }: { message: MailMessage; thread: string
 	}
 }
 
-const ROW = "flex w-full min-w-0 items-center gap-3 rounded-md px-3 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
+/** Avatar backgrounds that white letters read on in both themes; {@link colorIndex} picks one per sender. */
+const AVATAR_COLORS = [
+	"bg-rose-600",
+	"bg-orange-600",
+	"bg-amber-600",
+	"bg-lime-700",
+	"bg-emerald-600",
+	"bg-teal-600",
+	"bg-cyan-700",
+	"bg-sky-600",
+	"bg-blue-600",
+	"bg-indigo-600",
+	"bg-violet-600",
+	"bg-fuchsia-600",
+	"bg-pink-600",
+] as const;
+
+/** A round badge with the initial of `person`, in the colour their address always takes. */
+function Avatar({ person }: { person: MailPerson }) {
+	return (
+		<span aria-hidden className={cn("flex size-8 shrink-0 select-none items-center justify-center rounded-full text-sm font-medium text-white", AVATAR_COLORS[colorIndex(person.address, AVATAR_COLORS.length)])}>
+			{initialOf(person)}
+		</span>
+	);
+}
+
+const ROW = "flex w-full min-w-0 gap-3 rounded-md px-2 text-left outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
 interface MessageProps {
 	message: MailMessage;
@@ -85,21 +111,26 @@ interface MessageProps {
 	onToggle: () => void;
 }
 
-/** A message in full: its sender and date over whom it went to, its attachments, and its body; the header closes it. */
+/** A message in full: the sender's avatar, name, and address, the date, and whom it went to, then its attachments and body under the name; the header closes it. */
 function OpenMessage({ message, thread, address, onToggle }: MessageProps) {
 	const sender = senderLabel(message, address);
 	const recipients = recipientsLine(message, address);
 	return (
-		<article className="space-y-3 pb-3">
-			<button type="button" aria-expanded onClick={onToggle} className={cn(ROW, "h-10 text-sm")}>
-				<span className="flex min-w-0 flex-1 items-baseline gap-2">
-					<span className="truncate font-semibold">{sender}</span>
-					{message.from.name && <span className="truncate text-xs text-muted-foreground">{message.from.address}</span>}
+		<article className="space-y-3 py-4">
+			<button type="button" aria-expanded onClick={onToggle} className={cn(ROW, "items-start py-1.5")}>
+				<Avatar person={message.from} />
+				<span className="min-w-0 flex-1">
+					<span className="flex items-baseline gap-2 text-sm">
+						<span className="truncate font-semibold">{sender}</span>
+						{message.from.name && <span className="min-w-0 truncate text-xs text-muted-foreground">{message.from.address}</span>}
+						<span className="ml-auto">
+							<MailTime at={message.at} />
+						</span>
+					</span>
+					{recipients && <span className="block truncate text-xs text-muted-foreground">{recipients}</span>}
 				</span>
-				<MailTime at={message.at} />
 			</button>
-			<div className="space-y-3 px-3">
-				{recipients && <p className="truncate text-xs text-muted-foreground">{recipients}</p>}
+			<div className="space-y-3 pr-2 pl-13">
 				{message.attachments.length > 0 && <Attachments attachments={message.attachments} />}
 				<Body message={message} thread={thread} title={`Message from ${sender}`} />
 			</div>
@@ -107,12 +138,13 @@ function OpenMessage({ message, thread, address, onToggle }: MessageProps) {
 	);
 }
 
-/** A message on one line, its sender, snippet, and date, which opens it. */
+/** A message on one line, the sender's avatar and name, its snippet, and its date, which opens it. */
 function ClosedMessage({ message, address, onToggle }: MessageProps) {
 	return (
-		<button type="button" aria-expanded={false} onClick={onToggle} className={cn(ROW, "h-10 text-sm", message.unread && "font-semibold")}>
-			<span className="w-44 shrink-0 truncate">{senderLabel(message, address)}</span>
-			<span className="min-w-0 flex-1 truncate font-normal text-muted-foreground">{message.snippet}</span>
+		<button type="button" aria-expanded={false} onClick={onToggle} className={cn(ROW, "items-center py-3 text-sm")}>
+			<Avatar person={message.from} />
+			<span className={cn("max-w-[40%] shrink-0 truncate", message.unread && "font-semibold")}>{senderLabel(message, address)}</span>
+			<span className="min-w-0 flex-1 truncate text-muted-foreground">{message.snippet}</span>
 			<MailTime at={message.at} />
 		</button>
 	);
@@ -120,114 +152,111 @@ function ClosedMessage({ message, address, onToggle }: MessageProps) {
 
 interface ThreadDetailProps {
 	id: string;
-	/** The conversation as the inbox lists it, which titles the page until its read arrives; `null` when the list does not hold it. */
+	/** The conversation as the inbox lists it, which titles the panel until its read arrives; `null` when the list does not hold it. */
 	listed: MailThread | null;
-	/** The conversations listed before and after it, which ↑ and ↓ open. */
-	previous: MailThread | undefined;
-	next: MailThread | undefined;
+	/** Where it sits in the list, `null` when the list does not hold it. */
+	position: { at: number; of: number } | null;
+	/** Opens the previous listed conversation, `undefined` at the top. */
+	onPrevious?: () => void;
+	/** Opens the next listed conversation, `undefined` at the bottom. */
+	onNext?: () => void;
 	/** The inbox's own address, which reads as `me`. */
 	address: string | null;
 }
 
 /**
- * A conversation in full, as Gmail shows one: the last message and the unread ones open, earlier ones on one line, and a
- * long run of those folded into one row. ↓ and ↑ open the next and previous conversation of the list, which it reads
- * ahead, Esc goes back to the list, and O opens the conversation in Gmail. Reading it here does not mark it read, since
- * the dashboard reads Gmail read only.
+ * A conversation in full, as Superhuman shows one: a bar with where it sits in the list and its actions, its subject and
+ * who wrote in it, then its messages, folded as Gmail folds them: the last message and the unread ones open, earlier ones
+ * on one line, and a long run of those folded into one row. Reading it here does not mark it read, since the dashboard
+ * reads Gmail read only.
  */
-export function ThreadDetail({ id, listed, previous, next, address }: ThreadDetailProps) {
+export function ThreadDetail({ id, listed, position, onPrevious, onNext, address }: ThreadDetailProps) {
 	const { read, error, refreshing } = useMailThread(id, listed?.at ?? null);
 	const thread = read?.data ?? null;
 	const messages = thread?.messages ?? [];
 	const [folds, fold] = useReducer(foldsAfter, NO_FOLDS);
 	const url = thread?.url ?? listed?.url ?? null;
 
-	useEffect(() => {
-		if (previous) mailThreadStore.ensure(previous.id);
-		if (next) mailThreadStore.ensure(next.id);
-	}, [previous, next]);
-
-	const step = (neighbour: MailThread | undefined): boolean => {
-		if (!listed) return false;
-		if (neighbour) location.hash = hashForInbox(neighbour.id);
-		return true;
-	};
-	useShortcuts({
-		inboxNext: () => step(next),
-		inboxPrevious: () => step(previous),
-		inboxBack: () => {
-			location.hash = hashForInbox(null);
-		},
-		inboxOnGmail: () => {
-			if (!url) return false;
-			window.open(url, "_blank", "noopener,noreferrer");
-		},
-	});
-
 	const rows = foldMessages(messages, folds);
 	const subject = thread?.subject ?? listed?.subject ?? null;
-	const last = messages.at(-1);
 	const count = thread ? messages.length : listed?.count;
-	const meta = [last ? senderLabel(last, address) : listed?.from, count === undefined ? null : `${count} ${count === 1 ? "message" : "messages"}`].filter(Boolean).join(" · ");
+	const people = thread ? participants(messages, address) : listed ? [listed.from] : [];
+	const meta = [count === undefined ? "" : `${count} ${count === 1 ? "message" : "messages"}`, people.join(", ")].filter(Boolean).join(" · ");
 
+	const expandAll = rows.some(row => row.kind !== "open");
+	const previous: BarAction = { label: "Previous conversation", icon: CH_PREVIOUS, shortcut: "inboxPrevious", onClick: onPrevious };
+	const next: BarAction = { label: "Next conversation", icon: CH_NEXT, shortcut: "inboxNext", onClick: onNext };
+	const close: BarAction = { label: "Close", icon: CH_CLOSE, shortcut: "inboxClose", href: hashForInbox(null) };
 	return (
-		<DetailPage
-			title={subject === null ? "Conversation" : subject || "(no subject)"}
-			meta={meta || "Gmail conversation"}
-			backHref={hashForInbox(null)}
-			backLabel="Back to inbox"
-			className="max-w-4xl space-y-3"
-			actions={
-				<>
-					{rows.some(row => row.kind !== "open") && (
-						<Button variant="ghost" size="compact" leadingIcon={ChevronsUpDown} onClick={() => fold({ kind: "expand-all", messages })}>
-							Expand all
-						</Button>
-					)}
-					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={() => void mailThreadStore.refresh(id, { fresh: true })}>
-						{refreshing && thread ? "Refreshing…" : "Refresh"}
+		<section aria-label={subject || "Conversation"} className="flex min-w-0 flex-col">
+			<DetailBar
+				leading={position && <span className="tabular-nums">{position.at + 1} of {position.of}</span>}
+				previous={previous}
+				next={next}
+				close={close}
+			>
+				{expandAll && (
+					<Button variant="ghost" size="icon-compact" aria-label="Expand all" onClick={() => fold({ kind: "expand-all", messages })}>
+						<ChevronsUpDown />
 					</Button>
-					<Tooltip content="Open the conversation in Gmail" shortcut={shortcutLabels("inboxOnGmail")} side="bottom">
-						<Button variant="ghost" size="compact" leadingIcon={ExternalLink} disabled={!url} render={url ? <a href={url} target="_blank" rel="noreferrer" /> : undefined}>
-							Open in Gmail
-						</Button>
-					</Tooltip>
-				</>
-			}
-		>
-			{!thread && <LoadNote loading="Asking Gmail for the conversation…" error={error && `Cannot load the conversation: ${error}`} />}
-			{thread && error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the conversation: {error}</p>}
-			{thread && messages.length === 0 && <p className="text-sm text-muted-foreground">This conversation holds only drafts.</p>}
-			{rows.length > 0 && (
-				<ol aria-label="Messages" className="divide-y rounded-md border p-1">
-					{rows.map(row => {
-						switch (row.kind) {
-							case "open":
-							case "closed": {
-								const Message = row.kind === "open" ? OpenMessage : ClosedMessage;
-								return (
-									<li key={row.message.id}>
-										<Message message={row.message} thread={id} address={address} onToggle={() => fold({ kind: "toggle", id: row.message.id })} />
-									</li>
-								);
+				)}
+				<Tooltip content={refreshing ? "Refreshing…" : "Refresh"} disabled={refreshing}>
+					<Button variant="ghost" size="icon-compact" aria-label="Refresh" disabled={refreshing} onClick={() => void mailThreadStore.refresh(id, { fresh: true })}>
+						<RefreshCw className={cn(refreshing && "animate-spin")} />
+					</Button>
+				</Tooltip>
+				<Tooltip content="Open in Gmail" shortcut={shortcutLabels("inboxOnGmail")} disabled={!url}>
+					<Button variant="ghost" size="icon-compact" aria-label="Open in Gmail" disabled={!url} render={url ? <a href={url} target="_blank" rel="noreferrer" /> : undefined}>
+						<ExternalLink />
+					</Button>
+				</Tooltip>
+			</DetailBar>
+			<div className="w-full max-w-3xl space-y-4 px-8 py-6">
+				{subject !== null && (
+					<header className="space-y-1.5">
+						<h2 className="break-words text-2xl font-semibold leading-tight tracking-tight">{subject || "(no subject)"}</h2>
+						{meta && <p className="text-sm text-muted-foreground">{meta}</p>}
+					</header>
+				)}
+				{!thread && <LoadNote loading="Asking Gmail for the conversation…" error={error && `Cannot load the conversation: ${error}`} />}
+				{thread && error && <p role="alert" className="text-xs text-red-600 dark:text-red-400">Cannot refresh the conversation: {error}</p>}
+				{thread && messages.length === 0 && <p className="text-sm text-muted-foreground">This conversation holds only drafts.</p>}
+				{rows.length > 0 && (
+					<ol aria-label="Messages" className="-mx-2">
+						{rows.map(row => {
+							switch (row.kind) {
+								case "open":
+								case "closed": {
+									const Message = row.kind === "open" ? OpenMessage : ClosedMessage;
+									return (
+										<li key={row.message.id} className="border-t border-border first:border-t-0">
+											<Message message={row.message} thread={id} address={address} onToggle={() => fold({ kind: "toggle", id: row.message.id })} />
+										</li>
+									);
+								}
+								case "stack":
+									return (
+										// The stack stands in for the line between the messages around it, so the one after it draws none.
+										<li key={`stack-${row.ids[0]}`} className="relative flex justify-center py-3 [&+li]:border-t-0">
+											<span aria-hidden className="absolute inset-x-0 top-1/2 border-t border-border" />
+											<button
+												type="button"
+												onClick={() => fold({ kind: "unstack", ids: row.ids })}
+												className="relative rounded-full border border-border bg-background px-3 py-1 text-xs tabular-nums text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+											>
+												{row.ids.length} older messages
+											</button>
+										</li>
+									);
+								default: {
+									const never: never = row;
+									return never;
+								}
 							}
-							case "stack":
-								return (
-									<li key={`stack-${row.ids[0]}`}>
-										<button type="button" onClick={() => fold({ kind: "unstack", ids: row.ids })} className={cn(ROW, "h-9 text-xs text-muted-foreground")}>
-											<span className="rounded-full border px-2 py-0.5 tabular-nums">{row.ids.length}</span>
-											older messages
-										</button>
-									</li>
-								);
-							default: {
-								const never: never = row;
-								return never;
-							}
-						}
-					})}
-				</ol>
-			)}
-		</DetailPage>
+						})}
+					</ol>
+				)}
+			</div>
+		</section>
 	);
 }
