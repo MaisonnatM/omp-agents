@@ -24,7 +24,7 @@ function findPackageDir(): string {
 	const override = process.env.OMP_PACKAGE_DIR;
 	if (override) return override;
 	const bin = Bun.which("omp");
-	if (!bin) throw new Error("`omp` is not on PATH; set OMP_PACKAGE_DIR to the installed @oh-my-pi/pi-coding-agent directory");
+	if (!bin) throw new Error(`\`omp\` is not on PATH; install it with \`bun install -g ${PACKAGE_NAME}\`, or set OMP_PACKAGE_DIR to its installed directory`);
 	let dir = dirname(realpathSync(bin));
 	while (dir !== dirname(dir)) {
 		const manifest = join(dir, "package.json");

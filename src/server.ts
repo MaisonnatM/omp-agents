@@ -1,4 +1,5 @@
 /** The dashboard server: builds the {@link Dashboard}, serves its HTTP API, page, and sockets, then sets it following omp's files and registry. */
+import "./preflight";
 import type { Server, ServerWebSocket } from "bun";
 import { errorText } from "./json";
 import { ompVersion } from "./omp/install";

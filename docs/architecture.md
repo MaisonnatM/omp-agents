@@ -845,6 +845,8 @@ The server lives in `src/`:
   Builds the page, loads the access token, builds the `Dashboard`, starts the HTTP and WebSocket server on its routes and socket handlers, then starts it.
   `PORT` sets the port, 4317 by default.
   On `SIGINT`, `SIGTERM`, or the desktop shell's pipe ending, `shutdown()` awaits `Dashboard.stop` before it stops the server and exits; the process's `exit` handler calls `Dashboard.exited`, which writes what the stores have not and releases the owner lock, however the process exits.
+- `src/preflight.ts`: the first import of `src/server.ts`.
+  It checks the Bun version and loads `src/omp/install.ts`, so a missing requirement, such as `omp` absent from `PATH`, prints one `omp-agents:` line saying how to fix it and exits 1 instead of a stack trace.
 - `src/server/dashboard.ts`: `Dashboard`, the composition root: it builds the stores, `LiveSessions`, `Views`, `Notices`, `Broadcasts`, the inboxes, `Worktrees`, the starter, `RoutineRunner`, `ProjectRunner`, `Loops`, and the socket handler in dependency order, each handed the parts above it, and owns the live-update switch, the registry listing, the file rescans, the activity check, and the owner lock's takeover.
   Two edges point down, closing the only cycles: a live session's update reaches the parts built after `LiveSessions`, and a notice change reaches the `Broadcasts` that reads the notices; no constructor calls either.
   Nothing follows the registry, watches a directory, or publishes before `start(server)`; `stop()` first stops the loops and both inboxes, so no tick publishes while the rest shuts down, then ends the sessions started here, hangs up on the shells, stops omp-stats, flushes the stores, and aborts the routine commands still running.
@@ -1165,6 +1167,7 @@ Its `agent/` files are the default kit.
 The default `agent/AGENTS.md` keeps worktree and force-push safety inline and links to the model and review references under `agent/docs/`.
 The profile's `docs/git-workflow.md` detects Graphite with `git rev-parse --path-format=absolute --git-common-dir`, so the same procedure works from a checkout, a linked worktree, or a nested directory.
 The repository's agent guide links to the [coding standards](../CODING_STANDARDS.md), which every contributor follows, and to [agent smoke checks](agent-smoke.md) for server authentication and lifecycle, browser verification, and desktop verification.
+[Getting started](getting-started.md) walks a new user through a first session and each integration's sign-in, and `docs/images/` holds the README's screenshot.
 
 `desktop/` holds the desktop shell; see [Desktop shell](#desktop-shell).
 `desktop/main.ts` is its whole main process but for Open at Login, in `desktop/login-item.ts`, and `bun run desktop` at the root installs the package and starts it through `desktop/launch.ts`.

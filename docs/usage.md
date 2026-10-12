@@ -1,7 +1,7 @@
 # Using omp-agents
 
 The full reference for the dashboard's interface.
-For installation, see the [README](../README.md).
+For installation, see the [README](../README.md); for a first session and each integration's setup, see [Getting started](getting-started.md).
 
 A filled button marks the main action of its surface: Send, Finish, Resume on a past session, Run now on a routine, and **Work on it** on an open todo.
 Suggested prompts, other quick actions, forking, and menu items stay quiet, so they never compete with it.

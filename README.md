@@ -9,6 +9,8 @@ A local web dashboard for every [omp](https://omp.sh) session and subagent on yo
 omp-agents lists the sessions that run in your terminals and the ones it starts itself, streams each conversation as it happens, and lets you message, steer, interrupt, resume, or fork any of them from one browser tab.
 It reads omp's own session files and speaks omp's own protocols through omp's installed modules, so it stays in step with the omp version you run.
 
+![The dashboard: the session list on the left, a conversation in the middle, and the session's outline on the right](docs/images/dashboard.png)
+
 ## Contents
 
 - [Features](#features)
@@ -68,7 +70,7 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 
 - [Bun](https://bun.sh) 1.4 or later.
   Tested with Bun 1.4.2.
-- omp installed with Bun and on your `PATH`.
+- omp installed with Bun and on your `PATH`, signed in to at least one model provider with `/login`.
   Tested with omp 18.10.1.
 
   ```sh
@@ -87,13 +89,15 @@ It reads omp's own session files and speaks omp's own protocols through omp's in
 git clone https://github.com/MaisonnatM/omp-agents.git
 cd omp-agents
 bun install --frozen-lockfile
+omp config set collab.autoStart control   # show the sessions you start in a terminal
 bun start
 ```
 
 On start, the server prints a sign-in address, `http://127.0.0.1:4317/?token=<token>`.
 Open it once: it signs the browser in with a cookie, and from then on <http://127.0.0.1:4317> works in that browser.
-Sessions that the dashboard starts appear right away.
-To also see the sessions you start in a terminal, enable [Collab auto-start](#show-terminal-sessions).
+Sessions that the dashboard starts appear right away, and terminal sessions once they start after the `collab.autoStart` change; see [Show terminal sessions](#show-terminal-sessions).
+
+[Getting started](docs/getting-started.md) walks through a first session and each integration's setup.
 
 ### Desktop app
 
@@ -146,6 +150,8 @@ PORT=5000 bun start
 
 [`templates/omp`](templates/omp) holds the omp setup this project is built with: model roles and fallback chains across Anthropic, OpenAI Codex, Cursor, and OpenRouter, an `AGENTS.md`, a review agent, a `/ship` command, and skills.
 It also turns on `collab.autoStart`.
+It is opinionated: it expects accounts on those four providers, installs the third-party `pstack` plugin from the [`cursor/plugins`](https://github.com/cursor/plugins) marketplace, and sets a reply format for every session in `APPEND_SYSTEM.md`.
+Run it with `--dry-run` first to see each change.
 Install it with:
 
 ```sh
@@ -168,8 +174,8 @@ Cmd-click (Ctrl-click on Linux and Windows) opens it in a split pane.
 Click **+** to start a session, **Resume** to continue a past one, and **Fork from here** under a prompt or a reply to branch a conversation.
 The **Pull requests** tab shows your pull requests, the **Tickets** tab your Linear issues, and the **Settings** tab opens Settings.
 
-While a turn runs, Enter steers it and Cmd+Enter (Ctrl+Enter on Linux and Windows) queues a follow-up, as in omp's terminal.
-Esc interrupts the turn.
+While a turn runs, Enter queues a follow-up and Cmd+Enter (Ctrl+Enter on Linux and Windows) steers the turn.
+Esc interrupts it.
 
 In a session the dashboard started, built-in `/` commands and `!<command>` run as they do in omp's terminal.
 A terminal session cannot run them, because Collab accepts guest prompts and not host-side commands.
