@@ -19,7 +19,7 @@ import { useDefaultModel } from "../use-default-model";
 import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
-import { blockedShortcut, ComposerEditor, ComposerNote, EmptyConversation } from "./composer";
+import { blockedShortcut, ComposerEditor, ComposerNote, ComposerTray, EmptyConversation, OVER_TRAY } from "./composer";
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import type { PromptEditorHandle } from "./prompt-editor";
@@ -186,16 +186,6 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 									effort={{ current: thinking, levels: modelsRead.error === null ? levels : [], onPick: pickThinking, allowDefault: true }}
 									disabled={starting || !connected}
 								/>
-								<DirectoryPicker
-									cwd={cwd}
-									workspaces={workspaces}
-									disabled={starting}
-									shortcut="directory"
-									open={directoriesOpen}
-									onOpenChange={setDirectoriesOpen}
-									onPick={onPickCwd}
-								/>
-								{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
 								{pinnedSkill !== null && <PinnedSkillToggle name={pinnedSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 							</>
 						}
@@ -206,9 +196,26 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 							</>
 						)}
 						disabled={starting || !connected}
+						className={OVER_TRAY}
 						sendLabel={starting ? "Starting session" : "Start session"}
 						sending={starting}
 						editorProps={{ ...completion.editorProps, onKeyDown, autoFocus: true }}
+					/>
+					<ComposerTray
+						start={
+							<>
+								<DirectoryPicker
+									cwd={cwd}
+									workspaces={workspaces}
+									disabled={starting}
+									shortcut="directory"
+									open={directoriesOpen}
+									onOpenChange={setDirectoriesOpen}
+									onPick={onPickCwd}
+								/>
+								{checkout && <BranchPicker checkout={checkout} choice={choice} onChoose={next => setPicked({ cwd, choice: next })} disabled={starting} />}
+							</>
+						}
 					/>
 				</ComposerEditor>
 				{directCommand && <ComposerNote text={directCommand} />}

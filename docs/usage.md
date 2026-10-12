@@ -368,7 +368,8 @@ An action that fails shows its error, and its control becomes available again.
   While a model, Fast, or Effort change runs, the picker spins and its settings wait until the server answers.
   Terminal sessions show their model and thinking level in the same place, but Collab has no frame that changes them, so make those changes in the terminal.
   Subagents have no pickers.
-- The ring before the paperclip and the send button shows how full the session's context window is.
+- A strip tucked under the composer shows where the session works on the left and its context counter on the right.
+  The counter is a ring that fills clockwise beside the percent of the session's context window used.
   It turns amber at 70% and red at 90%.
   Hover or focus it to see the token count and the window size, for example `Context 10% full: 95.6k of 1m tokens`.
   The numbers are the ones that omp's status line shows.
@@ -388,7 +389,7 @@ An action that fails shows its error, and its control becomes available again.
   A picked suggestion is a chip at once; a reference you type becomes one once you type past it or move the caret away, so `/mo` stays text while you type `/move`.
   Typing right against a chip turns it back into text, so `/move` followed by `X` reads `/moveX`.
   The arrow keys step over a chip as over one character, Backspace removes a chip whole, undo brings it back, and the prompt you send is still the text behind each chip.
-- Attach files to a prompt with the paperclip between the context ring and the send button, by dropping them on the composer, or by pasting them, such as a screenshot.
+- Attach files to a prompt with the paperclip before the send button, by dropping them on the composer, or by pasting them, such as a screenshot.
   They show as tiles above the text field until you send; hover a tile for its **×**.
   PNG, JPEG, GIF, and WebP files go to the model as images, up to 32 MB per prompt.
   A text file, such as `.md`, `.txt`, `.json`, or source code, goes as its text, after what you typed, in the `<file name="…">` block that omp's `@file` writes.
@@ -449,7 +450,7 @@ An action that fails shows its error, and its control becomes available again.
   The page shows a new-session draft with the same header and composer as a running session: its trail reads `webapp / New session`, and hovering the workspace shows the directory that omp will run in.
   No omp process starts and no row appears in the sidebar until you send the first message, so leaving an empty draft leaves nothing running.
   The directory is the selected workspace's, else the open session's, else the newest live session's, else the newest past session's.
-  To start in another directory, under **All workspaces** or not, pick it in the directory picker after the model picker, or press Cmd+Alt+P.
+  To start in another directory, under **All workspaces** or not, pick it in the directory picker in the strip under the composer, or press Cmd+Alt+P.
   It lists the workspaces the sidebar lists, and **Use** takes any directory typed into its search field.
   The message you typed stays in the composer.
   Sending the first message starts omp there and sends it the message.
@@ -457,7 +458,7 @@ An action that fails shows its error, and its control becomes available again.
   When omp is ready, the dashboard opens the session in the focused pane.
   The draft is in the URL hash, `#new` or `#new/<encoded directory>`, and leaves the panes behind it, as **Settings** does.
   A session that you start or fork in another directory than the selected workspace switches the workspace picker to that directory, so the sidebar lists it.
-- A session that the dashboard started has the directory picker after its model picker too.
+- A session that the dashboard started has the directory picker in the strip under its composer too; other sessions show their directory's name there.
   Picking a directory moves the session there, as omp's `/move` does: the transcript stays, and the header and the session's tools follow the new directory.
   The sidebar's workspace picker switches to the new directory, as for a session you start there, unless it shows all workspaces.
   The picker is disabled while a turn runs or waits on a question, since omp moves only an idle session.
@@ -471,12 +472,12 @@ An action that fails shows its error, and its control becomes available again.
   Choosing a level starts the session at that level, and choosing another model resets the effort to **Default**.
   Models without selectable thinking levels offer only **Default**.
   Cmd+. opens the model search here too, and Cmd+J cycles the supported thinking levels after the catalog loads.
-- A skill pinned in **Settings** shows as a toggle after the pickers, with the skill's name.
+- A skill pinned in **Settings** shows as a toggle after the model picker, with the skill's name.
   While it is on, the first message goes through the skill, as if you had typed `/skill:<name>` before it, and the transcript shows the skill's pill.
   Click it to start this one session without the skill.
   It is greyed out when the directory has no skill of that name, and the session then starts without it.
   A first message that starts with `/` keeps its own command and skips the pinned skill.
-- When the directory is in a git checkout, a branch picker sits after the directory picker.
+- When the directory is in a git checkout, a branch picker sits after the directory picker in the strip.
   The picker lists the local branches, the checked-out one first, then the most recently committed to, each with where it would run: `here`, the worktree that has it checked out, or `new worktree`.
   Picking the checked-out branch keeps the directory as it is.
   Picking another branch runs omp in the worktree that has it checked out, or adds a worktree for it when none has.

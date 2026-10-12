@@ -1,5 +1,7 @@
-import { MessageCircle } from "lucide-react";
+import { Folder, MessageCircle } from "lucide-react";
 import { createContext, type ReactNode, type RefObject } from "react";
+import { Tooltip } from "@/components/ui/tooltip";
+import { folderName } from "../labels";
 import type { PromptEditorHandle } from "./prompt-editor";
 
 /** The text field of the composer around a picker, which takes the focus back once a choice closes the picker; `null` outside a composer. */
@@ -21,6 +23,27 @@ export const ComposerNote = ({ text }: { text: string }) => (
 	<p role="status" className="mt-2 text-xs text-amber-600 dark:text-amber-400">
 		{text}
 	</p>
+);
+
+/** The class that lifts the composer's frame over the {@link ComposerTray} tucked under its bottom edge. */
+export const OVER_TRAY = "relative z-10";
+
+/** The strip tucked under the composer's frame: where the session works on the left, its context counter on the right. */
+export const ComposerTray = ({ start, end }: { start: ReactNode; end?: ReactNode }) => (
+	<div className="mx-3 -mt-4 flex min-h-12 items-center justify-between gap-2 rounded-b-xl bg-muted px-1.5 pt-4 pb-1">
+		<div className="flex min-w-0 items-center gap-1">{start}</div>
+		{end && <div className="flex shrink-0 items-center gap-1">{end}</div>}
+	</div>
+);
+
+/** A directory the session cannot move from, by its folder name; the tooltip holds the whole path. */
+export const DirectoryLabel = ({ cwd }: { cwd: string }) => (
+	<Tooltip content={cwd} side="top">
+		<span tabIndex={0} className="flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+			<Folder aria-hidden="true" className="size-4 shrink-0" />
+			<span className="truncate">{folderName(cwd) ?? cwd}</span>
+		</span>
+	</Tooltip>
 );
 
 /** A conversation with no messages yet: what sending the first one does, and the composer's completions. */

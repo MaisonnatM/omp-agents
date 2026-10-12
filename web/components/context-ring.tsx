@@ -10,7 +10,7 @@ const RADIUS = 7;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const tokens = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
 
-/** How full the session's context window is, as a ring that fills clockwise. Hover or focus it for the numbers. */
+/** How full the session's context window is, as a ring that fills clockwise and the percent used. Hover or focus it for the token counts. */
 export function ContextRing({ context }: { context: ContextUsage }) {
 	const used = Math.min(context.tokens / context.window, 1);
 	const percent = Math.round(used * 100);
@@ -26,7 +26,7 @@ export function ContextRing({ context }: { context: ContextUsage }) {
 				aria-valuetext={label}
 				tabIndex={0}
 				className={cn(
-					"inline-flex size-7 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring",
+					"inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring",
 					used >= NEARLY_FULL
 						? "text-red-600 dark:text-red-400"
 						: used >= FILLING
@@ -48,6 +48,7 @@ export function ContextRing({ context }: { context: ContextUsage }) {
 						className="transition-[stroke-dashoffset] duration-300 ease-out motion-reduce:transition-none"
 					/>
 				</svg>
+				<span aria-hidden="true">{percent}%</span>
 			</span>
 		</Tooltip>
 	);
