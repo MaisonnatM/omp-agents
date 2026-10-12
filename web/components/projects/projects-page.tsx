@@ -1,7 +1,7 @@
-import { Archive, ArrowLeft, FileText, Pencil, Plus } from "lucide-react";
+import { Archive, ArrowLeft, Pencil, Plus } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
 import { type ConnectedModels, type ModelOption, selectorOf } from "../../../src/shared/models";
-import { DEFAULT_PROJECT_NAME, type Project, type ProjectNote, type ProjectUpdate, type WorkerPhase } from "../../../src/shared/projects";
+import { DEFAULT_PROJECT_NAME, type Project, type ProjectUpdate } from "../../../src/shared/projects";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,14 @@ import { hashForProjects, type ProjectsTarget } from "../../routing";
 import { projectSession } from "../../sessions";
 import type { StartOf } from "../../starts";
 import { useDefaultModel } from "../../use-default-model";
-import { Age } from "../age";
 import { useDashboardActions } from "../dashboard-context";
 import { PageFrame } from "../list-page";
 import { type ModelMenuOpen, ModelPicker } from "../model-picker";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { DirectoryPicker } from "../workspace-picker";
+import { PHASE_LABEL, ProjectNotesList } from "./project-parts";
 
 const FIELD = "rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
-
-const PHASE_LABEL: Record<WorkerPhase, string> = { working: "Working", asking: "Asks you", idle: "Idle", interrupted: "Interrupted", ended: "Ended" };
 
 /** What an update waiting for the coordinator says about its worker. */
 function updateText(update: ProjectUpdate): string {
@@ -237,37 +235,14 @@ function RenameForm({ project, onDone }: { project: Project; onDone: () => void 
 	);
 }
 
-/** The project's notes directory and its files, each opening in the file dialog; read again whenever the project changes. */
+/** The project's notes directory and its files. */
 function ProjectNotes({ project }: { project: Project }) {
-	const { openFile } = useDashboardActions();
-	const notes = useRead<{ dir: string; notes: ProjectNote[] }>(`/api/project-notes?id=${encodeURIComponent(project.id)}`, project);
 	return (
 		<section aria-labelledby="project-notes" className="space-y-2">
 			<h3 id="project-notes" className="text-sm font-medium">
 				Notes
 			</h3>
-			{notes.error !== null && notes.data === null ? (
-				<p role="alert" className="text-sm text-red-600 dark:text-red-400">
-					{notes.error}
-				</p>
-			) : notes.data === null ? (
-				<p className="text-sm text-muted-foreground">Reading the notes…</p>
-			) : notes.data.notes.length === 0 ? (
-				<p className="text-sm text-muted-foreground">No notes yet. The coordinator and its workers write them as they go.</p>
-			) : (
-				<ul aria-label="Notes" className="divide-y divide-border overflow-hidden rounded-md border border-border">
-					{notes.data.notes.map(note => (
-						<li key={note.path}>
-							<button type="button" title={note.path} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none" onClick={() => openFile(note.path)}>
-								<FileText aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
-								<span className="min-w-0 flex-1 truncate">{note.name}</span>
-								<Age at={Date.parse(note.modifiedAt)} exact className="shrink-0 text-xs tabular-nums text-muted-foreground" />
-							</button>
-						</li>
-					))}
-				</ul>
-			)}
-			{notes.data && <p className="font-mono text-xs break-all text-muted-foreground">{notes.data.dir}</p>}
+			<ProjectNotesList project={project} />
 		</section>
 	);
 }

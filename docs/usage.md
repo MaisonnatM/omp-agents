@@ -123,6 +123,8 @@ An action that fails shows its error, and its control becomes available again.
   Each tab shows its name and, in a badge, how many items it holds, such as `3` changed files.
   When the sidebar is too narrow for every tab's icon, the tabs show their names alone.
   The sidebar remembers the tab you chose, for every view.
+- A project's coordinator, which changes no code itself, gets other tabs instead: **Outline**, **Workers**, **Notes**, and **PRs**; see [Projects](#projects).
+  It remembers its own tab, **Workers** at first, apart from a session's.
 - **Outline** shows the conversation's turns in order, each weighted by how much it matters.
   Your first prompt opens the list whole, under **Request**, rendered as the transcript renders it, with its skill's chip first.
   The turns after it hang from a rail of icons: a person for your prompt, a bot for the reply a turn ended on.
@@ -1052,6 +1054,7 @@ An action that fails shows its error, and its control becomes available again.
   A worker's phase is working, asking while it waits on a question, idle, interrupted when it stopped without **End session**, or ended.
   Click a notes file to open it in the file dialog.
   **Rename** renames the project, and **Archive** archives it: its group leaves the sidebar, its sessions go back to the other groups, and its coordinator's tools refuse to start, list, read, or message workers.
+- With a coordinator's pane focused, the right sidebar shows its project rather than the coordinator's own changes: **Outline** follows the coordinator's conversation, **Workers** lists each worker with its phase and the first line of its last reply, a click opening its session, **Notes** lists the notes files, and **PRs** the pull requests its workers submitted or worked on, each once.
 - Workers report back on their own, so the coordinator never polls.
   Each time a worker finishes a turn, asks a question, or stops, the dashboard keeps an update for the coordinator; a worker's later finished turn replaces its earlier one, since the coordinator reads only its last reply.
   Once the coordinator runs and is idle, every waiting update reaches it as one message that starts with `[omp-agents] Project update.`, quoting each finished worker's last reply up to 2,000 characters.

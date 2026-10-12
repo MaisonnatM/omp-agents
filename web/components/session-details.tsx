@@ -19,18 +19,18 @@ const DETAILS_TABS = ["outline", "files", "media", "pull-requests"] as const;
 type DetailsTab = (typeof DETAILS_TABS)[number];
 
 /** Each tab names itself and counts its items in a badge, which screen readers hear through the tab's name. */
-function tabLabel(name: string, count: number): { label: string; badge: number | undefined; "aria-label": string | undefined } {
+export function tabLabel(name: string, count: number): { label: string; badge: number | undefined; "aria-label": string | undefined } {
 	return count > 0 ? { label: name, badge: count, "aria-label": `${name} (${count})` } : { label: name, badge: undefined, "aria-label": undefined };
 }
 
 /** The labeled tabs fit the sidebar's default width only with tighter padding than Fluid's, and only without their icons. */
-const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
+export const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
 
 /** Keeps each tab's content off the header's hairline at rest, and scrolls away with it. */
-const PANEL_VIEWPORT = "pt-2";
+export const PANEL_VIEWPORT = "pt-2";
 
 /** The PRs tab pins its pull request's header to the top edge, which must neither fade nor sit below a padding that the text scrolls through. */
-const PINNED_VIEWPORT = "scroll-fade-bottom-only";
+export const PINNED_VIEWPORT = "scroll-fade-bottom-only";
 
 interface SessionDetailsProps {
 	view: View;
