@@ -2,14 +2,16 @@ import { Radio } from "@base-ui/react/radio";
 import { RadioGroup } from "@base-ui/react/radio-group";
 import { Switch } from "@base-ui/react/switch";
 import { type LucideIcon, Monitor, Moon, Sun } from "lucide-react";
-import { useContext } from "react";
+import { type ComponentProps, useContext } from "react";
+import { MCP_SERVICES } from "../../../src/shared/accounts";
 import { usePinnedSkill } from "../../pinned-skill";
 import { type ShortcutId, shortcutKeys } from "../../shortcuts";
+import { hideTab, moveTab, positionKey, TAB_ROWS, useSidebarTabs } from "../../sidebar-tabs";
 import { type Theme, THEMES, useTheme } from "../../theme";
 import { useSkills } from "../../use-skills";
 import { SkillPicker } from "../skill-picker";
 import { ActivityVisibility } from "../transcript";
-import { Section } from "./editor";
+import { OrderButton, Section } from "./editor";
 
 const THEME_OPTIONS: Record<Theme, [string, LucideIcon]> = {
 	system: ["System", Monitor],
@@ -17,19 +19,65 @@ const THEME_OPTIONS: Record<Theme, [string, LucideIcon]> = {
 	dark: ["Dark", Moon],
 };
 
+function PreferenceSwitch(props: Omit<ComponentProps<typeof Switch.Root>, "className" | "children">) {
+	return (
+		<Switch.Root
+			{...props}
+			className="inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-input p-0.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 motion-reduce:transition-none"
+		>
+			<Switch.Thumb className="size-3 rounded-full bg-background shadow-xs transition-transform data-[checked]:translate-x-3 motion-reduce:transition-none" />
+		</Switch.Root>
+	);
+}
+
 function ActivitySwitch({ label, shortcut, checked, onToggle }: { label: string; shortcut: ShortcutId; checked: boolean; onToggle: () => void }) {
 	return (
 		<label className="flex w-fit cursor-pointer items-center gap-2 text-[12px]">
-			<Switch.Root
-				checked={checked}
-				onCheckedChange={onToggle}
-				className="inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-input p-0.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary motion-reduce:transition-none"
-			>
-				<Switch.Thumb className="size-3 rounded-full bg-background shadow-xs transition-transform data-[checked]:translate-x-3 motion-reduce:transition-none" />
-			</Switch.Root>
+			<PreferenceSwitch checked={checked} onCheckedChange={onToggle} />
 			{label}
 			<span className="text-muted-foreground">{shortcutKeys(shortcut)}</span>
 		</label>
+	);
+}
+
+const PINNED_SHOWS = "Always shows, so you can show the other tabs again.";
+
+/** The sidebar's tabs in the order the bar shows them, each with the key it takes now, a switch to hide it, and buttons to move it. */
+function SidebarTabs() {
+	const { layout, setLayout, signedOut, shown } = useSidebarTabs();
+	return (
+		<Section
+			title="Sidebar tabs"
+			meta={`The tabs the sidebar shows, in order, and ${shortcutKeys("tab1")} goes to the first one shown. A hidden tab's page, command, and links still work. Saved in this browser.`}
+		>
+			<ol className="space-y-1 text-sm">
+				{layout.map(({ tab, hidden }, index) => {
+					const row = TAB_ROWS[tab];
+					const position = positionKey(tab, shown);
+					return (
+						<li key={tab} className="flex items-center gap-2">
+							<row.icon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+							<div className="min-w-0 flex-1">
+								{row.label}
+								{"integration" in row && signedOut.has(tab) && (
+									<p className="text-xs text-muted-foreground">Shows only while {MCP_SERVICES[row.integration].label} is connected.</p>
+								)}
+								{"pinned" in row && <p className="text-xs text-muted-foreground">{PINNED_SHOWS}</p>}
+							</div>
+							<span className="w-12 shrink-0 text-right text-xs text-muted-foreground">{position === undefined ? null : shortcutKeys(position)}</span>
+							<PreferenceSwitch
+								checked={!hidden}
+								disabled={"pinned" in row}
+								onCheckedChange={checked => setLayout(prev => hideTab(prev, tab, !checked))}
+								aria-label={`Show ${row.label}`}
+							/>
+							<OrderButton label={row.label} direction="up" disabled={index === 0} onClick={() => setLayout(prev => moveTab(prev, tab, -1))} />
+							<OrderButton label={row.label} direction="down" disabled={index === layout.length - 1} onClick={() => setLayout(prev => moveTab(prev, tab, 1))} />
+						</li>
+					);
+				})}
+			</ol>
+		</Section>
 	);
 }
 
@@ -88,6 +136,7 @@ export function PreferencesTab({ cwd, workspace }: { cwd: string | null; workspa
 					<ActivitySwitch label="Show thinking" shortcut="hideThinking" checked={!hideThinking} onToggle={toggleThinking} />
 				</div>
 			</Section>
+			<SidebarTabs />
 			<PinnedSkill cwd={cwd} workspace={workspace} />
 		</>
 	);

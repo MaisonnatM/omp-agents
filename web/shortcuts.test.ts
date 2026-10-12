@@ -44,18 +44,18 @@ test("Ctrl+` toggles the terminal on every platform, and ⌘` stays macOS's wind
 test("browser-reserved chords stay the browser's", () => {
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["9", "Digit9"], ["0", "Digit0"]]) {
+		for (const [key, code] of [["t", "KeyT"], ["w", "KeyW"], ["n", "KeyN"], ["l", "KeyL"], ["r", "KeyR"], ["d", "KeyD"], ["o", "KeyO"], ["p", "KeyP"], ["s", "KeyS"], ["8", "Digit8"], ["9", "Digit9"], ["0", "Digit0"]]) {
 			expect(pressOn(mac, key, code, mod)).toEqual([]);
 		}
 	}
 });
 
-test("Cmd+1–6 selects dashboard tabs on macOS, Ctrl+1–6 elsewhere, including AZERTY", () => {
-	const tabs = ["pull-requests", "tickets", "sessions", "todo", "calendar", "settings"] as const;
-	const azerty = ["&", "é", "\"", "'", "(", "-"];
+test("Cmd+1–7 go to the sidebar's tabs by position on macOS, Ctrl+1–7 elsewhere, including AZERTY", () => {
+	const positions = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7"] as const;
+	const azerty = ["&", "é", "\"", "'", "(", "-", "è"];
 	for (const mac of [false, true]) {
 		const mod = mac ? { meta: true } : { ctrl: true };
-		for (const [index, id] of tabs.entries()) {
+		for (const [index, id] of positions.entries()) {
 			const key = String(index + 1);
 			const code = `Digit${key}`;
 			expect(shortcutsFor(keyEvent(key, code, mod), null, mac)).toEqual([{ id, scope: "anywhere" }]);

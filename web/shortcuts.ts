@@ -1,5 +1,10 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 
+/** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the sidebar shows, whichever it is. */
+export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7"] as const;
+
+export type TabShortcut = (typeof TAB_SHORTCUTS)[number];
+
 export type ShortcutId =
 	| "interrupt"
 	| "steer"
@@ -56,7 +61,8 @@ export type ShortcutId =
 	| "previousChangedFile"
 	| "moveUp"
 	| "moveDown"
-	| "terminal";
+	| "terminal"
+	| TabShortcut;
 
 /**
  * Where a binding fires. `composer`: from the composer's text field, before any page-wide binding sees the key.
@@ -105,7 +111,11 @@ export interface Shortcut {
 	command?: string;
 }
 
-/** Every dashboard shortcut, in the order a key tries them. The reference dialog lists exactly these, by category. */
+/**
+ * Every dashboard shortcut, in the order a key tries them: every binding the key listeners match, and the commands the
+ * palette lists. The reference dialog shows `shortcutRows` in `web/sidebar-tabs.ts`, by category: these as the tabs the
+ * sidebar shows take the position keys.
+ */
 export const SHORTCUTS: readonly Shortcut[] = [
 	{ id: "interrupt", category: "sessions", label: "Stop the running turn", keys: [{ chord: { key: "Backspace", mod: true, shift: true }, scope: "composer" }] },
 	{
@@ -164,7 +174,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		command: "Toggle details sidebar",
 		keys: [{ chord: { key: "b", mod: true, alt: true }, scope: "anywhere" }],
 	},
-	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [{ chord: { key: "6", mod: true }, scope: "anywhere" }] },
+	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [] },
 	{ id: "help", category: "general", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", category: "sessions", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{
@@ -176,12 +186,14 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "i", mod: true }, scope: "anywhere" },
 		],
 	},
-	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
-	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [{ chord: { key: "2", mod: true }, scope: "anywhere" }] },
+	// No one reads these rows' labels, by design: the dialog lists each position key on the tab it goes to, and the palette lists no command for them.
+	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
+	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
+	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
 	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo and Calendar pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },
-	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [{ chord: { key: "4", mod: true }, scope: "anywhere" }] },
-	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },
+	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
+	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
+	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
 	{ id: "inbox", category: "general", label: "Go to your Gmail inbox", command: "Open inbox", keys: [{ goTo: "i" }] },
 	{ id: "routines", category: "general", label: "Go to your routines", command: "Go to routines", keys: [{ goTo: "r" }] },
 	// After a G, P is also the Todo page's `todoPriority`: the page outranks the App, so the priority wins while a todo is focused or open, and its handler declines otherwise.
@@ -301,8 +313,15 @@ export function bindingLabel(binding: Binding): string {
 
 const EITHER = new Intl.ListFormat("en", { type: "disjunction" });
 
+const KEYS = {} as Record<ShortcutId, readonly Binding[]>;
 const LABELS = {} as Record<ShortcutId, readonly string[]>;
-for (const { id, keys } of SHORTCUTS) LABELS[id] = keys.map(bindingLabel);
+for (const { id, keys } of SHORTCUTS) {
+	KEYS[id] = keys;
+	LABELS[id] = keys.map(bindingLabel);
+}
+
+/** Every key that runs `id`: `[{ goTo: "i" }]`. */
+export const shortcutBindings = (id: ShortcutId): readonly Binding[] => KEYS[id];
 
 /** Every key that runs `id`, one label each, as a tooltip's chips draw them: `["⌘/", "?"]`. */
 export const shortcutLabels = (id: ShortcutId): readonly string[] => LABELS[id];
@@ -313,8 +332,11 @@ export const shortcutKeys = (id: ShortcutId): string => EITHER.format(shortcutLa
 const typing = (target: EventTarget | null): boolean =>
 	target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
-/** What to do for each shortcut. Returning `false` means the action does not apply now, so the key keeps its usual meaning. */
-export type ShortcutHandlers = Partial<Record<ShortcutId, () => boolean | void>>;
+/** What one shortcut does. Returning `false` means the action does not apply now, so the key keeps its usual meaning. */
+export type ShortcutHandler = () => boolean | void;
+
+/** What to do for each shortcut. */
+export type ShortcutHandlers = Partial<Record<ShortcutId, ShortcutHandler>>;
 
 type HandledEvent = KeyEvent & Pick<KeyboardEvent, "defaultPrevented" | "preventDefault">;
 

@@ -20,8 +20,8 @@ export function settingsRoute(page: Page | null, cwd: string | undefined): Setti
 
 interface SidebarTabInput {
 	page: Page | null;
-	/** The tabs that do not show; a page of one keeps the tab the panes had. */
-	hiddenTabs: ReadonlySet<SidebarTab>;
+	/** The tabs whose service omp holds no sign-in to; a page of one keeps the tab the panes had. */
+	signedOutTabs: ReadonlySet<SidebarTab>;
 	layout: Layout;
 	settings: SettingsRoute;
 	navigate: (page: Page) => void;
@@ -31,8 +31,10 @@ interface SidebarTabInput {
 /**
  * The tab the sidebar shows, and the way to show another: a page selects its tab, and `#pull-requests` picks the Pull requests tab, which
  * stays while you work in the panes until you choose Sessions. `showTab` keeps its identity across renders.
+ * A page whose tab the user hid in Preferences still selects that tab, so its panel, such as the Todo lists, shows with no trigger
+ * in the bar; a page whose service is signed out keeps the tab the panes had.
  */
-export function useSidebarTab({ page, hiddenTabs, layout, settings, navigate, show }: SidebarTabInput): { tab: SidebarTab; showTab: (tab: SidebarTab) => void } {
+export function useSidebarTab({ page, signedOutTabs, layout, settings, navigate, show }: SidebarTabInput): { tab: SidebarTab; showTab: (tab: SidebarTab) => void } {
 	const onPullRequests = page?.kind === "pull-requests";
 	const [paneTab, setPaneTab] = useState<"sessions" | "pull-requests">(onPullRequests ? "pull-requests" : "sessions");
 	const [wasOnPullRequests, setWasOnPullRequests] = useState(onPullRequests);
@@ -41,7 +43,7 @@ export function useSidebarTab({ page, hiddenTabs, layout, settings, navigate, sh
 		if (onPullRequests) setPaneTab("pull-requests");
 	}
 	const pageTab = page ? PAGE_TAB[page.kind] : undefined;
-	const tab: SidebarTab = pageTab && !hiddenTabs.has(pageTab) ? pageTab : paneTab;
+	const tab: SidebarTab = pageTab && !signedOutTabs.has(pageTab) ? pageTab : paneTab;
 	const latest = useRef({ layout, settings });
 	latest.current = { layout, settings };
 	const showTab = useCallback(

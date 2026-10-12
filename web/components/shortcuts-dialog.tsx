@@ -1,17 +1,16 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
-import { bindingLabel, type Scope, SHORTCUT_CATEGORIES, type ShortcutCategory, scopeOf, SHORTCUTS } from "../shortcuts";
+import type { SidebarTab } from "../routing";
+import { bindingLabel, type Scope, SHORTCUT_CATEGORIES, scopeOf } from "../shortcuts";
+import { type ShortcutRow, shortcutRows } from "../sidebar-tabs";
 
 const LIST = new Intl.ListFormat("en", { type: "conjunction" });
 
-const keysIn = (scope: Scope): string =>
-	LIST.format(SHORTCUTS.flatMap(({ keys }) => keys.filter(binding => scopeOf(binding) === scope).map(bindingLabel)));
-
-function ShortcutTable({ category }: { category: ShortcutCategory }) {
+function ShortcutTable({ rows }: { rows: readonly ShortcutRow[] }) {
 	return (
 		<table className="w-full text-sm" data-shortcuts>
 			<thead className="text-left text-xs text-muted-foreground">
@@ -21,7 +20,7 @@ function ShortcutTable({ category }: { category: ShortcutCategory }) {
 				</tr>
 			</thead>
 			<tbody>
-				{SHORTCUTS.filter(shortcut => shortcut.category === category).map(({ id, keys, label }) => (
+				{rows.map(({ id, keys, label }) => (
 					<tr key={id} className="border-t border-border" data-shortcut={id}>
 						<td className="py-2 pr-4 align-top whitespace-nowrap">
 							{keys.map((binding, index) => (
@@ -41,8 +40,11 @@ function ShortcutTable({ category }: { category: ShortcutCategory }) {
 	);
 }
 
-/** Every dashboard shortcut, from the table the key listeners read, one tab per category. */
-export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+/** Every dashboard shortcut, from the table the key listeners read, as {@link shortcutRows} lists it while the sidebar shows `tabs`, one tab per category. */
+export function ShortcutsDialog({ open, onOpenChange, tabs }: { open: boolean; onOpenChange: (open: boolean) => void; tabs: readonly SidebarTab[] }) {
+	const rows = useMemo(() => shortcutRows(tabs), [tabs]);
+	const keysIn = (scope: Scope): string => LIST.format(rows.flatMap(({ keys }) => keys.filter(binding => scopeOf(binding) === scope).map(bindingLabel)));
+
 	return (
 		<DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
 			<DialogPrimitive.Portal>
@@ -73,7 +75,7 @@ export function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenC
 						</TabsList>
 						{SHORTCUT_CATEGORIES.map(({ id }) => (
 							<TabPanel key={id} value={id} className="mt-3 min-h-0 flex-1 overflow-y-auto">
-								<ShortcutTable category={id} />
+								<ShortcutTable rows={rows.filter(row => row.category === id)} />
 							</TabPanel>
 						))}
 					</Tabs>
