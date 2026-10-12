@@ -1154,6 +1154,7 @@ An action that fails shows its error, and its control becomes available again.
       A request to the provider that works ends it, and a failure of another kind, such as a dropped connection, neither ends nor counts toward it.
 - **All**, **GitHub**, **Slack**, **Providers**, and **Updates** filter the list, each with its count of unread notices.
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
+  A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
 - A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in a new tab, and a provider's opens **Settings › Providers**.
   Selecting an update's notice marks it read.
   The check mark in the header marks every notice in the filter read.

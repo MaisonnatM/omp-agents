@@ -79,19 +79,20 @@ const fromSomeone = (message: Message, me: string): boolean => message.authorId 
 /**
  * The notices for `dms`, the newest direct and group messages, and `mentions`, the newest messages that mention `me`,
  * both newest first. A conversation gives one notice for the messages since `me` last wrote there; a mention gives one.
+ * `avatars` holds each author's profile picture by user ID.
  */
-function slackNotices(dms: Message[], mentions: Message[], me: string): SlackFound[] {
+function slackNotices(dms: Message[], mentions: Message[], me: string, avatars: ReadonlyMap<string, string>): SlackFound[] {
 	const waiting = [...Map.groupBy(dms, message => message.channelId).values()].flatMap(messages => {
 		const answered = messages.findIndex(message => message.authorId === me);
 		const unanswered = (answered === -1 ? messages : messages.slice(0, answered)).filter(message => fromSomeone(message, me));
 		const [newest] = unanswered;
 		if (!newest) return [];
 		const type = newest.channelName.startsWith("mpdm-") ? "group-dm" : "dm";
-		return [{ id: `slack:${newest.channelId}:${newest.ts}`, at: Number(newest.ts) * 1000, kind: "slack", type, count: unanswered.length, from: newest.author, text: slackText(newest.text), permalink: newest.permalink } as const];
+		return [{ id: `slack:${newest.channelId}:${newest.ts}`, at: Number(newest.ts) * 1000, kind: "slack", type, count: unanswered.length, from: newest.author, avatarUrl: avatars.get(newest.authorId) ?? null, text: slackText(newest.text), permalink: newest.permalink } as const];
 	});
 	const mentioned = mentions
 		.filter(message => fromSomeone(message, me))
-		.map(message => ({ id: `slack:${message.channelId}:${message.ts}`, at: Number(message.ts) * 1000, kind: "slack", type: "mention", channel: message.channelName, from: message.author, text: slackText(message.text), permalink: message.permalink }) as const);
+		.map(message => ({ id: `slack:${message.channelId}:${message.ts}`, at: Number(message.ts) * 1000, kind: "slack", type: "mention", channel: message.channelName, from: message.author, avatarUrl: avatars.get(message.authorId) ?? null, text: slackText(message.text), permalink: message.permalink }) as const);
 	return [...waiting, ...mentioned];
 }
 
@@ -116,10 +117,26 @@ async function signedInAs(get: SlackGet): Promise<string> {
 	return id;
 }
 
+/**
+ * The 72-pixel profile picture of each of `users` that Slack's `users.info` gives. One it refuses, such as under a
+ * sign-in without `users:read`, has none, so the bell shows that author's initial.
+ */
+async function avatarsOf(get: SlackGet, users: Iterable<string>): Promise<Map<string, string>> {
+	const found = await Promise.all(
+		[...new Set(users)].map(async user => {
+			const answer = await get(`${API}/users.info?${new URLSearchParams({ user })}`).catch(() => null);
+			const url = isObject(answer) && answer.ok === true && isObject(answer.user) && isObject(answer.user.profile) ? nonEmptyStr(answer.user.profile.image_72) : undefined;
+			return url ? [[user, url] as const] : [];
+		}),
+	);
+	return new Map(found.flat());
+}
+
 /** The Slack messages of the last {@link WINDOW_MS} that wait on you, as of `now`. */
 export async function waitingOnYou(get: SlackGet, now: number): Promise<SlackFound[]> {
 	const me = await signedInAs(get);
 	const after = now - WINDOW_MS;
 	const [dms, mentions] = await Promise.all([search(get, "*", "im,mpim", after), search(get, `<@${me}>`, "public_channel,private_channel", after)]);
-	return slackNotices(dms, mentions, me);
+	const avatars = await avatarsOf(get, [...dms, ...mentions].filter(message => fromSomeone(message, me)).map(message => message.authorId));
+	return slackNotices(dms, mentions, me, avatars);
 }

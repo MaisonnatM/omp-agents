@@ -222,7 +222,7 @@ describe("Notices", () => {
 	});
 
 	test("the first check dates each notice by its own time, a later one by the check, and Slack by the message", async () => {
-		const message: SlackFound = { id: "slack:D1:1.0", at: 5 * MINUTE, kind: "slack", type: "dm", count: 1, from: "Ana", text: "hi", permalink: "https://slack.test/p1" };
+		const message: SlackFound = { id: "slack:D1:1.0", at: 5 * MINUTE, kind: "slack", type: "dm", count: 1, from: "Ana", avatarUrl: null, text: "hi", permalink: "https://slack.test/p1" };
 		const state: State = { latest: null, installed: "18.8.0", models: [], pullRequests: [pr(1, { updatedAt: 1_000 })], slack: [message], now: 50 * MINUTE };
 		const notices = new Notices(noticesPath(), sources(state), () => {});
 		await notices.check(ACTIVITY_KINDS);

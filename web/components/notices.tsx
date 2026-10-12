@@ -264,7 +264,7 @@ function Face({ notice }: { notice: Notice }) {
 			</span>
 		);
 	} else {
-		person = { name: notice.from, avatarUrl: null };
+		person = { name: notice.from, avatarUrl: notice.avatarUrl };
 		badge = (
 			<span className={cn(BADGE, "bg-popover")}>
 				<svg aria-hidden viewBox="0 0 24 24" className="size-3" fill={SLACK_LOGO.color}>

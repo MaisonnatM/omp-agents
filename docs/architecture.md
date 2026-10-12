@@ -466,6 +466,7 @@ The provider check (`PROVIDER_KINDS`) runs after each `omp usage` run, at startu
   `auth.test` names the user, and two `assistant.search.context` searches over the last three days, newest first, read the direct and group messages (`im,mpim`) and the channel messages that mention them (`<@ID>`), each up to five pages of 20 through `next_cursor`.
   A conversation gives one notice for the messages after the user's last one there; the user's own messages, bots, Slack's system messages, and empty ones count for nothing.
   `slackText` turns Slack's markup into plain text.
+  `users.info` gives each author's 72-pixel profile picture as the notice's `avatarUrl`, which the page's `img-src` allows from `avatars.slack-edge.com`, `secure.gravatar.com`, and `a.slack-edge.com`; a lookup that fails leaves it `null`, and the page shows the initial.
   Without a Slack sign-in the check finds nothing.
 - The plan notices come from the plans of the last `omp usage` run, which `Broadcasts.refreshUsage` answers with, one per window whose `exhausted` is set; when that run failed, the check fails too and keeps its notices.
 - `readCreditRuns` in `src/omp/stats.ts` reads the last day's requests, in order, of each provider that had an error naming `402` then, aborted requests left out.

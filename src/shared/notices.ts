@@ -44,9 +44,10 @@ export interface PullRequestSubject {
 
 /**
  * A Slack message that waits on you: a mention of you in a channel, or the messages someone sent in a direct or group
- * message since you last wrote there, of which it holds the newest.
+ * message since you last wrote there, of which it holds the newest. `avatarUrl` is the author's Slack profile picture,
+ * or `null` when Slack did not give it.
  */
-export type SlackSubject = { kind: "slack"; from: string; text: string; permalink: string } & (
+export type SlackSubject = { kind: "slack"; from: string; avatarUrl: string | null; text: string; permalink: string } & (
 	| { type: "mention"; channel: string }
 	| { type: "dm" | "group-dm"; count: number }
 );

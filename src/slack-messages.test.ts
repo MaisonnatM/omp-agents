@@ -16,12 +16,23 @@ const message = (fields: Record<string, unknown>) => ({
 	...fields,
 });
 
-/** Slack's answers by search, newest first and 20 a page: direct and group messages, or mentions in channels. */
+const ANA_AVATAR = "https://avatars.slack-edge.com/ana_72.png";
+
+/**
+ * Slack's answers by search, newest first and 20 a page: direct and group messages, or mentions in channels. `users.info`
+ * gives Ana's picture, fails on Bo's, and refuses everyone else's.
+ */
 const slack =
 	(answers: { dms: unknown[]; mentions: unknown[]; error?: string }) =>
 	async (url: string): Promise<unknown> => {
 		const parsed = new URL(url);
 		if (parsed.pathname === "/api/auth.test") return { ok: true, user_id: ME };
+		if (parsed.pathname === "/api/users.info") {
+			const user = parsed.searchParams.get("user");
+			if (user === "U0ANA") return { ok: true, user: { id: user, profile: { image_72: ANA_AVATAR } } };
+			if (user === "U0BO") throw new Error("Slack answered HTTP 500");
+			return { ok: false, error: "missing_scope" };
+		}
 		if (answers.error) return { ok: false, error: answers.error };
 		const all = parsed.searchParams.get("channel_types") === "im,mpim" ? answers.dms : answers.mentions;
 		const from = Number(parsed.searchParams.get("cursor") ?? 0);
@@ -39,7 +50,7 @@ describe("waitingOnYou", () => {
 		]);
 	});
 
-	test("a conversation gives one notice for the messages since you last wrote there, without bots or empty ones", async () => {
+	test("a conversation gives one notice for the messages since you last wrote there, without bots or empty ones, with its author's picture when Slack gives it", async () => {
 		const get = slack({
 			dms: [
 				message({ message_ts: "300.0", content: "are you there?", permalink: "https://acme.slack.com/p300" }),
@@ -54,8 +65,8 @@ describe("waitingOnYou", () => {
 			mentions: [],
 		});
 		expect(await waitingOnYou(get, 1_000_000)).toEqual([
-			{ id: "slack:D0ANA:300.0", at: 300_000, kind: "slack", type: "dm", count: 2, from: "Ana Lopez", text: "are you there?", permalink: "https://acme.slack.com/p300" },
-			{ id: "slack:C0GROUP:230.0", at: 230_000, kind: "slack", type: "group-dm", count: 1, from: "Bo", text: "lunch?", permalink: message({}).permalink },
+			{ id: "slack:D0ANA:300.0", at: 300_000, kind: "slack", type: "dm", count: 2, from: "Ana Lopez", avatarUrl: ANA_AVATAR, text: "are you there?", permalink: "https://acme.slack.com/p300" },
+			{ id: "slack:C0GROUP:230.0", at: 230_000, kind: "slack", type: "group-dm", count: 1, from: "Bo", avatarUrl: null, text: "lunch?", permalink: message({}).permalink },
 		]);
 	});
 
@@ -76,7 +87,7 @@ describe("waitingOnYou", () => {
 			],
 		});
 		expect(await waitingOnYou(get, 1_000_000)).toEqual([
-			{ id: "slack:C0ENG:500.0", at: 500_000, kind: "slack", type: "mention", channel: "eng", from: "Cy", text: "@Max see the PR in #eng & @here https://example.com", permalink: message({}).permalink },
+			{ id: "slack:C0ENG:500.0", at: 500_000, kind: "slack", type: "mention", channel: "eng", from: "Cy", avatarUrl: null, text: "@Max see the PR in #eng & @here https://example.com", permalink: message({}).permalink },
 		]);
 	});
 
