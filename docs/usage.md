@@ -915,15 +915,18 @@ An action that fails shows its error, and its control becomes available again.
   With none open, the panel says how to open one.
   Drag the line between the list and the panel to size the list, which keeps that width; a page too narrow for both shows the panel in place of the list.
   With no conversation open, ↓ and ↑ outside text fields focus the next and previous row, and O opens the focused row's conversation in Gmail in a new tab, signed in as the inbox's address.
-- An open conversation shows its subject, its last sender, and how many messages it holds, drafts left out.
-  As in Gmail, the last message and every unread one show in full and earlier ones on one line with their snippet; three or more of those in a row after the first fold into one **N older messages** row.
-  Click a line or that row to unfold it, click a full message's header to fold it again, and **Expand all** unfolds every message.
-- A full message shows its sender's name and address, whom it went to, when it arrived, with the full date and time on hover, its attachments by name and size, and its text.
+- An open conversation's panel has a bar along its top with where the conversation sits in the list, **3 of 50**, and icon buttons, each naming itself and its key on hover: previous and next conversation, **Expand all** while a message is folded, **Refresh**, which spins while it reads, **Open in Gmail**, and **Close**.
+  Under the bar come its subject in large type and, on a muted line, how many messages it holds, drafts left out, and each person who wrote in it once, `me` for your own address.
+  Opening another conversation scrolls the panel back to its top.
+- Messages follow each other with a thin line between them, each with a round avatar of its sender's first letter, in a colour that sender's address always takes.
+  As in Gmail, the last message and every unread one show in full and earlier ones on one line with their avatar, sender, snippet, and date, the sender bold while unread; three or more of those in a row after the first fold into a line with an **N older messages** pill on it.
+  Click a line or the pill to unfold it, click a full message's header to fold it again, and **Expand all** unfolds every message.
+- A full message shows its sender's name and address, when it arrived, with the full date and time on hover, and whom it went to, then under the name its attachments by name and size, and its text.
   An HTML message shows as its sender wrote it, on white in both themes, with its scripts, forms, and popups blocked; it may load images, styles, and fonts, never sends the dashboard's address as the referrer, and its links open in a new tab.
   A plain text message keeps its line breaks, and its web addresses are links.
   The dashboard does not download attachments; **Open in Gmail** opens them there.
-- While a conversation is open, ↓ and ↑ open the next and previous conversation of the list and focus its row, which the list scrolls into view; the page reads those neighbours ahead so they show at once.
-  Esc closes the panel with that conversation's row focused, and O opens the focused row's conversation in Gmail, else the open one.
+- While a conversation is open, ↓ and ↑ or the bar's arrows open the next and previous conversation of the list and focus its row, which the list scrolls into view; the page reads those neighbours ahead so they show at once.
+  Esc or **Close** closes the panel with that conversation's row focused, and O opens the focused row's conversation in Gmail, else the open one.
   The keys work after a click inside an HTML message too.
   **Refresh** reads it from Gmail again, and the page also does once the list shows a message that arrived after it read the conversation.
 - The page only reads your mail: it never sends, deletes, labels, or marks a conversation read, so opening one here leaves it unread, in Gmail and in the list, until you read it in Gmail.

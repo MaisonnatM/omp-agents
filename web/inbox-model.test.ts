@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import type { MailMessage } from "../src/shared/gmail";
-import { type FoldEvent, type Folds, foldMessages, foldsAfter, linkParts, NO_FOLDS, recipientsLine } from "./inbox-model";
+import { colorIndex, type FoldEvent, type Folds, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, recipientsLine } from "./inbox-model";
 
 const message = (id: string, unread = false): MailMessage => ({
 	id,
@@ -69,6 +69,29 @@ test("the recipients line names the inbox's own address as me, then each name, e
 	expect(recipientsLine(sent, null)).toBe("to Max, bob@example.com, cc Carol Lee");
 	expect(recipientsLine({ ...sent, to: [] }, null)).toBe("cc Carol Lee");
 	expect(recipientsLine(message("m2"), null)).toBe("");
+});
+
+test("participants lists each sender once in the order they first wrote, the inbox's own address as me, and skips a missing sender", () => {
+	const from = (name: string, address: string): MailMessage => ({ ...message(address), from: { name, address } });
+	const messages = [from("Bob", "bob@example.com"), from("Max", "MAX@example.com"), from("Bob", "bob@example.com"), from("", ""), from("", "carol@example.com")];
+	expect(participants(messages, "max@example.com")).toEqual(["Bob", "me", "carol@example.com"]);
+	expect(participants([], null)).toEqual([]);
+});
+
+test("an avatar's initial is the first letter of the name, else of the address, past emoji and quotes, accents kept", () => {
+	expect(initialOf({ name: "", address: "hello@example.com" })).toBe("H");
+	expect(initialOf({ name: '"bob"', address: "x@example.com" })).toBe("B");
+	expect(initialOf({ name: "😀 Zoë", address: "x@example.com" })).toBe("Z");
+	expect(initialOf({ name: "e\u0301mile", address: "x@example.com" })).toBe("É");
+	expect(initialOf({ name: "张伟", address: "x@example.com" })).toBe("张");
+	expect(initialOf({ name: "", address: "" })).toBe("?");
+});
+
+test("an avatar's colour depends on the address alone, in any case", () => {
+	expect(colorIndex("alice@example.com", 13)).toBe(12);
+	expect(colorIndex("ALICE@Example.com", 13)).toBe(12);
+	expect(colorIndex("bob@example.com", 13)).toBe(6);
+	expect(colorIndex("", 13)).toBe(3);
 });
 
 test("web addresses in plain text become links without the punctuation that ends their sentence", () => {

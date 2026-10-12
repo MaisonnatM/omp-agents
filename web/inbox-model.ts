@@ -78,6 +78,30 @@ export function recipientsLine({ to, cc }: MailMessage, address: string | null):
 	return [to.length > 0 ? `to ${names(to)}` : "", cc.length > 0 ? `cc ${names(cc)}` : ""].filter(Boolean).join(", ");
 }
 
+/** Who wrote in a conversation, as its header lists them: each sender's {@link personLabel} once, in the order they first wrote. */
+export const participants = (messages: readonly MailMessage[], address: string | null): string[] => [
+	...new Set(messages.map(message => personLabel(message.from, address)).filter(Boolean)),
+];
+
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
+
+/** The letter on someone's avatar: the first letter or digit of their name, else of their address, in capitals; `?` when neither has one. */
+export function initialOf({ name, address }: MailPerson): string {
+	for (const text of [name, address]) {
+		for (const { segment } of graphemes.segment(text)) if (LETTER_OR_DIGIT.test(segment)) return segment.normalize("NFC").toUpperCase();
+	}
+	return "?";
+}
+
+/** Which of `size` colours someone's avatar takes, from a hash of their address in any case, so a sender keeps one colour everywhere. */
+export function colorIndex(address: string, size: number): number {
+	// FNV-1a, 32 bits.
+	let hash = 0x811c9dc5;
+	for (const char of address.toLowerCase()) hash = Math.imul(hash ^ char.codePointAt(0)!, 0x01000193);
+	return (hash >>> 0) % size;
+}
+
 /** A run of plain text, or a web address in it. */
 export type TextPart = { kind: "text"; text: string } | { kind: "link"; href: string };
 

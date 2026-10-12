@@ -47,7 +47,7 @@ interface DetailPageProps {
 	className?: string;
 }
 
-/** A page for one item of a list, a pull request, an issue, or a conversation: the frame with a back arrow to the list, `notice`, and the item's content. */
+/** A page for one item of a list, a pull request or an issue: the frame with a back arrow to the list, `notice`, and the item's content. */
 export function DetailPage({ title, meta, backHref, backLabel, notice, actions, children, className }: DetailPageProps) {
 	const back = (
 		<Tooltip content={backLabel} side="bottom">

@@ -127,9 +127,11 @@ export function InboxPage({ target }: { target: string | null }) {
 							key={target}
 							id={target}
 							listed={threads[at] ?? null}
+							position={at >= 0 ? { at, of: threads.length } : null}
 							previous={at > 0 ? threads[at - 1] : undefined}
 							next={at >= 0 ? threads[at + 1] : undefined}
 							address={read?.data.address ?? null}
+							onOpen={open}
 						/>
 					)
 				}
