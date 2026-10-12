@@ -13,9 +13,9 @@ const TAB_PAGE: Record<Exclude<SidebarTab, "sessions" | "settings">, Page> = {
 	inbox: { kind: "inbox", target: null },
 };
 
-/** The settings section and workspace the Settings tab's links keep: the open page's, else Analytics and the focused session's directory. */
-export function settingsRoute(page: Page | null, cwd: string | undefined): SettingsRoute {
-	return { section: page?.kind === "settings" ? page.section : "analytics", cwd: page?.kind === "settings" ? page.cwd : cwd || null };
+/** The settings section the Settings tab's links keep: the open page's, else Analytics. */
+export function settingsRoute(page: Page | null): SettingsRoute {
+	return { section: page?.kind === "settings" ? page.section : "analytics" };
 }
 
 interface SidebarTabInput {

@@ -14,6 +14,7 @@ const context = (change: Partial<SessionActionContext> = {}): SessionActionConte
 	resume: noop,
 	dismissInterrupted: noop,
 	end: noop,
+	workspaceSettings: null,
 	...change,
 });
 const live = (control: ControlPhase): SessionEntry => ({
@@ -57,11 +58,15 @@ describe("sessionActions", () => {
 
 	test("each pull request and ticket gets its own link, before the workspace settings", () => {
 		const entry = past({ pullRequests: [{ owner: "o", repo: "r", number: 4 } as LinkedPullRequest], tickets: ["ENG-1", "ENG-2"] });
-		expect(sessionActions(entry, context())[1].map(({ title, run }) => [title, run])).toEqual([
+		expect(sessionActions(entry, context({ workspaceSettings: noop }))[1].map(({ title, run }) => [title, run])).toEqual([
 			["Open r#4", { kind: "link", href: "https://github.com/o/r/pull/4", external: true }],
 			["Open ENG-1", { kind: "link", href: "#tickets/ENG-1" }],
 			["Open ENG-2", { kind: "link", href: "#tickets/ENG-2" }],
-			["Workspace settings", { kind: "link", href: "#settings/models/%2Fw" }],
+			["Workspace settings", { kind: "do", fn: noop }],
 		]);
+	});
+
+	test("a session whose workspace the sidebar cannot pick offers no workspace settings", () => {
+		expect(ids(past()).flat()).not.toContain("settings");
 	});
 });

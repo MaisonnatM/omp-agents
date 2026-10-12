@@ -129,7 +129,7 @@ function hrefOf(notice: Notice): string | null {
 			return notice.permalink;
 		case "plan":
 		case "credits":
-			return hashForSettings("providers", null);
+			return hashForSettings("providers");
 		default:
 			return null;
 	}

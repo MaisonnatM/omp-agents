@@ -22,6 +22,8 @@ export interface DashboardActions {
 	openFile: (path: string) => void;
 	/** Open the new-ticket dialog with `title` as the issue's title. */
 	openNewTicket: (title: string) => void;
+	/** What opens `cwd`'s Models settings by picking it in the sidebar, or `null` when the sidebar cannot pick it, as for `/tmp` or a hidden workspace. */
+	workspaceSettings: (cwd: string) => (() => void) | null;
 }
 
 export const DashboardActionsContext = createContext<DashboardActions | null>(null);

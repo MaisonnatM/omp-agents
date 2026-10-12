@@ -126,7 +126,7 @@ export const CommandPalette = memo(function CommandPalette({ state, ...props }: 
 });
 
 function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, linearConnected, projects, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
-	const { send, start, end, changeTodo } = useDashboardActions();
+	const { send, start, end, changeTodo, workspaceSettings } = useDashboardActions();
 	const { starts, ending, pullRequestsScope } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -155,6 +155,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 				resume: sessionId => start({ kind: "resume", sessionId }),
 				dismissInterrupted: sessionId => send({ t: "dismiss-interrupted", sessionId }),
 				end,
+				workspaceSettings: workspaceSettings(row.cwd),
 			});
 			const keywords = [...row.pullRequests.map(pr => `${pr.repo}#${pr.number}`), ...row.tickets];
 			return entry.kind === "live"
@@ -185,7 +186,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 					};
 		};
 		return [...hosts.map(host => sessionItem({ kind: "live", host })), ...past.map(session => sessionItem({ kind: "past", session }))];
-	}, [hosts, past, pinned, resuming, ending, onOpenSession, onTogglePin, start, send, end]);
+	}, [hosts, past, pinned, resuming, ending, onOpenSession, onTogglePin, start, send, end, workspaceSettings]);
 
 	const projectItems = useMemo(
 		(): PaletteItem[] =>

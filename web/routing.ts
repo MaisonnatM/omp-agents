@@ -64,10 +64,9 @@ export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["value"];
 
 const isSettingsSection = (segment: string): segment is SettingsSection => SETTINGS_SECTIONS.some(({ value }) => value === segment);
 
-/** The open section of the settings page, and where it reads project files and config from; `null` for user-level only. */
+/** The open section of the settings page; its workspace sections read the sidebar's workspace. */
 export interface SettingsRoute {
 	section: SettingsSection;
-	cwd: string | null;
 }
 
 /** Which todos the Todo page lists: every one, one category's, due ones, those waiting on you, those agents added, or the archive. */
@@ -138,8 +137,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
 /**
  * Each page by its kind, which is its hash's first segment, reading what follows the next `/` (`null` without one) and
  * what follows a `?` after it.
- * - `#settings/<section>` opens that section of the settings page, `#settings/<section>/<cwd>` with that workspace's
- *   project files and config. `#settings` and an unknown section open Analytics.
+ * - `#settings/<section>` opens that section of the settings page, whose workspace sections follow the sidebar's workspace.
+ *   `#settings` and an unknown section open Analytics; a segment after the section is ignored.
  * - `#new` opens the new-session draft, `#new/<cwd>` with that directory chosen, and `?todo=<id>` with that todo's
  *   title and notes as its first message. No omp runs until its first message.
  * - `#pull-requests` shows the sidebar's Pull requests tab, which lists the pull requests of the sidebar's workspace, beside the panes,
@@ -160,8 +159,8 @@ const TODO_LISTS = { today: { kind: "today" }, needs: { kind: "needs" }, agents:
  */
 const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams) => PageOf<K> } = {
 	settings: rest => {
-		const [section = "", cwd] = (rest ?? "").split("/");
-		return { kind: "settings", section: isSettingsSection(section) ? section : "analytics", cwd: decodeCwd(cwd ?? null) };
+		const [section = ""] = (rest ?? "").split("/");
+		return { kind: "settings", section: isSettingsSection(section) ? section : "analytics" };
 	},
 	new: (rest, query) => ({ kind: "new", cwd: decodeCwd(rest), todoId: query.get("todo") || null }),
 	"pull-requests": rest => {
@@ -193,7 +192,7 @@ const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, 
 function restOfPage(page: Page): string | null {
 	switch (page.kind) {
 		case "settings":
-			return `${page.section}${page.cwd === null ? "" : `/${encodeCwd(page.cwd)}`}`;
+			return page.section;
 		case "new":
 			return encodeCwd(page.cwd);
 		case "pull-requests": {
@@ -258,7 +257,7 @@ export const hashForOpenTodo = (id: string, categoryId: string | null): string =
 export const hashForRoutines = (target: string | null): string => hashForPage({ kind: "routines", target });
 export const hashForProjects = (target: ProjectsTarget): string => hashForPage({ kind: "projects", target });
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
-export const hashForSettings = (section: SettingsSection, cwd: string | null): string => hashForPage({ kind: "settings", section, cwd });
+export const hashForSettings = (section: SettingsSection): string => hashForPage({ kind: "settings", section });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
 
 /**

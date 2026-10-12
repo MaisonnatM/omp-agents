@@ -1056,7 +1056,7 @@ An action that fails shows its error, and its control becomes available again.
   Select **Sessions** to return to the existing panes.
   The sidebar lists eight sections in two groups.
   **General** holds **Analytics**, **Preferences**, **Providers**, **Integrations**, and **Workspaces**, which are the same whatever the workspace.
-  **This workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the chosen workspace loads them; only these sections show the workspace picker.
+  **This workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the sidebar's workspace loads them; only these sections show the workspace picker.
   It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit, and the selected section stays when you change workspace.
 - **Analytics** shows request usage for the last 24 hours.
@@ -1117,7 +1117,7 @@ An action that fails shows its error, and its control becomes available again.
   Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **New sessions** pins a skill.
   Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request, a Linear issue, or a todo, then sends its first message through that skill.
-  The picker lists the skills of the workspace that Settings opened on, and says which, or your own skills with **User files only**.
+  The picker lists the skills of the sidebar's workspace, and says which, or your own skills with **All workspaces**.
   Choose **None** to unpin.
 - **Providers** signs omp in to the model providers its sessions call, as `/login` and `omp login` do; see [Providers](#providers).
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar and Gmail; see [Integrations](#integrations).
@@ -1126,12 +1126,12 @@ An action that fails shows its error, and its control becomes available again.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.
   Hidden workspaces list under **Hidden**, and **Show** offers one again.
   The server keeps the list in `workspaces.json` beside its access token, so every browser tab and the desktop app show the same workspaces.
-- **Settings** opens on the workspace of the session that you had open, so it includes that workspace's project files and its `.omp/config.yml` overrides.
-  With no session open, it shows user files only.
-  Use the workspace picker in the header of a Workspace section to choose another directory that a session ran in, or **User files only**.
-  Selecting the active **Settings** sidebar tab keeps the section and the workspace you chose.
-  A session's **Workspace settings** opens **Models** on that session's workspace.
-  The page is in the URL hash, `#settings/<section>` or `#settings/<section>/<encoded directory>`, such as `#settings/integrations`; `#settings` opens **Analytics**.
+- Settings follows the workspace picked in the sidebar header, so it includes that workspace's project files and its `.omp/config.yml` overrides.
+  With **All workspaces**, **Models**, **Files**, and the **New sessions** skill picker show your user files only, and **Worktrees** lists every repository.
+  The picker in the header of a Workspace section is the same choice: picking a workspace there switches the sidebar to it too.
+  Selecting the active **Settings** sidebar tab keeps the section.
+  A session's **Workspace settings** switches the sidebar to that session's workspace and opens **Models**; a session in `/tmp` or a hidden workspace does not offer it.
+  The page is in the URL hash, `#settings/<section>`, such as `#settings/integrations`; `#settings` opens **Analytics**.
   After each save the page shows the settings as omp loads them from disk.
 
 ## Notifications

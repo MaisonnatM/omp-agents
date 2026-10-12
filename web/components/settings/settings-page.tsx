@@ -4,7 +4,7 @@ import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
 import { settingsUrl } from "../../api";
 import { type ReadState, useRead, useReplaceableRead } from "../../reads";
-import { hashForSettings, SETTINGS_SECTIONS, type SettingsRoute, type SettingsSection } from "../../routing";
+import { SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
 import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
 import { AnalyticsTab } from "./analytics-tab";
@@ -19,10 +19,11 @@ import { WorktreesTab } from "./worktrees-tab";
 
 const workspaceLabel = (cwd: string, workspaces: Workspace[]): string => workspaces.find(workspace => workspace.cwd === cwd)?.cwdDisplay ?? cwd;
 
-function WorkspacePicker({ route: { section, cwd }, workspaces }: { route: SettingsRoute; workspaces: Workspace[] }) {
-	const label = cwd === null ? "User files only" : workspaceLabel(cwd, workspaces);
+/** The sidebar's workspace picker again, for the sections it scopes: all workspaces read your user files only. */
+function WorkspacePicker({ cwd, workspaces, onPick }: { cwd: string | null; workspaces: Workspace[]; onPick: (cwd: string | null) => void }) {
+	const label = cwd === null ? "All workspaces" : workspaceLabel(cwd, workspaces);
 	const pick = (next: string | null) => (): void => {
-		location.hash = hashForSettings(section, next);
+		if (next !== cwd) onPick(next);
 	};
 	return (
 		<CommandPicker
@@ -34,7 +35,7 @@ function WorkspacePicker({ route: { section, cwd }, workspaces }: { route: Setti
 			list={{
 				kind: "ready",
 				groups: [
-					{ key: "user", items: [{ value: "User files only", label: "User files only", selected: cwd === null, onSelect: pick(null) }] },
+					{ key: "all", items: [{ value: "All workspaces", label: "All workspaces", selected: cwd === null, onSelect: pick(null) }] },
 					{
 						key: "workspaces",
 						heading: "Workspaces",
@@ -85,8 +86,22 @@ function ompPanels(read: ReadState<OmpSettings>, cwd: string | null, editing: Ed
 }
 
 /** One section of the settings: omp's usage, the dashboard's own choices, or omp's routing and files for one workspace or for the user only, each editable in place. */
-export function SettingsPage({ route, workspaces, workspaceList, pins }: { route: SettingsRoute; workspaces: Workspace[]; workspaceList: WorkspaceList<Workspace>; pins: string[] }) {
-	const { section, cwd } = route;
+export function SettingsPage({
+	section,
+	cwd,
+	onPickWorkspace,
+	workspaces,
+	workspaceList,
+	pins,
+}: {
+	section: SettingsSection;
+	/** The sidebar's workspace, `null` for all workspaces, which reads your user files only. */
+	cwd: string | null;
+	onPickWorkspace: (cwd: string | null) => void;
+	workspaces: Workspace[];
+	workspaceList: WorkspaceList<Workspace>;
+	pins: string[];
+}) {
 	const models = useRead<{ models: CatalogModel[] }>("/api/models");
 	const catalog = useMemo(
 		(): Catalog => ({
@@ -122,8 +137,8 @@ export function SettingsPage({ route, workspaces, workspaceList, pins }: { route
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
 			{scope === "workspace" ? (
-				<Header title={label} meta={cwd === null ? "Your user files only" : "As a session in this workspace loads them"}>
-					<WorkspacePicker route={route} workspaces={workspaces} />
+				<Header title={label} meta={cwd === null ? "Your user files only, for all workspaces" : "As a session in this workspace loads them"}>
+					<WorkspacePicker cwd={cwd} workspaces={workspaces} onPick={onPickWorkspace} />
 				</Header>
 			) : (
 				<Header title={label} />

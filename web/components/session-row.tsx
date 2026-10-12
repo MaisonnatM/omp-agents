@@ -92,7 +92,7 @@ interface RowMenuProps {
  * while it is open, so a row that keeps its menu closed renders for neither.
  */
 function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProps, "label" | "children">) {
-	const { open, send, start, end } = useDashboardActions();
+	const { open, send, start, end, workspaceSettings } = useDashboardActions();
 	const { starts: { resume }, ending } = useDashboardStatus();
 	const actions = sessionActions(entry, {
 		onScreen,
@@ -104,6 +104,7 @@ function RowMenuItems({ entry, onScreen, pinned, onTogglePin }: Omit<RowMenuProp
 		resume: sessionId => start({ kind: "resume", sessionId }),
 		dismissInterrupted: sessionId => send({ t: "dismiss-interrupted", sessionId }),
 		end,
+		workspaceSettings: workspaceSettings(entry.kind === "live" ? entry.host.cwd : entry.session.cwd),
 	});
 	return (
 		<>

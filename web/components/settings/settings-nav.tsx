@@ -7,7 +7,7 @@ const GROUPS = [
 ] as const;
 
 /** The Settings tab of the sidebar: the sections that are the same in every workspace, then those the workspace picker changes. */
-export function SettingsNav({ route: { section, cwd } }: { route: SettingsRoute }) {
+export function SettingsNav({ route: { section } }: { route: SettingsRoute }) {
 	return GROUPS.map(group => (
 		<SidebarGroup key={group.scope}>
 			<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
@@ -15,7 +15,7 @@ export function SettingsNav({ route: { section, cwd } }: { route: SettingsRoute 
 				{SETTINGS_SECTIONS.filter(({ scope }) => scope === group.scope).map(({ value, label, icon }) => (
 					<SidebarMenuItem key={value}>
 						<SidebarMenuButton asChild icon={icon} isActive={section === value}>
-							<a href={hashForSettings(value, cwd)} aria-current={section === value ? "page" : undefined}>
+							<a href={hashForSettings(value)} aria-current={section === value ? "page" : undefined}>
 								{label}
 							</a>
 						</SidebarMenuButton>

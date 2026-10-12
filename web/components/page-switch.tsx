@@ -117,7 +117,7 @@ export const PageSwitch = memo(function PageSwitch({
 	toggleSidebar,
 }: PageSwitchProps) {
 	const { send, start, dismissStart, changeTodo } = useDashboardActions();
-	const { visible, workspaces, workspace } = scope;
+	const { visible, workspaces, workspace, pickWorkspace } = scope;
 	switch (page?.kind) {
 		case "new": {
 			const cwd = page.cwd ?? defaultWorkspace;
@@ -143,7 +143,7 @@ export const PageSwitch = memo(function PageSwitch({
 			);
 		}
 		case "settings":
-			return <SettingsPage route={page} workspaces={workspaces} workspaceList={workspaceList} pins={pins} />;
+			return <SettingsPage section={page.section} cwd={workspace} onPickWorkspace={pickWorkspace} workspaces={workspaces} workspaceList={workspaceList} pins={pins} />;
 		case "pull-requests":
 			return page.target === null ? (
 				<PullRequestsPage workspace={workspace} hosts={visible.hosts} past={visible.past} section={sectionTarget} />

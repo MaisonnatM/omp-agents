@@ -78,13 +78,11 @@ describe("layout hash", () => {
 		expect(routeFromHash("#a,b@x")).toEqual({ kind: "panes", layout: layout([live("a"), live("b")], 0) });
 	});
 
-	test("the settings page names its section, its workspace keeps its slashes, and an unknown section opens Analytics", () => {
-		const hash = hashForSettings("models", "/Users/me/code/my app");
-		expect(hash).toBe("#settings/models/%2FUsers%2Fme%2Fcode%2Fmy%20app");
-		expect(routeFromHash(hash)).toEqual({ kind: "page", page: { kind: "settings", section: "models", cwd: "/Users/me/code/my app" } });
-		expect(routeFromHash("#settings/integrations")).toEqual({ kind: "page", page: { kind: "settings", section: "integrations", cwd: null } });
-		expect(routeFromHash("#settings")).toEqual({ kind: "page", page: { kind: "settings", section: "analytics", cwd: null } });
-		expect(routeFromHash("#settings/%2Fw")).toEqual({ kind: "page", page: { kind: "settings", section: "analytics", cwd: null } });
+	test("the settings page names its section, an older workspace segment is ignored, and an unknown section opens Analytics", () => {
+		expect(hashForSettings("models")).toBe("#settings/models");
+		expect(routeFromHash("#settings/models/%2FUsers%2Fme%2Fcode")).toEqual({ kind: "page", page: { kind: "settings", section: "models" } });
+		expect(routeFromHash("#settings")).toEqual({ kind: "page", page: { kind: "settings", section: "analytics" } });
+		expect(routeFromHash("#settings/%2Fw")).toEqual({ kind: "page", page: { kind: "settings", section: "analytics" } });
 		expect(routeFromHash("#7c51f77b2a1bf7ba").kind).toBe("panes");
 	});
 
@@ -192,7 +190,7 @@ describe("layout hash", () => {
 	});
 
 	test("every page hash names its page and route, and a session or layout hash names none", () => {
-		expect(routeFromHash(hashForSettings("files", "/work/app"))).toEqual({ kind: "page", page: { kind: "settings", section: "files", cwd: "/work/app" } });
+		expect(routeFromHash(hashForSettings("files"))).toEqual({ kind: "page", page: { kind: "settings", section: "files" } });
 		expect(routeFromHash(hashForPullRequests(null))).toEqual({ kind: "page", page: { kind: "pull-requests", target: null } });
 		expect(routeFromHash(hashForNewSession(null))).toEqual({ kind: "page", page: { kind: "new", cwd: null, todoId: null } });
 		expect(routeFromHash("#session/01a0f6a5-181e")).toEqual({ kind: "session", sessionId: "01a0f6a5-181e" });
@@ -211,7 +209,6 @@ describe("layout hash", () => {
 		const page = (page: Page): Route => ({ kind: "page", page });
 		expect(routeFromHash("#todo/%E0")).toEqual(page({ kind: "todo", list: { kind: "all" }, open: null }));
 		expect(routeFromHash("#routines/%zz")).toEqual(page({ kind: "routines", target: null }));
-		expect(routeFromHash("#settings/models/%E0")).toEqual(page({ kind: "settings", section: "models", cwd: null }));
 		expect(routeFromHash("#new/%E0?todo=t1")).toEqual(page({ kind: "new", cwd: null, todoId: "t1" }));
 		expect(routeFromHash("#pull-requests/acme/web/1/files/%E0")).toEqual(page({ kind: "pull-requests", target: { owner: "acme", repo: "web", number: 1 }, files: { path: null } }));
 		expect(routeFromHash("#session/%E0")).toEqual({ kind: "panes", layout: { panes: [], focus: 0, maximized: false } });

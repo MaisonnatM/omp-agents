@@ -3,7 +3,7 @@ import { pullRequestUrl } from "../src/shared/github";
 import type { PastSession, RosterHost, View } from "../src/shared/sessions";
 import type { ActionGroup, ActionRun } from "./command-palette";
 import { PAGE_ICON } from "./page-icons";
-import { hashForSettings, hashForTickets, type OpenMode } from "./routing";
+import { hashForTickets, type OpenMode } from "./routing";
 
 /** A session as a row lists it: running, or past. */
 export type SessionEntry = { kind: "live"; host: RosterHost } | { kind: "past"; session: PastSession };
@@ -26,6 +26,8 @@ export interface SessionActionContext {
 	/** Move interrupted session `sessionId` to the past sessions. */
 	dismissInterrupted: (sessionId: string) => void;
 	end: (instanceId: string) => void;
+	/** Open the session's workspace in Settings, or `null` when the sidebar cannot pick that workspace. */
+	workspaceSettings: (() => void) | null;
 }
 
 export const viewOf = (entry: SessionEntry): View =>
@@ -81,7 +83,7 @@ export function sessionActions(entry: SessionEntry, context: SessionActionContex
 			run: { kind: "link", href: pullRequestUrl(pr), external: true } as const,
 		})),
 		...row.tickets.map(id => ({ id: `ticket:${id}`, title: `Open ${id}`, icon: PAGE_ICON.tickets, run: { kind: "link", href: hashForTickets(id) } as const })),
-		{ id: "settings", title: "Workspace settings", icon: Settings, run: { kind: "link", href: hashForSettings("models", row.cwd) } },
+		...(context.workspaceSettings ? [{ id: "settings", title: "Workspace settings", icon: Settings, run: { kind: "do", fn: context.workspaceSettings } } as const] : []),
 	];
 	const copies: ActionGroup<SessionRun> = [
 		{ id: "copy-path", title: "Copy path", icon: Folder, chord: { key: "c", mod: true, shift: true }, run: { kind: "do", fn: () => void navigator.clipboard.writeText(row.cwd) } },

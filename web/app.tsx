@@ -68,7 +68,7 @@ export function App() {
 	const { signedOut: signedOutTabs, shown: tabs } = useSidebarTabs();
 	/** The dashboard reads and writes Linear: the tickets page lists issues, the Todo page creates them, and the Calendar shows their due days. */
 	const linearCallable = linear !== null && callable(linear.connection);
-	const settings = useMemo(() => settingsRoute(page, focused.cwd), [page, focused.cwd]);
+	const settings = useMemo(() => settingsRoute(page), [page]);
 	const { tab, showTab } = useSidebarTab({ page, signedOutTabs, layout, settings, navigate, show });
 	const maximized = layout.maximized && !page;
 	/** The view whose details the right sidebar shows; a page has none, and neither do side-by-side panes, which leave no single view to follow. */
@@ -117,6 +117,16 @@ export function App() {
 		},
 		[workspace, hiddenCwds, pickWorkspace, open],
 	);
+	const workspaceSettings = useCallback(
+		(cwd: string): (() => void) | null => {
+			if (!workspaces.some(listed => listed.cwd === cwd)) return null;
+			return () => {
+				pickWorkspace(cwd);
+				navigate({ kind: "settings", section: "models" });
+			};
+		},
+		[workspaces, pickWorkspace, navigate],
+	);
 
 	const { setShortcutsOpen, setFilePath, setNewTicket, dispatchPalette } = overlays;
 	const { handlers, unavailable } = usePageShortcuts({
@@ -148,8 +158,8 @@ export function App() {
 	});
 
 	const actions = useMemo(
-		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket }),
-		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, setFilePath, setNewTicket],
+		(): DashboardActions => ({ send, request, open, focus, start, dismissStart, openNewSession, changeTodo, end: endHost, openFile: setFilePath, openNewTicket: setNewTicket, workspaceSettings }),
+		[send, request, open, focus, start, dismissStart, openNewSession, changeTodo, endHost, setFilePath, setNewTicket, workspaceSettings],
 	);
 	const fork = startOf(state.starts, "fork");
 	const resume = startOf(state.starts, "resume");
