@@ -7,9 +7,12 @@ import { errorText, isObject } from "../json";
 import { type PullRequestList, prKey, repoKey } from "../shared/github";
 import { type AgentOn, moveOf, YOUR_MOVES, type YourMove } from "../shared/moves";
 import type { PlanUsage } from "../shared/models";
-import type { CreditsSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject } from "../shared/notices";
-import { usesClause } from "../shared/notices";
+import type { CreditsSubject, EventSubject, ModelUpdate, Notice, NoticeKind, NoticeOp, NoticeStatus, NoticeSubject } from "../shared/notices";
+import { EVENT_LEAD_MS, usesClause } from "../shared/notices";
 import type { SlackFound } from "../slack-messages";
+
+/** A timed calendar event; `ref` names it among the events: `local/<id>`, or `google/<calendar id>/<event id>`. */
+export type FoundEvent = Omit<EventSubject, "kind"> & { ref: string };
 
 export interface NoticeSources {
 	/** The newest omp release, or `null` when omp's settings turn the check off. */
@@ -28,6 +31,10 @@ export interface NoticeSources {
 	plans(): Promise<PlanUsage[]>;
 	/** Each provider whose prepaid credits ran out, as its latest requests failed. */
 	creditRuns(): Promise<Omit<CreditsSubject, "kind">[]>;
+	/** The timed events kept on this computer. */
+	localEvents(): FoundEvent[];
+	/** The timed events of the shown Google calendars that overlap `from` to `to`, epoch ms; none while Google Calendar is not connected. */
+	googleEvents(from: number, to: number): Promise<FoundEvent[]>;
 	now(): number;
 }
 
@@ -37,6 +44,8 @@ export const UPDATE_KINDS = ["omp", "model"] as const satisfies readonly NoticeK
 export const ACTIVITY_KINDS = ["pull-request", "slack"] as const satisfies readonly NoticeKind[];
 /** The kinds the provider check looks for. */
 export const PROVIDER_KINDS = ["plan", "credits"] as const satisfies readonly NoticeKind[];
+/** The kinds the event check looks for. */
+export const EVENT_KINDS = ["event"] as const satisfies readonly NoticeKind[];
 
 const MARKS = ["seen", "read", "cleared"] as const;
 type Mark = (typeof MARKS)[number];
@@ -71,6 +80,7 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 	slack: "Slack messages",
 	plan: "used-up plans",
 	credits: "providers out of credits",
+	event: "calendar events",
 };
 
 const isIds = (value: unknown): value is string[] => Array.isArray(value) && value.every(id => typeof id === "string");
@@ -123,6 +133,27 @@ function planNotices(plans: PlanUsage[], at: number): Found[] {
 				resetCredits: resetCredits?.count ?? 0,
 			})),
 	);
+}
+
+/** The scope of event notice `id`: Google's events, or the ones kept on this computer. */
+const eventScopeOf = (id: string): string => (id.startsWith("event:google/") ? "event:google" : "event:local");
+
+/**
+ * A notice for each event of `local` and `google` that starts within {@link EVENT_LEAD_MS} of `now` or runs then, dated
+ * that lead before its start. `google` is `null` when Google Calendar did not answer, which keeps its events' notices as
+ * they were, as the Calendar page shows why.
+ */
+function eventNotices(local: FoundEvent[], google: FoundEvent[] | null, now: number): Checked {
+	const found = [...local, ...(google ?? [])]
+		.filter(({ start, end }) => start - EVENT_LEAD_MS <= now && now < end)
+		.map(({ ref, ...event }) => ({ id: `event:${ref}:${event.start}`, at: event.start - EVENT_LEAD_MS, kind: "event" as const, ...event }));
+	return {
+		found,
+		unchecked: id => google === null && eventScopeOf(id) === "event:google",
+		scopeOf: eventScopeOf,
+		answered: google === null ? ["event:local"] : ["event:local", "event:google"],
+		dated: true,
+	};
 }
 
 export class Notices {
@@ -232,6 +263,11 @@ export class Notices {
 					(await this.#sources.creditRuns()).map(run => ({ id: `credits:${run.provider}`, at: run.since, kind: "credits", ...run })),
 					true,
 				);
+			case "event": {
+				const now = this.#sources.now();
+				const google = await this.#sources.googleEvents(now, now + EVENT_LEAD_MS).catch(() => null);
+				return eventNotices(this.#sources.localEvents(), google, now);
+			}
 		}
 	}
 

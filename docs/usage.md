@@ -1186,7 +1186,7 @@ An action that fails shows its error, and its control becomes available again.
 ## Notifications
 
 - The bell in the sidebar header, between the command menu and the keyboard shortcuts, lists what waits on you, newest first, and its badge counts the notices you have not read, up to `9+`.
-- Four sources feed it.
+- Five sources feed it.
   - **GitHub**: a pull request on the Pull requests page whose move is yours, one notice per move: **Review requested**, **Ready to merge**, **Checks failed**, **Conflicts to resolve**, or **Comments to address**.
     A pull request that a running session works on, or whose session asks you something, is not one, and its notice goes once the pull request leaves the move.
     Every two minutes while a page is open, and as soon as a page opens after none was, the server reads the pull requests of the workspaces that the Pull requests page covers.
@@ -1202,16 +1202,18 @@ An action that fails shows its error, and its control becomes available again.
       The notice goes once the window resets.
     - A provider whose prepaid credits ran out, such as OpenRouter answering `402 Insufficient credits`: a request to it failed for that in the last day, and none has worked since; the notice counts those failures since the first one.
       A request to the provider that works ends it, and a failure of another kind, such as a dropped connection, neither ends nor counts toward it.
-- **All**, **GitHub**, **Slack**, **Providers**, and **Updates** filter the list, each with its count of unread notices.
+  - **Calendar**: an event with a start time, kept on this computer or of a Google calendar the Calendar page shows, from ten minutes before it starts until it ends, checked every minute.
+    All-day events give none, and Google events need the Google Calendar sign-in of **Settings › Integrations**.
+- **All**, **GitHub**, **Slack**, **Providers**, **Calendar**, and **Updates** filter the list, each with its count of unread notices.
   Unread notices list under **New** with a blue dot, and read ones under **Earlier**.
   A pull request's or Slack message's notice shows the picture of who it comes from, or their initial when Slack's sign-in cannot read profiles without `users:read`.
-- A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in a new tab, and a provider's opens **Settings › Providers**.
+- A notice you open is read: a pull request's opens its details on the Pull requests page, a Slack message's opens it in Slack in a new tab, a provider's opens **Settings › Providers**, and an event's opens it in Google Calendar in a new tab, or the **Calendar** page for an event on this computer.
   Selecting an update's notice marks it read.
   The check mark in the header marks every notice in the filter read.
 - Each pull request notice offers the move's quick action, such as **Review** or **Fix CI**, which starts a session on it and opens its page, or **Merge on GitHub** for one ready to merge.
 - A notice that no page has shown yet shows as a toast at the bottom right; closing it marks it seen, so it does not show as a toast again in any tab or after a reload.
-  A pull request's, Slack message's, or provider's toast shows only within 15 minutes of its news, closes after a few seconds, and **Open** opens what it is about.
-  An update's toast stays until you dismiss it.
+  A pull request's, Slack message's, provider's, or event's toast shows only within 15 minutes of its news, and **Open** opens what it is about; an event's news is ten minutes before it starts.
+  A pull request's, Slack message's, or provider's toast closes after a few seconds; an event's stays until you dismiss it or the event ends, and an update's until you dismiss it.
 - **Update**, on the toast or in the bell, runs the update; the notice shows its progress, then what changed or why it failed, and a failed update can run again.
   - For omp, it runs `omp update`, which installs the newest release.
     Restart omp-agents to load it, since the running server keeps the omp it started with.

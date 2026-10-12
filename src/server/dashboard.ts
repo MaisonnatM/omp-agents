@@ -44,7 +44,7 @@ import { InterruptedSessions } from "./interrupted";
 import { LocalEventsFile } from "./local-events-file";
 import { LiveSessions, type SessionUpdate } from "./live-sessions";
 import { Loops } from "./loops";
-import { ACTIVITY_KINDS, Notices, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
+import { ACTIVITY_KINDS, EVENT_KINDS, Notices, PROVIDER_KINDS, UPDATE_KINDS } from "./notices";
 import { OwnerLock } from "./owner-lock";
 import { PinsFile } from "./pins-file";
 import { seedNotes } from "./project-notes";
@@ -156,6 +156,16 @@ export class Dashboard {
 					return this.#usage.plans;
 				},
 				creditRuns: () => readCreditRuns(Date.now()),
+				localEvents: () =>
+					this.#localEvents.all.flatMap(({ id, title, when }) => (when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null }])),
+				googleEvents: async (from, to) => {
+					const server = await findMcpServer(MCP_SERVICES["google-calendar"].host);
+					if (!server || !(await mcpSignedIn(server))) return [];
+					const { events } = await this.#google.events(new Date(from), new Date(to));
+					return events.flatMap(({ calendarId, eventId, title, calendar, color, url, when }) =>
+						when.allDay ? [] : [{ ref: `google/${calendarId}/${eventId}`, title, start: when.start, end: when.end, calendar, color, url }],
+					);
+				},
 				now: Date.now,
 			},
 			() => this.#broadcasts.pushNotices(),
@@ -274,6 +284,7 @@ export class Dashboard {
 				// Every server shows the sends, and the one that owns the unattended work sends them and saves what it did.
 				scheduled.reload();
 				broadcasts.pushScheduled();
+				await notices.check(EVENT_KINDS);
 				if (!this.#claimUnattendedWork()) return;
 				this.#clearOldDone();
 				await scheduledRunner.tick();
