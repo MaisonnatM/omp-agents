@@ -112,6 +112,7 @@ describe("Loops", () => {
 			onMinuteTick: tick("minute"),
 			onNoticeTick: tick("notice"),
 			onActivityTick: tick("activity"),
+			onPullTick: tick("pull"),
 		};
 		const loops = new Loops(dir, handlers);
 		try {

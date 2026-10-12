@@ -602,9 +602,19 @@ A removed file's patch holds every line, so it reads no blob; a file GitHub send
 `stackOf` in `src/pull-request-stack.ts` follows the base branches down from the pull request and the pull requests based on its branch up, so the stack holds those that the Pull requests page does not list.
 `GET /api/pull-request/options?owner=<o>&repo=<r>` answers `PullRequestOptions` for the pickers of a pull request's **Summary**: the repository's labels and the people its issues can be assigned to, whom a review can be asked of, each from `gh api --paginate --slurp` and sorted by name, kept five minutes per repository.
 `PUT /api/pull-request` takes a `PullRequestEdit`, a pull request and one `change`, checked by `parsePullRequestEdit` in `src/server/wire.ts`: a label or a review request added or removed through REST, or a state of `open`, `draft`, or `closed` through the GraphQL mutations `stateSteps` orders, a closed pull request reopening before its draft flag changes.
+A `merge` change, `{ method, head }`, runs GraphQL's `mergePullRequest` with that method and `expectedHeadOid: head`, so GitHub refuses the merge once the branch moved past the commit the page showed.
+The pull request's answer carries that commit as `headOid` and the methods its repository allows as `mergeMethods`.
 It answers the pull request as `GET /api/pull-request` reads it after the change, read again from GitHub, and the details then refresh the pull request list.
 One change goes per call, so two changes made at once each keep the other.
 The details send their changes one at a time through `web/use-queued-save.ts`, which the issue detail's fields share.
+
+`GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` and `gt` are installed and signed in, the automatic pull setting, and each repository the visible workspaces are in, keyed by its main checkout, with its own choice and its last pull since the server started.
+`gh` is signed in when `gh api user` answers a login, and `gt` when Graphite's `user_config` holds an `authToken`.
+`PUT /api/source-control` takes an `AutoPullChange`, `{ op: "default", on }` or `{ op: "repo", repo, on }` with `on: null` dropping a repository's own choice, checked by `parseAutoPullChange` in `src/server/wire.ts`, and answers the same as the `GET`.
+A change that changes the setting saves `source-control.json` beside the access token and, on the server that holds the owner lock, pulls at once.
+A pull, from that change or from the pull loop every five minutes, waits for the one under way, then runs `pullDefaultBranch` on each repository whose pulls are on.
+It reads the default branch from `origin/HEAD`, fetches it, and moves the local branch only when it is behind `origin`'s with no commits of its own: through `merge --ff-only` in the worktree that has it checked out, skipped when that worktree has changes to tracked files, else through `update-ref`.
+
 `GET /api/worktrees` lists the worktrees of every repository a session ran in, or of `?cwd=` when that directory is in a repository.
 Each row names the registered path, branch, lock, whether the directory is missing, the newest session file there, and why removal is refused.
 `GET /api/worktrees/metrics?repository=&path=` reads approximate allocated disk use, the last commit time, and the modified and untracked counts for one registered checkout.
@@ -913,7 +923,7 @@ The server lives in `src/`:
   The registry indexes its sessions by session id for `bySessionId`, and rebuilds the index when a session joins or leaves or a dashboard session reports `switched`.
   `add` refuses a session whose `finished()` already holds, such as a dashboard session whose omp exited as it spawned, and `start.ts` answers that start with an error.
   After each registry poll, `follow` hands every session the listed hosts and removes the ones that report `finished(now)`; a terminal guest decides there when to rejoin, so the registry reads no result from `follow`.
-- `src/server/loops.ts`: the registry, rescan, usage, routine minute, notice, and activity loops, each started through `repeat`, which waits for a tick to finish before it schedules the next and logs a tick that throws, so no loop overlaps itself or dies on one failure.
+- `src/server/loops.ts`: the registry, rescan, usage, routine minute, notice, activity, and pull loops, each started through `repeat`, which waits for a tick to finish before it schedules the next and logs a tick that throws, so no loop overlaps itself or dies on one failure.
   `Loops.stop` stops every loop, closes the recursive watcher, and drops a pending re-read; a file change reported after it is ignored.
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
@@ -963,7 +973,9 @@ The server lives in `src/`:
 - `src/changes.ts`: the session changes dialog's reads for `GET /api/changes` and `GET /api/changes/file`, a session's checkout diff merged with its own changed files, the last scan of each place kept for three seconds so that reading a file does not list every change again, and each session transcript folded into its changed files once, by the lines it gained since; `src/shared/changes.ts` holds the shapes the page shares, `parseFullDiff`, which numbers the rows of a whole-file diff, and `patchRows`, which fills GitHub's patch out to the whole file.
 - `src/pull-request-files.ts`: the reads of a pull request's **Code** tab for `GET /api/pull-request/files` and `GET /api/pull-request/file`, from GitHub's REST API and one GraphQL blob read.
   `src/pull-request-stack.ts` reads the stack for `GET /api/pull-request/stack`.
-  `src/pull-request-edit.ts` makes a change from the **Summary**'s pickers for `PUT /api/pull-request` and lists their choices for `GET /api/pull-request/options`.
+  `src/pull-request-edit.ts` makes a change from the **Summary**'s pickers or the header's merge button for `PUT /api/pull-request` and lists the pickers' choices for `GET /api/pull-request/options`.
+- `src/source-control.ts`: Settings › Source control providers on the server: `gh`'s and `gt`'s sign-in, the automatic pull setting in `source-control.json`, and `pullDefaultBranch`; see [HTTP API](#http-api).
+  `src/shared/source-control.ts` holds the shapes the page shares, the merge methods and their labels, `applyAutoPull`, and `startingMethod`, which picks the method the merge button starts with.
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
   `src/mcp-clients.ts` plans a Slack, Google Calendar, or Gmail OAuth client save, the setup each form shows and the server entry the save writes, from omp's MCP servers that `src/omp/mcp.ts` reads and writes.
@@ -1083,6 +1095,7 @@ The page lives in `web/`.
   The open section is in the hash, `#settings/<section>/<encoded cwd>`; `settings-page.tsx` keeps inactive panels mounted to preserve unsaved drafts, and shows the workspace picker on the **This workspace** sections only.
   `preferences-tab.tsx` holds the dashboard's browser-local choices, and `routing-tab.tsx` the Models section: roles, model chains, provider order, and retries.
   `workspaces-tab.tsx` lists the workspaces with **Hide**, the hidden ones with **Show**, and adds a directory by path through `PUT /api/workspaces`; the list it shows comes back as the `workspaces` socket message.
+  `source-control-tab.tsx` shows the `gh` and `gt` rows, the automatic pull switch, each repository's override with its last pull, and the default merge method, which `web/merge-method.ts` keeps in localStorage with the method last picked on a merge button.
 - `web/components/settings/analytics-tab.tsx`: the Settings section for request usage, including time-range buttons, a token chart, breakdowns, and the top sessions; it polls only while it shows.
   `provider-trend.tsx` renders the stacked provider chart and bucket-data table; `analytics-format.ts` shares number and cost formatting across the section.
 - `web/model-menu.ts`: what the model menu derives from the model list and plan usage, the context variants of a model, a provider's quota for the account with the most left, and the search's word match.

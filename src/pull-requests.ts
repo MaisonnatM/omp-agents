@@ -7,6 +7,7 @@ import { AVATAR, authorOf, CHANGE, CHECK_RUN, dataOf, ghGraphql, parsePerson, RE
 import { errorText, isObject, num, str } from "./json";
 import { directoryOf } from "./paths";
 import { type CheckRunState, type PullRequestList, type PullRequestSummary, type PullRequestRole, type Person, type PullRequest, type PullRequestCheck, type PullRequestComment, type PullRequestCommit, type PullRequestDetail, type PullRequestEvent, type PullRequestFile, type PullRequestThread, prKey, pullRequestName, type Repo, type RepoPullRequests, type Reviewer, type ReviewDecision, repoKey } from "./shared/github";
+import { MERGE_METHODS, type MergeMethod } from "./shared/source-control";
 
 export { parseRemote, repoOf } from "./github";
 
@@ -155,8 +156,8 @@ const loaded = createCache<PullRequestSummary[]>();
 const COMMENT_FIELDS = `author { login ${AVATAR} } body createdAt url`;
 
 const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
-	repository(owner: $owner, name: $repo) { pullRequest(number: $number) {
-		number title body isDraft state reviewDecision mergeable headRefName baseRefName createdAt updatedAt additions deletions changedFiles
+	repository(owner: $owner, name: $repo) { mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed pullRequest(number: $number) {
+		number title body isDraft state reviewDecision mergeable headRefName headRefOid baseRefName createdAt updatedAt additions deletions changedFiles
 		labels(first: 20) { nodes { name color } }
 		history: commits(last: 100) { nodes { commit {
 			abbreviatedOid messageHeadline committedDate additions deletions author { name ${AVATAR} user { login ${AVATAR} } }
@@ -175,6 +176,8 @@ const DETAIL_QUERY = `query($owner: String!, $repo: String!, $number: Int!) {
 }`;
 
 const CHECK_ORDER: CheckRunState[] = ["failing", "pending", "passing", "skipped"];
+
+const MERGE_ALLOWED: Record<MergeMethod, string> = { merge: "mergeCommitAllowed", squash: "squashMergeAllowed", rebase: "rebaseMergeAllowed" };
 
 function parseCheck(node: unknown): PullRequestCheck | null {
 	if (!isObject(node)) return null;
@@ -260,6 +263,8 @@ export function parseDetailAnswer(answer: unknown, pr: PullRequest): PullRequest
 		updatedAt: Date.parse(str(node.updatedAt) ?? "") || createdAt,
 		labels,
 		commits: commitList,
+		headOid: str(node.headRefOid) ?? "",
+		mergeMethods: MERGE_METHODS.filter(method => repository[MERGE_ALLOWED[method]] === true),
 	};
 }
 

@@ -14,6 +14,7 @@ import { IntegrationsTab } from "./integrations-tab";
 import { PreferencesTab } from "./preferences-tab";
 import { ProvidersTab } from "./providers-tab";
 import { ModelsTab } from "./routing-tab";
+import { SourceControlTab } from "./source-control-tab";
 import { WorkspacesTab } from "./workspaces-tab";
 import { WorktreesTab } from "./worktrees-tab";
 
@@ -123,6 +124,7 @@ export function SettingsPage({
 		providers: <ProvidersTab active={section === "providers"} />,
 		preferences: <PreferencesTab cwd={cwd} workspace={cwd === null ? null : workspaceLabel(cwd, workspaces)} />,
 		integrations: <IntegrationsTab active={section === "integrations"} />,
+		"source-control": <SourceControlTab active={section === "source-control"} />,
 		workspaces: <WorkspacesTab workspaces={workspaces} list={workspaceList} />,
 		worktrees: <WorktreesTab cwd={cwd} active={section === "worktrees"} pins={pins} />,
 	};

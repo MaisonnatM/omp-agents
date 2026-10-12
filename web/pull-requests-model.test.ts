@@ -333,6 +333,8 @@ describe("pull request status", () => {
 		updatedAt: 0,
 		labels: [],
 		commits: [],
+		headOid: "",
+		mergeMethods: [],
 		...fields,
 	});
 	const check = (state: PullRequestCheck["state"]) => ({ name: state, state, url: null });

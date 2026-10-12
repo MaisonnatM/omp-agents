@@ -19,6 +19,7 @@ import type { PinChange } from "../shared/pins";
 import type { ProjectEdit } from "../shared/projects";
 import { MAX_SCHEDULED_TEXT, type ScheduledChange, type ScheduledTarget } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
+import { type AutoPullChange, MERGE_METHODS } from "../shared/source-control";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
@@ -478,12 +479,15 @@ export function parsePullRequestQuery(params: URLSearchParams): Parsed<PullReque
 }
 
 const isSettableState = oneOf(SETTABLE_STATES);
+const isMergeMethod = oneOf(MERGE_METHODS);
+const COMMIT = /^[0-9a-f]{40,64}$/;
 
 function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (!isObject(change)) return null;
 	if (change.field === "label" && isNonEmpty(change.name) && typeof change.on === "boolean") return { ok: { field: "label", name: change.name, on: change.on } };
 	if (change.field === "reviewer" && typeof change.login === "string" && NAME.test(change.login) && typeof change.on === "boolean") return { ok: { field: "reviewer", login: change.login, on: change.on } };
 	if (change.field === "state" && isSettableState(change.state)) return { ok: { field: "state", state: change.state } };
+	if (change.field === "merge" && isMergeMethod(change.method) && typeof change.head === "string" && COMMIT.test(change.head)) return { ok: { field: "merge", method: change.method, head: change.head } };
 	return null;
 }
 
@@ -493,6 +497,14 @@ export function parsePullRequestEdit(body: unknown): Parsed<PullRequestEdit> {
 	const pr = parsePullRequest(body.owner, body.repo, body.number);
 	const change = parsePullRequestChange(body.change);
 	return pr && change && { ok: { ...pr.ok, change: change.ok } };
+}
+
+/** The body of `PUT /api/source-control`. */
+export function parseAutoPullChange(body: unknown): Parsed<AutoPullChange> {
+	if (!isObject(body)) return null;
+	if (body.op === "default" && typeof body.on === "boolean") return { ok: { op: "default", on: body.on } };
+	if (body.op === "repo" && typeof body.repo === "string" && body.repo.startsWith("/") && (typeof body.on === "boolean" || body.on === null)) return { ok: { op: "repo", repo: body.repo, on: body.on } };
+	return null;
 }
 
 /** `?owner=<o>&repo=<r>` of `GET /api/pull-request/options`. */

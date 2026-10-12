@@ -616,7 +616,8 @@ An action that fails shows its error, and its control becomes available again.
   Its last line shows the branch it merges into, marked with a stack icon in amber when that is another pull request's branch, the branch it brings, its files, and the lines added and removed.
   On the right of the first line, the **Next move** shows as its badge, with its reason on hover, and one button that makes it.
   The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**; a **Rebase** whose checks also failed offers **Fix CI and conflicts**.
-  **Merge** offers **Merge on GitHub**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
+  **Merge** offers a button named for the merge method it starts with, such as **Squash and merge**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
+  The merge button asks before it merges, offers the other methods the repository allows, and merges on GitHub only while the branch's head is still the commit the page shows; a pull request not yet read offers **Merge on GitHub**.
   The `⋯` menu beside it holds the other quick actions, then **Open on GitHub** and **Open on Graphite**, each with its logo.
 - Under the header, tabs split the details: **Summary**, **Timeline**, with the count of its comments, reviews, and review threads, and **Code**.
   The tab bar's right end sums up the head commit's checks, such as `1 of 3 running`, `2 of 5 failing`, or `3 passing`; click it for the failing and pending checks, and the passing and skipped ones folded behind their counts.
@@ -1082,8 +1083,8 @@ An action that fails shows its error, and its control becomes available again.
 - **Settings** is the last sidebar tab by default, after **Calendar** and, once Gmail is connected, **Inbox**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
-  The sidebar lists eight sections in two groups.
-  **General** holds **Analytics**, **Preferences**, **Providers**, **Integrations**, and **Workspaces**, which are the same whatever the workspace.
+  The sidebar lists nine sections in two groups.
+  **General** holds **Analytics**, **Preferences**, **Providers**, **Integrations**, **Source control providers**, and **Workspaces**, which are the same whatever the workspace.
   **This workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the sidebar's workspace loads them; only these sections show the workspace picker.
   It opens on **Analytics**, and the header names the open section.
   Switching sections keeps an unsaved edit, and the selected section stays when you change workspace.
@@ -1149,6 +1150,10 @@ An action that fails shows its error, and its control becomes available again.
   Choose **None** to unpin.
 - **Providers** signs omp in to the model providers its sessions call, as `/login` and `omp login` do; see [Providers](#providers).
 - **Integrations** connects omp to Linear and Slack and the dashboard to Google Calendar and Gmail; see [Integrations](#integrations).
+- **Source control providers** shows whether the `gh` and `gt` command-line tools are installed and signed in; **Check again** reads them again.
+  **Automatically pull** keeps the default branch current when the checkout has no local changes or commits; it is off by default, and the server checks every five minutes and right after a change.
+  Each repository your workspaces use lists its last pull and an override, **Default**, **On**, or **Off**; the server keeps both in `source-control.json` beside its access token.
+  **Default merge method** picks the method a pull request's merge button starts with; **Last selected** reuses whatever you chose most recently in this browser, and a method the repository does not allow falls back to the first one it does.
 - **Workspaces** lists the directories that the sidebar's workspace picker and the directory pickers offer.
   Type a path in **Directory** and choose **Add workspace** to offer a directory no session ran in yet; `~` works, and a path that is not a directory shows an error.
   **Hide** drops a workspace and its sessions from the pickers, the session lists and counts, and session search, as for `/tmp`; a direct session link still opens them.

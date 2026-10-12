@@ -20,8 +20,9 @@ import { type HostSnapshot, listHosts } from "../omp/collab";
 import { installedOmp, latestOmp, updateOmp } from "../omp/release";
 import { sessionsDir } from "../omp/sessions";
 import { readCreditRuns, stopStats } from "../omp/stats";
-import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
+import { calendarsFile, directoryOf, displayPath, interruptedFile, localEventsFile, noticesFile, oldGoogleFile, pinsFile, projectNotesDir, projectsFile, routinesFile, scheduledFile, sessionEndInboxDir, serverLockFile, sourceControlFile, userTodoInboxDir, userTodosFile, workspacesFile } from "../paths";
 import { runShell } from "../proc";
+import { SourceControl } from "../source-control";
 import { COMMAND_TIMEOUT_MS, MAX_COMMAND_OUTPUT } from "../routines";
 import { modelUpdates, upgradeModel } from "../settings";
 import { MCP_SERVICES } from "../shared/accounts";
@@ -78,6 +79,7 @@ export class Dashboard {
 	readonly #workspaces: WorkspacesFile;
 	readonly #projects: ProjectsFile;
 	readonly #pins = new PinsFile(pinsFile);
+	readonly #sourceControl = new SourceControl(sourceControlFile);
 	readonly #calendars = new CalendarsFile(calendarsFile);
 	readonly #localEvents = new LocalEventsFile(localEventsFile);
 	/** The terminal panel's shells, which the server's `/ws/terminal` upgrades open and attach to. */
@@ -282,6 +284,9 @@ export class Dashboard {
 				if (broadcasts.listening()) await this.#checkActivity();
 				else this.#activityFresh = false;
 			},
+			onPullTick: async () => {
+				if (ownerLock.held) await this.#sourceControl.pull(this.#workspaceCwds());
+			},
 		});
 		this.#requests = new RequestLedger(createClientHandler({
 			sessions,
@@ -344,6 +349,10 @@ export class Dashboard {
 				},
 				projectNotesDir: id => (this.#projects.get(id) ? projectNotesDir(id) : null),
 				searchConversations: query => files.searchConversations(query),
+				sourceControl: () => this.#sourceControl.answer(this.#workspaceCwds()),
+				changeAutoPull: change => {
+					if (this.#sourceControl.apply(change) && this.#ownerLock.held) void this.#sourceControl.pull(this.#workspaceCwds());
+				},
 			},
 			calendar: {
 				google: this.#google,
@@ -424,6 +433,11 @@ export class Dashboard {
 	/** Directories sessions ran in: live ones first, then saved ones newest first. */
 	knownCwds(): string[] {
 		return [...new Set([...this.#sessions.cwds(), ...this.#files.cwds()].filter(Boolean))];
+	}
+
+	#workspaceCwds(): string[] {
+		const { added, hidden } = this.#workspaces.list;
+		return [...new Set([...this.knownCwds(), ...added])].filter(cwd => !hidden.includes(cwd));
 	}
 
 	/** Where every live session's update goes: the views, the broadcasts, the routines, the projects, and the loops. */

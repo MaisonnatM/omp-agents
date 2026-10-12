@@ -1,7 +1,7 @@
 /**
  * Every recurring job of the server, with its cadence: the registry poll, the watcher on omp's sessions
  * directory and the throttled re-read it asks for, the full rescan, the `omp usage` poll, the routine tick, the
- * update check, and the activity check. The handlers do the work. Every loop schedules its next tick once the last one
+ * update check, the activity check, and the automatic pulls. The handlers do the work. Every loop schedules its next tick once the last one
  * finished, so ticks never overlap, and one that fails is logged and tried again at the next turn.
  * The routine tick runs whether or not a page is connected, since routines start sessions on their own.
  */
@@ -23,6 +23,8 @@ const MINUTE_TICK_MS = 60_000;
 const NOTICE_CHECK_MS = 6 * 60 * 60_000;
 /** Each activity check asks GitHub for every workspace's pull requests and searches Slack twice. */
 const ACTIVITY_CHECK_MS = 2 * 60_000;
+/** Each pull fetches every workspace repository's default branch whose automatic pulls are on. */
+const PULL_MS = 5 * 60_000;
 
 export interface LoopHandlers {
 	/** Every {@link POLL_MS}. */
@@ -41,6 +43,8 @@ export interface LoopHandlers {
 	onNoticeTick(): Promise<void>;
 	/** Every {@link ACTIVITY_CHECK_MS}. */
 	onActivityTick(): Promise<void>;
+	/** At once, then every {@link PULL_MS}, listener or not. */
+	onPullTick(): Promise<void>;
 }
 
 /**
@@ -87,7 +91,7 @@ export class Loops {
 		});
 	}
 
-	/** Start the registry poll, the rescans, the usage poll, the minute tick, the update check, and the activity check. */
+	/** Start every loop. */
 	start(): void {
 		this.#stops = [
 			repeat("registry", this.#on.onRegistryTick, POLL_MS),
@@ -96,6 +100,7 @@ export class Loops {
 			repeat("routine", this.#on.onMinuteTick, MINUTE_TICK_MS),
 			repeat("update check", this.#on.onNoticeTick, NOTICE_CHECK_MS, 0),
 			repeat("activity check", this.#on.onActivityTick, ACTIVITY_CHECK_MS),
+			repeat("pull", this.#on.onPullTick, PULL_MS, 0),
 		];
 	}
 

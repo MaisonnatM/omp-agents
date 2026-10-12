@@ -41,7 +41,8 @@ import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
-import { type Parsed, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
+import { type Parsed, parseAutoPullChange, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
+import type { AutoPullChange, SourceControlAnswer } from "../shared/source-control";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
 import { documentText, UnreadableDocument } from "../omp/documents";
@@ -68,6 +69,9 @@ export interface SessionRoutesEnv {
 	projectNotesDir(id: string): string | null;
 	/** The saved conversations whose prompts or replies hold every word of `query`, the file changed last first. */
 	searchConversations(query: string): Promise<ConversationHit[]>;
+	sourceControl(): Promise<SourceControlAnswer>;
+	/** Apply `change` to the automatic pulls, and pull again when it changed them. */
+	changeAutoPull(change: AutoPullChange): void;
 }
 
 /** What the calendar routes read: Google Calendar, the calendars it shows, and the events kept on this computer. */
@@ -222,6 +226,18 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		},
 	);
 
+	/** `GET /api/source-control`: GitHub's and Graphite's CLIs, the automatic pull setting, and the workspaces' repositories. */
+	const sourceControl = get(() => answer(() => env.sourceControl()));
+
+	/** `PUT /api/source-control` `{ op, on, repo? }`: turn automatic pulls on or off by default, or for one repository. */
+	const autoPullChange = write(
+		body => checked(parseAutoPullChange(body), "Expected { op: default, on } or { op: repo, repo, on } with on true, false, or null for a repository"),
+		async change => {
+			env.changeAutoPull(change);
+			return env.sourceControl();
+		},
+	);
+
 	/** The place of the session `?session=` names, or the response refusing it. */
 	function sessionPlace(params: URLSearchParams): SessionPlace | Response {
 		const sessionId = params.get("session") ?? "";
@@ -268,6 +284,7 @@ function sessionRoutes({ get, write }: RouteKit, env: SessionRoutesEnv): Routes 
 		"/api/skills": { GET: skills },
 		"/api/pull-requests": { GET: pullRequests },
 		"/api/workspaces": { PUT: workspaceChange },
+		"/api/source-control": { GET: sourceControl, PUT: autoPullChange },
 		"/api/changes": { GET: changes },
 		"/api/changes/file": { GET: changedFile },
 		"/api/project-notes": { GET: projectNotes },
@@ -472,7 +489,7 @@ function pullRequestRoutes({ get, write }: RouteKit): Routes {
 
 	/** `PUT /api/pull-request`: `PullRequestEdit`, made on GitHub; answers the pull request in full as it is after it. */
 	const pullRequestWrite = write(
-		body => checked(parsePullRequestEdit(body), "Expected { owner, repo, number, change } with a label or reviewer to add or remove, or a state of open, draft, or closed"),
+		body => checked(parsePullRequestEdit(body), "Expected { owner, repo, number, change } with a label or reviewer to add or remove, a state of open, draft, or closed, or a merge method and head commit"),
 		savePullRequest,
 	);
 

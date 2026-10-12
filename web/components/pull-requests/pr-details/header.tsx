@@ -1,5 +1,11 @@
 import { ArrowLeft, Check, Copy, Ellipsis, ExternalLink, FileDiff, GitMerge, Layers, Zap } from "lucide-react";
-import type { ReactNode, RefObject } from "react";
+import { type ReactNode, type RefObject, useState } from "react";
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
+import { MERGE_METHOD_LABELS, type MergeMethod, startingMethod } from "../../../../src/shared/source-control";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useLastMergeMethod, useMergeMethodChoice } from "../../../merge-method";
+import type { SavePullRequest } from "../pr-fields";
 import { type PullRequest, type PullRequestDetail, pullRequestName, pullRequestUrl, type StackedPullRequest } from "../../../../src/shared/github";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuItem, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
@@ -16,13 +22,69 @@ import { Avatar, IconTip, STATE_ICON } from "../avatars";
 import { MoveBadge } from "../pr-row";
 import type { DetailContentProps, NextMove, Placement } from ".";
 
+/** Merges on GitHub with the method Settings starts it on, after a confirmation that can switch the method. */
+function MergeButton({ pr, detail, onSave }: { pr: PullRequest; detail: PullRequestDetail; onSave: SavePullRequest }) {
+	const [choice] = useMergeMethodChoice();
+	const [last, setLast] = useLastMergeMethod();
+	const [open, setOpen] = useState(false);
+	const [picked, setPicked] = useState<MergeMethod | null>(null);
+	const method = picked && detail.mergeMethods.includes(picked) ? picked : startingMethod(choice, last, detail.mergeMethods);
+	if (!method)
+		return (
+			<Button variant="primary" size="compact" leadingIcon={GitMerge} render={<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" />}>
+				Merge on GitHub
+			</Button>
+		);
+	const merge = (): void => {
+		setLast(method);
+		setOpen(false);
+		onSave({ field: "merge", method, head: detail.headOid }, {});
+	};
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger asChild>
+				<Button variant="primary" size="compact" leadingIcon={GitMerge} active={open}>
+					{MERGE_METHOD_LABELS[method]}
+				</Button>
+			</PopoverTrigger>
+			<PopoverContent align="end" className="w-72 space-y-3 p-3">
+				<p className="text-[13px] text-pretty">
+					Merge {pullRequestName(pr)} into <span className="font-mono">{detail.base}</span> on GitHub?
+				</p>
+				{detail.mergeMethods.length > 1 && (
+					<RadioGroup aria-label="Merge method" value={method} onValueChange={value => setPicked(detail.mergeMethods.find(allowed => allowed === value) ?? null)} className="space-y-1">
+						{detail.mergeMethods.map(allowed => (
+							<label key={allowed} className="flex cursor-pointer items-center gap-2 text-[13px]">
+								<Radio.Root value={allowed} className="flex size-3.5 items-center justify-center rounded-full shadow-[0_0_0_1px_var(--border)] outline-none focus-visible:ring-2 focus-visible:ring-ring data-[checked]:bg-primary">
+									<Radio.Indicator className="size-1.5 rounded-full bg-background" />
+								</Radio.Root>
+								{MERGE_METHOD_LABELS[allowed]}
+							</label>
+						))}
+					</RadioGroup>
+				)}
+				<div className="flex justify-end gap-2">
+					<Button variant="ghost" size="compact" onClick={() => setOpen(false)}>
+						Cancel
+					</Button>
+					<Button variant="primary" size="compact" leadingIcon={GitMerge} onClick={merge}>
+						{MERGE_METHOD_LABELS[method]}
+					</Button>
+				</div>
+			</PopoverContent>
+		</Popover>
+	);
+}
+
 /** The Next move's one button, as the header's primary action. */
-function NextMoveButton({ pr, next, quick, onOpen }: { pr: PullRequest; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"] }) {
+function NextMoveButton({ pr, detail, next, quick, onOpen, onSave }: { pr: PullRequest; detail: PullRequestDetail | null; next: NextMove; quick: QuickActionsProps; onOpen: DetailContentProps["onOpen"]; onSave: SavePullRequest }) {
 	const { move, reason, action, session } = next;
 	let button: ReactNode = null;
 	if (action) button = <QuickActionButton action={action} pending={quick.pending} onRun={quick.onRun} primary />;
 	else if (move === "merge")
-		button = (
+		button = detail ? (
+			<MergeButton pr={pr} detail={detail} onSave={onSave} />
+		) : (
 			<Button variant="primary" size="compact" leadingIcon={GitMerge} render={<a href={pullRequestUrl(pr)} target="_blank" rel="noreferrer" />}>
 				Merge on GitHub
 			</Button>
@@ -98,13 +160,14 @@ interface DetailHeaderProps {
 	actions: QuickActionId[];
 	quick: QuickActionsProps;
 	onOpen: DetailContentProps["onOpen"];
+	onSave: SavePullRequest;
 	placement: Placement;
 	/** The heading, which takes focus on the page. */
 	headingRef: RefObject<HTMLHeadingElement | null>;
 }
 
 /** The header: the pull request's name, author, branches, and size, with the Next move's button and the `⋯` menu. */
-export function DetailHeader({ pr, detail, stack, next, actions, quick, onOpen, placement, headingRef }: DetailHeaderProps) {
+export function DetailHeader({ pr, detail, stack, next, actions, quick, onOpen, onSave, placement, headingRef }: DetailHeaderProps) {
 	const page = placement === "page";
 	const Heading = page ? "h1" : "h3";
 	const stackedBase = detail && stack.length > 0 && stack.at(-1)?.number !== pr.number;
@@ -119,7 +182,7 @@ export function DetailHeader({ pr, detail, stack, next, actions, quick, onOpen, 
 					</a>
 				</p>
 				<span className="ml-auto flex shrink-0 items-center gap-1.5">
-					{next && <NextMoveButton pr={pr} next={next} quick={quick} onOpen={onOpen} />}
+					{next && <NextMoveButton pr={pr} detail={detail} next={next} quick={quick} onOpen={onOpen} onSave={onSave} />}
 					<MoreMenu pr={pr} actions={actions} quick={quick} />
 				</span>
 			</div>

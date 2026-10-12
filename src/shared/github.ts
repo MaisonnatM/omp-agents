@@ -1,6 +1,7 @@
 /** GitHub repositories and pull requests: keys, links, the pull request list, one pull request in full, and its changed files. */
 
 import type { ChangedEntry } from "./changes";
+import type { MergeMethod } from "./source-control";
 
 /** A GitHub repository. */
 export interface Repo {
@@ -213,14 +214,22 @@ export interface PullRequestDetail extends PullRequest {
 	labels: PullRequestLabel[];
 	/** Its own commits among the branch's latest 100, oldest first: none that GitHub links only to other pull requests. */
 	commits: PullRequestCommit[];
+	/** The head commit's full id, which a merge names so GitHub refuses it once the branch moved. */
+	headOid: string;
+	/** The merge methods the repository allows, in GitHub's order. */
+	mergeMethods: MergeMethod[];
 }
 
-/** The states the details can set; GitHub alone merges. */
+/** The states the details can set; merging is a change of its own. */
 export const SETTABLE_STATES = ["open", "draft", "closed"] as const;
 export type SettableState = (typeof SETTABLE_STATES)[number];
 
-/** One pick in the details' fields: a label or a review request added or removed, or the state set. */
-export type PullRequestChange = { field: "label"; name: string; on: boolean } | { field: "reviewer"; login: string; on: boolean } | { field: "state"; state: SettableState };
+/** One change the details make to a pull request. */
+export type PullRequestChange =
+	| { field: "label"; name: string; on: boolean }
+	| { field: "reviewer"; login: string; on: boolean }
+	| { field: "state"; state: SettableState }
+	| { field: "merge"; method: MergeMethod; head: string };
 
 /** The body of `PUT /api/pull-request`. */
 export interface PullRequestEdit extends PullRequest {

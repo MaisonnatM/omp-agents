@@ -374,14 +374,18 @@ describe("parsePullRequestQuery", () => {
 describe("parsePullRequestEdit", () => {
 	const pr = { owner: "anthropics", repo: "omp-agents", number: 12 };
 
-	test("takes one label, reviewer, or state change to a pull request", () => {
+	test("takes one label, reviewer, state, or merge change to a pull request", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "good first issue", on: true } })?.ok).toEqual({ ...pr, change: { field: "label", name: "good first issue", on: true } });
 		expect(parsePullRequestEdit({ ...pr, change: { field: "reviewer", login: "octo-cat", on: false } })?.ok).toEqual({ ...pr, change: { field: "reviewer", login: "octo-cat", on: false } });
 		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "draft" } })?.ok).toEqual({ ...pr, change: { field: "state", state: "draft" } });
+		const merge = { field: "merge", method: "squash", head: "a".repeat(40) } as const;
+		expect(parsePullRequestEdit({ ...pr, change: merge })?.ok).toEqual({ ...pr, change: merge });
 	});
 
-	test("rejects a merge, an empty label, a login with a slash, a change without its direction, and no pull request", () => {
+	test("rejects the merged state, an unknown merge method, a head that is not a commit, an empty label, a login with a slash, a change without its direction, and no pull request", () => {
 		expect(parsePullRequestEdit({ ...pr, change: { field: "state", state: "merged" } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "merge", method: "fast-forward", head: "a".repeat(40) } })).toBeNull();
+		expect(parsePullRequestEdit({ ...pr, change: { field: "merge", method: "merge", head: "main" } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: " ", on: true } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "reviewer", login: "org/team", on: true } })).toBeNull();
 		expect(parsePullRequestEdit({ ...pr, change: { field: "label", name: "bug" } })).toBeNull();

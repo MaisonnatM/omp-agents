@@ -4,6 +4,7 @@ import { dataOf, ghGraphql, ghRest, ghRestWrite, parsePerson } from "./github";
 import { loadPullRequestDetail } from "./pull-requests";
 import { isObject, str } from "./json";
 import { type Person, type PullRequest, type PullRequestDetail, type PullRequestEdit, type PullRequestLabel, type PullRequestOptions, pullRequestName, type Repo, repoKey, type SettableState } from "./shared/github";
+import type { MergeMethod } from "./shared/source-control";
 
 const OPTIONS_TTL_MS = 5 * 60_000;
 
@@ -45,13 +46,28 @@ export function stateSteps(now: { open: boolean; draft: boolean }, target: Setta
 	return steps;
 }
 
-async function setState(pr: PullRequest, target: SettableState): Promise<void> {
+async function nodeOf(pr: PullRequest): Promise<{ id: string; state: unknown; isDraft: unknown }> {
 	const data = dataOf(await ghGraphql(STATE_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }));
 	const node = isObject(data.repository) && isObject(data.repository.pullRequest) ? data.repository.pullRequest : null;
 	const id = node && str(node.id);
 	if (!node || !id) throw new Error(`GitHub has no pull request ${pullRequestName(pr)}`);
+	return { id, state: node.state, isDraft: node.isDraft };
+}
+
+async function setState(pr: PullRequest, target: SettableState): Promise<void> {
+	const node = await nodeOf(pr);
 	if (node.state === "MERGED") throw new Error("A merged pull request keeps its state");
-	for (const step of stateSteps({ open: node.state === "OPEN", draft: node.isDraft === true }, target)) dataOf(await ghGraphql(mutation(step), { id }));
+	for (const step of stateSteps({ open: node.state === "OPEN", draft: node.isDraft === true }, target)) dataOf(await ghGraphql(mutation(step), { id: node.id }));
+}
+
+const MERGE_MUTATION = `mutation($id: ID!, $method: PullRequestMergeMethod!, $head: GitObjectID!) {
+	mergePullRequest(input: { pullRequestId: $id, mergeMethod: $method, expectedHeadOid: $head }) { clientMutationId }
+}`;
+
+async function merge(pr: PullRequest, method: MergeMethod, head: string): Promise<void> {
+	const { id, state } = await nodeOf(pr);
+	if (state !== "OPEN") throw new Error(`${pullRequestName(pr)} is ${String(state).toLowerCase()}, not open`);
+	dataOf(await ghGraphql(MERGE_MUTATION, { id, method: method.toUpperCase(), head }));
 }
 
 /** Makes `edit`'s change on GitHub, then answers the pull request as GitHub has it after. */
@@ -67,6 +83,9 @@ export async function savePullRequest({ change, ...pr }: PullRequestEdit): Promi
 			break;
 		case "state":
 			await setState(pr, change.state);
+			break;
+		case "merge":
+			await merge(pr, change.method, change.head);
 			break;
 	}
 	return loadPullRequestDetail(pr, true);

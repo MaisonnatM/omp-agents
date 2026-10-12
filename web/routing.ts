@@ -1,5 +1,5 @@
 /** The URL hash: which page and which panes are open, and the pure changes to them. */
-import { BarChart3, FileText, Folders, GitBranch, KeyRound, type LucideIcon, Plug, Route as RouteIcon, SlidersHorizontal } from "lucide-react";
+import { BarChart3, FileText, Folders, GitBranch, GitMerge, KeyRound, type LucideIcon, Plug, Route as RouteIcon, SlidersHorizontal } from "lucide-react";
 import type { McpIntegrationId } from "../src/shared/accounts";
 import type { PullRequest } from "../src/shared/github";
 import { type LiveView, type RosterHost, SESSION_HASH_PREFIX, type View } from "../src/shared/sessions";
@@ -54,6 +54,7 @@ export const SETTINGS_SECTIONS = [
 	{ value: "preferences", label: "Preferences", icon: SlidersHorizontal, scope: "general" },
 	{ value: "providers", label: "Providers", icon: KeyRound, scope: "general" },
 	{ value: "integrations", label: "Integrations", icon: Plug, scope: "general" },
+	{ value: "source-control", label: "Source control providers", icon: GitMerge, scope: "general" },
 	{ value: "workspaces", label: "Workspaces", icon: Folders, scope: "general" },
 	{ value: "models", label: "Models", icon: RouteIcon, scope: "workspace" },
 	{ value: "files", label: "Files", icon: FileText, scope: "workspace" },
