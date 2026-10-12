@@ -909,10 +909,12 @@ An action that fails shows its error, and its control becomes available again.
 - The **Inbox** tab, G then I, or an `#inbox` address shows the latest 50 conversations of your Gmail inbox in place of the panes, newest first, as Gmail lists them.
   The tab and its shortcut show only once Gmail is connected in **Settings › Integrations**; see [Integrations](#integrations).
   The sidebar then shows your Gmail address over one **Inbox** row with how many conversations are unread.
-- Each row shows who sent the conversation's last message, how many messages it holds when more than one, its subject and a snippet, and when its last message arrived: the time today, the day earlier this year, and the full date before.
-  An unread conversation is bold, with a blue dot before it, and the header counts them beside your address.
-- Click a row, or focus it and press Enter, to open the conversation in full in place of the list, at an `#inbox/<thread id>` address.
-  Outside text fields, ↓ and ↑ focus the next and previous row, and O opens the focused row's conversation in Gmail in a new tab, signed in as the inbox's address.
+- Each row shows, on three lines, who sent the conversation's last message, how many messages it holds when more than one, and when its last message arrived: the time today, the day earlier this year, and the full date before; then its subject; then a snippet.
+  An unread conversation's sender and subject are bold, with a blue dot before them, and the header counts them beside your address.
+- Click a row, or focus it and press Enter, to open the conversation in a panel beside the list, at an `#inbox/<thread id>` address; its row shows selected, with a bar on its left edge.
+  With none open, the panel says how to open one.
+  Drag the line between the list and the panel to size the list, which keeps that width; a page too narrow for both shows the panel in place of the list.
+  With no conversation open, ↓ and ↑ outside text fields focus the next and previous row, and O opens the focused row's conversation in Gmail in a new tab, signed in as the inbox's address.
 - An open conversation shows its subject, its last sender, and how many messages it holds, drafts left out.
   As in Gmail, the last message and every unread one show in full and earlier ones on one line with their snippet; three or more of those in a row after the first fold into one **N older messages** row.
   Click a line or that row to unfold it, click a full message's header to fold it again, and **Expand all** unfolds every message.
@@ -920,7 +922,9 @@ An action that fails shows its error, and its control becomes available again.
   An HTML message shows as its sender wrote it, on white in both themes, with its scripts, forms, and popups blocked; it may load images, styles, and fonts, never sends the dashboard's address as the referrer, and its links open in a new tab.
   A plain text message keeps its line breaks, and its web addresses are links.
   The dashboard does not download attachments; **Open in Gmail** opens them there.
-- While a conversation shows, ↓ and ↑ open the next and previous conversation of the list, which the page reads ahead so they show at once, Esc goes back to the list with that conversation's row focused, and O or **Open in Gmail** opens it in Gmail.
+- While a conversation is open, ↓ and ↑ open the next and previous conversation of the list and focus its row, which the list scrolls into view; the page reads those neighbours ahead so they show at once.
+  Esc closes the panel with that conversation's row focused, and O opens the focused row's conversation in Gmail, else the open one.
+  The keys work after a click inside an HTML message too.
   **Refresh** reads it from Gmail again, and the page also does once the list shows a message that arrived after it read the conversation.
 - The page only reads your mail: it never sends, deletes, labels, or marks a conversation read, so opening one here leaves it unread, in Gmail and in the list, until you read it in Gmail.
 - The page reads Gmail again every minute while it is open, and **Refresh** asks Gmail at once; the server keeps each read for a minute.
@@ -1183,8 +1187,8 @@ Alt is Option on macOS.
 | C | Todo page, outside text fields | Add a todo to the Todo group |
 | Esc | Todo page, outside text fields | Close the open todo |
 | C | Calendar page, outside text fields | Add an event |
-| ↓ / ↑ | Inbox page, outside text fields | Focus the next or previous conversation, or open it while a conversation shows |
-| Esc | Inbox page, outside text fields | Go back from a conversation to the list |
+| ↓ / ↑ | Inbox page, outside text fields | Focus the next or previous conversation, or open it while one is open |
+| Esc | Inbox page, outside text fields | Close the open conversation |
 | O | Inbox page, outside text fields | Open the focused or open conversation in Gmail |
 | Alt+Shift+↑ / Alt+Shift+↓ | Todo page or Pull requests page | Move the focused todo, or the Pull requests page's focused pull request, section, or repository, up or down |
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |

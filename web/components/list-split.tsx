@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStoredState } from "../stored-state";
 import { Separator, useDragSeparator } from "./drag-separator";
@@ -30,7 +30,7 @@ interface ListSplitProps {
 	empty: SplitEmpty;
 	list: ReactNode;
 	/** The open item, `null` with none open. */
-	detail: ReactNode | null;
+	detail: ReactElement | null;
 }
 
 /**

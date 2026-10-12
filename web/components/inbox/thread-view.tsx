@@ -8,7 +8,7 @@ import { foldMessages, foldsAfter, linkParts, NO_FOLDS, personLabel, recipientsL
 import { formatBytes, mailTime } from "../../labels";
 import { mailThreadStore, useMailThread } from "../../reads";
 import { hashForInbox } from "../../routing";
-import { shortcutLabels, useShortcuts } from "../../shortcuts";
+import { shortcutLabels } from "../../shortcuts";
 import { DetailPage } from "../list-page";
 import { LoadNote } from "../sheet-details";
 import { MailFrame } from "./mail-frame";
@@ -122,7 +122,7 @@ interface ThreadDetailProps {
 	id: string;
 	/** The conversation as the inbox lists it, which titles the page until its read arrives; `null` when the list does not hold it. */
 	listed: MailThread | null;
-	/** The conversations listed before and after it, which ↑ and ↓ open. */
+	/** The conversations listed before and after it, which it reads ahead so they show at once. */
 	previous: MailThread | undefined;
 	next: MailThread | undefined;
 	/** The inbox's own address, which reads as `me`. */
@@ -131,9 +131,7 @@ interface ThreadDetailProps {
 
 /**
  * A conversation in full, as Gmail shows one: the last message and the unread ones open, earlier ones on one line, and a
- * long run of those folded into one row. ↓ and ↑ open the next and previous conversation of the list, which it reads
- * ahead, Esc goes back to the list, and O opens the conversation in Gmail. Reading it here does not mark it read, since
- * the dashboard reads Gmail read only.
+ * long run of those folded into one row. Reading it here does not mark it read, since the dashboard reads Gmail read only.
  */
 export function ThreadDetail({ id, listed, previous, next, address }: ThreadDetailProps) {
 	const { read, error, refreshing } = useMailThread(id, listed?.at ?? null);
@@ -146,23 +144,6 @@ export function ThreadDetail({ id, listed, previous, next, address }: ThreadDeta
 		if (previous) mailThreadStore.ensure(previous.id);
 		if (next) mailThreadStore.ensure(next.id);
 	}, [previous, next]);
-
-	const step = (neighbour: MailThread | undefined): boolean => {
-		if (!listed) return false;
-		if (neighbour) location.hash = hashForInbox(neighbour.id);
-		return true;
-	};
-	useShortcuts({
-		inboxNext: () => step(next),
-		inboxPrevious: () => step(previous),
-		inboxBack: () => {
-			location.hash = hashForInbox(null);
-		},
-		inboxOnGmail: () => {
-			if (!url) return false;
-			window.open(url, "_blank", "noopener,noreferrer");
-		},
-	});
 
 	const rows = foldMessages(messages, folds);
 	const subject = thread?.subject ?? listed?.subject ?? null;
