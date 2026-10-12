@@ -1087,7 +1087,7 @@ An action that fails shows its error, and its control becomes available again.
   **General** holds **Analytics**, **Preferences**, **Providers**, **Integrations**, **Source control providers**, and **Workspaces**, which are the same whatever the workspace.
   **This workspace** holds **Models**, **Files**, and **Worktrees**, which show omp's config and files as a session in the sidebar's workspace loads them; only these sections show the workspace picker.
   It opens on **Analytics**, and the header names the open section.
-  Switching sections keeps an unsaved edit, and the selected section stays when you change workspace.
+  Switching sections keeps an unsaved edit and opens the new section at its top, and the selected section stays when you change workspace.
 - **Analytics** shows request usage for the last 24 hours.
   Choose **Today**, **24h**, **7d**, **30d**, **90d**, or **All** to change the range; **Today** starts at local midnight.
   Each range's last result is cached in your browser, so switching back, reopening the page, or reloading shows it while a fresh read runs.

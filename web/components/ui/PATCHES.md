@@ -70,6 +70,9 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
   The generic glyph shows the file's extension under it, so attached `.md` and `.txt` files tell apart.
 - `lib/icon-context.tsx`: the `git-branch` and `file-text` icons.
 - `ui/fluid-hover-highlight.tsx` is the registry file unchanged, moved from `web/components/` into `ui/`.
+- `ui/select.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/select.json`).
+  Its icons are lucide's, its trigger has the settings fields' 28px height and border, and its popup and rows take the look of `ui/menu.tsx`.
+  `SelectGroup`, `SelectLabel`, `SelectSeparator`, and the exported scroll buttons and trigger `size` are removed, since nothing uses them; the popup keeps its scroll arrows.
 
 ## `kibo-ui/calendar/index.tsx`
 

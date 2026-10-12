@@ -1,6 +1,6 @@
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
-import type { KeyboardEvent, ReactNode } from "react";
+import { type KeyboardEvent, type ReactNode, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -26,16 +26,24 @@ interface FormDialogProps {
 
 /** A dialog over the page that holds one form to fill in and send, such as a new issue or a new event. */
 export function FormDialog({ busy, onClose, className, children }: FormDialogProps) {
+	const popup = useRef<HTMLDivElement>(null);
 	return (
-		<DialogPrimitive.Root open onOpenChange={open => !open && !busy && onClose()}>
+		<DialogPrimitive.Root
+			open
+			onOpenChange={(open, details) => {
+				// The form's Radix pickers render outside the popup; Esc there closes only the picker.
+				if (details.reason === "escape-key" && !popup.current?.contains(details.event.target as Node)) return;
+				if (!open && !busy) onClose();
+			}}
+		>
 			<DialogPrimitive.Portal>
-				<DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
-				<DialogPrimitive.Content
-					aria-describedby={undefined}
+				<DialogPrimitive.Backdrop className="fixed inset-0 z-40 bg-black/40 dark:bg-black/80" />
+				<DialogPrimitive.Popup
+					ref={popup}
 					className={cn("fixed left-1/2 z-50 flex max-h-[calc(100vh-2rem)] -translate-x-1/2 flex-col overflow-y-auto rounded-2xl border bg-popover text-popover-foreground shadow-2xl outline-hidden", className)}
 				>
 					{children}
-				</DialogPrimitive.Content>
+				</DialogPrimitive.Popup>
 			</DialogPrimitive.Portal>
 		</DialogPrimitive.Root>
 	);
@@ -60,10 +68,8 @@ export function FormDialogHeader({ title, busy, lead, actions }: FormDialogHeade
 			<div className="ml-auto flex items-center gap-0.5">
 				{actions}
 				<Tooltip content="Close" shortcut={["Esc"]} side="bottom">
-					<DialogPrimitive.Close asChild>
-						<Button variant="ghost" size="icon-compact" aria-label="Close" disabled={busy}>
-							<X />
-						</Button>
+					<DialogPrimitive.Close render={<Button variant="ghost" size="icon-compact" aria-label="Close" disabled={busy} />}>
+						<X />
 					</DialogPrimitive.Close>
 				</Tooltip>
 			</div>

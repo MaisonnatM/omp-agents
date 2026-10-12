@@ -1,5 +1,5 @@
 import { FolderOpen } from "lucide-react";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
 import { settingsUrl } from "../../api";
@@ -117,6 +117,11 @@ export function SettingsPage({
 	const [reads, setReads] = useState(0);
 	const settings = useReplaceableRead<OmpSettings>(settingsUrl("", cwd), reads);
 	const editing: Editing = { cwd, catalog, saved: settings.replace, reload: () => setReads(count => count + 1) };
+	// Every section shares one scroller, so a newly opened one would start at the last one's offset.
+	const scroller = useRef<HTMLDivElement>(null);
+	useLayoutEffect(() => {
+		scroller.current?.scrollTo({ top: 0 });
+	}, [section]);
 
 	const panels: Record<SettingsSection, ReactNode> = {
 		...ompPanels(settings, cwd, editing),
@@ -145,7 +150,7 @@ export function SettingsPage({
 			) : (
 				<Header title={label} />
 			)}
-			<div className="min-h-0 flex-1 overflow-y-auto">
+			<div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
 				<div className="mx-auto w-full max-w-5xl space-y-10 px-6 py-6">{body}</div>
 			</div>
 		</div>

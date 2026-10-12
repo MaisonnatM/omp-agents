@@ -2,6 +2,7 @@ import { type ReactNode, useId, useState } from "react";
 import { COMMAND_TIME_LIMIT, type Weekday } from "../../../src/routines";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type RoutineSpec, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";
 import { useSkills } from "../../use-skills";
@@ -82,13 +83,18 @@ function ScheduleEditor({
 						onChange={event => set("amount", event.target.value)}
 						className={cn(FIELD, "w-20 tabular-nums")}
 					/>
-					<select aria-label={`Unit${which}`} value={schedule.unit} onChange={event => set("unit", event.target.value as EveryUnit)} className={FIELD}>
-						{UNITS.map(unit => (
-							<option key={unit} value={unit}>
-								{unit}
-							</option>
-						))}
-					</select>
+					<Select value={schedule.unit} onValueChange={next => next && set("unit", next)}>
+						<SelectTrigger aria-label={`Unit${which}`}>
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{UNITS.map(unit => (
+								<SelectItem key={unit} value={unit}>
+									{unit}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 				</div>
 				<p className="text-xs text-muted-foreground">Counted from its last run. Every schedule shares that run.</p>
 			</Choice>

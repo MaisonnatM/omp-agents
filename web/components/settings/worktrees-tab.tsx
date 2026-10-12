@@ -3,10 +3,13 @@ import { Copy, RefreshCw, Trash2 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import type { WorktreeEntry, WorktreeInventory, WorktreeMetrics, WorktreeRemovalPlan, WorktreeRemovalResult } from "../../../src/worktrees-shared";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { changeWorktrees, errorText, readWorktreeMetrics, readWorktrees } from "../../api";
 import { age, formatBytes } from "../../labels";
 
 type SortKey = "name" | "activity" | "size";
+
+const SORTS: Record<SortKey, string> = { size: "Size", activity: "Last omp activity", name: "Name" };
 
 type DialogState =
 	| { phase: "checking" }
@@ -162,14 +165,21 @@ export function WorktreesTab({ cwd, active, pins }: { cwd: string | null; active
 					<span className="sr-only">Search worktrees</span>
 					<input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search" className="w-36 bg-transparent outline-none" />
 				</label>
-				<label className="flex items-center gap-2 text-sm">
+				<div className="flex items-center gap-2 text-sm">
 					Sort
-					<select value={sort} onChange={event => setSort(event.target.value as SortKey)} className="h-7 rounded-md border border-border bg-transparent px-2">
-						<option value="size">Size</option>
-						<option value="activity">Last omp activity</option>
-						<option value="name">Name</option>
-					</select>
-				</label>
+					<Select<SortKey> items={SORTS} value={sort} onValueChange={next => next && setSort(next)}>
+						<SelectTrigger aria-label="Sort">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{(Object.keys(SORTS) as SortKey[]).map(key => (
+								<SelectItem key={key} value={key}>
+									{SORTS[key]}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</div>
 				<Button type="button" variant="ghost" size="compact" leadingIcon={RefreshCw} loading={reading} onClick={() => setRefresh(count => count + 1)}>
 					Refresh
 				</Button>

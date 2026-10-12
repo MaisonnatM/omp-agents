@@ -2,6 +2,7 @@ import { useState } from "react";
 import { errorText } from "../../../src/json";
 import { type EventWhen, type GoogleCalendar, type LocalEvent, MAX_EVENT_TITLE, type NewEvent, type NewEventAnswer, type NewEventCalendar } from "../../../src/shared/calendar";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import { putJson } from "../../api";
 import { dateOfDay, localDay, minutesOfTimeInput, timeInputValue } from "../../days";
@@ -15,7 +16,7 @@ const LAST_CALENDAR_KEY = "omp-agents.new-event-calendar";
 const FIELD = "h-7 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
 const LAST_MINUTE = 23 * 60 + 59;
 
-/** A calendar the picker offers, by the `<option>` value that names it. */
+/** A calendar the picker offers, by the value that names it. */
 interface CalendarChoice {
 	value: string;
 	label: string;
@@ -189,16 +190,21 @@ export function NewEventDialog({ day: initialDay, onClose, onCreated }: NewEvent
 							{when.error}
 						</p>
 					)}
-					<label className="flex items-center gap-2 text-sm text-muted-foreground">
+					<div className="flex items-center gap-2 text-sm text-muted-foreground">
 						Calendar
-						<select value={choice.value} disabled={creating} onChange={event => setPicked(event.target.value)} className={FIELD}>
-							{choices.map(({ value, label }) => (
-								<option key={value} value={value}>
-									{label}
-								</option>
-							))}
-						</select>
-					</label>
+						<Select items={choices} value={choice.value} disabled={creating} onValueChange={next => next && setPicked(next)}>
+							<SelectTrigger aria-label="Calendar" className="text-foreground">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{choices.map(({ value, label }) => (
+									<SelectItem key={value} value={value}>
+										{label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
 					{submit.kind === "failed" && (
 						<p role="alert" className={ERROR_TEXT}>
 							{submit.error}

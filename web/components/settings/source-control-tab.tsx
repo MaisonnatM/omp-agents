@@ -3,6 +3,7 @@ import { RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
 	type AutoPullChange,
 	MERGE_METHOD_LABELS,
@@ -20,7 +21,7 @@ import { useMergeMethodChoice } from "../../merge-method";
 import { useReplaceableRead } from "../../reads";
 import { IntegrationList } from "../integrations/integration-row";
 import { OrgIcon } from "../org-icon";
-import { FIELD, Section } from "./editor";
+import { Section } from "./editor";
 
 const PROVIDERS: Record<SourceControlProvider, { name: string; summary: string; signIn: string }> = {
 	github: { name: "GitHub", summary: "Reads your pull requests, changes them, and merges them through the gh CLI.", signIn: "gh auth login" },
@@ -63,6 +64,10 @@ function outcomeLabel(outcome: PullOutcome): string {
 function lastPull(repo: PullRepo): string {
 	return repo.last ? `${outcomeLabel(repo.last.outcome)} · ${age(repo.last.at)} ago` : "Not pulled since the dashboard started";
 }
+
+type RepoPull = "default" | "on" | "off";
+
+const MERGE_METHOD_CHOICES: Record<MergeMethodChoice, string> = { last: "Last selected", ...MERGE_METHOD_LABELS };
 
 function AutoPullSwitch(props: { checked: boolean; disabled: boolean; label: string; onCheckedChange: (on: boolean) => void }) {
 	return (
@@ -139,31 +144,39 @@ export function SourceControlTab({ active }: { active: boolean }) {
 										{repo.path} · {lastPull(repo)}
 									</p>
 								</div>
-								<select
-									aria-label={`Automatically pull ${folderName(repo.path) ?? repo.path}`}
-									className={FIELD}
+								<Select<RepoPull>
+									items={{ default: `Default (${on ? "on" : "off"})`, on: "On", off: "Off" }}
 									disabled={pending}
 									value={repo.on === null ? "default" : repo.on ? "on" : "off"}
-									onChange={event => void change({ op: "repo", repo: repo.path, on: event.target.value === "default" ? null : event.target.value === "on" })}
+									onValueChange={next => next && void change({ op: "repo", repo: repo.path, on: next === "default" ? null : next === "on" })}
 								>
-									<option value="default">Default ({on ? "on" : "off"})</option>
-									<option value="on">On</option>
-									<option value="off">Off</option>
-								</select>
+									<SelectTrigger aria-label={`Automatically pull ${folderName(repo.path) ?? repo.path}`}>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="default">Default ({on ? "on" : "off"})</SelectItem>
+										<SelectItem value="on">On</SelectItem>
+										<SelectItem value="off">Off</SelectItem>
+									</SelectContent>
+								</Select>
 							</li>
 						))}
 					</IntegrationList>
 				)}
 			</Section>
 			<Section title="Default merge method" meta="Pull requests start with this method. Last selected reuses whatever you chose most recently on this device.">
-				<select aria-label="Default merge method" className={`${FIELD} w-fit`} value={choice} onChange={event => setChoice(event.target.value as MergeMethodChoice)}>
-					<option value="last">Last selected</option>
-					{MERGE_METHODS.map(method => (
-						<option key={method} value={method}>
-							{MERGE_METHOD_LABELS[method]}
-						</option>
-					))}
-				</select>
+				<Select<MergeMethodChoice> items={MERGE_METHOD_CHOICES} value={choice} onValueChange={next => next && setChoice(next)}>
+					<SelectTrigger aria-label="Default merge method">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{(["last", ...MERGE_METHODS] as const).map(value => (
+							<SelectItem key={value} value={value}>
+								{MERGE_METHOD_CHOICES[value]}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 			</Section>
 		</>
 	);

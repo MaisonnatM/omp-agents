@@ -1,4 +1,5 @@
 import type { TicketChoice } from "../../../src/shared/tickets";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 /** The Linear team the last new issue went in. */
 const LAST_TEAM_KEY = "omp-agents.ticket-team";
@@ -22,20 +23,20 @@ interface TeamSelectProps {
 /** The Linear team a new issue goes in. */
 export function TeamSelect({ teams, value, disabled, onChange }: TeamSelectProps) {
 	return (
-		<label className="flex items-center gap-2 text-xs text-muted-foreground">
+		<div className="flex items-center gap-2 text-xs text-muted-foreground">
 			Team
-			<select
-				value={value}
-				disabled={disabled}
-				onChange={event => onChange(event.target.value)}
-				className="h-7 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-			>
-				{teams.map(({ id, name }) => (
-					<option key={id} value={id}>
-						{name}
-					</option>
-				))}
-			</select>
-		</label>
+			<Select items={teams.map(({ id, name }) => ({ value: id, label: name }))} value={value} disabled={disabled} onValueChange={next => next && onChange(next)}>
+				<SelectTrigger aria-label="Team" className="text-foreground">
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					{teams.map(({ id, name }) => (
+						<SelectItem key={id} value={id}>
+							{name}
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+		</div>
 	);
 }

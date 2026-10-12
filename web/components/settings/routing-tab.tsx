@@ -3,6 +3,7 @@ import { type ReactNode, useState } from "react";
 import { type CatalogModel, type ModelChain, type ModelRouting, type OmpSettings, type RetrySettings, type RoleRoute, type RoutingEdit, splitSelector } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
 import { providerOrg } from "../../labels";
@@ -73,21 +74,21 @@ function SelectorPicker({ value, catalog, label, onPick }: { value: string | nul
 				empty={MODEL_LIST.empty}
 			/>
 			{model && (levels.length > 0 || level) && (
-				<Tooltip content={`Thinking level for ${label}`}>
-					<select
-						aria-label={`${label}: thinking level`}
-						className={FIELD}
-						value={level ?? ""}
-						onChange={event => onPick(event.target.value ? `${model}:${event.target.value}` : model)}
-					>
-						<option value="">default</option>
+				<Select value={level ?? ""} onValueChange={next => onPick(next ? `${model}:${next}` : model)}>
+					<Tooltip content={`Thinking level for ${label}`}>
+						<SelectTrigger aria-label={`${label}: thinking level`}>
+							<SelectValue>{(value: string) => value || "default"}</SelectValue>
+						</SelectTrigger>
+					</Tooltip>
+					<SelectContent>
+						<SelectItem value="">default</SelectItem>
 						{[...new Set([...levels, ...(level ? [level] : [])])].map(option => (
-							<option key={option} value={option}>
+							<SelectItem key={option} value={option}>
 								{option}
-							</option>
+							</SelectItem>
 						))}
-					</select>
-				</Tooltip>
+					</SelectContent>
+				</Select>
 			)}
 		</div>
 	);
@@ -254,13 +255,18 @@ function RetrySection({ routing, editing }: { routing: ModelRouting; editing: Ed
 						);
 					} else {
 						field = (
-							<select id={id} className={FIELD} value={value} onChange={event => set(key, event.target.value)}>
-								{(choices ?? [value]).map(choice => (
-									<option key={choice} value={choice}>
-										{choice}
-									</option>
-								))}
-							</select>
+							<Select value={value} onValueChange={next => next !== null && set(key, next)}>
+								<SelectTrigger id={id}>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{(choices ?? [value]).map(choice => (
+										<SelectItem key={choice} value={choice}>
+											{choice}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
 						);
 					}
 					return (
