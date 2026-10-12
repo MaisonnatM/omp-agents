@@ -66,7 +66,7 @@ test("a saved Slack app keeps unrelated MCP config, hides the secret, and preser
 	expect(JSON.parse(readFileSync(path, "utf8")).mcpServers["team-slack"].oauth.clientSecret).toBe("app-secret");
 	const changed = await save(path, { ...app, clientSecret: "replacement-secret", scope: "users:read" });
 	expect(changed.dropCredentials).toBe(true);
-	expect(changed.credential).toEqual({ name: "team-slack", url: "https://mcp.slack.com/mcp", credentialId: "kept-id" });
+	expect(changed.credential).toMatchObject({ name: "team-slack", url: "https://mcp.slack.com/mcp", credentialId: "kept-id", config: { headers: { "X-Test": "keep" } } });
 	expect(slackSetupFrom(changed.server)).not.toHaveProperty("clientSecret");
 	const file = JSON.parse(readFileSync(path, "utf8"));
 	expect(file.disabledServers).toEqual(["other"]);
@@ -119,7 +119,7 @@ test("a Google client save asks for consent and the calendar scopes, redirects t
 	await expect(planGoogleSave(path, "google-calendar", { clientId: "2-b.apps.googleusercontent.com", callbackPort: 3119 })).rejects.toThrow("needs the new app's client secret");
 	const replaced = await planGoogleSave(path, "google-calendar", { clientId: "2-b.apps.googleusercontent.com", clientSecret: "second-secret", callbackPort: 3119 });
 	expect(replaced.dropCredentials).toBe(true);
-	expect(replaced.credential).toEqual({ name: "calendar", url: "https://calendarmcp.googleapis.com/mcp/v1", credentialId: "cal-id" });
+	expect(replaced.credential).toMatchObject({ name: "calendar", url: "https://calendarmcp.googleapis.com/mcp/v1", credentialId: "cal-id", config: { type: "http" } });
 });
 
 test("a Gmail client save adds its own gmail server that asks to read, send, and trash mail, beside the calendar's", async () => {

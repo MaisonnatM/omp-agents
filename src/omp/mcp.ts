@@ -36,6 +36,8 @@ export interface McpServer {
 	url: string;
 	/** What `omp token` takes: the server's `auth.credentialId`, else the id omp files a sign-in for its URL under. */
 	credentialId: string;
+	/** The configured transport and headers used for MCP discovery, not service HTTP API calls. */
+	config: McpServerConfig;
 }
 
 /** What `omp token` takes for the server at `url`: the id its config names, else the id omp files a sign-in for `url` under. */
@@ -134,8 +136,7 @@ export async function signInMcp(server: Pick<McpServer, "url"> & Partial<Pick<Mc
 	} finally {
 		storage.close();
 	}
-	tokens.drop(credentialId);
-	checks.drop(credentialId);
+	invalidateMcpSignIn(credentialId);
 }
 
 /**
@@ -150,20 +151,27 @@ export async function signOutMcp(server: McpServer): Promise<void> {
 		if (storage.credentials.hasOAuth(server.credentialId)) throw new Error(`omp does not manage the sign-in under ${server.credentialId}, so it stays. Remove it from omp's credentials yourself.`);
 	} finally {
 		storage.close();
-		tokens.drop(server.credentialId);
-		checks.drop(server.credentialId);
+		invalidateMcpSignIn(server.credentialId);
 	}
 }
 
 /** Adds `config` as `name` to omp's user-level MCP config, which new omp sessions load. */
-export const addMcpServer = (name: string, config: McpServerConfig): Promise<void> => mcpConfigWriter.addMCPServer(dirs.getMCPConfigPath("user"), name, config);
+export async function addMcpServer(name: string, config: McpServerConfig): Promise<void> {
+	await mcpConfigWriter.addMCPServer(dirs.getMCPConfigPath("user"), name, config);
+	forgetMcpTools(name);
+}
 
 /** Removes `name` from omp's user-level MCP config. */
-export const removeMcpServer = (name: string): Promise<void> => mcpConfigWriter.removeMCPServer(dirs.getMCPConfigPath("user"), name);
+export async function removeMcpServer(name: string): Promise<void> {
+	await mcpConfigWriter.removeMCPServer(dirs.getMCPConfigPath("user"), name);
+	forgetMcpTools(name);
+}
 
-/** Enables or disables `name` as `/mcp enable` and `/mcp disable` do, in omp's user-level MCP config. */
-export const setMcpServerEnabled = (name: string, enabled: boolean): Promise<void> =>
-	mcpConfigWriter.setMcpServerEnabled({ userPath: dirs.getMCPConfigPath("user"), name, enabled });
+/** Enables or disables `name` in omp's user-level MCP config. */
+export async function setMcpServerEnabled(name: string, enabled: boolean): Promise<void> {
+	await mcpConfigWriter.setMcpServerEnabled({ userPath: dirs.getMCPConfigPath("user"), name, enabled });
+	forgetMcpTools(name);
+}
 
 /** Why omp refuses `name` as a server name, or `undefined`. */
 export const mcpServerNameError = (name: string): string | undefined => mcpConfigWriter.validateServerName(name);
@@ -199,17 +207,30 @@ export class McpUnauthorized extends Error {}
 
 const toolLists = createCache<McpToolDefinition[]>(CHECK_MS);
 
+function forgetMcpTools(name: string): void {
+	toolLists.dropWhere(key => JSON.parse(key)[0] === name);
+}
+
+/** All discovery entries using this sign-in, including aliases and unsigned probes of the same server. */
+function invalidateMcpSignIn(credentialId: string): void {
+	tokens.drop(credentialId);
+	toolLists.dropWhere(key => JSON.parse(key)[1] === credentialId);
+}
+
 /**
- * Every tool remote server `name` offers, read by connecting with omp's own client: its configured headers, and
- * `credentialId`'s token when given. The list serves a minute unless `fresh`; a failure is not kept. Throws
- * {@link McpUnauthorized} on a 401, and the client's error on any other failure.
+ * Every tool `server` offers through omp's client, with its configured transport and headers.
+ * `signedIn` adds omp's token; unsigned discovery still works for public or header-authenticated servers.
+ * Equivalent probes share a minute-old list; `fresh` bypasses it and failures are not kept.
+ * Throws {@link McpUnauthorized} on discovery 401, not the service API's {@link McpRefused}.
  */
-export const listMcpTools = (name: string, config: McpServerConfig, credentialId: string | null, fresh: boolean): Promise<McpToolDefinition[]> =>
-	toolLists.get(
-		name,
+export const listMcpTools = (server: McpServer, signedIn: boolean, fresh: boolean): Promise<McpToolDefinition[]> => {
+	const { name, config, credentialId } = server;
+	const expanded = discoveryHelpers.expandEnvVarsDeep(config);
+	const key = JSON.stringify([name, credentialId, signedIn, expanded]);
+	return toolLists.get(
+		key,
 		async () => {
-			const expanded = discoveryHelpers.expandEnvVarsDeep(config);
-			const headers = { ...expanded.headers, ...(credentialId ? { Authorization: `Bearer ${await tokenOf(credentialId)}` } : {}) };
+			const headers = { ...expanded.headers, ...(signedIn ? { Authorization: `Bearer ${await tokenOf(credentialId)}` } : {}) };
 			const signal = AbortSignal.timeout(TIMEOUT_MS);
 			let connection: McpConnection | undefined;
 			try {
@@ -218,8 +239,12 @@ export const listMcpTools = (name: string, config: McpServerConfig, credentialId
 			} catch (err) {
 				// omp's HTTP transport throws `MCPTransportError`, `failure: "http_status"` with the status as `code`, on a refused
 				// request; its legacy SSE transport throws a plain `HTTP 401: <body>` error.
-				const unauthorized = isObject(err) && err.failure === "http_status" ? err.code === 401 : err instanceof Error && err.message.startsWith("HTTP 401:");
-				if (unauthorized) throw new McpUnauthorized(`${name} answered 401 Unauthorized`);
+				const status = isObject(err) && err.failure === "http_status" ? err.code : err instanceof Error && err.message.startsWith("HTTP 401:") ? 401 : null;
+				if (status === 401) {
+					invalidateMcpSignIn(credentialId);
+					throw new McpUnauthorized(`${name} answered 401 Unauthorized`);
+				}
+				if (typeof status === "number") throw new ApiError(`The "${name}" MCP server answered HTTP ${status}`, status);
 				throw err;
 			} finally {
 				if (connection) await mcpClient.disconnectServer(connection).catch(() => {});
@@ -227,9 +252,7 @@ export const listMcpTools = (name: string, config: McpServerConfig, credentialId
 		},
 		fresh,
 	);
-
-/** Forgets server `name`'s tool list, after a change to its config or sign-in. */
-export const forgetMcpTools = (name: string): void => toolLists.drop(name);
+};
 
 /** omp's user-level MCP config path. Slack's and Google Calendar's app settings live in that file, not in a second store. */
 export const userMcpConfigPath = (): string => dirs.getMCPConfigPath("user");
@@ -240,7 +263,10 @@ export async function readMcpServers(filePath: string): Promise<Record<string, M
 }
 
 /** Writes `server` as `name` in the config file at `filePath`, with omp's locked, owner-only MCP config writer. */
-export const writeMcpServer = (filePath: string, name: string, server: McpServerConfig): Promise<void> => mcpConfigWriter.updateMCPServer(filePath, name, server);
+export async function writeMcpServer(filePath: string, name: string, server: McpServerConfig): Promise<void> {
+	await mcpConfigWriter.updateMCPServer(filePath, name, server);
+	forgetMcpTools(name);
+}
 
 function serverHost(server: McpServerConfig | undefined): string | null {
 	if (!server?.url) return null;
@@ -265,7 +291,7 @@ export function credentialFor(name: string, config: McpServerConfig): McpServer 
 	if (!URL.canParse(url)) return null;
 	const credentialId = credentialIdFor(config.url, config.auth?.credentialId);
 	if (!credentialId) throw new Error(`omp has no sign-in for its "${name}" MCP server. Run /mcp reauth ${name} in omp.`);
-	return { name, url, credentialId };
+	return { name, url, credentialId, config };
 }
 
 async function configuredOAuth(serverUrl: string): Promise<NonNullable<McpServerConfig["oauth"]> | undefined> {
@@ -300,8 +326,7 @@ export class ApiError extends Error {
 
 /** Forgets `server`'s token and tool list once a service refused the token, and the error that says so. */
 function refused(server: McpServer): McpRefused {
-	tokens.drop(server.credentialId);
-	checks.drop(server.credentialId);
+	invalidateMcpSignIn(server.credentialId);
 	return new McpRefused(`The "${server.name}" MCP server refused omp's sign-in. Reconnect it in Settings › Integrations, or run /mcp reauth ${server.name} in omp.`);
 }
 
@@ -362,32 +387,6 @@ export async function callMcpTool(server: McpServer, tool: string, args: Record<
 	if (result.isError === true) throw new Error(toolError(text));
 	return text;
 }
-
-const checks = createCache<string[]>(CHECK_MS);
-
-/**
- * Every tool `server` offers, following its cursor. Throws {@link McpRefused} when the server refuses omp's sign-in, and
- * the server's error on any other failure, which the cache does not keep.
- */
-export const checkMcpServer = (server: McpServer, fresh: boolean): Promise<string[]> =>
-	checks.get(
-		server.credentialId,
-		async () => {
-			const tools: string[] = [];
-			let cursor: string | undefined;
-			do {
-				const page = await request(server, "tools/list", cursor ? { cursor } : {});
-				if (!isObject(page)) break;
-				for (const tool of Array.isArray(page.tools) ? page.tools : []) {
-					const name = isObject(tool) ? str(tool.name) : undefined;
-					if (name) tools.push(name);
-				}
-				cursor = str(page.nextCursor);
-			} while (cursor);
-			return tools;
-		},
-		fresh,
-	);
 
 /** `text`, what `service`'s `tool` answered, as JSON; the start of the text thrown when it is not JSON. */
 export function toolJson(service: string, tool: string, text: string): unknown {

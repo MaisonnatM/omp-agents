@@ -8,7 +8,6 @@ import {
 	addMcpServer,
 	type ConfiguredMcpServer,
 	credentialFor,
-	forgetMcpTools,
 	listMcpServers,
 	listMcpTools,
 	type McpServer,
@@ -81,7 +80,7 @@ async function rowOf(server: ConfiguredMcpServer, remote: McpServer | null, sign
 	else if (signIn?.phase === "waiting" && last) status = last;
 	else {
 		status = await statusOf(signedIn, async () =>
-			(await listMcpTools(name, config, signedIn ? remote.credentialId : null, fresh)).map(tool => ({ name: tool.name, description: tool.description?.trim() || null })),
+			(await listMcpTools(remote, signedIn, fresh)).map(tool => ({ name: tool.name, description: tool.description?.trim() || null })),
 		);
 	}
 	lastStatuses.set(name, status);
@@ -141,7 +140,6 @@ export async function startMcpServerSignIn(name: string): Promise<McpServerRow> 
 	const remote = signable(await configured(name));
 	await signInOf(name).start(async (signal, waiting) => {
 		await signInMcp(remote, { onAuth: waiting, signal });
-		forgetMcpTools(name);
 	});
 	return rowNamed(name);
 }
@@ -151,7 +149,6 @@ export async function signOutMcpServer(name: string): Promise<McpServerRow> {
 	const remote = signable(await configured(name));
 	signIns.get(name)?.cancel();
 	await signOutMcp(remote);
-	forgetMcpTools(name);
 	return rowNamed(name);
 }
 
@@ -173,7 +170,6 @@ export async function addMcpServerFrom(add: McpServerAdd): Promise<McpServerRow>
 		let name = entry.id;
 		for (let n = 2; taken.has(name); n++) name = `${entry.id}-${n}`;
 		await addMcpServer(name, { type: entry.transport, url: entry.url });
-		forgetMcpTools(name);
 		return entry.auth === "oauth" ? startMcpServerSignIn(name) : rowNamed(name);
 	}
 	const nameError = mcpServerNameError(add.name);
@@ -182,7 +178,6 @@ export async function addMcpServerFrom(add: McpServerAdd): Promise<McpServerRow>
 	const config: McpServerConfig = { type: add.transport, url: add.url };
 	if (add.header) config.headers = { [add.header.name]: add.header.value };
 	await addMcpServer(add.name, config);
-	forgetMcpTools(add.name);
 	return rowNamed(add.name);
 }
 
@@ -191,7 +186,6 @@ export async function setMcpServerEnabledFrom(name: string, enabled: boolean): P
 	editable(await configured(name));
 	signIns.get(name)?.cancel();
 	await setMcpServerEnabled(name, enabled);
-	forgetMcpTools(name);
 	return rowNamed(name);
 }
 
@@ -202,5 +196,4 @@ export async function removeMcpServerNamed(name: string): Promise<void> {
 	signIns.delete(name);
 	lastStatuses.delete(name);
 	await removeMcpServer(name);
-	forgetMcpTools(name);
 }

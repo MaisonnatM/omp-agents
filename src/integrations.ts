@@ -10,10 +10,11 @@ import {
 	ApiError,
 	type ApiWrite,
 	callWithMcpSignIn,
-	checkMcpServer,
+	listMcpTools,
 	findMcpServer,
 	type McpServer,
 	McpRefused,
+	McpUnauthorized,
 	mcpSignedIn,
 	signInMcp,
 	signOutMcp,
@@ -72,7 +73,7 @@ export async function connectionOf(found: McpServer | null, probes: McpProbes): 
 	try {
 		return { kind: "ready", server, tools: await probes.tools(found) };
 	} catch (err) {
-		if (err instanceof McpRefused) return { kind: "refused", server, error: errorText(err) };
+		if (err instanceof McpRefused || err instanceof McpUnauthorized) return { kind: "refused", server, error: errorText(err) };
 		return { kind: "failing", server, error: errorText(err), status: err instanceof ApiError ? err.status : null };
 	}
 }
@@ -85,7 +86,7 @@ async function loadIntegration(id: McpIntegrationId, found: McpServer | null, fr
 	const signIn = signIns[id].state();
 	const last = lastConnections.get(id);
 	const connection =
-		signIn?.phase === "waiting" && last ? last : await connectionOf(found, { signedIn: mcpSignedIn, tools: server => checkMcpServer(server, fresh) });
+		signIn?.phase === "waiting" && last ? last : await connectionOf(found, { signedIn: mcpSignedIn, tools: async server => (await listMcpTools(server, true, fresh)).map(tool => tool.name) });
 	lastConnections.set(id, connection);
 	const setup = id === "linear" ? null : (await clientSetups())[id];
 	return { id, connection, signIn, setup } as McpIntegration;

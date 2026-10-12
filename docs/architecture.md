@@ -757,9 +757,10 @@ Google Calendar's and Gmail's setups use callback port 3119 until a client is sa
 
 `connection` is `absent` while omp's user-level MCP config has no enabled server on the service's host, and `signed-out` while omp's credential store, read again on each call, holds no OAuth sign-in for it.
 A Slack, Google Calendar, or Gmail server that already has a sign-in is still probed when the saved client settings are incomplete.
-Otherwise `checkMcpServer` in `src/omp/mcp.ts` lists the server's tools with `tools/list`, following `nextCursor`, through the same token as the tickets' calls.
-`connectionOf` in `src/integrations.ts` turns the outcome into `ready` with the tool names, `refused` when the server throws `McpRefused` on a 401 that asks for a new sign-in, or `failing` with any other error.
-The server keeps each list for a minute and never a failure; `?fresh` lists again, and a sign-in, a sign-out, or a 401 on a tickets call drops it.
+`listMcpTools` in `src/omp/mcp.ts` discovers their tools through omp's client, with the configured transport and headers and the same token as the tickets' calls, following every cursor.
+`connectionOf` in `src/integrations.ts` turns the outcome into `ready` with the tool names, `refused` on discovery's `McpUnauthorized` or a service API's `McpRefused`, or `failing` with any other error.
+One cache keeps discovery lists for a minute and never a failure, keyed by server name, expanded config, credential id, and whether discovery sends omp's token; `?fresh` lists again.
+Config writes invalidate that name, and sign-in, sign-out, and discovery or service API 401 invalidate every list using that credential id plus its token.
 While a service's sign-in waits on the browser, its connection is the one last answered, without listing the tools again.
 The page shows the **Tickets** tab while Linear's connection is `ready`, `refused`, or `failing`, and the **Inbox** tab while Gmail's is, and keeps the last read in localStorage.
 Each gated tab names its service as the `integration` of its row in `SIDEBAR_TABS` in `web/routing.ts`, and `tabsSignedOut` in `web/sidebar-tabs.ts` turns those rows into the tabs omp holds no sign-in for. `useSidebarTabs` keeps the layout, the signed-out set, and the tabs the bar shows, which Cmd+1 through Cmd+7 go to, and the tab row fits its width by how many tabs show.
@@ -815,8 +816,10 @@ A sign-in that omp does not manage stays, and the route answers an error that sa
 Each row has the server's name, transport, URL with `${VAR}` references expanded, host, command, `source` (the config file and whether the page may change it: only omp's own user file), whether omp holds a sign-in for its URL, `status`, `signIn`, and `catalogId`, the catalog entry on its host.
 
 `status` is `disabled`, `integration` for a server on one of `MCP_SERVICES`' hosts, whose status [Integrations](#integrations) reads, `local` for a command, which only an omp session starts, or the outcome of listing the server's tools.
-`listMcpTools` in `src/omp/mcp.ts` connects through omp's own client, `connectToServer` and `listTools`, so streamable HTTP and SSE servers both work, with the server's headers and a Bearer token when omp holds a sign-in, then disconnects; it keeps each list for a minute, `?fresh` lists again, and a sign-in or sign-out drops it.
-A 401, a `http_status` failure from the HTTP transport or an `HTTP 401:` error from the SSE one, throws `McpUnauthorized`, which `statusOf` in `src/mcp-servers.ts` reads as `signed-out` when omp holds no sign-in and `refused` when it does; any other failure is `failing` with its message.
+`listMcpTools` in `src/omp/mcp.ts` is the same discovery operation Integrations uses: it connects through omp's own client, `connectToServer` and `listTools`, so streamable HTTP and SSE servers both work, with the server's headers and a Bearer token when omp holds a sign-in, then disconnects.
+A 401, a `http_status` failure from the HTTP transport or an `HTTP 401:` error from the SSE one, throws `McpUnauthorized`, distinct from service HTTP API authorization's `McpRefused`.
+`statusOf` in `src/mcp-servers.ts` reads discovery's 401 as `signed-out` when omp holds no sign-in and `refused` when it does; any other failure is `failing` with its message.
+Integration-host rows delegate to Integrations without probing a second time, and the two sections retain their own status contracts.
 While a server's sign-in waits on the browser, its status is the one last answered.
 
 `PUT /api/mcp-servers/add` takes `{ catalog }`, an id in `MCP_CATALOG` from `src/shared/mcp-catalog.ts`, or `{ name, url, transport?, header? }`, checked by `parseMcpServerAdd` in `src/server/wire.ts`: the address must be HTTPS or loopback HTTP, the transport `http` or `sse`, and a header a token name with a value.
