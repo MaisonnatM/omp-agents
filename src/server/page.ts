@@ -1,14 +1,19 @@
-/** The page itself: built once at startup, served only to a browser that holds the access token. */
+/** The page itself: built once at startup, or read prebuilt in a packaged app, and served only to a browser that holds the access token. */
 import { join } from "node:path";
-import tailwind from "bun-plugin-tailwind";
 import { fetchSiteAllowed, loginCookie } from "./auth";
 import type { Guards } from "./http";
+import { prebuiltPageDir } from "./resources";
+
+/** The web app by URL path (`/index.html`, `/chunk-<hash>.js`, ...). */
+export type Page = ReadonlyMap<string, Blob>;
 
 /**
- * The web app bundled in memory, by URL path (`/index.html`, `/chunk-<hash>.js`, ...). Bun's HTML import would
- * serve `/` to anyone, so the server bundles the page itself and decides who gets it.
+ * Bundles `web/index.html` in memory. Bun's HTML import would serve `/` to anyone, so the server bundles the page
+ * itself and decides who gets it.
  */
 export async function buildPage(): Promise<Map<string, Blob>> {
+	// Dynamic so the packaged server, which reads a prebuilt page, neither bundles nor ships Tailwind and its native binary.
+	const { default: tailwind } = await import("bun-plugin-tailwind");
 	const build = await Bun.build({
 		entrypoints: [join(import.meta.dir, "..", "..", "web", "index.html")],
 		plugins: [tailwind],
@@ -18,6 +23,16 @@ export async function buildPage(): Promise<Map<string, Blob>> {
 	if (!build.success) throw new AggregateError(build.logs, "cannot build the page");
 	return new Map(build.outputs.map(artifact => [artifact.path.replace(/^\./, ""), artifact]));
 }
+
+/** The files `scripts/build-desktop-artifact.ts` wrote into `dir`, by URL path. */
+function readPage(dir: string): Map<string, Blob> {
+	const files = [...new Bun.Glob("**/*").scanSync({ cwd: dir })];
+	if (!files.includes("index.html")) throw new Error(`${dir} holds no prebuilt page`);
+	return new Map(files.map(file => [`/${file}`, Bun.file(join(dir, file))]));
+}
+
+/** The page this server serves: the packaged app's prebuilt one, else a fresh build of the checkout's. */
+export const loadPage = async (): Promise<Page> => (prebuiltPageDir ? readPage(prebuiltPageDir) : buildPage());
 
 const NO_STORE = { "cache-control": "no-store" };
 

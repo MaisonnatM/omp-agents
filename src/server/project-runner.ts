@@ -13,6 +13,7 @@ import { type Project, type Worker, type WorkerId, type WorkerPhase, workerPhase
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { type ProjectControl, projectTools, updateText } from "./project-tools";
 import type { ProjectNews, ProjectRole, ProjectsFile } from "./projects-file";
+import { ompTemplateDir } from "./resources";
 
 /**
  * Why the runner starts a session, which the starter takes beside the request and the page never sends: a new
@@ -32,12 +33,12 @@ export interface ProjectJoin {
 const NO_PROJECT: ProjectJoin = { rpc: PLAIN_LAUNCH, attach() {} };
 
 /**
- * Loads the `projects` extension from this repository's template when `bun run omp-template` has not installed it, so a
+ * Loads the `projects` extension from the starter kit's template when `bun run omp-template` has not installed it, so a
  * project session gets its instructions either way. Never both: omp loads two copies at two paths twice.
  */
 export function projectsExtensionArgs(): string[] {
 	if (existsSync(join(agentDir, "extensions", "projects.ts"))) return [];
-	return ["-e", join(import.meta.dir, "..", "..", "templates", "omp", "agent", "extensions", "projects.ts")];
+	return ["-e", join(ompTemplateDir, "agent", "extensions", "projects.ts")];
 }
 
 /** What the runner asks of a live session. */

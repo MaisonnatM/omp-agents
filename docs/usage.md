@@ -1343,13 +1343,13 @@ Alt is Option on macOS.
 
 ## Desktop app
 
-`bun run desktop` shows the dashboard in its own window; see the [README](../README.md#desktop-app) to start it.
+The packaged app, or `bun run desktop` from a checkout, shows the dashboard in its own window; see the [README](../README.md#desktop-app) to install it.
 
 - The window is the same page as a browser tab, on the same address, `http://127.0.0.1:<port>`.
   It keeps its own localStorage, so folded sections, the sidebar widths, the theme, and the pinned skill start fresh in the window and stay apart from a browser's.
 - At launch, the app asks the port for the dashboard's sign-in.
   When an omp-agents server answers, the window uses it, and quitting the app leaves it running.
-  When nothing listens, the app starts the server from its checkout and stops it when you quit.
+  When nothing listens, the app starts the server, the one it ships or its checkout's, and stops it when you quit.
   When something else answers, the window says that the port is taken, with **Retry**.
   When the server that the app started stops on its own, or fails to start, the window shows the end of its output, with **Retry**.
   When the dashboard does not load, for example on a reload after the server it used stopped, the window says so, with **Retry**.
@@ -1357,8 +1357,10 @@ Alt is Option on macOS.
   Click the app in the Dock, or run `bun run desktop` again, to show it.
   Cmd+Q quits the app; when the app started the server, it waits for the server to end its sessions first, which then show under **interrupted** at the next start.
   Off macOS, closing the window quits.
-- On macOS, **omp agents › Open at Login** starts the app, and with it the server, when you log in.
-  It carries `PATH`, `PORT`, `XDG_CONFIG_HOME`, `OMP_PACKAGE_DIR`, and `PI_CODING_AGENT_DIR` from the environment you ticked it in, since an app started at login gets no shell environment; tick it off and on again after one of them changes.
+- In the packaged app on macOS, **omp agents › Open at Login** starts the app, and with it the server, when you log in.
+  The app reads `PATH` and the rest of its environment from your login shell at each start, so a change to your shell profile applies at the next launch.
+- In the packaged app, **omp agents › Check for Updates…** checks GitHub Releases now; the app also checks on its own, downloads an update in the background, and shows **Restart to Install** once it is ready.
+  **Install omp Starter Kit…** installs the starter kit from `templates/omp/` into omp's agent directory.
 - Every link to another site opens in the default browser, and so does an integration's sign-in page.
   The window never leaves the dashboard.
 - Cmd+W closes the window, Cmd+R reloads it, Cmd+Q quits, Cmd+M minimizes, and Cmd+0, Cmd++, and Cmd+- set the zoom.

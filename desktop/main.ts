@@ -1,9 +1,13 @@
 /**
- * The desktop shell: the dashboard in a native window. It starts the server from this checkout, or uses an
- * omp-agents server that already listens on the port, and opens every other address in the default browser.
+ * The desktop shell: the dashboard in a native window. It starts the server, from the app's resources when packaged or
+ * from this checkout otherwise, or uses an omp-agents server that already listens on the port, and opens every other
+ * address in the default browser.
  */
-import { type ChildProcess, spawn } from "node:child_process";
-import { readFileSync, watch, writeFileSync } from "node:fs";
+// First: a packaged app takes the login shell's environment before `src/paths.ts` reads it.
+import "./shell-env";
+import { type ChildProcess, execFile, spawn } from "node:child_process";
+import { readdirSync, readFileSync, rmSync, watch, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { createInterface, type Interface } from "node:readline";
 import type { Readable } from "node:stream";
@@ -26,12 +30,26 @@ import { tokenFile, userTodosFile } from "../src/paths";
 import { dashboardHosts, isListeningLine, originOf, portFromEnv, QUICK_TODO_EVENT } from "../src/server/address";
 import { loadToken } from "../src/server/auth";
 import { parseUserTodoList } from "../src/user-todos-parse";
-import { opensAtLogin, removeLoginAgent, writeLoginAgent } from "./login-item";
+import { startUpdates, type Updates } from "./updates";
 
 const PORT = portFromEnv();
 const ORIGIN = originOf(PORT);
-/** The checkout this shell runs: Electron runs the app in its `desktop/` directory. */
+/** What scripts/build-desktop-artifact.ts built, which electron-builder copies into the bundle; `null` when the shell runs from a checkout. */
+const RESOURCES = app.isPackaged ? join(process.resourcesPath, "server") : null;
+/** The checkout this shell runs when not packaged: Electron runs the app in its `desktop/` directory. */
 const REPO_DIR = resolve(app.getAppPath(), "..");
+/**
+ * The server: the bundled script on the Bun the app ships when packaged, else the checkout's source on the PATH's Bun.
+ * omp's sessions run on the same Bun, as the server starts them through `process.execPath` (src/omp/install.ts).
+ */
+const SERVER = RESOURCES
+	? { bun: join(RESOURCES, "bin", "bun"), script: join(RESOURCES, "server.js"), cwd: homedir(), env: { OMP_AGENTS_RESOURCES: RESOURCES } }
+	: { bun: "bun", script: join(REPO_DIR, "src", "server.ts"), cwd: REPO_DIR, env: {} };
+/** The omp starter kit's installer, which the app menu runs. */
+const KIT_INSTALLER = RESOURCES ? join(RESOURCES, "templates", "omp", "install.js") : join(REPO_DIR, "templates", "omp", "install.ts");
+/** Where `bun run desktop`'s Open at Login wrote its LaunchAgents, before the packaged app used its own login item. */
+const OLD_LOGIN_AGENTS = join(homedir(), "Library", "LaunchAgents");
+const OLD_LOGIN_AGENT = /^dev\.omp-agents\.desktop\.port-\d+\.plist$/;
 /** The server builds the page before it listens. */
 const READY_TIMEOUT_MS = 60_000;
 const PROBE_TIMEOUT_MS = 2_000;
@@ -97,10 +115,10 @@ function tail(stream: Readable, out: NodeJS.WriteStream): Interface {
  */
 function launch(): Promise<ChildProcess> {
 	serverLog.length = 0;
-	const child = spawn("bun", [join(REPO_DIR, "src", "server.ts")], {
-		cwd: REPO_DIR,
+	const child = spawn(SERVER.bun, [SERVER.script], {
+		cwd: SERVER.cwd,
 		// The server exits when its stdin ends, which it does however this process dies.
-		env: { ...process.env, PORT: String(PORT), OMP_AGENTS_PARENT: "stdin" },
+		env: { ...process.env, ...SERVER.env, PORT: String(PORT), OMP_AGENTS_PARENT: "stdin" },
 		stdio: ["pipe", "pipe", "pipe"],
 	});
 	const { promise, resolve: listening, reject } = Promise.withResolvers<ChildProcess>();
@@ -113,7 +131,7 @@ function launch(): Promise<ChildProcess> {
 		if (isListeningLine(line, PORT)) listening(child);
 	});
 	tail(child.stderr, process.stderr);
-	child.once("error", (err: NodeJS.ErrnoException) => reject(new Error(err.code === "ENOENT" ? "`bun` is not on PATH." : err.message)));
+	child.once("error", (err: NodeJS.ErrnoException) => reject(new Error(err.code === "ENOENT" ? `\`${SERVER.bun}\` is not found.` : err.message)));
 	child.once("exit", (code, signal) => reject(new Error(`The server exited with ${signal ?? `code ${code}`}.`)));
 	return promise;
 }
@@ -252,22 +270,71 @@ function createWindow(): BrowserWindow {
 	return win;
 }
 
-/** Writes or removes the login agent for `item`'s new state, then shows what the disk holds, so a failure leaves no wrong check mark. */
+/** Turns the app's login item on or off, then shows what macOS holds, so a failure leaves no wrong check mark. */
 function toggleOpenAtLogin(item: MenuItem): void {
-	try {
-		if (item.checked) writeLoginAgent(PORT, [process.execPath, app.getAppPath()]);
-		else removeLoginAgent(PORT);
-	} catch (err) {
-		dialog.showErrorBox("Open at Login failed", errorText(err));
-	}
-	item.checked = opensAtLogin(PORT);
+	app.setLoginItemSettings({ openAtLogin: item.checked });
+	item.checked = app.getLoginItemSettings().openAtLogin;
+}
+
+/** Runs the starter kit's installer, which writes into omp's agent directory, and shows what it printed. */
+function installStarterKit(): void {
+	execFile(SERVER.bun, [KIT_INSTALLER], { env: process.env, timeout: 120_000 }, (err, stdout, stderr) => {
+		if (err) dialog.showErrorBox("Starter kit install failed", `${stderr || errorText(err)}`.trim());
+		else void dialog.showMessageBox({ message: "omp starter kit installed", detail: `${stdout.trim()}\n\nNew omp sessions load it.` });
+	});
+}
+
+/** The update check, in a packaged app alone: a checkout updates through `git pull`. */
+let updates: Updates | null = null;
+
+/** Stops the server this shell started, letting it end its sessions first; resolves at once when it started none. */
+function stopServer(): Promise<void> {
+	const child = server;
+	if (!child) return Promise.resolve();
+	const { promise, resolve: stopped } = Promise.withResolvers<void>();
+	child.once("exit", () => stopped());
+	child.kill("SIGTERM");
+	setTimeout(() => child.kill("SIGKILL"), STOP_TIMEOUT_MS).unref();
+	return promise;
+}
+
+async function restartToUpdate(): Promise<void> {
+	quitting = true;
+	await stopServer();
+	updates?.install();
+}
+
+function updateItem(): MenuItemConstructorOptions[] {
+	if (!updates) return [];
+	const ready = updates.ready();
+	return [ready ? { label: `Restart to Install ${ready}`, click: () => void restartToUpdate() } : { label: "Check for Updates…", click: () => updates?.checkNow() }];
 }
 
 /** The menu holds no shortcut the dashboard binds (web/shortcuts.ts), so every one reaches the page. */
 function applicationMenu(): Menu {
-	const openAtLogin: MenuItemConstructorOptions = { label: "Open at Login", type: "checkbox", checked: IS_MAC && opensAtLogin(PORT), click: toggleOpenAtLogin };
+	// A checkout's Electron is not an app macOS can open at login.
+	const openAtLogin: MenuItemConstructorOptions[] = app.isPackaged
+		? [{ label: "Open at Login", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: toggleOpenAtLogin }]
+		: [];
 	const appMenu: MenuItemConstructorOptions[] = IS_MAC
-		? [{ label: app.name, submenu: [{ role: "about" }, SEPARATOR, openAtLogin, SEPARATOR, { role: "hide" }, { role: "hideOthers" }, { role: "unhide" }, SEPARATOR, { role: "quit" }] }]
+		? [
+				{
+					label: app.name,
+					submenu: [
+						{ role: "about" },
+						...updateItem(),
+						SEPARATOR,
+						...openAtLogin,
+						{ label: "Install omp Starter Kit…", click: installStarterKit },
+						SEPARATOR,
+						{ role: "hide" },
+						{ role: "hideOthers" },
+						{ role: "unhide" },
+						SEPARATOR,
+						{ role: "quit" },
+					],
+				},
+			]
 		: [];
 	const front: MenuItemConstructorOptions[] = IS_MAC ? [SEPARATOR, { role: "front" }] : [];
 	return Menu.buildFromTemplate([
@@ -279,6 +346,13 @@ function applicationMenu(): Menu {
 		},
 		{ label: "Window", role: "window", submenu: [{ role: "minimize" }, { role: "zoom" }, { role: "close" }, ...front] },
 	]);
+}
+
+/** Removes the LaunchAgents of the checkout's former Open at Login, which would start a second copy at each login. */
+function removeOldLoginAgents(): void {
+	try {
+		for (const name of readdirSync(OLD_LOGIN_AGENTS)) if (OLD_LOGIN_AGENT.test(name)) rmSync(join(OLD_LOGIN_AGENTS, name), { force: true });
+	} catch {}
 }
 
 /** The Dock and taskbar badge counts the top-level todos left, as the Todo tab's **All** does; none clears it. */
@@ -317,13 +391,10 @@ if (!app.requestSingleInstanceLock()) {
 	app.on("window-all-closed", () => app.quit());
 	app.on("before-quit", event => {
 		quitting = true;
-		const child = server;
-		if (!child) return;
+		if (!server) return;
 		// Hold the quit until the server has ended its sessions, so none outlives the app.
 		event.preventDefault();
-		child.once("exit", () => app.quit());
-		child.kill("SIGTERM");
-		setTimeout(() => child.kill("SIGKILL"), STOP_TIMEOUT_MS).unref();
+		void stopServer().then(() => app.quit());
 	});
 	for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => app.quit());
 
@@ -331,6 +402,8 @@ if (!app.requestSingleInstanceLock()) {
 
 	void app.whenReady().then(() => {
 		Menu.setApplicationMenu(applicationMenu());
+		removeOldLoginAgents();
+		if (app.isPackaged) updates = startUpdates(() => Menu.setApplicationMenu(applicationMenu()));
 		// The app runs from Electron's own bundle, so without this the Dock shows Electron's icon.
 		app.dock?.setIcon(ICON);
 		win = createWindow();

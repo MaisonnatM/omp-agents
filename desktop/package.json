@@ -1,6 +1,9 @@
 {
   "name": "omp-agents-desktop",
   "productName": "omp agents",
+  "version": "0.1.0",
+  "description": "A dashboard for omp coding-agent sessions",
+  "author": "Maxence Maisonnat",
   "license": "MIT",
   "private": true,
   "main": "dist/main.cjs",
@@ -9,9 +12,14 @@
     "start": "bun run build && bun launch.ts",
     "typecheck": "tsc --noEmit"
   },
+  "build": {
+    "appId": "dev.omp-agents.desktop"
+  },
   "devDependencies": {
     "@types/node": "^24.9.0",
     "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "electron-updater": "^6.8.9",
     "typescript": "^7.0.2"
   }
 }

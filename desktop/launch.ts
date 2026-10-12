@@ -1,15 +1,18 @@
 /**
- * Starts the desktop shell. On macOS the Dock, the menu bar, and Cmd+Tab take an app's name and icon from its bundle,
- * and the one in `node_modules` is Electron's, so this runs a copy of it that carries ours. Other systems run Electron as is.
+ * Starts the desktop shell from this checkout, for development; the packaged app is what electron-builder builds. On macOS
+ * the Dock, the menu bar, and Cmd+Tab take an app's name and icon from its bundle, and the one in `node_modules` is
+ * Electron's, so this runs a copy of it that carries ours. Other systems run Electron as is.
  * Arguments pass through to Electron, for example `--remote-debugging-port`.
  */
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { $ } from "bun";
-import { BUNDLE_ID } from "./login-item";
 
 const DESKTOP_DIR = import.meta.dir;
+/** The packaged app's `appId` in package.json, so both share their macOS preferences. */
+const BUNDLE_ID: string = JSON.parse(readFileSync(join(DESKTOP_DIR, "package.json"), "utf8")).build.appId;
+
 /** Resolving Electron's path downloads its binary into `dist` when missing; Electron 44 has no install step that does it. */
 const ELECTRON_BINARY: string = require("electron");
 const ELECTRON_DIST = join(DESKTOP_DIR, "node_modules", "electron", "dist");

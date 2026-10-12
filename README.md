@@ -101,21 +101,25 @@ Sessions that the dashboard starts appear right away, and terminal sessions once
 
 ### Desktop app
 
-To use the dashboard in its own window instead of a browser tab, run it from the clone:
+Download the DMG for your Mac (Apple silicon `arm64` or Intel `x64`) from the [latest release](https://github.com/MaisonnatM/omp-agents/releases/latest) and drag **omp agents** to Applications.
+The app ships its own Bun and server; it still needs omp installed, and finds it, `gh`, and `git` through your login shell's `PATH`.
+It checks GitHub Releases for updates and installs them when you quit or pick **Restart to Install**; until releases are signed with a Developer ID, macOS asks you to allow the app in System Settings › Privacy & Security, and updates download but do not install.
+
+To run it from the clone instead:
 
 ```sh
 bun run desktop
 ```
 
-The first run downloads Electron into `desktop/node_modules`, about 100 MB.
-The app is not packaged or signed; it runs from this checkout, so a `git pull` updates it.
-It signs itself in, so it needs no token from you.
+The first run downloads Electron into `desktop/node_modules`, about 100 MB; a `git pull` updates it.
+`bun scripts/build-desktop-artifact.ts` builds the packaged app into `desktop/release`.
+The window signs itself in, so it needs no token from you.
 
 - If an omp-agents server already listens on the port, for example a `bun start` in another terminal, the window uses that server and leaves it running when you quit.
   Otherwise the app starts the server and stops it, with every session that the dashboard started, when you quit.
 - On macOS, closing the window (Cmd+W) hides it and keeps the server and its sessions running; click the app in the Dock to show it again.
   Cmd+Q quits.
-- On macOS, **Open at Login** in the app menu starts the app, and with it your routines, when you log in.
+- In the packaged app, **Open at Login** in the app menu starts the app, and with it your routines, when you log in, and **Install omp Starter Kit…** installs the starter kit.
 - Links to GitHub, Graphite, Linear, and every other site open in your default browser.
 - `PORT` works as for `bun start`.
   A browser tab on the same address keeps working alongside the window.

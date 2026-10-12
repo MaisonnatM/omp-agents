@@ -8,7 +8,7 @@ import { HOSTNAME, listeningLine, originOf, portFromEnv } from "./server/address
 import { loadToken } from "./server/auth";
 import { Dashboard } from "./server/dashboard";
 import { fail, guardsFor } from "./server/http";
-import { buildPage, servePage } from "./server/page";
+import { loadPage, servePage } from "./server/page";
 import { terminalFor, type TerminalSocket, type TerminalSocketData, terminalSocket } from "./server/terminal-socket";
 import type { Socket, SocketData } from "./server/views";
 import { parsePageId } from "./server/wire";
@@ -16,7 +16,7 @@ import { parsePageId } from "./server/wire";
 const PORT = portFromEnv();
 const token = loadToken(tokenFile);
 const guards = guardsFor(PORT, token);
-const page = await buildPage();
+const page = await loadPage();
 const dashboard = new Dashboard(PORT);
 
 /** A socket is the dashboard's own, which watches views, or a terminal tab's, which carries one shell. */

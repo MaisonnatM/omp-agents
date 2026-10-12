@@ -260,7 +260,8 @@ A page loaded before page ids tags its requests with no `floor`, so the server d
 ## Desktop shell
 
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
-Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process, `bun src/server.ts`, and never imports it.
+Electron's main process runs on Node, which cannot load omp's TypeScript modules or the server's `Bun.*` calls, so the shell runs the server as a child process on Bun and never imports it: `bun src/server.ts` from a checkout, and in the packaged app the Bun binary it ships in `Contents/Resources/server/bin/bun` on the bundled `server.js`, with `OMP_AGENTS_RESOURCES` naming that directory (`src/server/resources.ts`) so the server reads its prebuilt page and the starter kit from it.
+omp's sessions run on that same Bun, through `process.execPath`.
 It imports only `src/paths.ts`, `src/json.ts`, `src/server/auth.ts`, `src/server/address.ts`, `src/user-todos-parse.ts`, `src/user-todos-shared.ts`, and `src/user-todos.ts`, which use Node's modules alone; `bun build` bundles them into `desktop/dist/main.cjs`.
 It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching the file's directory since the server replaces the file, and its global quick-capture shortcut dispatches `QUICK_TODO_EVENT`, from `src/server/address.ts`, in the page, which `web/app.tsx` answers by opening the command palette on its **Create todo** view.
 `src/server/address.ts` holds what the two processes must agree on: the port from `PORT`, the host names the server answers to, and the line it prints once it listens.
@@ -280,10 +281,17 @@ It reads `todos.json` through `parseUserTodoList` for the Dock badge, watching t
 - The page runs with context isolation and the sandbox on, and no preload: it gets no Node or Electron API.
 - The app keeps its data, its cookie, localStorage, window bounds, and single-instance lock, in `port-<port>` under Electron's `userData`, so a smoke run on another port is an instance of its own beside your app.
 - A main-frame load of the dashboard that fails (`did-fail-load`), for example after the server the window used stopped, shows the shell's error page with **Retry** instead of Chromium's.
-- **Open at Login** (`desktop/login-item.ts`) writes a LaunchAgent, `~/Library/LaunchAgents/dev.omp-agents.desktop.port-<port>.plist`, through `plutil`, and removes it when cleared.
-  Electron's `setLoginItemSettings` registers the bundle alone, and a bundle launched without arguments runs Electron's default app, not `desktop/`; the agent runs the bundle's binary with `desktop/` as its argument, as `desktop/launch.ts` does.
-  launchd reads the file at the next login, so ticking the box starts nothing now; `RunAtLoad` without `KeepAlive` lets Cmd+Q quit for good.
-  The agent carries only the environment variables that the server and omp read to find `bun`, `omp`, and their files, so no secret a shell exports lands in the plist.
+- The packaged app, launched by Finder or at login, gets no shell environment, so `desktop/shell-env.ts` runs the login shell (`$SHELL -ilc`) once at startup and merges its environment into `process.env` before the server starts; omp, `gh`, and `git` are then found as in a terminal.
+- **Open at Login** is the packaged app's own login item (`setLoginItemSettings`); a checkout has none, and the app removes the LaunchAgents that `bun run desktop` once wrote.
+- `desktop/updates.ts` updates the packaged app through electron-updater from GitHub Releases: a check 15 seconds after launch and then every 30 minutes, a download in the background, a notification, and **Restart to Install** in the app menu, which stops the server first; an update left waiting installs when the app quits.
+  Squirrel.Mac installs only an update signed by the same Developer ID as the running app, so ad hoc builds check and download but never install.
+
+### Packaging and releases
+
+`scripts/build-desktop-artifact.ts`, modeled on T3 Code's script of the same name, builds `desktop/dist/resources` (the server bundled into `server.js` with Tailwind left out, the page prebuilt by `buildPage`, and the starter kit with its installer bundled into `install.js`), downloads the Bun of the build's own version for each architecture into `desktop/dist/bun-<arch>`, and runs electron-builder with a config it generates, which writes a DMG, a zip, their blockmaps, and `latest-mac.yml` to `desktop/release`.
+It signs and notarizes when `CSC_LINK` and the `APPLE_API_KEY*` variables are set, with the hardened runtime and `desktop/entitlements.mac.plist`, which lets Bun JIT; otherwise it signs ad hoc.
+`--mock-update-port <port>` points the update feed at `scripts/mock-update-server.ts`, which serves `desktop/release`, to try an update without publishing.
+`.github/workflows/release.yml` runs on a `vX.Y.Z` tag matching `desktop/package.json`'s version: the checks, one build for arm64 and x64 on an Apple silicon runner, and a GitHub Release with every artifact.
 
 ## Terminal panel
 
@@ -1255,7 +1263,7 @@ The repository's agent guide links to the [coding standards](../CODING_STANDARDS
 [Getting started](getting-started.md) walks a new user through a first session and each integration's sign-in, and `docs/images/` holds the README's screenshot.
 
 `desktop/` holds the desktop shell; see [Desktop shell](#desktop-shell).
-`desktop/main.ts` is its whole main process but for Open at Login, in `desktop/login-item.ts`, and `bun run desktop` at the root installs the package and starts it through `desktop/launch.ts`.
+`desktop/main.ts` is its main process, with `desktop/shell-env.ts` and `desktop/updates.ts` for the packaged app, and `bun run desktop` at the root installs the package and starts it from the checkout through `desktop/launch.ts`; `scripts/build-desktop-artifact.ts` packages it (see [Packaging and releases](#packaging-and-releases)).
 On macOS the launcher clones `node_modules/electron/dist/Electron.app` to `desktop/dist/omp agents.app`, sets its `CFBundleName`, `CFBundleDisplayName`, and `CFBundleIdentifier`, gives it an `.icns` that it renders from `icon.png` with `sips` and `iconutil`, signs it ad hoc, and runs that copy, because the Dock, the menu bar, and Cmd+Tab read an app's name and icon from its bundle.
 It rebuilds the copy when Electron's version or `icon.png` changes.
 `desktop/icon.svg` is the app icon, the logo mark on a macOS-style tile, and `desktop/icon.png` is that SVG rendered at 1024 px, because Electron reads no SVG; render it again after you change the SVG.
