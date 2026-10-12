@@ -1239,6 +1239,7 @@ Alt is Option on macOS.
 | Cmd+Shift+X | Anywhere | End the focused session |
 | Cmd+[ | Anywhere | Open the previous session in the sidebar |
 | Cmd+] | Anywhere | Open the next session in the sidebar |
+| ↓ / ↑ | Sessions, outside text fields | Open the next or previous session in the sidebar |
 | Cmd+Alt+/ | Anywhere | Choose the session's model |
 | Cmd+Alt+P | Anywhere | Choose the session's working directory |
 | Cmd+E | Anywhere | Expand or collapse tool calls |
@@ -1318,6 +1319,7 @@ Alt is Option on macOS.
   The title can end with a due day or a `#category`, as in [Todo list](#todo-list).
   With Linear connected, it also offers **Create ticket**, which opens the new-ticket dialog with what you typed as the title; see [Linear tickets](#linear-tickets).
   Cmd+[ and Cmd+] walk the sidebar's list, pinned sessions, then idle ones, then running ones, then interrupted ones, then past ones, in the focused pane, skipping the rows that the sidebar's search hides.
+  ↓ and ↑ do the same while the panes show and no text field has focus, instead of scrolling the conversation; a page, the changed files, or a focused sidebar row keeps them.
   From a subagent they step from its session's row.
 - Cmd+Shift+O opens the new-session draft, as **New session** at the top of the session list does.
   Cmd+Shift+X ends the focused session, as **End session** in its header does, with no confirmation; **Resume** continues it from the past sessions.

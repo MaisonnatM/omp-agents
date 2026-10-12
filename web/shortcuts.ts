@@ -15,6 +15,8 @@ export type ShortcutId =
 	| "endSession"
 	| "previousSession"
 	| "nextSession"
+	| "sessionsNext"
+	| "sessionsPrevious"
 	| "model"
 	| "directory"
 	| "thinking"
@@ -146,6 +148,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		keys: [{ chord: { key: "[", mod: true }, scope: "anywhere" }],
 	},
 	{ id: "nextSession", category: "sessions", label: "Open the next session in the sidebar", command: "Open next session", keys: [{ chord: { key: "]", mod: true }, scope: "anywhere" }] },
+	{ id: "sessionsNext", category: "sessions", label: "Sessions: open the next session in the sidebar", keys: [{ chord: { key: "ArrowDown" }, scope: "outside-fields" }] },
+	{ id: "sessionsPrevious", category: "sessions", label: "Sessions: open the previous session in the sidebar", keys: [{ chord: { key: "ArrowUp" }, scope: "outside-fields" }] },
 	{ id: "model", category: "sessions", label: "Choose the session's model", keys: [{ chord: { key: "/", mod: true, alt: true }, scope: "anywhere" }] },
 	{ id: "directory", category: "sessions", label: "Choose the session's working directory", keys: [{ chord: { key: "p", mod: true, alt: true }, scope: "anywhere" }] },
 	{ id: "thinking", category: "sessions", label: "Cycle the thinking level", keys: [{ chord: { key: "Tab", shift: true }, scope: "composer" }] },

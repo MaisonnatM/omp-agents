@@ -90,6 +90,9 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			newSession: () => latest.current.openNewSession(),
 			previousSession: () => step(-1),
 			nextSession: () => step(1),
+			// ↑ and ↓ step only while the panes show: a page's list, or its native scrolling, keeps them.
+			sessionsNext: () => (latest.current.page ? false : step(1)),
+			sessionsPrevious: () => (latest.current.page ? false : step(-1)),
 			tools: () => latest.current.toggleTools(),
 			hideTools: () => latest.current.toggleHideTools(),
 			hideThinking: () => latest.current.toggleHideThinking(),

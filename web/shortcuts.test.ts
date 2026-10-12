@@ -106,9 +106,9 @@ test("a key matches only its intended scope, with no Esc interrupt or Cmd+/ help
 	expect(press("i", "KeyI", { ctrl: true })).toEqual(["focusComposer"]);
 });
 
-test("↓ and ↑ step through pull requests, todos, conversations, and changed files, ↑ also takes back a queued message, and J and K step through nothing", () => {
-	expect(press("ArrowDown", "ArrowDown")).toEqual(["nextPullRequest", "todoNext", "inboxNext", "nextChangedFile"]);
-	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "previousPullRequest", "todoPrevious", "inboxPrevious", "previousChangedFile"]);
+test("↓ and ↑ step through sessions, pull requests, todos, conversations, and changed files, ↑ also takes back a queued message, and J and K step through nothing", () => {
+	expect(press("ArrowDown", "ArrowDown")).toEqual(["sessionsNext", "nextPullRequest", "todoNext", "inboxNext", "nextChangedFile"]);
+	expect(press("ArrowUp", "ArrowUp")).toEqual(["dequeue", "sessionsPrevious", "previousPullRequest", "todoPrevious", "inboxPrevious", "previousChangedFile"]);
 	expect(press("j", "KeyJ")).toEqual([]);
 	expect(press("k", "KeyK")).toEqual([]);
 });
