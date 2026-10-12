@@ -1,7 +1,18 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { flushJsonFiles } from "../fs";
 import type { ServerMsg } from "../shared/protocol";
 import type { PastSession, RosterHost } from "../shared/sessions";
 import { Broadcasts } from "./broadcasts";
+import { ListRegistry } from "./list-registry";
+import { PinsFile } from "./pins-file";
+import { ProjectsFile } from "./projects-file";
+import { RoutinesFile } from "./routines-file";
+import { ScheduledFile } from "./scheduled-file";
+import { UserTodosFile } from "./user-todos-file";
+import { WorkspacesFile } from "./workspaces-file";
 import type { Socket, SocketData } from "./views";
 
 /** Only the fields the broadcast compares; the rest of a past row does not matter here. */
@@ -9,21 +20,47 @@ const past = (sessionId: string, title: string): PastSession => ({ sessionId, ti
 /** Only the fields the broadcast compares. */
 const host = (instanceId: string, cwd: string): RosterHost => ({ instanceId, cwd }) as unknown as RosterHost;
 
+const dirs: string[] = [];
+afterEach(() => {
+	flushJsonFiles();
+	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+
 function setup(initial: PastSession[]) {
 	let sessions = initial;
 	let roster: { hosts: RosterHost[]; error: string | null } = { hosts: [], error: null };
 	let listeners = 0;
 	const published: ServerMsg[] = [];
+	const dir = mkdtempSync(join(tmpdir(), "omp-agents-lists-"));
+	dirs.push(dir);
+	const todos = new UserTodosFile(join(dir, "todos.json"));
+	const routines = new RoutinesFile(join(dir, "routines.json"));
+	const scheduled = new ScheduledFile(join(dir, "scheduled.json"));
+	const workspaces = new WorkspacesFile(join(dir, "workspaces.json"));
+	const pins = new PinsFile(join(dir, "pins.json"));
+	const projects = new ProjectsFile(join(dir, "projects.json"));
+	const lists = new ListRegistry({
+		"user-todos": { msg: () => ({ t: "user-todos", list: todos.list }), apply: change => todos.apply(change) },
+		routines: { msg: () => ({ t: "routines", routines: routines.routines }), apply: change => routines.apply(change, 1000) },
+		scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.sends }), apply: change => scheduled.apply(change, 1000) },
+		workspaces: {
+			msg: () => ({
+				t: "workspaces",
+				list: {
+					added: workspaces.list.added.map(cwd => ({ cwd, cwdDisplay: cwd })),
+					hidden: workspaces.list.hidden.map(cwd => ({ cwd, cwdDisplay: cwd })),
+				},
+			}),
+			apply: change => workspaces.apply(change),
+		},
+		pins: { msg: () => ({ t: "pins", sessionIds: pins.sessionIds }), apply: change => pins.apply(change) },
+		projects: { msg: () => ({ t: "projects", projects: projects.projects }), apply: change => projects.apply(change) },
+		notices: { msg: () => ({ t: "notices", list: [] }) },
+	}, kind => broadcasts.pushList(kind));
 	const broadcasts = new Broadcasts({
 		roster: () => roster,
 		past: () => sessions,
-		userTodosMsg: () => ({ t: "user-todos" }) as unknown as Extract<ServerMsg, { t: "user-todos" }>,
-		routinesMsg: () => ({ t: "routines" }) as unknown as Extract<ServerMsg, { t: "routines" }>,
-		scheduledMsg: () => ({ t: "scheduled", sends: [] }),
-		workspacesMsg: () => ({ t: "workspaces", list: { added: [], hidden: [] } }),
-		pinsMsg: () => ({ t: "pins", sessionIds: [] }),
-		projectsMsg: () => ({ t: "projects", projects: [] }),
-		noticesMsg: () => ({ t: "notices", list: [] }),
+		lists,
 		publish: (_topic, json) => void published.push(JSON.parse(json)),
 		subscriberCount: () => listeners,
 		beforeRosterPush: () => {},
@@ -40,6 +77,9 @@ function setup(initial: PastSession[]) {
 	return {
 		broadcasts,
 		ws,
+		lists,
+		pins,
+		published,
 		sent,
 		pastPublished,
 		rosterPublished,
@@ -99,5 +139,57 @@ describe("roster broadcasts", () => {
 		broadcasts.open(ws);
 		expect(rosterPublished()).toEqual([{ t: "roster", reset: false, hosts: [host("b", "/other")], removed: ["a"], error: null }]);
 		expect(sent.filter(msg => msg.t === "roster").at(-1)).toEqual({ t: "roster", reset: true, hosts: [host("b", "/other")], removed: [], error: null });
+	});
+});
+
+describe("registered whole-list broadcasts", () => {
+	test("every registered list is included in an opening snapshot, even before any publish", () => {
+		const { broadcasts, ws, sent, lists } = setup([]);
+		lists.apply("pins", { op: "pin", sessionIds: ["saved"] });
+		broadcasts.open(ws);
+		expect(sent.slice(2)).toEqual([...lists.messages()]);
+		expect(sent.find(msg => msg.t === "pins")).toEqual({ t: "pins", sessionIds: ["saved"] });
+	});
+
+	test("an edit publishes the whole current list once; repeat edits resend only to their peer", () => {
+		const { lists, published, broadcasts, ws } = setup([]);
+		broadcasts.open(ws);
+		const replies: ServerMsg[] = [];
+		const peer = { send: (msg: ServerMsg) => void replies.push(msg) };
+		expect(lists.apply("pins", { op: "pin", sessionIds: ["a"] }, peer)).toBe(true);
+		expect(published).toEqual([{ t: "pins", sessionIds: ["a"] }]);
+		expect(replies).toEqual([]);
+
+		expect(lists.apply("pins", { op: "pin", sessionIds: ["a"] }, peer)).toBe(false);
+		expect(replies).toEqual([{ t: "pins", sessionIds: ["a"] }]);
+		broadcasts.pushList("pins");
+		expect(published).toHaveLength(1);
+	});
+
+	test("every editable registration resends its authoritative snapshot after a no-op", () => {
+		const { lists, published } = setup([]);
+		const replies: ServerMsg[] = [];
+		const peer = { send: (msg: ServerMsg) => void replies.push(msg) };
+		expect(lists.apply("user-todos", { op: "remove", id: "missing" }, peer)).toBe(false);
+		expect(lists.apply("routines", { op: "remove", id: "missing" }, peer)).toBe(false);
+		expect(lists.apply("scheduled", { op: "remove", id: "missing" }, peer)).toBe(false);
+		expect(lists.apply("workspaces", { op: "show", cwd: "/missing" }, peer)).toBe(false);
+		expect(lists.apply("pins", { op: "unpin", sessionIds: ["missing"] }, peer)).toBe(false);
+		expect(lists.apply("projects", { op: "rename", id: "missing", name: "new" }, peer)).toBe(false);
+		expect(replies).toEqual([...lists.messages()].filter(msg => msg.t !== "notices"));
+		expect(published).toEqual([]);
+	});
+
+	test("runner-side store changes use the same message builder as snapshots and peer resends", () => {
+		const { lists, pins, published, broadcasts, ws, sent } = setup([]);
+		pins.apply({ op: "pin", sessionIds: ["run"] });
+		broadcasts.pushList("pins");
+		broadcasts.pushList("pins");
+		broadcasts.open(ws);
+		const replies: ServerMsg[] = [];
+		lists.apply("pins", { op: "pin", sessionIds: ["run"] }, { send: msg => void replies.push(msg) });
+		expect(published).toEqual([{ t: "pins", sessionIds: ["run"] }]);
+		expect(replies).toEqual(published);
+		expect(sent.find(msg => msg.t === "pins")).toEqual({ t: "pins", sessionIds: ["run"] });
 	});
 });
