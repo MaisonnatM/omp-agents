@@ -1,3 +1,4 @@
+/** The page's toasts: the `toasts` manager that shows one from anywhere, and `Toaster`, which stacks them bottom right. */
 import { Toast } from "@base-ui/react/toast";
 import { Button } from "@/components/ui/button";
 

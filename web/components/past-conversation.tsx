@@ -1,3 +1,4 @@
+/** A past session's pane: its saved transcript under its trail, with **Resume** to continue it. */
 import { type ReactNode, useMemo } from "react";
 import type { PastSession } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";

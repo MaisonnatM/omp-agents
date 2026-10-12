@@ -1,3 +1,4 @@
+/** `PromptChip`, a skill, file, ticket, or other reference in a prompt drawn as one chip, in the composer and transcript. */
 import { File, Folder, GitPullRequest, ListTodo, type LucideIcon, MessageSquare, Slash, Sparkles, Ticket } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";

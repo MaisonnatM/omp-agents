@@ -1,3 +1,4 @@
+/** `StatusDot`, the colored dot that shows a session's or subagent's status. */
 import type { AgentStatus, HostStatus } from "../../src/shared/sessions";
 import { cn } from "@/lib/utils";
 

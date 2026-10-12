@@ -1,3 +1,4 @@
+/** The right sidebar for a session: tabs for its outline, files, media, and pull requests. */
 import { FileDiff, GitPullRequest, Images, TableOfContents } from "lucide-react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { RosterHost, View } from "../../src/shared/sessions";

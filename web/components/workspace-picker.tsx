@@ -1,3 +1,4 @@
+/** The workspace picker: the searchable directory list for the roster and the new session's directory. */
 import { Folder } from "lucide-react";
 import { useState } from "react";
 import type { Workspace } from "../../src/shared/workspaces";

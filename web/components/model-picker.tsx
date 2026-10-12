@@ -1,3 +1,4 @@
+/** The model menu: a model's logo and name, the grouped searchable model list, and Fast, Context, and Effort controls. */
 import { type ModelEntry, type ModelOption, type PlanUsage, selectorOf } from "../../src/shared/models";
 import type { FastMode } from "../../src/shared/sessions";
 import { ChevronDown } from "lucide-react";

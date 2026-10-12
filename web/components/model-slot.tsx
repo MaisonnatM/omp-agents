@@ -1,3 +1,4 @@
+/** The composer's model slot: the model menu for a session this dashboard started, or a terminal session's model read-only. */
 import { useState } from "react";
 import { Brain } from "lucide-react";
 import type { ModelOption } from "../../src/shared/models";

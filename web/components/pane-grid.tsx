@@ -1,3 +1,4 @@
+/** `PaneGrid`, the split-pane layout of open sessions, with resize handles between panes. */
 import { memo, useCallback, useRef } from "react";
 import type { PastSession, RosterHost } from "../../src/shared/sessions";
 import type { Workspace } from "../../src/shared/workspaces";

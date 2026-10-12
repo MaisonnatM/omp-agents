@@ -1,3 +1,4 @@
+/** A question an agent asks the user, as a card in the conversation, sending the answer back to omp. */
 import { useState } from "react";
 import { type Question, type QuestionAnswer, QuestionCard } from "@/components/question-card";
 import { Button } from "@/components/ui/button";

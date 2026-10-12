@@ -1,3 +1,4 @@
+/** The right sidebar's Pull requests tab: one of a session's pull requests in detail, with a way to pick another. */
 import { useState } from "react";
 import type { LinkedPullRequest, PullRequest } from "../../src/shared/github";
 import type { RosterHost } from "../../src/shared/sessions";

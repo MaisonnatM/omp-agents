@@ -1,3 +1,4 @@
+/** `NotesEditor`, a Lexical text field that edits markdown notes and saves them as markdown. */
 import { HistoryExtension } from "@lexical/history";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";

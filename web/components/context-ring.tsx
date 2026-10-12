@@ -1,3 +1,4 @@
+/** The composer's ring showing how full a session's context window is, with token counts on hover. */
 import type { ContextUsage } from "../../src/shared/sessions";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";

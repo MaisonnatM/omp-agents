@@ -1,3 +1,4 @@
+/** A session's header trail, `workspace / title`, and the menu of its pull requests. */
 import { ChevronDown, GitPullRequest } from "lucide-react";
 import { Fragment, useState } from "react";
 import { type LinkedPullRequest, pullRequestUrl } from "../../src/shared/github";

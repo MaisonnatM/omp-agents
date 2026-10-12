@@ -1,3 +1,4 @@
+/** The status bar along the page's bottom: the machine's CPU, memory, and disk, plus plan usage. */
 import { Cpu, HardDrive, MemoryStick, SquareTerminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { SystemLoad } from "../../src/shared/system";

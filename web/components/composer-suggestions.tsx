@@ -1,3 +1,4 @@
+/** The suggested next prompts above the composer, which a key or click sends or fills in, alone or several marked together. */
 import { AnimatePresence, motion } from "framer-motion";
 import { type FocusEventHandler, type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";

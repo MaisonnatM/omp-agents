@@ -1,3 +1,4 @@
+/** `CommandPicker`, the searchable popover list behind the dashboard's branch, model, skill, and workspace pickers. */
 import { Check, ChevronsUpDown } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, type Ref, useContext, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";

@@ -1,3 +1,4 @@
+/** `QuestionCard`, a card that asks one question: rows to pick from or a text field to answer. */
 import { motion } from "framer-motion";
 import { type HTMLAttributes, type ReactNode, useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";

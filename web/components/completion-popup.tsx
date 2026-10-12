@@ -1,3 +1,4 @@
+/** The composer's completion popup for skills, commands, files, and other mentions, and the `useCompletion` hook that drives it. */
 import { ChevronRight } from "lucide-react";
 import { type HTMLAttributes, type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";

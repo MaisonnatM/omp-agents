@@ -1,3 +1,4 @@
+/** `SidebarPanel`, the dashboard's left and right sidebars, each resizable and closeable, and the button that toggles one. */
 import { type LucideIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import type { ReactNode } from "react";
 import { flushSync } from "react-dom";

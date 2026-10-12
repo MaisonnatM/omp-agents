@@ -1,3 +1,4 @@
+/** A file path in agent text that opens the file dialog, and the context giving the directory relative paths resolve against. */
 import { createContext, type ReactNode, useContext } from "react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { absoluteFilePath } from "../file-paths";

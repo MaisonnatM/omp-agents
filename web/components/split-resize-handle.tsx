@@ -1,3 +1,4 @@
+/** The draggable line between split panes and the stored ratio that sizes them. */
 import { cn } from "@/lib/utils";
 import { useStoredState } from "../stored-state";
 import { Separator, useDragSeparator } from "./drag-separator";

@@ -1,3 +1,4 @@
+/** `PageSwitch`, which renders the page the route names: the pane grid, a new session, or one of the dashboard's pages. */
 import { memo } from "react";
 import type { McpIntegration } from "../../src/shared/accounts";
 import { newSessionRequest } from "../../src/shared/sessions";

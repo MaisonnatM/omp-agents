@@ -1,3 +1,4 @@
+/** `FormDialog`, the dialog shell the dashboard's forms share, with its header, error line, and Cmd+Enter submit chord. */
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
 import { type KeyboardEvent, type ReactNode, useRef } from "react";

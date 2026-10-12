@@ -1,3 +1,4 @@
+/** `Header`, the title bar with an optional meta line and controls that heads a pane or a page. */
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 

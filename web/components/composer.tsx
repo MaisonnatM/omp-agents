@@ -1,3 +1,4 @@
+/** Shared parts of the composer: its tray, directory label, empty-conversation view, and the check that holds back `!` and `$` drafts. */
 import { Folder, MessageCircle } from "lucide-react";
 import { createContext, type ReactNode, type RefObject } from "react";
 import { Tooltip } from "@/components/ui/tooltip";

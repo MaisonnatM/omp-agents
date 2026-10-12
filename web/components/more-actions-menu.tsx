@@ -1,3 +1,4 @@
+/** `MoreActionsMenu`, a ⋯ button that opens a menu of rarely used actions. */
 import { Ellipsis } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";

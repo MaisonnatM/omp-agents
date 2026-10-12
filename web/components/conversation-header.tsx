@@ -1,3 +1,4 @@
+/** The header of a live session's pane: its trail, pull request menu, connection status, and stop and end controls. */
 import { ArrowLeft, CircleStop } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ControlPhase, LiveView } from "../../src/shared/sessions";

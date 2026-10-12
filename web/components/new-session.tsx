@@ -1,3 +1,4 @@
+/** The new-session page: the composer that starts a session, with its directory, branch, model, and skill pickers. */
 import { Sparkles } from "lucide-react";
 import { type KeyboardEvent, useRef, useState } from "react";
 import type { BranchChoice } from "../../src/shared/git";

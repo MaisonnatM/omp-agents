@@ -1,3 +1,4 @@
+/** `Transcript`, a session's messages, thinking, and tool calls as rendered in a pane. */
 import {
 	AppWindow,
 	Bot,

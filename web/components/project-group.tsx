@@ -1,3 +1,4 @@
+/** One project's group in the sidebar's Sessions tab: the coordinator, then its workers. */
 import type { View } from "../../src/shared/sessions";
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu } from "@/components/ui/sidebar";
 import { type ProjectGroup, waitsOnYou } from "../sessions";

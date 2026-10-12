@@ -1,3 +1,4 @@
+/** Branch widgets: a branch label and copyable name, and the new-session branch picker with the directory it starts in. */
 import { Check, GitBranch, GitBranchPlus } from "lucide-react";
 import { useState } from "react";
 import { type BranchChoice, type GitCheckout, worktreeDir } from "../../src/shared/git";
