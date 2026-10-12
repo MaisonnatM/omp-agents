@@ -799,6 +799,8 @@ It reads a conversation once, reads the next and previous ones of the list ahead
 
 `GET /api/gmail/message?thread=<thread id>&id=<message id>` serves a message's HTML as a document of its own, built by `mailDocument` in `src/server/mail-document.ts`, from `GmailClient.messageHtml`, which reads the conversation's kept read, so opening a conversation asks Gmail nothing more.
 A request without both ids is a 400, and a message the conversation does not hold, or whose body is not HTML, is a 404.
+`mailDocument` drops every tracking pixel from the message, through Bun's `HTMLRewriter`: an `<img>` whose width and height, each the smallest of its attribute and its inline `width`/`max-width` or `height`/`max-height` in pixels, are both at most 3px.
+An image that declares only one side, a larger side, or a size in other units stays, so a 1×20 spacer keeps the layout it holds.
 The page frames that address, not a `srcdoc`: a `srcdoc` document inherits the page's `Content-Security-Policy` from `web/index.html`, whose `img-src` no message can widen, so a message's images never loaded.
 Widening the page's own policy is no answer, since it guards the whole dashboard, rendered transcripts too.
 The frame keeps `sandbox="allow-same-origin"` and nothing else.
