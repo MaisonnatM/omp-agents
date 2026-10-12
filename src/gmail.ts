@@ -9,6 +9,7 @@ import type { GoogleFetch } from "./integrations";
 import { isObject, nonEmptyStr, str } from "./json";
 import { mapLimit } from "./map-limit";
 import type { InboxAnswer, MailAttachment, MailBody, MailMessage, MailPerson, MailThread, ThreadAnswer } from "./shared/gmail";
+import { threadUrl } from "./shared/gmail";
 
 const API = "https://gmail.googleapis.com/gmail/v1/users/me";
 
@@ -86,9 +87,6 @@ const hasLabel = (message: Record<string, unknown>, label: string): boolean => A
 
 /** When a message arrived, epoch ms, `NaN` when Gmail gives no time. */
 const arrivalOf = (message: Record<string, unknown>): number => (typeof message.internalDate === "string" ? Number(message.internalDate) : Number.NaN);
-
-/** The conversation `id` in Gmail, signed in as `address`, whichever account the browser signed in first. */
-const threadUrl = (address: string, id: string): string => `https://mail.google.com/mail/?authuser=${encodeURIComponent(address)}#inbox/${id}`;
 
 /** A thread as the Inbox page lists it, or `null` for one without an id, a message other than a draft, or an arrival time. */
 function threadOf(thread: unknown, snippet: string, address: string): MailThread | null {

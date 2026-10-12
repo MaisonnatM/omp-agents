@@ -1,14 +1,15 @@
-import { ChevronDown, ChevronsUpDown, ChevronUp, ExternalLink, Paperclip, RefreshCw, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useReducer, useRef } from "react";
+import { ChevronsUpDown, ExternalLink, Paperclip, RefreshCw } from "lucide-react";
+import { useEffect, useReducer } from "react";
 import type { MailAttachment, MailMessage, MailPerson, MailThread } from "../../../src/shared/gmail";
-import { Button, type ButtonProps } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { colorIndex, foldMessages, foldsAfter, initialOf, linkParts, NO_FOLDS, participants, personLabel, recipientsLine } from "../../inbox-model";
 import { formatBytes, mailTime } from "../../labels";
 import { mailThreadStore, useMailThread } from "../../reads";
 import { hashForInbox } from "../../routing";
-import { type ShortcutId, shortcutLabels } from "../../shortcuts";
+import { shortcutLabels } from "../../shortcuts";
+import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar, type BarAction } from "../list-split";
 import { LoadNote } from "../sheet-details";
 import { MailFrame } from "./mail-frame";
 
@@ -149,28 +150,18 @@ function ClosedMessage({ message, address, onToggle }: MessageProps) {
 	);
 }
 
-/** An icon button of the conversation's bar, named by its tooltip, which also shows the key that does the same. */
-function BarButton({ label, shortcut, ...props }: { label: string; shortcut?: ShortcutId } & ButtonProps) {
-	return (
-		<Tooltip content={label} shortcut={shortcut && shortcutLabels(shortcut)} disabled={props.disabled}>
-			<Button variant="ghost" size="icon-compact" aria-label={label} {...props} />
-		</Tooltip>
-	);
-}
-
 interface ThreadDetailProps {
 	id: string;
 	/** The conversation as the inbox lists it, which titles the panel until its read arrives; `null` when the list does not hold it. */
 	listed: MailThread | null;
 	/** Where it sits in the list, `null` when the list does not hold it. */
 	position: { at: number; of: number } | null;
-	/** The conversations listed before and after it, which it reads ahead so they show at once. */
-	previous: MailThread | undefined;
-	next: MailThread | undefined;
+	/** Opens the previous listed conversation, `undefined` at the top. */
+	onPrevious?: () => void;
+	/** Opens the next listed conversation, `undefined` at the bottom. */
+	onNext?: () => void;
 	/** The inbox's own address, which reads as `me`. */
 	address: string | null;
-	/** Opens another listed conversation in its place. */
-	onOpen: (thread: MailThread) => void;
 }
 
 /**
@@ -179,22 +170,12 @@ interface ThreadDetailProps {
  * on one line, and a long run of those folded into one row. Reading it here does not mark it read, since the dashboard
  * reads Gmail read only.
  */
-export function ThreadDetail({ id, listed, position, previous, next, address, onOpen }: ThreadDetailProps) {
+export function ThreadDetail({ id, listed, position, onPrevious, onNext, address }: ThreadDetailProps) {
 	const { read, error, refreshing } = useMailThread(id, listed?.at ?? null);
 	const thread = read?.data ?? null;
 	const messages = thread?.messages ?? [];
 	const [folds, fold] = useReducer(foldsAfter, NO_FOLDS);
 	const url = thread?.url ?? listed?.url ?? null;
-	const panel = useRef<HTMLElement>(null);
-
-	useEffect(() => {
-		if (previous) mailThreadStore.ensure(previous.id);
-		if (next) mailThreadStore.ensure(next.id);
-	}, [previous, next]);
-	// The split keeps its scroll from one conversation to the next, which would open the next one where the last was read.
-	useLayoutEffect(() => {
-		panel.current?.scrollIntoView({ block: "start" });
-	}, [id]);
 
 	const rows = foldMessages(messages, folds);
 	const subject = thread?.subject ?? listed?.subject ?? null;
@@ -202,31 +183,34 @@ export function ThreadDetail({ id, listed, position, previous, next, address, on
 	const people = thread ? participants(messages, address) : listed ? [listed.from] : [];
 	const meta = [count === undefined ? "" : `${count} ${count === 1 ? "message" : "messages"}`, people.join(", ")].filter(Boolean).join(" · ");
 
+	const expandAll = rows.some(row => row.kind !== "open");
+	const previous: BarAction = { label: "Previous conversation", icon: CH_PREVIOUS, shortcut: "inboxPrevious", onClick: onPrevious };
+	const next: BarAction = { label: "Next conversation", icon: CH_NEXT, shortcut: "inboxNext", onClick: onNext };
+	const close: BarAction = { label: "Close", icon: CH_CLOSE, shortcut: "inboxClose", href: hashForInbox(null) };
 	return (
-		<section ref={panel} aria-label={subject || "Conversation"} className="flex min-w-0 flex-col">
-			<div className="sticky top-0 z-10 flex h-11 items-center gap-1 border-b border-border bg-background/95 px-4 backdrop-blur">
-				<p className="min-w-0 flex-1 truncate text-xs tabular-nums text-muted-foreground">{position && `${position.at + 1} of ${position.of}`}</p>
-				<BarButton label="Previous conversation" shortcut="inboxPrevious" disabled={!previous} onClick={() => previous && onOpen(previous)}>
-					<ChevronUp />
-				</BarButton>
-				<BarButton label="Next conversation" shortcut="inboxNext" disabled={!next} onClick={() => next && onOpen(next)}>
-					<ChevronDown />
-				</BarButton>
-				{rows.some(row => row.kind !== "open") && (
-					<BarButton label="Expand all" onClick={() => fold({ kind: "expand-all", messages })}>
+		<section aria-label={subject || "Conversation"} className="flex min-w-0 flex-col">
+			<DetailBar
+				leading={position && <span className="tabular-nums">{position.at + 1} of {position.of}</span>}
+				previous={previous}
+				next={next}
+				close={close}
+			>
+				{expandAll && (
+					<Button variant="ghost" size="icon-compact" aria-label="Expand all" onClick={() => fold({ kind: "expand-all", messages })}>
 						<ChevronsUpDown />
-					</BarButton>
+					</Button>
 				)}
-				<BarButton label={refreshing ? "Refreshing…" : "Refresh"} disabled={refreshing} onClick={() => void mailThreadStore.refresh(id, { fresh: true })}>
-					<RefreshCw className={cn(refreshing && "animate-spin")} />
-				</BarButton>
-				<BarButton label="Open in Gmail" shortcut="inboxOnGmail" disabled={!url} render={url ? <a href={url} target="_blank" rel="noreferrer" /> : undefined}>
-					<ExternalLink />
-				</BarButton>
-				<BarButton label="Close" shortcut="inboxClose" render={<a href={hashForInbox(null)} />}>
-					<X />
-				</BarButton>
-			</div>
+				<Tooltip content={refreshing ? "Refreshing…" : "Refresh"} disabled={refreshing}>
+					<Button variant="ghost" size="icon-compact" aria-label="Refresh" disabled={refreshing} onClick={() => void mailThreadStore.refresh(id, { fresh: true })}>
+						<RefreshCw className={cn(refreshing && "animate-spin")} />
+					</Button>
+				</Tooltip>
+				<Tooltip content="Open in Gmail" shortcut={shortcutLabels("inboxOnGmail")} disabled={!url}>
+					<Button variant="ghost" size="icon-compact" aria-label="Open in Gmail" disabled={!url} render={url ? <a href={url} target="_blank" rel="noreferrer" /> : undefined}>
+						<ExternalLink />
+					</Button>
+				</Tooltip>
+			</DetailBar>
 			<div className="w-full max-w-3xl space-y-4 px-8 py-6">
 				{subject !== null && (
 					<header className="space-y-1.5">

@@ -1,13 +1,14 @@
 import { Mail } from "lucide-react";
+import { useEffect } from "react";
 import { callable } from "../../../src/shared/accounts";
 import type { MailThread } from "../../../src/shared/gmail";
+import { threadUrl } from "../../../src/shared/gmail";
 import { cn } from "@/lib/utils";
-import { readTime } from "../../labels";
 import { gmailStore, mailThreadStore, useGmailInbox } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { shortcutKeys, useShortcuts } from "../../shortcuts";
 import { DisconnectedPage } from "../integrations/disconnected-page";
-import { focusRow, PageFrame, PolledContent, RefreshButton, stepRows, useReturnFocus } from "../list-page";
+import { focusRow, PolledPageFrame, PolledContent, stepRows, useReturnFocus } from "../list-page";
 import { ListSplit } from "../list-split";
 import { MailTime, ThreadDetail } from "./thread-view";
 
@@ -60,21 +61,30 @@ export function InboxPage({ target }: { target: string | null }) {
 	const read = inbox.read;
 	const threads = read?.data.threads ?? [];
 	const at = target === null ? -1 : threads.findIndex(thread => thread.id === target);
-	// A conversation the list does not hold, opened from its address, has its Gmail link only in its own read.
-	const openRead = mailThreadStore.use(target);
-	const openUrl = threads[at]?.url ?? openRead.read?.data.url ?? null;
+	const address = read?.data.address ?? null;
+	const openUrl = address !== null && target !== null ? threadUrl(address, target) : null;
 	useReturnFocus(target, id => id, id => document.getElementById(rowId(id))?.querySelector<HTMLElement>("a"), read);
+
+	// Read the next and previous conversations while one is open, so ↓/↑ open them at once.
+	const previous = at > 0 ? threads[at - 1] : undefined;
+	const next = at >= 0 ? threads[at + 1] : undefined;
+	useEffect(() => {
+		if (previous) mailThreadStore.ensure(previous.id);
+		if (next) mailThreadStore.ensure(next.id);
+	}, [previous, next]);
 
 	const open = (thread: MailThread): void => {
 		location.hash = hashForInbox(thread.id);
 		const row = rowOf(thread);
 		if (row) focusRow(row);
 	};
-	/** Opens the neighbour of the open conversation, or with none open, or one the list does not hold, moves the focus. */
-	const step = (by: 1 | -1): boolean => {
-		if (at < 0) return stepRows(threads, rowOf, by);
-		const neighbour = threads[at + by];
+	const openBy = (by: 1 | -1): void => {
+		const neighbour = at >= 0 ? threads[at + by] : threads[by === 1 ? 0 : threads.length - 1];
 		if (neighbour) open(neighbour);
+	};
+	const step = (by: 1 | -1): boolean => {
+		if (target === null) return stepRows(threads, rowOf, by);
+		openBy(by);
 		return true;
 	};
 	useShortcuts({
@@ -94,48 +104,50 @@ export function InboxPage({ target }: { target: string | null }) {
 	if (gmail && !callable(gmail.connection)) return <DisconnectedPage title={TITLE} meta={META} integration={gmail} />;
 
 	return (
-		<PageFrame
+		<PolledPageFrame
 			title={TITLE}
-			meta={read ? `${read.data.address} · ${unread} unread · updated ${readTime(read.at)}` : META}
-			actions={<RefreshButton refreshing={inbox.refreshing} onRefresh={() => void gmailStore.refresh(null, { fresh: true })} />}
+			meta={read ? `${read.data.address} · ${unread} unread` : META}
+			poll={inbox}
+			onRefresh={() => void gmailStore.refresh(null, { fresh: true })}
 		>
-			<ListSplit
-				widthKey="omp-agents.inbox-list-width"
-				resizeLabel="Resize the conversation list"
-				detailLabel="Open conversation"
-				empty={{ icon: Mail, title: "No conversation open", hint: `Click one, or focus one with ${shortcutKeys("inboxNext")} and press Enter.` }}
-				list={
-					<div className="space-y-2 p-2">
-						<PolledContent noun="your inbox" loading="Asking Gmail for your inbox…" poll={inbox}>
-							{answer =>
-								answer.threads.length === 0 ? (
-									<p className="px-3 text-sm text-muted-foreground">Your inbox is empty.</p>
-								) : (
-									<ul aria-label="Conversations" className="space-y-0.5">
-										{answer.threads.map(thread => (
-											<ThreadRow key={thread.id} thread={thread} open={thread.id === target} />
-										))}
-									</ul>
-								)
-							}
-						</PolledContent>
-					</div>
-				}
-				detail={
-					target === null ? null : (
-						<ThreadDetail
-							key={target}
-							id={target}
-							listed={threads[at] ?? null}
-							position={at >= 0 ? { at, of: threads.length } : null}
-							previous={at > 0 ? threads[at - 1] : undefined}
-							next={at >= 0 ? threads[at + 1] : undefined}
-							address={read?.data.address ?? null}
-							onOpen={open}
-						/>
-					)
-				}
-			/>
-		</PageFrame>
+			{() => (
+				<ListSplit
+					widthKey="omp-agents.inbox-list-width"
+					resizeLabel="Resize the conversation list"
+					detailLabel="Open conversation"
+					empty={{ icon: Mail, title: "No conversation open", hint: `Click one, or focus one with ${shortcutKeys("inboxNext")} and press Enter.` }}
+					list={
+						<div className="space-y-2 p-2">
+							<PolledContent noun="your inbox" loading="Asking Gmail for your inbox…" poll={inbox}>
+								{answer =>
+									answer.threads.length === 0 ? (
+										<p className="px-3 text-sm text-muted-foreground">Your inbox is empty.</p>
+									) : (
+										<ul aria-label="Conversations" className="space-y-0.5">
+											{answer.threads.map(thread => (
+												<ThreadRow key={thread.id} thread={thread} open={thread.id === target} />
+											))}
+										</ul>
+									)
+								}
+							</PolledContent>
+						</div>
+					}
+					detail={
+						target === null ? null : (
+							<ThreadDetail
+								key={target}
+								id={target}
+								listed={threads[at] ?? null}
+								position={at >= 0 ? { at, of: threads.length } : null}
+								onPrevious={previous ? () => open(previous) : undefined}
+								onNext={next ? () => open(next) : undefined}
+								address={address}
+							/>
+						)
+					}
+				/>
+			)}
+		</PolledPageFrame>
 	);
 }

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, ChevronUp, Play, Plus, Ticket, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Play, Plus, Ticket } from "lucide-react";
 import { useState } from "react";
 import { errorText } from "../../../src/json";
 import { hashForSession } from "../../../src/shared/sessions";
@@ -23,6 +23,7 @@ import { type Choice, FieldPicker } from "../field-picker";
 import { NotesEditor } from "../notes-editor";
 import { QuickActionButton, QuickStartNotice } from "../quick-actions";
 import { preferredTeam, rememberTeam, TeamSelect } from "../tickets/team-select";
+import { CH_CLOSE, CH_NEXT, CH_PREVIOUS, DetailBar } from "../list-split";
 import { StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, TodoStatusPicker } from "./fields";
 import { TodoInput } from "./input";
 import { AddedByChip, type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
@@ -274,36 +275,26 @@ export function TodoDetail({ list, open, readOnly, day, picker, onPicker, onChan
 	const links = top?.links ?? [];
 	return (
 		<section aria-label={todo.text} className="flex min-w-0 flex-col">
-			<div className="sticky top-0 z-10 flex h-11 items-center gap-1 border-b border-border bg-background/95 px-4 backdrop-blur">
-				<p className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted-foreground">
-					<CategoryDot categoryId={categoryId} />
-					<span className="shrink-0">{category}</span>
-					{open.parent && (
-						<>
-							<ChevronRight aria-hidden className="size-3 shrink-0" />
-							<span className="truncate">{open.parent.text}</span>
-						</>
-					)}
-					<ChevronRight aria-hidden className="size-3 shrink-0" />
-					<StatusIcon status={todo.status} className="size-3.5" />
-					<span className="shrink-0">{TODO_STATUS[todo.status].label}</span>
-				</p>
-				<Tooltip content="Previous todo" shortcut={shortcutLabels("todoPrevious")}>
-					<Button variant="ghost" size="icon-compact" aria-label="Previous todo" disabled={!onPrevious} onClick={onPrevious}>
-						<ChevronUp />
-					</Button>
-				</Tooltip>
-				<Tooltip content="Next todo" shortcut={shortcutLabels("todoNext")}>
-					<Button variant="ghost" size="icon-compact" aria-label="Next todo" disabled={!onNext} onClick={onNext}>
-						<ChevronDown />
-					</Button>
-				</Tooltip>
-				<Tooltip content="Close" shortcut={shortcutLabels("todoClose")}>
-					<Button variant="ghost" size="icon-compact" aria-label="Close the todo" onClick={onClose}>
-						<X />
-					</Button>
-				</Tooltip>
-			</div>
+			<DetailBar
+				leading={
+					<p className="flex min-w-0 items-center gap-1.5">
+						<CategoryDot categoryId={categoryId} />
+						<span className="shrink-0">{category}</span>
+						{open.parent && (
+							<>
+								<ChevronRight aria-hidden className="size-3 shrink-0" />
+								<span className="truncate">{open.parent.text}</span>
+							</>
+						)}
+						<ChevronRight aria-hidden className="size-3 shrink-0" />
+						<StatusIcon status={todo.status} className="size-3.5" />
+						<span className="shrink-0">{TODO_STATUS[todo.status].label}</span>
+					</p>
+				}
+				previous={{ label: "Previous todo", icon: CH_PREVIOUS, shortcut: "todoPrevious", onClick: onPrevious }}
+				next={{ label: "Next todo", icon: CH_NEXT, shortcut: "todoNext", onClick: onNext }}
+				close={{ label: "Close the todo", icon: CH_CLOSE, shortcut: "todoClose", onClick: onClose }}
+			/>
 			<div className="flex flex-col gap-5 px-6 py-5">
 				{readOnly ? (
 					<h2 className="break-words text-xl font-semibold leading-snug text-muted-foreground">{todo.text}</h2>

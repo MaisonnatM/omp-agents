@@ -89,7 +89,7 @@ interface ListPageProps<Data> {
 }
 
 /** A page header's Refresh button, which reads the page's data again now. */
-export function RefreshButton({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) {
+function RefreshButton({ refreshing, onRefresh }: { refreshing: boolean; onRefresh: () => void }) {
 	return (
 		<Button variant="ghost" size="compact" leadingIcon={RefreshCw} disabled={refreshing} onClick={onRefresh}>
 			{refreshing ? "Refreshing…" : "Refresh"}
@@ -117,8 +117,18 @@ export function PolledContent<Data>({ noun, loading, poll: { read, error }, chil
 	);
 }
 
-/** A page of lists read from GitHub or Linear with a Refresh button, `notice`, and the lists once the first read loads. */
-export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, className, actions, children }: ListPageProps<Data>) {
+interface PolledPageFrameProps<Data> {
+	title: string;
+	/** What the page lists, under its title; the time of the last read follows it once there is one. */
+	meta: string;
+	poll: PolledEntry<Data>;
+	onRefresh: () => void;
+	actions?: ReactNode;
+	children: (data: Data) => ReactNode;
+}
+
+/** A polled page's frame: its title and `meta` (with the time of the last read once there is one), its `actions`, a Refresh button, and its `children`. */
+export function PolledPageFrame<Data>({ title, meta, poll, onRefresh, actions, children }: PolledPageFrameProps<Data>) {
 	const { read, refreshing } = poll;
 	return (
 		<PageFrame
@@ -131,15 +141,26 @@ export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, no
 				</>
 			}
 		>
-			<TooltipProvider>
-				<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", className)}>
-					{notice}
-					<PolledContent noun={noun} loading={loading} poll={poll}>
-						{children}
-					</PolledContent>
-				</div>
-			</TooltipProvider>
+			{children(read?.data ?? (null as unknown as Data))}
 		</PageFrame>
+	);
+}
+
+/** A page of lists read from GitHub or Linear with a Refresh button, `notice`, and the lists once the first read loads. */
+export function ListPage<Data>({ title, meta, noun, loading, poll, onRefresh, notice, className, actions, children }: ListPageProps<Data>) {
+	return (
+		<PolledPageFrame title={title} meta={meta} poll={poll} onRefresh={onRefresh} actions={actions}>
+			{() => (
+				<TooltipProvider>
+					<div className={cn("mx-auto w-full max-w-5xl px-6 py-6", className)}>
+						{notice}
+						<PolledContent noun={noun} loading={loading} poll={poll}>
+							{children}
+						</PolledContent>
+					</div>
+				</TooltipProvider>
+			)}
+		</PolledPageFrame>
 	);
 }
 

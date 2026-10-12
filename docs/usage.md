@@ -918,7 +918,7 @@ An action that fails shows its error, and its control becomes available again.
 - An open conversation's panel has a bar along its top with where the conversation sits in the list, **3 of 50**, and icon buttons, each naming itself and its key on hover: previous and next conversation, **Expand all** while a message is folded, **Refresh**, which spins while it reads, **Open in Gmail**, and **Close**.
   Under the bar come its subject in large type and, on a muted line, how many messages it holds, drafts left out, and each person who wrote in it once, `me` for your own address.
   Opening another conversation scrolls the panel back to its top.
-- Messages follow each other with a thin line between them, each with a round avatar of its sender's first letter, in a colour that sender's address always takes.
+- Messages follow each other with a thin line between them, each with a round avatar of the first letter of its sender's name past a leading `the`, `a`, or `an`, in a colour that sender's address always takes.
   As in Gmail, the last message and every unread one show in full and earlier ones on one line with their avatar, sender, snippet, and date, the sender bold while unread; three or more of those in a row after the first fold into a line with an **N older messages** pill on it.
   Click a line or the pill to unfold it, click a full message's header to fold it again, and **Expand all** unfolds every message.
 - A full message shows its sender's name and address, when it arrived, with the full date and time on hover, and whom it went to, then under the name its attachments by name and size, and its text.
