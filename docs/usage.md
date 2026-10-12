@@ -1220,6 +1220,8 @@ Alt is Option on macOS.
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
   The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Inbox, Calendar, and Changes.
+  Its header states the rule for where a key works: chords with Cmd, Alt, or Ctrl work anywhere, even while you type, and single keys and G pairs work outside text fields; a **Composer only** tag marks the keys that work only in the composer.
+  Each tab's column headings stay pinned while its list scrolls, and rows fade in under them.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Inbox conversation's **Open in Gmail**.
 - Cmd+1 through Cmd+7 go to the first through seventh tab the sidebar shows, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers follow the order the sidebar shows, which **Settings › Preferences** sets: a tab you hide, or Tickets or Inbox without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.

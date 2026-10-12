@@ -255,3 +255,16 @@ test("every tab of the shortcuts dialog lists at least one shortcut", () => {
 	const empty = SHORTCUT_CATEGORIES.filter(({ id }) => !SHORTCUTS.some(({ category }) => category === id)).map(({ id }) => id);
 	expect(empty).toEqual([]);
 });
+
+test("the shortcuts dialog's rule holds: modifier chords work anywhere, single keys and G pairs outside text fields, apart from composer keys and Esc", () => {
+	const broken = SHORTCUTS.flatMap(({ id, keys }) =>
+		keys.filter(binding => {
+			if ("goTo" in binding) return false;
+			const { chord, scope } = binding;
+			if (scope === "composer") return false;
+			if (chord.mod || chord.ctrl || chord.alt) return scope !== "anywhere";
+			return scope !== "outside-fields" && chord.key !== "Escape";
+		}).map(() => id),
+	);
+	expect(broken).toEqual([]);
+});

@@ -304,6 +304,11 @@
     mask-image: linear-gradient(to bottom, #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
     -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
 }
+  /* For a scroller whose content pins a header --scroll-fade-header tall at the top: the top fade starts under the header, so rows fade in below it and the header stays opaque. */
+  .scroll-fade.scroll-fade-once-scrolled.scroll-fade-under-header {
+    mask-image: linear-gradient(to bottom, #000 var(--scroll-fade-header), rgba(0, 0, 0, var(--sf-start)) var(--scroll-fade-header), #000 calc(var(--scroll-fade-header) + var(--scroll-fade-size)), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 var(--scroll-fade-header), rgba(0, 0, 0, var(--sf-start)) var(--scroll-fade-header), #000 calc(var(--scroll-fade-header) + var(--scroll-fade-size)), #000 calc(100% - var(--scroll-fade-size)), rgba(0, 0, 0, calc(1 - (1 - var(--sf-start)) * (1 - var(--sf-end)))) 100%);
+}
 
 @supports (timeline-scope: --sf) {
   .scroll-divider {

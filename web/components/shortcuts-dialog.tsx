@@ -1,27 +1,34 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { Fragment, useMemo } from "react";
+import { type CSSProperties, Fragment, useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { SidebarTab } from "../routing";
-import { bindingLabel, type Scope, SHORTCUT_CATEGORIES, scopeOf } from "../shortcuts";
+import { bindingLabel, IS_MAC, SHORTCUT_CATEGORIES, scopeOf } from "../shortcuts";
 import { type ShortcutRow, shortcutRows } from "../sidebar-tabs";
 
-const LIST = new Intl.ListFormat("en", { type: "conjunction" });
+/** The pinned header row's height, where the panel's top fade begins. */
+const HEADER_HEIGHT = "2rem";
+
+const MODIFIERS = IS_MAC ? "⌘, ⌥, or ⌃" : "Ctrl or Alt";
+
+/** At fractional zoom such as 125%, Chromium paints the pinned header a few pixels below the scroller's top, so a shadow in the popover's color covers the rows there. */
+const HEADING = "border-b border-border bg-popover align-middle font-medium shadow-[0_-0.5rem_0_var(--popover)]";
 
 function ShortcutTable({ rows }: { rows: readonly ShortcutRow[] }) {
 	return (
-		<table className="w-full text-sm" data-shortcuts>
-			<thead className="text-left text-xs text-muted-foreground">
-				<tr>
-					<th className="pb-2 font-medium">Keys</th>
-					<th className="pb-2 font-medium">Action</th>
+		<table className="w-full border-separate border-spacing-0 text-sm" data-shortcuts>
+			<thead className="sticky top-0 text-left text-xs text-muted-foreground">
+				<tr style={{ height: HEADER_HEIGHT }}>
+					<th className={HEADING}>Keys</th>
+					<th className={HEADING}>Action</th>
 				</tr>
 			</thead>
 			<tbody>
 				{rows.map(({ id, keys, label }) => (
-					<tr key={id} className="border-t border-border" data-shortcut={id}>
+					<tr key={id} className="[&:not(:first-child)>td]:border-t [&>td]:border-border" data-shortcut={id}>
 						<td className="py-2 pr-4 align-top whitespace-nowrap">
 							{keys.map((binding, index) => (
 								<Fragment key={bindingLabel(binding)}>
@@ -32,7 +39,16 @@ function ShortcutTable({ rows }: { rows: readonly ShortcutRow[] }) {
 								</Fragment>
 							))}
 						</td>
-						<td className="py-2 align-top">{label}</td>
+						<td className="py-2 align-top">
+							<div className="flex items-start justify-between gap-3">
+								{label}
+								{keys.some(binding => scopeOf(binding) === "composer") && (
+									<Badge size="compact" className="shrink-0">
+										Composer only
+									</Badge>
+								)}
+							</div>
+						</td>
 					</tr>
 				))}
 			</tbody>
@@ -43,7 +59,6 @@ function ShortcutTable({ rows }: { rows: readonly ShortcutRow[] }) {
 /** Every dashboard shortcut, from the table the key listeners read, as {@link shortcutRows} lists it while the sidebar shows `tabs`, one tab per category. */
 export function ShortcutsDialog({ open, onOpenChange, tabs }: { open: boolean; onOpenChange: (open: boolean) => void; tabs: readonly SidebarTab[] }) {
 	const rows = useMemo(() => shortcutRows(tabs), [tabs]);
-	const keysIn = (scope: Scope): string => LIST.format(rows.flatMap(({ keys }) => keys.filter(binding => scopeOf(binding) === scope).map(bindingLabel)));
 
 	return (
 		<DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -55,8 +70,8 @@ export function ShortcutsDialog({ open, onOpenChange, tabs }: { open: boolean; o
 						<div className="space-y-1">
 							<DialogPrimitive.Title className="text-base font-semibold">Keyboard shortcuts</DialogPrimitive.Title>
 							<DialogPrimitive.Description className="text-sm text-muted-foreground">
-								{keysIn("composer")} work in the composer. {keysIn("outside-fields")} work outside text fields. The rest work
-								anywhere, even while you type. Session shortcuts act on the focused pane.
+								Shortcuts with {MODIFIERS} work anywhere, even while you type. Single keys and G pairs work outside text fields.
+								Session shortcuts act on the focused pane.
 							</DialogPrimitive.Description>
 						</div>
 						<Tooltip content="Close" shortcut={["Esc"]} side="bottom">
@@ -74,8 +89,14 @@ export function ShortcutsDialog({ open, onOpenChange, tabs }: { open: boolean; o
 							))}
 						</TabsList>
 						{SHORTCUT_CATEGORIES.map(({ id }) => (
-							<TabPanel key={id} value={id} className="mt-3 min-h-0 flex-1 overflow-y-auto">
-								<ShortcutTable rows={rows.filter(row => row.category === id)} />
+							<TabPanel key={id} value={id} className="mt-3 flex min-h-0 flex-1 flex-col">
+								{/* Radix sets animation-duration: 0s on the first panel, which would pin the scroll-driven fade at its end, so the fade goes on a child. */}
+								<div
+									className="scroll-fade scroll-fade-once-scrolled scroll-fade-under-header min-h-0 flex-1 overflow-y-auto"
+									style={{ "--scroll-fade-header": HEADER_HEIGHT } as CSSProperties}
+								>
+									<ShortcutTable rows={rows.filter(row => row.category === id)} />
+								</div>
 							</TabPanel>
 						))}
 					</Tabs>
