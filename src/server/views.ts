@@ -12,6 +12,8 @@ import type { View } from "../shared/sessions";
 export interface SocketData {
 	/** The views this socket shows, by {@link viewKey}. */
 	views: Map<string, View>;
+	/** The id of the page load this socket belongs to, the same across its reconnects. */
+	pageId: string;
 }
 export type Socket = ServerWebSocket<SocketData>;
 

@@ -44,7 +44,7 @@ export type ServerMsg =
 	| { t: "projects"; projects: Project[] }
 	/** Every notice the bell lists, whole, sent when a socket opens and after every change. */
 	| { t: "notices"; list: Notice[] }
-	/** Answers this socket's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
+	/** Answers the page's message tagged `ack` once its handler settled: `error` is why it threw, `null` when it did not. */
 	| { t: "done"; ack: number; error: string | null };
 
 export type ClientMsg =
@@ -100,5 +100,11 @@ export type ClientMsg =
 	/** Update notices `ids`, mark them seen or read, or clear them. */
 	| { t: "notice"; ids: string[]; op: NoticeOp };
 
-/** A {@link ClientMsg} as it crosses the socket: `ack`, counted per page, asks for a `done` once the server has handled it. */
-export type ClientFrame = ClientMsg & { ack?: number };
+/** A {@link ClientMsg} the page waits on: `ack`, counted per page, asks for a `done` once the server has handled it, and `floor` is the lowest `ack` the page still waits on. */
+export type AckedFrame = ClientMsg & { ack: number; floor: number };
+
+/** Sent after `watch` each time the page's socket opens: every message it still waits on, oldest first. */
+export type ResumeFrame = { t: "resume"; frames: AckedFrame[] };
+
+/** A message as it crosses the socket. */
+export type ClientFrame = ClientMsg | AckedFrame | ResumeFrame;

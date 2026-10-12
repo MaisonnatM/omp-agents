@@ -23,13 +23,13 @@ interface Attached {
 export interface PromptAttachments {
 	files: File[];
 	onFilesChange: (files: File[]) => void;
-	/** Why files the user added stayed out of the prompt, or why a prompt's files could not be read; else `null`. */
+	/** Why files the user added stayed out of the prompt, why a prompt's files could not be read, or why the server did not take a prompt; else `null`. */
 	note: string | null;
 	/**
 	 * Empty the composer's files and hand `text` with them to `deliver` as a prompt sends it: text files after the text,
-	 * images apart. When they cannot be read, they come back with a note, and `undo` runs instead.
+	 * images apart. When they cannot be read, or `deliver` rejects, they come back with a note, and `undo` runs too.
 	 */
-	take: (text: string, deliver: (prompt: string, images: PromptImage[]) => void, undo: () => void) => void;
+	take: (text: string, deliver: (prompt: string, images: PromptImage[]) => Promise<void>, undo: () => void) => void;
 	/** Hand `text` with the composer's files to `deliver` as {@link take} does, keeping them attached. */
 	read: (text: string, deliver: (prompt: string, images: PromptImage[]) => void) => void;
 	/** Attach images a queued message carried, after the files already attached. */
@@ -129,21 +129,28 @@ export function usePromptAttachments(images: boolean): PromptAttachments {
 		);
 	};
 
-	const take = (text: string, deliver: (prompt: string, images: PromptImage[]) => void, undo: () => void): void => {
+	const take = (text: string, deliver: (prompt: string, images: PromptImage[]) => Promise<void>, undo: () => void): void => {
 		const taken = files;
 		setFiles([]);
 		setNote(null);
+		const giveBack = (): void => {
+			setFiles(current => [...taken, ...current.filter(file => !taken.includes(file))]);
+			undo();
+		};
 		send(
 			taken,
 			text,
-			(prompt, sent) => {
-				for (const file of taken) attached.current.delete(file);
-				deliver(prompt, sent);
-			},
-			() => {
-				setFiles(taken);
-				undo();
-			},
+			(prompt, sent) =>
+				void deliver(prompt, sent).then(
+					() => {
+						for (const file of taken) attached.current.delete(file);
+					},
+					(error: unknown) => {
+						setNote(`The prompt failed: ${errorText(error)}`);
+						giveBack();
+					},
+				),
+			giveBack,
 		);
 	};
 

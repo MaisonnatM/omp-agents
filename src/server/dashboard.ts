@@ -53,11 +53,12 @@ import { RoutinesFile } from "./routines-file";
 import { createRoutes, type Routes } from "./routes";
 import { endSession } from "./session-end";
 import { SessionFiles } from "./session-files";
-import { type ClientHandler, createClientHandler } from "./socket";
+import { type Peer, RequestLedger } from "./request-ledger";
+import { createClientHandler } from "./socket";
 import { createStarter, type Starter } from "./start";
 import { TodoInbox } from "./todo-inbox";
 import { UserTodosFile } from "./user-todos-file";
-import { type Socket, send, Views } from "./views";
+import { type Socket, Views } from "./views";
 import { parseClientMsg } from "./wire";
 import { adoptOldWorkspaces, WorkspacesFile } from "./workspaces-file";
 
@@ -94,7 +95,7 @@ export class Dashboard {
 	readonly #runner: RoutineRunner;
 	readonly #projectRunner: ProjectRunner;
 	readonly #loops: Loops;
-	readonly #handleClientMsg: ClientHandler;
+	readonly #requests: RequestLedger;
 	/** The server, from {@link start} on; until then there is no socket to publish to. */
 	#publisher: Publisher | null = null;
 	/** Why the last registry listing failed, shown with the roster. */
@@ -249,12 +250,12 @@ export class Dashboard {
 				else this.#activityFresh = false;
 			},
 		});
-		this.#handleClientMsg = createClientHandler({
+		this.#requests = new RequestLedger(createClientHandler({
 			sessions,
 			views,
 			start: startSession,
 			createProject: spec => projectRunner.create(spec),
-			changeProject: (ws, change) => this.#changeProject(ws, change),
+			changeProject: (peer, change) => this.#changeProject(peer, change),
 			end: async instanceId => {
 				const session = sessions.get(instanceId);
 				if (session) await this.#endLive(session);
@@ -263,19 +264,21 @@ export class Dashboard {
 				if (interrupted.dismiss(sessionId)) broadcasts.pushPast();
 			},
 			stoppedMidTurn: sessionId => interrupted.stoppedMidTurn(sessionId),
-			changeTodo: (ws, change) => {
-				if (!this.#applyTodo(change)) send(ws, { t: "user-todos", list: todos.list });
+			changeTodo: (peer, change) => {
+				if (!this.#applyTodo(change)) peer.send({ t: "user-todos", list: todos.list });
 			},
-			changeRoutine(ws, change) {
+			changeRoutine(peer, change) {
 				if (routines.apply(change, Date.now())) broadcasts.pushRoutines();
-				else send(ws, { t: "routines", routines: routines.routines });
+				else peer.send({ t: "routines", routines: routines.routines });
 			},
-			changePins: (ws, change) => {
-				if (!this.#applyPinChange(change)) send(ws, { t: "pins", sessionIds: pins.sessionIds });
+			changePins: (peer, change) => {
+				if (!this.#applyPinChange(change)) peer.send({ t: "pins", sessionIds: pins.sessionIds });
 			},
 			runRoutine: id => runner.runNow(id),
 			changeNotices: (ids, op) => notices.apply(ids, op),
-		});
+			}),
+			(t, error) => console.error(`omp-agents: ${t} failed: ${errorText(error)}`),
+		);
 	}
 
 	/** The HTTP API over this dashboard, admitted by `guards`. */
@@ -360,6 +363,7 @@ export class Dashboard {
 
 	/** A dashboard socket opened. */
 	open(ws: Socket): void {
+		this.#requests.open(ws);
 		this.#broadcasts.open(ws);
 		// The registry was not polled while nobody listened; list it now rather than at the next tick.
 		if (!this.#registryFresh) void this.#listRegistry();
@@ -368,13 +372,14 @@ export class Dashboard {
 
 	/** A message on a dashboard socket; one that is not a client message is dropped. */
 	message(ws: Socket, raw: string | Buffer): void {
-		const msg = parseClientMsg(raw)?.ok;
-		if (msg) this.#handleClientMsg(ws, msg).catch((err: unknown) => console.error(`omp-agents: ${msg.t} failed: ${errorText(err)}`));
+		const frame = parseClientMsg(raw)?.ok;
+		if (frame) void this.#requests.handle(ws, frame);
 	}
 
-	/** A dashboard socket closed: it watches no view any more. */
+	/** A dashboard socket closed: it watches no view any more, and its page's requests wait for its next socket. */
 	close(ws: Socket): void {
 		this.#views.watch(ws, []);
+		this.#requests.close(ws);
 	}
 
 	/** Directories sessions ran in: live ones first, then saved ones newest first. */
@@ -444,10 +449,10 @@ export class Dashboard {
 		return changed;
 	}
 
-	/** Applies `change` to the projects and sends every socket the projects after it, or sends `ws` the ones it missed when nothing changed. */
-	#changeProject(ws: Socket, change: ProjectEdit): void {
+	/** Applies `change` to the projects and sends every socket the projects after it, or sends `peer` the ones it missed when nothing changed. */
+	#changeProject(peer: Peer, change: ProjectEdit): void {
 		if (this.#projects.apply(change)) this.#broadcasts.pushProjects();
-		else send(ws, { t: "projects", projects: this.#projects.projects });
+		else peer.send({ t: "projects", projects: this.#projects.projects });
 	}
 
 	/** Ends `session` as **End session** does, then removes the linked worktree it worked in: the one its bash calls last ran in, else its own directory's. */

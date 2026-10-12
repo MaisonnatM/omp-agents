@@ -13,7 +13,7 @@ import { applyDelta } from "./keyed-list";
 import type { Completions } from "./pane-store";
 import type { ModelList } from "./reads";
 import { EMPTY_LAYOUT, hashForLayout, type Layout, type Route, sameView } from "./routing";
-import { beginStart, dismissSettled, dropHidden, loseStarts, pendingStart, settleResumeAll, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
+import { beginStart, dismissSettled, dropHidden, failStart, pendingStart, settleResumeAll, settleStart, type StartKind, type StartOp, type Starts } from "./starts";
 
 export interface DashboardState {
 	connected: boolean;
@@ -64,6 +64,8 @@ export type Action =
 	| { t: "connected"; connected: boolean }
 	| { t: "route"; route: Route }
 	| { t: "start"; reqId: number; op: StartOp }
+	/** Start `reqId` failed with no answer from the server: its request was refused or never sent. */
+	| { t: "start-failed"; reqId: number; error: string }
 	/** A failed start's error goes away; a start under way keeps waiting for its answer. */
 	| { t: "dismiss-start"; kind: StartKind }
 	/** The page asked the server to end live session `instanceId`. */
@@ -114,7 +116,7 @@ function withLayout(state: DashboardState, next: Layout): DashboardState {
 export function reduce(state: DashboardState, action: Action): DashboardState {
 	switch (action.t) {
 		case "connected":
-			return { ...state, connected: action.connected, starts: action.connected ? state.starts : loseStarts(state.starts) };
+			return { ...state, connected: action.connected };
 		case "route": {
 			const { route } = action;
 			if (route.kind !== "panes") return { ...state, cover: route };
@@ -123,6 +125,10 @@ export function reduce(state: DashboardState, action: Action): DashboardState {
 		}
 		case "start":
 			return { ...state, starts: beginStart(state.starts, action.reqId, action.op) };
+		case "start-failed": {
+			const starts = failStart(state.starts, action.reqId, action.error);
+			return starts === state.starts ? state : { ...state, starts };
+		}
 		case "dismiss-start":
 			return { ...state, starts: dismissSettled(state.starts, action.kind) };
 		case "end":

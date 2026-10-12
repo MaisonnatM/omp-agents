@@ -144,7 +144,7 @@ function LiveConversation({
 		completion.close();
 		setDraft("");
 		scrollToEnd();
-		attachments.take(text, (prompt, images) => send({ t: "prompt", view, text: prompt, images, delivery }), () => setDraft(current => current || text));
+		attachments.take(text, (prompt, images) => request({ t: "prompt", view, text: prompt, images, delivery }), () => setDraft(current => current || text));
 	};
 	const sendText = (text: string): void => {
 		if (blockedShortcut(text, shell) === null) submit(text, working && subject.followUps ? "followUp" : "steer");
@@ -252,7 +252,7 @@ function LiveConversation({
 						key={requests[0].id}
 						request={requests[0]}
 						queued={requests.length - 1}
-						onAnswer={answer => send({ t: "answer", instanceId: view.instanceId, requestId: requests[0].id, answer })}
+						onAnswer={answer => request({ t: "answer", instanceId: view.instanceId, requestId: requests[0].id, answer })}
 					/>
 				)}
 				{completion.popup}

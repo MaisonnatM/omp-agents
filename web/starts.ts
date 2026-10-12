@@ -82,7 +82,7 @@ export function beginStart(starts: Starts, reqId: number, op: StartOp): Starts {
 	return next.set(reqId, { op, phase: "starting" });
 }
 
-/** Start `reqId` while it waits for the server's answer; `null` once it settled, was replaced, or lost the connection. */
+/** Start `reqId` while it waits for the server's answer; `null` once it settled or was replaced. */
 export function pendingStart(starts: Starts, reqId: number): Start | null {
 	const start = starts.get(reqId);
 	return start?.phase === "starting" ? start : null;
@@ -109,19 +109,10 @@ export function settleResumeAll(starts: Starts, reqId: number, errors: string[])
 	return next;
 }
 
-const LOST: Record<StartKind, string> = {
-	new: "Lost the dashboard server while the session was starting. It may still appear.",
-	fork: "Lost the dashboard server while forking. The fork may still appear.",
-	resume: "Lost the dashboard server while resuming. The session may still appear.",
-	quick: "Lost the dashboard server while the session was starting. It may still appear.",
-	"resume-all": "Lost the dashboard server while resuming. The sessions may still appear.",
-	project: "Lost the dashboard server while the project was starting. It may still appear.",
-};
-
-/** The answer to every start under way went to the socket that just closed. */
-export function loseStarts(starts: Starts): Starts {
-	if (![...starts.values()].some(start => start.phase === "starting")) return starts;
-	return new Map([...starts].map(([reqId, start]) => [reqId, start.phase === "starting" ? { op: start.op, phase: "failed", error: LOST[start.op.kind] } : start]));
+/** Start `reqId`, still under way, failed for `error` before the server answered it: the server refused the request, or the page could not send it. */
+export function failStart(starts: Starts, reqId: number, error: string): Starts {
+	const start = pendingStart(starts, reqId);
+	return start ? new Map(starts).set(reqId, { op: start.op, phase: "failed", error }) : starts;
 }
 
 /** The view a failed start shows its reason in, `null` when the reason belongs to the page rather than to a view. */

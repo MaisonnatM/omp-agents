@@ -3,6 +3,8 @@ import { type Question, type QuestionAnswer, QuestionCard } from "@/components/q
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { UserAnswer, UserRequest } from "../../src/shared/sessions";
+import { errorText } from "../api";
+import { toasts } from "./toaster";
 
 const CONFIRM_ROWS = [{ title: "Yes" }, { title: "No" }];
 
@@ -58,7 +60,8 @@ interface UserRequestCardProps {
 	request: UserRequest;
 	/** How many more questions wait behind this one. */
 	queued: number;
-	onAnswer: (answer: UserAnswer) => void;
+	/** Sends the answer; a rejection lets the card take another, and shows why. */
+	onAnswer: (answer: UserAnswer) => Promise<void>;
 }
 
 /**
@@ -73,7 +76,10 @@ export function UserRequestCard({ request, queued, onAnswer }: UserRequestCardPr
 	const reply = (answer: UserAnswer): void => {
 		if (sent) return;
 		setSent(true);
-		onAnswer(answer);
+		onAnswer(answer).catch((error: unknown) => {
+			setSent(false);
+			toasts.add({ title: "Could not answer", description: errorText(error) });
+		});
 	};
 
 	const status = [

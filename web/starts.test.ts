@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { beginStart, dismissSettled, dropHidden, loseStarts, messageOf, settleResumeAll, settleStart, type StartOp, startOf, type Starts } from "./starts";
+import { beginStart, dismissSettled, dropHidden, failStart, messageOf, settleResumeAll, settleStart, type StartOp, startOf, type Starts } from "./starts";
 
 const point = { entryId: "e1", prefill: true };
 const fork = { kind: "fork", view: { kind: "past", sessionId: "s1" }, itemId: "u1", point } as const;
@@ -25,14 +25,14 @@ describe("starts", () => {
 		expect(settleStart(starts, 9, ok)).toBe(starts);
 	});
 
-	test("losing the connection fails every start under way and leaves failed ones as they were", () => {
+	test("a request that fails fails its start only while it waits, with the request's reason", () => {
 		let starts = beginStart(new Map(), 1, resume);
 		starts = settleStart(starts, 1, { ok: false, error: "no file" });
 		starts = beginStart(starts, 2, fork);
-		const lost = loseStarts(starts);
+		const lost = failStart(failStart(starts, 1, "gone"), 2, "Not connected to the server.");
 		expect(startOf(lost, "resume")).toMatchObject({ phase: "failed", error: "no file" });
-		expect(startOf(lost, "fork")?.phase).toBe("failed");
-		expect(loseStarts(lost)).toBe(lost);
+		expect(startOf(lost, "fork")).toMatchObject({ phase: "failed", error: "Not connected to the server." });
+		expect(failStart(lost, 2, "again")).toBe(lost);
 	});
 
 	test("a failure's reason leaves with its view, a start under way stays, and a draft's failure outlives any view", () => {
@@ -62,7 +62,7 @@ describe("starts", () => {
 		const failed = settleResumeAll(waiting, 1, ["no file", "busy"]);
 		expect(startOf(failed, "resume-all")?.phase).toBe("failed");
 		expect(settleResumeAll(failed, 1, [])).toBe(failed);
-		const lost = loseStarts(waiting);
+		const lost = failStart(waiting, 1, "gone");
 		expect(startOf(lost, "resume-all")?.phase).toBe("failed");
 		expect(dropHidden(lost, () => false)).toBe(lost);
 		expect(dismissSettled(lost, "resume-all").size).toBe(0);

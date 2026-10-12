@@ -217,6 +217,27 @@ The route hands the bytes and the name's extension to omp's `convertBufferWithMa
 `withFiles` in `src/shared/prompt-files.ts` puts each file after the typed text in the block omp's `@file` arguments write, `<file name="…">`, its text, and `</file>`, so a leading `/skill:` or file command still expands with the files as its arguments; the composer keeps the files' text under `MAX_PROMPT_FILE_CHARS`, a million characters.
 omp saves the prompt as that text, so `userPrompt` in `src/transcript.ts` splits the trailing blocks off again with `splitFiles`, and a user item's `files` holds their names, which the transcript shows as chips.
 
+## Socket requests
+
+A page tags a message it waits on with an `ack`, counted per page load, and the server answers it with `done`, carrying the error its handler threw or `null`.
+`request` in `web/use-dashboard.ts` sends that way prompts, answers to questions, starts and **Resume all**, interrupts, ends, edited prompts, thinking and fast switches, subagent cancels, and a routine's **Run now**.
+A message the page does not tag, such as a pin, a todo change, a model switch, or a queued row's **Send now**, is dropped when the socket is down, as before.
+
+A socket can close after the server got a request and before its answer reached the page, and the page cannot tell that from a request the server never got, so it may not simply send it again: a prompt would reach the session twice.
+So the page picks an id once per load, `crypto.randomUUID()`, and opens `/ws?page=<id>`, and `RequestLedger` in `src/server/request-ledger.ts` keeps each page's requests by `ack` across its sockets.
+A request runs once, and its replies to the page that sent it (`withdrawn`, `started`, `resumed-all`) and its `done` are recorded and sent to whichever socket the page has open at the time.
+Each socket the page opens sends `resume` after `watch`, with every tagged message the page still waits on.
+The ledger sends the recorded replies of each request it ran, and its `done` once settled; it runs a request it never got; and it forgets every request the page no longer lists.
+A reply for a live session goes only to a socket that shows it, which a resume after `watch` already knows.
+Each tagged message also carries `floor`, the lowest `ack` the page still waits on, and the ledger forgets the requests below it.
+
+The first `resume` the ledger gets from a page lists only requests the page sent before this server knew it: to a server that has since restarted, or to this one more than an hour ago, since the ledger forgets a page an hour after its last socket closed.
+Each of them gets `done` with the error `FORGOTTEN`, "The server restarted before it answered. Check whether it took effect.", and the ledger records that answer, so a later resume gets it again and nothing runs.
+A request the page makes while disconnected rejects at once with "Not connected to the server.", and one it made before keeps waiting across the reconnect, with no time limit.
+A prompt that fails comes back to the composer with its files and a note, and a failed answer lets the question card take another.
+A handler's error goes to the server's log once, with its message type, on the run that threw.
+A page loaded before page ids tags its requests with no `floor`, so the server drops them until the page reloads.
+
 ## Desktop shell
 
 `desktop/` is the desktop app: an Electron main process, `desktop/main.ts`, in its own package, so the root `bun install` never fetches Electron.
@@ -821,10 +842,7 @@ The server lives in `src/`:
   Every read goes through `get`, and every write through `write(parse, run, refuse?)`, which checks the origin and the JSON body, answers a body `parse` refuses with its response, and maps an error `run` throws through `refuse`, else to a 500.
   `src/server/wire.ts` parses every socket message and request body into typed values; every parser returns a `Parsed<T>`, `{ ok }` or `null`, and the two OAuth client parsers `{ error }` in place of `null`, a reason the page shows.
 - `src/terminals.ts`: the terminal panel's shells, each in a pseudo-terminal with its scrollback; `src/server/terminal-socket.ts` handles the `/ws/terminal` sockets that attach to them, and `src/shared/terminals.ts` holds the shapes and messages the page shares.
-- `src/server/socket.ts`: handles each socket message.
-  A `ClientFrame` may carry a per-page `ack` counter, validated by `wire.ts`.
-  Once its handler settles, the server sends `done` with that counter and a nullable error.
-  Untagged messages retain their existing replies.
+- `src/server/socket.ts`: handles each socket message, answering through a `Peer` from `src/server/request-ledger.ts`; see [Socket requests](#socket-requests).
   `src/server/start.ts` starts, forks, and resumes dashboard sessions for the page's `start` and `resume-all` requests.
   `src/server/session-end.ts` ends a session for the page's `end` message and for the end inbox: `endSession` stops it, then calls `Worktrees.removeCheckout` on its worktree from `SessionFacts`, else its cwd, and logs the blockers of a checkout that stays, which **Settings → Worktrees** still lists.
 - `src/server/live-sessions.ts`: the one registry of running sessions, terminal and dashboard alike, each behind the `LiveSession` interface in `src/live-session.ts`.
@@ -966,7 +984,7 @@ The page lives in `web/`.
 - `web/use-dashboard.ts`: the socket, the page state, and the URL hash.
   One exhaustive switch in the socket's `onmessage` sends each server message to the pane store or the reducer, and the hash is read once into a `Route` (a page, a `#session/<id>` link, or the panes).
   `web/starts.ts` holds the sessions the page is starting, whether new, forked, resumed, resumed all at once, or started by a quick action on a pull request, a Linear issue, or a todo, which runs in the background.
-  `request` resolves or rejects on `done`, and rejects every outstanding request when the socket closes without replaying it.
+  `request` resolves or rejects on `done` and keeps waiting across a reconnect, whose `resume` hands the server every request still waiting.
   Ending sessions stay in a separate set until their requests settle, even if they have already left the roster.
 - `web/use-action.ts`: guards a control against repeated activation, exposes its pending state, and shows failures through the toast manager.
 - `web/pane-store.ts`: each open view's transcript, changed files, images, and completions, outside the page state.

@@ -6,8 +6,10 @@ import { DashboardSession, type DashboardUpdate } from "./dashboard-session";
 import type { Frame } from "./omp/collab";
 import * as rpc from "./omp/rpc";
 import { PLAIN_LAUNCH, type RpcChild, type RpcClient, type RpcState } from "./omp/rpc";
+import { errorText } from "./json";
 import { LiveSessions } from "./server/live-sessions";
 import { endSession } from "./server/session-end";
+import { RequestLedger } from "./server/request-ledger";
 import { createClientHandler, type SocketEnv } from "./server/socket";
 import type { Socket } from "./server/views";
 import type { ServerMsg } from "./shared/protocol";
@@ -369,9 +371,10 @@ describe("DashboardSession action failures", () => {
 		const sessions = new LiveSessions(() => {});
 		sessions.add(session, null);
 		const sent: ServerMsg[] = [];
-		const ws = { data: { views: new Map() }, send: (raw: string) => void sent.push(JSON.parse(raw)) } as unknown as Socket;
+		const ws = { data: { views: new Map(), pageId: "p" }, send: (raw: string) => void sent.push(JSON.parse(raw)) } as unknown as Socket;
 		let removed = false;
-		const handle = createClientHandler({
+		const failures: string[] = [];
+		const ledger = new RequestLedger(createClientHandler({
 			sessions,
 			end: async (instanceId: string) => {
 				const target = sessions.get(instanceId);
@@ -380,9 +383,11 @@ describe("DashboardSession action failures", () => {
 					return null;
 				});
 			},
-		} as SocketEnv);
-		await expect(handle(ws, { t: "interrupt", reqId: 1, ack: 1, view: { kind: "live", instanceId: "inst-1", agentId: null } })).rejects.toThrow("abort unavailable");
-		await expect(handle(ws, { t: "end", instanceId: "inst-1", ack: 2 })).rejects.toThrow("stop unavailable");
+		} as SocketEnv), (_t, error) => failures.push(errorText(error)));
+		ledger.open(ws);
+		await ledger.handle(ws, { t: "interrupt", reqId: 1, ack: 1, floor: 1, view: { kind: "live", instanceId: "inst-1", agentId: null } });
+		await ledger.handle(ws, { t: "end", instanceId: "inst-1", ack: 2, floor: 1 });
+		expect(failures).toEqual(["abort unavailable", "stop unavailable"]);
 		expect(sent).toEqual([
 			{ t: "done", ack: 1, error: "abort unavailable" },
 			{ t: "done", ack: 2, error: "stop unavailable" },
