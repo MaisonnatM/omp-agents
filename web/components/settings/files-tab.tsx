@@ -1,20 +1,11 @@
-import { type CSSProperties, useState } from "react";
+import { useState } from "react";
 import type { FileEdit, OmpFile, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { putJson, settingsUrl } from "../../api";
 import { FILE_KIND_LABELS, fileGroups, formatBytes } from "../../labels";
-import { useStoredState } from "../../stored-state";
-import { Separator, useDragSeparator } from "../drag-separator";
 import { EditBar, type Editing, SaveError, useEditor } from "./editor";
-
-const DEFAULT_NAV = 240;
-const MIN_NAV = 160;
-const MAX_NAV = 480;
-const NAV_STEP = 16;
-
-const clampNav = (width: number): number => Math.round(Math.max(MIN_NAV, Math.min(MAX_NAV, width)));
 
 function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
 	const { body } = file;
@@ -98,37 +89,10 @@ export function Files({ files, editing }: { files: OmpFile[]; editing: Editing }
 	const groups = fileGroups(files);
 	const [selected, setSelected] = useState<string | null>(null);
 	const open = files.find(file => file.path === selected) ?? groups[0]?.[1][0];
-	const [navWidth, setNavWidth] = useStoredState("omp-agents.settings-files-width", raw => {
-		const stored = Number(raw);
-		return stored >= MIN_NAV && stored <= MAX_NAV ? stored : DEFAULT_NAV;
-	});
-	const events = useDragSeparator({
-		value: navWidth,
-		onValue: setNavWidth,
-		axis: "vertical",
-		keyStep: NAV_STEP,
-		shiftSteps: 4,
-		min: MIN_NAV,
-		max: MAX_NAV,
-		reset: DEFAULT_NAV,
-		clamp: clampNav,
-		read: (event, start) => clampNav(start.value + event.clientX - start.coordinate),
-	});
 	if (!open) return <p className="text-sm text-muted-foreground">omp found no files.</p>;
 	return (
-		<div style={{ "--files-nav": `${navWidth}px` } as CSSProperties} className="relative grid gap-6 md:grid-cols-[var(--files-nav)_minmax(0,1fr)]">
-			<Separator
-				{...events}
-				axis="vertical"
-				label="Resize the file list"
-				min={MIN_NAV}
-				max={MAX_NAV}
-				now={navWidth}
-				// Centered in the 1.5rem gap between the list and the file.
-				style={{ left: "calc(var(--files-nav) + 0.75rem)" }}
-				className="inset-y-0 hidden w-3 -translate-x-1/2 cursor-col-resize select-none md:flex"
-			/>
-			<nav aria-label="omp files" className="min-w-0 space-y-4">
+		<div className="grid gap-6 md:grid-cols-[15rem_minmax(0,1fr)]">
+			<nav aria-label="omp files" className="space-y-4">
 				{groups.map(([kind, group]) => (
 					<div key={kind} className="space-y-1">
 						<h4 className="px-2 text-xs font-medium text-muted-foreground">{FILE_KIND_LABELS[kind]}</h4>

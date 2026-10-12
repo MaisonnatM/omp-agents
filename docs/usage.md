@@ -183,6 +183,7 @@ An action that fails shows its error, and its control becomes available again.
   Each file shows its lines added and removed, a blue dot when the session's own calls changed it, and a letter for what git says happened: **A** added, **U** untracked, **M** modified, **D** deleted, and **S** for a file only the session's calls name, outside the checkout or no different from the base.
   A file outside the checkout shows under a `~` or `/` folder.
   ↓ and ↑ open the next and previous file in the explorer's order, outside text fields, and open the folders above it.
+  Drag the line between the explorer and the editor, or focus it and use the left and right arrow keys, to size the explorer between 180 and 560 px; double-click it to reset, and the browser's localStorage keeps the width.
 - The editor shows the open file, its path above it, with **Diff** and **File** to choose how; the choice is remembered.
   **Diff**, the default, shows the changes with both line numbers, removed lines red and added lines green, and three unchanged lines around each change; click **Show N unchanged lines** to unfold a run.
   **File** shows the whole file as it is now: a green bar beside added lines, a blue bar beside lines that replaced others, and a red notch where lines were removed.
@@ -1132,7 +1133,6 @@ An action that fails shows its error, and its control becomes available again.
   A workspace's `.omp/config.yml` still overrides what you save there.
 - The **Files** section lists the files that omp reads: context files such as `AGENTS.md`, the `SYSTEM.md` and `APPEND_SYSTEM.md` prompt files, `config.yml`, agents, commands, rules, skills, and hooks.
   Select a file to read its content, and choose **Edit** to change it in place (**Create** for a file marked `missing`).
-  Drag the line between the list and the file, or focus it and use the left and right arrow keys, to size the list between 160 and 480 px; double-click it to reset, and the browser's localStorage keeps the width.
   Save with the button or with Cmd+S. If the file changed on disk after the page read it, the save is refused and your edits stay in the editor, so you can copy them before you load the file from disk.
   A `.yml`, `.yaml`, or `.json` file must parse before it saves, and a settings file must hold a mapping.
   `~/.omp/agent/AGENTS.md` and `~/.omp/agent/config.yml` appear even before they exist, marked `missing`.

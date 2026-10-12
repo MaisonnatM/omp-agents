@@ -8,6 +8,7 @@ import { useStoredState } from "../../stored-state";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { LineCounts } from "../line-counts";
+import { Separator, useDragSeparator } from "../drag-separator";
 import { CodeView } from "./code-view";
 import { type FileOpen, FileTree, StatusLetter, statusLabel } from "./file-tree";
 
@@ -15,6 +16,12 @@ import { type FileOpen, FileTree, StatusLetter, statusLabel } from "./file-tree"
 const MODES = ["diff", "file"] as const;
 type Mode = (typeof MODES)[number];
 const MODE_KEY = "omp-agents.changes-mode";
+const LIST_KEY = "omp-agents.changes-list-width";
+const DEFAULT_LIST = 288;
+const MIN_LIST = 180;
+const MAX_LIST = 560;
+
+const clampList = (width: number): number => Math.round(Math.max(MIN_LIST, Math.min(MAX_LIST, width)));
 
 type ChangesExplorerProps = FileOpen & {
 	/** The changed files, at least one. */
@@ -33,6 +40,22 @@ type ChangesExplorerProps = FileOpen & {
  */
 export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: ChangesExplorerProps) {
 	const [mode, setMode] = useStoredState<Mode>(MODE_KEY, raw => MODES.find(mode => mode === raw) ?? "diff");
+	const [listWidth, setListWidth] = useStoredState(LIST_KEY, raw => {
+		const stored = Number(raw);
+		return stored >= MIN_LIST && stored <= MAX_LIST ? stored : DEFAULT_LIST;
+	});
+	const resize = useDragSeparator({
+		value: listWidth,
+		onValue: setListWidth,
+		axis: "vertical",
+		keyStep: 16,
+		shiftSteps: 4,
+		min: MIN_LIST,
+		max: MAX_LIST,
+		reset: DEFAULT_LIST,
+		clamp: clampList,
+		read: (event, start) => clampList(start.value + event.clientX - start.coordinate),
+	});
 	const tree = useMemo(() => fileTree(files), [files]);
 	const order = useMemo(() => treeOrder(tree), [tree]);
 	const entry = order.find(file => file.path === path) ?? order[0] ?? null;
@@ -48,8 +71,8 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 	useShortcuts({ nextChangedFile: () => step(1), previousChangedFile: () => step(-1) });
 
 	return (
-		<div className="flex min-h-0 flex-1">
-			<nav aria-label="Changed files" className="flex w-72 shrink-0 flex-col border-r border-border">
+		<div className="relative flex min-h-0 flex-1">
+			<nav aria-label="Changed files" style={{ width: listWidth }} className="flex shrink-0 flex-col border-r border-border">
 				<p className="px-4 pt-3 pb-1 text-xs text-muted-foreground">
 					<kbd>{shortcutLabels("nextChangedFile")[0]}</kbd> and <kbd>{shortcutLabels("previousChangedFile")[0]}</kbd> step through the files
 				</p>
@@ -57,6 +80,16 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 					<FileTree tree={tree} open={entry?.path ?? null} {...opener} />
 				</div>
 			</nav>
+			<Separator
+				{...resize}
+				axis="vertical"
+				label="Resize the file list"
+				min={MIN_LIST}
+				max={MAX_LIST}
+				now={listWidth}
+				style={{ left: listWidth }}
+				className="inset-y-0 w-3 -translate-x-1/2 cursor-col-resize select-none"
+			/>
 			{entry && (
 				<section aria-label={entry.path} className="flex min-w-0 flex-1 flex-col">
 					<div className="flex items-center gap-3 border-b border-border px-4 py-1.5">
