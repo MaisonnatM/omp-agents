@@ -1,4 +1,4 @@
-/** The quick-action buttons on a pull request or issue row that start a session to fix CI, review, or work on it. */
+/** Quick actions on a pull request, an issue, or a todo: the row menu, the details' buttons, and the note when a start fails. */
 import { CircleX, Eye, GitMerge, Hammer, ListChecks, type LucideIcon, MessageSquare, Radiation, Wrench, Zap } from "lucide-react";
 import type { RosterHost, View } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
