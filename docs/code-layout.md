@@ -389,6 +389,7 @@ The page lives in `web/`.
   `pr-row.tsx` draws the sidebar row and the table row, and exports the DOM lookups of a row and its link that the board's keys use.
   `web/use-drag-order.ts` drags the pull request list's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
   The tickets and Pull requests pages use `web/components/list-page.tsx` for their frame, header, and load and refresh states, their issue details use its `DetailPage`, the Inbox page its `PolledPageFrame` and `PolledContent`, and the Todo, Routines, and Calendar pages its `PageFrame`.
+  `PolledPageFrame` renders ordinary children while reads load; only `PolledContent` supplies a data render callback, after an answer exists.
   `web/components/list-split.tsx` holds `ListSplit`, the Todo and Inbox pages' list on the left and their open item on the right, split by a line you drag to size the list, at a width each page stores in localStorage under its own key; a page too narrow for both shows one or the other.
   It also owns `DetailBar` and `BarAction`, the narrow sticky bar the Todo and Inbox pages put on top of their open item, with the previous, next, and close controls, and a slot for the page's own actions.
   The pull request's and the issue's details use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
