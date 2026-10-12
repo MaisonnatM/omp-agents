@@ -136,6 +136,19 @@ describe("RequestLedger", () => {
 		}
 	});
 
+	test("a request from a page that has not resumed yet is reported and never run, so its first resume still refuses it", async () => {
+		let runs = 0;
+		const failures: string[] = [];
+		const ledger = new RequestLedger(async () => void runs++, t => failures.push(t));
+		const early = socket();
+		ledger.open(early.ws);
+		await ledger.handle(early.ws, end(1));
+		await ledger.handle(early.ws, { t: "resume", frames: [end(1)] });
+		expect(runs).toBe(0);
+		expect(failures).toEqual(["end"]);
+		expect(early.sent).toEqual([{ t: "done", ack: 1, error: FORGOTTEN }]);
+	});
+
 	test("a page away longer than an hour reads as one the server never heard", async () => {
 		vi.useFakeTimers();
 		try {

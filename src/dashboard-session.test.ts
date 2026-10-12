@@ -385,6 +385,7 @@ describe("DashboardSession action failures", () => {
 			},
 		} as SocketEnv), (_t, error) => failures.push(errorText(error)));
 		ledger.open(ws);
+		await ledger.handle(ws, { t: "resume", frames: [] });
 		await ledger.handle(ws, { t: "interrupt", reqId: 1, ack: 1, floor: 1, view: { kind: "live", instanceId: "inst-1", agentId: null } });
 		await ledger.handle(ws, { t: "end", instanceId: "inst-1", ack: 2, floor: 1 });
 		expect(failures).toEqual(["abort unavailable", "stop unavailable"]);

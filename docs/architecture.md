@@ -231,8 +231,10 @@ The ledger sends the recorded replies of each request it ran, and its `done` onc
 A reply for a live session goes only to a socket that shows it, which a resume after `watch` already knows.
 Each tagged message also carries `floor`, the lowest `ack` the page still waits on, and the ledger forgets the requests below it.
 
-The first `resume` the ledger gets from a page lists only requests the page sent before this server knew it: to a server that has since restarted, or to this one more than an hour ago, since the ledger forgets a page an hour after its last socket closed.
-Each of them gets `done` with the error `FORGOTTEN`, "The server restarted before it answered. Check whether it took effect.", and the ledger records that answer, so a later resume gets it again and nothing runs.
+The ledger first hears of a page at its `resume`, which then lists only requests the page sent before this server knew it: to a server that has since restarted, or to this one more than an hour ago, since the ledger forgets a page an hour after its last socket closed.
+Each of them gets `done` with the error `FORGOTTEN`, "The server restarted or lost track of this page before it answered. Check whether it took effect.", and the ledger records that answer, so a later resume gets it again and nothing runs.
+A tagged message from a page the ledger does not know yet is logged and dropped, which the page never sends, since every socket sends `resume` first.
+Replies and `done` go to the page's current socket; `Peer.socket`, the socket a message came on, is only for `watch`, which sets that socket's views.
 A request the page makes while disconnected rejects at once with "Not connected to the server.", and one it made before keeps waiting across the reconnect, with no time limit.
 A prompt that fails comes back to the composer with its files and a note, and a failed answer lets the question card take another.
 A handler's error goes to the server's log once, with its message type, on the run that threw.

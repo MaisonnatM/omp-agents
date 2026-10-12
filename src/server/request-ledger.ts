@@ -14,11 +14,11 @@ import { send, type Socket, watching } from "./views";
 const KEEP_PAGE_MS = 60 * 60_000;
 
 /** The `done` error of a request the page still waits on that this server never heard of: it restarted, or forgot the page. */
-export const FORGOTTEN = "The server restarted before it answered. Check whether it took effect.";
+export const FORGOTTEN = "The server restarted or lost track of this page before it answered. Check whether it took effect.";
 
 /** Where a handler answers the page that sent its message. */
 export interface Peer {
-	/** The socket the message came on. */
+	/** The socket the message came on, whose views a `watch` sets; answers go through `send` and `reply`, which follow the page to its next socket. */
 	readonly socket: Socket;
 	/** Send `msg` to the page. */
 	send(msg: ServerMsg): void;
@@ -47,8 +47,6 @@ interface Entry {
 
 interface PageRecord {
 	socket: Socket | null;
-	/** Whether this server handled a `resume` from the page; the first one lists only requests an earlier server got. */
-	resumed: boolean;
 	readonly entries: Map<number, Entry>;
 	expiry: Timer | undefined;
 }
@@ -74,13 +72,10 @@ export class RequestLedger {
 		this.#failed = failed;
 	}
 
-	/** `ws` opened: its page answers there from now on. */
+	/** `ws` opened: a page this server knows answers there from now on; another one becomes known at its `resume`. */
 	open(ws: Socket): void {
 		const page = this.#pages.get(ws.data.pageId);
-		if (!page) {
-			this.#pages.set(ws.data.pageId, { socket: ws, resumed: false, entries: new Map(), expiry: undefined });
-			return;
-		}
+		if (!page) return;
 		clearTimeout(page.expiry);
 		page.socket = ws;
 	}
@@ -97,26 +92,24 @@ export class RequestLedger {
 
 	/** Handles one message from `ws`, settling once it is handled; a handler that throws goes to `failed`, on its one run. */
 	handle(ws: Socket, frame: ClientFrame): Promise<void> {
-		return this.#handle(ws, frame).catch((error: unknown) => this.#failed(frame.t, error));
-	}
-
-	#handle(ws: Socket, frame: ClientFrame): Promise<void> {
 		if (frame.t === "resume") return this.#resume(ws, frame.frames);
-		if (!("ack" in frame)) return this.#run(untrackedPeer(ws), frame);
-		const page = this.#pageOf(ws);
+		if (!("ack" in frame)) return this.#run(untrackedPeer(ws), frame).catch((error: unknown) => this.#failed(frame.t, error));
+		const page = this.#pages.get(ws.data.pageId);
+		if (!page) {
+			this.#failed(frame.t, new Error(`Page ${ws.data.pageId} sent a request before its resume.`));
+			return Promise.resolve();
+		}
 		for (const ack of page.entries.keys()) if (ack < frame.floor) page.entries.delete(ack);
 		return this.#answer(page, ws, frame);
 	}
 
+	/** A page this server does not know yet waits only on requests an earlier server got, so each is refused with {@link FORGOTTEN}. */
 	async #resume(ws: Socket, frames: AckedFrame[]): Promise<void> {
-		const page = this.#pageOf(ws);
-		if (!page.resumed) {
-			page.resumed = true;
-			for (const { ack } of frames) {
-				const done: Done = { t: "done", ack, error: FORGOTTEN };
-				page.entries.set(ack, { replies: [], done });
-				send(ws, done);
-			}
+		const page = this.#pages.get(ws.data.pageId);
+		if (!page) {
+			const forgotten = new Map(frames.map(({ ack }): [number, Entry] => [ack, { replies: [], done: { t: "done", ack, error: FORGOTTEN } }]));
+			this.#pages.set(ws.data.pageId, { socket: ws, entries: forgotten, expiry: undefined });
+			for (const { done } of forgotten.values()) if (done) send(ws, done);
 			return;
 		}
 		const waiting = new Set(frames.map(frame => frame.ack));
@@ -127,8 +120,9 @@ export class RequestLedger {
 	#answer(page: PageRecord, ws: Socket, frame: AckedFrame): Promise<void> {
 		const entry = page.entries.get(frame.ack);
 		if (!entry) return this.#start(page, ws, frame);
-		for (const reply of entry.replies) deliver(ws, reply);
-		if (entry.done) send(ws, entry.done);
+		if (!page.socket) return Promise.resolve();
+		for (const reply of entry.replies) deliver(page.socket, reply);
+		if (entry.done) send(page.socket, entry.done);
 		return Promise.resolve();
 	}
 
@@ -150,11 +144,5 @@ export class RequestLedger {
 				this.#failed(frame.t, error);
 			},
 		);
-	}
-
-	#pageOf(ws: Socket): PageRecord {
-		const page = this.#pages.get(ws.data.pageId);
-		if (!page) throw new Error(`No page ${ws.data.pageId}: a socket's messages come after it opened.`);
-		return page;
 	}
 }
