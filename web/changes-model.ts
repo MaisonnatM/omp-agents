@@ -1,5 +1,6 @@
-/** The changes page's pure layout: the explorer's tree, the diff's folds, and the file view's gutter marks. */
+/** The changes explorer's pure layout: the tree, the diff's folds, the file view's gutter marks, and which file the Files tab opens. */
 import type { ChangedEntry, DiffRow } from "../src/shared/changes";
+import { absoluteFilePath } from "./file-paths";
 
 export interface TreeDir {
 	/** Its name in its parent, which joins a chain of single-directory folders: `src/server`. */
@@ -121,4 +122,17 @@ export function fileLines(rows: readonly DiffRow[]): { lines: FileLine[]; remove
 		removed = [];
 	}
 	return { lines, removedAtEnd: removed };
+}
+
+/**
+ * The path the session's changes list gives the file that the Files tab names `path`, relative to the session's `cwd` or
+ * absolute with `~`; `null` when the list holds no such file. A `~` path inside the checkout matches by its tail.
+ */
+export function changesPathOf(path: string, cwd: string | null, root: string | null, files: readonly ChangedEntry[]): string | null {
+	const has = (candidate: string): boolean => files.some(file => file.path === candidate);
+	const absolute = absoluteFilePath(path, cwd);
+	if (root !== null && absolute?.startsWith(`${root}/`) && has(absolute.slice(root.length + 1))) return absolute.slice(root.length + 1);
+	if (has(path)) return path;
+	const tails = files.filter(file => path.endsWith(`/${file.path}`));
+	return tails.reduce<string | null>((best, file) => (best === null || file.path.length > best.length ? file.path : best), null);
 }

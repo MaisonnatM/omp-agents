@@ -98,12 +98,6 @@ export interface NewSessionRoute {
 	todoId: string | null;
 }
 
-/** The files session `sessionId` changed, and the one open, by the path the list gives it. */
-export interface ChangesRoute {
-	sessionId: string;
-	path: string | null;
-}
-
 /** A page that covers the panes. */
 export type Page =
 	| ({ kind: "settings" } & SettingsRoute)
@@ -114,8 +108,7 @@ export type Page =
 	| ({ kind: "projects" } & ProjectsRoute)
 	| { kind: "calendar" }
 	| ({ kind: "inbox" } & InboxRoute)
-	| ({ kind: "new" } & NewSessionRoute)
-	| ({ kind: "changes" } & ChangesRoute);
+	| ({ kind: "new" } & NewSessionRoute);
 
 /** What the hash names: a page over the panes, a session by its id, or the panes themselves. */
 export type Route = { kind: "page"; page: Page } | { kind: "session"; sessionId: string } | { kind: "panes"; layout: Layout };
@@ -192,10 +185,6 @@ const PAGES: { [K in Page["kind"]]: (rest: string | null, query: URLSearchParams
 	},
 	calendar: () => ({ kind: "calendar" }),
 	inbox: rest => ({ kind: "inbox", target: rest ? decodeSegment(rest) : null }),
-	changes: rest => {
-		const [sessionId = "", path] = (rest ?? "").split("/");
-		return { kind: "changes", sessionId: decodeSegment(sessionId) ?? "", path: path ? decodeSegment(path) : null };
-	},
 };
 
 const isPageKind = (head: string): head is Page["kind"] => Object.hasOwn(PAGES, head);
@@ -224,8 +213,6 @@ function restOfPage(page: Page): string | null {
 			return page.target.kind === "list" ? null : page.target.kind === "new" ? "new" : encodeURIComponent(page.target.id);
 		case "calendar":
 			return null;
-		case "changes":
-			return `${encodeURIComponent(page.sessionId)}${page.path === null ? "" : `/${encodeURIComponent(page.path)}`}`;
 		default: {
 			const never: never = page;
 			return never;
@@ -247,7 +234,6 @@ function queryOfPage(page: Page): string | null {
 		case "projects":
 		case "calendar":
 		case "inbox":
-		case "changes":
 			return null;
 		default: {
 			const never: never = page;
@@ -274,7 +260,6 @@ export const hashForProjects = (target: ProjectsTarget): string => hashForPage({
 export const hashForCalendar = (): string => hashForPage({ kind: "calendar" });
 export const hashForSettings = (section: SettingsSection, cwd: string | null): string => hashForPage({ kind: "settings", section, cwd });
 export const hashForNewSession = (cwd: string | null, todoId: string | null = null): string => hashForPage({ kind: "new", cwd, todoId });
-export const hashForChanges = (sessionId: string, path: string | null = null): string => hashForPage({ kind: "changes", sessionId, path });
 
 /**
  * The route a hash names. A page's kind is its first segment. `#session/<id>` names a session by its id, which outlives

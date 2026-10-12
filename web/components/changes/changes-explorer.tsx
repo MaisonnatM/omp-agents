@@ -9,33 +9,29 @@ import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
 import { LineCounts } from "../line-counts";
 import { CodeView } from "./code-view";
-import { FileTree, StatusLetter, statusLabel } from "./file-tree";
+import { type FileOpen, FileTree, StatusLetter, statusLabel } from "./file-tree";
 
 /** Diff shows the changes with unchanged runs folded; File shows the whole file as it is now, its changes marked in the gutter. */
 const MODES = ["diff", "file"] as const;
 type Mode = (typeof MODES)[number];
 const MODE_KEY = "omp-agents.changes-mode";
 
-interface ChangesExplorerProps {
+type ChangesExplorerProps = FileOpen & {
 	/** The changed files, at least one. */
 	files: ChangedEntry[];
 	/** The file open, by the path the list gives it; `null` opens the first. */
 	path: string | null;
-	/** The address that opens the file at `path`. */
-	hrefFor: (path: string) => string;
-	/** Opens the file at `path` in place, for the files, ↓, and ↑, instead of through its address. */
-	onPick?: (path: string) => void;
 	/** The read of the file at `path` in full, with its diff. */
 	fileUrl: (path: string) => string;
 	/** A new version reads the open file again. */
 	version: string | number;
-}
+};
 
 /**
- * Changed files as an editor shows them, for a session's changes page and a pull request's: the explorer lists them as
+ * Changed files as an editor shows them, for a session's changes and a pull request's: the explorer lists them as
  * folders, and the editor shows the open file's diff or the whole file with its changes marked.
  */
-export function ChangesExplorer({ files, path, hrefFor, onPick, fileUrl, version }: ChangesExplorerProps) {
+export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: ChangesExplorerProps) {
 	const [mode, setMode] = useStoredState<Mode>(MODE_KEY, raw => MODES.find(mode => mode === raw) ?? "diff");
 	const tree = useMemo(() => fileTree(files), [files]);
 	const order = useMemo(() => treeOrder(tree), [tree]);
@@ -45,8 +41,8 @@ export function ChangesExplorer({ files, path, hrefFor, onPick, fileUrl, version
 		if (!entry) return false;
 		const next = order[order.indexOf(entry) + by];
 		if (!next) return true;
-		if (onPick) onPick(next.path);
-		else location.hash = hrefFor(next.path);
+		if (opener.hrefFor && !opener.onPick) location.hash = opener.hrefFor(next.path);
+		else opener.onPick?.(next.path);
 		return true;
 	};
 	useShortcuts({ nextChangedFile: () => step(1), previousChangedFile: () => step(-1) });
@@ -58,7 +54,7 @@ export function ChangesExplorer({ files, path, hrefFor, onPick, fileUrl, version
 					<kbd>{shortcutLabels("nextChangedFile")[0]}</kbd> and <kbd>{shortcutLabels("previousChangedFile")[0]}</kbd> step through the files
 				</p>
 				<div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
-					<FileTree tree={tree} open={entry?.path ?? null} hrefFor={hrefFor} onPick={onPick} />
+					<FileTree tree={tree} open={entry?.path ?? null} {...opener} />
 				</div>
 			</nav>
 			{entry && (
