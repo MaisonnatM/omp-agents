@@ -1190,6 +1190,7 @@ Alt is Option on macOS.
 | ↓ / ↑ | Changes page or a pull request's **Code** tab, outside text fields | Open the next or previous changed file |
 
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
+  The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Inbox, Calendar, and Changes.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Inbox conversation's **Open in Gmail**.
 - Cmd+1 through Cmd+5 select the dashboard's tabs, even while typing; they replace the browser's tab selection when the dashboard handles them.
   The numbers stay fixed when Tickets is hidden without a Linear connection; Cmd+2 then keeps its browser behavior.
