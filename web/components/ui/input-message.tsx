@@ -387,7 +387,7 @@ const InputMessage = memo(forwardRef<HTMLDivElement, InputMessageProps>(
           surfaceClasses(2, 2),
           shape.container,
           !disabled && "cursor-text",
-          disabled && "opacity-50 pointer-events-none",
+          disabled && "pointer-events-none",
           className
         )}
         style={edgeShadow ? { boxShadow: edgeShadow, ...style } : style}
