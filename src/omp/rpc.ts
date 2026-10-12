@@ -54,7 +54,10 @@ export interface RpcClient {
 	start(): Promise<void>;
 	stop(): Promise<void>;
 	getState(): Promise<RpcState>;
+	/** Resolves with the request id once omp admits the prompt; a builtin slash command, which omp completes itself, gets no {@link onPromptResult}. */
 	prompt(message: string, images?: RpcImage[], streamingBehavior?: "steer" | "followUp"): Promise<string>;
+	/** Once all the work of an admitted prompt settled: at once when it failed or was cancelled before a turn, else after its turn's terminal `agent_end`. */
+	onPromptResult(listener: (result: { id?: string }) => void): () => void;
 	/** Takes the first queued message with this text out of `queue`; `removed` is false once omp has delivered it. */
 	removeQueuedMessage(message: string, queue: "steering" | "followUp"): Promise<{ removed: boolean; images?: RpcImage[] }>;
 	/** Moves the first queued follow-up with this text to the end of the steering queue; `promoted` is false once it has gone. */

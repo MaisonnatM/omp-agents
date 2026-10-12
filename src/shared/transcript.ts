@@ -20,8 +20,9 @@ export type Item =
 	 * any other prompt. `entryId`: the session-file entry omp can branch at; `null` for Collab and skill prompts and prompts
 	 * not yet in the file. `images`: the addresses of the images the prompt carried, a `data:` URL or `/api/image`; absent
 	 * when it carried none. `files`: the names of the files attached to it as text, which `text` leaves out; absent when none.
+	 * `pending`: a prompt omp admitted whose turn has not shown it yet, which the live user message replaces; absent otherwise.
 	 */
-	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null; images?: string[]; files?: string[] }
+	| { id: string; kind: "user"; text: string; skill: string | null; from: string | null; entryId: string | null; images?: string[]; files?: string[]; pending?: true }
 	| { id: string; kind: "assistant"; text: string; streaming: boolean; suggestions: string[] }
 	/** The model's reasoning text. `streaming` while that reply is still arriving. A redacted block has no text and is left out. */
 	| { id: string; kind: "thinking"; text: string; streaming: boolean }

@@ -16,9 +16,9 @@ describe("pane store", () => {
 		const shown = view("shown");
 		const hidden = view("hidden");
 		retainPanes([shown]);
-		applyPaneMessage({ t: "items", view: hidden, reset: true, items: [] });
+		applyPaneMessage({ t: "items", view: hidden, reset: true, items: [], removed: [] });
 		expect(renderToStaticMarkup(<Probe view={hidden} />)).toBe("<span>empty</span>");
-		applyPaneMessage({ t: "items", view: shown, reset: true, items: [] });
+		applyPaneMessage({ t: "items", view: shown, reset: true, items: [], removed: [] });
 		expect(renderToStaticMarkup(<Probe view={shown} />)).toBe("<span>0</span>");
 		retainPanes([]);
 		expect(renderToStaticMarkup(<Probe view={shown} />)).toBe("<span>empty</span>");

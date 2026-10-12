@@ -5,6 +5,7 @@ import { join } from "node:path";
 import type { ServerMsg } from "../shared/protocol";
 import type { LiveView } from "../shared/sessions";
 import type { Item } from "../shared/transcript";
+import type { StartingPrompt } from "../transcript";
 import { type Socket, type SocketData, Views } from "./views";
 
 const roots: string[] = [];
@@ -43,6 +44,7 @@ function setup() {
 	const root = mkdtempSync(join(tmpdir(), "omp-agents-views-"));
 	roots.push(root);
 	const paths = new Map<string, string | null>();
+	const starting = new Map<string, StartingPrompt>();
 	const published: { topic: string; msg: ServerMsg }[] = [];
 	let waiter: { count: number; resolve: () => void } | null = null;
 	const views = new Views(
@@ -52,6 +54,7 @@ function setup() {
 			published.push({ topic, msg });
 			if (waiter && published.length >= waiter.count) waiter.resolve();
 		},
+		instanceId => starting.get(instanceId) ?? null,
 	);
 	/** Settles once `count` messages have been published in all. */
 	const untilPublished = (count: number): Promise<void> => {
@@ -65,7 +68,7 @@ function setup() {
 		if (msg?.t !== "items") throw new Error(`published[${index}] is not an items message`);
 		return { reset: msg.reset, items: msg.items };
 	};
-	return { root, paths, published, views, untilPublished, itemsOf };
+	return { root, paths, starting, published, views, untilPublished, itemsOf };
 }
 
 describe("Views", () => {
@@ -126,6 +129,61 @@ describe("Views", () => {
 		expect(items.filter(item => item.id === "m600")).toHaveLength(1);
 	});
 
+	test("a session's starting prompt shows last in its view, also to a socket that joins later, and its live user message takes its place in one message", async () => {
+		const { root, paths, starting, views, untilPublished, itemsOf, published } = setup();
+		const file = join(root, "session.jsonl");
+		writeFileSync(file, userEntry("e1", 100, "hello"));
+		paths.set("a:", file);
+		starting.set("a", { id: "req_1", text: "say pong", images: [{ data: "aGk=", mimeType: "image/png" }] });
+		const pending: Item = { id: "starting:req_1", kind: "user", text: "say pong", skill: null, from: null, entryId: null, images: ["data:image/png;base64,aGk="], pending: true };
+
+		views.watch(socket().ws, [main("a")]);
+		await untilPublished(2);
+		expect([itemsOf(0), itemsOf(1)].flatMap(({ items }) => items.map(item => item.id))).toEqual(["m100", "starting:req_1"]);
+		expect(itemsOf(1).items).toEqual([pending]);
+		const late = socket();
+		views.watch(late.ws, [main("a")]);
+		expect(late.sent).toEqual([
+			{ t: "items", view: main("a"), reset: true, items: [{ id: "m100", kind: "user", text: "hello", skill: null, from: null, entryId: "e1" }, pending], removed: [] },
+		]);
+
+		starting.delete("a");
+		views.applyEvent("a", { type: "message_start", message: { role: "user", timestamp: 600, content: [{ type: "text", text: "say pong" }, { type: "image", data: "aGk=", mimeType: "image/png" }] } });
+		views.starting("a");
+		views.note("a", null, "warning", "barrier");
+		await untilPublished(4);
+		expect(published.slice(2).map(({ msg }) => msg)).toEqual([
+			{
+				t: "items",
+				view: main("a"),
+				reset: false,
+				items: [{ id: "m600", kind: "user", text: "say pong", skill: null, from: null, entryId: null, images: ["data:image/png;base64,aGk="] }],
+				removed: ["starting:req_1"],
+			},
+			{ t: "items", view: main("a"), reset: false, items: [{ id: "notice1", kind: "notice", level: "warning", text: "barrier" }], removed: [] },
+		]);
+	});
+
+	test("a starting prompt that ends without a turn leaves its view", async () => {
+		const { root, paths, starting, views, untilPublished, published } = setup();
+		const file = join(root, "session.jsonl");
+		writeFileSync(file, "");
+		paths.set("a:", file);
+		views.watch(socket().ws, [main("a")]);
+		await untilPublished(1);
+
+		starting.set("a", { id: "req_2", text: "/skill:review the diff", images: [] });
+		views.starting("a");
+		await untilPublished(2);
+		starting.delete("a");
+		views.starting("a");
+		await untilPublished(3);
+		expect(published.slice(1).map(({ msg }) => msg)).toEqual([
+			{ t: "items", view: main("a"), reset: false, items: [{ id: "starting:req_2", kind: "user", text: "the diff", skill: "review", from: null, entryId: null, pending: true }], removed: [] },
+			{ t: "items", view: main("a"), reset: false, items: [], removed: ["starting:req_2"] },
+		]);
+	});
+
 	test("live events and notes reach only the view they belong to", async () => {
 		const { root, paths, views, untilPublished, published } = setup();
 		const mainFile = join(root, "main.jsonl");
@@ -158,7 +216,7 @@ describe("Views", () => {
 
 		paths.set("a:", null);
 		views.watch(ws, [main("a")]);
-		expect(sent).toEqual([{ t: "items", view: main("a"), reset: true, items: [] }]);
+		expect(sent).toEqual([{ t: "items", view: main("a"), reset: true, items: [], removed: [] }]);
 		views.applyEvent("a", { type: "message_end", message: { role: "user", timestamp: 5, content: "hi" } });
 		views.note("a", null, "error", "lost");
 		expect(published).toEqual([]);
@@ -192,7 +250,7 @@ describe("Views", () => {
 
 		paths.set("a:", null);
 		views.sync();
-		expect(published.at(-1)).toEqual({ topic: "view:live:a:", msg: { t: "items", view: main("a"), reset: true, items: [] } });
+		expect(published.at(-1)).toEqual({ topic: "view:live:a:", msg: { t: "items", view: main("a"), reset: true, items: [], removed: [] } });
 	});
 
 	test("a socket that joins a view another socket already shows gets its current items at once, and the view stops when the last socket leaves", async () => {
@@ -207,7 +265,7 @@ describe("Views", () => {
 		await untilPublished(1);
 		views.watch(second.ws, [main("a")]);
 		expect(second.sent).toEqual([
-			{ t: "items", view: main("a"), reset: true, items: [{ id: "m100", kind: "user", text: "hello", skill: null, from: null, entryId: "e1" }] },
+			{ t: "items", view: main("a"), reset: true, items: [{ id: "m100", kind: "user", text: "hello", skill: null, from: null, entryId: "e1" }], removed: [] },
 		]);
 		expect(second.topics).toEqual(new Set(["view:live:a:"]));
 		expect(published).toHaveLength(1);
@@ -269,6 +327,7 @@ describe("Views", () => {
 				lists.push(msg.media.map(media => media.agentId));
 				waiter?.();
 			},
+			() => null,
 		);
 		const nextList = (): Promise<void> => {
 			const { promise, resolve } = Promise.withResolvers<void>();

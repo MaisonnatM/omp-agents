@@ -80,6 +80,26 @@ describe("Transcript", () => {
 		]);
 	});
 
+	test("a starting prompt shows after every item as its live message will, and replacing or clearing it reports it removed", () => {
+		const t = new Transcript();
+		t.applyEvent({ type: "message_end", message: assistant(600, [text("Done")], { stopReason: "stop" }) });
+		const prompt = withFiles("sum these up", [{ name: "notes.md", text: "# Notes" }]);
+		expect(t.setStarting({ id: "req_1", text: prompt, images: [{ data: "aGk=", mimeType: "image/png" }] })).toEqual([
+			{ id: "starting:req_1", kind: "user", text: "sum these up", skill: null, from: null, entryId: null, files: ["notes.md"], images: ["data:image/png;base64,aGk="], pending: true },
+		]);
+		expect(t.setStarting({ id: "req_1", text: prompt, images: [] })).toEqual([]);
+		expect(t.takeRemoved()).toEqual([]);
+
+		const skill = { id: "req_2", text: `/skill:mma-mode ${withFiles("check this", [{ name: "log.txt", text: "boom" }])}`, images: [] };
+		expect(t.setStarting(skill)).toMatchObject([{ id: "starting:req_2", text: "check this", skill: "mma-mode", files: ["log.txt"] }]);
+		expect(t.items().map(item => item.id)).toEqual(["m600:0", "starting:req_2"]);
+		expect(t.takeRemoved()).toEqual(["starting:req_1"]);
+
+		expect(t.setStarting(null)).toEqual([]);
+		expect(t.items().map(item => item.id)).toEqual(["m600:0"]);
+		expect(t.takeRemoved()).toEqual(["starting:req_2"]);
+	});
+
 	test("a fresh session's first prompt shows at once and stays ahead of its reply when the file catches up", () => {
 		const t = new Transcript();
 		const prompt = { role: "user", timestamp: 600, content: "say pong" };

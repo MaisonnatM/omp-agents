@@ -28,11 +28,11 @@ export class FileTail {
 	#pendingReset = false;
 	#window: Timer | undefined;
 	#closed = false;
-	readonly #emit: (reset: boolean, items: Item[]) => void;
+	readonly #emit: (reset: boolean, items: Item[], removed: string[]) => void;
 	readonly #emitWork: (reset: boolean, files: ChangedFile[]) => void;
 
-	/** `emitWork` gets every changed file once the first read finishes, then the files each later read changed. */
-	constructor(path: string, emit: (reset: boolean, items: Item[]) => void, emitWork: (reset: boolean, files: ChangedFile[]) => void) {
+	/** `emit` gets the items each change touched and the ids of those it removed. `emitWork` gets every changed file once the first read finishes, then the files each later read changed. */
+	constructor(path: string, emit: (reset: boolean, items: Item[], removed: string[]) => void, emitWork: (reset: boolean, files: ChangedFile[]) => void) {
 		this.path = path;
 		this.#lines = new LineReader(path, () => this.#restart());
 		this.#emit = emit;
@@ -71,23 +71,25 @@ export class FileTail {
 
 	/**
 	 * Publish what `changed`, and whatever it held back before, unless only items still in flux changed: those wait out
-	 * the window. A message that finishes, a tool that ends, a prompt or a notice publishes at once with them, so the
-	 * final state is never delayed.
+	 * the window. A message that finishes, a tool that ends, a prompt, a notice, or an item that leaves publishes at once
+	 * with them, so the final state is never delayed.
 	 */
 	#publish(changed: Item[]): void {
 		if (this.#closed) return;
 		if (this.transcript.takeReordered()) this.#pendingReset = true;
+		const removed = this.transcript.takeRemoved();
+		for (const id of removed) this.#pending.delete(id);
 		for (const item of changed) this.#pending.set(item.id, item);
-		if (!this.#pendingReset && this.#pending.size === 0) return;
-		if (!this.#pendingReset && changed.every(inFlux)) this.#window ??= setTimeout(() => this.#flush(), PUBLISH_WINDOW_MS);
-		else this.#flush();
+		if (!this.#pendingReset && this.#pending.size === 0 && removed.length === 0) return;
+		if (!this.#pendingReset && removed.length === 0 && changed.every(inFlux)) this.#window ??= setTimeout(() => this.#flush([]), PUBLISH_WINDOW_MS);
+		else this.#flush(removed);
 	}
 
-	#flush(): void {
+	#flush(removed: string[]): void {
 		const reset = this.#pendingReset;
 		const items = reset ? this.transcript.items() : [...this.#pending.values()];
 		this.#discardPending();
-		this.#emit(reset, items);
+		this.#emit(reset, items, reset ? [] : removed);
 	}
 
 	#discardPending(): void {
@@ -123,7 +125,8 @@ export class FileTail {
 			this.#loaded = true;
 			this.#discardPending();
 			this.transcript.takeReordered();
-			this.#emit(true, this.transcript.items());
+			this.transcript.takeRemoved();
+			this.#emit(true, this.transcript.items(), []);
 			this.#emitWork(true, this.files);
 		} else {
 			this.#publish(changed);

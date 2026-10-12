@@ -59,7 +59,7 @@ export function applyPaneMessage(msg: PaneMsg): void {
 	const pane = panes.get(key) ?? EMPTY_PANE;
 	switch (msg.t) {
 		case "items":
-			panes.set(key, { ...pane, items: applyDelta(pane.items, msg.reset, msg.items, item => item.id, []), loaded: true });
+			panes.set(key, { ...pane, items: applyDelta(pane.items, msg.reset, msg.items, item => item.id, msg.removed), loaded: true });
 			break;
 		case "work":
 			panes.set(key, { ...pane, files: applyDelta(pane.files ?? [], msg.reset, msg.files, file => file.path, []) });

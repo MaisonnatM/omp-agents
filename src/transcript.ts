@@ -10,10 +10,19 @@
 import { isObject, str } from "./json";
 import { imagesOf, oneLine, textOf, toolSummary } from "./session-entries";
 import { splitFiles } from "./shared/prompt-files";
+import type { PromptImage } from "./shared/sessions";
 import type { Item } from "./shared/transcript";
 
 type Json = Record<string, unknown>;
 type ToolItem = Extract<Item, { kind: "tool" }>;
+type UserItem = Extract<Item, { kind: "user" }>;
+
+/** A prompt omp admitted while the main agent was idle and whose turn has not shown it yet; `id` is its RPC request id. */
+export interface StartingPrompt {
+	id: string;
+	text: string;
+	images: PromptImage[];
+}
 
 const COLLAB_PROMPT = "collab-prompt";
 /** How omp's terminal and RPC clients record a `/skill:<name>` prompt: the skill's text, with the invocation in `details`. */
@@ -47,6 +56,23 @@ function userPrompt(prompt: string): { text: string; skill: string | null; files
 function typed(prompt: string): { text: string; files?: string[] } {
 	const { text, files } = splitFiles(prompt);
 	return files.length > 0 ? { text, files } : { text };
+}
+
+/** The leading form of omp's `parseSkillInvocation`: `/skill:<name>`, then its arguments. */
+const LEADING_SKILL = /^\s*\/skill:(\S+)([\s\S]*)$/;
+
+/** A starting prompt as its live user message will show it. */
+function startingItem({ id, text, images }: StartingPrompt): UserItem {
+	const skill = LEADING_SKILL.exec(text);
+	return {
+		id: `starting:${id}`,
+		kind: "user",
+		...(skill ? { ...typed(skill[2].trim()), skill: skill[1] } : userPrompt(text)),
+		from: null,
+		entryId: null,
+		...imagesOf(images.map(image => ({ type: "image", ...image }))),
+		pending: true,
+	};
 }
 
 /** A `!` command the user ran, as omp's terminal shows it: the command and its output, then how it ended when it failed. */
@@ -133,9 +159,12 @@ export class Transcript {
 	/** The latest time a file message got. The file holds messages in the order the agent took them. */
 	#fileLatest = 0;
 	#reordered = false;
+	#starting: UserItem | null = null;
+	#removed: string[] = [];
 
 	items(): Item[] {
-		return [...this.#items.values()];
+		const items = [...this.#items.values()];
+		return this.#starting ? [...items, this.#starting] : items;
 	}
 
 	/**
@@ -147,6 +176,21 @@ export class Transcript {
 		const reordered = this.#reordered;
 		this.#reordered = false;
 		return reordered;
+	}
+
+	/** The ids of the items gone since the last call. */
+	takeRemoved(): string[] {
+		const removed = this.#removed;
+		this.#removed = [];
+		return removed;
+	}
+
+	/** Show `prompt` as the session's starting prompt in place of the one shown, or none for `null`. Returns the item it added. */
+	setStarting(prompt: StartingPrompt | null): Item[] {
+		if ((this.#starting?.id ?? null) === (prompt && `starting:${prompt.id}`)) return [];
+		if (this.#starting) this.#removed.push(this.#starting.id);
+		this.#starting = prompt && startingItem(prompt);
+		return this.#starting ? [this.#starting] : [];
 	}
 
 	/** One session-file entry. Returns the items it created or changed. */

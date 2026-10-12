@@ -64,7 +64,7 @@ import { hashForView, type OpenMode, sameView } from "../routing";
 import type { StartOf } from "../starts";
 import { usePaneLoaded, useTranscript } from "../pane-store";
 import { revealed, useReveal } from "../message-reveal";
-import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoints, type ToolItem, toBlocks, turnReplies, withEditedPrompt } from "../transcript-view";
+import { type ActivityItem, type Block, editablePrompt, type ForkPoint, forkPoints, replacingPrompt, type ToolItem, toBlocks, turnReplies, withEditedPrompt } from "../transcript-view";
 import { useAction } from "../use-action";
 import { useCopy } from "../use-copy";
 import { MessageMarkdown } from "./message-markdown";
@@ -411,20 +411,25 @@ interface MessageRowProps {
 	/** The entry an edit of this message replaces, or `null` where it cannot be edited. */
 	editAt: string | null;
 	editor?: ReactNode;
+	/** It took the place of a pending prompt already on screen, so it shows at once without its entrance motion. */
+	replacing: boolean;
 	onFork: (itemId: string, point: ForkPoint) => void;
 	onEditing: (item: Extract<Item, { kind: "user" }>, entryId: string) => void;
 }
 
 /** One message with its actions. Every prop keeps its identity while the message is unchanged, so a streamed token renders only the row it extends. */
 const MessageRow = memo(function MessageRow({
-	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, onFork, onEditing,
+	item, copyable, forkAt, prefill, forking, forkDisabled, failed, editAt, editor, replacing, onFork, onEditing,
 }: MessageRowProps) {
 	const copied = copyText(item);
 	const point = forkAt === null ? null : { entryId: forkAt, prefill };
 	const edit = editAt !== null && item.kind === "user" ? () => onEditing(item, editAt) : undefined;
+	const pending = item.kind === "user" && item.pending === true;
 	return (
-		<MessageScrollerItem messageId={item.id} className="flex flex-col">
+		// The dimming sits on the wrapper: the message's entrance motion sets its own inline opacity.
+		<MessageScrollerItem messageId={item.id} className={cn("flex flex-col", pending && "opacity-60")}>
 			<ChatMessage
+				{...(replacing ? { initial: false } : {})}
 				from={item.kind}
 				time={item.kind === "user" ? (item.from ?? undefined) : undefined}
 				files={item.kind === "user" ? item.files : undefined}
@@ -442,6 +447,7 @@ const MessageRow = memo(function MessageRow({
 				data-item={item.kind}
 				data-editing={editor ? true : undefined}
 				data-streaming={item.kind === "assistant" ? item.streaming : undefined}
+				data-pending={pending || undefined}
 			>
 				{editor ?? (item.kind === "user" && (item.text || item.skill) ? (
 					<MessageMarkdown text={copyText(item)} prompt />
@@ -472,6 +478,12 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 	const replies = useMemo(() => turnReplies(items, working), [items, working]);
 	const shown = useRef<Block[]>([]);
 	const blocks = useMemo(() => (shown.current = toBlocks(items, shown.current)), [items]);
+	const previousItems = useRef<Item[]>([]);
+	const replacing = useMemo(() => {
+		const id = replacingPrompt(previousItems.current, items);
+		previousItems.current = items;
+		return id;
+	}, [items]);
 	const editable = useMemo(() => (onEdit ? editablePrompt(items) : null), [items, onEdit]);
 	const [editing, setEditing] = useState<{
 		item: Extract<Item, { kind: "user" }>;
@@ -570,6 +582,7 @@ export const Transcript = memo(function Transcript({ view, working, fork, onFork
 										onCancel={() => setEditing(null)}
 									/>
 								) : undefined}
+								replacing={item.id === replacing}
 								onFork={onFork}
 								onEditing={beginEditing}
 							/>

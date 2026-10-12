@@ -269,6 +269,12 @@ An action that fails shows its error, and its control becomes available again.
   It is offered in every room that the dashboard can write to.
 - The conversation follows new output while you are at the bottom.
   Scrolling up pauses that follow; the down-arrow button jumps back to the latest message.
+- In a session the dashboard started, a prompt sent to an idle session shows at once, dimmed, at the end of the conversation, and the session shows as working.
+  That covers a new session's first message, a suggested prompt, and an edited prompt.
+  omp takes up to a few seconds before its turn starts, and the prompt shows in full once it does.
+  A prompt that ends without a turn, such as one a usage limit refuses, takes the dimmed prompt away.
+  Stop before its turn starts takes it away too and puts it back in the composer, with its images.
+  omp's own `/` commands, such as `/model` or `/rename`, show no dimmed prompt; a `/skill:` prompt does.
 - User and assistant messages render GitHub-flavored Markdown, including tables, task lists, fenced code, and links.
   An image in agent text shows as a link to its address, so opening a transcript never fetches anything from the web; only inline `data:` images show in place.
 - A path to a text file in agent text opens the file in a dialog: `.md`, `.markdown`, `.txt`, `.log`, `.csv`, `.tsv`, `.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.xml`, `.diff`, or `.patch`.

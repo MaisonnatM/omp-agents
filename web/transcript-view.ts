@@ -170,3 +170,11 @@ export function editablePrompt(items: Item[]): { itemId: string; entryId: string
 	if (last?.kind !== "user" || !last.entryId || last.skill || last.images?.length || last.files?.length) return null;
 	return { itemId: last.id, entryId: last.entryId };
 }
+
+/** The prompt of `items` that took the place of the pending one `previous` ended on. */
+export function replacingPrompt(previous: readonly Item[], items: readonly Item[]): string | null {
+	const pending = previous.findLast(item => item.kind === "user");
+	if (pending?.kind !== "user" || !pending.pending || items.some(item => item.id === pending.id)) return null;
+	const prompt = items.findLast(item => item.kind === "user");
+	return prompt && !previous.some(item => item.id === prompt.id) ? prompt.id : null;
+}

@@ -22,6 +22,7 @@ The main ones:
 - RPC: `pi-coding-agent/src/modes/rpc/rpc-client.ts`, `rpc-frame.ts`, and the frame types in `rpc-types.ts`.
   `RpcClient` drops `extension_ui_request` and `session_info_update` frames, so `src/omp/rpc.ts` reads them from its own copy of the child's stdout (`UNROUTED_FRAMES`); see [Dashboard sessions](#dashboard-sessions).
   `get_available_models` returns omp's whole `Model` objects, with `name`, `contextWindow`, `api`, `identity`, and `serviceTiers`; `get_state` adds `fastModeEnabled` and `fastModeActive`, and `setFastMode` sends `set_fast_mode`.
+  `RpcClient.prompt` resolves with the request id once omp admitted the prompt, and `onPromptResult` delivers that prompt's `prompt_result` (`rpc-prompt-results.ts`); see [Dashboard sessions](#dashboard-sessions).
   Host tools: `RpcClient`'s `customTools` option (`RpcClientCustomTool`), which `start()` sends as `set_host_tools`, so a new process for the same session gets them again; `src/modes/rpc/host-tools.ts` runs them as strict tools, and `defaultLoadModeForToolName` in `src/tools/essential-tools.ts` makes one without `loadMode: "essential"` only discoverable.
   A host tool stays registered through `newSession`, `switchSession`, and `/move` in one process, since omp builds `SessionTools` once per `AgentSession` (`src/session/session-tools.ts`).
   Extensions: `omp -e <file>` (`src/main.ts`, `additionalExtensionPaths`) loads in `rpc-ui` mode too; `src/discovery/omp-extension-roots.ts` dedupes by path only, so the same extension at two paths loads twice.
@@ -63,6 +64,10 @@ Every transcript comes from the session files on this machine, not from a networ
   So a message from the file never goes ahead of the file messages before it, and a live user message goes after everything already shown.
 - A reply that streams and a tool call that runs change with every token.
   Each open transcript sends those changes to the page at most every 50 ms; a message that finishes, a tool call that ends, a prompt, or a notice goes out at once, together with what was held back.
+- A dashboard session's view shows a prompt that omp admitted while the main agent was idle as a pending user item, after every other item, until the turn's live user message replaces it ([Dashboard sessions](#dashboard-sessions)).
+  It renders as that message will: a `/skill:` prompt as the skill and its arguments, attached files by name, images inline.
+  Its id is `starting:<request id>`, and the `items` message that brings the live user message lists that id in `removed`, so the page drops it and appends the real prompt in one update.
+  A pending prompt is the only item that leaves a transcript, so `removed` is empty in every other `items` message.
 - The same read folds each line into the view's changed files as well, from each `edit` result's `details.path` and `diff` (one per entry of `perFileResults` for a multi-file edit) and each `write` result's `details.resolvedPath`, which omp sets only for a file.
   The view's socket topic carries them as `work` messages: the whole list with the transcript, then only the files each later read changed, which the page puts in place by path.
   A subagent's view folds its own file, so it shows its own changes.
@@ -159,6 +164,7 @@ The composer's queue is omp's `queue_update` event.
 A `dequeue` message takes one message back with `remove_queued_message`, and the server answers with `withdrawn`, carrying its text and images so the composer can restore both.
 A `promote` message, a queued row's **Send now**, is `promote_queued_message`, which moves a follow-up into the steering queue.
 An `interrupt` message, Stop, is `abort_and_restore_queue`, which aborts the turn and hands back both queues, steers first, in one `withdrawn` answer; omp's terminal Esc does the same.
+omp's restore leaves out a prompt it admitted but never ran, so when the session's starting prompt got no live user message before the abort answered, the session puts that prompt first in the `withdrawn` answer ([Dashboard sessions](#dashboard-sessions)).
 A session runs its prompts, interrupts, promotes, and `flush` requests one at a time, in the order the page sent them (`TurnGate` in `src/turn-gate.ts`), because the socket handlers do not wait for each other.
 When an abort follows, omp drops a prompt it has read but not yet run, so an abort that got ahead of a steer would lose it.
 Enter on the empty composer sends `flush`, and the session aborts only if omp's queue, read with `get_state` at that moment, still holds a steer; omp then runs that steer as its next turn.
@@ -178,6 +184,16 @@ While a session has no title, each user message's `message_end` event makes the 
 An `agent_end` that ends the run, not one that hands over to a queued follow-up (`isTerminal: false`), makes the session report `turn-ended` with its last reply: the text of the last assistant message that has any, without the suggested prompts `splitSuggestions` takes off, or `null` when none has text; the project runner reads it ([Projects](#projects)).
 Stopping the dashboard stops every session that it started.
 The transcripts stay on disk, and **Resume**, or `omp --resume <session id>` in a terminal, continues one.
+
+omp acks a `prompt` once it admitted it, but on every turn its auto-thinking classifier (`applyAutoThinkingLevel` in `pi-coding-agent/src/session/model-controls.ts`) holds `agent_start` back by about a second, and a new session's first turn can also wait on MCP discovery (`MCP_DISCOVERY_TURN_WAIT_MS` in `pi-coding-agent/src/session/agent-session.ts`).
+So a prompt the main agent takes while idle becomes the session's starting prompt at its ack: the session reports `working` and tells its view, which shows the prompt as pending ([Transcripts](#transcripts)).
+`DashboardSession` keeps whether a turn runs, from `agent_start` to the terminal `agent_end`, apart from the starting prompt, and reports `working` while either holds.
+The starting prompt ends at the live user message of its turn (`message_start` or `message_end`, or the user's `skill-prompt` custom message), at its `prompt_result`, at Stop or an edit's abort, when the session switches files, or when the process exits.
+omp sends one `prompt_result` per admitted prompt once its work settled, at once for a prompt that failed or that a usage preflight or an extension stopped before a turn (`src/modes/rpc/rpc-prompt-results.ts`), and `RpcClient.onPromptResult` hands it over by request id.
+Its `prompt_result` can reach the session before the ack's await resumes, so results that come while a prompt waits for its ack count against it.
+A prompt sent while a turn runs is queued as a steer or follow-up, and so is one sent while a prompt is starting, since omp counts a prompt in flight as streaming, so the session holds at most one starting prompt.
+A prompt whose `agent_start` came before its ack is not held, and neither is a `/` prompt other than `/skill:`, since omp completes a builtin slash command itself, with no turn and no `prompt_result`.
+A session's first message, a suggestion, and an edited prompt all take this path.
 
 `src/server/interrupted.ts` keeps which of those sessions were interrupted, in `interrupted.json` beside the access token, and which of them were mid-turn (working or waiting on a question).
 Each time a dashboard session starts, exits, or starts or ends a turn, the server writes the session ids of the ones that run and of those whose turn runs.
@@ -902,6 +918,7 @@ The server lives in `src/`:
 - `src/server/session-files.ts`: the session files on disk, re-read file by file as the watcher reports them, and the past list.
   `src/server/interrupted.ts` keeps which dashboard sessions were interrupted.
   `src/server/views.ts` points each open view at its file and keeps its tail and media tree together for their shared lifecycle: a view nobody shows any more, or one whose file changes, has its tail and media tree closed, so a read still in flight and the tail's held-back updates publish nothing.
+  It applies a session's starting prompt to that session's main view with each of its live events, so a live user message and the removal of the prompt it replaces go out together.
 - `src/shared/`: every type that crosses the socket or the HTTP API, one file per domain.
   `protocol.ts` holds `ServerMsg` and `ClientMsg`; `sessions.ts` the roster and past rows (`RosterHost`, `PastSession`), views, user requests, and starts; `transcript.ts` the transcript items, changed files, and images; `github.ts` the pull request and pull request list shapes; `tickets.ts` the Linear issues; `accounts.ts` the MCP integrations and their OAuth client setups; `calendar.ts` the Google calendars, their events, a new event, and the events kept on this computer; `git.ts` the checkouts and branches; `repo-files.ts` the repository page's file list; `models.ts` the models, routing, plan usage, and omp's files; `notices.ts` the bell's notices; and `analytics.ts` the Analytics section.
   `gmail.ts` holds `MailThread` and `InboxAnswer`, the Inbox page's conversations, and `ThreadAnswer` with its `MailMessage`, `MailPerson`, `MailBody`, and `MailAttachment`, one conversation in full.
@@ -921,7 +938,7 @@ The server lives in `src/`:
 - `src/commands.ts`: the composer's `/` and `@` completions, and the expansion of file commands and skills before a guest prompt.
 - `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below; `src/line-reader.ts` holds the incremental `LineReader` and the `ReadQueue` that serializes its reads, which `src/media.ts` shares.
 - `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, `toolResultOf`, `toolSummary`, and `imagesOf`, which the folds below and `src/guest.ts` read instead of walking the entry shape themselves.
-- `src/transcript.ts`: folds session-file lines and live events into display items.
+- `src/transcript.ts`: folds session-file lines and live events into display items, with a dashboard session's starting prompt last.
 - `src/conversation-search.ts`: the conversation search behind `GET /api/conversations`.
   `SessionFactsIndex` folds each session's own file, not its subagents', through `foldConversationLine` as it reads it, keeping the prompts' and replies' item ids and text: `messageItemsOf` in `src/transcript.ts` names them as the pane's fold does, from one entry alone, and the tool-result lines go unparsed.
   `searchConversations` then matches those with `everyWord` and reads no file.

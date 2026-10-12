@@ -530,6 +530,7 @@ export const rpc = await load<RpcClientModule>(join(srcDir, "modes", "rpc", "rpc
 	"RpcClient.prototype.cancelSubagent": "function",
 	"RpcClient.prototype.bash": "function",
 	"RpcClient.prototype.setFastMode": "function",
+	"RpcClient.prototype.onPromptResult": "function",
 	// Sends the constructor's `customTools`; the option itself cannot be checked.
 	"RpcClient.prototype.setCustomTools": "function",
 });

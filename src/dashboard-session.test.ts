@@ -20,13 +20,19 @@ const STATE: RpcState = { sessionId: "session-1", fastModeEnabled: false, fastMo
 class FakeClient implements RpcClient {
 	calls: string[] = [];
 	#listeners: ((event: Frame) => void)[] = [];
+	#resultListeners: ((result: { id?: string }) => void)[] = [];
+	#requests = 0;
 
 	start = async (): Promise<void> => {};
 	stop: RpcClient["stop"] = async () => {};
 	getState: RpcClient["getState"] = async () => STATE;
 	prompt: RpcClient["prompt"] = async text => {
 		this.calls.push(`prompt ${text}`);
-		return "";
+		return `req_${++this.#requests}`;
+	};
+	onPromptResult: RpcClient["onPromptResult"] = listener => {
+		this.#resultListeners.push(listener);
+		return () => {};
 	};
 	removeQueuedMessage: RpcClient["removeQueuedMessage"] = async () => ({ removed: true });
 	promoteQueuedMessage = async () => ({ promoted: true });
@@ -60,6 +66,10 @@ class FakeClient implements RpcClient {
 	/** A session event as omp's RPC client hands it to the session. */
 	fire(event: Record<string, unknown>): void {
 		for (const listener of this.#listeners) listener({ t: "event", ...event });
+	}
+
+	settlePrompt(id: string): void {
+		for (const listener of this.#resultListeners) listener({ id });
 	}
 }
 
@@ -231,6 +241,92 @@ describe("DashboardSession turns", () => {
 
 		client.fire({ type: "queue_update", steering: "x", followUp: [] });
 		expect(session.queue).toEqual({ steering: [], followUp: ["d"] });
+	});
+});
+
+describe("DashboardSession starting prompt", () => {
+	const image = { data: "aGk=", mimeType: "image/png" };
+
+	test("a prompt omp admits while idle is working and starting from its ack, until its turn shows the user message", async () => {
+		const { session, client, updates, rosters } = await startSession();
+		const before = rosters();
+		await session.prompt(null, "say pong", [image], "steer");
+		expect(session.status).toBe("working");
+		expect(session.starting).toEqual({ id: "req_1", text: "say pong", images: [image] });
+		expect(updates.filter(update => update.kind === "starting")).toHaveLength(1);
+		expect(rosters()).toBe(before + 1);
+
+		client.fire({ type: "agent_start" });
+		expect(session.starting).not.toBeNull();
+		client.fire({ type: "message_start", message: { role: "user", timestamp: 1, content: "say pong" } });
+		expect(session.starting).toBeNull();
+		expect(session.status).toBe("working");
+		expect(updates.filter(update => update.kind === "starting")).toHaveLength(2);
+
+		client.fire({ type: "agent_end", messages: [] });
+		expect(session.status).toBe("idle");
+	});
+
+	test("a prompt that ends without a turn goes back to idle on its prompt_result, even one that comes before its ack", async () => {
+		const { session, client } = await startSession();
+		await session.prompt(null, "denied", [], "steer");
+		expect(session.status).toBe("working");
+		client.settlePrompt("req_1");
+		expect(session.status).toBe("idle");
+		expect(session.starting).toBeNull();
+
+		client.prompt = async () => {
+			client.settlePrompt("req_2");
+			return "req_2";
+		};
+		await session.prompt(null, "denied again", [], "steer");
+		expect(session.status).toBe("idle");
+		expect(session.starting).toBeNull();
+	});
+
+	test("a builtin slash command omp completes itself never starts, a /skill: prompt does", async () => {
+		const { session } = await startSession();
+		await session.prompt(null, "/model", [], "steer");
+		expect(session.starting).toBeNull();
+		expect(session.status).toBe("idle");
+
+		await session.prompt(null, "/skill:review the diff", [], "steer");
+		expect(session.starting?.text).toBe("/skill:review the diff");
+	});
+
+	test("a prompt queued into a running turn, or one whose turn started before its ack, is not held as starting", async () => {
+		const { session, client } = await startSession();
+		client.fire({ type: "agent_start" });
+		await session.prompt(null, "steer this", [], "steer");
+		expect(session.starting).toBeNull();
+		client.fire({ type: "agent_end", messages: [] });
+
+		client.prompt = async () => {
+			client.fire({ type: "agent_start" });
+			return "req_9";
+		};
+		await session.prompt(null, "quick", [], "steer");
+		expect(session.starting).toBeNull();
+		expect(session.status).toBe("working");
+	});
+
+	test("a stop lets go of the starting prompt and hands it back first, even after its aborted prompt_result, unless its turn showed it", async () => {
+		const { session, client } = await startSession();
+		await session.prompt(null, "never mind", [image], "steer");
+		client.abortAndRestoreQueue = async () => {
+			client.settlePrompt("req_1");
+			return { steering: [{ text: "and this" }], followUp: [] };
+		};
+		expect(await session.interrupt()).toEqual([{ text: "never mind", images: [image] }, { text: "and this", images: [] }]);
+		expect(session.starting).toBeNull();
+		expect(session.status).toBe("idle");
+
+		await session.prompt(null, "shown", [], "steer");
+		client.abortAndRestoreQueue = async () => {
+			client.fire({ type: "message_start", message: { role: "user", timestamp: 2, content: "shown" } });
+			return { steering: [], followUp: [] };
+		};
+		expect(await session.interrupt()).toEqual([]);
 	});
 });
 

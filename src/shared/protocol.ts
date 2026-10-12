@@ -15,8 +15,8 @@ export type ServerMsg =
 	| { t: "roster"; reset: boolean; hosts: RosterHost[]; removed: string[]; error: string | null }
 	/** `reset` replaces the list with `sessions`; otherwise `sessions` replace or join by `sessionId` and `removed` leave. The page orders them with {@link newestPastFirst}. */
 	| { t: "past"; reset: boolean; sessions: PastSession[]; removed: string[] }
-	/** `reset` replaces the view's transcript; otherwise `items` are upserts by id, new ids appended. */
-	| { t: "items"; view: View; reset: boolean; items: Item[] }
+	/** `reset` replaces the view's transcript; otherwise `items` are upserts by id, new ids appended, and `removed` leave. */
+	| { t: "items"; view: View; reset: boolean; items: Item[]; removed: string[] }
 	/** The files the view's agent changed, in first-touch order: `reset` replaces them; otherwise `files` replace or join by `path`, new paths appended. */
 	| { t: "work"; view: View; reset: boolean; files: ChangedFile[] }
 	/** The images the view's agent and its subagents' tools returned: `reset` replaces them; otherwise `media` joins them. The page orders them with {@link newestMediaFirst}. */

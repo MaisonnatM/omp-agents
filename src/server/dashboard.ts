@@ -130,7 +130,11 @@ export class Dashboard {
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
-		const views = (this.#views = new Views(pathFor, (topic, msg) => void this.#publisher?.publish(topic, JSON.stringify(msg))));
+		const views = (this.#views = new Views(
+			pathFor,
+			(topic, msg) => void this.#publisher?.publish(topic, JSON.stringify(msg)),
+			instanceId => sessions.started(instanceId)?.starting ?? null,
+		));
 		const notices = (this.#notices = new Notices(
 			noticesFile,
 			{
@@ -432,6 +436,9 @@ export class Dashboard {
 				return;
 			case "event":
 				this.#views.applyEvent(instanceId, update.event);
+				return;
+			case "starting":
+				this.#views.starting(instanceId);
 				return;
 			case "note":
 				this.#views.note(instanceId, update.agentId, update.level, update.text);

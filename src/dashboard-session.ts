@@ -14,7 +14,7 @@ import { endsMidTurn } from "./omp/sessions";
 import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
-import { isUserPrompt, splitSuggestions } from "./transcript";
+import { isUserPrompt, type StartingPrompt, splitSuggestions } from "./transcript";
 import { TurnGate } from "./turn-gate";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
@@ -34,6 +34,8 @@ export type DashboardUpdate =
 	| { kind: "written"; path: string }
 	/** The session moved to a new file and session id, so its views read that file from now on. */
 	| { kind: "switched" }
+	/** The main agent's {@link DashboardSession.starting} prompt changed. */
+	| { kind: "starting" }
 	/** A turn ran to its end, which the queue did not hand to a follow-up; `reply` is its last text without suggested prompts, `null` when it ended on none. */
 	| { kind: "turn-ended"; reply: string | null };
 
@@ -101,8 +103,15 @@ export class DashboardSession implements LiveSession {
 	context: ContextUsage | null = null;
 	/** omp's own queues, from `get_state` and then each `queue_update`. */
 	queue: MessageQueue;
-	/** Whether a turn runs; {@link status} reports `needs-input` over it while a question waits. */
-	#activity: "working" | "idle" = "idle";
+	/** Whether a turn runs, from its `agent_start` to its terminal `agent_end`. */
+	#running = false;
+	#starting: StartingPrompt | null = null;
+	/** The `agent_start`s seen, so a prompt whose turn started before its ack came back is not held as starting. */
+	#turnStarts = 0;
+	/** The live user messages seen, so Stop can tell whether the starting prompt's turn showed it. */
+	#promptsShown = 0;
+	/** The ids of the `prompt_result`s that came while a main-agent prompt waited for its ack: its own may come first. */
+	#resultsBeforeAck: Set<string> | null = null;
 	readonly #child: RpcChild;
 	readonly #requests: PendingRequests;
 	#agents = new Map<string, RpcAgent>();
@@ -142,10 +151,16 @@ export class DashboardSession implements LiveSession {
 
 		const { client } = child;
 		client.onSessionEvent(event => this.#onEvent(event));
+		client.onPromptResult(({ id }) => {
+			if (id === undefined) return;
+			this.#resultsBeforeAck?.add(id);
+			if (id === this.#starting?.id) this.#clearStarting();
+		});
 		client.onSubagentLifecycle(payload => this.#onSubagent(SUBAGENT_LIFECYCLE, payload));
 		client.onSubagentProgress(payload => this.#onSubagent(SUBAGENT_PROGRESS, payload));
 		void child.exited.then(() => {
 			this.#exited = true;
+			this.#clearStarting();
 			requests.clear();
 			emit({ kind: "exited", ended: this.#ended });
 		});
@@ -279,8 +294,18 @@ export class DashboardSession implements LiveSession {
 		return this.#child.client.stop();
 	}
 
+	/** `working` from the ack of a prompt sent while idle, through its turn; `needs-input` over that while a question waits. */
 	get status(): HostStatus {
-		return this.#requests.list().length > 0 ? "needs-input" : this.#activity;
+		if (this.#requests.list().length > 0) return "needs-input";
+		return this.#running || this.#starting ? "working" : "idle";
+	}
+
+	/**
+	 * The prompt omp admitted while the main agent was idle, from its ack until its turn shows it as a live user message,
+	 * its `prompt_result` comes, or a stop, a switch to another file, or the exit ends it.
+	 */
+	get starting(): StartingPrompt | null {
+		return this.#starting;
 	}
 
 	requests(): UserRequest[] {
@@ -341,9 +366,24 @@ export class DashboardSession implements LiveSession {
 
 	/** Sends `text` and `images` to the main agent through the turn gate; rejects when omp does not take them. */
 	async #send(text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
+		await this.#turn.run(() => this.#promptMain(text, images, delivery));
+	}
+
+	/**
+	 * Prompts the main agent, and holds a prompt omp admitted while idle as {@link starting}. omp completes a builtin slash
+	 * command itself without a turn or a `prompt_result`, so only a `/skill:` prompt among `/` prompts is held.
+	 */
+	async #promptMain(text: string, images: PromptImage[], delivery?: Delivery): Promise<void> {
 		this.#userCommand = text.startsWith("/");
+		const idle = !this.#running && !this.#starting;
+		const starts = this.#turnStarts;
+		const settled = (this.#resultsBeforeAck = new Set<string>());
 		const content = images.map(image => ({ type: "image" as const, ...image }));
-		await this.#turn.run(() => this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery));
+		const id = await this.#child.client.prompt(text, content.length > 0 ? content : undefined, delivery).finally(() => {
+			this.#resultsBeforeAck = null;
+		});
+		const local = text.startsWith("/") && !text.startsWith("/skill:");
+		if (id && idle && !local && this.#turnStarts === starts && !settled.has(id)) this.#setTurn(false, { id, text, images });
 	}
 
 	/** A `!` command, which omp runs in the session's directory and records in its file for the agent to see. */
@@ -390,8 +430,13 @@ export class DashboardSession implements LiveSession {
 	async interrupt(): Promise<WithdrawnMessage[]> {
 		return this.#turn.run(async () => {
 			try {
+				const starting = this.#starting;
+				const shown = this.#promptsShown;
 				const { steering, followUp } = await this.#child.client.abortAndRestoreQueue();
-				return [...steering, ...followUp].map(({ text, images = [] }) => ({ text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) }));
+				this.#clearStarting();
+				// omp's restore leaves out a prompt it admitted but never ran, so the composer gets it back from here.
+				const unsent = starting && this.#promptsShown === shown ? [starting] : [];
+				return [...unsent, ...steering, ...followUp].map(({ text, images = [] }) => ({ text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) }));
 			} catch (err) {
 				this.#fail("Stop failed", err);
 				throw err;
@@ -418,7 +463,10 @@ export class DashboardSession implements LiveSession {
 		await this.#turn
 			.run(async () => {
 				if (text.startsWith("!")) throw new Error("an edited prompt cannot be a ! command");
-				if (this.#activity === "working") await client.abort();
+				if (this.#running || this.#starting) {
+					await client.abort();
+					this.#clearStarting();
+				}
 				if ((await client.branch(entryId)).cancelled) throw new Error("an omp extension cancelled the branch");
 				const state = await client.getState();
 				this.sessionId = state.sessionId;
@@ -428,8 +476,7 @@ export class DashboardSession implements LiveSession {
 				// omp forgets the subagents of the history it left.
 				this.#agents.clear();
 				this.#emit({ kind: "switched" });
-				this.#userCommand = text.startsWith("/");
-				await client.prompt(text);
+				await this.#promptMain(text, []);
 			})
 			.catch((err: unknown) => {
 				this.#fail("Edit failed", err);
@@ -512,10 +559,16 @@ export class DashboardSession implements LiveSession {
 	#onEvent(event: unknown): void {
 		this.#emit({ kind: "event", event });
 		if (!isObject(event)) return;
-		if (event.type === "agent_start") this.#setActivity("working");
-		// A non-terminal end hands over to a queued follow-up.
-		else if (event.type === "agent_end" && event.isTerminal !== false) {
-			this.#setActivity("idle");
+		if ((event.type === "message_start" || event.type === "message_end") && isObject(event.message) && isUserPrompt(event.message)) {
+			this.#promptsShown++;
+			this.#clearStarting();
+		}
+		if (event.type === "agent_start") {
+			this.#turnStarts++;
+			this.#setTurn(true, this.#starting);
+		} else if (event.type === "agent_end" && event.isTerminal !== false) {
+			// A non-terminal end hands over to a queued follow-up.
+			this.#setTurn(false, this.#starting);
 			this.#refresh();
 			this.#emit({ kind: "turn-ended", reply: lastReply(event.messages) });
 		} else if (event.type === "queue_update" && isTexts(event.steering) && isTexts(event.followUp)) {
@@ -558,6 +611,7 @@ export class DashboardSession implements LiveSession {
 			const moved = await this.#follow(state);
 			this.#applyState(state);
 			this.thinkingLevels = levels;
+			if (moved) this.#clearStarting();
 			this.#emit({ kind: moved ? "switched" : "roster" });
 		} catch (err) {
 			if (failure) this.#fail(failure, err);
@@ -581,10 +635,17 @@ export class DashboardSession implements LiveSession {
 		return true;
 	}
 
-	#setActivity(activity: "working" | "idle"): void {
-		if (this.#activity === activity) return;
-		this.#activity = activity;
-		this.#emit({ kind: "roster" });
+	#setTurn(running: boolean, starting: StartingPrompt | null): void {
+		const status = this.status;
+		const changed = starting !== this.#starting;
+		this.#running = running;
+		this.#starting = starting;
+		if (changed) this.#emit({ kind: "starting" });
+		if (this.status !== status) this.#emit({ kind: "roster" });
+	}
+
+	#clearStarting(): void {
+		this.#setTurn(this.#running, null);
 	}
 
 	#onSubagent(channel: string, payload: unknown): void {

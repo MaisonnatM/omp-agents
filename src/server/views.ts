@@ -6,6 +6,7 @@ import { dirname } from "node:path";
 import type { ServerWebSocket } from "bun";
 import { MediaTree } from "../media";
 import { FileTail } from "../tail";
+import type { StartingPrompt } from "../transcript";
 import type { ServerMsg } from "../shared/protocol";
 import type { View } from "../shared/sessions";
 
@@ -35,7 +36,7 @@ export const watching = (ws: Socket, instanceId: string): boolean =>
 function snapshot(view: View, resources: { tail: FileTail; media: MediaTree } | undefined): ServerMsg[] {
 	if (!resources) {
 		return [
-			{ t: "items", view, reset: true, items: [] },
+			{ t: "items", view, reset: true, items: [], removed: [] },
 			{ t: "work", view, reset: true, files: [] },
 			{ t: "media", view, reset: true, media: [] },
 		];
@@ -43,10 +44,10 @@ function snapshot(view: View, resources: { tail: FileTail; media: MediaTree } | 
 	const { tail, media } = resources;
 	return [
 		...(tail.loaded
-			? [
-					{ t: "items", view, reset: true, items: tail.transcript.items() } as const,
-					{ t: "work", view, reset: true, files: tail.files } as const,
-				]
+			? ([
+					{ t: "items", view, reset: true, items: tail.transcript.items(), removed: [] },
+					{ t: "work", view, reset: true, files: tail.files },
+				] satisfies ServerMsg[])
 			: []),
 		...(media.loaded ? [{ t: "media", view, reset: true, media: media.media } as const] : []),
 	];
@@ -58,11 +59,16 @@ export class Views {
 	readonly #resources = new Map<string, { tail: FileTail; media: MediaTree }>();
 	readonly #pathFor: (view: View) => string | null;
 	readonly #publish: (topic: string, msg: ServerMsg) => void;
+	readonly #startingFor: (instanceId: string) => StartingPrompt | null;
 
-	/** `pathFor` names the file a view reads, or `null` while it is not known (not listed yet, or no such session). */
-	constructor(pathFor: (view: View) => string | null, publish: (topic: string, msg: ServerMsg) => void) {
+	/**
+	 * `pathFor` names the file a view reads, or `null` while it is not known (not listed yet, or no such session).
+	 * `startingFor` names a session's starting prompt, which its main view shows last.
+	 */
+	constructor(pathFor: (view: View) => string | null, publish: (topic: string, msg: ServerMsg) => void, startingFor: (instanceId: string) => StartingPrompt | null) {
 		this.#pathFor = pathFor;
 		this.#publish = publish;
+		this.#startingFor = startingFor;
 	}
 
 	/** Make `views` the socket's whole watch set. Views it already shows keep streaming without a fresh transcript. */
@@ -112,13 +118,14 @@ export class Views {
 			}
 			const tail = new FileTail(
 				path,
-				(reset, items) => this.#publish(viewTopic(key), { t: "items", view, reset, items }),
+				(reset, items, removed) => this.#publish(viewTopic(key), { t: "items", view, reset, items, removed }),
 				(reset, files) => this.#publish(viewTopic(key), { t: "work", view, reset, files }),
 			);
 			const media = new MediaTree(path, view.kind === "live" ? view.agentId : null, (reset, list) => this.#publish(viewTopic(key), { t: "media", view, reset, media: list }));
 			this.#resources.set(key, { tail, media });
 			tail.poke();
 			media.poke(path);
+			if (view.kind === "live" && view.agentId === null) this.starting(view.instanceId);
 		}
 	}
 
@@ -137,7 +144,12 @@ export class Views {
 
 	/** A live agent event of session `instanceId`'s main agent. */
 	applyEvent(instanceId: string, event: unknown): void {
-		this.#resources.get(viewKey({ kind: "live", instanceId, agentId: null }))?.tail.live(t => t.applyEvent(event));
+		this.#resources.get(viewKey({ kind: "live", instanceId, agentId: null }))?.tail.live(t => [...t.applyEvent(event), ...t.setStarting(this.#startingFor(instanceId))]);
+	}
+
+	/** Session `instanceId`'s starting prompt changed. */
+	starting(instanceId: string): void {
+		this.#resources.get(viewKey({ kind: "live", instanceId, agentId: null }))?.tail.live(t => t.setStarting(this.#startingFor(instanceId)));
 	}
 
 	/** An out-of-band line for session `instanceId` (`agentId` null) or one of its subagents. */
