@@ -1,4 +1,4 @@
-import { ListX, Plus, Trash2 } from "lucide-react";
+import { ListTodo, ListX, Plus, Trash2 } from "lucide-react";
 import { Fragment, type ReactNode, useRef, useState } from "react";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import { isClosed, type TodoStatus, type UserTodo, type UserTodoChange, type UserTodoLeaf, type UserTodoList } from "../../../src/user-todos-shared";
@@ -7,18 +7,19 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { DONE_KEPT_HOURS } from "../../../src/user-todos";
 import { localDay } from "../../days";
 import { hashForTodo, type TodoListView } from "../../routing";
+import { shortcutKeys } from "../../shortcuts";
 import { byStatus, LIST_KINDS, lastOf, leftIn, placeIn, type Section, TODO_STATUS, type TodoEntry, titleOf, todoMatcher, todosOf } from "../../todo-views";
 import { useTodoDrag } from "../../use-todo-drag";
 import { type OpenPicker, type TodoField, useTodoKeys } from "../../use-todo-keys";
 import { FoldButton, useFolds } from "../fold";
 import { PageFrame } from "../list-page";
+import { ListSplit } from "../list-split";
 import { TodoDetail } from "./detail";
 import { useTodoEditing } from "./editing";
 import { StatusIcon } from "./fields";
 import type { KnownSessions } from "./links";
 import { ArchivedRow, DraftRow, TodoRow } from "./row";
 import { TodoSearch } from "./search";
-import { TodoSplit } from "./split";
 
 interface TodoPageProps {
 	/** `null` until the server sends the list. */
@@ -177,7 +178,11 @@ function LoadedTodoPage({ list, view, openId, disabled, onChange, hosts, past, n
 				</>
 			}
 		>
-			<TodoSplit
+			<ListSplit
+				widthKey="omp-agents.todo-list-width"
+				resizeLabel="Resize the todo list"
+				detailLabel="Open todo"
+				empty={{ icon: ListTodo, title: "No todo open", hint: `Click a todo, or focus one with ${shortcutKeys("todoNext")} and press Enter.` }}
 				list={
 					<section ref={listRef} aria-label={title} className="mx-auto w-full max-w-3xl space-y-2 px-3 py-2">
 						{kind.readOnly ? (

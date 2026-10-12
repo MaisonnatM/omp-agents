@@ -1044,7 +1044,7 @@ The page lives in `web/`.
   `web/components/notices.tsx` holds `NoticesBell`, the roster header's bell, its source filters, and its list, and `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once, even with the sidebar hidden.
 - `web/components/todo/`: the Todo page.
   `page.tsx` is the page and its lists, **Archive** included, which `LIST_KINDS` marks read-only: its rows put a todo back or delete it for good, and its header offers **Empty** where the others offer **Clear done**.
-  Every other list groups its top-level todos by status, in `STATUS_GROUPS` order, under fold headers whose folds `useFolds` keeps; `split.tsx` puts the list on the left and the open todo's `detail.tsx` on the right, at a list width stored in localStorage.
+  Every other list groups its top-level todos by status, in `STATUS_GROUPS` order, under fold headers whose folds `useFolds` keeps; the page puts the list on the left and the open todo's `detail.tsx` on the right in a `ListSplit`.
   `row.tsx` holds a todo's row, with its priority and status buttons, category badge, work-state dot, due day and assignee buttons, link icons, and the day it was added, an archived todo's row, and the row of a todo not added yet; `fields.tsx` holds the status, priority, assignee, and due day pickers, as a row's icon or a labeled property button, and `input.tsx` the input a title is typed into, whose Cmd+Enter starts a session from the todo.
   As icons, the priority, assignee, and due day pickers show nothing while their field is unset, or for a closed todo's due day, until their key opens them, so a row and a sub-todo follow the same rule.
   `editing.ts` holds `useTodoEditing`, which of those inputs is open, the status a new todo takes, and what its keys do, and deleting with its **Undo** toast; `search.tsx` is the search field.
@@ -1095,6 +1095,7 @@ The page lives in `web/`.
   `pr-row.tsx` draws the sidebar row and the table row, and exports the DOM lookups of a row and its link that the board's keys use.
   `web/use-drag-order.ts` drags the pull request list's repositories, sections, and pull requests, each within its own scope, and draws the drop line.
   The tickets, Pull requests, and Inbox pages use `web/components/list-page.tsx` for their frame, header, and load and refresh states, their issue and conversation details use its `DetailPage`, and the Todo, Routines, and Calendar pages its `PageFrame`.
+  `web/components/list-split.tsx` holds `ListSplit`, the Todo page's list on the left and its open item on the right, split by a line you drag to size the list, at a width each page stores in localStorage under its own key; a page too narrow for both shows one or the other.
   The pull request's and the issue's details use `web/components/sheet-details.tsx` for the sections, links, and comments of those details.
   `LoadNote` is the loading or error line that the pull request's details, the issue's, the conversation's, and the list page share.
   `web/components/fold.tsx` holds the fold button that the Pull requests and tickets pages share, `useFolds`, which keeps in localStorage the sections you flipped from their default fold, and `useReveal`, which unfolds a section or a row and scrolls to it once that element is in the document; `web/section.ts` names such a section target.
