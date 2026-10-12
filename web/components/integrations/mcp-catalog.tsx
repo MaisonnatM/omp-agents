@@ -8,7 +8,7 @@ import { errorText, putJson } from "../../api";
 import { mcpServersStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MarkTile } from "./integration-row";
-import { catalogLogo } from "./mcp-server-row";
+import { MCP_LOGOS } from "./mcp-logo-paths";
 
 const refresh = (): Promise<void> => mcpServersStore.refresh();
 
@@ -40,7 +40,7 @@ function CatalogCard({ entry, added }: { entry: McpCatalogEntry; added: McpServe
 	return (
 		<li className="flex flex-col gap-3 rounded-xl bg-surface-3 p-4 shadow-surface-2">
 			<div className="flex items-start gap-3">
-				<MarkTile logo={catalogLogo(entry.id)} name={entry.label} />
+				<MarkTile logo={MCP_LOGOS[entry.id] ?? null} name={entry.label} />
 				<div className="min-w-0 flex-1">
 					<h3 className="truncate text-[13px] font-medium">{entry.label}</h3>
 					<p className="text-xs text-muted-foreground">{entry.category}</p>

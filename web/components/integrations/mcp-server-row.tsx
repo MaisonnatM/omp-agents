@@ -11,18 +11,11 @@ import { integrationsStore, mcpServersStore } from "../../reads";
 import { hashForSettings } from "../../routing";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
-import type { BrandLogo } from "./brand-logos";
 import { Callout, IntegrationRow, MarkTile, MetaDot } from "./integration-row";
 import { SERVICES, STATUS as INTEGRATION_STATUS, ToolList, ToolsToggle } from "./mcp-integration";
-import { MCP_LOGO_PATHS } from "./mcp-logo-paths";
+import { MCP_LOGOS } from "./mcp-logo-paths";
 
 const refresh = (): Promise<void> => mcpServersStore.refresh();
-
-/** A catalog vendor's mark in the text color, or `null` when Simple Icons has none for it. */
-export function catalogLogo(catalogId: string | null): BrandLogo | null {
-	const path = catalogId === null ? undefined : MCP_LOGO_PATHS[catalogId];
-	return path === undefined ? null : { path, color: "currentColor" };
-}
 
 const TRANSPORT: Record<McpTransport, string> = { http: "HTTP", sse: "SSE", stdio: "Local command" };
 
@@ -313,7 +306,7 @@ function ServerRow({ server }: { server: McpServerRow }) {
 	return (
 		<IntegrationRow
 			name={name}
-			mark={<MarkTile logo={catalogLogo(server.catalogId)} name={name} />}
+			mark={<MarkTile logo={(server.catalogId === null ? undefined : MCP_LOGOS[server.catalogId]) ?? null} name={name} />}
 			status={<StatusBadge {...badge} />}
 			summary={
 				entry?.description ??
