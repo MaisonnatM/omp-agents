@@ -24,7 +24,8 @@ interface AppSidebarProps {
 	panes: View[];
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
-	hiddenTabs: ReadonlySet<SidebarTab>;
+	/** The tabs the sidebar shows, in order. */
+	tabs: readonly SidebarTab[];
 	/** The server has sent the session lists. */
 	listed: boolean;
 	userTodos: UserTodoList | null;
@@ -55,7 +56,7 @@ export const AppSidebar = memo(function AppSidebar({
 	panes,
 	tab,
 	onTab,
-	hiddenTabs,
+	tabs,
 	listed,
 	userTodos,
 	hosts,
@@ -98,7 +99,7 @@ export const AppSidebar = memo(function AppSidebar({
 			onTogglePin={togglePin}
 			open={page ? NO_VIEWS : panes}
 			newSessionOpen={page?.kind === "new"}
-			hiddenTabs={hiddenTabs}
+			tabs={tabs}
 			tab={tab}
 			onTab={onTab}
 			userTodos={userTodos}

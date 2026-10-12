@@ -2,7 +2,7 @@ import { type Dispatch, type SetStateAction, useMemo, useRef } from "react";
 import type { View } from "../src/shared/sessions";
 import type { PaletteEvent, PaletteState } from "./command-palette";
 import { adjacentSession, type Layout, type Page, type SettingsRoute, type SidebarTab } from "./routing";
-import { type ShortcutHandlers, type ShortcutId, useShortcuts } from "./shortcuts";
+import { type ShortcutHandlers, type ShortcutId, TAB_SHORTCUTS, useShortcuts } from "./shortcuts";
 
 /** What the page-wide shortcuts read when a key arrives, and what they call. */
 export interface PageShortcutInput {
@@ -15,8 +15,10 @@ export interface PageShortcutInput {
 	/** The views of the Sessions tab, in order, and the focused one: what the session shortcuts step through. */
 	listed: View[];
 	view: View | null;
-	/** The sidebar tabs that do not show; their shortcuts do not apply. */
-	hiddenTabs: ReadonlySet<SidebarTab>;
+	/** The sidebar tabs whose service omp holds no sign-in to; their shortcuts and commands do not apply. */
+	signedOutTabs: ReadonlySet<SidebarTab>;
+	/** The tabs the sidebar shows, in order: Cmd+1 goes to the first. */
+	tabs: readonly SidebarTab[];
 	/** The dashboard can create Linear issues, so the new-ticket shortcut applies. */
 	linearCallable: boolean;
 	/** The right sidebar has a session to show. */
@@ -53,12 +55,45 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 			else if (!listed.length) return false;
 		};
 		const goToTab = (tab: Exclude<SidebarTab, "sessions" | "settings" | "pull-requests">) => (): boolean | void => {
-			const { hiddenTabs, page, showTab } = latest.current;
-			if (hiddenTabs.has(tab)) return false;
+			const { signedOutTabs, page, showTab } = latest.current;
+			if (signedOutTabs.has(tab)) return false;
 			if (page?.kind === tab) return;
 			showTab(tab);
 		};
+		const goTo: Record<SidebarTab, () => boolean | void> = {
+			settings: () => {
+				const { page, layout, settings, navigate, show } = latest.current;
+				if (page?.kind === "settings") show(layout);
+				else navigate({ kind: "settings", ...settings });
+			},
+			"pull-requests": () => {
+				const { page } = latest.current;
+				// The Pull requests page lists the pull requests itself; its shortcut then has nothing to open.
+				if (page?.kind === "pull-requests" && !page.target) return;
+				latest.current.showTab("pull-requests");
+			},
+			tickets: goToTab("tickets"),
+			sessions: () => {
+				const { tab, page } = latest.current;
+				if (tab === "sessions" && !page) return;
+				latest.current.showTab("sessions");
+			},
+			todo: goToTab("todo"),
+			calendar: goToTab("calendar"),
+			inbox: goToTab("inbox"),
+		};
+		const positions = Object.fromEntries(
+			TAB_SHORTCUTS.map((id, index) => [
+				id,
+				(): boolean | void => {
+					const tab: SidebarTab | undefined = latest.current.tabs[index];
+					return tab === undefined ? false : goTo[tab]();
+				},
+			]),
+		);
 		return {
+			...goTo,
+			...positions,
 			help: () => latest.current.setShortcutsOpen(open => !open),
 			switcher: () => latest.current.dispatchPalette(latest.current.palette ? { type: "close" } : { type: "open" }),
 			newSession: () => latest.current.openNewSession(),
@@ -72,31 +107,11 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 				if (!latest.current.hasDetails) return false;
 				latest.current.toggleSidebar("right");
 			},
-			settings: () => {
-				const { page, layout, settings, navigate, show } = latest.current;
-				if (page?.kind === "settings") show(layout);
-				else navigate({ kind: "settings", ...settings });
-			},
-			"pull-requests": () => {
-				const { page } = latest.current;
-				// The Pull requests page lists the pull requests itself; its shortcut then has nothing to open.
-				if (page?.kind === "pull-requests" && !page.target) return;
-				latest.current.showTab("pull-requests");
-			},
-			tickets: goToTab("tickets"),
 			newTicket: () => {
 				const { linearCallable, setNewTicket } = latest.current;
 				if (!linearCallable) return false;
 				setNewTicket(current => current ?? "");
 			},
-			sessions: () => {
-				const { tab, page } = latest.current;
-				if (tab === "sessions" && !page) return;
-				latest.current.showTab("sessions");
-			},
-			todo: goToTab("todo"),
-			calendar: goToTab("calendar"),
-			inbox: goToTab("inbox"),
 			routines: () => {
 				const { page, navigate } = latest.current;
 				if (page?.kind === "routines") return false;
@@ -116,17 +131,17 @@ export function usePageShortcuts(input: PageShortcutInput): { handlers: Shortcut
 		};
 	}, []);
 	useShortcuts(handlers);
-	const { hiddenTabs, linearCallable, hasDetails } = input;
+	const { signedOutTabs, linearCallable, hasDetails } = input;
 	/** Commands that would do nothing now. */
 	const unavailable = useMemo(
 		() =>
 			new Set<ShortcutId>([
 				// A sidebar tab's shortcut has the tab's id.
-				...(hiddenTabs satisfies ReadonlySet<ShortcutId>),
+				...(signedOutTabs satisfies ReadonlySet<ShortcutId>),
 				...(linearCallable ? [] : ["newTicket" as const]),
 				...(hasDetails ? [] : ["detailsSidebar" as const]),
 			]),
-		[hiddenTabs, linearCallable, hasDetails],
+		[signedOutTabs, linearCallable, hasDetails],
 	);
 	return { handlers, unavailable };
 }

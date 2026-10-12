@@ -109,7 +109,7 @@ export function Section({ title, meta, actions, children }: { title: string; met
 	);
 }
 
-function OrderButton({ label, direction, disabled, onClick }: { label: string; direction: "up" | "down"; disabled: boolean; onClick: () => void }) {
+export function OrderButton({ label, direction, disabled, onClick }: { label: string; direction: "up" | "down"; disabled: boolean; onClick: () => void }) {
 	const name = direction === "up" ? "up" : "down";
 	const button = (
 		<Button variant="ghost" size="icon-compact" aria-label={`Move ${label} ${name}`} disabled={disabled} onClick={onClick}>

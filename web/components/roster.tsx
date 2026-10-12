@@ -15,10 +15,11 @@ import { yourMoveCount } from "../pull-requests-model";
 import { folderName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import { pullRequestsStore, ticketsStore } from "../reads";
-import { hashForTickets, type SettingsRoute, SIDEBAR_TABS, type SidebarTab, type TodoListView } from "../routing";
+import { hashForTickets, type SettingsRoute, type SidebarTab, type TodoListView } from "../routing";
 import type { SectionTarget } from "../section";
 import type { SidebarSessions } from "../sessions";
-import { shortcutLabels, useShortcuts } from "../shortcuts";
+import { shortcutLabels, tabShortcutLabels, useShortcuts } from "../shortcuts";
+import { TAB_ROWS } from "../sidebar-tabs";
 import { ticketGroups, ticketSection } from "../tickets-model";
 import { CommandPicker } from "./command-picker";
 import { SectionLink } from "./section-link";
@@ -121,7 +122,8 @@ interface TabFit {
 /**
  * How the sidebar tabs fit its width, by how many tabs show, through container queries: labels while they fit, then icons
  * alone sharing the row. Icons alone keep each name in the tooltip and for screen readers. The tiers go by tab count
- * only, not by which tabs show, and leave room for counts on Pull requests and Sessions and the list's margins.
+ * only, not by which tabs show, and leave room for counts on Pull requests and Sessions and the list's margins; fewer
+ * than five tabs fit as five do.
  */
 const SIDEBAR_TAB_FIT = {
 	5: {
@@ -159,7 +161,8 @@ interface RosterProps {
 	open: View[];
 	/** The new-session draft is open. */
 	newSessionOpen: boolean;
-	hiddenTabs: ReadonlySet<SidebarTab>;
+	/** The tabs the bar shows, in order. */
+	tabs: readonly SidebarTab[];
 	/** The sidebar's tab, selected by the page or kept over the panes. */
 	tab: SidebarTab;
 	onTab: (tab: SidebarTab) => void;
@@ -201,7 +204,7 @@ export function Roster({
 	onTogglePin,
 	open,
 	newSessionOpen,
-	hiddenTabs,
+	tabs,
 	tab,
 	onTab,
 	userTodos,
@@ -231,8 +234,8 @@ export function Roster({
 	};
 	const selectedWorkspace = workspaces.find(({ cwd }) => cwd === workspace);
 	const newSessionLabel = selectedWorkspace ? `New session in ${folderName(selectedWorkspace.cwdDisplay) ?? selectedWorkspace.cwdDisplay}` : "New session";
-	const shownTabs = SIDEBAR_TABS.filter(({ value }) => !hiddenTabs.has(value));
-	const fit = SIDEBAR_TAB_FIT[hasTabFit(shownTabs.length) ? shownTabs.length : 7];
+	const fitCount = Math.max(tabs.length, 5);
+	const fit = SIDEBAR_TAB_FIT[hasTabFit(fitCount) ? fitCount : 7];
 	return (
 		<Tabs value={tab} onValueChange={value => onTab(value as SidebarTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
 			<SidebarHeader className="h-(--page-header-height) flex-row items-center justify-between gap-2 border-b border-border px-2 py-0">
@@ -253,7 +256,8 @@ export function Roster({
 			</SidebarHeader>
 			<SizeProvider size="compact">
 				<TabsList aria-label="Sidebar" className={cn("mx-2 mt-2 max-w-[calc(100%-1rem)] self-start", fit.list)}>
-					{shownTabs.map(({ value, label, icon }) => {
+					{tabs.map(value => {
+						const { label, icon } = TAB_ROWS[value];
 						const counted = tabCounts[value];
 						const badge = counted && counted.count > 0 ? counted : undefined;
 						return (
@@ -266,7 +270,7 @@ export function Roster({
 								aria-label={badge && `${label}, ${badge.count} ${badge.meaning}`}
 								className={cn("px-2", fit.tab)}
 								labelClassName={fit.label}
-								shortcut={shortcutLabels(value)}
+								shortcut={tabShortcutLabels(value, tabs)}
 							/>
 						);
 					})}

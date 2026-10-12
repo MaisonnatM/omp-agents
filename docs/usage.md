@@ -696,7 +696,7 @@ An action that fails shows its error, and its control becomes available again.
   A saved tickets list without each issue's opening date is discarded, and the page reads Linear again.
   The server keeps Linear's answer for 30 seconds, and **Refresh** asks again at once.
 - The dashboard reads Linear through omp's Linear MCP server and its sign-in, so there is no key to set.
-  Until omp is signed in to that server, the sidebar has no **Tickets** tab, Cmd+2 keeps its browser behavior, and a `#tickets` address shows Linear's integration row instead of the issues.
+  Until omp is signed in to that server, the sidebar has no **Tickets** tab, which then takes no number, so the tabs after it move up one, and a `#tickets` address shows Linear's integration row instead of the issues.
 - To connect, open **Settings › Integrations** and choose **Connect** on Linear's row; see [Integrations](#integrations).
   A new browser tab opens Linear's sign-in page; approve omp there, and the **Tickets** tab appears within a few seconds.
   When Linear later refuses the sign-in, the **Tickets** tab stays and its page shows Linear's row with **Reconnect**; the Todo page's **Create Linear ticket** and the Calendar's tickets hide until it works again.
@@ -1019,7 +1019,7 @@ An action that fails shows its error, and its control becomes available again.
 
 ## Settings
 
-- **Settings** is the last sidebar tab, after **Calendar** and, once Gmail is connected, **Inbox**.
+- **Settings** is the last sidebar tab by default, after **Calendar** and, once Gmail is connected, **Inbox**.
   It stays selected while Settings is open, including through a session's **Workspace settings** menu item, a direct link, or the Settings shortcut.
   Select **Sessions** to return to the existing panes.
   The sidebar lists seven sections in two groups.
@@ -1078,6 +1078,11 @@ An action that fails shows its error, and its control becomes available again.
 - **Preferences** holds the dashboard's own choices, saved in the browser's localStorage, not in omp's files.
   **Theme**: **System** follows the computer's light or dark setting, and **Light** and **Dark** pin one; it applies at once and does not change omp's terminal theme.
   **Transcript**: **Show tool calls** and **Show thinking** are the same choices as their shortcuts.
+  **Sidebar tabs** lists the seven sidebar tabs in the order the sidebar shows them, each with the Cmd+number it takes now, a switch that shows or hides it, and buttons that move it up or down.
+  A hidden tab only leaves the sidebar and loses its number: its page, its command in the command menu, its G pair, and links to it still work.
+  **Settings** cannot be hidden, so you can always come back to show the others, but it can move.
+  While omp holds no sign-in to Linear or Gmail, the **Tickets** or **Inbox** row says that tab shows only once the service is connected.
+  Putting every tab back in its default order and shown forgets the choice, so the sidebar follows the default again.
   **New sessions** pins a skill.
   Every session that you start from the dashboard, from the new-session draft or from a quick action on a pull request, a Linear issue, or a todo, then sends its first message through that skill.
   The picker lists the skills of the workspace that Settings opened on, and says which, or your own skills with **User files only**.
@@ -1157,13 +1162,8 @@ Alt is Option on macOS.
 | Esc | Maximized pane | Restore the split |
 | ? | Outside text fields | Show keyboard shortcuts |
 | / / Cmd+I | Outside text fields / anywhere | Focus the composer |
-| Cmd+1 | Anywhere | Go to Pull requests |
-| Cmd+2 | Anywhere | Go to your Linear tickets, when connected |
+| Cmd+1 … Cmd+7 | Anywhere | Go to the first … seventh tab the sidebar shows |
 | C | Outside text fields, except on the Todo and Calendar pages | Create a Linear ticket, when connected |
-| Cmd+3 | Anywhere | Go to the sessions |
-| Cmd+4 | Anywhere | Go to your todo list |
-| Cmd+5 | Anywhere | Go to your calendar |
-| Cmd+6 | Anywhere | Open or close settings |
 | G then I | Outside text fields | Go to your Gmail inbox, when connected |
 | G then R | Outside text fields | Go to your routines |
 | G then P | Outside text fields | Go to your projects |
@@ -1192,10 +1192,12 @@ Alt is Option on macOS.
 - Press `?` outside a text field, or click the keyboard button in the sidebar header, to list the keyboard shortcuts.
   The dialog groups them in tabs by category: General, Sessions, Pull requests, Todo, Inbox, Calendar, and Changes.
   Hovering a button that has a shortcut shows its keys in the button's tooltip: the sidebar header's buttons and tabs, the workspace, model, directory, and thinking pickers, **New session**, **End session**, the composer's Stop and **Send now** buttons, a queued row's **Send now** and **Edit**, a maximized pane's restore button, the open todo's ↑, ↓, and **×**, the Calendar page's **New event**, and an Inbox conversation's **Open in Gmail**.
-- Cmd+1 through Cmd+5 select the dashboard's tabs, even while typing; they replace the browser's tab selection when the dashboard handles them.
-  The numbers stay fixed when Tickets is hidden without a Linear connection; Cmd+2 then keeps its browser behavior.
-  The **Inbox** tab takes no number, so G then I opens it.
-  Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, or another digit keeps its browser behavior.
+- Cmd+1 through Cmd+7 go to the first through seventh tab the sidebar shows, even while typing; they replace the browser's tab selection when the dashboard handles them.
+  The numbers follow the order the sidebar shows, which **Settings › Preferences** sets: a tab you hide, or Tickets or Inbox without a Linear or Gmail sign-in, takes no number, and the tabs after it move up one.
+  A number with no tab keeps its browser behavior.
+  In the default order the tabs are Pull requests, Tickets, Sessions, Todo, Calendar, Inbox, and Settings, so with both services connected Cmd+6 opens the **Inbox** and Cmd+7 **Settings**.
+  The **Inbox** takes its number like any tab and keeps G then I.
+  Cmd with T, W, N, L, R, D, Q, O, P, S, Tab, 8, 9, or 0 keeps its browser behavior.
   Single keys and the G pairs work only while no text field has focus, so they never take what you type.
   For a pair, press G, then the second key within 1.5 seconds.
 - In the composer, Enter queues a follow-up while a turn runs, and Cmd+Enter steers it immediately.
@@ -1233,10 +1235,10 @@ Alt is Option on macOS.
   Cmd+E expands or collapses every tool group.
   Cmd+Shift+E shows or hides the tool rows in those groups, and Alt+T (Option+T on macOS) shows or hides the thinking text.
   Both stay as you set them in this browser.
-- Cmd+1 opens the Pull requests page, and Cmd+2 opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page but the Todo and Calendar pages, where it adds a todo or an event.
-  Cmd+3 goes back from the Pull requests page, the todo list, the calendar, the inbox, the routines, Settings, or the new-session draft to the panes.
-  Cmd+4 opens the **Todo** page, Cmd+5 the **Calendar** page, G then I the **Inbox** page when connected to Gmail, G then R the **Routines** page, and G then P the **Projects** page.
-  Cmd+6 opens Settings, where the model roles and the integrations live, and closes it again.
+- The number of the **Pull requests** tab opens the Pull requests page, and that of **Tickets** opens Tickets when connected to Linear; C then opens the new-ticket dialog from any page but the Todo and Calendar pages, where it adds a todo or an event.
+  The number of **Sessions** goes back from the Pull requests page, the todo list, the calendar, the inbox, the routines, Settings, or the new-session draft to the panes.
+  The numbers of **Todo** and **Calendar** open those pages, G then I or the Inbox's number the **Inbox** page when connected to Gmail, G then R the **Routines** page, and G then P the **Projects** page.
+  The number of **Settings** opens Settings, where the model roles and the integrations live, and closes it again.
   G then W opens the workspace picker with its search field focused.
 - Session shortcuts act on the focused pane.
   The dashboard does not read `~/.omp/agent/keybindings.yml`.

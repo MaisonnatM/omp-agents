@@ -1,5 +1,8 @@
 import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 
+/** The keys that go to the sidebar's tabs by position: Cmd+1 goes to the first tab the sidebar shows, whichever it is. */
+export const TAB_SHORTCUTS = ["tab1", "tab2", "tab3", "tab4", "tab5", "tab6", "tab7"] as const;
+
 export type ShortcutId =
 	| "interrupt"
 	| "steer"
@@ -56,7 +59,8 @@ export type ShortcutId =
 	| "previousChangedFile"
 	| "moveUp"
 	| "moveDown"
-	| "terminal";
+	| "terminal"
+	| (typeof TAB_SHORTCUTS)[number];
 
 /**
  * Where a binding fires. `composer`: from the composer's text field, before any page-wide binding sees the key.
@@ -164,7 +168,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
 		command: "Toggle details sidebar",
 		keys: [{ chord: { key: "b", mod: true, alt: true }, scope: "anywhere" }],
 	},
-	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [{ chord: { key: "6", mod: true }, scope: "anywhere" }] },
+	{ id: "settings", category: "general", label: "Open or close settings", command: "Toggle settings", keys: [] },
 	{ id: "help", category: "general", label: "Show keyboard shortcuts", command: "Show keyboard shortcuts", keys: [{ chord: { key: "?" }, scope: "outside-fields" }] },
 	{ id: "restore", category: "sessions", label: "Restore the split from a maximized pane", keys: [{ chord: { key: "Escape" }, scope: "anywhere" }] },
 	{
@@ -176,12 +180,13 @@ export const SHORTCUTS: readonly Shortcut[] = [
 			{ chord: { key: "i", mod: true }, scope: "anywhere" },
 		],
 	},
-	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [{ chord: { key: "1", mod: true }, scope: "anywhere" }] },
-	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [{ chord: { key: "2", mod: true }, scope: "anywhere" }] },
+	...TAB_SHORTCUTS.map((id, index): Shortcut => ({ id, category: "general", label: `Go to tab ${index + 1} of the sidebar`, keys: [{ chord: { key: String(index + 1), mod: true }, scope: "anywhere" }] })),
+	{ id: "pull-requests", category: "general", label: "Go to Pull requests", command: "Go to pull requests", keys: [] },
+	{ id: "tickets", category: "general", label: "Go to your Linear tickets", command: "Go to tickets", keys: [] },
 	{ id: "newTicket", category: "general", label: "Create a Linear ticket, except on the Todo and Calendar pages", command: "Create ticket", keys: [{ chord: { key: "c" }, scope: "outside-fields" }] },
-	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [{ chord: { key: "3", mod: true }, scope: "anywhere" }] },
-	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [{ chord: { key: "4", mod: true }, scope: "anywhere" }] },
-	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [{ chord: { key: "5", mod: true }, scope: "anywhere" }] },
+	{ id: "sessions", category: "general", label: "Go to the sessions", command: "Go to sessions", keys: [] },
+	{ id: "todo", category: "general", label: "Go to your todo list", command: "Go to todo list", keys: [] },
+	{ id: "calendar", category: "general", label: "Go to your calendar", command: "Go to calendar", keys: [] },
 	{ id: "inbox", category: "general", label: "Go to your Gmail inbox", command: "Open inbox", keys: [{ goTo: "i" }] },
 	{ id: "routines", category: "general", label: "Go to your routines", command: "Go to routines", keys: [{ goTo: "r" }] },
 	// After a G, P is also the Todo page's `todoPriority`: the page outranks the App, so the priority wins while a todo is focused or open, and its handler declines otherwise.
@@ -301,14 +306,27 @@ export function bindingLabel(binding: Binding): string {
 
 const EITHER = new Intl.ListFormat("en", { type: "disjunction" });
 
+const KEYS = {} as Record<ShortcutId, readonly Binding[]>;
 const LABELS = {} as Record<ShortcutId, readonly string[]>;
-for (const { id, keys } of SHORTCUTS) LABELS[id] = keys.map(bindingLabel);
+for (const { id, keys } of SHORTCUTS) {
+	KEYS[id] = keys;
+	LABELS[id] = keys.map(bindingLabel);
+}
 
 /** Every key that runs `id`, one label each, as a tooltip's chips draw them: `["⌘/", "?"]`. */
 export const shortcutLabels = (id: ShortcutId): readonly string[] => LABELS[id];
 
 /** Every key that runs `id`, as prose names them: `⌘/ or ?`. */
 export const shortcutKeys = (id: ShortcutId): string => EITHER.format(shortcutLabels(id));
+
+/** The keys that run `id` while the sidebar shows `tabs`: the position key of its place there, if any, then its own keys. */
+export function tabBindings(id: ShortcutId, tabs: readonly ShortcutId[]): readonly Binding[] {
+	const position: (typeof TAB_SHORTCUTS)[number] | undefined = TAB_SHORTCUTS[tabs.indexOf(id)];
+	return position === undefined ? KEYS[id] : [...KEYS[position], ...KEYS[id]];
+}
+
+/** {@link tabBindings}, one label each, as a tooltip's chips draw them: `["⌘6", "G then I"]`. */
+export const tabShortcutLabels = (id: ShortcutId, tabs: readonly ShortcutId[]): readonly string[] => tabBindings(id, tabs).map(bindingLabel);
 
 const typing = (target: EventTarget | null): boolean =>
 	target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));

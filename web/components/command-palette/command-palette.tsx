@@ -51,7 +51,7 @@ import { useConversationHits, useSearchSources } from "../../reads";
 import { hashForProjects, type OpenMode } from "../../routing";
 import { revealMessage } from "../../message-reveal";
 import { sessionActions, type SessionEntry } from "../../session-actions";
-import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels } from "../../shortcuts";
+import { pressesChord, type ShortcutHandlers, type ShortcutId, shortcutLabels, tabShortcutLabels } from "../../shortcuts";
 import { useStoredState } from "../../stored-state";
 import { quickAddTodo } from "../../todo-quick-add";
 import { useDashboardActions, useDashboardStatus } from "../dashboard-context";
@@ -100,6 +100,8 @@ interface CommandPaletteProps {
 	handlers: ShortcutHandlers;
 	/** Commands that do nothing now, which the palette leaves out. */
 	unavailable: ReadonlySet<ShortcutId>;
+	/** The tabs the sidebar shows, in order, whose position keys the tab commands show. */
+	tabs: readonly ShortcutId[];
 	/** The todo list's categories, which a typed `#category` files a new todo under; `null` while the list cannot be edited. */
 	todoCategories: readonly UserTodoCategory[] | null;
 	/** The todo list's top-level todos, which a search lists. */
@@ -122,7 +124,7 @@ export const CommandPalette = memo(function CommandPalette({ state, ...props }: 
 	return state && <OpenCommandPalette state={state} {...props} />;
 });
 
-function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, todoCategories, todos, linearConnected, projects, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
+function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspace, onOpenSession, onPickWorkspace, pinned, onTogglePin, handlers, unavailable, tabs, todoCategories, todos, linearConnected, projects, onCreateTicket }: CommandPaletteProps & { state: PaletteState }) {
 	const { send, start, end, changeTodo } = useDashboardActions();
 	const { starts, ending, pullRequestsScope } = useDashboardStatus();
 	const [frecency, setFrecency] = useStoredState(FRECENCY_KEY, decodeFrecency, JSON.stringify);
@@ -221,7 +223,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 					title: command,
 					keywords: [label],
 					icon: COMMAND_ICON[id] ?? Command,
-					accessories: [{ kind: "keys", labels: shortcutLabels(id) }],
+					accessories: [{ kind: "keys", labels: tabShortcutLabels(id, tabs) }],
 					kind: "Command",
 					actions: [[{ id: "run", title: "Run command", icon: COMMAND_ICON[id] ?? Command, run: { kind: "do", fn: () => void handlers[id]?.() } }]],
 				}),
@@ -229,7 +231,7 @@ function OpenCommandPalette({ state, dispatch, hosts, past, workspaces, workspac
 			pushItem("command:workspace", "Choose workspace…", Folder, "workspaces", ["switch workspace", "directory"], shortcutLabels("workspace")),
 			pushItem("command:create-todo", "Create todo", ListTodo, "createTodo", ["add todo", "task"], []),
 		];
-	}, [handlers, unavailable]);
+	}, [handlers, unavailable, tabs]);
 
 	const workspaceItems = useMemo((): PaletteItem[] => {
 		const pickWorkspace = (cwd: string | null): void => {
