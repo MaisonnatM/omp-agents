@@ -1,6 +1,6 @@
 /**
  * The HTTP API the page reads and writes omp's settings, analytics, pull requests, git checkouts, worktrees,
- * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, and the text files agent text names through.
+ * the workspaces Settings adds and hides, the machine's load, the terminal panel's shells, the integrations, the model providers omp signs in to, Linear tickets and their files, the Linear issue a todo opens, Google Calendar and the events kept on this computer, your Gmail inbox, prompt images, and the text files agent text names through.
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { join } from "node:path";
@@ -42,7 +42,8 @@ import { answer, fail, type Guards } from "./http";
 import type { LocalEventsFile } from "./local-events-file";
 import { mailDocument } from "./mail-document";
 import { listNotes } from "./project-notes";
-import { type Parsed, parseAutoPullChange, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
+import { createTicketForTodo, type TodoTicketEnv, TodoTicketRefused } from "./todo-ticket";
+import { type Parsed, parseAutoPullChange, parseCalendarShown, parseEventRef, parseGoogleClient, parseIntegrationId, parseLoginAnswer, parseLoginMethod, parseMailReply, parseMailSend, parseMailTrash, parseMcpServerAdd, parseMcpServerEnabled, parseMcpServerName, parseNewEvent, parsePromptDocument, parseProviderSignOut, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange, parseWorktreeRemoval, SHA256 } from "./wire";
 import type { AutoPullChange, SourceControlAnswer } from "../shared/source-control";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
 import { MAX_PROMPT_DOCUMENT_BYTES } from "../shared/prompt-files";
@@ -89,6 +90,9 @@ export interface FileRoutesEnv {
 	terminals: Terminals;
 }
 
+/** What the todo routes read and write: the Todo page's list. */
+export type TodoRoutesEnv = Omit<TodoTicketEnv, "createTicket">;
+
 /** Everything the HTTP API reads, by concern. */
 export interface RouteEnv {
 	guards: Guards;
@@ -96,6 +100,7 @@ export interface RouteEnv {
 	calendar: CalendarRoutesEnv;
 	gmail: GmailClient;
 	files: FileRoutesEnv;
+	todos: TodoRoutesEnv;
 }
 
 type Handler = (req: Request) => Promise<Response>;
@@ -408,6 +413,17 @@ function integrationRoutes({ get, write }: RouteKit): Routes {
 	};
 }
 
+/** The Linear issue a todo opens and links. */
+function todoRoutes({ write }: RouteKit, env: TodoRoutesEnv): Routes {
+	/** `PUT /api/todo/ticket`: `TodoTicketRequest`; answers `TodoTicketAnswer` once the todo list holds the issue's link or could not. */
+	const todoTicket = write(
+		body => checked(parseTodoTicket(body), "Expected { todoId, team } naming a todo and a Linear team by id"),
+		request => createTicketForTodo({ ...env, createTicket }, request),
+		err => (err instanceof TodoTicketRefused ? fail(409, err.message) : null),
+	);
+	return { "/api/todo/ticket": { PUT: todoTicket } };
+}
+
 /** Google Calendar's calendars and events, the events the Calendar page adds and deletes, and the events kept on this computer. */
 function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Routes {
 	const { google, localEvents } = env;
@@ -676,5 +692,6 @@ export function createRoutes(env: RouteEnv): Routes {
 		...gmailRoutes(kit, env.gmail),
 		...pullRequestRoutes(kit),
 		...fileRoutes(kit, env.files),
+		...todoRoutes(kit, env.todos),
 	};
 }

@@ -2,7 +2,7 @@ import { ChevronDown, ChevronRight, Play, Plus, Ticket } from "lucide-react";
 import { useState } from "react";
 import { errorText } from "../../../src/json";
 import { hashForSession } from "../../../src/shared/sessions";
-import type { TicketChoice, TicketDraft } from "../../../src/shared/tickets";
+import type { TicketChoice, TodoTicketAnswer, TodoTicketRequest } from "../../../src/shared/tickets";
 import { addTodo } from "../../../src/user-todos";
 import type { UserTodo, UserTodoChange, UserTodoList } from "../../../src/user-todos-shared";
 import { badgeColors } from "@/components/ui/badge";
@@ -28,13 +28,18 @@ import { StatusIcon, TodoAssigneePicker, TodoDuePicker, TodoPriorityPicker, Todo
 import { TodoInput } from "./input";
 import { AddedByChip, type KnownSessions, TodoLinkChip, TodoWorkPill } from "./links";
 
-/** Opening a Linear issue from a todo: pick its team, then create it, which links it to the todo. */
+/**
+ * Opening a Linear issue from a todo: pick its team, then the server creates it and links it to the todo. An issue the
+ * server opened but could not link stays `unlinked`, which offers to link it rather than to open another.
+ */
 type TicketStep =
 	| { kind: "idle" }
 	| { kind: "loading" }
 	| { kind: "picking"; teams: TicketChoice[]; team: string }
 	| { kind: "creating"; teams: TicketChoice[]; team: string }
-	| { kind: "failed"; error: string };
+	| { kind: "failed"; error: string }
+	| { kind: "linked"; identifier: string }
+	| { kind: "unlinked"; identifier: string; error: string };
 
 function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: UserTodoChange) => void }) {
 	const [step, setStep] = useState<TicketStep>({ kind: "idle" });
@@ -50,15 +55,32 @@ function CreateTicket({ todo, onChange }: { todo: UserTodo; onChange: (change: U
 	};
 	const create = async (teams: TicketChoice[], team: string): Promise<void> => {
 		setStep({ kind: "creating", teams, team });
+		let created: TodoTicketAnswer;
 		try {
-			const { identifier } = await putJson<{ identifier: string }>("/api/ticket/new", { title: todo.text, description: todo.body, team } satisfies TicketDraft);
-			rememberTeam(team);
-			onChange({ op: "link", id: todo.id, link: { kind: "ticket", identifier } });
-			setStep({ kind: "idle" });
+			created = await putJson<TodoTicketAnswer>("/api/todo/ticket", { todoId: todo.id, team } satisfies TodoTicketRequest);
 		} catch (err) {
-			setStep({ kind: "failed", error: errorText(err) });
+			return setStep({ kind: "failed", error: errorText(err) });
 		}
+		rememberTeam(team);
+		setStep(created.linked ? { kind: "linked", identifier: created.identifier } : { kind: "unlinked", identifier: created.identifier, error: created.error });
 	};
+	// The todo list arrives over the socket, so the link may show a moment after the answer; this one hides then.
+	if (step.kind === "linked") return <p className="text-xs text-muted-foreground">Opened {step.identifier} and linked it.</p>;
+	if (step.kind === "unlinked") {
+		const { identifier, error } = step;
+		return (
+			<div className="flex flex-wrap items-center gap-2">
+				<p role="alert" className="text-xs text-red-600 dark:text-red-400">
+					Opened {identifier} in Linear, but this todo does not link it: {error}
+				</p>
+				<Tooltip content={`Link ${identifier} to this todo, without opening another issue`}>
+					<Button variant="tertiary" size="compact" leadingIcon={Ticket} onClick={() => onChange({ op: "link", id: todo.id, link: { kind: "ticket", identifier } })}>
+						Link {identifier}
+					</Button>
+				</Tooltip>
+			</div>
+		);
+	}
 	if (step.kind === "idle" || step.kind === "loading" || step.kind === "failed") {
 		const loading = step.kind === "loading";
 		const createButton = (

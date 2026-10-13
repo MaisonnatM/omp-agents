@@ -934,6 +934,8 @@ An action that fails shows its error, and its control becomes available again.
 - An open top-level todo's **Start session** opens the new-session draft with its title and notes as the first message, in the sidebar's workspace, to edit the prompt or pick another directory first; `#new/<cwd>?todo=<id>` addresses it.
   A session started from a todo links to it once omp starts, which moves a **Backlog** or **Todo** todo to **In Progress**, and its agent marks the todo **Done** once it finishes the work; see [Todos from agents](#todos-from-agents).
 - With Linear connected, an open top-level todo's **Create Linear ticket** asks for a team, starting with the last one an issue was created in, then opens an issue from the title and notes, assigned to you, and links it to the todo.
+  It reports success only once the server's todo list holds the link.
+  When the issue opened but the todo did not take the link, it names the issue and offers **Link** for it instead of opening another.
 - The list icon on a ticket adds a todo of no category, last in the list, that links to it.
 - The server keeps the list in `todos.json` beside its access token, so every browser tab and the desktop app show the same list, and a change in one shows in the others at once.
   A `todos.json` from before categories, notes, due days, links, the archive, statuses, priorities, or assignees still loads, with none of them; a todo checked then reads as **Done**, an unchecked one as **Todo**, both with no priority.

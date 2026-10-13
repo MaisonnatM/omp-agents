@@ -5,7 +5,7 @@ import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest } from "../shared/sessions";
 import type { RoutineChange, Schedule } from "../routines";
 import { MAX_SCHEDULED_TEXT } from "../shared/scheduled";
 import { MAX_TICKET_ATTACHMENT_BYTES } from "../shared/tickets";
-import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationId, parseMcpServerAdd, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseWorkspaceChange } from "./wire";
+import { parseCalendarShown, parseClientMsg, parseEventRef, parseGoogleClient, parseIntegrationId, parseMcpServerAdd, parseNewEvent, parsePromptDocument, parsePullRequestEdit, parsePullRequestQuery, parseRepoQuery, parseSlackClient, parseTicketAttachment, parseTicketDraft, parseTicketEdit, parseTodoTicket, parseWorkspaceChange } from "./wire";
 
 const msg = (value: unknown): ClientFrame | null => parseClientMsg(JSON.stringify(value))?.ok ?? null;
 const live = { kind: "live", instanceId: "i1", agentId: null };
@@ -561,6 +561,16 @@ describe("parseTicketDraft", () => {
 		expect(parseTicketDraft({ title: "Fix", team: "t1" })).toBeNull();
 		expect(parseTicketDraft({ title: "Fix", description: "", team: "t1", priority: 7 })).toBeNull();
 		expect(parseTicketDraft({ title: "Fix", description: "", team: "t1", dueDate: "soon" })).toBeNull();
+	});
+});
+
+describe("parseTodoTicket", () => {
+	test("takes a todo and a team by id, and drops any other field", () => {
+		expect(parseTodoTicket({ todoId: "a", team: "t1", title: "ignored" })?.ok).toEqual({ todoId: "a", team: "t1" });
+		expect(parseTodoTicket({ todoId: "", team: "t1" })).toBeNull();
+		expect(parseTodoTicket({ todoId: "x".repeat(65), team: "t1" })).toBeNull();
+		expect(parseTodoTicket({ todoId: "a", team: " " })).toBeNull();
+		expect(parseTodoTicket({ todoId: "a" })).toBeNull();
 	});
 });
 
