@@ -32,6 +32,16 @@ export class ScheduledFile extends ReducerFile<ScheduledSend[], [change: Exclude
 		});
 	}
 
+	/**
+	 * Applies `change` at time `now` and saves; whether it changed anything. A refused take throws and saves nothing.
+	 * A take writes at once, as a claim does, so a server that claims next reads the send gone before the page restores its text.
+	 */
+	override apply(change: Exclude<ScheduledChange, { op: "send-now" }>, now: number): boolean {
+		const changed = super.apply(change, now);
+		if (change.op === "take") this.flush();
+		return changed;
+	}
+
 	/** Marks send `id` as sending and saves, before anything sends it; the send, or `null` when it is gone or already sending. */
 	claim(id: string): ScheduledSend | null {
 		const claims = this.update(sends => {

@@ -172,7 +172,7 @@ describe("parseClientMsg", () => {
 		});
 	});
 
-	test("schedule adds a message to a session or a new session's start without images, and removes or sends one by id", () => {
+	test("schedule adds a message to a session or a new session's start without images, and removes, takes, or sends one by id", () => {
 		const change = (value: unknown) => msg({ t: "schedule", change: value });
 		const message = { kind: "message", sessionId: "s1", text: "carry on" } as const;
 		const add = (fields: Record<string, unknown>) => change({ op: "add", send: { id: "a", at: 1_800_000_000_000, reset: "Anthropic 5h", target: message, ...fields } });
@@ -181,6 +181,7 @@ describe("parseClientMsg", () => {
 		expect(add({ reset: null, target: { kind: "start", request } })).toMatchObject({ change: { send: { reset: null, target: { kind: "start", request } } } });
 		expect(change({ op: "send-now", id: "a" })).toEqual({ t: "schedule", change: { op: "send-now", id: "a" } });
 		expect(change({ op: "remove", id: "a" })).toEqual({ t: "schedule", change: { op: "remove", id: "a" } });
+		expect(change({ op: "take", id: "a" })).toEqual({ t: "schedule", change: { op: "take", id: "a" } });
 
 		expect(add({ target: { kind: "start", request: { ...request, images: [{ data: "aGVsbG8=", mimeType: "image/png" }] } } })).toBeNull();
 		expect(add({ target: { kind: "start", request: { ...request, prompt: " " } } })).toBeNull();

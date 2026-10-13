@@ -96,7 +96,7 @@ export type ClientMsg =
 	| { t: "user-todo"; change: UserTodoChange }
 	/** Change the routines, or run one now; every socket then gets the routines as they are after. */
 	| { t: "routine"; change: RoutineChange }
-	/** Schedule a message or a session start, cancel one, or send one now; every socket then gets the scheduled sends as they are after. */
+	/** Schedule a message or a session start, cancel one, take one back to edit, or send one now; every socket then gets the scheduled sends as they are after. */
 	| { t: "schedule"; change: ScheduledChange }
 	/** Pin or unpin sessions; every socket then gets the pins as they are after. */
 	| { t: "pin"; change: PinChange }

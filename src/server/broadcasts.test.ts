@@ -9,8 +9,10 @@ import { Broadcasts } from "./broadcasts";
 import { ListRegistry } from "./list-registry";
 import { PinsFile } from "./pins-file";
 import { ProjectsFile } from "./projects-file";
+import { RequestLedger } from "./request-ledger";
 import { RoutinesFile } from "./routines-file";
 import { ScheduledFile } from "./scheduled-file";
+import { createClientHandler, type SocketEnv } from "./socket";
 import { UserTodosFile } from "./user-todos-file";
 import { WorkspacesFile } from "./workspaces-file";
 import type { Socket, SocketData } from "./views";
@@ -79,6 +81,7 @@ function setup(initial: PastSession[]) {
 		ws,
 		lists,
 		pins,
+		scheduled,
 		published,
 		sent,
 		pastPublished,
@@ -191,5 +194,29 @@ describe("registered whole-list broadcasts", () => {
 		expect(published).toEqual([{ t: "pins", sessionIds: ["run"] }]);
 		expect(replies).toEqual(published);
 		expect(sent.find(msg => msg.t === "pins")).toEqual({ t: "pins", sessionIds: ["run"] });
+	});
+
+	test("a take answers the page once the send is off the list, and refuses one under way with why, leaving it scheduled", async () => {
+		const { lists, scheduled, published, broadcasts, ws } = setup([]);
+		broadcasts.open(ws);
+		const send = (id: string) => ({ id, at: 2000, reset: null, target: { kind: "message" as const, sessionId: "s1", text: id } });
+		lists.apply("scheduled", { op: "add", send: send("waiting") });
+		lists.apply("scheduled", { op: "add", send: send("going") });
+		scheduled.claim("going");
+		published.length = 0;
+		const answers: ServerMsg[] = [];
+		const page = { data: { views: new Map(), pageId: "page" }, send: (raw: string) => void answers.push(JSON.parse(raw)) } as unknown as Socket;
+		const ledger = new RequestLedger(createClientHandler({ lists } as SocketEnv), () => {});
+		ledger.open(page);
+		await ledger.handle(page, { t: "resume", frames: [] });
+
+		await ledger.handle(page, { t: "schedule", change: { op: "take", id: "waiting" }, ack: 1, floor: 1 });
+		await ledger.handle(page, { t: "schedule", change: { op: "take", id: "going" }, ack: 2, floor: 2 });
+		expect(answers).toEqual([
+			{ t: "done", ack: 1, error: null },
+			{ t: "done", ack: 2, error: "It is already sending." },
+		]);
+		expect(published.map(msg => (msg.t === "scheduled" ? msg.sends.map(({ id, state }) => [id, state.phase]) : msg.t))).toEqual([[["going", "sending"]]]);
+		expect(scheduled.value.map(({ id, state }) => [id, state.phase])).toEqual([["going", "sending"]]);
 	});
 });
