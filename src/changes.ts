@@ -6,7 +6,7 @@
 import { join, relative } from "node:path";
 import { createCache } from "./cache";
 import { git } from "./git";
-import { LineReader } from "./line-reader";
+import { FoldedFile } from "./line-reader";
 import { displayPath } from "./paths";
 import { run } from "./proc";
 import { type ChangedEntry, type ChangedFileText, type ChangeStatus, contextRows, MAX_CHANGED_FILE_BYTES, parseFullDiff, type SessionChanges } from "./shared/changes";
@@ -23,48 +23,20 @@ type Located = ChangedEntry & { absolute: string };
 
 const STATUS: Record<string, ChangeStatus> = { A: "added", M: "modified", D: "deleted", T: "modified" };
 
-/** A transcript folded as far as it has been read: only the lines appended since the last read are parsed. */
-class FoldedTranscript {
-	#work = new Work();
-	readonly #reader: LineReader;
-	/** Reads one after another, so two callers never fold the same appended lines twice. */
-	#chain: Promise<unknown> = Promise.resolve();
-
-	constructor(file: string) {
-		this.#reader = new LineReader(file, () => {
-			this.#work = new Work();
-		});
-	}
-
-	/** The absolute paths the transcript's `edit` and `write` calls changed, in first-touch order. */
-	paths(): Promise<string[]> {
-		const next = this.#chain.then(async () => {
-			await this.#reader.read(line => {
-				try {
-					this.#work.applyEntry(JSON.parse(line));
-				} catch {
-					/* A line that is not JSON is not an entry. */
-				}
-			});
-			return this.#work.paths();
-		});
-		this.#chain = next.catch(() => {});
-		return next;
-	}
-}
-
 /** The most transcripts kept folded; the oldest is forgotten first. */
 const MAX_FOLDED = 32;
-const folded = new Map<string, FoldedTranscript>();
+const folded = new Map<string, FoldedFile<Work>>();
 
-function sessionPaths(file: string): Promise<string[]> {
+/** The absolute paths transcript `file`'s `edit` and `write` calls changed, in first-touch order, parsing only the lines it gained since the last call. */
+async function sessionPaths(file: string): Promise<string[]> {
 	let transcript = folded.get(file);
 	if (!transcript) {
 		if (folded.size >= MAX_FOLDED) folded.delete(folded.keys().next().value!);
-		transcript = new FoldedTranscript(file);
+		transcript = new FoldedFile(file, () => new Work());
 		folded.set(file, transcript);
 	}
-	return transcript.paths();
+	await transcript.read();
+	return transcript.fold.paths();
 }
 
 /**

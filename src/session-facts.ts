@@ -22,7 +22,7 @@ import { type Conversation, foldConversationLine } from "./conversation-search";
 import { branchAt, type HeadHistory, type WorktreeAt } from "./git";
 import { parseRemote } from "./github";
 import { isObject, oneOf } from "./json";
-import { LineReader } from "./line-reader";
+import { FoldedFile } from "./line-reader";
 import { mapLimit, PROBE_PARALLEL } from "./map-limit";
 import { HOME } from "./paths";
 import { textOf, toolCallsOf, toolResultOf } from "./session-entries";
@@ -337,27 +337,19 @@ export function resolveLinks(refs: Iterable<PullRequestRef>, repo: Repo | null, 
 	return [...linked.values()];
 }
 
-/** One transcript, read up to its last complete line. */
-class TranscriptScan {
-	scan = new SessionFactsScan();
-	/** The prompts and replies of a session's own file; `null` for a subagent's, which the conversation search leaves out. */
-	conversation: Conversation | null;
-	readonly #lines: LineReader;
+/** A transcript's facts and, for a session's own file, its prompts and replies. */
+class TranscriptFold {
+	readonly scan = new SessionFactsScan();
+	/** `null` for a subagent's file, which the conversation search leaves out. */
+	readonly conversation: Conversation | null;
 
-	constructor(path: string, own: boolean) {
+	constructor(own: boolean) {
 		this.conversation = own ? new Map() : null;
-		this.#lines = new LineReader(path, () => {
-			this.scan = new SessionFactsScan();
-			if (this.conversation) this.conversation = new Map();
-		});
 	}
 
-	/** Resolves `false` when the file could not be read; it reads again on the next call. */
-	read(): Promise<boolean> {
-		return this.#lines.read(line => {
-			this.scan.applyLine(line);
-			if (this.conversation) foldConversationLine(this.conversation, line);
-		});
+	applyLine(line: string): void {
+		this.scan.applyLine(line);
+		if (this.conversation) foldConversationLine(this.conversation, line);
 	}
 }
 
@@ -365,7 +357,7 @@ interface SessionScan {
 	modifiedAt: number;
 	cwd: string;
 	/** The session file first, then its subagents' files. */
-	transcripts: Map<string, TranscriptScan>;
+	transcripts: Map<string, FoldedFile<TranscriptFold>>;
 	/** Every transcript's refs, in transcript order. */
 	refs: FoundRef[];
 	/** The branch each of `refs`' `gt submit` calls submitted, by its `refKey`, once found. */
@@ -471,12 +463,12 @@ export class SessionFactsIndex {
 	factsOf(sessionPath: string): SessionFacts {
 		const session = this.#sessions.get(sessionPath);
 		if (!session) return NO_FACTS;
-		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.scan.ship ?? null, worktree: session.worktree };
+		return { pullRequests: session.pullRequests, tickets: session.tickets, ship: session.transcripts.get(sessionPath)?.fold.scan.ship ?? null, worktree: session.worktree };
 	}
 
 	/** The prompts and replies of the session file in `sessionPath`, as read so far; `null` before its first scan. */
 	conversationOf(sessionPath: string): Conversation | null {
-		return this.#sessions.get(sessionPath)?.transcripts.get(sessionPath)?.conversation ?? null;
+		return this.#sessions.get(sessionPath)?.transcripts.get(sessionPath)?.fold.conversation ?? null;
 	}
 
 	/** Resolves once the refreshes asked for so far are done. */
@@ -527,8 +519,8 @@ export class SessionFactsIndex {
 	/** Collect every transcript's refs and Linear issues into the session; returns whether its Linear issues changed. */
 	#gather(session: SessionScan): boolean {
 		const transcripts = [...session.transcripts.values()];
-		session.refs = transcripts.flatMap(transcript => [...transcript.scan.found.values()]);
-		const tickets = [...new Set(transcripts.flatMap(transcript => [...transcript.scan.tickets]))];
+		session.refs = transcripts.flatMap(transcript => [...transcript.fold.scan.found.values()]);
+		const tickets = [...new Set(transcripts.flatMap(transcript => [...transcript.fold.scan.tickets]))];
 		const before = session.tickets;
 		if (tickets.length === before.length && tickets.every((id, i) => id === before[i])) return false;
 		session.tickets = tickets;
@@ -583,18 +575,18 @@ export class SessionFactsIndex {
 	/** Read what session `path` and its subagents appended: whether its /ship stage or Linear issues changed, and whether its worktree needs asking again. */
 	async #scan({ path, cwd, modifiedAt }: ListedSession): Promise<{ session: SessionScan; changed: boolean; moved: boolean }> {
 		let session = this.#sessions.get(path);
-		const previousShip = session?.transcripts.get(path)?.scan.ship;
+		const previousShip = session?.transcripts.get(path)?.fold.scan.ship;
 		session ??= {
-			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new TranscriptScan(path, true)]]), refs: [], submitted: new Map(),
+			modifiedAt: Number.NaN, cwd, transcripts: new Map([[path, new FoldedFile(path, () => new TranscriptFold(true))]]), refs: [], submitted: new Map(),
 			repo: null, pullRequests: [], tickets: [], workDirs: [], worktree: null, branch: null,
 		};
 		this.#sessions.set(path, session);
 		for (const file of await subagentFiles(path)) {
-			if (!session.transcripts.has(file)) session.transcripts.set(file, new TranscriptScan(file, false));
+			if (!session.transcripts.has(file)) session.transcripts.set(file, new FoldedFile(file, () => new TranscriptFold(false)));
 		}
 		const reads = await Promise.all([...session.transcripts.values()].map(transcript => transcript.read()));
-		if (!reads.includes(false)) session.modifiedAt = modifiedAt;
-		const own = session.transcripts.get(path)!.scan;
+		if (reads.every(read => read.readable)) session.modifiedAt = modifiedAt;
+		const own = session.transcripts.get(path)!.fold.scan;
 		const shipChanged = JSON.stringify(previousShip ?? null) !== JSON.stringify(own.ship ?? null);
 		const workDirs = [...own.workDirs].reverse().map(dir => absolute(cwd, dir));
 		const before = session.workDirs;

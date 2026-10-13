@@ -84,6 +84,17 @@ export class Work {
 		}
 	}
 
+	/** One session-file line; a line that is not JSON is not an entry. */
+	applyLine(line: string): void {
+		let entry: unknown;
+		try {
+			entry = JSON.parse(line);
+		} catch {
+			return;
+		}
+		this.applyEntry(entry);
+	}
+
 	/** Every changed file, in first-touch order. */
 	files(): ChangedFile[] {
 		return [...this.#files].map(([path, changes]) => this.#file(path, changes));

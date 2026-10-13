@@ -104,7 +104,8 @@ The server lives in `src/`:
 - `src/turn-gate.ts`: `TurnGate`, which both transports use to run a session's prompts, aborts, and flushes in the order the page sent them.
 - `src/user-requests.ts`: parses the RPC and Collab question frames into one request shape, writes the answers back, and keeps each session's pending questions.
 - `src/commands.ts`: the composer's `/` and `@` completions, and the expansion of file commands and skills before a guest prompt.
-- `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below; `src/line-reader.ts` holds the incremental `LineReader` and the `ReadQueue` that serializes its reads, which `src/media.ts` shares.
+- `src/tail.ts`: reads one transcript file incrementally and feeds each entry to both folds below.
+  `src/line-reader.ts` holds `FoldedFile`, which keeps a fold of a file's lines (any `LineFold`) up to date, applying only the complete lines appended since its last read and starting a fresh fold when the file shrinks; `src/tail.ts`, `src/media.ts`, `src/changes.ts`, and `src/session-facts.ts` each fold their transcripts through it, and the first two queue their reads with its `ReadQueue`, which shares one read among a burst of pokes.
 - `src/session-entries.ts`: the vocabulary of a session file's entries, `textOf`, `oneLine`, `entryTime`, `toolCallsOf`, `toolResultOf`, `toolSummary`, and `imagesOf`, which the folds below and `src/guest.ts` read instead of walking the entry shape themselves.
 - `src/transcript.ts`: folds session-file lines and live events into display items, with a dashboard session's starting prompt last.
 - `src/conversation-search.ts`: the conversation search behind `GET /api/conversations`.
