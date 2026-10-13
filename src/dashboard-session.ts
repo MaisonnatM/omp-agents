@@ -84,6 +84,11 @@ function lastReply(messages: unknown): string | null {
 	return null;
 }
 
+/** A message taken back from omp's queue, holding only the image fields the composer restores. */
+function withdrawn({ text, images = [] }: { text: string; images?: readonly PromptImage[] }): WithdrawnMessage {
+	return { text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) };
+}
+
 export class DashboardSession implements LiveSession {
 	readonly instanceId: string;
 	readonly startedAt = Date.now();
@@ -338,21 +343,18 @@ export class DashboardSession implements LiveSession {
 	 * rejects with {@link PromptRefused}.
 	 */
 	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
-		if (agentId !== null) {
-			if (images.length > 0) throw new Error("omp sends a subagent text only.");
-			await this.#child.client.steerSubagent(agentId, text).catch((err: unknown) => this.#refuse("Message failed", err, agentId));
-			return;
-		}
-		if (text.startsWith("!")) {
+		if (agentId !== null && images.length > 0) throw new Error("omp sends a subagent text only.");
+		if (agentId === null && text.startsWith("!")) {
 			if (images.length > 0) throw new Error("A ! command takes no images.");
 			return this.#shell(text);
 		}
-		await this.#send(text, images, delivery).catch((err: unknown) => this.#refuse("Prompt failed", err));
-	}
-
-	#refuse(what: string, err: unknown, agentId: string | null = null): never {
-		this.#fail(what, err, agentId);
-		throw new PromptRefused(errorText(err));
+		const sent =
+			agentId !== null
+				? this.#noting("Message failed", () => this.#child.client.steerSubagent(agentId, text), agentId)
+				: this.#noting("Prompt failed", () => this.#send(text, images, delivery));
+		await sent.catch((err: unknown) => {
+			throw new PromptRefused(errorText(err));
+		});
 	}
 
 	/** Sends `text` and `images` to the main agent through the turn gate; rejects when omp does not take them. */
@@ -394,7 +396,7 @@ export class DashboardSession implements LiveSession {
 			if (agentId !== null) return null;
 			try {
 				const { removed, images = [] } = await this.#child.client.removeQueuedMessage(text, queue);
-				return removed ? { text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) } : null;
+				return removed ? withdrawn({ text, images }) : null;
 			} catch (err) {
 				this.#fail("Dequeue failed", err);
 				return null;
@@ -415,18 +417,15 @@ export class DashboardSession implements LiveSession {
 	}
 
 	async interrupt(): Promise<WithdrawnMessage[]> {
-		return this.#turn.run(async () => {
-			try {
+		return this.#turn.run(() =>
+			this.#noting("Stop failed", async () => {
 				const mark = this.#prompt.interrupt();
 				const { steering, followUp } = await this.#child.client.abortAndRestoreQueue();
 				this.#change(() => this.#prompt.release());
 				// omp's restore leaves out a prompt it admitted but never ran, so the composer gets it back from here.
-				return [...mark.unsent(), ...steering, ...followUp].map(({ text, images = [] }) => ({ text, images: images.map(({ data, mimeType }) => ({ data, mimeType })) }));
-			} catch (err) {
-				this.#fail("Stop failed", err);
-				throw err;
-			}
-		});
+				return [...mark.unsent(), ...steering, ...followUp].map(withdrawn);
+			}),
+		);
 	}
 
 	/** omp's queue as it stands now, not as the page last saw it: the turn may already have taken the steer. */
@@ -445,8 +444,8 @@ export class DashboardSession implements LiveSession {
 	 */
 	async editPrompt(entryId: string, text: string): Promise<void> {
 		const { client } = this.#child;
-		await this.#turn
-			.run(async () => {
+		await this.#noting("Edit failed", () =>
+			this.#turn.run(async () => {
 				if (text.startsWith("!")) throw new Error("an edited prompt cannot be a ! command");
 				if (this.#prompt.busy) {
 					await client.abort();
@@ -460,19 +459,13 @@ export class DashboardSession implements LiveSession {
 				this.#applyState(state);
 				this.#emit({ kind: "switched" });
 				await this.#promptMain(text, []);
-			})
-			.catch((err: unknown) => {
-				this.#fail("Edit failed", err);
-				throw err;
-			});
+			}),
+		);
 	}
 
 	async cancelAgent(agentId: string): Promise<void> {
 		if (this.#agents.get(agentId)?.status !== "running") return;
-		await this.#child.client.cancelSubagent(agentId).catch((err: unknown) => {
-			this.#fail("Cancel failed", err, agentId);
-			throw err;
-		});
+		await this.#noting("Cancel failed", () => this.#child.client.cancelSubagent(agentId), agentId);
 	}
 
 	/** The models omp offers this session, from the providers you are connected to. */
@@ -504,29 +497,17 @@ export class DashboardSession implements LiveSession {
 	setThinking(level: string): Promise<void> {
 		return this.#modelGate.run(async () => {
 			if (!this.thinkingLevels.includes(level)) return;
-			try {
+			await this.#noting("Thinking level switch failed", async () => {
 				const levels = await this.#child.client.getAvailableThinkingLevels();
 				if (!levels.includes(level)) return;
 				await this.#child.client.setThinkingLevel(level);
-			} catch (err) {
-				this.#fail("Thinking level switch failed", err);
-				throw err;
-			} finally {
-				await this.#readModelState("Model state refresh failed");
-			}
+			}).finally(() => this.#readModelState("Model state refresh failed"));
 		});
 	}
 
 	setFast(enabled: boolean): Promise<void> {
 		return this.#modelGate.run(async () => {
-			try {
-				await this.#child.client.setFastMode(enabled);
-			} catch (err) {
-				this.#fail("Fast mode switch failed", err);
-				throw err;
-			} finally {
-				await this.#readModelState("Model state refresh failed");
-			}
+			await this.#noting("Fast mode switch failed", () => this.#child.client.setFastMode(enabled)).finally(() => this.#readModelState("Model state refresh failed"));
 		});
 	}
 
@@ -537,6 +518,16 @@ export class DashboardSession implements LiveSession {
 
 	#fail(what: string, err: unknown, agentId: string | null = null): void {
 		this.#emit({ kind: "note", agentId, level: "error", text: `${what}: ${errorText(err)}` });
+	}
+
+	/** Runs `work`, and shows its failure as an error note before rejecting with it. */
+	async #noting<T>(what: string, work: () => Promise<T>, agentId: string | null = null): Promise<T> {
+		try {
+			return await work();
+		} catch (err) {
+			this.#fail(what, err, agentId);
+			throw err;
+		}
 	}
 
 	#onEvent(event: unknown): void {
