@@ -58,8 +58,11 @@ The main ones:
   `connectedProviders` in `src/omp/models.ts` keeps the `/login` providers that have a credential, as omp's RPC `get_login_providers` marks them `authenticated`.
   It opens the credential store on each call and closes it, so a login in a terminal counts at the next call.
   Settings › Providers runs omp's own `/login` and `/logout` through `src/omp/providers.ts`: `AuthStorage.oauth.login` (`pi-ai/src/auth-storage.ts`) with `captureBrowserSession` from `pi-coding-agent/src/utils/browser-session.ts` for a cookie sign-in, `formatLoginIdentity` from `pi-coding-agent/src/cli/oauth-terminal.ts`, `ModelRegistry.refreshProvider` from `pi-coding-agent/src/config/model-registry.ts` afterwards, as `omp login` does, and `toLogoutAccounts` and `logoutCredential` from `pi-coding-agent/src/slash-commands/helpers/logout.ts`.
+- Model selectors: `parseRetryFallbackSelector` in `pi-coding-agent/src/session/retry-fallback-chains.ts`, which only `readSelector` in `src/omp/config.ts` calls.
+  `readSelector` reads a selector against the `provider/id` of the listed models, so a `:level` splits off only after an id that `omp models` lists, and returns the selector's provider, id, and suffix.
+  `resolveSelector` keeps the read only when its model is listed, and `routedSelectors` names every selector of the routing: each role's, and each fallback chain's key and entries.
 - Model roles: `pi-coding-agent/src/config/model-resolver.ts` (`expandRoleAlias`, `resolveRoleChain`), whose `@role` aliases `resolveRoles` in `src/omp/models.ts` follows for `GET /api/models/roles`.
-  `modelEntries` reads each role and fallback selector with `parseRetryFallbackSelector` and maps it to a listed model with `resolveProviderModelReference`, which follows retired variant ids such as `grok-4.7-high` and dotted spellings such as `claude-fable-5.1`.
+  `modelEntries` reads each of the `routedSelectors` with `readSelector` and maps it to a listed model with `resolveProviderModelReference`, which follows retired variant ids such as `grok-4.7-high` and dotted spellings such as `claude-fable-5.1`.
 - MCP: `pi-coding-agent/src/mcp/json-rpc.ts` (`callMCP`), `config.ts` (`loadAllMCPConfigs`), `client.ts` (`connectToServer`, `listTools`, `disconnectServer`), `oauth-credentials.ts` (`removeManagedMcpOAuthCredentials`), `oauth-discovery.ts` (`discoverOAuthEndpoints`), `oauth-flow.ts` (`MCPOAuthFlow`), and `config-writer.ts` (`addMCPServer`, `updateMCPServer`, `removeMCPServer`, `setMcpServerEnabled`, `validateServerName`, `readMCPConfigFile`), which `src/omp/mcp.ts` wraps for the tickets page, Settings › Integrations, and Settings › MCP servers.
   The MCP sign-ins and sign-outs read and write omp's credential store through the same `discoverAuthStorage`, opened and closed on each call.
   `pi-coding-agent/src/commands/token.ts` uses `refreshStoredManagedMcpOAuthCredential` from `oauth-credentials.ts` to refresh a managed token and persist its rotated refresh token before printing the access token.
@@ -549,7 +552,7 @@ The event check (`EVENT_KINDS`) runs on the minute tick, whether or not a page i
 
 - `latestOmp` in `src/omp/release.ts` asks `getLatestRelease` in `pi-coding-agent/src/cli/update-cli.ts` for the newest release on omp's `update.channel`, unless `startup.checkUpdate` is off.
   `installedOmp` reads the version from the installed package's `package.json` on each check, so the check is right after an update, before a restart.
-- `findModelUpdates` in `src/omp/model-updates.ts` reads the global `modelRoles` and `retry.fallbackChains` with `parseRetryFallbackSelector`, and keeps the listed models that `classifyModel` in `pi-catalog/src/identity/index.ts` places in an Anthropic or OpenAI family with a revision.
+- `findModelUpdates` in `src/omp/model-updates.ts` reads the global `modelRoles` and `retry.fallbackChains` entries with `resolveSelector`, and keeps the listed models that `classifyModel` in `pi-catalog/src/identity/index.ts` places in an Anthropic or OpenAI family with a revision.
   A model's line is its provider, its family, and its id with the version masked, so `claude-opus-5-5` and `claude-opus-5-6` share one.
   It offers the newest revision of each line that a connected provider lists, and leaves dated snapshots out.
 - The pull requests come from `loadPullRequests` in `src/pull-requests.ts` over the known workspaces that still exist, through the pull request list's 30-second cache, so the page's polls and the check share one query.
@@ -601,7 +604,7 @@ Edits go through two endpoints, each taking the same `?cwd=` and answering with 
 - `PUT /api/settings/routing` takes one change: a role's model or fallbacks, a model-keyed chain, some `retry.*` values, or the provider order.
   The server writes it through omp's own write path, the one `omp config set` uses: `Settings.loadIsolated`, the setting's `set` or `setEntry`, and `flush`.
   omp re-reads `config.yml` under its lock and writes back only the paths that changed.
-  A model must be one that `omp models` lists, read by omp's `parseRetryFallbackSelector`, so `provider/id:level` works even when the id holds a colon.
+  A model must be one that `omp models` lists, read by `resolveSelector` in `src/omp/config.ts`, so `provider/id:level` works even when the id holds a colon.
   A selector that the config already names passes as it is, so keeping an entry never blocks a save.
   omp checks each retry value against the setting's type and allowed values.
   If omp cannot load `config.yml`, the write is refused, because omp would move the broken file aside before it writes.

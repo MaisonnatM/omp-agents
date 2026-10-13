@@ -1,7 +1,7 @@
 import { isObject } from "../json";
 import { runJson } from "../proc";
 import { type CatalogModel, type ConnectedModels, type DraftModel, type ModelEntry, type ModelRole, selectorOf, splitSelector } from "../shared/models";
-import { loadOmpConfig, type OmpConfig, parseRetryFallbackSelector } from "./config";
+import { loadOmpConfig, type OmpConfig, readSelector, routedSelectors } from "./config";
 import { ompCommand } from "./install";
 import { auth, modelResolver, oauth, type ServiceTierModel, serviceTiers } from "./modules";
 
@@ -61,12 +61,10 @@ export function modelEntries<T extends ListedModel>(
 	connected: ReadonlySet<string>,
 ): (ModelEntry & Omit<T, keyof ListedModel>)[] {
 	const known = new Set(models.map(selectorOf));
-	const lookup = { find: (provider: string, id: string) => (known.has(`${provider}/${id}`) ? true : undefined) };
-	const named = [...Object.values(config.modelRoles), ...Object.entries(config.fallbackChains).flatMap(([key, chain]) => [key, ...chain])];
 	const curated = new Set(
-		named.flatMap(value => {
-			const parsed = parseRetryFallbackSelector(value, lookup);
-			const model = parsed && modelResolver.resolveProviderModelReference(parsed.provider, parsed.id, models);
+		routedSelectors(config).flatMap(value => {
+			const read = readSelector(value, known);
+			const model = read && modelResolver.resolveProviderModelReference(read.provider, read.id, models);
 			return model ? [selectorOf(model)] : [];
 		}),
 	);
@@ -77,7 +75,7 @@ export function modelEntries<T extends ListedModel>(
 		.toSorted((a, b) => rank(a.provider) - rank(b.provider))
 		.map(model => {
 			const { provider, id, name, contextWindow, ...rest } = model;
-			return { ...rest, provider, id, name, contextWindow, curated: curated.has(`${provider}/${id}`) };
+			return { ...rest, provider, id, name, contextWindow, curated: curated.has(selectorOf(model)) };
 		});
 }
 

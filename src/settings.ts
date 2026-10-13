@@ -3,7 +3,7 @@ import { mkdir, realpath, stat } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { atomicWriteText } from "./fs";
 import { errorText, isObject } from "./json";
-import { agentDir, assertRetryValue, expandDefaultRetryFallbackChains, loadOmpConfig, type OmpConfig, parseRetryFallbackSelector, retryChoices, writeRouting } from "./omp/config";
+import { agentDir, assertRetryValue, expandDefaultRetryFallbackChains, loadOmpConfig, type OmpConfig, resolveSelector, retryChoices, routedSelectors, writeRouting } from "./omp/config";
 import { discoverOmpFiles, type FoundFile } from "./omp/discovery";
 import { findModelUpdates, upgradeEdits } from "./omp/model-updates";
 import { connectedProviders, listModels } from "./omp/models";
@@ -123,16 +123,10 @@ function stringList(value: unknown, field: string): string[] {
 export function parseRoutingEdit(raw: unknown, { catalog, config }: RoutingContext): RoutingEdit {
 	if (!isObject(raw) || Array.isArray(raw)) throw new Rejected(400, "Expected a JSON object");
 	const known = new Set(catalog.map(model => model.selector));
-	const configured = new Set([
-		...Object.values(config.modelRoles),
-		...Object.entries(config.fallbackChains).flatMap(([key, chain]) => [key, ...chain]),
-	]);
-	const lookup = { find: (provider: string, id: string) => (known.has(`${provider}/${id}`) ? true : undefined) };
+	const configured = new Set(routedSelectors(config));
 	const selector = (value: unknown, field: string): string => {
 		if (typeof value !== "string") throw new Rejected(400, `${field} must be a model selector`);
-		if (configured.has(value)) return value;
-		const parsed = parseRetryFallbackSelector(value, lookup);
-		if (!parsed || !known.has(`${parsed.provider}/${parsed.id}`)) throw new Rejected(400, `omp lists no model ${value}`);
+		if (!configured.has(value) && !resolveSelector(value, known)) throw new Rejected(400, `omp lists no model ${value}`);
 		return value;
 	};
 	const chain = (value: unknown): string[] => stringList(value, "fallbacks").map(entry => selector(entry, "A fallback"));
