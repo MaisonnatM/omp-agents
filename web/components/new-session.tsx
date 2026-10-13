@@ -142,7 +142,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						onSend={text => {
 							if (directCommand) return;
 							completion.close();
-							attachments.read(text, (prompt, images) => onStart({ prompt, images, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : pinnedSkill }));
+							void attachments.read(text, (prompt, images) => onStart({ prompt, images, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : pinnedSkill }));
 						}}
 						placeholder="Message this session…"
 						files={attachments.files}

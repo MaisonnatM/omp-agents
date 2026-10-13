@@ -152,7 +152,7 @@ function LiveConversation({
 		completion.close();
 		setDraft("");
 		scrollToEnd();
-		attachments.take(text, (prompt, images) => request({ t: "prompt", view, text: prompt, images, delivery }), () => setDraft(current => current || text));
+		void attachments.take(text, (prompt, images) => request({ t: "prompt", view, text: prompt, images, delivery }), () => setDraft(current => current || text));
 	};
 	const sendText = (text: string): void => {
 		if (blockedShortcut(text, shell) === null) submit(text, working && subject.followUps ? "followUp" : "steer");
