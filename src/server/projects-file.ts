@@ -3,7 +3,7 @@
  * only writer; omp's `projects` extension reads the file to find the project and role of its session, so a link is
  * flushed before the session's first prompt.
  */
-import { JsonFile } from "../fs";
+import { ReducerFile } from "../fs";
 import { isObject, parseAll } from "../json";
 import { DEFAULT_PROJECT_NAME, type Project, type ProjectEdit, type ProjectUpdate, type Worker, type WorkerId } from "../shared/projects";
 
@@ -104,10 +104,6 @@ export function applyProject(projects: Project[], change: ProjectChange): Projec
 	}
 }
 
-interface Stored {
-	projects: Project[];
-}
-
 const isText = (value: unknown): value is string => typeof value === "string";
 
 function parseWorker(value: unknown): Worker | null {
@@ -145,59 +141,30 @@ function parseProject(value: unknown): Project | null {
 	return { id, name, cwd, createdAt, archived, coordinator: { sessionId: coordinator.sessionId }, workers, updates, nextWorker };
 }
 
-export function parseProjects(value: unknown): Stored | null {
-	if (!isObject(value)) return null;
-	const projects = parseAll(value.projects, parseProject);
-	return projects ? { projects } : null;
+export function parseProjects(value: unknown): Project[] | null {
+	return isObject(value) ? parseAll(value.projects, parseProject) : null;
 }
 
-export class ProjectsFile {
-	readonly #file: JsonFile<Stored>;
-	#projects: Project[];
-
+/**
+ * Every server runs its own runner, so the file is shared: a change applies to the file as it is now, and keeps what
+ * a server beside this one saved.
+ */
+export class ProjectsFile extends ReducerFile<Project[], [ProjectChange]> {
 	constructor(path: string) {
-		this.#file = new JsonFile(path, { parse: parseProjects, holds: "a list of projects", onInvalid: "aside", indent: "\t" });
-		this.#projects = this.#file.load()?.projects ?? [];
-	}
-
-	get projects(): Project[] {
-		return this.#projects;
+		super(path, { parse: parseProjects, toJson: projects => ({ projects }), holds: "a list of projects", empty: [], reduce: applyProject, shared: true });
 	}
 
 	get(id: string): Project | undefined {
-		return this.#projects.find(project => project.id === id);
+		return this.value.find(project => project.id === id);
 	}
 
 	/** The project and role of session `sessionId`, or `null` when it belongs to none. */
 	roleOf(sessionId: string): ProjectRole | null {
-		for (const project of this.#projects) {
+		for (const project of this.value) {
 			if (project.coordinator.sessionId === sessionId) return { projectId: project.id, role: "coordinator" };
 			const worker = project.workers.find(candidate => candidate.sessionId === sessionId);
 			if (worker) return { projectId: project.id, role: "worker", workerId: worker.id };
 		}
 		return null;
-	}
-
-	/**
-	 * Applies `change` to the file as it is now and saves; whether it changed anything. Every server runs its own runner,
-	 * so the file is read first: a change made beside another server keeps what that server saved.
-	 */
-	apply(change: ProjectChange): boolean {
-		const current = this.#file.load()?.projects ?? this.#projects;
-		const next = applyProject(current, change);
-		this.#projects = next;
-		if (next === current) return false;
-		this.#file.save({ projects: next });
-		return true;
-	}
-
-	/** Writes what {@link apply} saved now, for a session about to read the file. */
-	flush(): void {
-		this.#file.flush();
-	}
-
-	/** Reads the file again, for what the server that ran before this one saved. */
-	reload(): void {
-		this.#projects = this.#file.load()?.projects ?? [];
 	}
 }

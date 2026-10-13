@@ -33,7 +33,7 @@ test("a run from before `outcome` reads its command result, and a malformed or m
 		],
 	};
 	writeFileSync(path, JSON.stringify({ routines: [routine] }));
-	expect(new RoutinesFile(path).routines[0]?.runs.map(run => run.outcome)).toEqual([
+	expect(new RoutinesFile(path).value[0]?.runs.map(run => run.outcome)).toEqual([
 		{ kind: "command", run: { phase: "exited", code: 0, output: "ok\n", startedAt: 4, endedAt: 5 } },
 		{ kind: "command", run: { phase: "running", startedAt: 3 } },
 		{ kind: "pending", queued: false },
@@ -72,7 +72,7 @@ test("an older file keeps its other routines, reads one schedule as a list and a
 	writeFileSync(path, JSON.stringify({ routines: [reviews, command, { ...reviews, name: "" }] }));
 	const file = new RoutinesFile(path);
 	const { schedule, done: _done, runs: _runs, ...kept } = command;
-	expect(file.routines).toEqual([
+	expect(file.value).toEqual([
 		{
 			...kept,
 			schedules: [schedule],
@@ -112,7 +112,7 @@ test("a prompt task from before `pin` reads as unpinned, and the next save write
 	};
 	writeFileSync(path, JSON.stringify({ routines: [routine] }));
 	const file = new RoutinesFile(path);
-	expect(file.routines[0]?.task).toEqual({ kind: "prompt", prompt: "Write the daily retro.", pin: false });
+	expect(file.value[0]?.task).toEqual({ kind: "prompt", prompt: "Write the daily retro.", pin: false });
 	expect(existsSync(`${path}.invalid`)).toBe(false);
 
 	file.apply({ op: "enable", id: "r1", enabled: false }, 2);
@@ -127,7 +127,7 @@ test("a file that is not a list of routines moves aside", () => {
 	const path = join(dir, "omp-agents", "routines.json");
 	mkdirSync(join(dir, "omp-agents"));
 	writeFileSync(path, JSON.stringify({ routines: [{ id: "r1" }] }));
-	expect(new RoutinesFile(path).routines).toEqual([]);
+	expect(new RoutinesFile(path).value).toEqual([]);
 	expect(existsSync(path)).toBe(false);
 	expect(existsSync(`${path}.invalid`)).toBe(true);
 });

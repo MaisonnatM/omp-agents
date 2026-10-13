@@ -4,14 +4,10 @@
  * A routine whose task was pull requests is dropped on load. The rest of the file stays.
  * A file from before `schedules`, before a run's `outcome`, or before a prompt task's `pin` migrates here, so everything else sees the current shape.
  */
-import { JsonFile } from "../fs";
+import { ReducerFile } from "../fs";
 import { isObject, isTexts, parseAll } from "../json";
 import { applyRoutine, MAX_ROUTINE_RUNS, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
 import { parseRoutineSpec } from "./wire";
-
-interface Stored {
-	routines: Routine[];
-}
 
 /** A session a run recorded before `outcome`, which also held its `label`. */
 function parseStarted(value: unknown): { instanceId: string; sessionId: string } | null {
@@ -80,7 +76,7 @@ function parseRoutine(value: unknown): Routine | "drop" | null {
 	return typeof createdAt === "number" && runs ? { ...spec.ok, createdAt, runs } : null;
 }
 
-function parseStored(value: unknown): Stored | null {
+function parseRoutines(value: unknown): Routine[] | null {
 	if (!isObject(value) || !Array.isArray(value.routines)) return null;
 	const routines: Routine[] = [];
 	for (const entry of value.routines) {
@@ -93,40 +89,17 @@ function parseStored(value: unknown): Stored | null {
 		}
 		routines.push(routine);
 	}
-	return { routines };
+	return routines;
 }
 
-export class RoutinesFile {
-	readonly #file: JsonFile<Stored>;
-	#routines: Routine[];
-
+export class RoutinesFile extends ReducerFile<Routine[], [change: Exclude<RoutineChange, { op: "run-now" }>, now: number]> {
 	constructor(path: string) {
-		// The file holds routines someone wrote, so a file that is not one moves aside rather than being written over.
-		this.#file = new JsonFile(path, { parse: parseStored, holds: "a list of routines", onInvalid: "aside", indent: "\t" });
-		this.#routines = this.#file.load()?.routines ?? [];
-	}
-
-	get routines(): Routine[] {
-		return this.#routines;
-	}
-
-	/** Reads the file again, for a server that takes over from one that kept saving since this one started. */
-	reload(): void {
-		this.#routines = this.#file.load()?.routines ?? this.#routines;
-	}
-
-	/** Applies `change` at time `now` and saves; whether it changed anything. */
-	apply(change: Exclude<RoutineChange, { op: "run-now" }>, now: number): boolean {
-		const next = applyRoutine(this.#routines, change, now);
-		if (next === this.#routines) return false;
-		this.#routines = next;
-		this.#save();
-		return true;
+		super(path, { parse: parseRoutines, toJson: routines => ({ routines }), holds: "a list of routines", empty: [], reduce: applyRoutine });
 	}
 
 	/** Claims routine `id`'s slot at `at`, queued, keeping the newest {@link MAX_ROUTINE_RUNS} runs. */
 	claim(id: string, at: number): void {
-		this.#update(id, routine => ({
+		this.#updateRoutine(id, routine => ({
 			...routine,
 			runs: [{ at, outcome: { kind: "pending", queued: true }, errors: [] } satisfies RoutineRun, ...routine.runs].slice(0, MAX_ROUTINE_RUNS),
 		}));
@@ -154,22 +127,18 @@ export class RoutinesFile {
 	}
 
 	#run(id: string, at: number): RoutineRun | undefined {
-		return this.#routines.find(routine => routine.id === id)?.runs.find(run => run.at === at);
+		return this.value.find(routine => routine.id === id)?.runs.find(run => run.at === at);
 	}
 
 	#updateRun(id: string, at: number, next: (run: RoutineRun) => RoutineRun): void {
-		this.#update(id, routine => ({ ...routine, runs: routine.runs.map(run => (run.at === at ? next(run) : run)) }));
+		this.#updateRoutine(id, routine => ({ ...routine, runs: routine.runs.map(run => (run.at === at ? next(run) : run)) }));
 	}
 
 	/** Passes routine `id` through `next` and saves; a routine that is gone stays gone. */
-	#update(id: string, next: (routine: Routine) => Routine): void {
-		const index = this.#routines.findIndex(routine => routine.id === id);
-		if (index === -1) return;
-		this.#routines = this.#routines.with(index, next(this.#routines[index]!));
-		this.#save();
-	}
-
-	#save(): void {
-		this.#file.save({ routines: this.#routines });
+	#updateRoutine(id: string, next: (routine: Routine) => Routine): void {
+		this.update(routines => {
+			const index = routines.findIndex(routine => routine.id === id);
+			return index === -1 ? routines : routines.with(index, next(routines[index]!));
+		});
 	}
 }

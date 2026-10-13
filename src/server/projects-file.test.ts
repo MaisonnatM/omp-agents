@@ -93,7 +93,7 @@ describe("ProjectsFile", () => {
 		file.flush();
 		expect(JSON.parse(readFileSync(path, "utf8")).projects[0].coordinator.sessionId).toBe("s-c");
 		const next = new ProjectsFile(path);
-		expect(next.projects).toEqual(file.projects);
+		expect(next.value).toEqual(file.value);
 		expect(next.roleOf("s-w1")).toEqual({ projectId: "p1", role: "worker", workerId: "w1" });
 		expect(next.roleOf("s-c")).toEqual({ projectId: "p1", role: "coordinator" });
 		expect(next.roleOf("s-other")).toBeNull();
@@ -109,7 +109,7 @@ describe("ProjectsFile", () => {
 		mine.apply({ ...create, id: "p2", coordinator: "s-c2" });
 		theirs.apply(addWorker("s-w1"));
 		theirs.flush();
-		expect(new ProjectsFile(path).projects.map(project => [project.id, project.workers.length])).toEqual([
+		expect(new ProjectsFile(path).value.map(project => [project.id, project.workers.length])).toEqual([
 			["p1", 1],
 			["p2", 0],
 		]);
@@ -122,7 +122,7 @@ describe("ProjectsFile", () => {
 		const theirs = new ProjectsFile(path);
 		theirs.apply(create);
 		theirs.flush();
-		expect(mine.projects).toEqual([]);
+		expect(mine.value).toEqual([]);
 		mine.reload();
 		expect(mine.get("p1")?.name).toBe("Billing v3");
 	});
@@ -131,7 +131,7 @@ describe("ProjectsFile", () => {
 		const path = projectsPath();
 		mkdirSync(dirname(path), { recursive: true });
 		writeFileSync(path, JSON.stringify({ added: ["/a"], hidden: [] }));
-		expect(new ProjectsFile(path).projects).toEqual([]);
+		expect(new ProjectsFile(path).value).toEqual([]);
 		expect(existsSync(`${path}.invalid`)).toBe(true);
 	});
 });

@@ -93,7 +93,7 @@ function harness(path = projectsPath(), sessions = new Map<string, FakeSession>(
 		sessions.set(instanceId, session);
 		join.attach(session);
 		if (request.kind === "new") {
-			session.firstPromptSaw = parseProjects(JSON.parse(readFileSync(path, "utf8")))?.projects ?? null;
+			session.firstPromptSaw = parseProjects(JSON.parse(readFileSync(path, "utf8")));
 			session.status = "working";
 		}
 		return { ok: true, instanceId, cwd, prompt: null };
@@ -134,7 +134,7 @@ async function project(h: Harness, workers: number): Promise<{ projectId: string
 	const created = await h.runner.create({ name: "Billing", cwd: "/work/app", prompt: "Migrate billing.", model: null, thinking: "high" });
 	if (!created.ok) throw new Error(created.error);
 	const coordinator = h.sessions.get(created.instanceId)!;
-	const projectId = h.file.projects[0]!.id;
+	const projectId = h.file.value[0]!.id;
 	for (let n = 1; n <= workers; n++) await startWorker(h, projectId, { title: `Task ${n}`, prompt: `Do task ${n}.`, cwd: null });
 	const worker = (n: number) => [...h.sessions.values()].find(session => session.sessionId === h.file.get(projectId)!.workers[n - 1]!.sessionId)!;
 	return { projectId, coordinator, worker };
@@ -177,7 +177,7 @@ describe("ProjectRunner", () => {
 		const h = harness();
 		h.failNextStart();
 		expect(await h.runner.create({ name: "Billing", cwd: "/work/app", prompt: "Migrate billing.", model: null, thinking: null })).toEqual({ ok: false, error: "Cannot start omp: it crashed" });
-		expect(h.file.projects).toEqual([]);
+		expect(h.file.value).toEqual([]);
 		expect(h.seeded).toEqual([]);
 	});
 
@@ -290,7 +290,7 @@ describe("ProjectRunner", () => {
 		const w1 = worker(1);
 		w1.alive = false;
 		h.runner.exited(w1.instanceId);
-		await h.runner.messageWorker(h.file.projects[0]!.workers[0]!, "Use PKCE.");
+		await h.runner.messageWorker(h.file.value[0]!.workers[0]!, "Use PKCE.");
 		expect(h.launches.at(-1)?.request).toEqual({ kind: "resume", sessionId: w1.sessionId });
 		expect(h.launches.at(-1)?.launch.tools).toEqual([]);
 		expect([...h.sessions.values()].at(-1)?.prompts).toEqual(["Use PKCE."]);

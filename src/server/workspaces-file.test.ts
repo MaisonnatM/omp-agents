@@ -34,16 +34,16 @@ describe("WorkspacesFile", () => {
 		expect(first.apply({ op: "add", cwd: "/b" })).toBe(true);
 		expect(first.apply({ op: "hide", cwd: "/a" })).toBe(true);
 		expect(first.apply({ op: "show", cwd: "/c" })).toBe(false);
-		expect(workspacesFile(path).list).toEqual({ added: ["/a", "/b"], hidden: ["/a"] });
+		expect(workspacesFile(path).value).toEqual({ added: ["/a", "/b"], hidden: ["/a"] });
 		expect(first.apply({ op: "show", cwd: "/a" })).toBe(true);
-		expect(workspacesFile(path).list).toEqual({ added: ["/a", "/b"], hidden: [] });
+		expect(workspacesFile(path).value).toEqual({ added: ["/a", "/b"], hidden: [] });
 	});
 
 	test("a file holding relative paths moves aside rather than being written over", () => {
 		const path = workspacesPath();
 		mkdirSync(dirname(path), { recursive: true });
 		writeFileSync(path, JSON.stringify({ added: ["code/app"], hidden: [] }));
-		expect(workspacesFile(path).list).toEqual({ added: [], hidden: [] });
+		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [] });
 		expect(existsSync(`${path}.invalid`)).toBe(true);
 	});
 
@@ -52,7 +52,7 @@ describe("WorkspacesFile", () => {
 		const oldPath = oldPathOf(path);
 		mkdirSync(dirname(path), { recursive: true });
 		writeFileSync(oldPath, JSON.stringify({ added: ["/a"], hidden: ["/b"] }));
-		expect(workspacesFile(path).list).toEqual({ added: ["/a"], hidden: ["/b"] });
+		expect(workspacesFile(path).value).toEqual({ added: ["/a"], hidden: ["/b"] });
 		expect(existsSync(oldPath)).toBe(false);
 		expect(existsSync(path)).toBe(true);
 	});
@@ -64,7 +64,7 @@ describe("WorkspacesFile", () => {
 		const saved = JSON.stringify({ added: ["/a"], hidden: [] });
 		writeFileSync(path, saved);
 		writeFileSync(oldPath, JSON.stringify({ added: ["/c"], hidden: [] }));
-		expect(workspacesFile(path).list).toEqual({ added: ["/a"], hidden: [] });
+		expect(workspacesFile(path).value).toEqual({ added: ["/a"], hidden: [] });
 		expect(readFileSync(path, "utf8")).toBe(saved);
 		expect(existsSync(oldPath)).toBe(true);
 	});
@@ -75,7 +75,7 @@ describe("WorkspacesFile", () => {
 		mkdirSync(dirname(path), { recursive: true });
 		const other = JSON.stringify({ projects: [{ name: "Launch", cwds: ["/a"] }] });
 		writeFileSync(oldPath, other);
-		expect(workspacesFile(path).list).toEqual({ added: [], hidden: [] });
+		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [] });
 		expect(readFileSync(oldPath, "utf8")).toBe(other);
 		expect(existsSync(path)).toBe(false);
 	});
@@ -83,6 +83,6 @@ describe("WorkspacesFile", () => {
 	test("starts empty when neither file exists", () => {
 		const path = workspacesPath();
 		mkdirSync(dirname(path), { recursive: true });
-		expect(workspacesFile(path).list).toEqual({ added: [], hidden: [] });
+		expect(workspacesFile(path).value).toEqual({ added: [], hidden: [] });
 	});
 });

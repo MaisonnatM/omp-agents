@@ -1,6 +1,6 @@
 /** The directories Settings → Workspaces added and hid, saved in `workspaces.json`. */
 import { linkSync, readFileSync, unlinkSync } from "node:fs";
-import { JsonFile } from "../fs";
+import { ReducerFile } from "../fs";
 import { errorText, isObject } from "../json";
 import { applyWorkspace, NO_WORKSPACES, type WorkspaceChange, type WorkspaceList } from "../shared/workspaces";
 
@@ -37,26 +37,8 @@ export function adoptOldWorkspaces(oldPath: string, path: string): void {
 	}
 }
 
-export class WorkspacesFile {
-	readonly #file: JsonFile<WorkspaceList>;
-	#list: WorkspaceList;
-
+export class WorkspacesFile extends ReducerFile<WorkspaceList, [WorkspaceChange]> {
 	constructor(path: string) {
-		// Someone may have edited the file by hand, so one that holds something else moves aside rather than being written over.
-		this.#file = new JsonFile(path, { parse: parseWorkspaces, holds: "a workspace list", onInvalid: "aside", indent: "\t" });
-		this.#list = this.#file.load() ?? NO_WORKSPACES;
-	}
-
-	get list(): WorkspaceList {
-		return this.#list;
-	}
-
-	/** Applies `change` and saves; whether it changed anything. */
-	apply(change: WorkspaceChange): boolean {
-		const next = applyWorkspace(this.#list, change);
-		if (next === this.#list) return false;
-		this.#list = next;
-		this.#file.save(next);
-		return true;
+		super(path, { parse: parseWorkspaces, holds: "a workspace list", empty: NO_WORKSPACES, reduce: applyWorkspace });
 	}
 }

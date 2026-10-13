@@ -32,7 +32,7 @@ describe("UserTodosFile", () => {
 		expect(first.apply(addTodo({ id: "b", parentId: "a", text: "Write the docs", priority: 3, createdAt: CREATED }))).toBe(true);
 		expect(first.apply({ op: "edit-body", id: "a", body: "**Friday**" })).toBe(true);
 		expect(first.apply({ op: "indent", id: "a" })).toBe(false);
-		expect(new UserTodosFile(path).list).toEqual({
+		expect(new UserTodosFile(path).value).toEqual({
 			categories: [{ id: "w", name: "Work" }],
 			todos: [
 				{
@@ -62,7 +62,7 @@ describe("UserTodosFile", () => {
 			'{"todos": [{"id": "a", "text": "Old", "children": [{"id": "a1", "text": "Older", "doneAt": "2026-10-05T09:00:00.000Z"}]}, {"id": "b", "text": "Lost", "categoryId": "gone", "children": []}]}',
 		);
 		const old = { body: "", priority: 0 as const, assignee: null, due: null, createdAt: null };
-		expect(new UserTodosFile(path).list).toEqual({
+		expect(new UserTodosFile(path).value).toEqual({
 			categories: [],
 			todos: [
 				{
@@ -91,7 +91,7 @@ describe("UserTodosFile", () => {
 			{ id: "c", text: "c", status: "canceled", doneAt: at, priority: 2, createdAt: at, children: [] },
 		];
 		writeTodos(path, JSON.stringify({ todos: stored }));
-		expect(new UserTodosFile(path).list.todos.map(({ id, status, doneAt, priority, createdAt }) => ({ id, status, doneAt, priority, createdAt }))).toEqual([
+		expect(new UserTodosFile(path).value.todos.map(({ id, status, doneAt, priority, createdAt }) => ({ id, status, doneAt, priority, createdAt }))).toEqual([
 			{ id: "a", status: "in-progress", doneAt: null, priority: 0, createdAt: null },
 			{ id: "b", status: "todo", doneAt: null, priority: 0, createdAt: null },
 			{ id: "c", status: "canceled", doneAt: at, priority: 2, createdAt: at },
@@ -103,7 +103,7 @@ describe("UserTodosFile", () => {
 		const path = todosPath();
 		writeTodos(path, '{"todos": [{"id": "a", "text": "kept"}]}');
 		const file = new UserTodosFile(path);
-		expect(file.list).toEqual({ categories: [], todos: [], archive: [] });
+		expect(file.value).toEqual({ categories: [], todos: [], archive: [] });
 		expect(readFileSync(`${path}.invalid`, "utf8")).toBe('{"todos": [{"id": "a", "text": "kept"}]}');
 		expect(existsSync(path)).toBe(false);
 	});

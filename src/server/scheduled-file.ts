@@ -3,14 +3,10 @@
  * Servers on different ports share the file, and a send added on any of them must reach the one that sends it, so every
  * change reads the file again before it applies, as `projects.json` does.
  */
-import { JsonFile } from "../fs";
+import { ReducerFile } from "../fs";
 import { isObject, parseAll } from "../json";
 import { applyScheduled, type ScheduledChange, type ScheduledSend, type ScheduledState } from "../shared/scheduled";
 import { parseScheduledSpec } from "./wire";
-
-interface Stored {
-	sends: ScheduledSend[];
-}
 
 const isTime = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
@@ -27,66 +23,40 @@ function parseSend(value: unknown): ScheduledSend | null {
 	return spec && state && { ...spec.ok, createdAt: value.createdAt, state };
 }
 
-function parseStored(value: unknown): Stored | null {
-	const sends = isObject(value) ? parseAll(value.sends, parseSend) : null;
-	return sends && { sends };
-}
-
-export class ScheduledFile {
-	readonly #file: JsonFile<Stored>;
-	#sends: ScheduledSend[];
-
+export class ScheduledFile extends ReducerFile<ScheduledSend[], [change: Exclude<ScheduledChange, { op: "send-now" }>, now: number]> {
 	constructor(path: string) {
-		// The file holds messages someone wrote, so a file that is not one moves aside rather than being written over.
-		this.#file = new JsonFile(path, { parse: parseStored, holds: "a list of scheduled sends", onInvalid: "aside", indent: "\t" });
-		this.#sends = this.#file.load()?.sends ?? [];
-	}
-
-	get sends(): ScheduledSend[] {
-		return this.#sends;
-	}
-
-	/** Reads the file again, so a send that another server added or sent counts. */
-	reload(): void {
-		this.#sends = this.#file.load()?.sends ?? this.#sends;
-	}
-
-	/** Applies `change` at time `now` and saves; whether it changed anything. */
-	apply(change: Exclude<ScheduledChange, { op: "send-now" }>, now: number): boolean {
-		this.reload();
-		return this.#replace(applyScheduled(this.#sends, change, now));
+		super(path, {
+			parse: value => (isObject(value) ? parseAll(value.sends, parseSend) : null),
+			toJson: sends => ({ sends }),
+			holds: "a list of scheduled sends",
+			empty: [],
+			reduce: applyScheduled,
+			shared: true,
+		});
 	}
 
 	/** Marks send `id` as sending and saves, before anything sends it; the send, or `null` when it is gone or already sending. */
 	claim(id: string): ScheduledSend | null {
-		this.reload();
-		const send = this.#sends.find(candidate => candidate.id === id);
-		if (!send || send.state.phase === "sending") return null;
-		this.#update(id, { phase: "sending" });
-		this.#file.flush();
-		return send;
+		const claims = this.update(sends => {
+			const index = sends.findIndex(send => send.id === id);
+			const send = sends[index];
+			return !send || send.state.phase === "sending" ? sends : sends.with(index, { ...send, state: { phase: "sending" } });
+		});
+		if (!claims) return null;
+		this.flush();
+		return this.value.find(send => send.id === id)!;
 	}
 
 	/** Drops send `id`, which reached its session. */
 	sent(id: string): void {
-		this.reload();
-		this.#replace(this.#sends.filter(send => send.id !== id));
+		this.update(sends => (sends.some(send => send.id === id) ? sends.filter(send => send.id !== id) : sends));
 	}
 
 	/** Records why send `id` did not send; it stays until it is sent again or dismissed. */
 	failed(id: string, error: string, at: number): void {
-		this.reload();
-		this.#update(id, { phase: "failed", error, at });
-	}
-
-	#update(id: string, state: ScheduledState): void {
-		this.#replace(this.#sends.map(send => (send.id === id ? { ...send, state } : send)));
-	}
-
-	#replace(next: ScheduledSend[]): boolean {
-		if (next === this.#sends || (next.length === this.#sends.length && next.every((send, index) => send === this.#sends[index]))) return false;
-		this.#sends = next;
-		this.#file.save({ sends: next });
-		return true;
+		this.update(sends => {
+			const index = sends.findIndex(send => send.id === id);
+			return index === -1 ? sends : sends.with(index, { ...sends[index]!, state: { phase: "failed", error, at } });
+		});
 	}
 }

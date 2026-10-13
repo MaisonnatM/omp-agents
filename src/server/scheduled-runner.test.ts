@@ -69,7 +69,7 @@ describe("ScheduledRunner", () => {
 		await runner.tick();
 		expect(fake.live.get("s1")).toEqual(["continue"]);
 		expect(fake.requests).toEqual([]);
-		expect(file.sends.map(send => [send.id, send.state.phase])).toEqual([["later", "waiting"]]);
+		expect(file.value.map(send => [send.id, send.state.phase])).toEqual([["later", "waiting"]]);
 	});
 
 	test("a message to a session that is not running resumes it, then reaches the resumed session", async () => {
@@ -78,7 +78,7 @@ describe("ScheduledRunner", () => {
 		await runner.tick();
 		expect(fake.requests).toEqual([{ kind: "resume", sessionId: "s-past" }]);
 		expect(fake.live.get("s-past")).toEqual(["the plan reset, carry on"]);
-		expect(file.sends).toEqual([]);
+		expect(file.value).toEqual([]);
 	});
 
 	test("a start that fails stays with its error until Send now tries again", async () => {
@@ -87,7 +87,7 @@ describe("ScheduledRunner", () => {
 		add("s", T0, { kind: "start", request });
 		fake.failWith = "Out of credits.";
 		await runner.tick();
-		expect(file.sends.map(send => send.state)).toEqual([{ phase: "failed", error: "Out of credits.", at: T0 }]);
+		expect(file.value.map(send => send.state)).toEqual([{ phase: "failed", error: "Out of credits.", at: T0 }]);
 
 		await runner.tick();
 		expect(fake.requests).toHaveLength(1);
@@ -95,7 +95,7 @@ describe("ScheduledRunner", () => {
 		fake.failWith = null;
 		await runner.sendNow("s");
 		expect(fake.requests).toEqual([request, request]);
-		expect(file.sends).toEqual([]);
+		expect(file.value).toEqual([]);
 	});
 
 	test("two sends of the same message at once deliver it once", async () => {
@@ -115,7 +115,7 @@ describe("ScheduledRunner", () => {
 		runner.recover();
 		await runner.tick();
 		expect(fake.live.get("s1")).toEqual([]);
-		expect(file.sends.map(send => send.state)).toEqual([{ phase: "failed", error: STOPPED_WHILE_SENDING, at: T0 + MINUTE }]);
+		expect(file.value.map(send => send.state)).toEqual([{ phase: "failed", error: STOPPED_WHILE_SENDING, at: T0 + MINUTE }]);
 	});
 });
 
@@ -127,7 +127,7 @@ describe("ScheduledFile", () => {
 		theirs.apply({ op: "add", send: { id: "a", at: T0, reset: "Anthropic 5h", target: message("s1", "go") } }, T0);
 		theirs.failed("a", "Cannot resume the session: gone", T0);
 		mine.apply({ op: "add", send: { id: "b", at: T0 - MINUTE, reset: null, target: message("s2", "first") } }, T0);
-		expect(new ScheduledFile(path).sends).toEqual([
+		expect(new ScheduledFile(path).value).toEqual([
 			{ id: "b", at: T0 - MINUTE, reset: null, target: message("s2", "first"), createdAt: T0, state: { phase: "waiting" } },
 			{ id: "a", at: T0, reset: "Anthropic 5h", target: message("s1", "go"), createdAt: T0, state: { phase: "failed", error: "Cannot resume the session: gone", at: T0 } },
 		]);
@@ -140,6 +140,6 @@ describe("ScheduledFile", () => {
 		file.claim("a");
 		expect(file.apply({ op: "remove", id: "a" }, T0)).toBe(false);
 		expect(file.apply({ op: "remove", id: "b" }, T0)).toBe(true);
-		expect(file.sends.map(send => send.id)).toEqual(["a"]);
+		expect(file.value.map(send => send.id)).toEqual(["a"]);
 	});
 });
