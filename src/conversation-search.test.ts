@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { searchConversations, snippetOf } from "./conversation-search";
+import { Conversations, snippetOf } from "./conversation-search";
 import { type ListedSession, SessionFactsIndex } from "./session-facts";
 
 const dirs: string[] = [];
@@ -13,7 +13,7 @@ afterEach(() => {
 const line = (role: "user" | "assistant" | "toolResult", text: string, timestamp: number): string =>
 	`${JSON.stringify({ type: "message", id: `e${timestamp}`, timestamp: new Date(timestamp).toISOString(), message: { role, timestamp, content: [{ type: "text", text }] } })}\n`;
 
-test("finds each session by its latest prompt or reply holding every word, not tool output or a subagent's, and follows what a file gains", async () => {
+test("finds each session by its latest prompt or reply holding every word, not tool output or a subagent's, and follows appends, rewrites, and unlisting", async () => {
 	const dir = mkdtempSync(join(tmpdir(), "omp-agents-convo-"));
 	dirs.push(dir);
 	const older = join(dir, "a.jsonl");
@@ -22,12 +22,13 @@ test("finds each session by its latest prompt or reply holding every word, not t
 	writeFileSync(newer, line("user", "Write the login test", 4) + line("toolResult", "fix the login", 5));
 	mkdirSync(join(dir, "b", "Child"), { recursive: true });
 	writeFileSync(join(dir, "b", "Child", "sub.jsonl"), line("assistant", "fix login in the subagent", 6));
-	const index = new SessionFactsIndex(async () => null, async () => null, async () => null);
-	const listed = (newerAt: number): (ListedSession & { id: string })[] => [
+	const conversations = new Conversations();
+	const index = new SessionFactsIndex(async () => null, async () => null, async () => null, [conversations]);
+	const listed = (newerAt: number, olderAt = 1): (ListedSession & { id: string })[] => [
 		{ id: "b", path: newer, cwd: dir, modifiedAt: newerAt },
-		{ id: "a", path: older, cwd: dir, modifiedAt: 1 },
+		{ id: "a", path: older, cwd: dir, modifiedAt: olderAt },
 	];
-	const search = (sessions: (ListedSession & { id: string })[]) => searchConversations(sessions, path => index.conversationOf(path), "fix login");
+	const search = (sessions: (ListedSession & { id: string })[]) => conversations.search(sessions, "fix login");
 
 	await index.refresh(listed(1));
 	expect(search(listed(1))).toEqual([{ sessionId: "a", messageId: "m2:0", role: "assistant", snippet: "The login fix is pushed.", matches: 2 }]);
@@ -38,6 +39,16 @@ test("finds each session by its latest prompt or reply holding every word, not t
 		["b", "m7:0", 1],
 		["a", "m2:0", 2],
 	]);
+
+	writeFileSync(older, line("user", "Fix login", 8));
+	await index.refresh(listed(2, 3));
+	expect(search(listed(2)).map(hit => [hit.sessionId, hit.messageId, hit.matches])).toEqual([
+		["b", "m7:0", 1],
+		["a", "m8", 1],
+	]);
+
+	await index.refresh([listed(2)[0]!]);
+	expect(search(listed(2)).map(hit => hit.sessionId)).toEqual(["b"]);
 });
 
 test("a snippet is one line that starts on a word a little before the first word searched", () => {
