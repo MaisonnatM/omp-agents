@@ -449,7 +449,7 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 	});
 
 	/** `GET /api/calendar/local`: every event kept on this computer. */
-	const localCalendarEvents = get(() => answer(async (): Promise<LocalEventsAnswer> => ({ events: [...localEvents.all] })));
+	const localCalendarEvents = get(() => answer(async (): Promise<LocalEventsAnswer> => ({ events: [...localEvents.value] })));
 
 	/** `PUT /api/calendar/events/new`: `NewEvent`, kept on this computer or added to a Google calendar you may write to; answers `NewEventAnswer`. */
 	const eventCreate = write(
@@ -475,7 +475,7 @@ function calendarRoutes({ get, write }: RouteKit, env: CalendarRoutesEnv): Route
 		async (event): Promise<object> => {
 			switch (event.kind) {
 				case "local":
-					localEvents.remove(event.id);
+					localEvents.apply({ op: "remove", id: event.id });
 					return {};
 				case "google":
 					await google.delete(event.calendarId, event.eventId);

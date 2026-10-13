@@ -19,13 +19,13 @@ describe("CalendarsFile", () => {
 	test("hiding or showing a calendar changes only once, and the next server reads the result", () => {
 		const path = calendarsPath();
 		const first = new CalendarsFile(path);
-		expect(first.setShown("team@group.calendar.google.com", true)).toBe(false);
-		expect(first.setShown("team@group.calendar.google.com", false)).toBe(true);
-		expect(first.setShown("team@group.calendar.google.com", false)).toBe(false);
-		expect(first.setShown("holidays@group.v.calendar.google.com", false)).toBe(true);
-		expect([...new CalendarsFile(path).hidden]).toEqual(["team@group.calendar.google.com", "holidays@group.v.calendar.google.com"]);
-		expect(first.setShown("team@group.calendar.google.com", true)).toBe(true);
-		expect([...new CalendarsFile(path).hidden]).toEqual(["holidays@group.v.calendar.google.com"]);
+		expect(first.apply("team@group.calendar.google.com", true)).toBe(false);
+		expect(first.apply("team@group.calendar.google.com", false)).toBe(true);
+		expect(first.apply("team@group.calendar.google.com", false)).toBe(false);
+		expect(first.apply("holidays@group.v.calendar.google.com", false)).toBe(true);
+		expect([...new CalendarsFile(path).value]).toEqual(["team@group.calendar.google.com", "holidays@group.v.calendar.google.com"]);
+		expect(first.apply("team@group.calendar.google.com", true)).toBe(true);
+		expect([...new CalendarsFile(path).value]).toEqual(["holidays@group.v.calendar.google.com"]);
 	});
 
 	test("a file holding something else moves aside rather than being written over", () => {
@@ -34,7 +34,7 @@ describe("CalendarsFile", () => {
 		writeFileSync(path, JSON.stringify({ hidden: "team@group.calendar.google.com" }));
 		const file = new CalendarsFile(path);
 		expect(existsSync(`${path}.invalid`)).toBe(true);
-		expect(file.setShown("team@group.calendar.google.com", false)).toBe(true);
-		expect([...new CalendarsFile(path).hidden]).toEqual(["team@group.calendar.google.com"]);
+		expect(file.apply("team@group.calendar.google.com", false)).toBe(true);
+		expect([...new CalendarsFile(path).value]).toEqual(["team@group.calendar.google.com"]);
 	});
 });

@@ -1,40 +1,11 @@
 /** The Todo page's list, kept in a file so that every window of the dashboard, and the next server, shows the same one. */
-import { JsonFile } from "../fs";
+import { ReducerFile } from "../fs";
 import { applyUserTodo } from "../user-todos";
 import { parseUserTodoList } from "../user-todos-parse";
 import type { UserTodoChange, UserTodoList } from "../user-todos-shared";
 
-const EMPTY: UserTodoList = { categories: [], todos: [], archive: [] };
-
-export class UserTodosFile {
-	readonly #file: JsonFile<UserTodoList>;
-	#list: UserTodoList;
-
+export class UserTodosFile extends ReducerFile<UserTodoList, [UserTodoChange]> {
 	constructor(path: string) {
-		// The file holds what someone typed, so a file that is not a list moves aside rather than being written over.
-		this.#file = new JsonFile(path, { parse: parseUserTodoList, holds: "a todo list", onInvalid: "aside", indent: "\t" });
-		this.#list = this.#file.load() ?? EMPTY;
-	}
-
-	get list(): UserTodoList {
-		return this.#list;
-	}
-
-	/** Reads the file again, for a server that takes over from one that kept saving since this one started. */
-	reload(): void {
-		this.#list = this.#file.load() ?? this.#list;
-	}
-
-	/** Applies `change` and saves the list; whether it changed. */
-	apply(change: UserTodoChange): boolean {
-		const next = applyUserTodo(this.#list, change);
-		if (next === this.#list) return false;
-		this.#list = next;
-		this.#save();
-		return true;
-	}
-
-	#save(): void {
-		this.#file.save(this.#list);
+		super(path, { parse: parseUserTodoList, holds: "a todo list", empty: { categories: [], todos: [], archive: [] }, reduce: applyUserTodo });
 	}
 }

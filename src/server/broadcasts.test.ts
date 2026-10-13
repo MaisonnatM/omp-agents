@@ -40,21 +40,21 @@ function setup(initial: PastSession[]) {
 	const pins = new PinsFile(join(dir, "pins.json"));
 	const projects = new ProjectsFile(join(dir, "projects.json"));
 	const lists = new ListRegistry({
-		"user-todos": { msg: () => ({ t: "user-todos", list: todos.list }), apply: change => todos.apply(change) },
-		routines: { msg: () => ({ t: "routines", routines: routines.routines }), apply: change => routines.apply(change, 1000) },
-		scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.sends }), apply: change => scheduled.apply(change, 1000) },
+		"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
+		routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, 1000) },
+		scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, 1000) },
 		workspaces: {
 			msg: () => ({
 				t: "workspaces",
 				list: {
-					added: workspaces.list.added.map(cwd => ({ cwd, cwdDisplay: cwd })),
-					hidden: workspaces.list.hidden.map(cwd => ({ cwd, cwdDisplay: cwd })),
+					added: workspaces.value.added.map(cwd => ({ cwd, cwdDisplay: cwd })),
+					hidden: workspaces.value.hidden.map(cwd => ({ cwd, cwdDisplay: cwd })),
 				},
 			}),
 			apply: change => workspaces.apply(change),
 		},
-		pins: { msg: () => ({ t: "pins", sessionIds: pins.sessionIds }), apply: change => pins.apply(change) },
-		projects: { msg: () => ({ t: "projects", projects: projects.projects }), apply: change => projects.apply(change) },
+		pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
+		projects: { msg: () => ({ t: "projects", projects: projects.value }), apply: change => projects.apply(change) },
 		notices: { msg: () => ({ t: "notices", list: [] }) },
 	}, kind => broadcasts.pushList(kind));
 	const broadcasts = new Broadcasts({

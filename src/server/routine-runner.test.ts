@@ -110,14 +110,14 @@ describe("RoutineRunner", () => {
 		const first = harness(firstFile);
 		await first.runner.tick();
 		expect(first.fake.requests).toHaveLength(3);
-		expect(firstFile.routines[3]?.runs[0]?.outcome).toEqual({ kind: "pending", queued: true });
+		expect(firstFile.value[3]?.runs[0]?.outcome).toEqual({ kind: "pending", queued: true });
 
 		const file = new RoutinesFile(path);
 		const second = harness(file);
 		await second.runner.tick();
 		expect(second.fake.requests).toHaveLength(1);
-		expect(file.routines.map(routine => routine.runs[0]?.outcome.kind)).toEqual(["session", "session", "session", "session"]);
-		expect(file.routines.map(routine => routine.runs.length)).toEqual([1, 1, 1, 1]);
+		expect(file.value.map(routine => routine.runs[0]?.outcome.kind)).toEqual(["session", "session", "session", "session"]);
+		expect(file.value.map(routine => routine.runs.length)).toEqual([1, 1, 1, 1]);
 	});
 
 	test("no more than three routine sessions run at once, and a freed slot takes the next routine", async () => {
@@ -152,14 +152,14 @@ describe("RoutineRunner", () => {
 		const { runner, fake } = harness(file);
 		fake.failWith = "omp is not installed";
 		await runner.tick();
-		expect(file.routines[0]?.runs[0]?.errors).toEqual(["Notes: omp is not installed"]);
-		expect(file.routines[0]?.runs[0]?.outcome).toEqual({ kind: "pending", queued: false });
+		expect(file.value[0]?.runs[0]?.errors).toEqual(["Notes: omp is not installed"]);
+		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "pending", queued: false });
 
 		fake.failWith = null;
 		fake.now += HOUR;
 		await runner.tick();
 		expect(fake.requests).toHaveLength(2);
-		expect(file.routines[0]?.runs[0]?.outcome).toEqual({ kind: "session", instanceId: "i2", sessionId: "s-i2" });
+		expect(file.value[0]?.runs[0]?.outcome).toEqual({ kind: "session", instanceId: "i2", sessionId: "s-i2" });
 	});
 
 	test("a session that worked and went idle ends, and one idle before it ever worked keeps running", async () => {
@@ -193,8 +193,8 @@ describe("RoutineRunner", () => {
 		fake.now += 1;
 		await runner.tick();
 		expect([...fake.sessions.values()].map(session => session.ended)).toEqual([true, false, true]);
-		expect(file.routines[0]?.runs[0]?.errors).toEqual(["The session never started its turn within 10 minutes, so it was ended."]);
-		expect(file.routines[1]?.runs[0]?.errors).toEqual([]);
+		expect(file.value[0]?.runs[0]?.errors).toEqual(["The session never started its turn within 10 minutes, so it was ended."]);
+		expect(file.value[1]?.runs[0]?.errors).toEqual([]);
 		expect(fake.requests).toHaveLength(3);
 
 		// The freed slots take the routine that waited.
@@ -221,7 +221,7 @@ describe("RoutineRunner", () => {
 		fake.now += HOUR;
 		await runner.tick();
 		expect(fake.requests.length).toBe(1);
-		expect(file.routines[0]?.runs.map(run => [run.outcome.kind, run.errors])).toEqual([
+		expect(file.value[0]?.runs.map(run => [run.outcome.kind, run.errors])).toEqual([
 			["pending", ["The last run's session is still running."]],
 			["session", []],
 		]);
@@ -273,12 +273,12 @@ describe("RoutineRunner", () => {
 			const { runner, fake } = harness(file);
 			await runner.tick();
 			expect(fake.execs.map(({ command, cwd }) => ({ command, cwd }))).toEqual([{ command: "git worktree prune", cwd: "/work/webapp" }]);
-			expect(file.routines[0]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "command", run: { phase: "running", startedAt: T0 + HOUR } }, errors: [] });
+			expect(file.value[0]?.runs[0]).toEqual({ at: T0 + HOUR, outcome: { kind: "command", run: { phase: "running", startedAt: T0 + HOUR } }, errors: [] });
 
 			fake.now += 4000;
 			fake.execs[0]!.end({ exitCode: 0, output: "Removing worktrees/old\n" });
 			await settled();
-			expect(file.routines[0]?.runs[0]).toEqual({
+			expect(file.value[0]?.runs[0]).toEqual({
 				at: T0 + HOUR,
 				outcome: { kind: "command", run: { phase: "exited", code: 0, output: "Removing worktrees/old\n", startedAt: T0 + HOUR, endedAt: T0 + HOUR + 4000 } },
 				errors: [],
@@ -293,17 +293,17 @@ describe("RoutineRunner", () => {
 			fake.now += HOUR;
 			await runner.tick();
 			expect(fake.execs.length).toBe(1);
-			expect(file.routines[0]?.runs.map(run => run.errors)).toEqual([["The last run's command is still running."], []]);
+			expect(file.value[0]?.runs.map(run => run.errors)).toEqual([["The last run's command is still running."], []]);
 
 			fake.execs[0]!.end({ exitCode: 3, output: "fatal: not a git repository\n" });
 			await settled();
-			expect(file.routines[0]?.runs[1]).toMatchObject({ errors: ["Exited with code 3."], outcome: { kind: "command", run: { phase: "exited", code: 3, output: "fatal: not a git repository\n" } } });
+			expect(file.value[0]?.runs[1]).toMatchObject({ errors: ["Exited with code 3."], outcome: { kind: "command", run: { phase: "exited", code: 3, output: "fatal: not a git repository\n" } } });
 
 			fake.now += HOUR;
 			await runner.tick();
 			fake.execs[1]!.end({ exitCode: null, output: "" });
 			await settled();
-			expect(file.routines[0]?.runs[0]).toMatchObject({ errors: ["Stopped after 10 minutes."], outcome: { kind: "command", run: { phase: "stopped", reason: "time-limit" } } });
+			expect(file.value[0]?.runs[0]).toMatchObject({ errors: ["Stopped after 10 minutes."], outcome: { kind: "command", run: { phase: "stopped", reason: "time-limit" } } });
 		});
 
 		test("a command that cannot start saves why as its failure and its error", async () => {
@@ -312,7 +312,7 @@ describe("RoutineRunner", () => {
 			await runner.tick();
 			fake.execs[0]!.fail(new Error("/work/webapp is not a directory."));
 			await settled();
-			expect(file.routines[0]?.runs[0]).toMatchObject({
+			expect(file.value[0]?.runs[0]).toMatchObject({
 				errors: ["/work/webapp is not a directory."],
 				outcome: { kind: "command", run: { phase: "failed", error: "/work/webapp is not a directory." } },
 			});
@@ -338,7 +338,7 @@ describe("RoutineRunner", () => {
 			second.runner.recover();
 			await second.runner.tick();
 			expect(second.fake.execs).toEqual([]);
-			expect(file.routines[0]?.runs).toEqual([
+			expect(file.value[0]?.runs).toEqual([
 				{
 					at: T0 + HOUR,
 					outcome: { kind: "command", run: { phase: "stopped", reason: "dashboard", output: "", startedAt: T0 + HOUR, endedAt: T0 + HOUR } },

@@ -125,7 +125,7 @@ export class Dashboard {
 		// The calendars' secret addresses an older version kept read them; Google Calendar now reads through omp's sign-in.
 		rmSync(oldGoogleFile, { force: true });
 		const calendars = this.#calendars;
-		this.#google = new GoogleCalendarClient(integrationFetch("google-calendar"), () => calendars.hidden);
+		this.#google = new GoogleCalendarClient(integrationFetch("google-calendar"), () => calendars.value);
 		const sessions = (this.#sessions = new LiveSessions((instanceId, update) => this.#onLiveUpdate(instanceId, update)));
 		const pathFor = (view: View): string | null =>
 			view.kind === "past" ? files.pathOf(view.sessionId) : (sessions.get(view.instanceId)?.transcriptPath(view.agentId, files.pathOf) ?? null);
@@ -151,7 +151,7 @@ export class Dashboard {
 				},
 				creditRuns: () => readCreditRuns(Date.now()),
 				localEvents: () =>
-					this.#localEvents.all.flatMap(({ id, title, when }) => (when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null }])),
+					this.#localEvents.value.flatMap(({ id, title, when }) => (when.allDay ? [] : [{ ref: `local/${id}`, title, start: when.start, end: when.end, calendar: null, color: null, url: null }])),
 				googleEvents: async (from, to) => {
 					if (!(await integrationSignedIn("google-calendar"))) return [];
 					const { events } = await this.#google.events(new Date(from), new Date(to));
@@ -164,18 +164,18 @@ export class Dashboard {
 			() => this.#broadcasts.pushList("notices"),
 		));
 		const lists = (this.#lists = new ListRegistry({
-			"user-todos": { msg: () => ({ t: "user-todos", list: todos.list }), apply: change => todos.apply(change) },
-			routines: { msg: () => ({ t: "routines", routines: routines.routines }), apply: change => routines.apply(change, Date.now()) },
-			scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.sends }), apply: change => scheduled.apply(change, Date.now()) },
+			"user-todos": { msg: () => ({ t: "user-todos", list: todos.value }), apply: change => todos.apply(change) },
+			routines: { msg: () => ({ t: "routines", routines: routines.value }), apply: change => routines.apply(change, Date.now()) },
+			scheduled: { msg: () => ({ t: "scheduled", sends: scheduled.value }), apply: change => scheduled.apply(change, Date.now()) },
 			workspaces: {
 				msg: () => {
-					const [added, hidden] = [workspaces.list.added, workspaces.list.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
+					const [added, hidden] = [workspaces.value.added, workspaces.value.hidden].map(cwds => cwds.map(cwd => ({ cwd, cwdDisplay: displayPath(cwd) })));
 					return { t: "workspaces", list: { added, hidden } };
 				},
 				apply: change => workspaces.apply(change),
 			},
-			pins: { msg: () => ({ t: "pins", sessionIds: pins.sessionIds }), apply: change => pins.apply(change) },
-			projects: { msg: () => ({ t: "projects", projects: projects.projects }), apply: change => projects.apply(change) },
+			pins: { msg: () => ({ t: "pins", sessionIds: pins.value }), apply: change => pins.apply(change) },
+			projects: { msg: () => ({ t: "projects", projects: projects.value }), apply: change => projects.apply(change) },
 			notices: { msg: () => ({ t: "notices", list: notices.list }) },
 		}, kind => this.#broadcasts.pushList(kind)));
 		const broadcasts = (this.#broadcasts = new Broadcasts({
@@ -194,7 +194,7 @@ export class Dashboard {
 			savedFile: files.pathOf,
 			onStarted: () => broadcasts.syncRoster(),
 			linkTodo: (todoId, sessionId) => {
-				for (const change of startChanges(todos.list, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
+				for (const change of startChanges(todos.value, todoId, sessionId, new Date().toISOString())) lists.apply("user-todos", change);
 			},
 			projects: { launchFor: (request, project) => this.#projectRunner.launchFor(request, project) },
 		});
@@ -329,7 +329,7 @@ export class Dashboard {
 			guards,
 			sessions: {
 				knownCwds: () => this.knownCwds(),
-				addedCwds: () => this.#workspaces.list.added,
+				addedCwds: () => this.#workspaces.value.added,
 				changeWorkspaces: change => void this.#lists.apply("workspaces", change),
 				savedOf: files.savedOf,
 				placeOf(sessionId) {
@@ -350,12 +350,12 @@ export class Dashboard {
 			},
 			calendar: {
 				google: this.#google,
-				setCalendarShown: (id, shown) => this.#calendars.setShown(id, shown),
+				setCalendarShown: (id, shown) => this.#calendars.apply(id, shown),
 				localEvents: this.#localEvents,
 			},
 			gmail: this.#gmail,
 			files: { worktrees: this.#worktrees, terminals: this.terminals },
-			todos: { list: () => this.#todos.list, change: change => void this.#lists.apply("user-todos", change) },
+			todos: { list: () => this.#todos.value, change: change => void this.#lists.apply("user-todos", change) },
 		});
 	}
 
@@ -431,7 +431,7 @@ export class Dashboard {
 	}
 
 	#workspaceCwds(): string[] {
-		const { added, hidden } = this.#workspaces.list;
+		const { added, hidden } = this.#workspaces.value;
 		return [...new Set([...this.knownCwds(), ...added])].filter(cwd => !hidden.includes(cwd));
 	}
 

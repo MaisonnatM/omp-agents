@@ -37,7 +37,7 @@ export class ScheduledRunner {
 	recover(): void {
 		const { file, now } = this.#deps;
 		file.reload();
-		const stranded = file.sends.filter(send => send.state.phase === "sending");
+		const stranded = file.value.filter(send => send.state.phase === "sending");
 		for (const send of stranded) file.failed(send.id, STOPPED_WHILE_SENDING, now());
 		if (stranded.length > 0) this.#deps.onChange();
 	}
@@ -47,7 +47,7 @@ export class ScheduledRunner {
 		const { file, now } = this.#deps;
 		file.reload();
 		const at = now();
-		for (const send of file.sends.filter(candidate => isDueSend(candidate, at))) await this.sendNow(send.id);
+		for (const send of file.value.filter(candidate => isDueSend(candidate, at))) await this.sendNow(send.id);
 	}
 
 	/** Sends `id` now, whatever its time, or tries a failed one again; a send already under way sends once. */

@@ -19,20 +19,20 @@ describe("PinsFile", () => {
 	test("a change that changes the pins saves them for the next server, and one that changes nothing says so", () => {
 		const path = pinsPath();
 		const first = new PinsFile(path);
-		expect(first.sessionIds).toEqual([]);
+		expect(first.value).toEqual([]);
 		expect(first.apply({ op: "pin", sessionIds: ["s1", "s2"] })).toBe(true);
 		expect(first.apply({ op: "pin", sessionIds: ["s1"] })).toBe(false);
 		expect(first.apply({ op: "unpin", sessionIds: ["s3"] })).toBe(false);
-		expect(new PinsFile(path).sessionIds).toEqual(["s1", "s2"]);
+		expect(new PinsFile(path).value).toEqual(["s1", "s2"]);
 		expect(first.apply({ op: "unpin", sessionIds: ["s1"] })).toBe(true);
-		expect(new PinsFile(path).sessionIds).toEqual(["s2"]);
+		expect(new PinsFile(path).value).toEqual(["s2"]);
 	});
 
 	test("a file that holds something other than session ids moves aside rather than being written over", () => {
 		const path = pinsPath();
 		mkdirSync(dirname(path), { recursive: true });
 		writeFileSync(path, JSON.stringify({ sessions: [7] }));
-		expect(new PinsFile(path).sessionIds).toEqual([]);
+		expect(new PinsFile(path).value).toEqual([]);
 		expect(existsSync(`${path}.invalid`)).toBe(true);
 	});
 });

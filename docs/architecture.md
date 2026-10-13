@@ -441,8 +441,8 @@ On a takeover the server logs it, reads `routines.json`, `todos.json`, and `proj
 A server that exits normally deletes its lock.
 The servers that do not own it still serve their pages, start sessions, and take what you do in them, such as editing a routine, a todo, or **Run now**; only the minute tick's routines and scheduled sends, the todo inbox, and the end inbox's requests for sessions started in a terminal are left to the owner.
 Each server keeps its own copy of `routines.json` and `todos.json` in memory and saves whole, so the last server you edited in wins until the owner changes.
-`projects.json` is the exception: every server runs its own project runner, which writes on every worker turn, so `ProjectsFile.apply` reads the file again before it applies a change, and a change made on one server keeps what another saved.
-`scheduled.json` reads again the same way, before every change, so a send added on any server reaches the owner.
+`projects.json` is the exception: every server runs its own project runner, which writes on every worker turn, so `ProjectsFile` is a `shared` `ReducerFile`, which reads the file again before it applies a change, and a change made on one server keeps what another saved.
+`ScheduledFile` is shared the same way, so a send added on any server reaches the owner.
 
 ## Scheduled sends
 

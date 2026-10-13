@@ -43,6 +43,8 @@ function atomicWriteTextSync(path: string, text: string, mode?: number): void {
 interface JsonFileOptions<T> {
 	/** The value `json` holds, or `null` when it is not one. */
 	parse: (json: unknown) => T | null;
+	/** What the file holds for `value`, when that is not `value` itself: `{ sessions }` around a list of session ids. */
+	toJson?: (value: T) => unknown;
 	/** What the file holds, as the report of a file that holds something else names it: `a todo list`. */
 	holds: string;
 	/** A file that holds something else stays where it is (`ignore`), or moves to `<path>.invalid` (`aside`) because it holds what someone typed. */
@@ -54,7 +56,7 @@ interface JsonFileOptions<T> {
 }
 
 /** Files with a value {@link JsonFile.save} has not written yet, by path. */
-const pending = new Map<string, JsonFile<unknown>>();
+const pending = new Map<string, { flush(): void }>();
 
 /** Writes every value saved and not yet written, as the server stops: a value saved in its last tick still reaches its file. */
 export function flushJsonFiles(): void {
@@ -127,12 +129,70 @@ export class JsonFile<T> {
 		if (!unwritten) return;
 		this.#unwritten = null;
 		if (pending.get(this.#path) === this) pending.delete(this.#path);
-		const { indent, mode } = this.#options;
+		const { indent, mode, toJson } = this.#options;
 		try {
 			mkdirSync(dirname(this.#path), { recursive: true, mode: mode === undefined ? undefined : 0o700 });
-			atomicWriteTextSync(this.#path, `${JSON.stringify(unwritten.value, null, indent)}\n`, mode);
+			atomicWriteTextSync(this.#path, `${JSON.stringify(toJson ? toJson(unwritten.value) : unwritten.value, null, indent)}\n`, mode);
 		} catch (err) {
 			console.error(`omp-agents: cannot write ${this.#path}: ${errorText(err)}`);
 		}
+	}
+}
+
+interface ReducerFileOptions<S, A extends unknown[]> extends Pick<JsonFileOptions<S>, "parse" | "toJson" | "holds"> {
+	/** The value while there is no file to read. */
+	empty: S;
+	/** `value` after a change, or `value` itself when the change changes nothing. */
+	reduce: (value: S, ...change: A) => S;
+	/** Servers on other ports write the file too, so every change reads it again first and keeps what they saved. */
+	shared?: boolean;
+}
+
+/**
+ * A {@link JsonFile} kept in memory as one value that changes through `reduce`, or {@link ReducerFile.update} for a change
+ * a subclass makes itself; a change that changes nothing saves nothing. What each file holds was typed or chosen by
+ * someone, so it is written tab-indented, and a file that holds something else moves aside rather than being written over.
+ */
+export class ReducerFile<S, A extends unknown[]> {
+	readonly #file: JsonFile<S>;
+	readonly #reduce: (value: S, ...change: A) => S;
+	readonly #shared: boolean;
+	#value: S;
+
+	constructor(path: string, { parse, toJson, holds, empty, reduce, shared = false }: ReducerFileOptions<S, A>) {
+		this.#file = new JsonFile(path, { parse, toJson, holds, onInvalid: "aside", indent: "\t" });
+		this.#reduce = reduce;
+		this.#shared = shared;
+		this.#value = this.#file.load() ?? empty;
+	}
+
+	get value(): S {
+		return this.#value;
+	}
+
+	/** Applies `change` through `reduce` and saves; whether it changed anything. */
+	apply(...change: A): boolean {
+		return this.update(value => this.#reduce(value, ...change));
+	}
+
+	/** Passes the value through `next` and saves; whether it changed anything. A shared file is read again first. */
+	update(next: (value: S) => S): boolean {
+		if (this.#shared) this.reload();
+		const current = this.#value;
+		const changed = next(current);
+		if (changed === current) return false;
+		this.#value = changed;
+		this.#file.save(changed);
+		return true;
+	}
+
+	/** Reads the file again, for what another server saved; a file it cannot read keeps the value it has. */
+	reload(): void {
+		this.#value = this.#file.load() ?? this.#value;
+	}
+
+	/** Writes what {@link update} saved now, for a reader of the file that cannot wait for the end of this tick. */
+	flush(): void {
+		this.#file.flush();
 	}
 }

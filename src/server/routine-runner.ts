@@ -66,7 +66,7 @@ export class RoutineRunner {
 	 */
 	recover(): void {
 		const { file, now } = this.#deps;
-		for (const { id, runs } of file.routines)
+		for (const { id, runs } of file.value)
 			for (const { at, outcome } of runs)
 				if (outcome.kind === "command" && outcome.run.phase === "running") {
 					file.command(id, at, { phase: "stopped", reason: "dashboard", output: "", startedAt: outcome.run.startedAt, endedAt: now() });
@@ -79,7 +79,7 @@ export class RoutineRunner {
 		if (this.#lane.busy) return this.#lane.idle();
 		return this.#lane.run(async () => {
 			const now = this.#deps.now();
-			for (const routine of this.#deps.file.routines) if (isDue(routine, now)) await this.#claim(routine, now);
+			for (const routine of this.#deps.file.value) if (isDue(routine, now)) await this.#claim(routine, now);
 			await this.#drain();
 			await this.#retire();
 		});
@@ -94,7 +94,7 @@ export class RoutineRunner {
 	/** Claims a slot for routine `id` now, whatever its schedule, then drains; waits for a tick under way rather than skip. */
 	runNow(id: string): Promise<void> {
 		return this.#lane.run(async () => {
-			const routine = this.#deps.file.routines.find(candidate => candidate.id === id);
+			const routine = this.#deps.file.value.find(candidate => candidate.id === id);
 			if (!routine) return;
 			await this.#claim(routine, this.#deps.now());
 			await this.#drain();
@@ -114,7 +114,7 @@ export class RoutineRunner {
 	async #drain(): Promise<void> {
 		const { file } = this.#deps;
 		for (;;) {
-			const next = oldestQueued(file.routines, this.#tracked.size >= MAX_ROUTINE_SESSIONS);
+			const next = oldestQueued(file.value, this.#tracked.size >= MAX_ROUTINE_SESSIONS);
 			if (!next) return;
 			const { routine, run } = next;
 			const { task } = routine;
@@ -203,7 +203,7 @@ export class RoutineRunner {
 
 	/** Pins `sessionId` when its routine asks, and unpins the sessions of the routine's other runs, so the latest run alone stays pinned. */
 	#pinFinished(routineId: string, sessionId: string): void {
-		const routine = this.#deps.file.routines.find(r => r.id === routineId);
+		const routine = this.#deps.file.value.find(r => r.id === routineId);
 		if (routine?.task.kind !== "prompt" || !routine.task.pin) return;
 		const earlier = routine.runs.flatMap(({ outcome }) => (outcome.kind === "session" && outcome.sessionId !== sessionId ? [outcome.sessionId] : []));
 		if (earlier.length > 0) this.#deps.changePins({ op: "unpin", sessionIds: earlier });
