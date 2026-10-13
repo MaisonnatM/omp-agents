@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { completionTrigger, type MentionToken } from "../completion-trigger";
 import { type Composer, completionOption, fileSearch, mentionMenu, mentionQuery, type MenuOption, type MenuSection, wants } from "../mentions";
 import type { Completions } from "../pane-store";
-import { useSearchSources } from "../reads";
+import { useMailAndEvents, useSearchSources } from "../reads";
 import { useDashboardStatus, useMentionLists } from "./dashboard-context";
 import type { PromptEditorHandle } from "./prompt-editor";
 
@@ -102,12 +102,13 @@ export function useCompletion({ editorRef, draft, setDraft, completions, onCompl
 	const token = menu?.token ?? null;
 	const query = token && mentionQuery(token);
 	const { tickets, pullRequestRepos } = useSearchSources(query !== null && wants(query, "ticket"), useDashboardStatus().pullRequestsScope);
+	const { threads, events } = useMailAndEvents(query !== null && wants(query, "mail"), query !== null && wants(query, "event"));
 	const answer = completions && completions.reqId === menu?.reqId ? completions : null;
 	const sections: MenuSection[] =
 		menu === null
 			? []
 			: token
-				? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequestRepos }, composer, files: answer?.items ?? null })
+				? mentionMenu({ text: draft, token, data: { ...lists, tickets, pullRequestRepos, threads, events }, composer, files: answer?.items ?? null })
 				: answer?.items.length
 					? [{ title: null, options: answer.items.map(completionOption) }]
 					: [];

@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isObject } from "../src/json";
 import { callable, type IntegrationsAnswer, MCP_INTEGRATIONS, type McpIntegration } from "../src/shared/accounts";
-import type { CalendarEventsAnswer, GoogleCalendar, GoogleStatus, LocalEventsAnswer } from "../src/shared/calendar";
-import type { InboxAnswer, ThreadAnswer } from "../src/shared/gmail";
+import type { CalendarEventsAnswer, EventWhen, GoogleCalendar, GoogleStatus, LocalEventsAnswer } from "../src/shared/calendar";
+import type { InboxAnswer, MailThread, ThreadAnswer } from "../src/shared/gmail";
 import { type Analytics, isAnalyticsRange } from "../src/shared/analytics";
 import type { PullRequestList, RepoPullRequests } from "../src/shared/github";
 import type { ModelEntry } from "../src/shared/models";
@@ -108,6 +108,52 @@ export function useSearchSources(ticketsWanted: boolean, scope: string | null): 
 	const tickets = ticketsStore.usePolling(null, ticketsWanted).read?.data.tickets;
 	const pullRequestRepos = pullRequestsStore.use(scope).read?.data.repos ?? NO_REPOS;
 	return { tickets: (ticketsWanted && tickets) || NO_TICKETS, pullRequestRepos };
+}
+
+const NO_THREADS: MailThread[] = [];
+/** How many days from today's midnight the `@` menu lists events of. */
+const MENTION_EVENT_DAYS = 14;
+
+/** An event the `@` menu offers: a Google one carries its link, one kept on this computer has none. */
+export interface MentionEvent {
+	title: string;
+	when: EventWhen;
+	calendar: string;
+	url: string | null;
+}
+
+const startOf = (when: EventWhen): number => (when.allDay ? new Date(`${when.firstDay}T00:00`).getTime() : when.start);
+const endOf = (when: EventWhen): number => (when.allDay ? new Date(`${when.lastDay}T00:00`).getTime() + 86_400_000 : when.end);
+
+/**
+ * What the `@` menu offers from your inbox and calendars: the inbox's latest conversations while `mailWanted` and
+ * Gmail is callable, and the events from today's midnight over the next {@link MENTION_EVENT_DAYS} days while
+ * `eventsWanted`, earliest first: Google's while Google Calendar is callable, and this computer's.
+ */
+export function useMailAndEvents(mailWanted: boolean, eventsWanted: boolean): { threads: MailThread[]; events: MentionEvent[] } {
+	const integrations = integrationsStore.usePolling().read?.data.integrations;
+	const gmail = integrations?.gmail.connection;
+	const google = integrations?.["google-calendar"].connection;
+	const threads = gmailStore.usePolling(null, mailWanted && gmail !== undefined && callable(gmail)).read?.data.threads;
+	const now = new Date();
+	const from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+	const to = new Date(now.getFullYear(), now.getMonth(), now.getDate() + MENTION_EVENT_DAYS).getTime();
+	const span = new URLSearchParams({ from: new Date(from).toISOString(), to: new Date(to).toISOString() }).toString();
+	const googleEvents = calendarEventsStore.usePolling(span, eventsWanted && google !== undefined && callable(google)).read?.data.events;
+	const localEvents = localEventsStore.usePolling(null, eventsWanted).read?.data.events;
+	const events = useMemo(
+		() =>
+			eventsWanted
+				? [
+						...(googleEvents ?? []).map(({ title, when, calendar, url }) => ({ title, when, calendar, url })),
+						...(localEvents ?? []).map(({ title, when }) => ({ title, when, calendar: "This computer", url: null })),
+					]
+						.filter(({ when }) => startOf(when) < to && endOf(when) > from)
+						.sort((a, b) => startOf(a.when) - startOf(b.when))
+				: [],
+		[eventsWanted, googleEvents, localEvents, from, to],
+	);
+	return { threads: (mailWanted && threads) || NO_THREADS, events };
 }
 
 const NO_HITS: ConversationHit[] = [];
