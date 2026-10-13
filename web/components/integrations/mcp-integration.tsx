@@ -1,6 +1,6 @@
 /** `McpIntegrationRow`: one MCP-backed service in Settings › Integrations, with its status, sign-in, and tool list. */
-import { ChevronRight, CircleAlert, ExternalLink, KeyRound, LoaderCircle, LogOut, RefreshCw, WifiOff } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { ExternalLink, KeyRound } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import {
 	googleMcpEnableUrl,
 	isGoogleIntegration,
@@ -11,17 +11,28 @@ import {
 	type SignInState,
 	signedIn,
 } from "../../../src/shared/accounts";
-import { Badge, type BadgeColor } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MenuItem, MenuSeparator } from "@/components/ui/menu";
-import { cn } from "@/lib/utils";
-import { errorText, putJson } from "../../api";
+import { putJson } from "../../api";
 import { integrationsStore } from "../../reads";
 import { useSignIn } from "../../use-sign-in";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { type BrandLogo, GMAIL_LOGO, GOOGLE_CALENDAR_LOGO, LINEAR_LOGO, SLACK_LOGO } from "./brand-logos";
 import { GOOGLE_TEXT, GoogleClientForm } from "./google-client-form";
-import { Callout, IntegrationRow, MarkTile, MetaDot } from "./integration-row";
+import { IntegrationRow, MarkTile, MetaDot } from "./integration-row";
+import {
+	ConnectButton,
+	ConnectionCallout,
+	Reconnecting,
+	ReconnectItem,
+	REMOTE_STATUS,
+	SignOutConfirm,
+	SignOutItem,
+	StatusBadge,
+	type StatusLabel,
+	useToolList,
+	WAITING_STATUS,
+} from "./mcp-connection-controls";
 import { SlackAppForm } from "./slack-app-form";
 
 interface Service {
@@ -54,92 +65,7 @@ export const SERVICES: Record<McpIntegrationId, Service> = {
 	},
 };
 
-export const STATUS: Record<McpConnection["kind"], { label: string; color: BadgeColor }> = {
-	absent: { label: "Not connected", color: "gray" },
-	"signed-out": { label: "Signed out", color: "gray" },
-	ready: { label: "Connected", color: "green" },
-	refused: { label: "Needs reconnecting", color: "red" },
-	failing: { label: "Unreachable", color: "amber" },
-};
-
-/** The tools omp sessions can call, sorted for scanning, each description on hover, and the server they come from. */
-export function ToolList({ id, tools, server }: { id: string; tools: readonly { name: string; description: string | null }[]; server: { name: string; url: string } }) {
-	return (
-		<div id={id} className="rounded-lg bg-muted/60 p-3">
-			<ul aria-label="Tools" className="grid max-h-60 grid-cols-1 gap-x-6 gap-y-1 overflow-y-auto font-mono text-xs text-muted-foreground sm:grid-cols-2">
-				{tools.toSorted((a, b) => a.name.localeCompare(b.name)).map(tool => (
-					<li key={tool.name} className="truncate" title={tool.description ? `${tool.name}: ${tool.description}` : tool.name}>
-						{tool.name}
-					</li>
-				))}
-			</ul>
-			<p className="mt-3 border-t border-border pt-2.5 text-xs text-muted-foreground">
-				From omp's <code className="font-mono text-foreground">{server.name}</code> MCP server at <span className="font-mono">{server.url}</span>
-			</p>
-		</div>
-	);
-}
-
-/** The meta fact that counts a server's tools and opens their {@link ToolList}. */
-export function ToolsToggle({ count, open, controls, onToggle }: { count: number; open: boolean; controls: string; onToggle: () => void }) {
-	return (
-		<button
-			type="button"
-			aria-expanded={open}
-			aria-controls={open ? controls : undefined}
-			onClick={onToggle}
-			className="-mx-1 inline-flex items-center gap-0.5 rounded px-1 hover:bg-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:outline-none"
-		>
-			<span className="tabular-nums">{count}</span> tools
-			<ChevronRight aria-hidden className={cn("size-3 transition-transform duration-150 ease-out", open && "rotate-90")} />
-		</button>
-	);
-}
-
-/** Asks before signing omp out of `name`, then signs out; a failure stays in the question, to try again or cancel. */
-function SignOutConfirm({ id, name, onDone }: { id: McpIntegrationId; name: string; onDone: () => void }) {
-	const [signingOut, setSigningOut] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const signOut = async (): Promise<void> => {
-		setSigningOut(true);
-		setError(null);
-		try {
-			await putJson<McpIntegration>("/api/integrations/sign-out", { id });
-			await integrationsStore.refresh();
-			onDone();
-		} catch (err) {
-			setError(errorText(err));
-			setSigningOut(false);
-		}
-	};
-
-	return (
-		<Callout
-			tone="danger"
-			icon={LogOut}
-			role="group"
-			label={`Sign omp out of ${name}?`}
-			action={
-				<div className="flex items-center gap-2">
-					<Button variant="ghost" size="compact" autoFocus disabled={signingOut} onClick={onDone}>
-						Cancel
-					</Button>
-					<Button size="compact" loading={signingOut} onClick={() => void signOut()}>
-						Sign out
-					</Button>
-				</div>
-			}
-		>
-			Sign omp out of {name}? Its tools leave every omp session until you reconnect.
-			{error && (
-				<p role="alert" className="mt-1">
-					Sign-out failed: {error}
-				</p>
-			)}
-		</Callout>
-	);
-}
+export const STATUS: Record<McpConnection["kind"], StatusLabel> = { absent: { label: "Not connected", color: "gray" }, ...REMOTE_STATUS };
 
 /** For a Google row whose MCP server answered 403, the API to turn on and Google's page that turns it on; otherwise `null`. */
 function googleApiOff(integration: McpIntegration, connection: Extract<McpConnection, { kind: "failing" }>): { api: string; url: string } | null {
@@ -156,17 +82,16 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 	const needsSetup = setup !== null && !setup.configured;
 	const settingsLabel = id === "slack" ? "app settings" : "OAuth client";
 	const start = async (): Promise<SignInState> => (await putJson<McpIntegration>("/api/integrations/sign-in", { id })).signIn;
-	const { starting, waitingUrl, failure, connect } = useSignIn(integration.signIn, integrationsStore.refresh, start);
+	const signIn = useSignIn(integration.signIn, integrationsStore.refresh, start);
 	const { refreshing } = integrationsStore.use();
 	const [confirming, setConfirming] = useState(false);
 	const [formOpen, setFormOpen] = useState(false);
-	const [toolsOpen, setToolsOpen] = useState(false);
-	const toolsId = useId();
+	const tools = useToolList(connection.kind === "ready" ? connection : null);
 
-	const status = waitingUrl ? { label: "Waiting for you", color: "blue" as const } : needsSetup && !signedIn(connection) ? { label: "Not set up", color: "gray" as const } : STATUS[connection.kind];
+	const status = signIn.waitingUrl ? WAITING_STATUS : needsSetup && !signedIn(connection) ? { label: "Not set up", color: "gray" as const } : STATUS[connection.kind];
 
 	let actions: ReactNode = null;
-	if (!waitingUrl && !confirming && !formOpen) {
+	if (!signIn.waitingUrl && !confirming && !formOpen) {
 		if (needsSetup && !signedIn(connection)) {
 			actions = (
 				<Button variant="secondary" size="compact" onClick={() => setFormOpen(true)}>
@@ -176,19 +101,9 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 		} else if (signedIn(connection)) {
 			actions = (
 				<>
-					{starting && (
-						<span role="status" aria-busy className="flex items-center gap-1.5 text-xs text-muted-foreground">
-							<LoaderCircle aria-hidden className="size-3.5 animate-spin" />
-							Reconnecting…
-						</span>
-					)}
-					<MoreActionsMenu name={label} disabled={starting}>
-						{!needsSetup && (
-							<MenuItem onClick={() => void connect()}>
-								<RefreshCw />
-								Reconnect
-							</MenuItem>
-						)}
+					<Reconnecting signIn={signIn} />
+					<MoreActionsMenu name={label} disabled={signIn.starting}>
+						{!needsSetup && <ReconnectItem signIn={signIn} />}
 						{setup !== null && (
 							<MenuItem onClick={() => setFormOpen(true)}>
 								<KeyRound />
@@ -196,21 +111,16 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 							</MenuItem>
 						)}
 						<MenuSeparator />
-						<MenuItem variant="destructive" onClick={() => setConfirming(true)}>
-							<LogOut />
-							Sign out
-						</MenuItem>
+						<SignOutItem destructive onClick={() => setConfirming(true)} />
 					</MoreActionsMenu>
 				</>
 			);
 		} else {
 			actions = (
 				<>
-					<Button variant="secondary" size="compact" loading={starting} onClick={() => void connect()}>
-						Connect
-					</Button>
+					<ConnectButton signIn={signIn} />
 					{setup !== null && (
-						<MoreActionsMenu name={label} disabled={starting}>
+						<MoreActionsMenu name={label} disabled={signIn.starting}>
 							<MenuItem onClick={() => setFormOpen(true)}>
 								<KeyRound />
 								Replace {settingsLabel}
@@ -222,79 +132,62 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 		}
 	}
 
-	let callout: ReactNode = null;
-	if (waitingUrl) {
-		callout = (
-			<Callout
-				tone="info"
-				icon={LoaderCircle}
-				role="status"
-				spin
-				action={
-					<Button variant="ghost" size="compact" leadingIcon={ExternalLink} render={<a href={waitingUrl} target="_blank" rel="noreferrer" />}>
-						Open sign-in page
-					</Button>
-				}
-			>
-				Approve omp on {label} in the tab that opened. This updates on its own.
-			</Callout>
-		);
-	} else if (confirming) {
-		callout = <SignOutConfirm id={id} name={label} onDone={() => setConfirming(false)} />;
-	} else if (failure) {
-		callout = (
-			<Callout tone="danger" icon={CircleAlert} role="alert">
-				Sign-in failed: {failure}
-			</Callout>
-		);
-	} else if (connection.kind === "refused") {
-		callout = (
-			<Callout
-				tone="danger"
-				icon={CircleAlert}
-				action={
-					<Button variant="secondary" size="compact" leadingIcon={needsSetup ? KeyRound : RefreshCw} loading={starting} onClick={() => needsSetup ? setFormOpen(true) : void connect()}>
-						{needsSetup ? "Set up" : "Reconnect"}
-					</Button>
-				}
-			>
-				{needsSetup ? `Complete the ${label} ${settingsLabel} before you reconnect.` : `${label} refused omp's sign-in. Reconnect to sign in again.`}
-			</Callout>
-		);
-	} else if (connection.kind === "failing") {
-		const apiOff = googleApiOff(integration, connection);
-		callout = (
-			<Callout
-				tone="warning"
-				icon={WifiOff}
-				action={
-					<div className="flex items-center gap-2">
-						{apiOff && (
-							<Button variant="secondary" size="compact" leadingIcon={ExternalLink} render={<a href={apiOff.url} target="_blank" rel="noreferrer" />}>
-								Enable {apiOff.api}
-							</Button>
-						)}
-						<Button variant="ghost" size="compact" leadingIcon={RefreshCw} loading={refreshing} onClick={() => void integrationsStore.refresh(null, { fresh: true })}>
-							Check again
-						</Button>
-					</div>
-				}
-			>
-				{apiOff ? `Google refused ${label}'s tools to omp's sessions (HTTP 403), most often because the ${apiOff.api} is off in your OAuth client's Google Cloud project.` : connection.error}
-			</Callout>
-		);
-	}
+	const apiOff = connection.kind === "failing" ? googleApiOff(integration, connection) : null;
+	const callout = (
+		<ConnectionCallout
+			approveOn={label}
+			signIn={signIn}
+			question={
+				confirming && (
+					<SignOutConfirm
+						name={label}
+						signOut={async () => {
+							await putJson<McpIntegration>("/api/integrations/sign-out", { id });
+							await integrationsStore.refresh();
+						}}
+						onDone={() => setConfirming(false)}
+					/>
+				)
+			}
+			refused={
+				connection.kind !== "refused"
+					? null
+					: needsSetup
+						? {
+								message: `Complete the ${label} ${settingsLabel} before you reconnect.`,
+								fix: (
+									<Button variant="secondary" size="compact" leadingIcon={KeyRound} onClick={() => setFormOpen(true)}>
+										Set up
+									</Button>
+								),
+							}
+						: { message: `${label} refused omp's sign-in. Reconnect to sign in again.` }
+			}
+			failing={
+				connection.kind !== "failing"
+					? null
+					: {
+							message: apiOff
+								? `Google refused ${label}'s tools to omp's sessions (HTTP 403), most often because the ${apiOff.api} is off in your OAuth client's Google Cloud project.`
+								: connection.error,
+							checking: refreshing,
+							check: () => void integrationsStore.refresh(null, { fresh: true }),
+							fix: apiOff && (
+								<Button variant="secondary" size="compact" leadingIcon={ExternalLink} render={<a href={apiOff.url} target="_blank" rel="noreferrer" />}>
+									Enable {apiOff.api}
+								</Button>
+							),
+						}
+			}
+		/>
+	);
 
 	return (
 		<IntegrationRow
 			name={label}
 			mark={<MarkTile logo={service.logo} name={label} />}
 			summary={service.gives}
-			status={
-				<Badge variant="dot" size="compact" color={status.color}>
-					{status.label}
-				</Badge>
-			}
+			status={<StatusBadge {...status} />}
 			meta={
 				<>
 					<span>MCP</span>
@@ -324,10 +217,10 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 							</span>
 						</>
 					)}
-					{connection.kind === "ready" && (
+					{tools.toggle && (
 						<>
 							<MetaDot />
-							<ToolsToggle count={connection.tools.length} open={toolsOpen} controls={toolsId} onToggle={() => setToolsOpen(open => !open)} />
+							{tools.toggle}
 						</>
 					)}
 				</>
@@ -340,7 +233,7 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 				<GoogleClientForm id={integration.id} setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />
 			)}
 			{children}
-			{connection.kind === "ready" && toolsOpen && <ToolList id={toolsId} tools={connection.tools} server={connection.server} />}
+			{tools.list}
 		</IntegrationRow>
 	);
 }
