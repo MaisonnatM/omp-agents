@@ -1,43 +1,45 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-
-/** The setters of every mounted {@link useStoredState} by key, so a write in one component shows in the others. */
-const holders = new Map<string, Set<(value: unknown) => void>>();
+import { useCallback, useMemo, useRef } from "react";
+import { keyedStore } from "./keyed-store";
 
 /**
- * A value that localStorage keeps under `key`, read once, and its setter, which stores it at once and stays the same
- * function across renders. `decode` turns what is stored into a value; what it makes of `null`, when nothing is stored,
- * is the default. The default is removed rather than stored, so a value reset to it follows the default if it changes.
+ * What localStorage holds under each key, `null` when nothing is stored, and `undefined` until the key is first read.
+ * The one snapshot every {@link useStoredState} of a key reads, so a write in one component shows in the others.
+ */
+const raws = keyedStore<string | null | undefined>(undefined);
+
+function readRaw(key: string): string | null {
+	const raw = raws.get(key);
+	return raw === undefined ? localStorage.getItem(key) : raw;
+}
+
+if (typeof window !== "undefined") window.addEventListener("storage", event => {
+	if (event.storageArea !== localStorage) return;
+	if (event.key === null) for (const key of raws.keys()) raws.set(key, localStorage.getItem(key));
+	else raws.set(event.key, event.newValue);
+});
+
+/**
+ * A value that localStorage keeps under `key`, and its setter, which stores it at once and stays the same function
+ * across renders. `decode` turns what is stored into a value; what it makes of `null`, when nothing is stored, is the
+ * default. The default is removed rather than stored, so a value reset to it follows the default if it changes.
  * The setter also takes an update of the value it last set, so two in one event both apply. Every component that holds
- * the same key sees the write, such as the sidebar's pull request list and the Pull requests page.
- * `key` stays the same for as long as the component is mounted: the value is read when it mounts, not when `key` changes.
+ * the same key, in this tab or another, sees the write, such as the sidebar's pull request list and the Pull requests page.
  */
 export function useStoredState<T>(key: string, decode: (raw: string | null) => T, encode: (value: T) => string = String): [T, (next: T | ((prev: T) => T)) => void] {
-	const [value, setValue] = useState(() => decode(localStorage.getItem(key)));
-	const latest = useRef({ value, decode, encode });
-	latest.current.decode = decode;
-	latest.current.encode = encode;
-	useEffect(() => {
-		const hold = (next: unknown): void => {
-			latest.current.value = next as T;
-			setValue(next as T);
-		};
-		const set = holders.get(key) ?? new Set();
-		holders.set(key, set.add(hold));
-		return () => {
-			set.delete(hold);
-			if (set.size === 0) holders.delete(key);
-		};
-	}, [key]);
+	const codec = useRef({ decode, encode });
+	codec.current = { decode, encode };
+	raws.use(key);
+	const raw = readRaw(key);
+	const value = useMemo(() => codec.current.decode(raw), [raw]);
 	const store = useCallback(
 		(next: T | ((prev: T) => T)): void => {
-			const codec = latest.current;
-			const resolved = typeof next === "function" ? (next as (prev: T) => T)(codec.value) : next;
-			codec.value = resolved;
-			setValue(resolved);
-			for (const hold of holders.get(key) ?? []) hold(resolved);
-			const raw = codec.encode(resolved);
-			if (raw === codec.encode(codec.decode(null))) localStorage.removeItem(key);
-			else localStorage.setItem(key, raw);
+			const { decode, encode } = codec.current;
+			const resolved = typeof next === "function" ? (next as (prev: T) => T)(decode(readRaw(key))) : next;
+			const encoded = encode(resolved);
+			const kept = encoded === encode(decode(null)) ? null : encoded;
+			if (kept === null) localStorage.removeItem(key);
+			else localStorage.setItem(key, kept);
+			raws.set(key, kept);
 		},
 		[key],
 	);
