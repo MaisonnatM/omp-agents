@@ -5,8 +5,10 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { TICKET_MEDIA_PATH } from "../../src/shared/tickets";
+import type { PullRequestDetail } from "../../src/shared/github";
 import { remarkFilePaths, textFilePath } from "../file-paths";
 import { remarkPromptChips } from "../prompt-tokens";
+import { useRead } from "../reads";
 import { FileLink } from "./file-link";
 import { BrandMark, LINEAR_LOGO, SLACK_LOGO } from "./integrations/brand-logos";
 import { OrgIcon } from "./org-icon";
@@ -48,6 +50,8 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 	let service: "linear" | "github" | "graphite" | "slack" | null = null;
 	let label = "";
 	let favicon: string | null = null;
+	let titleUrl: string | null = null;
+	const bare = children === href || children === href?.replace(/^https?:\/\//, "");
 	try {
 		const url = new URL(href ?? "");
 		if (url.protocol === "https:" || url.protocol === "http:") {
@@ -60,10 +64,13 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 				service = "github";
 				const pr = url.pathname.match(/^\/([^/]+)\/([^/]+)\/(?:pull|issues)\/(\d+)/);
 				label = pr ? `${pr[1]}/${pr[2]} #${pr[3]}` : url.pathname.split("/").filter(Boolean).slice(0, 2).join("/") || "GitHub";
+				const pull = url.pathname.match(/^\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:\/|$)/);
+				if (pull) titleUrl = `/api/pull-request/title?${new URLSearchParams({ owner: pull[1]!, repo: pull[2]!, number: pull[3]! })}`;
 			} else if (host === "app.graphite.com" || host === "app.graphite.dev") {
 				service = "graphite";
 				const pr = url.pathname.match(/^\/github\/pr\/([^/]+)\/([^/]+)\/(\d+)/);
 				label = pr ? `${pr[1]}/${pr[2]} #${pr[3]}` : "Graphite";
+				if (pr) titleUrl = `/api/pull-request/title?${new URLSearchParams({ owner: pr[1]!, repo: pr[2]!, number: pr[3]! })}`;
 			} else if (host === "slack.com" || host.endsWith(".slack.com")) {
 				service = "slack";
 				label = url.pathname.includes("/archives/") ? "Slack message" : "Slack";
@@ -72,6 +79,7 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 	} catch {
 		// Relative and filtered URLs keep their original label.
 	}
+	const title = useRead<Pick<PullRequestDetail, "title">>(bare && !props.title ? titleUrl : null);
 	return (
 		<a {...props} href={href} target="_blank" rel="noopener noreferrer">
 			{favicon ? (
@@ -83,7 +91,7 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 					) : (
 						<img src={favicon} alt="" className="size-3 shrink-0 self-center" loading="lazy" referrerPolicy="no-referrer" />
 					)}
-					<span className="font-semibold underline">{service && (children === href || children === href?.replace(/^https?:\/\//, "")) ? props.title || label : children}</span>
+					<span className="font-semibold underline">{service && bare ? props.title || title.data?.title || label : children}</span>
 				</span>
 			) : children}
 		</a>

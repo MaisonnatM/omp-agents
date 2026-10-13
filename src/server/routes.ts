@@ -11,7 +11,7 @@ import { listChanges, readChangedFile, type SessionPlace } from "../changes";
 import { gitCheckout } from "../git";
 import type { GoogleCalendarClient } from "../google-calendar";
 import type { GmailClient } from "../gmail";
-import { loadPullRequests, loadPullRequestDetail } from "../pull-requests";
+import { loadPullRequests, loadPullRequestDetail, loadPullRequestTitle } from "../pull-requests";
 import { loadIntegrations, saveGoogleClient, saveSlackClient, signOutIntegration, startIntegrationSignIn } from "../integrations";
 import { addMcpServerFrom, loadMcpServers, McpServerRejected, removeMcpServerNamed, setMcpServerEnabledFrom, signOutMcpServer, startMcpServerSignIn } from "../mcp-servers";
 import { answerProviderLogin, cancelProviderLogin, loadProviders, signOutProvider, startProviderLogin } from "../providers";
@@ -554,6 +554,9 @@ function pullRequestRoutes({ get, write }: RouteKit): Routes {
 	/** `GET /api/pull-request?owner=<o>&repo=<r>&number=<n>`: that pull request in full, for a pull request's details. */
 	const pullRequest = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestDetail(pr)));
 
+	/** A bare link's PR title, without loading the full details. */
+	const pullRequestTitle = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestTitle(pr)));
+
 	/** `GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>`: the open pull requests stacked with that one, top first, for its details' Stack. */
 	const pullRequestStack = pullRequestGet("Expected ?owner=&repo=&number=", pr => answer(() => loadPullRequestStack(pr)));
 
@@ -582,6 +585,7 @@ function pullRequestRoutes({ get, write }: RouteKit): Routes {
 
 	return {
 		"/api/pull-request": { GET: pullRequest, PUT: pullRequestWrite },
+		"/api/pull-request/title": { GET: pullRequestTitle },
 		"/api/pull-request/options": { GET: pullRequestOptions },
 		"/api/pull-request/stack": { GET: pullRequestStack },
 		"/api/pull-request/files": { GET: pullRequestFiles },

@@ -292,7 +292,9 @@ An action that fails shows its error, and its control becomes available again.
 - User and assistant messages render GitHub-flavored Markdown, including tables, task lists, fenced code, and links.
   Images in agent text show as links rather than loading remote images; only inline `data:` images show in place.
   Linear, GitHub, Graphite, and Slack links show only their title and service icon, in conversations and rendered GitHub or Linear text.
-  A bare URL shows a short destination label instead: an issue identifier, repository and pull request number, or **Slack message**; no title is fetched from the service.
+  Bare GitHub and Graphite pull request URLs resolve to the PR's actual title through your signed-in GitHub CLI.
+  Explicit Markdown labels and link titles stay as written.
+  While a PR title loads, or if GitHub cannot read it, its repository and number stay visible; other bare service links use an issue identifier or **Slack message**.
   The link still opens its original address in a new tab.
   Other HTTP and HTTPS links show their favicon beside their original label.
   Link labels are semibold (font weight 600) and underlined beside their icons, without underlining the icons.

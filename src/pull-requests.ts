@@ -275,6 +275,22 @@ export function loadPullRequestDetail(pr: PullRequest, fresh = false): Promise<P
 	return details.get(prKey(pr), async () => parseDetailAnswer(await ghGraphql(DETAIL_QUERY, { owner: pr.owner, repo: pr.repo, number: pr.number }), pr), fresh);
 }
 
+const titles = createCache<Pick<PullRequestDetail, "title">>();
+
+/** A linked PR's title only, without reading its timeline, checks, or files. */
+export function loadPullRequestTitle(pr: PullRequest): Promise<Pick<PullRequestDetail, "title">> {
+	return titles.get(prKey(pr), async () => {
+		const data = dataOf(await ghGraphql(
+			"query($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { title } } }",
+			{ owner: pr.owner, repo: pr.repo, number: pr.number },
+		));
+		const node = isObject(data.repository) ? data.repository.pullRequest : null;
+		const title = isObject(node) ? str(node.title) : undefined;
+		if (!title) throw new Error(`Cannot read the title of ${prKey(pr)}`);
+		return { title };
+	});
+}
+
 /**
  * The pull request list for `cwds`, one entry per GitHub repository in the order its first workspace comes. `fresh` skips the cache.
  * A workspace removed since a session ran there is left out, as a quick action starts its session in a repository's first workspace.
