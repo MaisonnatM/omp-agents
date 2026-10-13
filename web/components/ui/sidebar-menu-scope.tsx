@@ -20,12 +20,7 @@ import { FluidHoverHighlight } from "@/components/ui/fluid-hover-highlight";
 //
 // One scope per SidebarMenu tree: a single fluid-hover system plus the
 // traveling overlays — hover background, active background(s), focus ring —
-// that glide between every visible row, sub-menu rows included, so the hover
-// moves from a parent into its children as one continuous piece. Sub rows
-// live inside positioned ancestors, so their rects are accumulated into the
-// menu's own coordinate space by the fluid hover hook. The active background
-// stays one per level (the root rows, and each sub-menu) so a current section
-// and the current page inside it can both be lit, exactly as before.
+// that glide between every visible row.
 //
 // Hover never re-renders a row: the fluid hover hook stamps
 // `data-fluid-hover-active` on the hovered row's button, and the row lights
@@ -41,8 +36,7 @@ export interface MenuRegistry {
 
 /** What rows read back: changes only when rows register or turn active. */
 export interface MenuRows {
-  /** Every visible active row, in DOM order — a parent section marker and
-   *  the current row inside its sub-tree can be active at once. */
+  /** Every active row, in DOM order. */
   activeRows: HTMLElement[];
   firstRowEl: HTMLElement | null;
   hasActive: boolean;
@@ -51,46 +45,16 @@ export interface MenuRows {
 export const MenuRegistryContext = createContext<MenuRegistry | null>(null);
 export const MenuRowsContext = createContext<MenuRows | null>(null);
 
-/** True while the element sits inside a collapsed sub-tree — clipped away,
- *  so it must be invisible to hover, highlights, and keyboard order. Rows
- *  stay registered either way: unregistering on every toggle would churn the
- *  fluid hover measurements and blink the overlays. */
-function rowHidden(el: HTMLElement) {
-  return el.closest('[data-sidebar="menu-sub"][data-state="closed"]') !== null;
-}
-
 /** True for a disabled row: it stays in the list (and in the layout) but is
  *  never lit, never takes a routed click, and is skipped by the keyboard.
  *  The hook registers the row's button (falling back to the row itself), so
- *  check the element first, then a button directly inside it. A sub-row's
- *  anchor carries aria-disabled instead of `disabled`. */
+ *  check the element first, then a button directly inside it. */
 const DISABLED_CONTROL = ':disabled, [aria-disabled="true"]';
 function rowDisabled(el: HTMLElement) {
   return (
     el.matches(DISABLED_CONTROL) ||
-    el.querySelector(
-      `:scope > [data-sidebar="menu-button"]:is(${DISABLED_CONTROL}), :scope > [data-sidebar="menu-sub-button"]:is(${DISABLED_CONTROL})`
-    ) !== null
+    el.querySelector(`:scope > [data-sidebar="menu-button"]:is(${DISABLED_CONTROL})`) !== null
   );
-}
-
-/** Hidden or disabled: what hover, highlights, and the keyboard skip. */
-function rowSkipped(el: HTMLElement) {
-  return rowHidden(el) || rowDisabled(el);
-}
-
-/** Stable keys for the per-level active overlays: one id per sub-menu <ul>
- *  (or the menu root), so the active background glides when the active row
- *  moves within its level instead of remounting. */
-let overlayGroupSeq = 0;
-const overlayGroupIds = new WeakMap<Element, number>();
-function overlayGroupId(el: Element) {
-  let id = overlayGroupIds.get(el);
-  if (id === undefined) {
-    id = ++overlayGroupSeq;
-    overlayGroupIds.set(el, id);
-  }
-  return id;
 }
 
 function byDomOrder(a: HTMLElement, b: HTMLElement) {
@@ -141,7 +105,7 @@ export function useMenuScope(
     sessionRef,
     handlers,
     registerItem,
-  } = useFluidHover(containerRef, { isItemDisabled: rowSkipped });
+  } = useFluidHover(containerRef, { isItemDisabled: rowDisabled });
 
   const rowsRef = useRef<Set<HTMLElement>>(new Set());
   const rowButtonsRef = useRef<Map<HTMLElement, HTMLElement>>(new Map());
@@ -157,9 +121,7 @@ export function useMenuScope(
   const rowButton = useCallback(
     (row: HTMLElement) =>
       rowButtonsRef.current.get(row) ??
-      row.querySelector<HTMLElement>(
-        ':scope > [data-sidebar="menu-button"], :scope > [data-sidebar="menu-sub-button"]'
-      ),
+      row.querySelector<HTMLElement>(':scope > [data-sidebar="menu-button"]'),
     []
   );
 
@@ -180,10 +142,8 @@ export function useMenuScope(
     if (dirty === "rows") {
       // Rows register by element; indexes are derived from DOM order so
       // consumers never pass an index prop and conditional rows just work.
-      // The fluid hover system measures the row's BUTTON, not the <li>: a row
-      // hosting an expanded sub-tree is a tall <li>, and hit-testing against
-      // that whole box would hand the sub-tree's gaps and gutter to the
-      // parent — the button strip is the only part that is really "the row".
+      // The fluid hover system measures the row's BUTTON, not the <li>, so
+      // overlays fit the button strip the row actually draws.
       const sorted = [...rowsRef.current].sort(byDomOrder);
       orderedRowsRef.current = sorted;
       setOrderedRows((prev) => (sameElements(prev, sorted) ? prev : sorted));
@@ -201,7 +161,7 @@ export function useMenuScope(
       registeredRef.current = next;
     }
     const active = orderedRowsRef.current.filter(
-      (el) => activeMapRef.current.get(el) && !rowSkipped(el)
+      (el) => activeMapRef.current.get(el) && !rowDisabled(el)
     );
     setActiveRows((prev) => (sameElements(prev, active) ? prev : active));
   }, [registerItem, rowButton]);
@@ -261,20 +221,13 @@ export function useMenuScope(
     [markDirty]
   );
 
-  // A row's rect spans the whole <li> — which grows when it hosts an expanded
-  // sub-menu — so overlay heights are clamped to the row's button box. The
-  // 48px fallback (the tallest row, size="lg") guarantees the highlight can
-  // never cover an expanded sub-tree even if the button lookup misses.
   const overlayRect = useCallback(
     (row: HTMLElement | null): ItemRect | null => {
       if (!row) return null;
       const idx = orderedRowsRef.current.indexOf(row);
-      const rect = idx === -1 ? null : itemRects[idx];
-      if (!rect) return null;
-      const height = Math.min(rect.height, rowButton(row)?.offsetHeight ?? 48);
-      return { ...rect, height };
+      return idx === -1 ? null : itemRects[idx] ?? null;
     },
-    [itemRects, rowButton]
+    [itemRects]
   );
 
   // While a popup anchored in the sidebar is open (a row action's or the
@@ -305,10 +258,8 @@ export function useMenuScope(
       const target = e.target as HTMLElement;
       // Only the row's main button drives the traveling highlight and ring —
       // actions keep their own static focus rings.
-      if (!target.closest('[data-sidebar="menu-button"],[data-sidebar="menu-sub-button"]')) return;
-      const row = target.closest(
-        '[data-sidebar="menu-item"],[data-sidebar="menu-sub-item"]'
-      ) as HTMLElement | null;
+      if (!target.closest('[data-sidebar="menu-button"]')) return;
+      const row = target.closest('[data-sidebar="menu-item"]') as HTMLElement | null;
       if (!row) return;
       const idx = orderedRowsRef.current.indexOf(row);
       if (idx === -1) return;
@@ -331,8 +282,7 @@ export function useMenuScope(
     [containerRef, setActiveIndex]
   );
 
-  // Arrow/Home/End over every button in DOM order, sub rows included — only
-  // the root scope binds it so nested scopes don't double-handle.
+  // Arrow/Home/End over every row button in DOM order.
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key))
@@ -340,10 +290,8 @@ export function useMenuScope(
       const container = containerRef.current;
       if (!container) return;
       const items = Array.from(
-        container.querySelectorAll<HTMLElement>(
-          '[data-sidebar="menu-button"], [data-sidebar="menu-sub-button"]'
-        )
-      ).filter((el) => !el.closest('[data-sidebar="menu-sub"][data-state="closed"]'));
+        container.querySelectorAll<HTMLElement>('[data-sidebar="menu-button"]')
+      );
       const currentIdx = items.indexOf(e.target as HTMLElement);
       if (currentIdx === -1) return;
       e.preventDefault();
@@ -377,50 +325,34 @@ export function useMenuScope(
   const shape = useShape();
   // Every active row gets its own background — the buttons' own text styling
   // already lights each active row, so the overlays must match. Keys are the
-  // row's level (root, or its sub-menu) plus its occurrence within that
-  // level: the usual case — one active per level, e.g. a current section
-  // marker plus the current page inside its sub-tree — keeps a stable key,
-  // so the background GLIDES when the selection moves instead of remounting.
-  const rowLevel = useCallback(
-    (row: HTMLElement) =>
-      row.closest('[data-sidebar="menu-sub"]') ?? containerRef.current,
-    [containerRef]
-  );
+  // row's occurrence among the active rows, so the background GLIDES when
+  // the selection moves instead of remounting.
   // A rect change has two causes with two right answers. The highlight moving
   // to a DIFFERENT row springs — that's the glide. The same row itself moving
-  // — a sibling sub-tree collapsing above reflows every row below on every
-  // frame of its own spring — must snap, or the overlay chases the row it is
-  // sitting on with a trailing second spring. Targets are compared against
+  // — rows above it reflowing — must snap, or the overlay chases the row it
+  // is sitting on with a trailing second spring. Targets are compared against
   // the previous COMMIT (the effect below), not the previous render, so
   // strict mode's double render can't eat a genuine row change.
   const prevTargetsRef = useRef<{
     hover: HTMLElement | null;
     focus: HTMLElement | null;
-    actives: Map<string, HTMLElement>;
-  }>({ hover: null, focus: null, actives: new Map() });
+    actives: HTMLElement[];
+  }>({ hover: null, focus: null, actives: [] });
 
-  const levelOccurrence = new Map<number, number>();
   const activeRects: {
-    key: string;
+    key: number;
     rect: ItemRect;
-    row: HTMLElement;
     rowChanged: boolean;
   }[] = [];
-  for (const row of activeRows) {
-    const level = rowLevel(row);
-    if (!level) continue;
-    const levelId = overlayGroupId(level);
-    const occurrence = levelOccurrence.get(levelId) ?? 0;
-    levelOccurrence.set(levelId, occurrence + 1);
+  activeRows.forEach((row, occurrence) => {
     const rect = overlayRect(row);
     if (rect)
       activeRects.push({
-        key: `${levelId}:${occurrence}`,
+        key: occurrence,
         rect,
-        row,
-        rowChanged: prevTargetsRef.current.actives.get(`${levelId}:${occurrence}`) !== row,
+        rowChanged: prevTargetsRef.current.actives[occurrence] !== row,
       });
-  }
+  });
   const hoverRect = overlayRect(hoveredRowEl);
   const focusRect = focusRing ? overlayRect(focusedRowEl) : null;
   const hoverRowChanged = prevTargetsRef.current.hover !== hoveredRowEl;
@@ -430,7 +362,7 @@ export function useMenuScope(
     prevTargetsRef.current = {
       hover: hoveredRowEl,
       focus: focusedRowEl,
-      actives: new Map(activeRects.map(({ key, row }) => [key, row])),
+      actives: activeRows,
     };
   });
 
