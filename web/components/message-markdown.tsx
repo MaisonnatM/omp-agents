@@ -47,10 +47,12 @@ const imageFrom =
 function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 	let service: "linear" | "github" | "graphite" | "slack" | null = null;
 	let label = "";
+	let favicon: string | null = null;
 	try {
 		const url = new URL(href ?? "");
 		if (url.protocol === "https:" || url.protocol === "http:") {
 			const host = url.hostname;
+			favicon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=32`;
 			if (host === "linear.app") {
 				service = "linear";
 				label = url.pathname.match(/\/issue\/([^/]+)/)?.[1] ?? "Linear";
@@ -72,14 +74,16 @@ function ExternalLink({ href, children, ...props }: ComponentProps<"a">) {
 	}
 	return (
 		<a {...props} href={href} target="_blank" rel="noopener noreferrer">
-			{service ? (
+			{favicon ? (
 				<span className="inline-flex max-w-full items-baseline gap-1">
 					{service === "linear" || service === "slack" ? (
 						<BrandMark logo={service === "linear" ? LINEAR_LOGO : SLACK_LOGO} className="size-3 self-center" />
-					) : (
+					) : service ? (
 						<OrgIcon org={service} className="self-center" />
+					) : (
+						<img src={favicon} alt="" className="size-3 shrink-0 self-center" loading="lazy" referrerPolicy="no-referrer" />
 					)}
-					<span>{children === href || children === href?.replace(/^https?:\/\//, "") ? props.title || label : children}</span>
+					<span>{service && (children === href || children === href?.replace(/^https?:\/\//, "")) ? props.title || label : children}</span>
 				</span>
 			) : children}
 		</a>

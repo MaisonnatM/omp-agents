@@ -290,10 +290,12 @@ An action that fails shows its error, and its control becomes available again.
   Stop before its turn starts takes it away too and puts it back in the composer, with its images.
   omp's own `/` commands, such as `/model` or `/rename`, show no dimmed prompt; a `/skill:` prompt does.
 - User and assistant messages render GitHub-flavored Markdown, including tables, task lists, fenced code, and links.
-  An image in agent text shows as a link to its address, so opening a transcript never fetches anything from the web; only inline `data:` images show in place.
+  Images in agent text show as links rather than loading remote images; only inline `data:` images show in place.
   Linear, GitHub, Graphite, and Slack links show only their title and service icon, in conversations and rendered GitHub or Linear text.
   A bare URL shows a short destination label instead: an issue identifier, repository and pull request number, or **Slack message**; no title is fetched from the service.
   The link still opens its original address in a new tab.
+  Other HTTP and HTTPS links show their favicon beside their original label.
+  Favicons load lazily through Google's favicon service, sharing only the destination hostname, not its path, query, credentials, or the dashboard's address.
 - A path to a text file in agent text opens the file in a dialog: `.md`, `.markdown`, `.txt`, `.log`, `.csv`, `.tsv`, `.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.xml`, `.diff`, or `.patch`.
   An absolute or `~/` path opens from plain text, inline code, or a link, `file://` included; a relative one opens from inline code or a link, against the session's directory.
   A `:line` suffix, as in `docs/usage.md:12`, is dropped; hover the path to read the file it opens.

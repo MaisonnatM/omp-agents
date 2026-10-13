@@ -41,9 +41,17 @@ test("service links keep their titles and icons without displaying bare URLs", (
 test("lookalike hosts and ordinary links keep their original labels without service icons", () => {
 	for (const url of ["https://github.com.evil.example/org/repo", "https://not-slack.com/archives/C1/p1", "https://example.com"]) {
 		const html = renderToStaticMarkup(<MessageMarkdown text={url} />);
-		expect(html).toContain(`>${url}</a>`);
+		expect(html).toContain(`>${url}</span>`);
 		expect(html).not.toContain("<svg");
 	}
+});
+
+test("external favicons disclose only the hostname, never the link path or credentials", () => {
+	const html = renderToStaticMarkup(<MessageMarkdown text="[Private report](https://user:secret@example.com/private?token=sensitive)" />);
+	expect(html).toContain('src="https://www.google.com/s2/favicons?domain=example.com&amp;sz=32"');
+	expect(html).toContain('referrerPolicy="no-referrer"');
+	expect(html).not.toContain('src="https://user');
+	expect(renderToStaticMarkup(<MessageMarkdown text="[Mail](mailto:person@example.com)" />)).not.toContain("/s2/favicons");
 });
 
 test("unfinished streaming fences remain code blocks", () => {
