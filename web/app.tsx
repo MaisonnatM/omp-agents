@@ -215,7 +215,6 @@ export function App() {
 									onPickWorkspace={switchWorkspace}
 									dispatchPalette={dispatchPalette}
 									setShortcutsOpen={setShortcutsOpen}
-									toggleSidebar={toggleSidebar}
 								/>
 							</DashboardSidebar>
 							<SidebarInset>

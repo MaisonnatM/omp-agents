@@ -11,7 +11,6 @@ import type { WorkspaceScope } from "../use-workspace-scope";
 import { PullRequestsIndex, PullRequestsNav } from "./pull-requests/pull-requests-nav";
 import { NoticesBell } from "./notices";
 import { Roster } from "./roster";
-import { SidebarToggle } from "./sidebar-panel";
 
 const NO_VIEWS: View[] = [];
 const NO_PULL_REQUESTS_ROUTE: PullRequestsRoute = { target: null };
@@ -42,7 +41,6 @@ interface AppSidebarProps {
 	onPickWorkspace: (cwd: string | null) => void;
 	dispatchPalette: Dispatch<PaletteEvent>;
 	setShortcutsOpen: Dispatch<SetStateAction<boolean>>;
-	toggleSidebar: (side: "left") => void;
 }
 
 /**
@@ -71,7 +69,6 @@ export const AppSidebar = memo(function AppSidebar({
 	onPickWorkspace,
 	dispatchPalette,
 	setShortcutsOpen,
-	toggleSidebar,
 }: AppSidebarProps) {
 	const pullRequestsTab = useMemo(() => {
 		// Until the sessions are listed, the saved workspace reads as all workspaces, which would ask GitHub about every repository.
@@ -80,7 +77,6 @@ export const AppSidebar = memo(function AppSidebar({
 		if (page?.kind === "pull-requests" && !page.target) return <PullRequestsIndex workspace={workspace} hosts={visible.hosts} target={sectionTarget} onTarget={onSectionTarget} />;
 		return <PullRequestsNav workspace={workspace} hosts={visible.hosts} past={visible.past} route={page?.kind === "pull-requests" ? page : NO_PULL_REQUESTS_ROUTE} />;
 	}, [listed, page, workspace, visible, sectionTarget, onSectionTarget]);
-	const toggle = useMemo(() => <SidebarToggle side="left" open onToggle={() => toggleSidebar("left")} />, [toggleSidebar]);
 	const todoSessions = useMemo(() => ({ hosts, past }), [hosts, past]);
 	const calendarTab = useMemo(
 		() => (page?.kind === "calendar" ? page : page?.kind === "routines" ? ({ kind: "routines", target: routinesTarget } as const) : null),
@@ -117,7 +113,6 @@ export const AppSidebar = memo(function AppSidebar({
 			onShowSearch={onShowSearch}
 			onShowShortcuts={onShowShortcuts}
 			bell={bell}
-			toggle={toggle}
 		/>
 	);
 });

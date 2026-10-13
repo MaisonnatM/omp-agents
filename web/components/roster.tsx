@@ -188,8 +188,6 @@ interface RosterProps {
 	onPickWorkspace: (cwd: string | null) => void;
 	onShowSearch: () => void;
 	onShowShortcuts: () => void;
-	/** The button that hides the sidebar, first in the header. */
-	toggle: ReactNode;
 	/** The notices' bell, between the command menu and the shortcuts. */
 	bell: ReactNode;
 }
@@ -221,7 +219,6 @@ export function Roster({
 	onShowSearch,
 	onShowShortcuts,
 	bell,
-	toggle,
 }: RosterProps) {
 	const { changeTodo: onTodoChange } = useDashboardActions();
 	const { connected } = useDashboardStatus();
@@ -250,7 +247,8 @@ export function Roster({
 						<Keyboard />
 					</Button>
 				</Tooltip>
-				{toggle}
+				{/* The sidebar's toggle rides over this corner, from `DashboardSidebar`, so it can glide to the strip a hidden sidebar leaves. */}
+				<span aria-hidden className="size-7 shrink-0" />
 			</SidebarHeader>
 			<SizeProvider size="compact">
 				<TabsList aria-label="Sidebar" className={cn("mx-2 mt-2 max-w-[calc(100%-1rem)] self-start", fit.list)}>

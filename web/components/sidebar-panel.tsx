@@ -1,6 +1,6 @@
 /** `DashboardSidebar`, one of the dashboard's two sidebars, resizable and closeable; `useSidebarPanels` keeps both panels' state and `SidebarToggle` shows or hides one. */
 import { type LucideIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Sidebar, type SidebarSide } from "@/components/ui/sidebar";
@@ -19,6 +19,11 @@ import { Separator, useDragSeparator } from "./drag-separator";
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 560;
 const STEP = 16;
+/** The strip a hidden left sidebar leaves, wide enough to center its toggle. */
+const RAIL = 40;
+/** The show and hide motion: a drawer's curve, fast out of the gate and settling without overshoot. */
+const MOTION_MS = 260;
+const MOTION = "duration-[260ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
 
 interface SidebarSpec {
 	/** What the sidebar lists, as its controls name it. */
@@ -109,7 +114,7 @@ interface SidebarToggleProps {
 	onToggle: () => void;
 }
 
-/** Shows or hides a sidebar: the left one's from its header or the strip left in its place, the right one's from the pane header. */
+/** Shows or hides a sidebar: the left one's from the corner it rides on, the right one's from the pane header. */
 export function SidebarToggle({ side, open, onToggle }: SidebarToggleProps) {
 	const { name, id, shortcut, hideIcon: Hide, showIcon: Show } = SIDEBARS[side];
 	return (
@@ -173,22 +178,55 @@ interface DashboardSidebarProps {
 }
 
 /**
- * A sidebar with its resize handle. While the left one is hidden, a strip holds the button that shows it again; the
- * right one's button always sits in the pane header instead (see `App`). The hidden sidebar stays mounted, so its filter
- * and scroll survive.
+ * A sidebar with its resize handle, sliding its width open and shut. The left one's toggle rides its edge, from the
+ * header's corner to the strip a hidden sidebar leaves, so it stays where the eye followed it. The hidden sidebar stays
+ * mounted, so its filter and scroll survive; the right one's toggle sits in the pane header instead (see `App`).
  */
 export function DashboardSidebar({ side, panel, onResize, onToggle, children }: DashboardSidebarProps) {
+	// While the width moves: the transition applies only then, so a resize drag follows the pointer without lag.
+	const [moving, setMoving] = useState(false);
+	const [shownOpen, setShownOpen] = useState(panel.open);
+	if (shownOpen !== panel.open) {
+		setShownOpen(panel.open);
+		setMoving(true);
+	}
+	useEffect(() => {
+		if (!moving) return;
+		const timer = window.setTimeout(() => setMoving(false), MOTION_MS);
+		return () => window.clearTimeout(timer);
+	}, [moving, panel.open]);
+	const left = side === "left";
+	const closedWidth = left ? RAIL : 0;
 	return (
-		<>
-			<Sidebar id={SIDEBARS[side].id} side={side} hidden={!panel.open} className="relative h-full" style={{ width: panel.width }}>
+		<div
+			className={cn(
+				"relative h-full shrink-0",
+				side === "right" && "order-last",
+				(!panel.open || moving) && "overflow-hidden",
+				moving && cn("transition-[width]", MOTION),
+				left && !panel.open && "border-r border-border",
+			)}
+			style={{ width: panel.open ? panel.width : closedWidth }}
+		>
+			<Sidebar
+				id={SIDEBARS[side].id}
+				side={side}
+				hidden={!panel.open && !moving}
+				inert={!panel.open}
+				className={cn("relative h-full transition-opacity duration-150 ease-out motion-reduce:transition-none", !panel.open && "opacity-0", !left && "absolute top-0 right-0")}
+				style={{ width: panel.width }}
+			>
 				{children}
 				<SidebarResizeHandle side={side} width={panel.width} onWidth={onResize} />
 			</Sidebar>
-			{side === "left" && !panel.open && (
-				<div className="sticky top-0 flex h-full shrink-0 flex-col border-r border-border px-2 pt-4">
-					<SidebarToggle side={side} open={false} onToggle={onToggle} />
+			{left && (
+				<div
+					className={cn("absolute top-[calc((var(--page-header-height)-1.75rem)/2)] z-10", moving && cn("transition-[left]", MOTION))}
+					style={{ left: panel.open ? panel.width - 37 : (RAIL - 28) / 2 - 1 }}
+				>
+					<SidebarToggle side={side} open={panel.open} onToggle={onToggle} />
 				</div>
 			)}
-		</>
+		</div>
 	);
 }
