@@ -628,6 +628,7 @@ An action that fails shows its error, and its control becomes available again.
 - The details of a pull request open with a header: the repository and number, a link to it on GitHub, then the title, its author, when it last changed, and `gh pr checkout <number>`, which a click copies.
   Its last line shows the branch it merges into, marked with a stack icon in amber when that is another pull request's branch, the branch it brings, its files, and the lines added and removed.
   On the right of the first line, the **Next move** shows as its badge, with its reason on hover, and one button that makes it.
+  The badge, its button, the `⋯` menu, and the Status's buttons all follow what the details read from GitHub, so a pull request you just made a draft, whose checks failed, or that merged since the list last refreshed shows the move the Summary agrees with, and a closed one offers none.
   The button is the quick action that hands the move to an agent, such as **Fix CI** for **Fix CI** or **Resolve conflicts** for **Rebase**; a **Rebase** whose checks also failed offers **Fix CI and conflicts**.
   **Merge** offers a button named for the merge method it starts with, such as **Squash and merge**, and **Answer** and **Working** offer **Open the session**; a move that no button makes, such as **CI running**, shows its badge alone.
   The merge button asks before it merges, offers the other methods the repository allows, and merges on GitHub only while the branch's head is still the commit the page shows; a pull request not yet read offers **Merge on GitHub**.
