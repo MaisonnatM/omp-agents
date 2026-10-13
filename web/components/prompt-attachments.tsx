@@ -1,38 +1,28 @@
 /** The composer's attach button and the hook that reads attached files into a prompt's images and text. */
 import { Paperclip } from "lucide-react";
-import { useRef, useState } from "react";
-import { MAX_PROMPT_DOCUMENT_BYTES, MAX_PROMPT_FILE_CHARS, plainText, type PromptDocument, type PromptFile, withFiles } from "../../src/shared/prompt-files";
-import { MAX_PROMPT_IMAGE_BYTES, PROMPT_IMAGE_TYPES, type PromptImage } from "../../src/shared/sessions";
+import { useState } from "react";
+import { plainText, type PromptDocument } from "../../src/shared/prompt-files";
+import { PROMPT_IMAGE_TYPES, type PromptImage } from "../../src/shared/sessions";
 import { errorText, putJson } from "../api";
+import { type Attachment, type AttachmentRead, preparePrompt, screenFiles } from "../prompt-attachments-model";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 
 /** The composer's `accept`: any file; each is read as an image, as text, or as a document omp converts, or refused with a note. */
 export const ATTACH_ACCEPT = "*/*";
 
-const MB = 1024 * 1024;
-
-/** What a prompt sends for one attached file. */
-type Read = { kind: "image"; image: PromptImage } | { kind: "file"; file: PromptFile };
-
-/** A file's read, started as it attaches, and the characters it adds to the prompt once read as text. */
-interface Attached {
-	read: Promise<Read>;
-	chars: number;
-}
-
 export interface PromptAttachments {
 	files: File[];
 	onFilesChange: (files: File[]) => void;
-	/** Why files the user added stayed out of the prompt, why a prompt's files could not be read, or why the server did not take a prompt; else `null`. */
+	/** Why files the user added stayed out of the prompt, or why the server did not take a prompt; else `null`. */
 	note: string | null;
 	/**
-	 * Empty the composer's files and hand `text` with them to `deliver` as a prompt sends it: text files after the text,
-	 * images apart. When they cannot be read, or `deliver` rejects, they come back with a note, and `undo` runs too.
+	 * Empty the composer's files and hand `text` with those {@link preparePrompt} accepts to `deliver`: text files after the text,
+	 * images apart. When `deliver` rejects, the accepted files come back with a note, and `undo` runs too.
 	 */
-	take: (text: string, deliver: (prompt: string, images: PromptImage[]) => Promise<void>, undo: () => void) => void;
-	/** Hand `text` with the composer's files to `deliver` as {@link take} does, keeping them attached. */
-	read: (text: string, deliver: (prompt: string, images: PromptImage[]) => void) => void;
+	take: (text: string, deliver: (prompt: string, images: PromptImage[]) => Promise<void>, undo: () => void) => Promise<void>;
+	/** Hand `text` with the composer's accepted files to `deliver` as {@link take} does, keeping them attached. */
+	read: (text: string, deliver: (prompt: string, images: PromptImage[]) => void) => Promise<void>;
 	/** Attach images a queued message carried, after the files already attached. */
 	restore: (images: PromptImage[]) => void;
 }
@@ -51,7 +41,7 @@ export function fileBase64(file: File): Promise<string> {
 }
 
 /** An image as omp's `ImageContent`, a text file as its text, and any other file as the text omp converts it to. */
-async function readFile(file: File): Promise<Read> {
+async function readFile(file: File): Promise<AttachmentRead> {
 	if (PROMPT_IMAGE_TYPES.includes(file.type)) return { kind: "image", image: { data: await fileBase64(file), mimeType: file.type } };
 	const text = plainText(new Uint8Array(await file.arrayBuffer()));
 	if (text !== null) return { kind: "file", file: { name: file.name, text } };
@@ -60,109 +50,63 @@ async function readFile(file: File): Promise<Read> {
 	return { kind: "file", file: { name: file.name, text: converted.text } };
 }
 
+const joined = (refused: string[]): string | null => (refused.length > 0 ? refused.join(" ") : null);
+
 /**
  * The files a composer attaches to its next prompt. Each is read as it attaches, so a document converts while the user
- * types. `images`: the subject takes images; omp sends a subagent text only.
+ * types, and {@link preparePrompt} decides both which stay attached and which a prompt carries. `images`: the subject takes images; omp sends a subagent text only.
  */
 export function usePromptAttachments(images: boolean): PromptAttachments {
-	const [files, setFiles] = useState<File[]>([]);
+	const [attachments, setAttachments] = useState<Attachment[]>([]);
 	const [note, setNote] = useState<string | null>(null);
-	const attached = useRef(new Map<File, Attached>());
 
-	const refuse = (file: File, why: string): void => {
-		attached.current.delete(file);
-		setFiles(current => current.filter(other => other !== file));
-		setNote(current => (current ? `${current} ${why}` : why));
-	};
-
-	const attach = (file: File): void => {
-		const entry: Attached = { read: readFile(file), chars: 0 };
-		attached.current.set(file, entry);
-		entry.read.then(
-			read => {
-				if (read.kind !== "file" || attached.current.get(file) !== entry) return;
-				const others = [...attached.current.values()].reduce((sum, other) => sum + other.chars, 0);
-				if (others + read.file.text.length > MAX_PROMPT_FILE_CHARS) {
-					refuse(file, `A prompt carries up to ${MAX_PROMPT_FILE_CHARS.toLocaleString("en-US")} characters of files, so ${file.name} stayed out.`);
-				} else entry.chars = read.file.text.length;
-			},
-			(err: unknown) => {
-				if (attached.current.get(file) === entry) refuse(file, `${file.name} stayed out. ${errorText(err)}`);
-			},
-		);
+	/** Drop what `prepared` refused from `snapshot`, unless the files changed since; a change runs its own check. */
+	const keepAccepted = (snapshot: Attachment[], accepted: Attachment[], refused: string[]): void => {
+		if (refused.length === 0) return;
+		setAttachments(current => (current === snapshot ? current.filter(attachment => accepted.includes(attachment)) : current));
+		setNote(current => [current, ...refused].filter(Boolean).join(" "));
 	};
 
 	const onFilesChange = (next: File[]): void => {
-		for (const file of attached.current.keys()) if (!next.includes(file)) attached.current.delete(file);
-		const refused: string[] = [];
-		let imageBytes = 0;
-		const kept = next.filter(file => {
-			if (!PROMPT_IMAGE_TYPES.includes(file.type)) {
-				if (file.size <= MAX_PROMPT_DOCUMENT_BYTES) return true;
-				refused.push(`A file attaches up to ${MAX_PROMPT_DOCUMENT_BYTES / MB} MB, so ${file.name} stayed out.`);
-				return false;
-			}
-			if (!images) {
-				refused.push(`A subagent takes text only, so ${file.name} stayed out.`);
-				return false;
-			}
-			if (imageBytes + file.size > MAX_PROMPT_IMAGE_BYTES) {
-				refused.push(`A prompt carries up to ${MAX_PROMPT_IMAGE_BYTES / MB} MB of images, so ${file.name} stayed out.`);
-				return false;
-			}
-			imageBytes += file.size;
-			return true;
-		});
-		for (const file of kept) if (!attached.current.has(file)) attach(file);
-		setNote(refused.length > 0 ? refused.join(" ") : null);
-		setFiles(kept);
+		const { kept, refused } = screenFiles(next, images);
+		const snapshot = kept.map(file => attachments.find(attachment => attachment.file === file) ?? { file, read: readFile(file) });
+		setAttachments(snapshot);
+		setNote(joined(refused));
+		void preparePrompt(snapshot, "", images).then(prepared => keepAccepted(snapshot, prepared.accepted, prepared.refused));
 	};
 
-	const send = (chosen: File[], text: string, deliver: (prompt: string, images: PromptImage[]) => void, failed?: () => void): void => {
-		if (chosen.length === 0) return deliver(text, []);
-		const reads = chosen.map(file => attached.current.get(file)?.read ?? readFile(file));
-		Promise.all(reads).then(
-			read => deliver(withFiles(text, read.flatMap(r => (r.kind === "file" ? [r.file] : []))), read.flatMap(r => (r.kind === "image" ? [r.image] : []))),
-			() => {
-				setNote("The attached files could not be read. Remove them and attach them again.");
-				failed?.();
-			},
-		);
-	};
-
-	const take = (text: string, deliver: (prompt: string, images: PromptImage[]) => Promise<void>, undo: () => void): void => {
-		const taken = files;
-		setFiles([]);
+	const take = async (text: string, deliver: (prompt: string, images: PromptImage[]) => Promise<void>, undo: () => void): Promise<void> => {
+		const taken = attachments;
+		setAttachments([]);
 		setNote(null);
-		const giveBack = (): void => {
-			setFiles(current => [...taken, ...current.filter(file => !taken.includes(file))]);
+		const prepared = await preparePrompt(taken, text, images);
+		setNote(joined(prepared.refused));
+		if (prepared.accepted.length === 0 && taken.length > 0 && text === "") return undo();
+		try {
+			await deliver(prepared.prompt, prepared.images);
+		} catch (error) {
+			setNote([`The prompt failed: ${errorText(error)}`, ...prepared.refused].join(" "));
+			setAttachments(current => [...prepared.accepted, ...current.filter(attachment => !prepared.accepted.includes(attachment))]);
 			undo();
-		};
-		send(
-			taken,
-			text,
-			(prompt, sent) =>
-				void deliver(prompt, sent).then(
-					() => {
-						for (const file of taken) attached.current.delete(file);
-					},
-					(error: unknown) => {
-						setNote(`The prompt failed: ${errorText(error)}`);
-						giveBack();
-					},
-				),
-			giveBack,
-		);
+		}
 	};
 
-	const restore = (images: PromptImage[]): void => {
-		if (images.length === 0) return;
-		const restored = images.map(
+	const read = async (text: string, deliver: (prompt: string, images: PromptImage[]) => void): Promise<void> => {
+		const snapshot = attachments;
+		const prepared = await preparePrompt(snapshot, text, images);
+		keepAccepted(snapshot, prepared.accepted, prepared.refused);
+		if (prepared.accepted.length === 0 && snapshot.length > 0 && text === "") return;
+		deliver(prepared.prompt, prepared.images);
+	};
+
+	const restore = (restoredImages: PromptImage[]): void => {
+		if (restoredImages.length === 0) return;
+		const restored = restoredImages.map(
 			({ data, mimeType }, index) => new File([Uint8Array.from(atob(data), char => char.charCodeAt(0))], `queued-${index + 1}.${mimeType.split("/")[1]}`, { type: mimeType }),
 		);
-		onFilesChange([...files, ...restored]);
+		onFilesChange([...attachments.map(attachment => attachment.file), ...restored]);
 	};
-	return { files, onFilesChange, note, take, read: (text, deliver) => send(files, text, deliver), restore };
+	return { files: attachments.map(attachment => attachment.file), onFilesChange, note, take, read, restore };
 }
 
 /** Opens the file picker. Dropping or pasting a file into the composer attaches it too. */
