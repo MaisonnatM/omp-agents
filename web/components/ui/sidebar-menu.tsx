@@ -28,7 +28,6 @@ import {
   useMenuScope,
 } from "@/components/ui/sidebar-menu-scope";
 import {
-  MenuActionsClusterContext,
   MenuItemContext,
   rowGutter,
   useMenuRow,
@@ -203,7 +202,7 @@ const sidebarMenuButtonVariants = cva(
   // container keeps seeing the moves, and fluid hover simply never lights it.
   // `group/menu-button` lets the icon, dot and label light from the
   // `data-fluid-hover-active` mark the menu's hover puts on this button.
-  "peer/menu-button group/menu-button relative z-10 flex w-full cursor-pointer select-none items-center gap-2 pl-2 text-left outline-none disabled:opacity-50 disabled:pointer-events-none transition-[padding] duration-80 pr-[var(--row-gutter)] group-hover/menu-item:pr-[var(--row-gutter-hover)] group-focus-within/menu-item:pr-[var(--row-gutter-hover)] group-hover/menu-sub-item:pr-[var(--row-gutter-hover)] group-focus-within/menu-sub-item:pr-[var(--row-gutter-hover)] group-has-[[data-sidebar=menu-action]:is([data-state=open],[data-popup-open],[aria-expanded=true])]/menu-item:pr-[var(--row-gutter-hover)] group-has-[[data-sidebar=menu-action]:is([data-state=open],[data-popup-open],[aria-expanded=true])]/menu-sub-item:pr-[var(--row-gutter-hover)]",
+  "peer/menu-button group/menu-button relative z-10 flex w-full cursor-pointer select-none items-center gap-2 pl-2 text-left outline-none disabled:opacity-50 disabled:pointer-events-none transition-[padding] duration-80 pr-[var(--row-gutter)] group-hover/menu-item:pr-[var(--row-gutter-hover)] group-focus-within/menu-item:pr-[var(--row-gutter-hover)] group-has-[[data-sidebar=menu-action]:is([data-state=open],[data-popup-open],[aria-expanded=true])]/menu-item:pr-[var(--row-gutter-hover)]",
   {
     variants: {
       variant: {
@@ -391,17 +390,14 @@ const SidebarMenuAction = forwardRef<HTMLButtonElement, SidebarMenuActionProps>(
     const shape = useShape();
     const sizeClasses = useSize();
     const item = useContext(MenuItemContext);
-    const inCluster = useContext(MenuActionsClusterContext);
     const { template, content } = resolveSlotTemplate(render, asChild, children);
 
-    // A lone action registers its own slot; inside a cluster the wrapper
-    // registers the whole count and each action flows in its row.
     const setActions = item?.setActions;
     useLayoutEffect(() => {
-      if (inCluster || !setActions) return;
+      if (!setActions) return;
       setActions(1, showOnHover);
       return () => setActions(0, false);
-    }, [inCluster, setActions, showOnHover]);
+    }, [setActions, showOnHover]);
     return slotElement(
       template,
       "button",
@@ -414,17 +410,10 @@ const SidebarMenuAction = forwardRef<HTMLButtonElement, SidebarMenuActionProps>(
           // right-1.5 centers the 24px hit-box on the same axis as the badge
           // (right-2 + min-w-5): both land 18px from the row's right edge.
           // With a badge on the same row the badge keeps that rightmost spot
-          // and the action slides left of it. Inside a cluster the wrapper
-          // owns the positioning and actions simply flow.
-          inCluster
-            ? "relative flex size-6 shrink-0 items-center justify-center text-muted-foreground outline-none"
-            : "absolute right-1.5 z-10 flex size-6 items-center justify-center text-muted-foreground outline-none",
-          !inCluster &&
-            (item?.isSubRow
-              ? "group-has-[>[data-sidebar=menu-badge]]/menu-sub-item:right-8.5"
-              : "group-has-[>[data-sidebar=menu-badge]]/menu-item:right-8.5"),
-          !inCluster &&
-            (item?.isSubRow || sizeClasses.variant === "compact" ? "top-0.5" : "top-1"),
+          // and the action slides left of it.
+          "absolute right-1.5 z-10 flex size-6 items-center justify-center text-muted-foreground outline-none",
+          "group-has-[>[data-sidebar=menu-badge]]/menu-item:right-8.5",
+          sizeClasses.variant === "compact" ? "top-0.5" : "top-1",
           "hover:bg-hover hover:text-foreground transition-[color,background-color,opacity] duration-80",
           "focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring,#6B97FF)]",
           // One icon size across the sidebar: row actions match the leading
@@ -433,17 +422,9 @@ const SidebarMenuAction = forwardRef<HTMLButtonElement, SidebarMenuActionProps>(
           // vary), thickening to 2 on hover — Button's icon-only treatment.
           "[&_svg]:size-[var(--icon-size)] [&_svg]:shrink-0 [&_svg]:stroke-[1.5] [&_svg]:transition-[stroke-width] [&_svg]:duration-80 hover:[&_svg]:stroke-[2]",
           shape.item,
-          // Reveal on the OWN row only. A sub action must not use the
-          // menu-item group — its nearest one is the parent li, which would
-          // light every sibling sub action on any hover inside the sub-tree.
-          !inCluster &&
-            showOnHover &&
-            (item?.isSubRow
-              ? "opacity-0 group-hover/menu-sub-item:opacity-100 group-focus-within/menu-sub-item:opacity-100 data-[state=open]:opacity-100 aria-expanded:opacity-100"
-              // Tracks the row's own button (its peer), not the <li> — a row
-              // that hosts a sub-menu wraps its children too, and hovering a
-              // child should not light the parent's action.
-              : "opacity-0 peer-hover/menu-button:opacity-100 peer-focus-visible/menu-button:opacity-100 hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 aria-expanded:opacity-100"),
+          // Reveal on the OWN row only: tracks the row's button (its peer).
+          showOnHover &&
+            "opacity-0 peer-hover/menu-button:opacity-100 peer-focus-visible/menu-button:opacity-100 hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 aria-expanded:opacity-100",
           className
         ),
         onClick: (event: React.MouseEvent<HTMLButtonElement>) => {

@@ -54,7 +54,8 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/sidebar-menu.tsx`: `gap-0.5` between rows, and the `FluidHoverHighlight` import points at `ui/fluid-hover-highlight.tsx`.
 - `ui/sidebar-menu.tsx`: `SidebarMenuActions`, `SidebarMenuSkeleton`, `SidebarMenuSub`, `SidebarMenuSubItem`, and `SidebarMenuSubButton` are removed, since nothing renders them.
   `sidebarMenuButtonVariants` and the `SidebarMenu*Props` types are no longer exported.
-  `useMenuRow`'s `isSubRow` and `MenuActionsClusterContext` stay, and now always take their default.
+  `useMenuRow`'s `isSubRow`, `MenuActionsClusterContext`, the submenu selectors and styles, and the scope's per-submenu active overlay groups are removed with them.
+  The scope keeps one active background per active row, keyed by its occurrence among the active rows.
 - `ui/sidebar-menu.tsx` is split: the scope, its overlays and the row helpers are `ui/sidebar-menu-scope.tsx`, and `useMenuRow`, the row contexts and the gutter math are `ui/sidebar-menu-row.ts`.
   The scope batches row registration: rows only mark it dirty, and one flush per commit sorts the rows and registers with the fluid hover hook just the indexes whose element changed.
   The scope's context is two: a stable registration context, and the rows' active state, which changes only when a row registers or turns active; `refreshVisibility`, which only `SidebarMenuSub` called, is removed.

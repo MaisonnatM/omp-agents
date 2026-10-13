@@ -20,8 +20,6 @@ export interface MenuItemContextValue {
    *  to the scope, covering the windows where the ref is detached. */
   attachRow: (node: HTMLLIElement | null) => void;
   isActiveRow: boolean;
-  /** True inside SidebarMenuSubItem — actions center on the shorter row. */
-  isSubRow: boolean;
   setActive: (active: boolean) => void;
   setButtonEl: (el: HTMLElement | null) => void;
   /** Trailing controls on this row, registered by the action / badge parts.
@@ -35,14 +33,7 @@ export interface MenuItemContextValue {
 
 export const MenuItemContext = createContext<MenuItemContextValue | null>(null);
 
-/** True while rendering inside a SidebarMenuActions cluster, where each
- *  action flows in the wrapper's row instead of positioning itself. */
-export const MenuActionsClusterContext = createContext(false);
-
-export function useMenuRow(
-  rowRef: RefObject<HTMLLIElement | null>,
-  isSubRow = false
-): MenuItemContextValue {
+export function useMenuRow(rowRef: RefObject<HTMLLIElement | null>): MenuItemContextValue {
   const registry = useContext(MenuRegistryContext);
   const rows = useContext(MenuRowsContext);
   const registerRow = registry?.registerRow;
@@ -116,7 +107,6 @@ export function useMenuRow(
       rowRef,
       attachRow,
       isActiveRow,
-      isSubRow,
       setActive,
       setButtonEl,
       ...trailing,
@@ -127,7 +117,6 @@ export function useMenuRow(
       rowRef,
       attachRow,
       isActiveRow,
-      isSubRow,
       setActive,
       setButtonEl,
       trailing,
