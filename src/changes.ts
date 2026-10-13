@@ -9,7 +9,7 @@ import { git } from "./git";
 import { FoldedFile } from "./line-reader";
 import { displayPath } from "./paths";
 import { run } from "./proc";
-import { type ChangedEntry, type ChangedFileText, type ChangeStatus, contextRows, MAX_CHANGED_FILE_BYTES, parseFullDiff, type SessionChanges } from "./shared/changes";
+import { type ChangedEntry, type ChangedFileText, type ChangeStatus, contextRows, fileText, MAX_CHANGED_FILE_BYTES, parseFullDiff, type SessionChanges } from "./shared/changes";
 import { Work } from "./work";
 
 /** Where a session works: its transcript, and the directory its checkout is read from (its worktree, else its cwd). */
@@ -149,10 +149,9 @@ export async function readChangedFile(place: SessionPlace, path: string): Promis
 	const { changes, files } = await lists.get(placeKey(place), () => scan(place));
 	const entry = files.find(file => file.path === path);
 	if (!entry) return null;
-	const shown = (rows: ChangedFileText["rows"], note: string | null = null): ChangedFileText => ({ path, rows, note });
 	const current = Bun.file(entry.absolute);
 	const exists = await current.exists();
-	if (exists && current.size > MAX_CHANGED_FILE_BYTES) return shown(null, `Too large to show: ${Math.round(current.size / 1024)} KB`);
+	if (exists && current.size > MAX_CHANGED_FILE_BYTES) return fileText(path, null, `Too large to show: ${Math.round(current.size / 1024)} KB`);
 	if (changes.root && changes.base && entry.status !== null) {
 		const argv =
 			entry.status === "untracked"
@@ -160,11 +159,11 @@ export async function readChangedFile(place: SessionPlace, path: string): Promis
 				: // Literal, so a path such as `app/[id]/page.tsx` names that one file rather than a glob that can match another.
 					["git", "--literal-pathspecs", "-C", changes.root, "diff", "--no-color", "--no-ext-diff", "--histogram", "--unified=100000000", changes.base.sha, "--", entry.path];
 		const diff = await run(argv, { timeoutMs: 10000 });
-		if (diff.code > 1) return shown(null, diff.stderr.trim() || "git could not compare this file");
-		if (/^Binary files /m.test(diff.stdout)) return shown(null, "Binary file");
-		return shown(parseFullDiff(diff.stdout));
+		if (diff.code > 1) return fileText(path, null, diff.stderr.trim() || "git could not compare this file");
+		if (/^Binary files /m.test(diff.stdout)) return fileText(path, null, "Binary file");
+		return fileText(path, parseFullDiff(diff.stdout));
 	}
-	if (!exists) return shown(null, "Deleted");
+	if (!exists) return fileText(path, null, "Deleted");
 	const read = decode(await current.bytes());
-	return "text" in read ? shown(contextRows(read.text)) : shown(null, read.note);
+	return "text" in read ? fileText(path, contextRows(read.text)) : fileText(path, null, read.note);
 }

@@ -41,6 +41,9 @@ export interface ChangedFileText {
 	note: string | null;
 }
 
+/** `path` shown as `rows`, or with none and the `note` saying why. */
+export const fileText = (path: string, rows: ChangedFileText["rows"], note: string | null = null): ChangedFileText => ({ path, rows, note });
+
 /** The most bytes of a side that the changes view reads. */
 export const MAX_CHANGED_FILE_BYTES = 1024 * 1024;
 

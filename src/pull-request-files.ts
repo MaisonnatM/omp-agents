@@ -6,7 +6,7 @@
 import { createCache } from "./cache";
 import { dataOf, FILE_STATUS, ghGraphql, ghRest } from "./github";
 import { isObject, num, str } from "./json";
-import { type ChangedEntry, type ChangedFileText, MAX_CHANGED_FILE_BYTES, patchRows } from "./shared/changes";
+import { type ChangedEntry, type ChangedFileText, fileText, MAX_CHANGED_FILE_BYTES, patchRows } from "./shared/changes";
 import { type PullRequest, type PullRequestChanges, prKey } from "./shared/github";
 
 /** A file of the list with what its read needs: GitHub's patch and the blob it names at the head. */
@@ -89,10 +89,9 @@ export function parseBlobAnswer(answer: unknown): { text: string } | { note: str
 export async function readPullRequestFile(pr: PullRequest, path: string): Promise<ChangedFileText | null> {
 	const file = (await listed(pr)).files.find(entry => entry.path === path);
 	if (!file) return null;
-	const shown = (rows: ChangedFileText["rows"], note: string | null = null): ChangedFileText => ({ path, rows, note });
-	if (file.patch === null) return shown(null, "GitHub shows no diff for this file: it is binary or its diff is too large");
+	if (file.patch === null) return fileText(path, null, "GitHub shows no diff for this file: it is binary or its diff is too large");
 	// GitHub names no blob at the head for a removed file, and its patch holds every line.
-	if (file.status === "deleted") return file.patch ? shown(patchRows(file.patch, "")) : shown(null, "Deleted; GitHub shows no lines for it");
+	if (file.status === "deleted") return file.patch ? fileText(path, patchRows(file.patch, "")) : fileText(path, null, "Deleted; GitHub shows no lines for it");
 	const head = parseBlobAnswer(await ghGraphql(BLOB_QUERY, { owner: pr.owner, repo: pr.repo, oid: file.sha }));
-	return "text" in head ? shown(patchRows(file.patch, head.text)) : shown(null, head.note);
+	return "text" in head ? fileText(path, patchRows(file.patch, head.text)) : fileText(path, null, head.note);
 }
