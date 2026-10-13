@@ -16,6 +16,14 @@ export type LiveUpdate =
 	/** An out-of-band line for the session (`agentId` null) or one of its subagents. */
 	| { kind: "note"; agentId: string | null; level: "info" | "warning" | "error"; text: string };
 
+/** A message the session did not take; the session itself reports it, so a caller with someone to tell need not. */
+export class PromptRefused extends Error {}
+
+/** A prompt's `catch` for a caller with no one to tell: the session showed a refusal, and anything else still rejects. */
+export const skipRefused = (err: unknown): void => {
+	if (!(err instanceof PromptRefused)) throw err;
+};
+
 export interface LiveSession {
 	/** Collab's instance id for a terminal session, a random one for a session this dashboard started. */
 	readonly instanceId: string;
@@ -31,10 +39,9 @@ export interface LiveSession {
 	/**
 	 * Send `text` and `images` to the main agent, or chat `text` to a subagent; `delivery` applies while a turn runs.
 	 * Rejects when the text cannot be prepared, and a subagent's message with images, which omp gives no subagent.
+	 * Rejects with {@link PromptRefused} when the session does not take the message, which it has already shown its viewers or, for a terminal session closed to the dashboard, need not.
 	 */
 	prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void>;
-	/** Send `text` to the main agent as a follow-up while a turn runs, else as a prompt, as a project's runner does; unlike {@link prompt}, also rejects when it does not reach omp. */
-	followUp(text: string): Promise<void>;
 	/** Take a queued message back with its images; `null` when the session no longer holds it. */
 	dequeue(agentId: string | null, queue: keyof MessageQueue, text: string): Promise<WithdrawnMessage | null>;
 	/** Turn a queued follow-up into a steer, which the running turn takes at its next step; whether it was still queued. */

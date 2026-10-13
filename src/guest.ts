@@ -7,7 +7,7 @@
  */
 import { expandPrompt } from "./commands";
 import { errorText, isObject, nonEmptyStr } from "./json";
-import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
+import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused } from "./live-session";
 import { COLLAB_PROTO, type CollabSocket, type Frame, type HostSnapshot, linkErrorCode, listHosts, openRoom, type Room } from "./omp/collab";
 import { selectorOf } from "./shared/models";
 import type { AgentRow, ContextUsage, ControlPhase, Delivery, HostStatus, MessageQueue, PromptImage, UserAnswer, UserRequest, WithdrawnMessage } from "./shared/sessions";
@@ -207,19 +207,17 @@ export class SessionGuest implements LiveSession {
 		return this.#requests.list();
 	}
 
-	/** Prepare `text` as the terminal would, expanding a skill or file command, then {@link send} it with `images`. */
+	/**
+	 * Prepare `text` as the terminal would, expanding a skill or file command, then {@link send} it with `images`.
+	 * Rejects with {@link PromptRefused} while the room takes no messages from this guest, where {@link send} drops one.
+	 */
 	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
+		if (!this.canWrite) throw new PromptRefused("this terminal session takes no messages from the dashboard");
 		await this.#turn.run(async () => {
 			if (agentId && images.length > 0) throw new Error("omp sends a subagent text only.");
 			const payload = await expandPrompt(this.instanceId, this.#host.cwd, text, agentId ? "subagent" : "session");
 			this.send(agentId, { text, payload, images }, delivery);
 		});
-	}
-
-	/** {@link prompt}, but rejects while the room takes no messages from this guest, where {@link send} drops one. */
-	async followUp(text: string): Promise<void> {
-		if (!this.canWrite) throw new Error("this terminal session takes no messages from the dashboard");
-		await this.prompt(null, text, [], "followUp");
 	}
 
 	/**

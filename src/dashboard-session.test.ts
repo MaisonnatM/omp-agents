@@ -7,6 +7,7 @@ import type { Frame } from "./omp/collab";
 import * as rpc from "./omp/rpc";
 import { PLAIN_LAUNCH, type RpcChild, type RpcClient, type RpcState } from "./omp/rpc";
 import { errorText } from "./json";
+import { PromptRefused } from "./live-session";
 import { LiveSessions } from "./server/live-sessions";
 import { endSession } from "./server/session-end";
 import { RequestLedger } from "./server/request-ledger";
@@ -282,6 +283,15 @@ describe("DashboardSession starting prompt", () => {
 		await session.prompt(null, "denied again", [], "steer");
 		expect(session.status).toBe("idle");
 		expect(session.starting).toBeNull();
+	});
+
+	test("a prompt omp refuses shows a note and rejects with PromptRefused", async () => {
+		const { session, client, updates } = await startSession();
+		client.prompt = async () => {
+			throw new Error("busy");
+		};
+		await expect(session.prompt(null, "hi", [], "followUp")).rejects.toBeInstanceOf(PromptRefused);
+		expect(updates).toContainEqual({ kind: "note", agentId: null, level: "error", text: "Prompt failed: busy" });
 	});
 
 	test("a builtin slash command omp completes itself never starts, a /skill: prompt does", async () => {

@@ -1,6 +1,7 @@
 /** What the server does with each message a page sends over its socket. */
 import { complete } from "../commands";
 import { errorText } from "../json";
+import { PromptRefused, skipRefused } from "../live-session";
 import { directoryOf } from "../paths";
 import type { NoticeOp } from "../shared/notices";
 import type { ClientMsg, ServerMsg } from "../shared/protocol";
@@ -40,6 +41,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 		try {
 			await sessions.get(view.instanceId)?.prompt(view.agentId, text, images, delivery);
 		} catch (error) {
+			if (error instanceof PromptRefused) return;
 			peer.reply(view.instanceId, {
 				t: "items",
 				view,
@@ -99,7 +101,7 @@ const clientHandlers: { [T in ClientMsg["t"]]: (env: SocketEnv, peer: Peer, msg:
 				const midTurn = stoppedMidTurn(sessionId);
 				const result = await start({ kind: "resume", sessionId });
 				// omp records the cut-off turn as aborted on resume; a plain prompt picks the work back up.
-				if (result.ok && midTurn) void sessions.get(result.instanceId)?.prompt(null, "continue", [], "steer");
+				if (result.ok && midTurn) void sessions.get(result.instanceId)?.prompt(null, "continue", [], "steer").catch(skipRefused);
 				return { sessionId, result };
 			}),
 		);
