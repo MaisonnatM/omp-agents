@@ -271,6 +271,7 @@ export function App() {
 											project={coordinated}
 											view={detailsView}
 											working={detailsView.kind === "live" && subjectOf(detailsView, focused.host ?? null, focused.lastHost).working}
+											cwd={focused.cwd ?? null}
 											workspace={workspace}
 											hosts={state.hosts}
 											past={state.past}

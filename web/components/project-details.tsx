@@ -2,24 +2,17 @@ import { GitPullRequest, NotebookText, TableOfContents, Users } from "lucide-rea
 import { type LinkedPullRequest, samePullRequest } from "../../src/shared/github";
 import type { Project } from "../../src/shared/projects";
 import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
-import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
-import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
-import { SizeProvider } from "@/lib/size-context";
 import { modeOf, SPLIT_CLICK } from "../labels";
 import { useTurnCount } from "../pane-store";
 import { projectSession } from "../sessions";
-import { useStoredState } from "../stored-state";
+import { DetailsSidebarFrame } from "./details-sidebar-frame";
 import { useDashboardActions } from "./dashboard-context";
 import { OutlineTab } from "./outline-tab";
 import { PHASE_LABEL, ProjectNotesList } from "./projects/project-parts";
 import { SessionPullRequestsTab } from "./session-pull-requests-tab";
-import { PANEL_VIEWPORT, PINNED_VIEWPORT, TAB_CLASS, tabLabel } from "./session-details";
 
 /** The coordinator sidebar's tab, kept apart from a session's, since the two sidebars offer different tabs. */
 const TAB_KEY = "omp-agents.project-tab";
-
-const PROJECT_TABS = ["outline", "workers", "notes", "pull-requests"] as const;
-type ProjectTab = (typeof PROJECT_TABS)[number];
 
 /** What the project's workers submitted or worked on, each pull request once, in worker order. */
 function workerPullRequests(project: Project, hosts: RosterHost[], past: PastSession[]): LinkedPullRequest[] {
@@ -71,6 +64,8 @@ interface ProjectDetailsProps {
 	/** The coordinator's view, whose conversation the outline follows. */
 	view: View;
 	working: boolean;
+	/** The coordinator's directory, which relative paths in its outline resolve against. */
+	cwd: string | null;
 	workspace: string | null;
 	hosts: RosterHost[];
 	past: PastSession[];
@@ -80,45 +75,38 @@ interface ProjectDetailsProps {
  * The right sidebar for a project's coordinator, which changes no code itself: an outline of its conversation, its
  * workers, the project's notes, and the pull requests its workers opened, each tab apart.
  */
-export function ProjectDetails({ project, view, working, workspace, hosts, past }: ProjectDetailsProps) {
+export function ProjectDetails({ project, view, working, cwd, workspace, hosts, past }: ProjectDetailsProps) {
 	const turnCount = useTurnCount(view);
 	const pullRequests = workerPullRequests(project, hosts, past);
-	const [tab, setTab] = useStoredState<ProjectTab>(TAB_KEY, raw => PROJECT_TABS.find(tab => tab === raw) ?? "workers");
 	return (
-		<Tabs value={tab} onValueChange={value => setTab(value as ProjectTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
-			<SidebarHeader className="h-(--page-header-height) flex-row items-center gap-2 border-b border-border px-2 py-0">
-				<h2 className="sr-only">Project details</h2>
-				<SizeProvider size="compact">
-					<TabsList aria-label="Project details">
-						<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", turnCount)} />
-						<TabItem value="workers" icon={Users} className={TAB_CLASS} {...tabLabel("Workers", project.workers.length)} />
-						<TabItem value="notes" icon={NotebookText} className={TAB_CLASS} {...tabLabel("Notes", 0)} />
-						<TabItem value="pull-requests" icon={GitPullRequest} className={TAB_CLASS} {...tabLabel("PRs", pullRequests.length)} />
-					</TabsList>
-				</SizeProvider>
-			</SidebarHeader>
-			<TabPanel value="outline" asChild>
-				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-					<OutlineTab view={view} working={working} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="workers" asChild>
-				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-					<WorkersTab project={project} hosts={hosts} past={past} />
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="notes" asChild>
-				<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-					<div className="space-y-2 px-3">
-						<ProjectNotesList project={project} />
-					</div>
-				</SidebarContent>
-			</TabPanel>
-			<TabPanel value="pull-requests" asChild>
-				<SidebarContent viewportClassName={PINNED_VIEWPORT}>
-					<SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />
-				</SidebarContent>
-			</TabPanel>
-		</Tabs>
+		<DetailsSidebarFrame
+			label="Project details"
+			storageKey={TAB_KEY}
+			defaultTab="workers"
+			cwd={cwd}
+			tabs={[
+				{ value: "outline", icon: TableOfContents, name: "Outline", count: turnCount, content: <OutlineTab view={view} working={working} /> },
+				{ value: "workers", icon: Users, name: "Workers", count: project.workers.length, content: <WorkersTab project={project} hosts={hosts} past={past} /> },
+				{
+					value: "notes",
+					icon: NotebookText,
+					name: "Notes",
+					count: 0,
+					content: (
+						<div className="space-y-2 px-3">
+							<ProjectNotesList project={project} />
+						</div>
+					),
+				},
+				{
+					value: "pull-requests",
+					icon: GitPullRequest,
+					name: "PRs",
+					count: pullRequests.length,
+					pinned: true,
+					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />,
+				},
+			]}
+		/>
 	);
 }

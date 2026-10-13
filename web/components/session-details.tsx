@@ -2,12 +2,8 @@
 import { FileDiff, GitPullRequest, Images, TableOfContents } from "lucide-react";
 import type { LinkedPullRequest } from "../../src/shared/github";
 import type { RosterHost, View } from "../../src/shared/sessions";
-import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
-import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
-import { SizeProvider } from "@/lib/size-context";
 import { useChangedFiles, useMedia, useTurnCount } from "../pane-store";
-import { useStoredState } from "../stored-state";
-import { FileBaseContext } from "./file-link";
+import { DetailsSidebarFrame } from "./details-sidebar-frame";
 import { FilesTab } from "./files-tab";
 import { MediaTab } from "./media-tab";
 import { OutlineTab } from "./outline-tab";
@@ -15,23 +11,6 @@ import { SessionPullRequestsTab } from "./session-pull-requests-tab";
 
 /** The right sidebar's tab, which localStorage keeps across views. The key keeps its old name, and a tab that no longer exists reads as the outline. */
 const TAB_KEY = "omp-agents.plan-tab";
-
-const DETAILS_TABS = ["outline", "files", "media", "pull-requests"] as const;
-type DetailsTab = (typeof DETAILS_TABS)[number];
-
-/** Each tab names itself and counts its items in a badge, which screen readers hear through the tab's name. */
-export function tabLabel(name: string, count: number): { label: string; badge: number | undefined; "aria-label": string | undefined } {
-	return count > 0 ? { label: name, badge: count, "aria-label": `${name} (${count})` } : { label: name, badge: undefined, "aria-label": undefined };
-}
-
-/** The labeled tabs fit the sidebar's default width only with tighter padding than Fluid's, and only without their icons. */
-export const TAB_CLASS = "px-2 @max-[23rem]/sidebar:[&>svg]:hidden";
-
-/** Keeps each tab's content off the header's hairline at rest, and scrolls away with it. */
-export const PANEL_VIEWPORT = "pt-2";
-
-/** The PRs tab pins its pull request's header to the top edge, which must neither fade nor sit below a padding that the text scrolls through. */
-export const PINNED_VIEWPORT = "scroll-fade-bottom-only";
 
 interface SessionDetailsProps {
 	view: View;
@@ -56,42 +35,25 @@ export function SessionDetails({ view, working, sessionId, cwd, pullRequests, wo
 	const files = useChangedFiles(view);
 	const media = useMedia(view);
 	const turnCount = useTurnCount(view);
-	const [tab, setTab] = useStoredState<DetailsTab>(TAB_KEY, raw => DETAILS_TABS.find(tab => tab === raw) ?? "outline");
 	return (
-		<FileBaseContext.Provider value={cwd}>
-			<Tabs value={tab} onValueChange={value => setTab(value as DetailsTab)} className="@container/sidebar flex min-h-0 flex-1 flex-col">
-				<SidebarHeader className="h-(--page-header-height) flex-row items-center gap-2 border-b border-border px-2 py-0">
-					<h2 className="sr-only">Session details</h2>
-					<SizeProvider size="compact">
-						<TabsList aria-label="Session details">
-							<TabItem value="outline" icon={TableOfContents} className={TAB_CLASS} {...tabLabel("Outline", turnCount)} />
-							<TabItem value="files" icon={FileDiff} className={TAB_CLASS} {...tabLabel("Files", files?.length ?? 0)} />
-							<TabItem value="media" icon={Images} className={TAB_CLASS} {...tabLabel("Media", media?.length ?? 0)} />
-							<TabItem value="pull-requests" icon={GitPullRequest} className={TAB_CLASS} {...tabLabel("PRs", pullRequests.length)} />
-						</TabsList>
-					</SizeProvider>
-				</SidebarHeader>
-				<TabPanel value="outline" asChild>
-					<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-						<OutlineTab view={view} working={working} />
-					</SidebarContent>
-				</TabPanel>
-				<TabPanel value="files" asChild>
-					<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-						<FilesTab files={files} sessionId={sessionId} cwd={cwd} working={working} />
-					</SidebarContent>
-				</TabPanel>
-				<TabPanel value="media" asChild>
-					<SidebarContent viewportClassName={PANEL_VIEWPORT}>
-						<MediaTab media={media} view={view} />
-					</SidebarContent>
-				</TabPanel>
-				<TabPanel value="pull-requests" asChild>
-					<SidebarContent viewportClassName={PINNED_VIEWPORT}>
-						<SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />
-					</SidebarContent>
-				</TabPanel>
-			</Tabs>
-		</FileBaseContext.Provider>
+		<DetailsSidebarFrame
+			label="Session details"
+			storageKey={TAB_KEY}
+			defaultTab="outline"
+			cwd={cwd}
+			tabs={[
+				{ value: "outline", icon: TableOfContents, name: "Outline", count: turnCount, content: <OutlineTab view={view} working={working} /> },
+				{ value: "files", icon: FileDiff, name: "Files", count: files?.length ?? 0, content: <FilesTab files={files} sessionId={sessionId} cwd={cwd} working={working} /> },
+				{ value: "media", icon: Images, name: "Media", count: media?.length ?? 0, content: <MediaTab media={media} view={view} /> },
+				{
+					value: "pull-requests",
+					icon: GitPullRequest,
+					name: "PRs",
+					count: pullRequests.length,
+					pinned: true,
+					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />,
+				},
+			]}
+		/>
 	);
 }
