@@ -5,6 +5,7 @@ import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { ApiError, errorText } from "../../api";
+import type { Editable } from "../../editable-read";
 import type { ReadState } from "../../reads";
 
 /** A settings text field or select. */
@@ -13,11 +14,12 @@ export const FIELD = "h-7 rounded-md border border-border bg-background px-2 tex
 /** The models `omp models` lists, for the pickers; loaded once per page. */
 export type Catalog = ReadState<{ bySelector: ReadonlyMap<string, CatalogModel>; byProvider: ReadonlyMap<string, CatalogModel[]> }>;
 
-/** What every editor shares: where it saves, the models it offers, and how the page takes a save's answer. */
+/** What every editor shares: where it saves, the models it offers, and the page's settings, which its saves write through. */
 export interface Editing {
 	cwd: string | null;
 	catalog: Catalog;
-	saved: (settings: OmpSettings) => void;
+	/** Sends a save in turn with the page's other saves and shows what it answers. */
+	write: Editable<OmpSettings>["write"];
 	/** Re-read everything from disk, keeping the page as it is until the answer arrives. */
 	reload: () => void;
 }
@@ -39,7 +41,7 @@ interface Editor<T> {
 }
 
 /** Edit, then save or cancel. A failed save keeps the draft and shows why, for another try. */
-export function useEditor<T>(original: T, save: (draft: T) => Promise<OmpSettings>, saved: (settings: OmpSettings) => void): Editor<T> {
+export function useEditor<T>(original: T, save: (draft: T) => Promise<OmpSettings>, editing: Pick<Editing, "write">): Editor<T> {
 	const [state, setState] = useState<EditorState<T>>({ phase: "viewing" });
 	const draft = state.phase === "viewing" ? original : state.draft;
 	return {
@@ -53,7 +55,7 @@ export function useEditor<T>(original: T, save: (draft: T) => Promise<OmpSetting
 			if (state.phase !== "editing") return;
 			setState({ phase: "saving", draft: state.draft });
 			try {
-				saved(await save(state.draft));
+				await editing.write(() => save(state.draft));
 				setState({ phase: "viewing" });
 			} catch (err) {
 				const conflict = err instanceof ApiError && err.conflict;

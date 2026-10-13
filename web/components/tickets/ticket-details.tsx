@@ -2,8 +2,8 @@ import { GitPullRequest, Link2 } from "lucide-react";
 import { type ReactNode, useEffect, useRef } from "react";
 import { pullRequestOfUrl } from "../../../src/shared/github";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
+import type { Editable } from "../../editable-read";
 import { age } from "../../labels";
-import type { ReadState } from "../../reads";
 import { BranchName } from "../git";
 import { Comment, DetailSection, LoadNote, Markdown, OutLink } from "../sheet-details";
 import { TicketFields } from "./ticket-fields";
@@ -12,8 +12,8 @@ interface TicketDetailContentProps {
 	id: string;
 	/** The issue as the page lists it, which names it while Linear answers; `null` when the page does not list it. */
 	listed: Ticket | null;
-	/** Linear's answer for the issue, which the page also heads with its title. */
-	read: ReadState<TicketDetail> & { replace: (detail: TicketDetail) => void; reload: () => void };
+	/** Linear's answer for the issue, which the page also heads with its title, and which the fields edit. */
+	read: Editable<TicketDetail>;
 	actions?: (ticket: Ticket) => ReactNode;
 }
 
@@ -21,7 +21,8 @@ interface TicketDetailContentProps {
  * A Linear issue laid out as Linear lays it out: the title, description, and comments in a wide column, and beside it
  * {@link TicketSide}. On a narrow page the side column follows the title.
  */
-export function TicketDetailContent({ id, listed, read: { data: detail, error, replace, reload }, actions }: TicketDetailContentProps) {
+export function TicketDetailContent({ id, listed, read, actions }: TicketDetailContentProps) {
+	const { data: detail, error } = read;
 	const ticket = detail ?? listed;
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	useEffect(() => {
@@ -36,7 +37,7 @@ export function TicketDetailContent({ id, listed, read: { data: detail, error, r
 			>
 				{ticket?.title ?? id}
 			</h1>
-			{ticket && <TicketSide ticket={ticket} detail={detail} replace={replace} reload={reload} actions={actions} />}
+			{ticket && <TicketSide ticket={ticket} read={read} actions={actions} />}
 			<div className="min-w-0 space-y-10 lg:col-start-1 lg:row-start-2">
 				{detail ? <TicketBody detail={detail} /> : <LoadNote loading="Asking Linear for the issue…" error={error && `Cannot load the issue: ${error}`} />}
 			</div>
@@ -44,17 +45,17 @@ export function TicketDetailContent({ id, listed, read: { data: detail, error, r
 	);
 }
 
-interface TicketSideProps extends Pick<TicketDetailContentProps, "actions">, Pick<TicketDetailContentProps["read"], "replace" | "reload"> {
+interface TicketSideProps extends Pick<TicketDetailContentProps, "actions" | "read"> {
 	ticket: Ticket;
-	detail: TicketDetail | null;
 }
 
 /** The side column: the quick actions, the editable fields, the branch, the links, and who opened the issue. */
-function TicketSide({ ticket, detail, replace, reload, actions }: TicketSideProps) {
+function TicketSide({ ticket, read, actions }: TicketSideProps) {
+	const detail = read.data;
 	return (
 		<aside aria-label="Issue properties" className="space-y-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
 			{actions?.(ticket)}
-			<TicketFields ticket={ticket} detail={detail} replace={replace} reload={reload} />
+			<TicketFields ticket={ticket} detail={detail} edit={read.edit} saveError={read.saveError} />
 			{detail && <TicketLinks detail={detail} />}
 			<div className="space-y-1 text-xs text-muted-foreground">
 				<p className="tabular-nums">{ticket.id}</p>

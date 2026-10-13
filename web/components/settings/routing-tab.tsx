@@ -146,7 +146,7 @@ function RoleRow({ route, editing }: { route: RoleRoute; editing: Editing }) {
 				// An unchanged inherited chain stays inherited rather than becoming a copy.
 				...(JSON.stringify(draft.fallbacks) !== JSON.stringify(route.fallbacks) && { fallbacks: draft.fallbacks }),
 			}),
-		editing.saved,
+		editing,
 	);
 	const { draft } = editor;
 	const viewing = editor.state.phase === "viewing";
@@ -183,7 +183,7 @@ function RoleRow({ route, editing }: { route: RoleRoute; editing: Editing }) {
 }
 
 function ModelChainRow({ chain, editing }: { chain: ModelChain; editing: Editing }) {
-	const editor = useEditor(chain.fallbacks, fallbacks => saveRouting(editing.cwd, { kind: "model-chain", key: chain.key, fallbacks }), editing.saved);
+	const editor = useEditor(chain.fallbacks, fallbacks => saveRouting(editing.cwd, { kind: "model-chain", key: chain.key, fallbacks }), editing);
 	return (
 		<tr className="border-t border-border align-baseline">
 			<th scope="row" className="py-2 pr-6 text-left font-mono text-xs font-medium">
@@ -232,7 +232,7 @@ function RetrySection({ routing, editing }: { routing: ModelRouting; editing: Ed
 				kind: "retry",
 				values: Object.fromEntries(Object.entries(draft).filter(([key, value]) => routing.retry[key as keyof RetrySettings] !== value)),
 			}),
-		editing.saved,
+		editing,
 	);
 	const set = (key: keyof RetrySettings, value: boolean | number | string): void => editor.change({ ...editor.draft, [key]: value });
 	return (
@@ -317,7 +317,7 @@ function ProviderPicker({ providers, onPick }: { providers: string[]; onPick: (p
 }
 
 function ProviderOrderSection({ order, editing }: { order: string[]; editing: Editing }) {
-	const editor = useEditor(order, providers => saveRouting(editing.cwd, { kind: "provider-order", providers }), editing.saved);
+	const editor = useEditor(order, providers => saveRouting(editing.cwd, { kind: "provider-order", providers }), editing);
 	const { catalog } = editing;
 	const unlisted = catalog.data ? [...catalog.data.byProvider.keys()].filter(provider => !editor.draft.includes(provider)) : [];
 	const row = (provider: string): ReactNode => (

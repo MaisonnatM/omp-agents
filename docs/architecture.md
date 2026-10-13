@@ -668,7 +668,8 @@ A `merge` change, `{ method, head }`, runs GraphQL's `mergePullRequest` with tha
 The pull request's answer carries that commit as `headOid` and the methods its repository allows as `mergeMethods`.
 It answers the pull request as `GET /api/pull-request` reads it after the change, read again from GitHub, and the details then refresh the pull request list.
 One change goes per call, so two changes made at once each keep the other.
-The details send their changes one at a time through `web/use-queued-save.ts`, which the issue detail's fields share.
+The details send their changes one at a time through `useEditableRead` in `web/editable-read.ts`, which the issue detail's fields share.
+Each answer carries how many writes had answered when it was asked, so an answer to an earlier change, or a read sent before a write answered, never hides a later change.
 
 `GET /api/source-control` answers a `SourceControlAnswer` from `SourceControl` in `src/source-control.ts`: whether `gh` and `gt` are installed and signed in, the automatic pull setting, and each repository the visible workspaces are in, keyed by its main checkout, with its own choice and its last pull since the server started.
 `gh` is signed in when `gh api user` answers a login, and `gt` when Graphite's `user_config` holds an `authToken`.
