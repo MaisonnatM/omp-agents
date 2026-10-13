@@ -7,8 +7,8 @@ import type { Analytics, AnalyticsProviderUsage, AnalyticsRange, AnalyticsSessio
 /** How many sessions the page lists. */
 export const TOP_SESSIONS = 20;
 
-/** What the dashboard knows of a session from its file. */
-export interface SessionFacts {
+/** What the dashboard knows of a session from its file for Analytics: its title and working directory. */
+export interface SessionSummary {
 	title: string | null;
 	cwd: string;
 }
@@ -54,9 +54,9 @@ export function sessionOfFile(file: string, root: string): { sessionId: string; 
 }
 
 /** The sessions in `rows`, subagents folded in, every one of them, most tokens first. */
-export function foldSessions(rows: readonly SessionModelRow[], root: string, factsOf: (sessionId: string) => SessionFacts | null): AnalyticsSession[] {
+export function foldSessions(rows: readonly SessionModelRow[], root: string, factsOf: (sessionId: string) => SessionSummary | null): AnalyticsSession[] {
 	interface Fold {
-		facts: SessionFacts | null;
+		facts: SessionSummary | null;
 		folder: string;
 		usage: Usage;
 		subagentTokens: number;
@@ -148,7 +148,7 @@ export function chartOf(points: readonly StatsProviderPoint[], { cutoff, bucketM
 }
 
 /** The page's payload from one omp-stats read over `range`. */
-export function buildAnalytics(range: AnalyticsRange, read: StatsRead, root: string, factsOf: (sessionId: string) => SessionFacts | null): Analytics {
+export function buildAnalytics(range: AnalyticsRange, read: StatsRead, root: string, factsOf: (sessionId: string) => SessionSummary | null): Analytics {
 	const { dashboard, tools, sync } = read;
 	const sessions = foldSessions(read.rows, root, factsOf);
 	const agents: Analytics["agents"] = { main: 0, subagent: 0, advisor: 0 };
