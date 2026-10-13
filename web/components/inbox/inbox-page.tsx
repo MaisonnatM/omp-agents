@@ -5,6 +5,7 @@ import type { MailThread } from "../../../src/shared/gmail";
 import { threadUrl, type MailSend } from "../../../src/shared/gmail";
 import { putJson } from "../../api";
 import { cn } from "@/lib/utils";
+import { type MailDocument, useMailDraft } from "../../mail-draft";
 import { gmailStore, mailThreadStore, useGmailInbox } from "../../reads";
 import { hashForInbox } from "../../routing";
 import { shortcutKeys, shortcutLabels, useShortcuts } from "../../shortcuts";
@@ -59,33 +60,36 @@ function ThreadRow({ thread, open }: { thread: MailThread; open: boolean }) {
 
 /** A new mail in the panel beside the list; sending it or throwing it away goes back to the inbox. */
 function ComposePage({ address }: { address: string | null }) {
+	const mail = useMailDraft("new", NEW_MAIL);
 	const back = (): void => {
 		location.hash = hashForInbox(null);
 	};
 	return (
 		<div className="flex h-full min-h-0 flex-col p-4">
-			<MailEditor
-				draftKey="new"
-				toLabel="To"
-				recipients={NO_ONE}
-				subject=""
-				focusPeople
-				expanded
-				onSend={async draft => {
-					await putJson<object>("/api/gmail/send", draft satisfies MailSend);
-				}}
-				onClose={back}
-				onDone={() => {
-					back();
-					void gmailStore.refresh(null, { fresh: true });
-				}}
-			/>
+			{mail.draft && (
+				<MailEditor
+					draft={mail.draft}
+					edit={mail}
+					toLabel="To"
+					withSubject
+					focusPeople
+					expanded
+					onSend={async draft => {
+						await putJson<object>("/api/gmail/send", draft satisfies MailSend);
+					}}
+					onClose={back}
+					onDone={() => {
+						back();
+						void gmailStore.refresh(null, { fresh: true });
+					}}
+				/>
+			)}
 			{address && <p className="mt-2 px-1 text-xs text-muted-foreground">From {address}</p>}
 		</div>
 	);
 }
 
-const NO_ONE = { to: [], cc: [], bcc: [] };
+const NEW_MAIL: MailDocument = { to: [], cc: [], bcc: [], subject: "", body: "" };
 
 /**
  * Your Gmail inbox's latest conversations, newest first, beside the conversation `target` names, or Gmail's integration

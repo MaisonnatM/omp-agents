@@ -1024,10 +1024,11 @@ An action that fails shows its error, and its control becomes available again.
 - **Reply**, the **Reply to…** line under the messages, or R outside text fields, docks an editor at the bottom of the conversation, which scrolls above it, to answer its last message: to its `Reply-To` or sender, or, for a message you sent, to whom you sent it.
   **Reply all**, or A, also copies everyone else that message named; your own address is left out of both.
   The recipients are chips you can edit: type an address and press Enter, a comma, a semicolon, or Tab to add it, Backspace in an empty field to remove the last, and **Cc** or **Bcc** to show those rows.
+  The editor takes its recipients when the reply begins: a refresh, or a message that arrives while you write, leaves them as they are, and only choosing the other of **Reply** and **Reply all** addresses the reply again, to the conversation's last message, keeping **Bcc** and what you wrote.
   The editor writes rich text: its toolbar and Cmd+B, Cmd+I, and Cmd+U make bold, italic, and underline, a link, bulleted and numbered lists, and a quote, and a pasted web address becomes a link.
   The expand button grows the editor over the conversation, and shrinks it back.
   Cmd+Enter or **Send** sends the mail as HTML with a plain text copy, in the conversation, which then shows in the conversation and the list.
-  Esc closes the editor and keeps the draft in the browser, per conversation, until you reopen it; **Discard draft** drops it.
+  Esc closes the editor and keeps the draft in the browser, per conversation, until you reopen it, as long as anything in it differs from how it began, recipients included; **Discard draft** drops it.
 - **Compose**, in the header, or C outside text fields, opens a new mail at `#inbox/new` in the panel, in the same editor, with a **Subject** row, focused on **To**; it keeps its draft the same way, and sending it goes back to the list.
 - **Delete**, or #, moves the conversation to Gmail's Trash, where Gmail keeps it 30 days, with no confirmation, and opens the next conversation of the list, else the previous one.
 - The page never labels a conversation or marks it read, so opening one here leaves it unread, in Gmail and in the list, until you read it in Gmail.
