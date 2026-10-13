@@ -141,8 +141,8 @@ The server lives in `src/`:
   `src/shared/source-control.ts` holds the shapes the page shares, the merge methods and their labels, `applyAutoPull`, and `startingMethod`, which picks the method the merge button starts with.
 - `src/tickets.ts`: the Linear side of the tickets page: the `list_issues` queries, their paging, and parsing the issues out of the tool's text, one issue in full for the main content, the options of its field pickers, and the `save_issue` call they make.
   `src/linear-uploads.ts` keeps the signed addresses of an issue's files and serves them.
-  `src/mcp-clients.ts` plans a Slack, Google Calendar, or Gmail OAuth client save, the setup each form shows and the server entry the save writes, from omp's MCP servers that `src/omp/mcp.ts` reads and writes.
-  `src/integrations.ts` finds omp's server for each MCP integration, checks it, and runs the sign-ins and sign-outs that Settings › Integrations starts; see [Integrations](architecture.md#integrations).
+  `src/mcp-clients.ts` plans a Slack, Google Calendar, or Gmail OAuth client save, the setup each form shows and the server entry the save writes, from omp's MCP servers that `src/omp/mcp.ts` reads and writes; `clientSetup(id)` reads the setup the service's `client` in `MCP_SERVICES` decides.
+  `src/integrations.ts` finds omp's server for each MCP integration, checks it, and runs the sign-ins and sign-outs that Settings › Integrations starts, reading each service's OAuth client and refresh-token rule from `MCP_SERVICES` in `src/shared/accounts.ts`; see [Integrations](architecture.md#integrations).
   Its `integrationFetch(id)` calls a service's own API, Google's or Slack's, with omp's sign-in to the service's server.
   `src/signed-fetch.ts` holds that HTTP call without anything of omp: `signedFetch` over a `Bearer`, `SignedFetch`, `ApiWrite`, and `ApiError`; `mcpBearer` in `src/omp/mcp.ts` supplies omp's token and its refusal.
   `src/mcp-servers.ts` lists every MCP server omp loads with where omp stands with each, and runs the adds, sign-ins, sign-outs, enables, disables, and removals that Settings › MCP servers starts; see [MCP servers](architecture.md#mcp-servers).

@@ -750,14 +750,16 @@ The issue detail shows a change at once and sends its changes one at a time, and
 `integrationOn(host)` there names the service whose server is on a host, which is how the MCP servers page tells an integration's server from one it manages itself.
 Linear, Slack, Google Calendar, and Gmail are the four.
 Each names its label, the host omp's server for the service is on, and the name and URL of the server a sign-in adds when omp has none.
-`src/integrations.ts` keeps a sign-in per service, and the page adds each service's brand mark and what it gives.
+Each also names its `client`, where its sign-in gets its OAuth client: `none` for Linear, which registers its own, `slack-app` for Slack, and `google-oauth` for Google Calendar and Gmail.
+Its `requireRefresh` says whether a sign-in refuses a grant without a refresh token, which only Slack's does.
+`src/integrations.ts` reads both fields for every service rather than naming one, keeps a sign-in per service, and the page adds each service's brand mark and what it gives.
 `SLACK_USER_SCOPES` is the chat, history, search, and user set a dedicated Slack app may grant.
 Canvas, list, file, reaction, and channel-creation scopes are not requested.
 
 `GET /api/integrations` answers `{ integrations }`, one `McpIntegration`, `{ id, connection, signIn, setup }`, under each service's id.
-`setup` is `null` for Linear, which registers its own OAuth client.
+`setup` is the one its `client` decides, through `clientSetup` in `src/mcp-clients.ts`: `null` for Linear, which registers its own OAuth client, without reading `mcp.json`.
 For Slack it is a `SlackSetup` with the client ID, whether a client secret is stored, the redirect URI, the callback port, the scope string, and `configured`.
-For Google Calendar and Gmail, the `GOOGLE_SERVICES` in `src/shared/accounts.ts`, it is a `GoogleSetup` with the client ID, whether a client secret is stored, the callback port, and `configured`.
+For Google Calendar and Gmail, the `GOOGLE_SERVICES` in `src/shared/accounts.ts`, the services whose `client` is `google-oauth`, it is a `GoogleSetup` with the client ID, whether a client secret is stored, the callback port, and `configured`.
 The client secret is absent from that body.
 `GET /api/settings` does not read `mcp.json` either.
 Its file list comes from omp's context, prompt, command, rule, skill, hook, and agent discovery.
