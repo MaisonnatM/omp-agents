@@ -1,5 +1,6 @@
 /** GitHub repositories and pull requests: keys, links, the pull request list, one pull request in full, and its changed files. */
 
+import type { Parsed } from "../json";
 import type { ChangedEntry } from "./changes";
 import type { MergeMethod } from "./source-control";
 
@@ -12,6 +13,15 @@ export interface Repo {
 /** A GitHub pull request. */
 export interface PullRequest extends Repo {
 	number: number;
+}
+
+/** GitHub's owner, repository, and login names. */
+export const GITHUB_NAME = /^[\w.-]+$/;
+
+/** A pull request named by an owner, repository, and number, as the routes and a new session's work item carry one. */
+export function parsePullRequest(owner: unknown, repo: unknown, number: unknown): Parsed<PullRequest> {
+	if (typeof owner !== "string" || typeof repo !== "string" || !GITHUB_NAME.test(owner) || !GITHUB_NAME.test(repo)) return null;
+	return typeof number === "number" && Number.isSafeInteger(number) && number >= 1 ? { ok: { owner, repo, number } } : null;
 }
 
 /** A GitHub repository's key in maps and lookups: `owner/repo`, lowercased, since GitHub matches names in any case. */

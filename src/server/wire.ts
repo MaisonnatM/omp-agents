@@ -3,49 +3,42 @@
  * Each socket message has one parser in {@link clientParsers}, so a {@link ClientMsg} variant without one does not compile.
  * Every parser returns a {@link Parsed}: `{ ok }` for a value, even a `null` one, and `null` for anything else, so no caller
  * casts what it received; a parser whose refusal the page shows returns `{ error }` in place of `null`.
+ * A shape the server also keeps in a file, such as a routine, a scheduled send, or an event's time, is parsed by its domain module.
  */
-import { isObject, nonEmpty, nonEmptyStr, oneOf, str } from "../json";
-import { MAX_COMMAND_LENGTH, type RoutineChange, type RoutineTask, type Schedule, type Schedules, type Weekday } from "../routines";
+import { BASE64, isDay, isNonEmpty, isObject, isSafeInteger, oneOf, type Parsed, str } from "../json";
+import { parseRoutineSpec, type RoutineChange } from "../routines";
 import { GOOGLE_CLIENT_ID, type GoogleClientInput, MCP_INTEGRATIONS, type McpIntegrationId, normalizeSlackScope, type SlackClientInput, slackRedirectError } from "../shared/accounts";
 import { type McpServerAdd, type McpServerInput, REMOTE_TRANSPORTS } from "../shared/mcp-servers";
-import { type CalendarShownInput, type EventRef, type EventWhen, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar } from "../shared/calendar";
+import { type CalendarShownInput, type EventRef, MAX_EVENT_TITLE, type NewEvent, type NewEventCalendar, parseEventWhen } from "../shared/calendar";
 import { MAX_MAIL_BODY, type MailDraft, type MailPerson, type MailReply, type MailSend, type MailTrash } from "../shared/gmail";
-import { MAX_PROMPT_IMAGE_BYTES, newSessionRequest, PROMPT_IMAGE_TYPES } from "../shared/sessions";
+import { parseImages, parseModel, parseNewSessionRequest, parseThinking } from "../shared/sessions";
 import { MAX_PROMPT_DOCUMENT_BYTES, type PromptDocument } from "../shared/prompt-files";
 import { MAX_TICKET_ATTACHMENT_BYTES, TICKET_ID, TICKET_PRIORITIES } from "../shared/tickets";
-import type { BranchChoice } from "../shared/git";
-import { type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
-import type { ModelOption } from "../shared/models";
+import { GITHUB_NAME, parsePullRequest, type PullRequest, type PullRequestChange, type PullRequestEdit, type Repo, SETTABLE_STATES } from "../shared/github";
 import { NOTICE_OPS } from "../shared/notices";
 import type { PinChange } from "../shared/pins";
 import type { ProjectEdit } from "../shared/projects";
-import { MAX_SCHEDULED_TEXT, type ScheduledChange, type ScheduledTarget } from "../shared/scheduled";
+import { parseScheduledSpec, type ScheduledChange } from "../shared/scheduled";
 import { MAX_LOGIN_ANSWER } from "../shared/providers";
 import { type AutoPullChange, MERGE_METHODS } from "../shared/source-control";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
-import type { CompletionScope, LiveView, PromptImage, StartRequest, UserAnswer, View, WorkItem } from "../shared/sessions";
+import type { CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
 import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
-import { isDay, isTodoId, parseTodoChange } from "../user-todos-parse";
+import { parseTodoChange } from "../user-todos-parse";
 import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } from "../worktrees-shared";
 
 /** The longest composer text the server completes. */
 const MAX_COMPLETION_TEXT = 4096;
 /** The longest project name the server keeps. */
 const MAX_PROJECT_NAME = 200;
-/** GitHub's owner and repository names. */
-const NAME = /^[\w.-]+$/;
-
-/** A checked value as `{ ok }`, or the refusal: `null`, or `{ error }` from a parser that says why. */
-export type Parsed<T, Refusal extends { error: string } | null = null> = { ok: T } | Refusal;
 
 /** The variant of {@link ClientMsg} that `t` names. */
 export type MsgOf<T extends ClientMsg["t"]> = Extract<ClientMsg, { t: T }>;
 
 const isCounter = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-const isNonEmpty = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
 
 const isNoticeOp = oneOf(NOTICE_OPS);
 
@@ -77,117 +70,6 @@ function parseAnswer(value: unknown): Parsed<UserAnswer> {
 	if (value.kind === "value" && typeof value.value === "string") return { ok: { kind: "value", value: value.value } };
 	if (value.kind === "confirm" && typeof value.confirmed === "boolean") return { ok: { kind: "confirm", confirmed: value.confirmed } };
 	return null;
-}
-
-/** `{ ok: null }` for no branch. */
-function parseBranchChoice(value: unknown): Parsed<BranchChoice | null> {
-	if (value === null || value === undefined) return { ok: null };
-	if (!isObject(value) || !isNonEmpty(value.name)) return null;
-	if (value.kind === "existing") return { ok: { kind: "existing", name: value.name } };
-	return value.kind === "new" && isNonEmpty(value.base) ? { ok: { kind: "new", name: value.name, base: value.base } } : null;
-}
-
-function parseModel(value: unknown): Parsed<ModelOption> {
-	return isObject(value) && isNonEmpty(value.provider) && isNonEmpty(value.id) ? { ok: { provider: value.provider, id: value.id } } : null;
-}
-
-/** The longest base64 of {@link MAX_PROMPT_IMAGE_BYTES}. */
-const MAX_PROMPT_IMAGE_BASE64 = Math.ceil(MAX_PROMPT_IMAGE_BYTES / 3) * 4;
-const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
-
-/** A prompt's images: `[]` when it sends none, `null` for anything but images of {@link PROMPT_IMAGE_TYPES} within the size limit. */
-function parseImages(value: unknown): Parsed<PromptImage[]> {
-	if (value === undefined) return { ok: [] };
-	if (!Array.isArray(value)) return null;
-	const images: PromptImage[] = [];
-	let size = 0;
-	for (const image of value) {
-		if (!isObject(image) || typeof image.data !== "string" || typeof image.mimeType !== "string") return null;
-		if (!PROMPT_IMAGE_TYPES.includes(image.mimeType) || !BASE64.test(image.data)) return null;
-		size += image.data.length;
-		images.push({ data: image.data, mimeType: image.mimeType });
-	}
-	return size <= MAX_PROMPT_IMAGE_BASE64 ? { ok: images } : null;
-}
-
-/** `{ ok: null }` for none, which keeps omp's thinking level. */
-function parseThinking(value: unknown): Parsed<string | null> {
-	if (value === null || value === undefined) return { ok: null };
-	return isNonEmpty(value) ? { ok: value } : null;
-}
-
-/** `{ ok: null }` for no pinned skill; only one token passes, as `/skill:<name>` takes a name. */
-function parseSkill(value: unknown): Parsed<string | null> {
-	if (value === null || value === undefined) return { ok: null };
-	return typeof value === "string" && /^\S+$/.test(value) ? { ok: value } : null;
-}
-
-/** `{ ok: null }` for a start that works on nothing in particular. */
-function parseWorkItem(value: unknown): Parsed<WorkItem | null> {
-	if (value === null || value === undefined) return { ok: null };
-	if (!isObject(value)) return null;
-	if (value.kind === "ticket") return typeof value.id === "string" && TICKET_ID.test(value.id) ? { ok: { kind: "ticket", id: value.id } } : null;
-	if (value.kind !== "pull-request" || !isObject(value.pr)) return null;
-	const pr = parsePullRequest(value.pr.owner, value.pr.repo, value.pr.number);
-	return pr && { ok: { kind: "pull-request", pr: pr.ok } };
-}
-
-const isIntIn = (value: unknown, min: number, max: number): value is number => Number.isSafeInteger(value) && (value as number) >= min && (value as number) <= max;
-const isWeekday = (value: unknown): value is Weekday => isIntIn(value, 0, 6);
-
-function parseSchedule(value: unknown): Parsed<Schedule> {
-	if (!isObject(value)) return null;
-	switch (value.kind) {
-		case "every":
-			return isIntIn(value.minutes, 1, Number.MAX_SAFE_INTEGER) ? { ok: { kind: "every", minutes: value.minutes } } : null;
-		case "weekly": {
-			const { days, time } = value;
-			if (!Array.isArray(days) || days.length === 0 || !days.every(isWeekday) || new Set(days).size !== days.length) return null;
-			if (!isObject(time) || !isIntIn(time.hour, 0, 23) || !isIntIn(time.minute, 0, 59)) return null;
-			return { ok: { kind: "weekly", days, time: { hour: time.hour, minute: time.minute } } };
-		}
-		default:
-			return null;
-	}
-}
-
-/** One or more schedules. An empty list is not one. */
-function parseSchedules(value: unknown): Parsed<Schedules> {
-	if (!Array.isArray(value)) return null;
-	const schedules: Schedule[] = [];
-	for (const entry of value) {
-		const schedule = parseSchedule(entry);
-		if (!schedule) return null;
-		schedules.push(schedule.ok);
-	}
-	const nonEmptySchedules = nonEmpty(schedules);
-	return nonEmptySchedules && { ok: nonEmptySchedules };
-}
-
-function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
-	if (!isObject(value)) return null;
-	switch (value.kind) {
-		case "prompt":
-			return isNonEmpty(value.prompt) && typeof value.pin === "boolean" ? { ok: { kind: "prompt", prompt: value.prompt, pin: value.pin } } : null;
-		case "command":
-			return isNonEmpty(value.command) && value.command.length <= MAX_COMMAND_LENGTH ? { ok: { kind: "command", command: value.command } } : null;
-		default:
-			return null;
-	}
-}
-
-/** What the page edits of a routine: all but its runs and its creation time, which the server keeps. */
-export type RoutineSpec = Extract<RoutineChange, { op: "save" }>["routine"];
-
-/** A routine as the page saves it, or `null` when a field is missing, of the wrong type, or out of range; other fields drop. */
-export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
-	if (!isObject(value)) return null;
-	const { id, name, cwd, enabled } = value;
-	const schedules = parseSchedules(value.schedules);
-	const task = parseRoutineTask(value.task);
-	const skill = parseSkill(value.skill);
-	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !skill) return null;
-	return { ok: { id, name, cwd, schedules: schedules.ok, task: task.ok, skill: skill.ok, enabled } };
 }
 
 function parseRoutineChange(value: unknown): Parsed<RoutineChange> {
@@ -228,21 +110,8 @@ function parseProjectEdit(value: unknown): Parsed<ProjectEdit> {
 
 function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest> {
 	switch (value.kind) {
-		case "new": {
-			const { cwd, prompt, todoId = null } = value;
-			const images = parseImages(value.images);
-			const branch = parseBranchChoice(value.branch);
-			// `null` starts on omp's default model.
-			const model = value.model === null || value.model === undefined ? { ok: null } : parseModel(value.model);
-			const thinking = parseThinking(value.thinking);
-			const skill = parseSkill(value.skill);
-			const subject = parseWorkItem(value.subject);
-			if (!isNonEmpty(cwd) || typeof prompt !== "string" || !images || !branch || !model || !thinking || !skill || !subject) return null;
-			if (todoId !== null && !isTodoId(todoId)) return null;
-			return prompt.trim() || images.ok.length > 0
-				? { ok: newSessionRequest(cwd, prompt, { images: images.ok, branch: branch.ok, model: model.ok, thinking: thinking.ok, skill: skill.ok, subject: subject.ok, todoId }) }
-				: null;
-		}
+		case "new":
+			return parseNewSessionRequest(value);
 		case "fork": {
 			const view = parseView(value.view);
 			const { entryId } = value;
@@ -255,30 +124,6 @@ function parseStartRequest(value: Record<string, unknown>): Parsed<StartRequest>
 		default:
 			return null;
 	}
-}
-
-function parseScheduledTarget(value: unknown): Parsed<ScheduledTarget> {
-	if (!isObject(value)) return null;
-	if (value.kind === "message") {
-		const { sessionId, text } = value;
-		return isNonEmpty(sessionId) && isNonEmpty(text) && text.length <= MAX_SCHEDULED_TEXT ? { ok: { kind: "message", sessionId, text } } : null;
-	}
-	if (value.kind !== "start" || !isObject(value.request) || value.request.kind !== "new") return null;
-	const request = parseStartRequest(value.request);
-	if (request?.ok.kind !== "new" || request.ok.images.length > 0 || !request.ok.prompt.trim() || request.ok.prompt.length > MAX_SCHEDULED_TEXT) return null;
-	return { ok: { kind: "start", request: request.ok } };
-}
-
-/** What the page sends of a scheduled send: all but its creation time and its state, which the server keeps. */
-export type ScheduledSpec = Extract<ScheduledChange, { op: "add" }>["send"];
-
-/** A scheduled send as the page adds it: a text message to a session, or a new session's start without images; other fields drop. */
-export function parseScheduledSpec(value: unknown): Parsed<ScheduledSpec> {
-	if (!isObject(value)) return null;
-	const { id, at, reset } = value;
-	const target = parseScheduledTarget(value.target);
-	if (!isNonEmpty(id) || !isTime(at) || (reset !== null && !isNonEmpty(reset)) || !target) return null;
-	return { ok: { id, at, reset, target: target.ok } };
 }
 
 function parseScheduledChange(value: unknown): Parsed<ScheduledChange> {
@@ -469,12 +314,6 @@ export function parseTerminalQuery(params: URLSearchParams): Parsed<{ id: string
 	return isNonEmpty(cwd) && isTerminalSide(cols) && isTerminalSide(rows) ? { ok: { cwd, cols, rows } } : null;
 }
 
-/** A pull request named by an owner, repository, and number, as the routes that take one receive them. */
-export function parsePullRequest(owner: unknown, repo: unknown, number: unknown): Parsed<PullRequest> {
-	if (typeof owner !== "string" || typeof repo !== "string" || !NAME.test(owner) || !NAME.test(repo)) return null;
-	return typeof number === "number" && Number.isSafeInteger(number) && number >= 1 ? { ok: { owner, repo, number } } : null;
-}
-
 /** `?owner=<o>&repo=<r>&number=<n>` of `GET /api/pull-request` and its `/files` and `/file`. */
 export function parsePullRequestQuery(params: URLSearchParams): Parsed<PullRequest> {
 	return parsePullRequest(params.get("owner"), params.get("repo"), Number(params.get("number")));
@@ -487,7 +326,7 @@ const COMMIT = /^[0-9a-f]{40,64}$/;
 function parsePullRequestChange(change: unknown): Parsed<PullRequestChange> {
 	if (!isObject(change)) return null;
 	if (change.field === "label" && isNonEmpty(change.name) && typeof change.on === "boolean") return { ok: { field: "label", name: change.name, on: change.on } };
-	if (change.field === "reviewer" && typeof change.login === "string" && NAME.test(change.login) && typeof change.on === "boolean") return { ok: { field: "reviewer", login: change.login, on: change.on } };
+	if (change.field === "reviewer" && typeof change.login === "string" && GITHUB_NAME.test(change.login) && typeof change.on === "boolean") return { ok: { field: "reviewer", login: change.login, on: change.on } };
 	if (change.field === "state" && isSettableState(change.state)) return { ok: { field: "state", state: change.state } };
 	if (change.field === "merge" && isMergeMethod(change.method) && typeof change.head === "string" && COMMIT.test(change.head)) return { ok: { field: "merge", method: change.method, head: change.head } };
 	return null;
@@ -513,7 +352,7 @@ export function parseAutoPullChange(body: unknown): Parsed<AutoPullChange> {
 export function parseRepoQuery(params: URLSearchParams): Parsed<Repo> {
 	const owner = params.get("owner") ?? "";
 	const repo = params.get("repo") ?? "";
-	return NAME.test(owner) && NAME.test(repo) ? { ok: { owner, repo } } : null;
+	return GITHUB_NAME.test(owner) && GITHUB_NAME.test(repo) ? { ok: { owner, repo } } : null;
 }
 
 const isMcpIntegration = oneOf(MCP_INTEGRATIONS);
@@ -565,32 +404,22 @@ export const parseLoginMethod = (body: unknown): Parsed<string> => (isObject(bod
 
 /** The body of `PUT /api/providers/login/answer`: `{ prompt, value }`, the question's id and its answer. */
 export const parseLoginAnswer = (body: unknown): Parsed<{ prompt: number; value: string }> =>
-	isObject(body) && Number.isSafeInteger(body.prompt) && typeof body.value === "string" && body.value.length <= MAX_LOGIN_ANSWER
-		? { ok: { prompt: body.prompt as number, value: body.value } }
+	isObject(body) && isSafeInteger(body.prompt) && typeof body.value === "string" && body.value.length <= MAX_LOGIN_ANSWER
+		? { ok: { prompt: body.prompt, value: body.value } }
 		: null;
 
 /** The body of `PUT /api/providers/sign-out`: `{ provider, credentialId }`, one stored credential of that provider. */
 export const parseProviderSignOut = (body: unknown): Parsed<{ provider: string; credentialId: number }> =>
-	isObject(body) && isNonEmpty(body.provider) && Number.isSafeInteger(body.credentialId) ? { ok: { provider: body.provider, credentialId: body.credentialId as number } } : null;
+	isObject(body) && isNonEmpty(body.provider) && isSafeInteger(body.credentialId) ? { ok: { provider: body.provider, credentialId: body.credentialId } } : null;
 
 /** The body of `PUT /api/google/calendars`: `{ id, shown }`, a Google calendar's id and whether the Calendar page shows it. */
 export const parseCalendarShown = (body: unknown): Parsed<CalendarShownInput> =>
 	isObject(body) && isNonEmpty(body.id) && typeof body.shown === "boolean" ? { ok: { id: body.id, shown: body.shown } } : null;
 
-const isTime = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value);
-
-/** An event's days or times: all-day days that do not run backward, or a timed span that ends after it starts. */
-export function parseEventWhen(value: unknown): EventWhen | null {
+function parseNewEventCalendar(value: unknown): Parsed<NewEventCalendar> {
 	if (!isObject(value)) return null;
-	if (value.allDay === true) return isDay(value.firstDay) && isDay(value.lastDay) && value.lastDay >= value.firstDay ? { allDay: true, firstDay: value.firstDay, lastDay: value.lastDay } : null;
-	if (value.allDay === false) return isTime(value.start) && isTime(value.end) && value.end > value.start ? { allDay: false, start: value.start, end: value.end } : null;
-	return null;
-}
-
-function parseNewEventCalendar(value: unknown): NewEventCalendar | null {
-	if (!isObject(value)) return null;
-	if (value.kind === "local") return { kind: "local" };
-	return value.kind === "google" && isNonEmpty(value.calendarId) ? { kind: "google", calendarId: value.calendarId } : null;
+	if (value.kind === "local") return { ok: { kind: "local" } };
+	return value.kind === "google" && isNonEmpty(value.calendarId) ? { ok: { kind: "google", calendarId: value.calendarId } } : null;
 }
 
 /** The body of `PUT /api/calendar/events/new`: a trimmed title of at most {@link MAX_EVENT_TITLE} characters, when it happens, and the calendar it goes in. */
@@ -599,7 +428,7 @@ export function parseNewEvent(body: unknown): Parsed<NewEvent> {
 	const title = body.title.trim();
 	const when = parseEventWhen(body.when);
 	const calendar = parseNewEventCalendar(body.calendar);
-	return title.length <= MAX_EVENT_TITLE && when && calendar ? { ok: { title, when, calendar } } : null;
+	return title.length <= MAX_EVENT_TITLE && when && calendar ? { ok: { title, when: when.ok, calendar: calendar.ok } } : null;
 }
 
 /** The body of `PUT /api/calendar/events/delete`: an event kept on this computer by its id, or a Google event by its calendar's id and its own. */
@@ -756,8 +585,8 @@ export function parsePromptDocument(body: unknown): Parsed<PromptDocument> {
 
 export const SHA256 = /^[0-9a-f]{64}$/;
 
-const worktreeTarget = (value: unknown): WorktreeTarget | null =>
-	isObject(value) && isNonEmpty(value.repository) && isNonEmpty(value.path) ? { repository: value.repository, path: value.path } : null;
+const parseWorktreeTarget = (value: unknown): Parsed<WorktreeTarget> =>
+	isObject(value) && isNonEmpty(value.repository) && isNonEmpty(value.path) ? { ok: { repository: value.repository, path: value.path } } : null;
 
 /** The body of `PUT /api/worktrees/removal`: a preview of up to 100 registered checkouts, or the confirmations from such a preview. */
 export function parseWorktreeRemoval(body: unknown): Parsed<WorktreeRemovalRequest> {
@@ -766,19 +595,19 @@ export function parseWorktreeRemoval(body: unknown): Parsed<WorktreeRemovalReque
 		if (!Array.isArray(body.targets) || body.targets.length === 0 || body.targets.length > 100) return null;
 		const targets: WorktreeTarget[] = [];
 		for (const item of body.targets) {
-			const target = worktreeTarget(item);
+			const target = parseWorktreeTarget(item);
 			if (!target) return null;
-			targets.push(target);
+			targets.push(target.ok);
 		}
 		return { ok: { action: "preview", targets } };
 	}
 	if (body.action !== "remove" || !Array.isArray(body.plans) || body.plans.length === 0 || body.plans.length > 100) return null;
 	const plans: WorktreeConfirmation[] = [];
 	for (const item of body.plans) {
-		const target = worktreeTarget(item);
+		const target = parseWorktreeTarget(item);
 		const confirmation = isObject(item) ? str(item.confirmation) : undefined;
 		if (!target || !confirmation || !SHA256.test(confirmation)) return null;
-		plans.push({ ...target, confirmation });
+		plans.push({ ...target.ok, confirmation });
 	}
 	return { ok: { action: "remove", plans } };
 }

@@ -247,7 +247,7 @@ The dashboard serializes model, effort, and fast-mode setters with state reads i
 Event-driven refreshes coalesce while queued, so a read cannot overwrite a later switch, and switching stays visible until every queued model change has finished.
 
 A `prompt` message, and a `start` of kind `new`, carry `images`, each `{ data, mimeType }` with the file's bytes in base64, as omp's `ImageContent` takes them.
-`src/server/wire.ts` accepts PNG, JPEG, GIF, and WebP, up to `MAX_PROMPT_IMAGE_BYTES` (32 MB) per prompt, and a prompt of images with no text.
+`parseImages` in `src/shared/sessions.ts`, which `src/server/wire.ts` uses, accepts PNG, JPEG, GIF, and WebP, up to `MAX_PROMPT_IMAGE_BYTES` (32 MB) per prompt, and a prompt of images with no text.
 The socket's `maxPayloadLength` is 64 MB so such a message fits.
 A dashboard session passes the images to omp's RPC `prompt`; a terminal session's guest puts them on its Collab `prompt` frame, a held follow-up included.
 omp's `steer_subagent` and Collab's `agent-cmd` `chat` take text only, so a subagent's prompt with images is refused.
@@ -383,6 +383,7 @@ A prompt task from before `pin` reads as unpinned.
 The rest of the file stays.
 The next save writes `schedules` and `pin`.
 A file that is not a list of routines still moves aside.
+`parseRoutineSpec` in `src/routines.ts` checks each routine's fields both for the file and for the socket's `routine` save, so the two hold the same limits.
 Each routine holds its last 10 runs, newest first.
 A run holds its slot time, its errors, and one `outcome`: `pending` from its claim, with whether it is still `queued`; a `session` with the instance and session ids it started; or a `command` with the command's result once it ran.
 A run from before `outcome` migrates as the file loads, in `parseRun`, and nothing else sees the old fields: its `command` becomes a `command` outcome, a started session a `session` (the first, of the several that a pull request routine's run started), and otherwise `pending`, queued when its `queued` is set or its `queue` list holds an entry.
@@ -457,7 +458,7 @@ A failure, such as a session that cannot resume or a start that fails, saves the
 A send that a stopped server left `sending` may have reached its session, so the owner fails it at its start or takeover (`ScheduledRunner.recover`) rather than sending it again.
 
 A `schedule` socket message carries one `ScheduledChange`: `add`, whose `id` the page picks so an add sent twice adds once, `remove`, which cancels a waiting send or dismisses a failed one and leaves one under way, or `send-now`, which answers once the send went or failed.
-`parseScheduledChange` in `src/server/wire.ts` holds a message's text and a start's prompt to `MAX_SCHEDULED_TEXT`, a million characters, and refuses images, an empty text, and a start that resumes.
+`parseScheduledSpec` in `src/shared/scheduled.ts`, which `parseScheduledChange` in `src/server/wire.ts` and `src/server/scheduled-file.ts` share, holds a message's text and a start's prompt to `MAX_SCHEDULED_TEXT`, a million characters, and refuses images, an empty text, and a start that resumes.
 Every socket hears the sends after each change and each claim, send, or failure as a `scheduled` message on the roster topic, also sent when a socket opens; a change that changes nothing sends them back to its own socket alone.
 Each server also reads the file and sends the list on its minute tick, so pages on a server that does not send see what the owner did.
 A send is at most a minute late, and one whose time passed while no server ran goes at the first tick after one starts.
@@ -889,6 +890,7 @@ The title is trimmed, nonempty, and at most 500 characters; `when` is `{ allDay:
 A Google calendar goes through `GoogleCalendarClient.create`, which refuses a calendar not checked in your Google Calendar's list or not `writable`, and otherwise posts the event to the calendar's `events` with its `summary` and `start` and `end`: `{ date }` for an all-day event, whose end Google takes as the day after the last, or `{ dateTime }` in ISO time.
 It then forgets that calendar's kept event reads, which the client keeps per calendar, so the next read shows the event.
 This computer adds the event to `events.json` beside the access token, through `LocalEventsFile` in `src/server/local-events-file.ts`, with a `crypto.randomUUID()` id; a file it cannot read moves to `events.json.invalid`.
+`parseEventWhen` in `src/shared/calendar.ts` checks an event's `when` both for `parseNewEvent` and for each event that file keeps.
 `GET /api/calendar/local` answers every kept event, since only what you typed by hand is there, and the page lays out the days of the month it shows.
 `PUT /api/calendar/events/delete` takes an `EventRef`, checked by `parseEventRef`: `{ kind: "local", id }` deletes that kept event if it is still there, and `{ kind: "google", calendarId, eventId }` goes through `GoogleCalendarClient.delete`; it answers `{}`.
 `GoogleCalendarClient.delete` refuses a calendar not checked in your Google Calendar's list or not `writable` before asking Google, as `create` does, and otherwise sends a DELETE to the event's address under the calendar's `events`, without `sendUpdates`.

@@ -1,4 +1,5 @@
 /** The Calendar page's events: your Google calendars and their events, the events it adds, and the events kept on this computer. */
+import { isDay, isObject, isSafeInteger, type Parsed } from "../json";
 
 /** A calendar shown in your Google Calendar, which the Calendar page reads unless you unchecked it there. */
 export interface GoogleCalendar {
@@ -31,6 +32,14 @@ export interface CalendarShownInput {
 
 /** An all-day event's first and last days, `YYYY-MM-DD`, or a timed event's start and end, epoch ms. */
 export type EventWhen = { allDay: true; firstDay: string; lastDay: string } | { allDay: false; start: number; end: number };
+
+/** An event's days or times, as a new event carries them and `events.json` keeps them: all-day days that do not run backward, or a timed span that ends after it starts. */
+export function parseEventWhen(value: unknown): Parsed<EventWhen> {
+	if (!isObject(value)) return null;
+	if (value.allDay === true) return isDay(value.firstDay) && isDay(value.lastDay) && value.lastDay >= value.firstDay ? { ok: { allDay: true, firstDay: value.firstDay, lastDay: value.lastDay } } : null;
+	if (value.allDay === false) return isSafeInteger(value.start) && isSafeInteger(value.end) && value.end > value.start ? { ok: { allDay: false, start: value.start, end: value.end } } : null;
+	return null;
+}
 
 /** An event of one of your Google calendars. */
 export interface CalendarEvent {

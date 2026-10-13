@@ -1,4 +1,6 @@
-/** The rules of routines: when one is due, and how a change edits the list. */
+/** The rules of routines: when one is due, how a change edits the list, and which routine the page and `routines.json` may hold. */
+import { isNonEmpty, isObject, isSafeInteger, nonEmpty, type Parsed } from "./json";
+import { parseSkill } from "./shared/sessions";
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -53,9 +55,12 @@ export interface Routine {
 	runs: RoutineRun[];
 }
 
+/** What the page edits of a routine: all but its runs and its creation time, which the server keeps. */
+export type RoutineSpec = Omit<Routine, "runs" | "createdAt">;
+
 /** One edit of the routines; the page picks a new routine's `id`, so a save sent twice saves once. */
 export type RoutineChange =
-	| { op: "save"; routine: Omit<Routine, "runs" | "createdAt"> }
+	| { op: "save"; routine: RoutineSpec }
 	| { op: "remove"; id: string }
 	| { op: "enable"; id: string; enabled: boolean }
 	/** Claims a run now, whatever the schedule says. */
@@ -102,7 +107,7 @@ export const isDue = (routine: Routine, now: number): boolean =>
 	routine.enabled && nextDueAt(routine.schedules, routine.runs[0]?.at ?? routine.createdAt) <= now;
 
 /** Whether `routine` already holds every field the page edits of `spec`. */
-function isSameSpec(routine: Routine, spec: Extract<RoutineChange, { op: "save" }>["routine"]): boolean {
+function isSameSpec(routine: Routine, spec: RoutineSpec): boolean {
 	return (
 		routine.name === spec.name &&
 		routine.cwd === spec.cwd &&
@@ -136,4 +141,62 @@ export function applyRoutine(routines: Routine[], change: Exclude<RoutineChange,
 			return unhandled;
 		}
 	}
+}
+
+const isIntIn = (value: unknown, min: number, max: number): value is number => isSafeInteger(value) && value >= min && value <= max;
+const isWeekday = (value: unknown): value is Weekday => isIntIn(value, 0, 6);
+
+function parseSchedule(value: unknown): Parsed<Schedule> {
+	if (!isObject(value)) return null;
+	switch (value.kind) {
+		case "every":
+			return isIntIn(value.minutes, 1, Number.MAX_SAFE_INTEGER) ? { ok: { kind: "every", minutes: value.minutes } } : null;
+		case "weekly": {
+			const { days, time } = value;
+			if (!Array.isArray(days) || days.length === 0 || !days.every(isWeekday) || new Set(days).size !== days.length) return null;
+			if (!isObject(time) || !isIntIn(time.hour, 0, 23) || !isIntIn(time.minute, 0, 59)) return null;
+			return { ok: { kind: "weekly", days, time: { hour: time.hour, minute: time.minute } } };
+		}
+		default:
+			return null;
+	}
+}
+
+/** One or more schedules. An empty list is not one. */
+function parseSchedules(value: unknown): Parsed<Schedules> {
+	if (!Array.isArray(value)) return null;
+	const schedules: Schedule[] = [];
+	for (const entry of value) {
+		const schedule = parseSchedule(entry);
+		if (!schedule) return null;
+		schedules.push(schedule.ok);
+	}
+	const nonEmptySchedules = nonEmpty(schedules);
+	return nonEmptySchedules && { ok: nonEmptySchedules };
+}
+
+function parseRoutineTask(value: unknown): Parsed<RoutineTask> {
+	if (!isObject(value)) return null;
+	switch (value.kind) {
+		case "prompt":
+			return isNonEmpty(value.prompt) && typeof value.pin === "boolean" ? { ok: { kind: "prompt", prompt: value.prompt, pin: value.pin } } : null;
+		case "command":
+			return isNonEmpty(value.command) && value.command.length <= MAX_COMMAND_LENGTH ? { ok: { kind: "command", command: value.command } } : null;
+		default:
+			return null;
+	}
+}
+
+/**
+ * A routine as the page saves it and `routines.json` keeps it, or `null` when a field is missing, of the wrong type, or
+ * out of range; other fields drop.
+ */
+export function parseRoutineSpec(value: unknown): Parsed<RoutineSpec> {
+	if (!isObject(value)) return null;
+	const { id, name, cwd, enabled } = value;
+	const schedules = parseSchedules(value.schedules);
+	const task = parseRoutineTask(value.task);
+	const skill = parseSkill(value.skill);
+	if (!isNonEmpty(id) || !isNonEmpty(name) || !isNonEmpty(cwd) || typeof enabled !== "boolean" || !schedules || !task || !skill) return null;
+	return { ok: { id, name, cwd, schedules: schedules.ok, task: task.ok, skill: skill.ok, enabled } };
 }

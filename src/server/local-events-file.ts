@@ -1,8 +1,7 @@
 /** The events the Calendar page keeps on this computer, saved in `events.json`. */
 import { JsonFile } from "../fs";
 import { isObject, nonEmptyStr, parseAll } from "../json";
-import type { EventWhen, LocalEvent } from "../shared/calendar";
-import { parseEventWhen } from "./wire";
+import { type EventWhen, type LocalEvent, parseEventWhen } from "../shared/calendar";
 
 interface LocalEvents {
 	events: LocalEvent[];
@@ -13,7 +12,7 @@ function parseLocalEvent(value: unknown): LocalEvent | null {
 	const id = nonEmptyStr(value.id);
 	const title = nonEmptyStr(value.title);
 	const when = parseEventWhen(value.when);
-	return id && title && when ? { id, title, when } : null;
+	return id && title && when ? { id, title, when: when.ok } : null;
 }
 
 function parseLocalEvents(value: unknown): LocalEvents | null {

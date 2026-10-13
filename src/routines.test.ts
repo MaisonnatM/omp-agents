@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { applyRoutine, isDue, nextRunAt, type Routine, type Schedule } from "./routines";
+import { applyRoutine, isDue, nextRunAt, parseRoutineSpec, type Routine, type RoutineSpec, type Schedule } from "./routines";
 
 // Weekly slots are local wall-clock times; Paris has both DST changes in the dates below.
 const savedTz = process.env.TZ;
@@ -15,7 +15,7 @@ const daily: Schedule = { kind: "weekly", days: [0, 1, 2, 3, 4, 5, 6], time: { h
 
 const evening: Schedule = { kind: "weekly", days: [1, 2, 3, 4, 5], time: { hour: 18, minute: 0 } };
 
-const spec: Omit<Routine, "runs" | "createdAt"> = {
+const spec: RoutineSpec = {
 	id: "r1",
 	name: "Notes",
 	cwd: "/work/webapp",
@@ -26,6 +26,21 @@ const spec: Omit<Routine, "runs" | "createdAt"> = {
 };
 
 const routine = (fields: Partial<Routine>): Routine => ({ ...spec, createdAt: at("2026-10-01T08:00:00+02:00"), runs: [], ...fields });
+
+describe("parseRoutineSpec", () => {
+	test("keeps a routine's edited fields and drops the runs and creation time the server keeps", () => {
+		expect(parseRoutineSpec({ ...routine({}), extra: 1 })).toEqual({ ok: spec });
+		expect(parseRoutineSpec({ ...spec, skill: "ship", schedules: [{ kind: "every", minutes: 90 }, weekdays] })?.ok).toMatchObject({ skill: "ship" });
+	});
+
+	test("refuses a skill that is not one token, an hour past 23, a weekday past Saturday, and a fractional interval", () => {
+		expect(parseRoutineSpec({ ...spec, skill: "two words" })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, schedules: [{ ...weekdays, time: { hour: 24, minute: 0 } }] })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, schedules: [{ ...weekdays, days: [7] }] })).toBeNull();
+		expect(parseRoutineSpec({ ...spec, schedules: [{ kind: "every", minutes: 1.5 }] })).toBeNull();
+		expect(parseRoutineSpec("routine")).toBeNull();
+	});
+});
 
 describe("nextRunAt", () => {
 	test("a weekday schedule rolls from Friday over the weekend to Monday", () => {

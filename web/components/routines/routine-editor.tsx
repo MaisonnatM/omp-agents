@@ -1,10 +1,10 @@
 import { type ReactNode, useId, useState } from "react";
-import { COMMAND_TIME_LIMIT, type Weekday } from "../../../src/routines";
+import { COMMAND_TIME_LIMIT, type RoutineSpec, type Weekday } from "../../../src/routines";
 import type { Workspace } from "../../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type RoutineSpec, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";
+import { blankSchedule, dayName, type EveryUnit, type RoutineDraft, type ScheduleDraft, specOf, WEEK, WEEKDAYS } from "../../routines-model";
 import { useSkills } from "../../use-skills";
 import { PageFrame } from "../list-page";
 import { DirectoryPicker } from "../workspace-picker";

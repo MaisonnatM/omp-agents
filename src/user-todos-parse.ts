@@ -2,7 +2,7 @@
  * Reading the Todo page's list and its changes from untyped JSON: `todos.json`, the page's `user-todo` messages, and
  * the files omp's `user_todo` tool leaves. It uses no Bun API, so the desktop shell bundles it too.
  */
-import { isObject } from "./json";
+import { isDay, isNonEmpty, isObject } from "./json";
 import { inStatusOrder } from "./user-todos";
 import {
 	isClosed,
@@ -25,20 +25,10 @@ export const MAX_TODO_TEXT = 2000;
 export const MAX_TODO_ID = 64;
 export const MAX_TODO_BODY = 100_000;
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-
-/** A day as `YYYY-MM-DD`, as a todo's `due`, a Linear issue's `dueDate`, and an all-day Google event name one, that the calendar has. */
-export const isDay = (value: unknown): value is string => {
-	if (typeof value !== "string" || !DAY.test(value)) return false;
-	const time = Date.parse(`${value}T00:00:00Z`);
-	return Number.isFinite(time) && new Date(time).toISOString().startsWith(value);
-};
-
 const isTime = (value: unknown): value is string => typeof value === "string" && !Number.isNaN(Date.parse(value));
 const isStatus = (value: unknown): value is TodoStatus => TODO_STATUSES.includes(value as TodoStatus);
 const isPriority = (value: unknown): value is TodoPriority => TODO_PRIORITIES.includes(value as TodoPriority);
 const isAssignee = (value: unknown): value is TodoAssignee => TODO_ASSIGNEES.includes(value as TodoAssignee);
-const isNonEmpty = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
 
 function isOptional<T>(value: unknown, is: (value: unknown) => value is T): value is T | null {
 	return value === null || is(value);

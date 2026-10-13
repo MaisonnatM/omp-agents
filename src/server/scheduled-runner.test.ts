@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { ScheduledTarget } from "../shared/scheduled";
 import { newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import { ScheduledFile } from "./scheduled-file";
@@ -141,5 +141,26 @@ describe("ScheduledFile", () => {
 		expect(file.apply({ op: "remove", id: "a" }, T0)).toBe(false);
 		expect(file.apply({ op: "remove", id: "b" }, T0)).toBe(true);
 		expect(file.sends.map(send => send.id)).toEqual(["a"]);
+	});
+
+	test("a kept start reads back as a new session's start, and a file holding a send the page could not add moves aside", () => {
+		const path = scheduledPath();
+		const request = newSessionRequest("/work/app", "Review the plan", { skill: "review", todoId: "t1" });
+		const start: ScheduledTarget = { kind: "start", request };
+		new ScheduledFile(path).apply({ op: "add", send: { id: "a", at: T0, reset: null, target: start } }, T0);
+		expect(new ScheduledFile(path).sends).toEqual([{ id: "a", at: T0, reset: null, target: start, createdAt: T0, state: { phase: "waiting" } }]);
+
+		const withImage = { ...request, images: [{ data: "aGk=", mimeType: "image/png" }] };
+		writeFileSync(path, JSON.stringify({ sends: [{ id: "b", at: T0, reset: null, target: { kind: "start", request: withImage }, createdAt: T0, state: { phase: "waiting" } }] }));
+		expect(new ScheduledFile(path).sends).toEqual([]);
+		expect(existsSync(`${path}.invalid`)).toBe(true);
+	});
+
+	test("a send at a time that is not a whole millisecond moves the file aside", () => {
+		const path = scheduledPath();
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, JSON.stringify({ sends: [{ id: "a", at: T0 + 0.5, reset: null, target: message("s1", "go"), createdAt: T0, state: { phase: "waiting" } }] }));
+		expect(new ScheduledFile(path).sends).toEqual([]);
+		expect(existsSync(`${path}.invalid`)).toBe(true);
 	});
 });
