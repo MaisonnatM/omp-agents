@@ -238,8 +238,8 @@ omp appends that record without the lock churn that the watcher reports on macOS
 A built-in slash command runs from a plain `prompt`, and omp sends what it prints as `command_output` frames and a model switch as `config_update`.
 `RpcClient` drops both, so the same stdout copy reads them: the server shows the output as a notice when the user's last prompt was a `/` command, which leaves out what the titling `/rename` prints, and reads omp's state again after a model switch.
 An `edit-prompt` message rewinds a dashboard session in place: inside the same `TurnGate`, the server aborts a running turn, sends omp's `branch` command with the last prompt's entry id, and reads omp's state for the new session id and file.
-omp writes the history before that prompt to a new file and keeps the old one, which then lists as a past session.
-The session reports `switched`, so the server points its views at the new file before it sends the edited text as a plain `prompt`, whose events then land in the new transcript.
+omp writes the history before that prompt to a new file and keeps the old one, which then lists as a past session; a branch from the first prompt has no history, so omp writes its file only with the edited prompt's reply.
+The session follows the new file the same way it follows a `/move` below, in its current directory and without waiting for that file to exist, then reports `switched`, so the server points its views at the new file before it sends the edited text as a plain `prompt`, whose events then land in the new transcript.
 A Collab terminal session has no `branch` frame, so only a dashboard session offers the edit.
 omp's `/move` sends `config_update` too, and the state read after it finds a new session file: the session takes its working directory from that file's header, clears its subagents when the session id changed, and reports `switched`, so the roster and the views follow the moved file.
 omp writes a moved session that has no reply yet only with its first reply, so until that file exists the session keeps its old file and directory, and a later state read follows it.

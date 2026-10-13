@@ -455,12 +455,10 @@ export class DashboardSession implements LiveSession {
 				}
 				if ((await client.branch(entryId)).cancelled) throw new Error("an omp extension cancelled the branch");
 				const state = await client.getState();
-				this.sessionId = state.sessionId;
-				this.sessionFile = state.sessionFile ?? null;
+				// omp keeps the directory on a branch, and writes a branch from the first prompt only with its reply.
+				await this.#follow(state, this.cwd);
 				this.queue = state.queuedMessages;
 				this.#applyState(state);
-				// omp forgets the subagents of the history it left.
-				this.#agents.clear();
 				this.#emit({ kind: "switched" });
 				await this.#promptMain(text, []);
 			})
@@ -602,13 +600,18 @@ export class DashboardSession implements LiveSession {
 		}
 	}
 
-	/** Whether omp now holds another file, as after `/move`; the session then works where that file's header says. */
-	async #follow(state: RpcState): Promise<boolean> {
+	/**
+	 * Whether omp now holds another file, as after `/move` or a branch; the session then works where that file's header
+	 * says, or in `cwd` when the caller knows it.
+	 */
+	async #follow(state: RpcState, cwd?: string): Promise<boolean> {
 		const file = state.sessionFile ?? null;
 		if (file === this.sessionFile) return false;
-		// omp writes a moved session with no reply yet only with that reply, so the session follows on a later read.
-		if (file && !(await stat(file).catch(() => null))) return false;
-		const cwd = file ? await recordedCwd(file) : this.cwd;
+		if (cwd === undefined) {
+			// omp writes a moved session with no reply yet only with that reply, so the session follows on a later read.
+			if (file && !(await stat(file).catch(() => null))) return false;
+			cwd = file ? await recordedCwd(file) : this.cwd;
+		}
 		this.sessionFile = file;
 		this.cwd = cwd;
 		if (state.sessionId !== this.sessionId) {
