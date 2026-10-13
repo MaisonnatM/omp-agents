@@ -183,13 +183,10 @@ async function connect(win: BrowserWindow): Promise<void> {
 	win.loadURL(`${ORIGIN}/?token=${token}`).catch(() => {});
 }
 
-/** Schemes the default browser may open. */
-const OUTSIDE_PROTOCOLS: Record<string, true> = { "http:": true, "https:": true };
-
 /** Opens a web address in the default browser; any other scheme goes nowhere. */
 function openOutside(url: string): void {
 	const protocol = URL.parse(url)?.protocol;
-	if (protocol && OUTSIDE_PROTOCOLS[protocol]) void shell.openExternal(url);
+	if (protocol === "http:" || protocol === "https:") void shell.openExternal(url);
 }
 
 /** The bounds the window had when it last hid or closed; only the size when no display shows its top-left corner any more. */

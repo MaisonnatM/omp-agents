@@ -282,10 +282,11 @@ export function parseClientMsg(raw: string | Buffer): Parsed<ClientFrame> {
 	return { ok: { t: "resume", frames } };
 }
 
-const PAGE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** A UUID as `crypto.randomUUID()` writes it, lowercase. */
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** The `page` of a `/ws` address: the id a page load picks once, `crypto.randomUUID()`; `null` when absent or not one. */
-export const parsePageId = (value: string | null): string | null => (value !== null && PAGE_ID.test(value) ? value : null);
+export const parsePageId = (value: string | null): string | null => (value !== null && UUID.test(value) ? value : null);
 
 /** A terminal's columns or rows: xterm's own bounds. */
 const isTerminalSide = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= 1000;

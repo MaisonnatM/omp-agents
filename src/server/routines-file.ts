@@ -5,7 +5,7 @@
  * A file from before `schedules`, before a run's `outcome`, or before a prompt task's `pin` migrates here, so everything else sees the current shape.
  */
 import { JsonFile } from "../fs";
-import { isObject, isTexts, parseAll } from "../json";
+import { isObject, isSafeInteger, isTexts, parseAll } from "../json";
 import { applyRoutine, MAX_ROUTINE_RUNS, parseRoutineSpec, type CommandRun, type Routine, type RoutineChange, type RoutineOutcome, type RoutineRun } from "../routines";
 
 interface Stored {
@@ -19,13 +19,11 @@ function parseStarted(value: unknown): { instanceId: string; sessionId: string }
 	return typeof instanceId === "string" && typeof sessionId === "string" ? { instanceId, sessionId } : null;
 }
 
-const isTime = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
-
 function parseCommandRun(value: unknown): CommandRun | null {
-	if (!isObject(value) || !isTime(value.startedAt)) return null;
+	if (!isObject(value) || !isSafeInteger(value.startedAt)) return null;
 	const { phase, startedAt, endedAt, output } = value;
 	if (phase === "running") return { phase, startedAt };
-	if (!isTime(endedAt)) return null;
+	if (!isSafeInteger(endedAt)) return null;
 	switch (phase) {
 		case "exited":
 			return typeof value.code === "number" && Number.isSafeInteger(value.code) && typeof output === "string" ? { phase, code: value.code, output, startedAt, endedAt } : null;
@@ -40,7 +38,7 @@ function parseCommandRun(value: unknown): CommandRun | null {
 
 /** A run's `outcome`, or the fields it had before: `queued` or `queue`, `started` sessions, and `command`. Of several sessions, only a pull request routine's run started more than one, and the first stays. */
 function parseRun(value: unknown): RoutineRun | null {
-	if (!isObject(value) || !isTime(value.at) || !isTexts(value.errors)) return null;
+	if (!isObject(value) || !isSafeInteger(value.at) || !isTexts(value.errors)) return null;
 	if (isObject(value.outcome)) {
 		const { outcome } = value;
 		let parsed: RoutineOutcome | null = null;

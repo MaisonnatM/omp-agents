@@ -4,23 +4,21 @@
  * change reads the file again before it applies, as `projects.json` does.
  */
 import { JsonFile } from "../fs";
-import { isObject, parseAll } from "../json";
+import { isObject, isSafeInteger, parseAll } from "../json";
 import { applyScheduled, parseScheduledSpec, type ScheduledChange, type ScheduledSend, type ScheduledState } from "../shared/scheduled";
 
 interface Stored {
 	sends: ScheduledSend[];
 }
 
-const isTime = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
-
 function parseState(value: unknown): ScheduledState | null {
 	if (!isObject(value)) return null;
 	if (value.phase === "waiting" || value.phase === "sending") return { phase: value.phase };
-	return value.phase === "failed" && typeof value.error === "string" && isTime(value.at) ? { phase: "failed", error: value.error, at: value.at } : null;
+	return value.phase === "failed" && typeof value.error === "string" && isSafeInteger(value.at) ? { phase: "failed", error: value.error, at: value.at } : null;
 }
 
 function parseSend(value: unknown): ScheduledSend | null {
-	if (!isObject(value) || !isTime(value.createdAt)) return null;
+	if (!isObject(value) || !isSafeInteger(value.createdAt)) return null;
 	const spec = parseScheduledSpec(value);
 	const state = parseState(value.state);
 	return spec && state && { ...spec.ok, createdAt: value.createdAt, state };
