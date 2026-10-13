@@ -6,7 +6,7 @@
 import { randomBytes } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { errorText, isObject, isTexts } from "./json";
-import type { LiveRow, LiveSession, LiveUpdate } from "./live-session";
+import { type LiveRow, type LiveSession, type LiveUpdate, PromptRefused } from "./live-session";
 import { loadOmpConfig } from "./omp/config";
 import { connectedProviders, fastAvailable, modelEntries } from "./omp/models";
 import { PLAIN_LAUNCH, type RpcChild, type RpcClient, type RpcLaunch, type RpcState, startRpc } from "./omp/rpc";
@@ -334,26 +334,25 @@ export class DashboardSession implements LiveSession {
 	/**
 	 * omp queues a prompt sent while a turn runs, as a steer or a follow-up, and starts one sent while idle. Its prompt runs
 	 * the session's own slash-command and skill pipeline. A subagent takes every message as a steer: omp reaches only a
-	 * running one, so a follow-up held until it stopped could never be sent.
+	 * running one, so a follow-up held until it stopped could never be sent. A message omp refuses is shown as a note and
+	 * rejects with {@link PromptRefused}.
 	 */
 	async prompt(agentId: string | null, text: string, images: PromptImage[], delivery: Delivery): Promise<void> {
 		if (agentId !== null) {
 			if (images.length > 0) throw new Error("omp sends a subagent text only.");
-			await this.#child.client.steerSubagent(agentId, text).catch((err: unknown) => this.#fail("Message failed", err, agentId));
+			await this.#child.client.steerSubagent(agentId, text).catch((err: unknown) => this.#refuse("Message failed", err, agentId));
 			return;
 		}
 		if (text.startsWith("!")) {
 			if (images.length > 0) throw new Error("A ! command takes no images.");
 			return this.#shell(text);
 		}
-		await this.#send(text, images, delivery).catch((err: unknown) => this.#fail("Prompt failed", err));
+		await this.#send(text, images, delivery).catch((err: unknown) => this.#refuse("Prompt failed", err));
 	}
 
-	followUp(text: string): Promise<void> {
-		return this.#send(text, [], "followUp").catch((err: unknown) => {
-			this.#fail("Prompt failed", err);
-			throw err;
-		});
+	#refuse(what: string, err: unknown, agentId: string | null = null): never {
+		this.#fail(what, err, agentId);
+		throw new PromptRefused(errorText(err));
 	}
 
 	/** Sends `text` and `images` to the main agent through the turn gate; rejects when omp does not take them. */

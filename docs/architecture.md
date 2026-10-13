@@ -186,6 +186,7 @@ A new session's first message rides on the `start` request: the server spawns om
 **Resume** spawns the same child in the directory that the session file's header records and opens the file with omp's `switch_session` command.
 Prompts, Stop, live events, subagent progress, and questions stay on the pipe.
 A prompt carries omp's `streamingBehavior`, `steer` or `followUp`, so omp queues it during a turn the way its terminal does.
+A prompt omp refuses shows as a note in the session, and `LiveSession.prompt` rejects with `PromptRefused`, so a caller that has no one else to tell, such as the socket handler or a session's first message, skips it.
 The composer's queue is omp's `queue_update` event.
 A `dequeue` message takes one message back with `remove_queued_message`, and the server answers with `withdrawn`, carrying its text and images so the composer can restore both.
 A `promote` message, a queued row's **Send now**, is `promote_queued_message`, which moves a follow-up into the steering queue.
@@ -452,7 +453,7 @@ A send's `state` is `waiting`, `sending` from its claim until it reaches omp, or
 Its `tick` runs on the minute tick, before the routine runner's, only on the server that owns the unattended work, and sends each due waiting send in turn.
 `sendNow` sends one at once on whichever server the page talks to, a failed one too.
 Either way the runner first claims the send and writes `sending` to the file at once, so a second tick or another server never sends it twice.
-A message goes to the live session with that session id through `followUp`, a follow-up while its turn runs and a prompt otherwise, as a project's updates go; with no live session, the runner resumes it through the same `start` the page uses, then sends.
+A message goes to the live session with that session id through its `prompt` as a `followUp`, a follow-up while its turn runs and a prompt otherwise, as a project's updates go; with no live session, the runner resumes it through the same `start` the page uses, then sends.
 A start goes through `start` as the page's would, so the todo it names is linked the same way.
 A failure, such as a session that cannot resume or a start that fails, saves the error on the send, which waits for **Try again** or **Dismiss**.
 A send that a stopped server left `sending` may have reached its session, so the owner fails it at its start or takeover (`ScheduledRunner.recover`) rather than sending it again.
@@ -508,7 +509,7 @@ A worker's session reports three kinds of news, which the runner saves as update
 
 The runner saves each update in `projects.json` at once and then delivers.
 When the coordinator's session runs and its status is `idle`, the runner sends every waiting update, in order, as one prompt that `updateText` builds, starting `[omp-agents] Project update.`, quoting at most `REPLY_QUOTE_CHARS` (2,000) of each finished worker's `lastReply`, and telling the coordinator that only the user answers an `asked` question, in the dashboard.
-It sends it through `LiveSession.followUp`, which, unlike `prompt`, rejects when omp does not take the message.
+It sends it through `LiveSession.prompt` as a `followUp`, which rejects with `PromptRefused` when the session does not take the message, after showing the refusal in the session.
 Once omp takes it, `delivered` removes those updates, and delivery runs again for the ones that came meanwhile; one delivery per project is in flight at a time.
 When omp refuses it, the updates stay and nothing retries at once: delivery runs again when the coordinator's row changes, when its turn ends, and when it attaches, which is also how what waited while it worked, or while it was stopped, reaches it once it is idle.
 Only sessions that attached through the starter are tracked, so a project's session resumed in a terminal reports nothing.

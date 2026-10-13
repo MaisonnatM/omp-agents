@@ -37,7 +37,7 @@ function harness() {
 	};
 	const recipient = (sessionId: string) => {
 		const received = fake.live.get(sessionId);
-		return received ? { followUp: async (text: string) => void received.push(text) } : null;
+		return received ? { prompt: async (_agentId: string | null, text: string) => void received.push(text) } : null;
 	};
 	const runner = new ScheduledRunner({
 		file,

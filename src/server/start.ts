@@ -3,6 +3,7 @@ import { withPinnedSkill } from "../commands";
 import { DashboardSession, type DashboardUpdate } from "../dashboard-session";
 import { checkoutDir } from "../git";
 import { errorText } from "../json";
+import { skipRefused } from "../live-session";
 import type { RpcLaunch } from "../omp/rpc";
 import { directoryOf } from "../paths";
 import type { PromptImage, StartRequest, StartResult, View } from "../shared/sessions";
@@ -111,7 +112,7 @@ export function createStarter(env: StartEnv): Starter {
 		if (request.kind === "new" && request.todoId) env.linkTodo(request.todoId, session.sessionId);
 		join.attach(session);
 		// The new session's first message goes in once it is in the registry, where its events find their view.
-		if (first) void session.prompt(null, first.text, first.images, "steer");
+		if (first) void session.prompt(null, first.text, first.images, "steer").catch(skipRefused);
 		env.onStarted();
 		return { ok: true, instanceId: session.instanceId, cwd: session.cwd, prompt };
 	};

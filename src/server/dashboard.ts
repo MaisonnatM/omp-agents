@@ -254,7 +254,7 @@ export class Dashboard {
 		const runnerSession = (session: LiveSession | undefined): RunnerSession | null => {
 			if (!session) return null;
 			const { status, requests } = session.row();
-			return { sessionId: session.sessionId, status, requests, prompt: text => session.followUp(text) };
+			return { sessionId: session.sessionId, status, requests, prompt: text => session.prompt(null, text, [], "followUp") };
 		};
 		const projectRunner = (this.#projectRunner = new ProjectRunner({
 			file: projects,

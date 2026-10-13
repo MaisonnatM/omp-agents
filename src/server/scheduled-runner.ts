@@ -4,15 +4,13 @@
  * server left sending fails rather than going again, since it may have reached its session.
  */
 import { errorText } from "../json";
+import type { LiveSession } from "../live-session";
 import { isDueSend, type ScheduledTarget } from "../shared/scheduled";
 import type { StartRequest, StartResult } from "../shared/sessions";
 import type { ScheduledFile } from "./scheduled-file";
 
-/** A live session as the runner reaches it. */
-interface Recipient {
-	/** A follow-up while its turn runs, else a prompt; rejects when it does not reach omp. */
-	followUp(text: string): Promise<void>;
-}
+/** A live session as the runner reaches it: it sends the text as a follow-up while a turn runs, else as a prompt. */
+type Recipient = Pick<LiveSession, "prompt">;
 
 export interface ScheduledRunnerDeps {
 	file: ScheduledFile;
@@ -81,6 +79,6 @@ export class ScheduledRunner {
 			recipient = session(result.instanceId);
 			if (!recipient) throw new Error("The session exited as it resumed.");
 		}
-		await recipient.followUp(target.text);
+		await recipient.prompt(null, target.text, [], "followUp");
 	}
 }
