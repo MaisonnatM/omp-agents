@@ -28,11 +28,11 @@ test("service links keep their titles and icons without displaying bare URLs", (
 		for (const [url, label] of destinations) {
 			const bare = renderToStaticMarkup(<MessageMarkdown github={github} text={url!} />);
 			expect(bare).toContain(`href="${url}"`);
-			expect(bare).toContain(`<span>${label}</span>`);
+			expect(bare.replace(/<[^>]*>/g, "")).toBe(label!);
 			expect(bare).toContain('aria-hidden="true"');
 			expect(bare).not.toContain(`>${url}<`);
 			const titled = renderToStaticMarkup(<MessageMarkdown github={github} text={`[Fix **login**](${url})`} />);
-			expect(titled).toContain("<span>Fix <strong>login</strong></span>");
+			expect(titled.replace(/<[^>]*>/g, "")).toBe("Fix login");
 			expect(titled).toContain('aria-hidden="true"');
 		}
 	}
@@ -41,7 +41,7 @@ test("service links keep their titles and icons without displaying bare URLs", (
 test("lookalike hosts and ordinary links keep their original labels without service icons", () => {
 	for (const url of ["https://github.com.evil.example/org/repo", "https://not-slack.com/archives/C1/p1", "https://example.com"]) {
 		const html = renderToStaticMarkup(<MessageMarkdown text={url} />);
-		expect(html).toContain(`>${url}</span>`);
+		expect(html.replace(/<[^>]*>/g, "")).toBe(url);
 		expect(html).not.toContain("<svg");
 	}
 });

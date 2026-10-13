@@ -295,6 +295,7 @@ An action that fails shows its error, and its control becomes available again.
   A bare URL shows a short destination label instead: an issue identifier, repository and pull request number, or **Slack message**; no title is fetched from the service.
   The link still opens its original address in a new tab.
   Other HTTP and HTTPS links show their favicon beside their original label.
+  Link labels stay underlined beside their icons, without underlining the icons.
   Favicons load lazily through Google's favicon service, sharing only the destination hostname, not its path, query, credentials, or the dashboard's address.
 - A path to a text file in agent text opens the file in a dialog: `.md`, `.markdown`, `.txt`, `.log`, `.csv`, `.tsv`, `.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.xml`, `.diff`, or `.patch`.
   An absolute or `~/` path opens from plain text, inline code, or a link, `file://` included; a relative one opens from inline code or a link, against the session's directory.
