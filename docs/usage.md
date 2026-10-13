@@ -119,6 +119,7 @@ An action that fails shows its error, and its control becomes available again.
   A new tab shows **Starting shell…** until the server opens its shell.
   The server refuses a new shell in a directory that no longer exists, such as a removed worktree, and while 16 shells already run; that tab reads that the server hung up on it.
 - A shell keeps running while the panel is hidden and across a page reload: the reloaded page reopens a tab for each shell with its last megabyte of output.
+  If the page cannot read which shells run, the panel says so with **Try again** and starts no shell, so a running shell is never left without its tab.
   It ends when you type `exit`, when the tab's × hangs up on it, or when the server stops; the last tab closing hides the panel.
   The close button spins until the tab closes.
   A tab whose server stopped reads **(disconnected)** until you close it.
