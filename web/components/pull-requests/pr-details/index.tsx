@@ -1,5 +1,5 @@
 /** `PullRequestDetailContent`: a pull request's details, its header over the Summary, Timeline, and Code tabs. */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type LinkedPullRequest, type PullRequest, type PullRequestChange, type PullRequestDetail, type StackedPullRequest, samePullRequest } from "../../../../src/shared/github";
 import type { RosterHost, View } from "../../../../src/shared/sessions";
 import { TabItem, Tabs, TabsList } from "@/components/ui/tabs";
@@ -10,8 +10,8 @@ import { putJson } from "../../../api";
 import type { PullRequestActionId } from "../../../../src/pull-request-actions";
 import type { MoveId } from "../../../../src/shared/moves";
 import { hashForPullRequests, hashForPullRequestFiles, type OpenMode } from "../../../routing";
-import { useRead, useReplaceableRead } from "../../../reads";
-import { useQueuedSave } from "../../../use-queued-save";
+import { useEditableRead } from "../../../editable-read";
+import { useRead } from "../../../reads";
 import type { QuickActionsProps } from "../../quick-actions";
 import { LoadNote } from "../../sheet-details";
 import { Timeline } from "../pr-timeline";
@@ -63,17 +63,19 @@ type DetailTab = "summary" | "timeline" | "code";
  * of the other actions; then Summary, Timeline, and Code tabs, with the checks at a glance on the tab bar.
  */
 export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: listedNext, session = [], placement, version, files = null, onPick, onSaved }: DetailContentProps) {
-	const [reads, setReads] = useState(0);
-	const readVersion = useMemo(() => [version, reads], [version, reads]);
 	const query = new URLSearchParams({ owner: pr.owner, repo: pr.repo, number: String(pr.number) });
-	const { data: detail, error, replace } = useReplaceableRead<PullRequestDetail>(`/api/pull-request?${query}`, readVersion);
+	const { data: detail, error, saveError, edit } = useEditableRead<PullRequestDetail>(`/api/pull-request?${query}`, version);
 	const stackRead = useRead<StackedPullRequest[]>(`/api/pull-request/stack?${query}`, version);
 	const stack = stackRead.data ?? [];
 	// Until the stack is read, its members would flash in the list of the others.
 	const others = stackRead.data || stackRead.error ? session.filter(other => !samePullRequest(other, pr) && !stack.some(member => samePullRequest(member, other))) : [];
-	const queued = useQueuedSave({ replace, reload: () => setReads(count => count + 1), onSaved });
 	const save = (change: PullRequestChange, shown: Partial<PullRequestDetail>): void => {
-		if (detail) queued.save({ ...detail, ...shown }, () => putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change }));
+		if (!detail) return;
+		edit(shown, async () => {
+			const answer = await putJson<PullRequestDetail>("/api/pull-request", { owner: pr.owner, repo: pr.repo, number: pr.number, change });
+			onSaved?.();
+			return answer;
+		});
 	};
 	const headingRef = useRef<HTMLHeadingElement>(null);
 	const [tab, setTab] = useState<DetailTab>(files ? "code" : "summary");
@@ -125,7 +127,7 @@ export function PullRequestDetailContent({ pr, quick, sessions, onOpen, next: li
 			) : (
 				<div className={cn("min-h-0 flex-1 overflow-y-auto", page && "px-6")}>
 					<div className="py-4">
-						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} saveError={queued.error} /> : <Timeline detail={detail} />}
+						{tab === "summary" ? <Summary pr={pr} detail={detail} placed={placed} quick={quick} stack={stack} others={others} sessions={sessions} onOpen={onOpen} onPick={onPick} save={save} saveError={saveError} /> : <Timeline detail={detail} />}
 					</div>
 				</div>
 			)}

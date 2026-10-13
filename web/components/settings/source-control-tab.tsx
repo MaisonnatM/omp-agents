@@ -16,9 +16,9 @@ import {
 	type SourceControlProvider,
 } from "../../../src/shared/source-control";
 import { errorText, putJson } from "../../api";
+import { useEditableRead } from "../../editable-read";
 import { age, folderName } from "../../labels";
 import { useMergeMethodChoice } from "../../merge-method";
-import { useReplaceableRead } from "../../reads";
 import { IntegrationList } from "../integrations/integration-row";
 import { OrgIcon } from "../org-icon";
 import { Section } from "./editor";
@@ -85,8 +85,7 @@ function AutoPullSwitch(props: { checked: boolean; disabled: boolean; label: str
 
 /** GitHub's and Graphite's CLIs, automatic pulls by default and per repository, and the merge button's starting method. */
 export function SourceControlTab({ active }: { active: boolean }) {
-	const [reads, setReads] = useState(0);
-	const read = useReplaceableRead<SourceControlAnswer>(active ? "/api/source-control" : null, reads);
+	const read = useEditableRead<SourceControlAnswer>(active ? "/api/source-control" : null);
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [choice, setChoice] = useMergeMethodChoice();
@@ -94,7 +93,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 		setPending(true);
 		setError(null);
 		try {
-			read.replace(await putJson<SourceControlAnswer>("/api/source-control", next));
+			await read.write(() => putJson<SourceControlAnswer>("/api/source-control", next));
 		} catch (err) {
 			setError(errorText(err));
 		} finally {
@@ -109,7 +108,7 @@ export function SourceControlTab({ active }: { active: boolean }) {
 				title="Providers"
 				meta="The command-line tools the dashboard and your sessions reach GitHub and Graphite through."
 				actions={
-					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={() => setReads(count => count + 1)}>
+					<Button variant="ghost" size="compact" leadingIcon={RefreshCw} onClick={read.reload}>
 						Check again
 					</Button>
 				}

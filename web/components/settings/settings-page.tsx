@@ -1,9 +1,10 @@
 import { FolderOpen } from "lucide-react";
-import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import type { CatalogModel, OmpSettings } from "../../../src/shared/models";
 import type { Workspace, WorkspaceList } from "../../../src/shared/workspaces";
 import { settingsUrl } from "../../api";
-import { type ReadState, useRead, useReplaceableRead } from "../../reads";
+import { useEditableRead } from "../../editable-read";
+import { type ReadState, useRead } from "../../reads";
 import { SETTINGS_SECTIONS, type SettingsSection } from "../../routing";
 import { CommandPicker } from "../command-picker";
 import { Header } from "../page-header";
@@ -115,9 +116,8 @@ export function SettingsPage({
 		}),
 		[models],
 	);
-	const [reads, setReads] = useState(0);
-	const settings = useReplaceableRead<OmpSettings>(settingsUrl("", cwd), reads);
-	const editing: Editing = { cwd, catalog, saved: settings.replace, reload: () => setReads(count => count + 1) };
+	const settings = useEditableRead<OmpSettings>(settingsUrl("", cwd));
+	const editing: Editing = { cwd, catalog, write: settings.write, reload: settings.reload };
 	// Every section shares one scroller, so a newly opened one would start at the last one's offset.
 	const scroller = useRef<HTMLDivElement>(null);
 	useLayoutEffect(() => {

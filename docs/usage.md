@@ -639,7 +639,7 @@ An action that fails shows its error, and its control becomes available again.
   Click the reviewers for the people who can review on the repository, its author left out: picking one asks them for a review, again when they reviewed already, and picking someone already asked withdraws the request.
   **Labels** shows the labels in their GitHub colors; click them for the repository's labels, and pick one to add or remove it.
   The lists of reviewers and labels come from GitHub on the first click, and the server keeps them for 5 minutes.
-  A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details say why and read the pull request again.
+  A change shows at once and goes to GitHub in turn after the ones before it; when GitHub refuses one, the details undo it, keep the changes made after it, and say why.
   **Sessions** shows the running sessions on the pull request.
   When another open pull request of its repository stacks with it by base branch, whoever opened it, **Stack** shows the stack top first on a rail down to the branch the bottom one merges into, as Graphite does, marks this one, and links to the others; in the session details sidebar, a click shows the other one there instead.
   The server reads the repository's open pull requests for it and keeps them for 30 seconds.
@@ -708,7 +708,7 @@ An action that fails shows its error, and its control becomes available again.
   Labels toggle, and their list stays open for several.
   A change shows at once and saves in turn after the ones before it.
   The tickets list reads Linear again after each save, so an issue you assign to someone else leaves it.
-  When Linear refuses a change, the detail view says why and shows the issue as Linear has it.
+  When Linear refuses a change, the detail view undoes it, keeps the changes made after it, and says why.
   The lists come from the issue's team in Linear, read when you first open one, and the server keeps them for five minutes.
 - `#tickets/<identifier>`, such as `#tickets/ENG-2368`, opens that issue's details directly, even when the tickets list does not include it or cannot load.
   The header's back arrow opens the list from a direct link too.

@@ -14,7 +14,7 @@ function FileView({ file, editing }: { file: OmpFile; editing: Editing }) {
 		body.state === "read" ? body.text : "",
 		text =>
 			putJson<OmpSettings>(settingsUrl("/file", editing.cwd), { path: file.path, text, baseHash: body.state === "read" ? body.hash : null } satisfies FileEdit),
-		editing.saved,
+		editing,
 	);
 	const viewing = editor.state.phase === "viewing";
 	const conflict = editor.state.phase === "editing" && editor.state.conflict;

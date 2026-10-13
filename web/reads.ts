@@ -52,17 +52,6 @@ export function useRead<T>(url: string | null, version?: unknown): Refreshable<T
 	return useMemo(() => (current ? { data: current.data, error: current.error, refreshing } : UNREAD_IDLE), [current, refreshing]);
 }
 
-/**
- * {@link useRead} whose answer a write can replace: `replace(answer)` shows the version that a save answered until a read
- * of the same `url` answers anew, and a failed read shows no error over it.
- */
-export function useReplaceableRead<T>(url: string | null, version?: unknown): ReadState<T> & { replace: (answer: T) => void } {
-	const read = useRead<T>(url, version);
-	const [replaced, setReplaced] = useState<{ url: string | null; answered: T | null; answer: T } | null>(null);
-	const shown = replaced?.url === url && replaced.answered === read.data ? replaced.answer : null;
-	return { data: shown ?? read.data, error: shown ? null : read.error, replace: answer => setReplaced({ url, answered: read.data, answer }) };
-}
-
 /** The open pull requests by workspace `cwd`, which the sidebar and the Pull requests page share; `null` reads every workspace. */
 export const pullRequestsStore = createPolledStore<PullRequestList>({
 	// Keeps its name from before the page was called Pull requests, so the browser's cached list survives.

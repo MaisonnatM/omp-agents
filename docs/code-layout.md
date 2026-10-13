@@ -281,10 +281,9 @@ The page lives in `web/`.
 - `web/api.ts`: the page's HTTP client, `errorText`, which says what any failure was, and `socketUrl`, the address of the dashboard's and a terminal's WebSocket, `wss:` when the page is on HTTPS.
   `settingsUrl` names a settings route for one workspace, or for the user's own files.
 - `web/reads.ts`: the server reads that components hold.
-  `useRead` reads one URL, such as the pull request or the Linear issue the main content shows, the settings page's model catalog, or the new-session draft's model list.
+  `useRead` reads one URL, such as a pull request's stack, the settings page's model catalog, or the new-session draft's model list.
   A version change retains the last answer and exposes `refreshing` until the new read settles, including a failed read.
   A URL change never returns the previous URL's answer.
-  `useReplaceableRead` shows the version a save answered until that URL is read again.
   The polled stores, made by `web/polled-store.ts`, are shared by a sidebar list and its page, kept in localStorage, and re-read every minute while the page is open: one for the pull requests, with one entry per workspace, one for the tickets, with one entry, since Linear is not per workspace, one for the MCP integrations, one for the Google calendars shown, one for the Calendar page's Google events, with one entry per month, one for its events kept on this computer, with one entry, and one for the Gmail inbox, with one entry.
   `mcpServersStore`, for Settings › MCP servers, and `providersStore` are polled stores kept in memory only.
   `useGoogleCalendars` there tells whether Google Calendar is connected and reads its calendars, for the Calendar tab's sidebar, the Calendar page, and the new-event dialog, and `useGmailInbox` answers Gmail's integration and the inbox with its unread count, read through `gmailStore` while Gmail is connected, for the Inbox page and its tab.
@@ -293,7 +292,11 @@ The page lives in `web/`.
   The Inbox page's conversations are not a polled store: `readMailThread` and `useMailThread` keep them in memory by thread id, one read each, and a later read supersedes one in flight.
   `web/app.tsx` polls the pull requests instead, on every page once the sessions are listed, for the Pull requests tab's count, and the sidebar's pull request list reads that entry.
   The composer's `@` menu reads the pull request entry that `pullRequestsScope` in the status context names, the one `web/app.tsx` polls, so it starts no poll of its own and never reads the all-workspaces entry, which asks GitHub about every repository, in place of the selected workspace's.
-  `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes through `useQueuedSave` from `web/use-queued-save.ts`, which shows a change at once and sends each after the ones before it; the picker button and its searchable list, and the due date's, live in `web/components/field-picker.tsx`, which the Todo page and a pull request's details share, with an open state its owner can hold so a key opens it, and digits that pick a choice.
+  `web/components/tickets/ticket-fields.tsx` holds the issue detail's field pickers and sends their changes through the issue's `useEditableRead`; the picker button and its searchable list, and the due date's, live in `web/components/field-picker.tsx`, which the Todo page and a pull request's details share, with an open state its owner can hold so a key opens it, and digits that pick a choice.
+- `web/editable-read.ts`: `useEditableRead`, a read that writes change in place, which owns what it shows: the server's last answer, from a read or a write, and the edits not yet answered, shown over it in order.
+  Writes go one at a time, and each answer carries how many writes had answered when it was asked, so an older answer never replaces a newer one, and the edits still pending show over each answer that arrives.
+  A refused edit is undone, and the page names why.
+  A pull request's details, a Linear issue's details and its fields, the settings page's omp settings, and the source control section read through it; the settings editors' saves go through its `write`.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft's branch picker.
   `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests and tickets also show.
   `web/use-copy.ts` copies text to the clipboard and holds the copied state behind a button's check mark.

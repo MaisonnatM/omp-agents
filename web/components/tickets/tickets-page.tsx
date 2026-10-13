@@ -1,13 +1,14 @@
 /** `TicketsPage`: your assigned Linear issues grouped by workflow state, as Linear's My issues lists them. */
 import { Plus } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { RosterHost, View } from "../../../src/shared/sessions";
 import type { Ticket, TicketDetail } from "../../../src/shared/tickets";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { readPinnedSkill } from "../../pinned-skill";
 import { pendingOf, ticketActions, ticketStart, type WorkActionId } from "../../quick-actions";
-import { ticketsStore, useReplaceableRead } from "../../reads";
+import { useEditableRead } from "../../editable-read";
+import { ticketsStore } from "../../reads";
 import { hashForTickets, type OpenMode } from "../../routing";
 import { sessionsOn } from "../../sessions";
 import type { SectionTarget } from "../../section";
@@ -89,8 +90,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 	const { starts: { quick } } = useDashboardStatus();
 	const poll = ticketsStore.usePolling();
 	const tickets = poll.read?.data.tickets ?? [];
-	const [version, setVersion] = useState(0);
-	const detailRead = useReplaceableRead<TicketDetail>(target && `/api/ticket?${new URLSearchParams({ id: target })}`, version);
+	const detailRead = useEditableRead<TicketDetail>(target && `/api/ticket?${new URLSearchParams({ id: target })}`);
 	const folds = useFolds(COLLAPSED_KEY);
 	const start = (ticket: Ticket, action: WorkActionId) => startSession(ticketStart(ticket, action, cwd, readPinnedSkill()));
 	const listRef = useRef<HTMLDivElement>(null);
@@ -112,7 +112,7 @@ export function TicketsPage({ target, section, cwd, hosts }: TicketsPageProps) {
 					key={target}
 					id={target}
 					listed={listed}
-					read={{ ...detailRead, reload: () => setVersion(count => count + 1) }}
+					read={detailRead}
 					actions={ticket => (
 						<DetailQuickActions
 							actions={ticketActions(ticket)}
