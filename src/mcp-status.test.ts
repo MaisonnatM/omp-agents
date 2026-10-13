@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { remoteStatusOf } from "./mcp-status";
-import { ApiError, type McpServer, type McpToolDefinition, McpUnauthorized } from "./omp/mcp";
+import { type McpServer, type McpToolDefinition, McpUnauthorized } from "./omp/mcp";
+import { ApiError } from "./signed-fetch";
 import type { McpRemoteStatus } from "./shared/mcp-status";
 
 const server: McpServer = { name: "linear", url: "https://mcp.linear.app/mcp", credentialId: "mcp:linear", config: { type: "http", url: "https://mcp.linear.app/mcp" } };

@@ -1,6 +1,7 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import * as proc from "../proc";
-import { ApiError, callWithMcpSignIn, listMcpTools, type McpServer, McpRefused, McpUnauthorized, writeMcpServer } from "./mcp";
+import { ApiError, signedFetch } from "../signed-fetch";
+import { listMcpTools, mcpBearer, type McpServer, McpRefused, McpUnauthorized, writeMcpServer } from "./mcp";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -104,7 +105,7 @@ test("service API and discovery refusals invalidate signed and unsigned lists sh
 		expect(r.headers[2].get("Authorization")).toBe("Bearer test-token");
 		expect(token).toHaveBeenCalledTimes(1);
 		r.status(401);
-		await expect(callWithMcpSignIn(r.found, r.found.url)).rejects.toBeInstanceOf(McpRefused);
+		await expect(signedFetch(() => mcpBearer(r.found))(r.found.url)).rejects.toBeInstanceOf(McpRefused);
 		r.status(200);
 		await listMcpTools(r.found, false, false);
 		await listMcpTools(r.found, true, false);

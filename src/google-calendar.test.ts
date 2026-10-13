@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import { GoogleCalendarClient } from "./google-calendar";
-import type { GoogleFetch } from "./integrations";
-import { ApiError } from "./omp/mcp";
+import { ApiError, type SignedFetch } from "./signed-fetch";
 
 const OCTOBER = [new Date("2026-10-01T00:00:00+02:00"), new Date("2026-11-01T00:00:00+01:00")] as const;
 
@@ -65,7 +64,7 @@ function clientOf(
 	const reads: string[] = [];
 	const posts: { url: string; body: unknown }[] = [];
 	const deletes: string[] = [];
-	const fetch: GoogleFetch = async (url, init) => {
+	const fetch: SignedFetch = async (url, init) => {
 		switch (init?.method) {
 			case "POST":
 				posts.push({ url, body: init.body });

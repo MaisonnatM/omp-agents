@@ -5,6 +5,7 @@
  */
 import { isObject, nonEmptyStr, str } from "./json";
 import type { SlackSubject } from "./shared/notices";
+import type { SignedFetch } from "./signed-fetch";
 
 const API = "https://slack.com/api";
 
@@ -13,9 +14,6 @@ const WINDOW_MS = 3 * 24 * 60 * 60_000;
 
 /** How many pages of 20 messages, Slack's most, one search reads; a busy window's oldest messages fall past them. */
 const MAX_PAGES = 5;
-
-/** Reads the JSON at a Slack Web API address with your sign-in. */
-export type SlackGet = (url: string) => Promise<unknown>;
 
 /** A Slack message the bell lists, keyed by its conversation and timestamp. */
 export type SlackFound = { id: string; at: number } & SlackSubject;
@@ -97,7 +95,7 @@ function slackNotices(dms: Message[], mentions: Message[], me: string, avatars: 
 }
 
 /** Slack's answer to one search for `query` in `channelTypes` since `after`, newest first and without bots, up to {@link MAX_PAGES} pages. */
-async function search(get: SlackGet, query: string, channelTypes: string, after: number): Promise<Message[]> {
+async function search(get: SignedFetch, query: string, channelTypes: string, after: number): Promise<Message[]> {
 	const params = new URLSearchParams({ query, channel_types: channelTypes, sort: "timestamp", include_bots: "false", limit: "20", after: String(Math.floor(after / 1000)) });
 	const messages: Message[] = [];
 	for (let page = 0; page < MAX_PAGES; page++) {
@@ -110,7 +108,7 @@ async function search(get: SlackGet, query: string, channelTypes: string, after:
 }
 
 /** Who the token signs in as. */
-async function signedInAs(get: SlackGet): Promise<string> {
+async function signedInAs(get: SignedFetch): Promise<string> {
 	const answer = await get(`${API}/auth.test`);
 	const id = isObject(answer) && answer.ok === true ? nonEmptyStr(answer.user_id) : undefined;
 	if (!id) throw new Error(`Slack did not say who you are: ${(isObject(answer) && str(answer.error)) || "no answer"}`);
@@ -121,7 +119,7 @@ async function signedInAs(get: SlackGet): Promise<string> {
  * The 72-pixel profile picture of each of `users` that Slack's `users.info` gives. One it refuses, such as under a
  * sign-in without `users:read`, has none, so the bell shows that author's initial.
  */
-async function avatarsOf(get: SlackGet, users: Iterable<string>): Promise<Map<string, string>> {
+async function avatarsOf(get: SignedFetch, users: Iterable<string>): Promise<Map<string, string>> {
 	const found = await Promise.all(
 		[...new Set(users)].map(async user => {
 			const answer = await get(`${API}/users.info?${new URLSearchParams({ user })}`).catch(() => null);
@@ -133,7 +131,7 @@ async function avatarsOf(get: SlackGet, users: Iterable<string>): Promise<Map<st
 }
 
 /** The Slack messages of the last {@link WINDOW_MS} that wait on you, as of `now`. */
-export async function waitingOnYou(get: SlackGet, now: number): Promise<SlackFound[]> {
+export async function waitingOnYou(get: SignedFetch, now: number): Promise<SlackFound[]> {
 	const me = await signedInAs(get);
 	const after = now - WINDOW_MS;
 	const [dms, mentions] = await Promise.all([search(get, "*", "im,mpim", after), search(get, `<@${me}>`, "public_channel,private_channel", after)]);

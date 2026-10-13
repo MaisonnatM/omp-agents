@@ -5,10 +5,9 @@
  * the server's own tools answer only for OAuth clients in Google's Developer Preview Program.
  */
 import { type Cache, createCache } from "./cache";
-import type { GoogleFetch } from "./integrations";
 import { errorText, isObject, nonEmptyStr, str } from "./json";
-import { ApiError } from "./omp/mcp";
 import type { CalendarEvent, CalendarEventsAnswer, EventWhen, GoogleCalendar, GoogleStatus } from "./shared/calendar";
+import { ApiError, type SignedFetch } from "./signed-fetch";
 
 const API = "https://www.googleapis.com/calendar/v3";
 
@@ -87,7 +86,7 @@ function eventOf(item: unknown, calendar: ListedCalendar): CalendarEvent | null 
  * minute, and the events it adds and deletes.
  */
 export class GoogleCalendarClient {
-	readonly #fetch: GoogleFetch;
+	readonly #fetch: SignedFetch;
 	/** The ids of the calendars the Calendar page's sidebar unchecked. */
 	readonly #hidden: () => ReadonlySet<string>;
 	readonly #lists = createCache<ListedCalendar[]>(60_000);
@@ -96,7 +95,7 @@ export class GoogleCalendarClient {
 	/** Why each calendar's last read failed, by its id. */
 	readonly #errors = new Map<string, string>();
 
-	constructor(fetch: GoogleFetch, hidden: () => ReadonlySet<string>) {
+	constructor(fetch: SignedFetch, hidden: () => ReadonlySet<string>) {
 		this.#fetch = fetch;
 		this.#hidden = hidden;
 	}
