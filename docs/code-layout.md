@@ -314,11 +314,11 @@ The page lives in `web/`.
 - `web/use-git-checkout.ts`: reads a directory's git checkout for the new-session draft's branch picker.
   `web/components/git.tsx` holds the branch picker, the repository and branch in a header's meta line, and `BranchName`, the branch that copies itself on click, which the pull requests and tickets also show.
   `web/use-copy.ts` copies text to the clipboard and holds the copied state behind a button's check mark.
-  `web/use-default-model.ts` reads the model that the `default` role names, which the draft's model picker shows until a pick.
+  `web/use-draft-model.ts` holds `useDraftModelSelection`, the model and effort of the new-session draft and the **New project** form: the model a start sends, `null` for omp's default, the model the picker shows, which until a pick is the one the `default` role names, and an effort kept only for the model it was picked on; it also reads the model list again whenever the menu opens.
   `web/use-skills.ts` reads a directory's skills, and `web/pinned-skill.ts` keeps the skill pinned for new sessions.
   `web/components/skill-picker.tsx` is the skill picker that the settings' pinned skill and the routine editor share.
   `web/components/command-picker.tsx` holds `CommandPicker`, the searchable grouped list behind the branch, workspace, and skill pickers, with `CommandResults`, which the model menu's search shares.
-  The checkout, the default model, and the skills are each one `useRead`.
+  The checkout, the default model's role, and the skills are each one `useRead`.
 - `web/shortcuts.ts`: the keyboard shortcut table, which both the key listeners and the shortcut dialog read.
   One `keydown` listener on the window serves every `useShortcuts` registration, which `createShortcutStack` orders: the registration that mounted last tries a key first, and the first handler that takes it ends the press, so a page's own bindings come before `web/use-page-shortcuts.ts`'s, which `web/app.tsx` mounts first, and a handler that returns `false` lets the key fall to the one below.
   Shortcuts with a `command` title are also the command palette's commands, and `web/app.tsx` hands the palette the same handlers it registers.

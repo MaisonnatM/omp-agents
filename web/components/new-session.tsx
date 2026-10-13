@@ -1,7 +1,6 @@
 import { Sparkles } from "lucide-react";
 import { type KeyboardEvent, useRef, useState } from "react";
 import type { BranchChoice } from "../../src/shared/git";
-import { type ConnectedModels, type ModelOption, selectorOf } from "../../src/shared/models";
 import type { Workspace } from "../../src/shared/workspaces";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,12 +9,11 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { folderName } from "../labels";
 import type { Completions } from "../pane-store";
 import { usePinnedSkill } from "../pinned-skill";
-import { useRead } from "../reads";
+import { useDraftModelSelection } from "../use-draft-model";
 import { useShortcuts } from "../shortcuts";
 import type { ScheduleWhen } from "../scheduled-model";
 import type { NewOp, StartOf } from "../starts";
 import { useGitCheckout } from "../use-git-checkout";
-import { useDefaultModel } from "../use-default-model";
 import { useAction } from "../use-action";
 import { useSkills } from "../use-skills";
 import { useCompletion } from "./completion-popup";
@@ -23,7 +21,7 @@ import { blockedShortcut, ComposerEditor, ComposerNote, ComposerTray, EmptyConve
 import { BranchPicker, targetOf } from "./git";
 import { ATTACH_ACCEPT, AttachButton, usePromptAttachments } from "./prompt-attachments";
 import type { PromptEditorHandle } from "./prompt-editor";
-import { type ModelMenuOpen, ModelPicker } from "./model-picker";
+import { ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
 import { ScheduleButton } from "./scheduled";
 import { DirectoryPicker } from "./workspace-picker";
@@ -60,12 +58,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const [draft, setDraft] = useState(todo?.prompt ?? "");
 	const attachments = usePromptAttachments(true);
 	const [picked, setPicked] = useState<{ cwd: string; choice: BranchChoice | null }>({ cwd, choice: null });
-	/** `null` leaves omp's default model unchanged. */
-	const [model, setModel] = useState<ModelOption | null>(null);
-	const [pickedThinking, setPickedThinking] = useState<{ model: string; level: string } | null>(null);
-	// Until a pick, omp starts on its `default` role's model, so the picker shows that one.
-	const defaultModel = useDefaultModel(cwd);
-	const shownModel = model ?? defaultModel;
+	const models = useDraftModelSelection(cwd);
 	const [pinnedSkill] = usePinnedSkill();
 	const [skipSkill, setSkipSkill] = useState(false);
 	const skills = useSkills(cwd);
@@ -79,17 +72,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 				: draft.trimStart().startsWith("/")
 					? "bypassed"
 					: "on";
-	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
-	// Reopening reads credentials and model capabilities again after a provider login.
-	const [modelOpens, setModelOpens] = useState(0);
-	const modelsRead = useRead<ConnectedModels>(`/api/models/connected?cwd=${encodeURIComponent(cwd)}`, modelOpens);
 	const [directoriesOpen, setDirectoriesOpen] = useState(false);
-	const shownSelector = shownModel ? selectorOf(shownModel) : null;
-	const levels = modelsRead.data?.models.find(model => selectorOf(model) === shownSelector)?.thinkingLevels ?? null;
-	const thinking = pickedThinking?.model === shownSelector && levels?.includes(pickedThinking.level) ? pickedThinking.level : null;
-	const pickThinking = (level: string | null): void => {
-		setPickedThinking(level !== null && shownSelector ? { model: shownSelector, level } : null);
-	};
 	// A failed start can still have added the branch and its worktree, so the picker reads the checkout again.
 	const checkout = useGitCheckout(cwd, launch?.phase === "failed" ? launch : null);
 	const pickedChoice = picked.cwd === cwd ? picked.choice : null;
@@ -99,23 +82,19 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 			? { kind: "existing", name: pickedChoice.name }
 			: pickedChoice;
 	const starting = launch?.phase === "starting";
-	const openModels = (open: ModelMenuOpen | null): void => {
-		if (open !== null && modelsOpen === null) setModelOpens(count => count + 1);
-		setModelsOpen(open);
-	};
 	const completion = useCompletion({ editorRef, draft, setDraft, completions, onComplete, composer: { sessionId: null, changed: [] } });
 	const onComposerKey = useShortcuts({
 		model: () => {
 			if (starting || !connected) return false;
-			openModels("models");
+			models.openModels("models");
 		},
 		directory: () => {
 			if (starting) return false;
 			setDirectoriesOpen(open => !open);
 		},
 		thinking: () => {
-			if (starting || !connected || modelsRead.error !== null || !levels?.length) return false;
-			pickThinking(levels[(levels.indexOf(thinking ?? "") + 1) % levels.length]);
+			if (starting || !connected || !models.levels?.length) return false;
+			models.pickThinking(models.levels[(models.levels.indexOf(models.thinking ?? "") + 1) % models.levels.length]);
 		},
 		focusComposer: () => {
 			const editor = editorRef.current;
@@ -134,7 +113,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	const directCommand = blockedShortcut(draft, "new");
 	const schedule = useAction(async (when: ScheduleWhen) => {
 		const prompt = draft.trim();
-		await onSchedule({ prompt, branch: choice, model, thinking, skill: skipSkill ? null : pinnedSkill }, when);
+		await onSchedule({ prompt, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : pinnedSkill }, when);
 		setDraft(current => (current.trim() === prompt ? "" : current));
 	}, "Could not schedule the session");
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
@@ -163,7 +142,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						onSend={text => {
 							if (directCommand) return;
 							completion.close();
-							attachments.read(text, (prompt, images) => onStart({ prompt, images, branch: choice, model, thinking, skill: skipSkill ? null : pinnedSkill }));
+							attachments.read(text, (prompt, images) => onStart({ prompt, images, branch: choice, model: models.model, thinking: models.thinking, skill: skipSkill ? null : pinnedSkill }));
 						}}
 						placeholder="Message this session…"
 						files={attachments.files}
@@ -171,19 +150,7 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 						accept={ATTACH_ACCEPT}
 						leftSlot={
 							<>
-								<ModelPicker
-									current={shownSelector}
-									unset="Default model"
-									list={modelsRead}
-									open={modelsOpen}
-									onOpenChange={openModels}
-									onPick={next => {
-										setModel(next);
-										setPickedThinking(null);
-									}}
-									effort={{ current: thinking, levels: modelsRead.error === null ? levels : [], onPick: pickThinking, allowDefault: true }}
-									disabled={starting || !connected}
-								/>
+								<ModelPicker {...models.picker} disabled={starting || !connected} />
 								{pinnedSkill !== null && <PinnedSkillToggle name={pinnedSkill} state={skillState} onToggle={() => setSkipSkill(skip => !skip)} disabled={starting} />}
 							</>
 						}

@@ -480,7 +480,7 @@ An action that fails shows its error, and its control becomes available again.
   Context and the model search work as in a running session, and the curated models come from the draft directory's config.
   The effort choices come from the selected model's omp catalog entry.
   **Default** leaves omp's configured thinking level unchanged.
-  Choosing a level starts the session at that level, and choosing another model resets the effort to **Default**.
+  Choosing a level starts the session at that level, for the model it was chosen on: choosing another model, or a directory whose `default` role names another model, resets the effort to **Default**.
   Models without selectable thinking levels offer only **Default**.
   Cmd+. opens the model search here too, and Cmd+J cycles the supported thinking levels after the catalog loads.
 - A skill pinned in **Settings** shows as a toggle after the model picker, with the skill's name.

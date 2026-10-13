@@ -1,6 +1,6 @@
 import { Archive, ArrowLeft, Pencil, Plus } from "lucide-react";
 import { type FormEvent, useId, useState } from "react";
-import { type ConnectedModels, type ModelOption, selectorOf } from "../../../src/shared/models";
+import type { ModelOption } from "../../../src/shared/models";
 import { DEFAULT_PROJECT_NAME, type Project, type ProjectUpdate } from "../../../src/shared/projects";
 import type { PastSession, RosterHost } from "../../../src/shared/sessions";
 import type { Workspace } from "../../../src/shared/workspaces";
@@ -8,14 +8,13 @@ import { Button } from "@/components/ui/button";
 import { MenuItem } from "@/components/ui/menu";
 import { cn } from "@/lib/utils";
 import { modeOf, readTime, SPLIT_CLICK } from "../../labels";
-import { useRead } from "../../reads";
 import { hashForProjects, type ProjectsTarget } from "../../routing";
 import { projectSession } from "../../sessions";
 import type { StartOf } from "../../starts";
-import { useDefaultModel } from "../../use-default-model";
+import { useDraftModelSelection } from "../../use-draft-model";
 import { useDashboardActions } from "../dashboard-context";
 import { PageFrame } from "../list-page";
-import { type ModelMenuOpen, ModelPicker } from "../model-picker";
+import { ModelPicker } from "../model-picker";
 import { MoreActionsMenu } from "../more-actions-menu";
 import { DirectoryPicker } from "../workspace-picker";
 import { PHASE_LABEL, ProjectNotesList } from "./project-parts";
@@ -54,27 +53,14 @@ function NewProject({ initial, workspaces, connected, launch, onCancel }: NewPro
 	const [name, setName] = useState(initial.name);
 	const [cwd, setCwd] = useState(initial.cwd);
 	const [prompt, setPrompt] = useState(initial.prompt);
-	/** `null` leaves omp's default model, which the picker shows until a pick. */
-	const [model, setModel] = useState(initial.model);
-	/** A level holds for the model it was picked on, `null` for omp's default, as on the new-session draft. */
-	const [pickedThinking, setPickedThinking] = useState(initial.thinking === null ? null : { model: initial.model && selectorOf(initial.model), level: initial.thinking });
+	const models = useDraftModelSelection(cwd, initial);
 	const [tried, setTried] = useState(false);
-	const defaultModel = useDefaultModel(cwd);
-	const shownModel = model ?? defaultModel;
-	const [modelsOpen, setModelsOpen] = useState<ModelMenuOpen | null>(null);
-	// Reopening reads credentials and model capabilities again after a provider login.
-	const [modelOpens, setModelOpens] = useState(0);
-	const modelsRead = useRead<ConnectedModels>(`/api/models/connected?cwd=${encodeURIComponent(cwd)}`, modelOpens);
-	const pickedSelector = model && selectorOf(model);
-	const shownSelector = shownModel ? selectorOf(shownModel) : null;
-	const levels = modelsRead.data?.models.find(entry => selectorOf(entry) === shownSelector)?.thinkingLevels ?? null;
-	const thinking = pickedThinking?.model === pickedSelector && levels?.includes(pickedThinking.level) ? pickedThinking.level : null;
 	const starting = launch?.phase === "starting";
 	const missingPrompt = prompt.trim() === "";
 	const submit = (event: FormEvent): void => {
 		event.preventDefault();
 		setTried(true);
-		if (!missingPrompt) start({ kind: "project", name: name.trim(), cwd, prompt: prompt.trim(), model, thinking });
+		if (!missingPrompt) start({ kind: "project", name: name.trim(), cwd, prompt: prompt.trim(), model: models.model, thinking: models.thinking });
 	};
 	return (
 		<PageFrame title="New project" meta="A coordinator agent plans the work and starts worker sessions">
@@ -100,24 +86,7 @@ function NewProject({ initial, workspaces, connected, launch, onCancel }: NewPro
 				</div>
 				<div className="space-y-1.5">
 					<p className="block text-sm font-medium">Model</p>
-					<ModelPicker
-						current={shownSelector}
-						unset="Default model"
-						list={modelsRead}
-						open={modelsOpen}
-						onOpenChange={next => {
-							if (next !== null && modelsOpen === null) setModelOpens(count => count + 1);
-							setModelsOpen(next);
-						}}
-						onPick={setModel}
-						effort={{
-							current: thinking,
-							levels: modelsRead.error === null ? levels : [],
-							onPick: level => setPickedThinking(level === null ? null : { model: pickedSelector, level }),
-							allowDefault: true,
-						}}
-						disabled={starting || !connected}
-					/>
+					<ModelPicker {...models.picker} disabled={starting || !connected} />
 					<p className="text-xs text-muted-foreground">The coordinator's model. Workers start on omp's default model.</p>
 				</div>
 				<div className="space-y-1.5">
