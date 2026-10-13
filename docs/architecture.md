@@ -579,6 +579,8 @@ A plan notice's id leaves out the reset time, which a provider may report a litt
 A Slack notice dates from its message, and a credits notice from the first failure the check reads.
 A pull request notice dates from the check that found it, since the pull request's last update on GitHub may predate the move, except on its repository's first answer since startup, which dates each from that update, so a workspace found later or a repository GitHub answers again does not bring old pull requests as news.
 The marks of a notice the checks stop finding last ten minutes, so a pull request whose checks run again, which leaves **Ready to merge** for a moment, keeps its marks, and one that comes back later is news again.
+Each notice carries its scope when its check finds it, its kind, a pull request's `owner/repo`, or `event:local` or `event:google`, and a check answers for the scopes it looked at, never by reading ids back.
+`notices.json` keeps each marked notice's scope under `scopes`, so a restarted server forgets the marks of a notice that is gone from an answered scope; a mark from a file without `scopes` stays until its notice is found again.
 
 A `notice` socket message carries `{ ids, op }`, with `op` one of `update`, `seen`, `read`, and `clear`.
 `update` runs on update notices and marks them seen and read.

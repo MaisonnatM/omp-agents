@@ -255,6 +255,36 @@ describe("Notices", () => {
 		expect(notices.list.map(({ id }) => id)).toEqual(["pull-request:acme/webapp#1:merge"]);
 	});
 
+	test("a marked notice keeps its scope across a restart: a repository that fails keeps its marks, and one that answers without it forgets them after a while", async () => {
+		const path = noticesPath();
+		const MERGE_1 = "pull-request:acme/webapp#1:merge";
+		const state: State = { latest: null, installed: "18.8.0", models: [], pullRequests: [pr(1)], now: 0 };
+		/** Whether a fresh server, as after a restart, shows the pull request's notice read. */
+		const readAfterRestart = async (): Promise<boolean | undefined> => {
+			const restarted = new Notices(path, sources({ ...state, githubError: undefined, pullRequests: [pr(1)] }), () => {});
+			await restarted.check(ACTIVITY_KINDS);
+			return restarted.list.find(({ id }) => id === MERGE_1)?.read;
+		};
+		const first = new Notices(path, sources(state), () => {});
+		await first.check(ACTIVITY_KINDS);
+		await first.apply([MERGE_1], "read");
+
+		const second = new Notices(path, sources(state), () => {});
+		state.githubError = "GitHub answered HTTP 502";
+		await second.check(ACTIVITY_KINDS);
+		state.now = 30 * MINUTE;
+		await second.check(ACTIVITY_KINDS);
+		expect(await readAfterRestart()).toBe(true);
+
+		state.githubError = undefined;
+		state.pullRequests = [];
+		state.now = 31 * MINUTE;
+		await second.check(ACTIVITY_KINDS);
+		state.now = 42 * MINUTE;
+		await second.check(ACTIVITY_KINDS);
+		expect(await readAfterRestart()).toBe(false);
+	});
+
 	test("a repository that answers only after the first check dates its pull requests by their own time, not as news", async () => {
 		const state: State = { latest: null, installed: "18.8.0", models: [], pullRequests: [pr(1, { updatedAt: 1_000 })], githubError: "GitHub answered HTTP 502", now: 50 * MINUTE };
 		const notices = new Notices(noticesPath(), sources(state), () => {});
