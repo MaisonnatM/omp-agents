@@ -16,9 +16,9 @@ const PullRequestsIcon = PAGE_ICON["pull-requests"];
 
 /**
  * `webapp / Fix login`: the workspace a session runs in, then `path`, each name below the one before it. Hover the workspace
- * for its full directory, and the worktree it works in when another.
+ * for its full directory, and the worktree it works in when another. With `onOpenParent`, the name before the last opens its page.
  */
-export function SessionTrail({ cwdDisplay, worktree, path }: { cwdDisplay: string; worktree: string | null; path: string[] }) {
+export function SessionTrail({ cwdDisplay, worktree, path, onOpenParent }: { cwdDisplay: string; worktree: string | null; path: string[]; onOpenParent?: () => void }) {
 	return (
 		<>
 			<Tooltip content={worktree ? `${cwdDisplay}, working in ${worktree}` : cwdDisplay}>
@@ -29,7 +29,13 @@ export function SessionTrail({ cwdDisplay, worktree, path }: { cwdDisplay: strin
 					<span aria-hidden className="px-1.5 font-normal text-muted-foreground/60">
 						/
 					</span>
-					<span className={index < path.length - 1 ? PARENT_CRUMB : undefined}>{name}</span>
+					{onOpenParent && index === path.length - 2 ? (
+						<button type="button" className={`${PARENT_CRUMB} cursor-pointer hover:text-foreground hover:underline`} onClick={onOpenParent}>
+							{name}
+						</button>
+					) : (
+						<span className={index < path.length - 1 ? PARENT_CRUMB : undefined}>{name}</span>
+					)}
 				</Fragment>
 			))}
 		</>

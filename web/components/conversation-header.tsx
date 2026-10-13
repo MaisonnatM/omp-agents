@@ -1,9 +1,8 @@
-import { ArrowLeft, CircleStop } from "lucide-react";
+import { CircleStop } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
@@ -27,7 +26,7 @@ interface ConversationHeaderProps {
 }
 
 /**
- * A live session's or subagent's trail, `workspace / title`, or `workspace / title / subagent` with the way back to its session;
+ * A live session's or subagent's trail, `workspace / title`, or `workspace / title / subagent` whose title opens its session;
  * the connection status; a session's pull requests, its directory in Cursor, and End session, which shows it is
  * ending until the server answers, though the session may leave the roster before then.
  */
@@ -44,23 +43,14 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 				: `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
 	const endable = live && host ? host : ending ? shown : null;
 	const path = [shown?.sessionName, agent?.id].filter((name): name is string => !!name);
-	const title = shown ? <SessionTrail cwdDisplay={shown.cwdDisplay} worktree={shown.worktree} path={path} /> : (agent?.id ?? view.instanceId);
-	const session = shown ? hostLabel(shown) : "the session";
-	const back = view.agentId !== null && (
-		<Tooltip content={`Back to ${session}`} side="bottom">
-			<Button
-				variant="ghost"
-				size="icon-compact"
-				className="shrink-0 text-muted-foreground"
-				aria-label={`Back to ${session}`}
-				onClick={() => open({ ...view, agentId: null }, "replace")}
-			>
-				<ArrowLeft />
-			</Button>
-		</Tooltip>
+	const openParent = view.agentId !== null ? () => open({ ...view, agentId: null }, "replace") : undefined;
+	const title = shown ? (
+		<SessionTrail cwdDisplay={shown.cwdDisplay} worktree={shown.worktree} path={path} onOpenParent={openParent} />
+	) : (
+		(agent?.id ?? view.instanceId)
 	);
 	return (
-		<Header title={title} status={status} alert={!ending && phase.phase === "ended"} leading={back}>
+		<Header title={title} status={status} alert={!ending && phase.phase === "ended"}>
 			{subject.kind === "session" && shown && <PullRequestMenu pullRequests={shown.pullRequests} />}
 			{subject.kind === "session" && endable && (
 				<Tooltip
