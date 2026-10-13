@@ -1,4 +1,4 @@
-/** A header trail, `workspace / title`, and the menu of a session's pull requests. */
+/** The subagent header's crumb styles, and the menu of a session's pull requests. */
 import { ChevronDown, GitPullRequest } from "lucide-react";
 import { Fragment, useState } from "react";
 import { type LinkedPullRequest, pullRequestUrl } from "../../src/shared/github";
@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, MenuLinkItem, MenuSeparator } from "@/components/ui/menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import { graphiteUrl } from "../pull-requests-model";
-import { folderName } from "../labels";
 import { PAGE_ICON } from "../page-icons";
 import { hashForPullRequests } from "../routing";
 import { OrgIcon } from "./org-icon";
@@ -14,28 +13,6 @@ import { OrgIcon } from "./org-icon";
 export const PARENT_CRUMB = "font-normal text-muted-foreground";
 export const CRUMB_SEPARATOR = "px-1.5 font-normal text-muted-foreground/60";
 const PullRequestsIcon = PAGE_ICON["pull-requests"];
-
-/**
- * `webapp / New session`: the workspace a draft runs in, then `path`, each name below the one before it. Hover the workspace
- * for its full directory, and the worktree it works in when another.
- */
-export function SessionTrail({ cwdDisplay, worktree, path }: { cwdDisplay: string; worktree: string | null; path: string[] }) {
-	return (
-		<>
-			<Tooltip content={worktree ? `${cwdDisplay}, working in ${worktree}` : cwdDisplay}>
-				<span className={path.length > 0 ? PARENT_CRUMB : undefined}>{folderName(cwdDisplay) ?? cwdDisplay}</span>
-			</Tooltip>
-			{path.map((name, index) => (
-				<Fragment key={index}>
-					<span aria-hidden className={CRUMB_SEPARATOR}>
-						/
-					</span>
-					<span className={index < path.length - 1 ? PARENT_CRUMB : undefined}>{name}</span>
-				</Fragment>
-			))}
-		</>
-	);
-}
 
 /** The PRs a session submitted or worked on, behind one button: each opens on GitHub, on Graphite, or in its details on the Pull requests page. */
 export function PullRequestMenu({ pullRequests }: { pullRequests: LinkedPullRequest[] }) {

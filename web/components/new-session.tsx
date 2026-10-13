@@ -26,7 +26,6 @@ import type { PromptEditorHandle } from "./prompt-editor";
 import { type ModelMenuOpen, ModelPicker } from "./model-picker";
 import { Header } from "./page-header";
 import { ScheduleButton } from "./scheduled";
-import { SessionTrail } from "./session-meta";
 import { DirectoryPicker } from "./workspace-picker";
 
 interface NewSessionProps {
@@ -140,10 +139,9 @@ export function NewSession({ cwd, workspaces, launch, connected, completions, on
 	}, "Could not schedule the session");
 	const target = checkout ? targetOf(checkout, cwd, choice) : { dir: cwd, creates: false };
 	const name = folderName(target.dir) ?? target.dir;
-	const title = <SessionTrail cwdDisplay={cwd} worktree={target.dir === cwd ? null : target.dir} path={["New session"]} />;
 	return (
 		<div className="flex h-full min-h-0 flex-1 flex-col">
-			<Header title={title} status={starting ? "Starting omp…" : undefined} />
+			<Header title="New session" status={starting ? "Starting omp…" : undefined} />
 			{launch?.phase === "failed" && (
 				<p role="alert" className="border-b border-border px-6 py-2 text-xs text-red-600 dark:text-red-400">
 					{launch.error}
