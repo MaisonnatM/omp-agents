@@ -2,8 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type ClientSave, googleSetupFrom, planGoogleSave, planGoogleScope, planSlackSave, slackSetupFrom } from "./mcp-clients";
-import { writeMcpServer } from "./omp/mcp";
+import { clientSetup, type ClientSave, googleSetupFrom, planGoogleSave, planGoogleScope, planSlackSave, slackSetupFrom } from "./mcp-clients";
+import { userMcpConfigPath, writeMcpServer } from "./omp/mcp";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -163,4 +163,16 @@ test("a Google client without a saved callback port is not set up, since omp wou
 		callbackPort: 3119,
 		configured: false,
 	});
+});
+
+test("each service's setup follows its client: Linear has none, Slack its app, and a Google service its OAuth client or the defaults", async () => {
+	const path = userMcpConfigPath();
+	try {
+		await save(path, app);
+		expect(await clientSetup("linear")).toBeNull();
+		expect(await clientSetup("slack")).toEqual({ clientId: "111.222", hasClientSecret: true, redirectUri: app.redirectUri, callbackPort: 8787, scope: app.scope, configured: true });
+		expect(await clientSetup("gmail")).toEqual(googleSetupFrom(undefined));
+	} finally {
+		rmSync(path, { force: true });
+	}
 });

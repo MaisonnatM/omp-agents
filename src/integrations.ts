@@ -3,7 +3,7 @@
  * the server's tools, and the sign-in and sign-out the page starts. A sign-in adds the service's server to omp's
  * user-level MCP config when omp has none.
  */
-import { clientSetups, type ClientSave, planGoogleSave, planGoogleScope, planSlackSave } from "./mcp-clients";
+import { clientSetup, type ClientSave, planGoogleSave, planGoogleScope, planSlackSave } from "./mcp-clients";
 import { remoteStatusOf } from "./mcp-status";
 import {
 	addMcpServer,
@@ -19,11 +19,12 @@ import {
 import {
 	type ClientService,
 	type GoogleClientInput,
-	GOOGLE_SERVICES,
 	type GoogleService,
 	type IntegrationsAnswer,
+	isGoogleService,
 	MCP_INTEGRATIONS,
 	MCP_SERVICES,
+	type McpClient,
 	type McpConnection,
 	type McpIntegration,
 	type McpIntegrationId,
@@ -56,7 +57,7 @@ export const integrationFetch = (id: McpIntegrationId): SignedFetch => signedFet
  * `id`'s integration with `found` as its server, which every service requires a sign-in to: its status is held while a
  * sign-in waits on the browser.
  */
-async function loadIntegration(id: McpIntegrationId, found: McpServer | null, fresh: boolean): Promise<McpIntegration> {
+async function loadIntegration<Id extends McpIntegrationId>(id: Id, found: McpServer | null, fresh: boolean): Promise<McpIntegration<Id>> {
 	const signIn = signIns[id];
 	const connection: McpConnection = found
 		? {
@@ -64,8 +65,7 @@ async function loadIntegration(id: McpIntegrationId, found: McpServer | null, fr
 				server: { name: found.name, url: found.url, host: new URL(found.url).host },
 			}
 		: { kind: "absent" };
-	const setup = id === "linear" ? null : (await clientSetups())[id];
-	return { id, connection, signIn: signIn.state(), setup } as McpIntegration;
+	return { id, connection, signIn: signIn.state(), setup: await clientSetup(id) };
 }
 
 const findServer = (id: McpIntegrationId): Promise<McpServer | null> => findMcpServer(MCP_SERVICES[id].host);
@@ -76,15 +76,10 @@ export async function loadIntegrations(fresh: boolean): Promise<IntegrationsAnsw
 	return { integrations: Object.fromEntries(loaded.map(integration => [integration.id, integration])) as IntegrationsAnswer["integrations"] };
 }
 
-const GOOGLE_SETUP_ERROR = "Set up the Google OAuth client before connecting. Save its client ID, client secret, and callback port.";
-
-const SETUP_ERROR: Record<ClientService, string> = {
-	slack: "Set up the Slack app before connecting. Save a client ID, client secret, HTTPS redirect, callback port, and at least one supported scope.",
-	"google-calendar": GOOGLE_SETUP_ERROR,
-	gmail: GOOGLE_SETUP_ERROR,
+const SETUP_ERROR: Record<Exclude<McpClient, "none">, string> = {
+	"slack-app": "Set up the Slack app before connecting. Save a client ID, client secret, HTTPS redirect, callback port, and at least one supported scope.",
+	"google-oauth": "Set up the Google OAuth client before connecting. Save its client ID, client secret, and callback port.",
 };
-
-const isGoogleService = (id: McpIntegrationId): id is GoogleService => (GOOGLE_SERVICES as readonly string[]).includes(id);
 
 /**
  * Starts a sign-in to `id`, abandoning any under way, and answers once it has the service's authorization address or
@@ -93,13 +88,13 @@ const isGoogleService = (id: McpIntegrationId): id is GoogleService => (GOOGLE_S
 export async function startIntegrationSignIn(id: McpIntegrationId): Promise<McpIntegration> {
 	const service = MCP_SERVICES[id];
 	await signIns[id].start(async (signal, waiting) => {
-		if (id !== "linear" && !(await clientSetups())[id].configured) throw new Error(SETUP_ERROR[id]);
+		if (service.client !== "none" && !(await clientSetup(id))?.configured) throw new Error(SETUP_ERROR[service.client]);
 		if (isGoogleService(id)) {
 			const rescoped = await planGoogleScope(userMcpConfigPath(), id);
 			if (rescoped) await writeMcpServer(userMcpConfigPath(), rescoped.name, rescoped.server);
 		}
 		const found = await findServer(id);
-		await signInMcp(found ?? { url: service.url }, { onAuth: waiting, signal, requireRefresh: id === "slack" });
+		await signInMcp(found ?? { url: service.url }, { onAuth: waiting, signal, requireRefresh: service.requireRefresh });
 		if (!found) await addMcpServer(service.serverName, { type: "http", url: service.url });
 	});
 	return loadIntegration(id, await findServer(id), false);

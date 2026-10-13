@@ -5,6 +5,7 @@
 import { type McpServer, type McpServerConfig, credentialFor, readMcpServers, serverOnHost, userMcpConfigPath } from "./omp/mcp";
 import {
 	type ClientService,
+	type ClientSetups,
 	DEFAULT_GOOGLE_CALLBACK_PORT,
 	GOOGLE_SCOPES,
 	type GoogleClientInput,
@@ -12,7 +13,9 @@ import {
 	type GoogleSetup,
 	googleRedirectUri,
 	MCP_SERVICES,
-	type McpSetups,
+	type McpClient,
+	type McpIntegrationId,
+	type McpSetup,
 	normalizeSlackScope,
 	type SlackClientInput,
 	type SlackSetup,
@@ -69,14 +72,21 @@ export function googleSetupFrom(server: McpServerConfig | undefined): GoogleSetu
 	return { clientId, hasClientSecret, callbackPort, configured: clientId !== null && hasClientSecret && validPort(storedPort) };
 }
 
-/** Slack's, Google Calendar's, and Gmail's setups from the user MCP file. An unconfigured service still gets its defaults. */
-export async function clientSetups(): Promise<Omit<McpSetups, "linear">> {
-	const servers = await readMcpServers(userMcpConfigPath());
-	return {
-		slack: slackSetupFrom(serverOnHost(servers, MCP_SERVICES.slack.host)?.config),
-		"google-calendar": googleSetupFrom(serverOnHost(servers, MCP_SERVICES["google-calendar"].host)?.config),
-		gmail: googleSetupFrom(serverOnHost(servers, MCP_SERVICES.gmail.host)?.config),
-	};
+const savedServer = async (host: string): Promise<McpServerConfig | undefined> => serverOnHost(await readMcpServers(userMcpConfigPath()), host)?.config;
+
+const SETUP_OF: { [C in McpClient]: (host: string) => Promise<ClientSetups[C]> } = {
+	none: async () => null,
+	"slack-app": async host => slackSetupFrom(await savedServer(host)),
+	"google-oauth": async host => googleSetupFrom(await savedServer(host)),
+};
+
+/**
+ * Service `id`'s setup from the user MCP file, as its `client` decides: an unconfigured app or client still gets its
+ * defaults, and a service that registers its own client, Linear, has `null` without reading the file.
+ */
+export function clientSetup<Id extends McpIntegrationId>(id: Id): Promise<McpSetup<Id>> {
+	const client: (typeof MCP_SERVICES)[Id]["client"] = MCP_SERVICES[id].client;
+	return SETUP_OF[client](MCP_SERVICES[id].host);
 }
 
 /**
