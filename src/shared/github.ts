@@ -1,6 +1,6 @@
 /** GitHub repositories and pull requests: keys, links, the pull request list, one pull request in full, and its changed files. */
 
-import type { Parsed } from "../json";
+import { arrayOf, decoder, fields, isBoolean, isNumber, isString, isTexts, nullable, oneOf, type Parsed, type Shape } from "../json";
 import type { ChangedEntry } from "./changes";
 import type { MergeMethod } from "./source-control";
 
@@ -113,6 +113,40 @@ export interface PullRequestList {
 	/** Workspaces with no GitHub `origin`, which the Pull requests page cannot show. */
 	unmatched: string[];
 }
+
+const isPerson = fields<Person>({ login: isString, avatarUrl: nullable(isString) });
+
+const isSummary = fields<PullRequestSummary>({
+	owner: isString,
+	repo: isString,
+	number: isNumber,
+	title: isString,
+	author: isPerson,
+	reviewers: arrayOf(fields<Reviewer>({ login: isString, avatarUrl: nullable(isString), state: oneOf(["approved", "changes-requested", "commented", "requested"]) })),
+	role: oneOf(["author", "reviewer"]),
+	state: oneOf(["open", "draft", "merged"]),
+	review: oneOf(["approved", "changes-requested", "review-required", "none"]),
+	checks: oneOf(["passing", "failing", "pending", "none"]),
+	conflicts: isBoolean,
+	additions: isNumber,
+	deletions: isNumber,
+	head: isString,
+	stackedOn: nullable(isString),
+	unresolved: fields<PullRequestSummary["unresolved"]>({ count: isNumber, exact: isBoolean }),
+	updatedAt: isNumber,
+});
+
+const REPO: Shape<Repo & { cwds: string[] }> = { owner: isString, repo: isString, cwds: isTexts };
+const isListed = fields<Repo & { cwds: string[]; pullRequests: PullRequestSummary[] }>({ ...REPO, pullRequests: arrayOf(isSummary) });
+const isFailed = fields<Repo & { cwds: string[]; error: string }>({ ...REPO, error: isString });
+
+/** A kept {@link PullRequestList} with every repository and pull request whole, or `null`: a read saved before the list carried each PR's diff size reads GitHub again. */
+export const decodePullRequestList = decoder(
+	fields<PullRequestList>({
+		repos: arrayOf((repo: unknown): repo is RepoPullRequests => isListed(repo) || isFailed(repo)),
+		unmatched: isTexts,
+	}),
+);
 
 /** An open or draft pull request of a stack, as a pull request's details list its stack. */
 export interface StackedPullRequest extends PullRequest {

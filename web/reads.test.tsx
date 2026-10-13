@@ -188,6 +188,7 @@ test.each([
 const integrationsScenario = String.raw`
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+
 const memory = new Map([["omp-agents.integrations-cache", process.env.INTEGRATIONS_CACHE]]);
 globalThis.localStorage = { getItem: key => memory.get(key) ?? null, setItem: (key, value) => memory.set(key, value) };
 // A static import would hydrate the cache before storage is installed in this fresh process.
@@ -207,8 +208,13 @@ test.each([
 	{ name: "a ready connection that lists tool names is discarded", connection: { kind: "ready", server, tools: ["list_issues"] }, shown: "<span>loading</span>" },
 	{ name: "an integration without a connection is discarded", connection: undefined, shown: "<span>loading</span>" },
 ])("integrations cache: $name", async ({ connection, shown }) => {
-	const integration = (id: string, own: unknown) => ({ id, connection: own, signIn: null, setup: null });
-	const integrations = { linear: integration("linear", connection), slack: integration("slack", { kind: "absent" }), "google-calendar": integration("google-calendar", { kind: "absent" }), gmail: integration("gmail", { kind: "absent" }) };
+	const setup = { clientId: null, hasClientSecret: false, callbackPort: 3119, configured: false };
+	const integrations = {
+		linear: { id: "linear", connection, signIn: null, setup: null },
+		slack: { id: "slack", connection: { kind: "absent" }, signIn: null, setup: { ...setup, redirectUri: null, scope: "chat:write" } },
+		"google-calendar": { id: "google-calendar", connection: { kind: "absent" }, signIn: null, setup },
+		gmail: { id: "gmail", connection: { kind: "absent" }, signIn: null, setup },
+	};
 	const child = Bun.spawn([process.execPath, "--eval", integrationsScenario], {
 		cwd: import.meta.dir,
 		env: { ...process.env, INTEGRATIONS_CACHE: JSON.stringify({ "": { data: { integrations }, at: 1 } }) },

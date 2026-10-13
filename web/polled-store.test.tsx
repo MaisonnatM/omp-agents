@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, jest, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
+import { decoder, fields, isNumber } from "../src/json";
 import { createPolledStore, type PolledEntry } from "./polled-store";
 
 const memory = new Map<string, string>();
@@ -19,13 +20,14 @@ globalThis.localStorage = {
 } as Storage;
 
 const keys: string[] = [];
+const decodeN = decoder(fields<{ n: number }>({ n: isNumber }));
 
 function store() {
 	const cacheKey = `test.polled.${keys.length}`;
 	keys.push(cacheKey);
 	return createPolledStore<{ n: number }>({
 		url: scope => `/polled/${scope ?? ""}`,
-		cache: { key: cacheKey, isValid: (value): value is { n: number } => typeof (value as { n?: unknown } | null)?.n === "number" },
+		cache: { key: cacheKey, decode: decodeN },
 	});
 }
 
@@ -209,14 +211,14 @@ describe("polled store", () => {
 		);
 		const polled = createPolledStore<{ n: number }>({
 			url: () => "/polled",
-			cache: { key: cacheKey, isValid: (value): value is { n: number } => typeof (value as { n?: unknown } | null)?.n === "number" },
+			cache: { key: cacheKey, decode: decodeN },
 		});
 		expect(text(polled, "ok")).toBe("<span>4:still:</span>");
 		expect(text(polled, "bad")).toBe("<span>-:still:</span>");
 		localStorage.setItem(cacheKey, "{");
 		const again = createPolledStore<{ n: number }>({
 			url: () => "/polled",
-			cache: { key: cacheKey, isValid: (value): value is { n: number } => typeof (value as { n?: unknown } | null)?.n === "number" },
+			cache: { key: cacheKey, decode: decodeN },
 		});
 		expect(text(again, "ok")).toBe("<span>-:still:</span>");
 	});

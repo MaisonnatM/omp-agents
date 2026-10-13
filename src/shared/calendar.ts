@@ -1,5 +1,5 @@
 /** The Calendar page's events: your Google calendars and their events, the events it adds, and the events kept on this computer. */
-import { isDay, isObject, isSafeInteger, type Parsed } from "../json";
+import { arrayOf, decoder, fields, isBoolean, isDay, isNumber, isObject, isSafeInteger, isString, nullable, oneOf, type Parsed } from "../json";
 
 /** A calendar shown in your Google Calendar, which the Calendar page reads unless you unchecked it there. */
 export interface GoogleCalendar {
@@ -102,3 +102,45 @@ export type GoogleEventRef = { kind: "google"; calendarId: string; eventId: stri
 
 /** The event `PUT /api/calendar/events/delete` deletes: one kept on this computer, or one of a Google calendar you may write to. */
 export type EventRef = LocalEventRef | GoogleEventRef;
+
+const isEventWhen = (value: unknown): value is EventWhen =>
+	fields<Extract<EventWhen, { allDay: true }>>({ allDay: oneOf([true]), firstDay: isString, lastDay: isString })(value)
+	|| fields<Extract<EventWhen, { allDay: false }>>({ allDay: oneOf([false]), start: isNumber, end: isNumber })(value);
+
+/** A kept {@link GoogleStatus} with every calendar whole, or `null`. */
+export const decodeGoogleStatus = decoder(
+	fields<GoogleStatus>({
+		calendars: arrayOf(
+			fields<GoogleCalendar>({
+				id: isString,
+				name: isString,
+				color: isString,
+				group: oneOf(["mine", "other"]),
+				writable: isBoolean,
+				shown: isBoolean,
+				error: nullable(isString),
+			}),
+		),
+	}),
+);
+
+/** A kept {@link CalendarEventsAnswer} with every event whole, or `null`. */
+export const decodeCalendarEventsAnswer = decoder(
+	fields<CalendarEventsAnswer>({
+		events: arrayOf(
+			fields<CalendarEvent>({
+				calendarId: isString,
+				eventId: isString,
+				writable: isBoolean,
+				title: isString,
+				calendar: isString,
+				color: isString,
+				url: isString,
+				when: isEventWhen,
+			}),
+		),
+	}),
+);
+
+/** A kept {@link LocalEventsAnswer} with every event whole, or `null`. */
+export const decodeLocalEventsAnswer = decoder(fields<LocalEventsAnswer>({ events: arrayOf(fields<LocalEvent>({ id: isString, title: isString, when: isEventWhen })) }));
