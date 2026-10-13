@@ -643,6 +643,7 @@ It waits for the transcript reads asked for so far, then reads nothing itself; t
 It reads GitHub again on each call and keeps the answer, with each file's `patch` and blob id, for the file reads for 30 seconds.
 `GET /api/pull-request/file?owner=<o>&repo=<r>&number=<n>&path=<path>` answers one file of that list in full, `ChangedFileText`, and 404 for a path the list does not hold.
 GitHub's patch keeps three unchanged lines around each change, so `patchRows` in `src/shared/changes.ts` fills the lines before, between, and after its hunks from the file's text at the head, which one `gh api graphql` call reads by the blob id the list names.
+Both file readers answer through `fileText(path, rows, note)` in `src/shared/changes.ts`, so a file's rows and the note on why it has none take one shape.
 A removed file's patch holds every line, so it reads no blob; a file GitHub sends no patch for, a binary file, and one over `MAX_CHANGED_FILE_BYTES` answer a note.
 `GET /api/pull-request/stack?owner=<o>&repo=<r>&number=<n>` answers the pull requests of a details' **Stack**, `StackedPullRequest[]` top first, from one `gh api graphql --paginate --slurp` read of the repository's open pull requests, forks left out, which it keeps for 30 seconds.
 `stackOf` in `src/pull-request-stack.ts` follows the base branches down from the pull request and the pull requests based on its branch up, so the stack holds those that the Pull requests page does not list.
@@ -746,6 +747,7 @@ The issue detail shows a change at once and sends its changes one at a time, and
 ### Integrations
 
 `MCP_SERVICES` in `src/shared/accounts.ts` holds the services whose MCP server the **Integrations** page signs omp in to, keyed by the ids in `MCP_INTEGRATIONS`.
+`integrationOn(host)` there names the service whose server is on a host, which is how the MCP servers page tells an integration's server from one it manages itself.
 Linear, Slack, Google Calendar, and Gmail are the four.
 Each names its label, the host omp's server for the service is on, and the name and URL of the server a sign-in adds when omp has none.
 `src/integrations.ts` keeps a sign-in per service, and the page adds each service's brand mark and what it gives.

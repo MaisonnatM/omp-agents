@@ -76,6 +76,9 @@ export const MCP_SERVICES: Record<McpIntegrationId, McpService> = {
 	gmail: { label: "Gmail", host: "gmailmcp.googleapis.com", url: "https://gmailmcp.googleapis.com/mcp/v1", serverName: "gmail" },
 };
 
+/** The Settings › Integrations service whose server is on `host`, if any. */
+export const integrationOn = (host: string | null): McpIntegrationId | null => MCP_INTEGRATIONS.find(id => MCP_SERVICES[id].host === host) ?? null;
+
 /** The services that sign in with a Google OAuth client of your own. */
 export const GOOGLE_SERVICES = ["google-calendar", "gmail"] as const satisfies readonly McpIntegrationId[];
 export type GoogleService = (typeof GOOGLE_SERVICES)[number];

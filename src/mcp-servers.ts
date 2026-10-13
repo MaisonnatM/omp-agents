@@ -19,7 +19,7 @@ import {
 	signOutMcp,
 	userMcpConfigPath,
 } from "./omp/mcp";
-import { MCP_INTEGRATIONS, MCP_SERVICES } from "./shared/accounts";
+import { integrationOn, MCP_SERVICES } from "./shared/accounts";
 import { catalogEntry, catalogEntryOn } from "./shared/mcp-catalog";
 import type { McpServerAdd, McpServerRow, McpServerStatus, McpServersAnswer } from "./shared/mcp-servers";
 import { createSignIn, type SignIn } from "./sign-in";
@@ -51,7 +51,7 @@ async function rowOf(server: ConfiguredMcpServer, remote: McpServer | null, sign
 	const { name, config, source, enabled } = server;
 	const host = remote && new URL(remote.url).host;
 	const transport = config.type === "sse" ? "sse" : config.type === "stdio" || (!config.type && !config.url) ? "stdio" : "http";
-	const integration = MCP_INTEGRATIONS.find(id => MCP_SERVICES[id].host === host);
+	const integration = integrationOn(host);
 	const signIn = signIns.get(name)?.state() ?? null;
 	let status: McpServerStatus;
 	if (!enabled) status = { kind: "disabled" };
@@ -105,7 +105,7 @@ function editable(server: ConfiguredMcpServer): ConfiguredMcpServer {
 function signable(server: ConfiguredMcpServer): McpServer {
 	const remote = remoteOf(server);
 	if (!remote) throw new McpServerRejected(`"${server.name}" runs a local command, which takes no sign-in.`);
-	const integration = MCP_INTEGRATIONS.find(id => MCP_SERVICES[id].host === new URL(remote.url).host);
+	const integration = integrationOn(new URL(remote.url).host);
 	if (integration) throw new McpServerRejected(`Connect ${MCP_SERVICES[integration].label} in Settings › Integrations.`);
 	return remote;
 }
