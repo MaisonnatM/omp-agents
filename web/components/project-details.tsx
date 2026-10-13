@@ -5,7 +5,7 @@ import type { PastSession, RosterHost, View } from "../../src/shared/sessions";
 import { modeOf, SPLIT_CLICK } from "../labels";
 import { useTurnCount } from "../pane-store";
 import { projectSession } from "../sessions";
-import { DetailsSidebarFrame } from "./details-sidebar-frame";
+import { DetailsEmpty, DetailsSidebarFrame } from "./details-sidebar-frame";
 import { useDashboardActions } from "./dashboard-context";
 import { OutlineTab } from "./outline-tab";
 import { PHASE_LABEL, ProjectNotesList } from "./projects/project-parts";
@@ -28,7 +28,7 @@ function workerPullRequests(project: Project, hosts: RosterHost[], past: PastSes
 /** Each worker with its phase and the first line of its last reply; a click opens its session. */
 function WorkersTab({ project, hosts, past }: { project: Project; hosts: RosterHost[]; past: PastSession[] }) {
 	const { open } = useDashboardActions();
-	if (project.workers.length === 0) return <p className="px-4 py-2 text-sm text-muted-foreground">No workers yet. The coordinator starts them as it plans.</p>;
+	if (project.workers.length === 0) return <DetailsEmpty icon={Users} title="No workers yet" description="The coordinator starts them as it plans." />;
 	return (
 		<ul aria-label="Workers" className="space-y-0.5 px-2">
 			{project.workers.map(worker => {
@@ -103,7 +103,7 @@ export function ProjectDetails({ project, view, working, cwd, workspace, hosts, 
 					icon: GitPullRequest,
 					name: "PRs",
 					count: pullRequests.length,
-					pinned: true,
+					pinned: pullRequests.length > 0,
 					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />,
 				},
 			]}

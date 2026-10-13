@@ -1,5 +1,5 @@
 import { useReducedMotion } from "framer-motion";
-import { Bot, Check, ChevronDown, ListChecks, Loader, type LucideIcon, Play, User } from "lucide-react";
+import { Bot, Check, ChevronDown, ListChecks, Loader, type LucideIcon, Play, TableOfContents, User } from "lucide-react";
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { skillLabel } from "../labels";
 import { usePaneLoaded, useTranscript } from "../pane-store";
 import { hashForView } from "../routing";
 import { type OutlineTurn, outline } from "../transcript-view";
+import { DetailsEmpty } from "./details-sidebar-frame";
 import { MessageMarkdown } from "./message-markdown";
 
 /** The transcript's own top padding, kept above the message so it does not sit under the viewport's edge fade. */
@@ -277,7 +278,7 @@ export function OutlineTab({ view, working }: { view: View; working: boolean }) 
 	const reduceMotion = useReducedMotion() ?? false;
 	const { current, pin } = useReadingTurn(turns, hashForView(view));
 	if (!loaded) return <p className="px-4 py-2 text-sm text-muted-foreground">Loading the conversation…</p>;
-	if (turns.length === 0) return <p className="px-4 py-2 text-sm text-muted-foreground">No messages yet.</p>;
+	if (turns.length === 0) return <DetailsEmpty icon={TableOfContents} title="No messages yet" description="Each turn of the conversation shows here once it starts." />;
 	const jump = (messageId: string, turnId: string) => {
 		pin(turnId);
 		scrollToMessage(messageId, reduceMotion ? "auto" : "smooth");

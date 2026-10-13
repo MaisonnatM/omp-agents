@@ -1,5 +1,5 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ChevronLeft, ChevronRight, ExternalLink, MessageSquare, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Images, MessageSquare, X } from "lucide-react";
 import { useState } from "react";
 import type { View } from "../../src/shared/sessions";
 import type { AgentMedia } from "../../src/shared/transcript";
@@ -8,6 +8,7 @@ import { SidebarGroup } from "@/components/ui/sidebar";
 import { Tooltip } from "@/components/ui/tooltip";
 import { age } from "../labels";
 import { useDashboardActions } from "./dashboard-context";
+import { DetailsEmpty } from "./details-sidebar-frame";
 
 const agentName = (media: AgentMedia): string => media.agentId ?? "Main agent";
 
@@ -99,7 +100,7 @@ function MediaViewer({ media, index, view, onShow }: { media: AgentMedia[]; inde
 export function MediaTab({ media, view }: { media: AgentMedia[] | null; view: View }) {
 	const [selected, setSelected] = useState<string | null>(null);
 	if (!media) return null;
-	if (media.length === 0) return <p className="px-4 py-2 text-sm text-muted-foreground">No screenshots or images yet.</p>;
+	if (media.length === 0) return <DetailsEmpty icon={Images} title="No images yet" description="Screenshots and images the agent's tools return show here." />;
 	const index = selected === null ? -1 : media.findIndex(item => mediaKey(item) === selected);
 	return (
 		<SidebarGroup>

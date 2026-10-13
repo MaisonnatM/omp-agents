@@ -1,6 +1,7 @@
 /** The right sidebar's shell for a focused view: the directory its file references resolve against, a header of counted tabs, and each tab's panel. */
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { SidebarContent, SidebarHeader } from "@/components/ui/sidebar";
 import { TabItem, TabPanel, Tabs, TabsList } from "@/components/ui/tabs";
 import { SizeProvider } from "@/lib/size-context";
@@ -42,6 +43,21 @@ interface DetailsSidebarFrameProps<T extends string> {
 /** Each tab names itself and counts its items in a badge, which screen readers hear through the tab's name. */
 function tabLabel(name: string, count: number): { label: string; badge: number | undefined; "aria-label": string | undefined } {
 	return count > 0 ? { label: name, badge: count, "aria-label": `${name} (${count})` } : { label: name, badge: undefined, "aria-label": undefined };
+}
+
+/** A tab with nothing to show yet, the same in every tab whether its panel is pinned or padded. */
+export function DetailsEmpty({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) {
+	return (
+		<Empty className="py-10">
+			<EmptyHeader>
+				<EmptyMedia variant="icon">
+					<Icon aria-hidden="true" />
+				</EmptyMedia>
+				<EmptyTitle>{title}</EmptyTitle>
+				<EmptyDescription className="text-xs/relaxed">{description}</EmptyDescription>
+			</EmptyHeader>
+		</Empty>
+	);
 }
 
 export function DetailsSidebarFrame<T extends string>({ label, storageKey, defaultTab, cwd, tabs }: DetailsSidebarFrameProps<T>) {

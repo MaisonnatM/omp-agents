@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { everyWord } from "../../src/shared/every-word";
 import { age, readTime } from "../labels";
 import { SessionChangesDialog } from "./changes/session-changes-dialog";
+import { DetailsEmpty } from "./details-sidebar-frame";
 import { LineCounts } from "./line-counts";
 import { SidebarSearch } from "./sidebar-search";
 import { ViewerDialog } from "./viewer-dialog";
@@ -185,7 +186,7 @@ export function FilesTab({ files, sessionId, cwd, working }: FilesTabProps) {
 		<>
 			{files &&
 				(files.length === 0 ? (
-					<p className="px-4 py-2 text-sm text-muted-foreground">No file changes yet.</p>
+					<DetailsEmpty icon={FileDiff} title="No file changes yet" description="Files the agent creates, edits, or deletes show here." />
 				) : (
 					<ChangedFiles files={files} onOpen={path => setShown({ kind: sessionId === null ? "history" : "changes", path })} />
 				))}

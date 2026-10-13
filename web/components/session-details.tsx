@@ -50,7 +50,7 @@ export function SessionDetails({ view, working, sessionId, cwd, pullRequests, wo
 					icon: GitPullRequest,
 					name: "PRs",
 					count: pullRequests.length,
-					pinned: true,
+					pinned: pullRequests.length > 0,
 					content: <SessionPullRequestsTab pullRequests={pullRequests} workspace={workspace} hosts={hosts} version={working} />,
 				},
 			]}

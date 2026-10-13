@@ -1,6 +1,8 @@
+import { GitPullRequest } from "lucide-react";
 import { useState } from "react";
 import type { LinkedPullRequest, PullRequest } from "../../src/shared/github";
 import type { RosterHost } from "../../src/shared/sessions";
+import { DetailsEmpty } from "./details-sidebar-frame";
 import { PullRequestDetails } from "./pull-requests/pr-page";
 
 interface PullRequestsTabProps {
@@ -20,7 +22,7 @@ interface PullRequestsTabProps {
 export function SessionPullRequestsTab({ pullRequests, workspace, hosts, version }: PullRequestsTabProps) {
 	const [picked, setPicked] = useState<PullRequest | null>(null);
 	const shown = picked ?? pullRequests[0];
-	if (!shown) return <p className="px-4 py-2 text-sm text-muted-foreground">No pull request yet.</p>;
+	if (!shown) return <DetailsEmpty icon={GitPullRequest} title="No pull request yet" description="Pull requests this session opens or works on show here." />;
 	return (
 		<div className="space-y-3 px-4 pb-4">
 			<PullRequestDetails workspace={workspace} hosts={hosts} target={shown} placement="sidebar" version={version} onPick={setPicked} session={pullRequests} />

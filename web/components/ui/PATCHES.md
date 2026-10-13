@@ -74,6 +74,8 @@ A session's question is `web/components/question-card.tsx`, a dashboard card in 
 - `ui/select.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/select.json`).
   Its icons are lucide's, its trigger has the settings fields' 28px height and border, and its popup and rows take the look of `ui/menu.tsx`.
   `SelectGroup`, `SelectLabel`, `SelectSeparator`, and the exported scroll buttons and trigger `size` are removed, since nothing uses them; the popup keeps its scroll arrows.
+- `ui/empty.tsx` comes from shadcn's Base UI registry (`https://ui.shadcn.com/r/styles/base-nova/empty.json`).
+  It imports `cn` from `@/lib/utils`, and `EmptyContent` is removed, since nothing uses it.
 
 ## `kibo-ui/calendar/index.tsx`
 
