@@ -1,12 +1,13 @@
 import { CircleStop } from "lucide-react";
 import type { ReactNode } from "react";
 import type { ControlPhase, LiveView } from "../../src/shared/sessions";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
-import { PullRequestMenu, SessionTrail } from "./session-meta";
+import { CRUMB_SEPARATOR, PARENT_CRUMB, PullRequestMenu, SessionTrail } from "./session-meta";
 import type { Subject } from "./subject";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
@@ -26,7 +27,7 @@ interface ConversationHeaderProps {
 }
 
 /**
- * A live session's or subagent's trail, `workspace / title`, or `workspace / title / subagent` whose title opens its session;
+ * A live session's trail, `workspace / title`, or a subagent's, `title / subagent` with its agent type as a badge, whose title opens its session;
  * the connection status; a session's pull requests, its directory in Cursor, and End session, which shows it is
  * ending until the server answers, though the session may leave the roster before then.
  */
@@ -42,13 +43,31 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 				? CONTROL_LABEL.connecting
 				: `${CONTROL_LABEL[phase.phase]} · ${phase.reason}`;
 	const endable = live && host ? host : ending ? shown : null;
-	const path = [shown?.sessionName, agent?.id].filter((name): name is string => !!name);
-	const openParent = view.agentId !== null ? () => open({ ...view, agentId: null }, "replace") : undefined;
-	const title = shown ? (
-		<SessionTrail cwdDisplay={shown.cwdDisplay} worktree={shown.worktree} path={path} onOpenParent={openParent} />
-	) : (
-		(agent?.id ?? view.instanceId)
-	);
+	const title =
+		subject.kind === "subagent" ? (
+			<span className="inline-flex min-w-0 items-center">
+				{shown?.sessionName && (
+					<>
+						<button type="button" className={`${PARENT_CRUMB} cursor-pointer hover:text-foreground hover:underline`} onClick={() => open({ ...view, agentId: null }, "replace")}>
+							{shown.sessionName}
+						</button>
+						<span aria-hidden className={CRUMB_SEPARATOR}>
+							/
+						</span>
+					</>
+				)}
+				<span>{agent?.id ?? view.agentId}</span>
+				{agent && (
+					<Badge variant="dot" size="compact" className="ml-2">
+						{agent.kind}
+					</Badge>
+				)}
+			</span>
+		) : shown ? (
+			<SessionTrail cwdDisplay={shown.cwdDisplay} worktree={shown.worktree} path={shown.sessionName ? [shown.sessionName] : []} />
+		) : (
+			view.instanceId
+		);
 	return (
 		<Header title={title} status={status} alert={!ending && phase.phase === "ended"}>
 			{subject.kind === "session" && shown && <PullRequestMenu pullRequests={shown.pullRequests} />}
