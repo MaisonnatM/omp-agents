@@ -49,23 +49,26 @@ export const EVENT_KINDS = ["event"] as const satisfies readonly NoticeKind[];
 
 const MARKS = ["seen", "read", "cleared"] as const;
 type Mark = (typeof MARKS)[number];
-type Marks = Record<Mark, string[]>;
+/** The ids of each mark, and the scope of each marked notice, so a restart can tell which check would find it again. */
+type Marks = Record<Mark, string[]> & { scopes: Record<string, string> };
 
 /** How long a mark outlives its notice: a pull request whose state flickers, as GitHub works out its conflicts again, does not toast twice. */
 const MARK_GRACE_MS = 10 * 60_000;
 
-type Found = { id: string; at: number } & NoticeSubject;
+/**
+ * A notice a check found. Its `scope` is what one answer covers: its kind, a pull request's repository, or Google's or the
+ * local calendar events.
+ */
+type Found = Unscoped & { scope: string };
+type Unscoped = { id: string; at: number } & NoticeSubject;
 
 /**
- * What one kind's check found, and the ids it could not look at, such as a repository GitHub did not answer for, which
- * keep their last state. Each id belongs to a scope, the kind or a pull request's repository, and `answered` lists the
- * scopes this check looked at.
+ * What one kind's check found, and the scopes it looked at; a notice of a scope it could not look at, such as a repository
+ * GitHub did not answer for, keeps its last state.
  */
 interface Checked {
 	found: Found[];
-	unchecked: (id: string) => boolean;
-	scopeOf: (id: string) => string;
-	answered: string[];
+	scopes: ReadonlySet<string>;
 	/** Each found notice's time is when its news came, as a message's, rather than the latest it could be, as a pull request's last update. */
 	dated: boolean;
 }
@@ -85,39 +88,37 @@ const LOOKED_FOR: Record<NoticeKind, string> = {
 
 const isIds = (value: unknown): value is string[] => Array.isArray(value) && value.every(id => typeof id === "string");
 
-/** The marks `notices.json` holds; a file from before notices could be read holds no `read`. */
+const isScopes = (value: unknown): value is Record<string, string> => isObject(value) && Object.values(value).every(scope => typeof scope === "string");
+
+/**
+ * The marks `notices.json` holds; a file from before notices could be read holds no `read`, and one from before marks kept
+ * their scopes holds no `scopes`, whose marks stay until their notices are found again.
+ */
 function parseMarks(value: unknown): Marks | null {
 	if (!isObject(value) || !isIds(value.seen) || !isIds(value.cleared)) return null;
-	return { seen: value.seen, read: isIds(value.read) ? value.read : [], cleared: value.cleared };
+	return { seen: value.seen, read: isIds(value.read) ? value.read : [], cleared: value.cleared, scopes: isScopes(value.scopes) ? value.scopes : {} };
 }
-
-const kindOf = (id: string): string => id.slice(0, id.indexOf(":"));
 
 const isYourMove = (move: string): move is YourMove => (YOUR_MOVES as readonly string[]).includes(move);
 
-/** The pull request notice `id`'s repository, `owner/repo`. */
-const repoOf = (id: string): string => id.slice("pull-request:".length, id.lastIndexOf("#"));
-
 /** The pull requests of `list` whose next move is yours, each a notice per move; the repositories GitHub did not answer for stay unchecked. */
 function pullRequestNotices(list: PullRequestList, agent: AgentOn): Checked {
-	const failed = new Set(list.repos.flatMap(repo => ("error" in repo ? [repoKey(repo)] : [])));
-	const found = list.repos.flatMap(repo =>
-		"error" in repo
-			? []
-			: repo.pullRequests.flatMap(pr => {
-					const move = moveOf(pr, agent(pr));
-					return isYourMove(move) ? [{ id: `pull-request:${prKey(pr)}:${move}`, at: pr.updatedAt, kind: "pull-request", pr, move, cwd: repo.cwds[0] ?? "" } as const] : [];
-				}),
-	);
-	const answered = list.repos.flatMap(repo => ("error" in repo ? [] : [repoKey(repo)]));
-	return { found, unchecked: id => failed.has(repoOf(id)), scopeOf: repoOf, answered, dated: false };
+	const answered = list.repos.flatMap(repo => ("error" in repo ? [] : [repo]));
+	const found = answered.flatMap(repo => {
+		const scope = repoKey(repo);
+		return repo.pullRequests.flatMap(pr => {
+			const move = moveOf(pr, agent(pr));
+			return isYourMove(move) ? [{ id: `pull-request:${prKey(pr)}:${move}`, at: pr.updatedAt, scope, kind: "pull-request", pr, move, cwd: repo.cwds[0] ?? "" } as const] : [];
+		});
+	});
+	return { found, scopes: new Set(answered.map(repoKey)), dated: false };
 }
 
 /**
  * A notice for each used-up window of `plans`. Its id leaves out the reset time, which some providers report a little
  * differently on each poll.
  */
-function planNotices(plans: PlanUsage[], at: number): Found[] {
+function planNotices(plans: PlanUsage[], at: number): Unscoped[] {
 	return plans.flatMap(({ provider, name, account, windows, resetCredits }) =>
 		windows
 			.filter(window => window.exhausted)
@@ -135,23 +136,19 @@ function planNotices(plans: PlanUsage[], at: number): Found[] {
 	);
 }
 
-/** The scope of event notice `id`: Google's events, or the ones kept on this computer. */
-const eventScopeOf = (id: string): string => (id.startsWith("event:google/") ? "event:google" : "event:local");
-
 /**
  * A notice for each event of `local` and `google` that starts within {@link EVENT_LEAD_MS} of `now` or runs then, dated
  * that lead before its start. `google` is `null` when Google Calendar did not answer, which keeps its events' notices as
  * they were, as the Calendar page shows why.
  */
 function eventNotices(local: FoundEvent[], google: FoundEvent[] | null, now: number): Checked {
-	const found = [...local, ...(google ?? [])]
-		.filter(({ start, end }) => start - EVENT_LEAD_MS <= now && now < end)
-		.map(({ ref, ...event }) => ({ id: `event:${ref}:${event.start}`, at: event.start - EVENT_LEAD_MS, kind: "event" as const, ...event }));
+	const scoped = (events: FoundEvent[], scope: string): Found[] =>
+		events
+			.filter(({ start, end }) => start - EVENT_LEAD_MS <= now && now < end)
+			.map(({ ref, ...event }) => ({ id: `event:${ref}:${event.start}`, at: event.start - EVENT_LEAD_MS, scope, kind: "event" as const, ...event }));
 	return {
-		found,
-		unchecked: id => google === null && eventScopeOf(id) === "event:google",
-		scopeOf: eventScopeOf,
-		answered: google === null ? ["event:local"] : ["event:local", "event:google"],
+		found: [...scoped(local, "event:local"), ...scoped(google ?? [], "event:google")],
+		scopes: new Set(google === null ? ["event:local"] : ["event:local", "event:google"]),
 		dated: true,
 	};
 }
@@ -161,6 +158,8 @@ export class Notices {
 	readonly #sources: NoticeSources;
 	readonly #changed: () => void;
 	readonly #marks: Record<Mark, Set<string>>;
+	/** The scope of each marked notice. */
+	readonly #markScopes: Map<string, string>;
 	/** By id, in the order found. */
 	#found = new Map<string, Found>();
 	/** The status of each notice the user updated; any other is available. */
@@ -176,6 +175,7 @@ export class Notices {
 		this.#file = new JsonFile(path, { parse: parseMarks, holds: "notice marks", onInvalid: "ignore" });
 		const marks = this.#file.load();
 		this.#marks = { seen: new Set(marks?.seen), read: new Set(marks?.read), cleared: new Set(marks?.cleared) };
+		this.#markScopes = new Map(Object.entries(marks?.scopes ?? {}));
 		this.#sources = sources;
 		this.#changed = changed;
 	}
@@ -184,7 +184,7 @@ export class Notices {
 	get list(): Notice[] {
 		return [...this.#found.values()]
 			.filter(({ id }) => !this.#marks.cleared.has(id))
-			.map((found): Notice => {
+			.map(({ scope: _, ...found }): Notice => {
 				const marks = { seen: this.#marks.seen.has(found.id), read: this.#marks.read.has(found.id) };
 				return found.kind === "omp" || found.kind === "model" ? { ...found, ...marks, status: this.#status.get(found.id) ?? AVAILABLE } : { ...found, ...marks };
 			})
@@ -200,7 +200,7 @@ export class Notices {
 		const results = await Promise.allSettled(kinds.map(kind => this.#find(kind)));
 		const before = this.#found;
 		const next = new Map(before);
-		const covered: ((id: string) => boolean)[] = [];
+		const answered = new Set<string>();
 		kinds.forEach((kind, at) => {
 			const result = results[at];
 			if (result.status === "rejected") {
@@ -210,18 +210,26 @@ export class Notices {
 				return;
 			}
 			this.#failures.delete(kind);
-			const { found, unchecked, scopeOf, answered, dated } = result.value;
-			const answers = (id: string): boolean => kindOf(id) === kind && !unchecked(id);
-			covered.push(answers);
-			for (const id of next.keys()) if (answers(id) && !this.#updateStarted(id)) next.delete(id);
-			const isNews = (id: string): boolean => !dated && this.#answered.has(scopeOf(id));
-			for (const item of found) next.set(item.id, { ...item, at: before.get(item.id)?.at ?? (isNews(item.id) ? now : item.at) });
-			for (const scope of answered) this.#answered.add(scope);
+			const { found, scopes, dated } = result.value;
+			for (const [id, { scope }] of next) if (scopes.has(scope) && !this.#updateStarted(id)) next.delete(id);
+			for (const item of found) next.set(item.id, { ...item, at: before.get(item.id)?.at ?? (!dated && this.#answered.has(item.scope) ? now : item.at) });
+			for (const scope of scopes) answered.add(scope);
 		});
+		for (const scope of answered) this.#answered.add(scope);
 		this.#found = next;
 		for (const id of this.#status.keys()) if (!next.has(id)) this.#status.delete(id);
-		const missingFromAnAnswer = (id: string): boolean => !next.has(id) && covered.some(answers => answers(id));
-		if (this.#forgetGone(now, missingFromAnAnswer)) this.#save();
+		let rescoped = false;
+		for (const [id, { scope }] of next) {
+			if (this.#isMarked(id) && this.#markScopes.get(id) !== scope) {
+				this.#markScopes.set(id, scope);
+				rescoped = true;
+			}
+		}
+		const missingFromAnAnswer = (id: string): boolean => {
+			const scope = this.#markScopes.get(id);
+			return !next.has(id) && scope !== undefined && answered.has(scope);
+		};
+		if (this.#forgetGone(now, missingFromAnAnswer) || rescoped) this.#save();
 		this.#changed();
 	}
 
@@ -239,12 +247,17 @@ export class Notices {
 				if (now - since >= MARK_GRACE_MS) forgot = marks.delete(id) || forgot;
 			}
 		}
-		for (const id of this.#gone.keys()) if (!MARKS.some(mark => this.#marks[mark].has(id))) this.#gone.delete(id);
+		for (const id of this.#gone.keys()) if (!this.#isMarked(id)) this.#gone.delete(id);
+		for (const id of this.#markScopes.keys()) if (!this.#isMarked(id)) this.#markScopes.delete(id);
 		return forgot;
 	}
 
+	#isMarked(id: string): boolean {
+		return MARKS.some(mark => this.#marks[mark].has(id));
+	}
+
 	async #find(kind: NoticeKind): Promise<Checked> {
-		const all = (found: Found[], dated: boolean): Checked => ({ found, unchecked: () => false, scopeOf: () => kind, answered: [kind], dated });
+		const all = (found: Unscoped[], dated: boolean): Checked => ({ found: found.map(item => ({ ...item, scope: kind })), scopes: new Set([kind]), dated });
 		switch (kind) {
 			case "omp":
 				return all(await this.#ompNotices(), false);
@@ -285,7 +298,10 @@ export class Notices {
 			await Promise.all(listed.map(found => (found.kind === "omp" || found.kind === "model" ? this.#update(found) : undefined)));
 			return;
 		}
-		for (const { id } of listed) this.#marks[op === "clear" ? "cleared" : op].add(id);
+		for (const { id, scope } of listed) {
+			this.#marks[op === "clear" ? "cleared" : op].add(id);
+			this.#markScopes.set(id, scope);
+		}
 		this.#save();
 		this.#changed();
 	}
@@ -294,6 +310,7 @@ export class Notices {
 		if (this.#updateStarted(found.id)) return;
 		this.#marks.seen.add(found.id);
 		this.#marks.read.add(found.id);
+		this.#markScopes.set(found.id, found.scope);
 		this.#save();
 		this.#setStatus(found.id, { state: "updating" });
 		try {
@@ -311,13 +328,13 @@ export class Notices {
 		return `${usesClause(update.uses)} ${update.to.name} now.`;
 	}
 
-	async #ompNotices(): Promise<Found[]> {
+	async #ompNotices(): Promise<Unscoped[]> {
 		const latest = await this.#sources.latestOmp();
 		const current = this.#sources.installedOmp();
 		return latest !== null && Bun.semver.order(latest, current) > 0 ? [{ id: `omp:${latest}`, at: this.#sources.now(), kind: "omp", current, latest }] : [];
 	}
 
-	async #modelNotices(): Promise<Found[]> {
+	async #modelNotices(): Promise<Unscoped[]> {
 		const at = this.#sources.now();
 		return (await this.#sources.modelUpdates()).map(update => ({ id: `model:${update.provider}/${update.from.id}>${update.to.id}`, at, kind: "model", ...update }));
 	}
@@ -328,6 +345,6 @@ export class Notices {
 	}
 
 	#save(): void {
-		this.#file.save({ seen: [...this.#marks.seen], read: [...this.#marks.read], cleared: [...this.#marks.cleared] });
+		this.#file.save({ seen: [...this.#marks.seen], read: [...this.#marks.read], cleared: [...this.#marks.cleared], scopes: Object.fromEntries(this.#markScopes) });
 	}
 }
