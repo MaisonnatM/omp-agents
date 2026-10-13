@@ -89,6 +89,22 @@ describe("MediaTree", () => {
 		expect(tree.media.map(item => item.src)).toEqual([src(HASH_B), src(HASH_A)]);
 	});
 
+	test("a file rewritten shorter resets the list to the images it holds now, and a later append adds to that", async () => {
+		const { path } = session();
+		writeFileSync(path, call("c1", "eval", {}) + result("c1", "eval", HASH_A, "2026-10-05T10:00:00Z") + call("c2", "eval", {}) + result("c2", "eval", HASH_B, "2026-10-05T10:01:00Z"));
+		const { tree, read } = treeOf(path);
+		expect((await read()).media.map(item => item.src)).toEqual([src(HASH_B), src(HASH_A)]);
+
+		writeFileSync(path, call("c3", "eval", {}) + result("c3", "eval", HASH_C, "2026-10-05T10:02:00Z"));
+		const rewritten = await read();
+		expect([rewritten.reset, rewritten.media.map(item => item.src)]).toEqual([true, [src(HASH_C)]]);
+
+		appendFileSync(path, call("c4", "eval", {}) + result("c4", "eval", HASH_A, "2026-10-05T10:03:00Z"));
+		const appended = await read();
+		expect([appended.reset, appended.media.map(item => item.src)]).toEqual([false, [src(HASH_A)]]);
+		expect(tree.media.map(item => item.src)).toEqual([src(HASH_A), src(HASH_C)]);
+	});
+
 	test("only its own file, that file's lock sidecar, and its subagents' files are this tree's changes, not a sibling session's", () => {
 		const { path, artifacts } = session();
 		const dir = dirname(path);

@@ -3,7 +3,7 @@
  * folds each appended line into a {@link Transcript} and a {@link Work}. The
  * server pokes it when its file changes.
  */
-import { LineReader, ReadQueue } from "./line-reader";
+import { FoldedFile, ReadQueue } from "./line-reader";
 import type { ChangedFile, Item } from "./shared/transcript";
 import { Transcript } from "./transcript";
 import { Work } from "./work";
@@ -15,12 +15,36 @@ const PUBLISH_WINDOW_MS = 50;
 const inFlux = (item: Item): boolean =>
 	((item.kind === "assistant" || item.kind === "thinking") && item.streaming) || (item.kind === "tool" && item.status === "running");
 
-/** Folds a transcript's appended entries into a {@link Transcript} and a {@link Work} and publishes their changes; {@link LineReader} reads the file. */
+/** A transcript's entries folded into its display items and its changed files, each line parsed once for both. */
+class TailFold {
+	readonly transcript = new Transcript();
+	readonly work = new Work();
+	/** The items the lines applied since the last {@link takeChanged} touched. */
+	#changed: Item[] = [];
+
+	applyLine(line: string): void {
+		let entry: unknown;
+		try {
+			entry = JSON.parse(line);
+		} catch {
+			// A line that does not parse is skipped.
+			return;
+		}
+		this.#changed.push(...this.transcript.applyEntry(entry));
+		this.work.applyEntry(entry);
+	}
+
+	takeChanged(): Item[] {
+		const changed = this.#changed;
+		this.#changed = [];
+		return changed;
+	}
+}
+
+/** Publishes the changes of a transcript's {@link TailFold}, which a {@link FoldedFile} keeps up to date. */
 export class FileTail {
-	transcript = new Transcript();
-	#work = new Work();
 	readonly path: string;
-	readonly #lines: LineReader;
+	readonly #file: FoldedFile<TailFold>;
 	#loaded = false;
 	readonly #reads = new ReadQueue(() => this.#read());
 	/** Changes held back for the window, by item id; a later version of an item replaces the earlier one in place. */
@@ -34,9 +58,13 @@ export class FileTail {
 	/** `emit` gets the items each change touched and the ids of those it removed. `emitWork` gets every changed file once the first read finishes, then the files each later read changed. */
 	constructor(path: string, emit: (reset: boolean, items: Item[], removed: string[]) => void, emitWork: (reset: boolean, files: ChangedFile[]) => void) {
 		this.path = path;
-		this.#lines = new LineReader(path, () => this.#restart());
+		this.#file = new FoldedFile(path, () => new TailFold());
 		this.#emit = emit;
 		this.#emitWork = emitWork;
+	}
+
+	get transcript(): Transcript {
+		return this.#file.fold.transcript;
 	}
 
 	get loaded(): boolean {
@@ -45,7 +73,7 @@ export class FileTail {
 
 	/** The changed files, as of the last read. */
 	get files(): ChangedFile[] {
-		return this.#work.files();
+		return this.#file.fold.work.files();
 	}
 
 	/** Read what was appended since the last read. Calls that arrive before a queued read starts share it. */
@@ -99,28 +127,18 @@ export class FileTail {
 		this.#pendingReset = false;
 	}
 
-	/** Rewritten in place (omp rewrites a file on some migrations): start over. */
-	#restart(): void {
-		this.#discardPending();
-		this.transcript = new Transcript();
-		this.#work = new Work();
-		this.#loaded = false;
-	}
-
 	async #read(): Promise<void> {
-		const entries: unknown[] = [];
-		const complete = await this.#lines.read(line => {
-			try {
-				entries.push(JSON.parse(line));
-			} catch {
-				// A line that does not parse is skipped.
-			}
-		});
+		const { readable, restarted } = await this.#file.read();
+		// Rewritten in place (omp rewrites a file on some migrations): the fold started over, and so does what was published.
+		if (restarted) {
+			this.#discardPending();
+			this.#loaded = false;
+		}
 		// Unreadable for now: the next poke retries from the same offset.
-		if (!complete || this.#closed) return;
-		const changed = entries.flatMap(entry => this.transcript.applyEntry(entry));
-		for (const entry of entries) this.#work.applyEntry(entry);
-		const changedFiles = this.#work.takeChanged();
+		if (!readable || this.#closed) return;
+		const fold = this.#file.fold;
+		const changed = fold.takeChanged();
+		const changedFiles = fold.work.takeChanged();
 		if (!this.#loaded) {
 			this.#loaded = true;
 			this.#discardPending();

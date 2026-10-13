@@ -4,7 +4,7 @@
  */
 import { basename, dirname, join } from "node:path";
 import { isObject } from "./json";
-import { LineReader, ReadQueue } from "./line-reader";
+import { FoldedFile, ReadQueue } from "./line-reader";
 import { entryTime, imagesOf, toolCallsOf, toolResultOf, toolSummary } from "./session-entries";
 import { type AgentMedia, newestMediaFirst } from "./shared/transcript";
 import { artifactsDir, subagentFiles } from "./subagents";
@@ -15,32 +15,17 @@ const MARKERS = ['"type":"toolCall"', '"type":"image"'];
 const RESULT_CALL_ID = /"role":"toolResult","toolCallId":"([^"\\]+)"/;
 
 /** One transcript's images, oldest first. */
-class MediaFile {
+class MediaFold {
 	readonly #agentId: string | null;
-	readonly #lines: LineReader;
 	/** What each tool call said it did, by call id, until its result arrives. */
 	readonly #summaries = new Map<string, string>();
-	media: AgentMedia[] = [];
-	#rewritten = false;
+	readonly media: AgentMedia[] = [];
 
-	constructor(path: string, agentId: string | null) {
+	constructor(agentId: string | null) {
 		this.#agentId = agentId;
-		this.#lines = new LineReader(path, () => {
-			this.media = [];
-			this.#summaries.clear();
-			this.#rewritten = true;
-		});
 	}
 
-	/** Reads what was appended since the last read: the images it added, or `null` when the file was rewritten and its images start over. */
-	async read(): Promise<AgentMedia[] | null> {
-		const before = this.media.length;
-		this.#rewritten = false;
-		await this.#lines.read(line => this.#apply(line));
-		return this.#rewritten ? null : this.media.slice(before);
-	}
-
-	#apply(line: string): void {
+	applyLine(line: string): void {
 		if (!MARKERS.some(marker => line.includes(marker))) {
 			const callId = RESULT_CALL_ID.exec(line)?.[1];
 			if (callId) this.#summaries.delete(callId);
@@ -82,9 +67,9 @@ export class MediaTree {
 	/** omp's lock sidecar beside the file, the only change a burst of appends can surface as on macOS. */
 	readonly #lock: string;
 	readonly #dir: string;
-	readonly #own: MediaFile;
+	readonly #own: FoldedFile<MediaFold>;
 	/** Subagent transcripts by path, at any depth. */
-	readonly #subagents = new Map<string, MediaFile>();
+	readonly #subagents = new Map<string, FoldedFile<MediaFold>>();
 	readonly #emit: (reset: boolean, media: AgentMedia[]) => void;
 	readonly #reads = new ReadQueue(() => this.#read());
 	#media: AgentMedia[] = [];
@@ -98,7 +83,7 @@ export class MediaTree {
 		this.path = path;
 		this.#lock = join(dirname(path), `.${basename(path)}.lock`);
 		this.#dir = artifactsDir(path);
-		this.#own = new MediaFile(path, agentId);
+		this.#own = new FoldedFile(path, () => new MediaFold(agentId));
 		this.#emit = emit;
 	}
 
@@ -135,11 +120,18 @@ export class MediaTree {
 		this.#subagentsChanged = false;
 		if (subagents) {
 			for (const path of await subagentFiles(this.path)) {
-				if (!this.#subagents.has(path)) this.#subagents.set(path, new MediaFile(path, basename(path, ".jsonl")));
+				if (!this.#subagents.has(path)) this.#subagents.set(path, new FoldedFile(path, () => new MediaFold(basename(path, ".jsonl"))));
 			}
 		}
 		const files = subagents ? [this.#own, ...this.#subagents.values()] : [this.#own];
-		const reads = await Promise.all(files.map(file => file.read()));
+		// Each file's images it added, or `null` when it was rewritten and its images start over.
+		const reads = await Promise.all(
+			files.map(async file => {
+				const before = file.fold.media.length;
+				const { restarted } = await file.read();
+				return restarted ? null : file.fold.media.slice(before);
+			}),
+		);
 		if (this.#closed) return;
 		if (this.#loaded && !reads.includes(null)) {
 			const added = reads.flatMap(read => read ?? []).sort(newestMediaFirst);
@@ -149,7 +141,7 @@ export class MediaTree {
 			return;
 		}
 		this.#loaded = true;
-		this.#media = [this.#own, ...this.#subagents.values()].flatMap(file => file.media).sort(newestMediaFirst);
+		this.#media = [this.#own, ...this.#subagents.values()].flatMap(file => file.fold.media).sort(newestMediaFirst);
 		this.#emit(true, this.#media);
 	}
 }
