@@ -3,18 +3,14 @@
  * the server's tools, and the sign-in and sign-out the page starts. A sign-in adds the service's server to omp's
  * user-level MCP config when omp has none.
  */
-import { errorText } from "./json";
 import { clientSetups, type ClientSave, planGoogleSave, planGoogleScope, planSlackSave } from "./mcp-clients";
+import { remoteStatusOf } from "./mcp-status";
 import {
 	addMcpServer,
-	ApiError,
 	type ApiWrite,
 	callWithMcpSignIn,
-	listMcpTools,
 	findMcpServer,
 	type McpServer,
-	McpRefused,
-	McpUnauthorized,
 	mcpSignedIn,
 	signInMcp,
 	signOutMcp,
@@ -40,9 +36,6 @@ const signIns = Object.fromEntries(
 	MCP_INTEGRATIONS.map(id => [id, createSignIn(`${MCP_SERVICES[id].label}'s sign-in page was not completed within 5 minutes. Try again.`)]),
 ) as Record<McpIntegrationId, SignIn>;
 
-/** Each service's connection as last answered, which a read repeats while its sign-in waits on the browser. */
-const lastConnections = new Map<McpIntegrationId, McpConnection>();
-
 /** omp's server for `id`, which reads and writes the service through its tools. */
 export async function integrationServer(id: McpIntegrationId): Promise<McpServer> {
 	const server = await findMcpServer(MCP_SERVICES[id].host);
@@ -59,37 +52,20 @@ export type GoogleFetch = (url: string, init?: ApiWrite) => Promise<unknown>;
 /** {@link GoogleFetch} with omp's sign-in to Google service `id`. */
 export const googleFetch = (id: GoogleService): GoogleFetch => async (url, init) => callWithMcpSignIn(await integrationServer(id), url, init);
 
-/** How {@link connectionOf} asks omp about a server: whether it holds a sign-in, and the server's tools with it. */
-export interface McpProbes {
-	signedIn: (server: McpServer) => Promise<boolean>;
-	tools: (server: McpServer) => Promise<string[]>;
-}
-
-/** Where omp stands with `found`, omp's server for a service or `null` when its config has none. */
-export async function connectionOf(found: McpServer | null, probes: McpProbes): Promise<McpConnection> {
-	if (!found) return { kind: "absent" };
-	const server = { name: found.name, url: found.url, host: new URL(found.url).host };
-	if (!(await probes.signedIn(found))) return { kind: "signed-out", server };
-	try {
-		return { kind: "ready", server, tools: await probes.tools(found) };
-	} catch (err) {
-		if (err instanceof McpRefused || err instanceof McpUnauthorized) return { kind: "refused", server, error: errorText(err) };
-		return { kind: "failing", server, error: errorText(err), status: err instanceof ApiError ? err.status : null };
-	}
-}
-
 /**
- * `id`'s integration with `found` as its server. While a sign-in waits on the browser, the connection is the last one
- * answered, since the sign-in is about to change it and the page asks every few seconds meanwhile.
+ * `id`'s integration with `found` as its server, which every service requires a sign-in to: its status is held while a
+ * sign-in waits on the browser.
  */
 async function loadIntegration(id: McpIntegrationId, found: McpServer | null, fresh: boolean): Promise<McpIntegration> {
-	const signIn = signIns[id].state();
-	const last = lastConnections.get(id);
-	const connection =
-		signIn?.phase === "waiting" && last ? last : await connectionOf(found, { signedIn: mcpSignedIn, tools: async server => (await listMcpTools(server, true, fresh)).map(tool => tool.name) });
-	lastConnections.set(id, connection);
+	const signIn = signIns[id];
+	const connection: McpConnection = found
+		? {
+				...(await signIn.hold(async () => remoteStatusOf(found, { signedIn: await mcpSignedIn(found), signInRequired: true }, fresh))),
+				server: { name: found.name, url: found.url, host: new URL(found.url).host },
+			}
+		: { kind: "absent" };
 	const setup = id === "linear" ? null : (await clientSetups())[id];
-	return { id, connection, signIn, setup } as McpIntegration;
+	return { id, connection, signIn: signIn.state(), setup } as McpIntegration;
 }
 
 const findServer = (id: McpIntegrationId): Promise<McpServer | null> => findMcpServer(MCP_SERVICES[id].host);

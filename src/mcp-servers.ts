@@ -3,18 +3,16 @@
  * sign-ins, sign-outs, enables, and removals the page starts. Only servers in omp's own user `mcp.json` change here;
  * Settings › Integrations' services keep their own section.
  */
-import { errorText } from "./json";
+import { remoteStatusOf } from "./mcp-status";
 import {
 	addMcpServer,
 	type ConfiguredMcpServer,
 	credentialFor,
 	listMcpServers,
-	listMcpTools,
 	type McpServer,
 	type McpServerConfig,
 	mcpServerNameError,
 	mcpSignedInIds,
-	McpUnauthorized,
 	removeMcpServer,
 	setMcpServerEnabled,
 	signInMcp,
@@ -23,7 +21,7 @@ import {
 } from "./omp/mcp";
 import { MCP_INTEGRATIONS, MCP_SERVICES } from "./shared/accounts";
 import { catalogEntry, catalogEntryOn } from "./shared/mcp-catalog";
-import type { McpServerAdd, McpServerRow, McpServerStatus, McpServersAnswer, McpTool } from "./shared/mcp-servers";
+import type { McpServerAdd, McpServerRow, McpServerStatus, McpServersAnswer } from "./shared/mcp-servers";
 import { createSignIn, type SignIn } from "./sign-in";
 
 /** A change the page asked for that omp's config does not allow, answered as a 400 with its message. */
@@ -40,9 +38,6 @@ function signInOf(name: string): SignIn {
 	return signIn;
 }
 
-/** Each server's status as last answered, which a read repeats while its sign-in waits on the browser. */
-const lastStatuses = new Map<string, McpServerStatus>();
-
 /** `server` with the credential id omp files its sign-in under; `null` for a local command or an address that does not parse. */
 function remoteOf({ name, config }: ConfiguredMcpServer): McpServer | null {
 	try {
@@ -52,38 +47,18 @@ function remoteOf({ name, config }: ConfiguredMcpServer): McpServer | null {
 	}
 }
 
-/**
- * Where omp stands with a remote server, from `tools`, its tool list read with omp's sign-in when `signedIn`: a 401
- * is a sign-in to start when omp holds none, and a refused one when it does.
- */
-export async function statusOf(signedIn: boolean, tools: () => Promise<McpTool[]>): Promise<McpServerStatus> {
-	try {
-		return { kind: "ready", tools: await tools() };
-	} catch (err) {
-		if (!(err instanceof McpUnauthorized)) return { kind: "failing", error: errorText(err) };
-		return signedIn ? { kind: "refused", error: "The server refused omp's sign-in. Reconnect to sign in again." } : { kind: "signed-out" };
-	}
-}
-
 async function rowOf(server: ConfiguredMcpServer, remote: McpServer | null, signedIn: boolean, fresh: boolean): Promise<McpServerRow> {
 	const { name, config, source, enabled } = server;
 	const host = remote && new URL(remote.url).host;
 	const transport = config.type === "sse" ? "sse" : config.type === "stdio" || (!config.type && !config.url) ? "stdio" : "http";
 	const integration = MCP_INTEGRATIONS.find(id => MCP_SERVICES[id].host === host);
 	const signIn = signIns.get(name)?.state() ?? null;
-	const last = lastStatuses.get(name);
 	let status: McpServerStatus;
 	if (!enabled) status = { kind: "disabled" };
 	else if (integration) status = { kind: "integration", id: integration };
 	else if (transport === "stdio") status = { kind: "local" };
-	else if (!remote) status = { kind: "failing", error: `Its address, ${config.url ?? "missing"}, is not a URL.` };
-	else if (signIn?.phase === "waiting" && last) status = last;
-	else {
-		status = await statusOf(signedIn, async () =>
-			(await listMcpTools(remote, signedIn, fresh)).map(tool => ({ name: tool.name, description: tool.description?.trim() || null })),
-		);
-	}
-	lastStatuses.set(name, status);
+	else if (!remote) status = { kind: "failing", error: `Its address, ${config.url ?? "missing"}, is not a URL.`, status: null };
+	else status = await signInOf(name).hold(() => remoteStatusOf(remote, { signedIn, signInRequired: false }, fresh));
 	return {
 		name,
 		transport,
@@ -194,6 +169,5 @@ export async function removeMcpServerNamed(name: string): Promise<void> {
 	editable(await configured(name));
 	signIns.get(name)?.cancel();
 	signIns.delete(name);
-	lastStatuses.delete(name);
 	await removeMcpServer(name);
 }

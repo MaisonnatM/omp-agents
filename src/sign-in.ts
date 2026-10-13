@@ -1,11 +1,15 @@
-/** The sign-ins the integrations page starts to omp's MCP servers: one at a time each, waiting for the browser at most five minutes. */
+/**
+ * The sign-ins Settings › Integrations and Settings › MCP servers start to omp's MCP servers: one at a time each,
+ * waiting for the browser at most five minutes, and holding the server's status while one waits.
+ */
 import { errorText } from "./json";
 import type { SignInState } from "./shared/accounts";
+import type { McpRemoteStatus } from "./shared/mcp-status";
 
 /** How long a sign-in waits for the browser, as omp's `/mcp` does. */
 const SIGN_IN_MS = 5 * 60_000;
 
-/** One provider's sign-in under way or that last failed. */
+/** One server's sign-in under way or that last failed. */
 export interface SignIn {
 	/** The sign-in under way or that last failed, `null` once one succeeds. */
 	state(): SignInState;
@@ -16,11 +20,17 @@ export interface SignIn {
 	 * authorization address, or ends. `signal` aborts when another sign-in replaces this one or the time runs out.
 	 */
 	start(run: (signal: AbortSignal, waiting: (url: string) => void) => Promise<void>): Promise<void>;
+	/**
+	 * The server's status as `read` answers it, or while this sign-in waits on the browser, as `read` last answered it:
+	 * the sign-in is about to change it, and the page asks every few seconds meanwhile.
+	 */
+	hold(read: () => Promise<McpRemoteStatus>): Promise<McpRemoteStatus>;
 }
 
-/** A provider's {@link SignIn}; `timeoutError` is the failure a sign-in shows when the browser does not come back in time. */
+/** A server's {@link SignIn}; `timeoutError` is the failure a sign-in shows when the browser does not come back in time. */
 export function createSignIn(timeoutError: string): SignIn {
 	let current: { signIn: SignInState; controller: AbortController } | null = null;
+	let last: McpRemoteStatus | null = null;
 	return {
 		state: () => current?.signIn ?? null,
 		cancel(): void {
@@ -48,6 +58,11 @@ export function createSignIn(timeoutError: string): SignIn {
 				)
 				.finally(() => ready.resolve());
 			await ready.promise;
+		},
+		async hold(read) {
+			if (current?.signIn?.phase === "waiting" && last) return last;
+			last = await read();
+			return last;
 		},
 	};
 }

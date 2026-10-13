@@ -1,4 +1,5 @@
 /** The integrations: omp's MCP sign-ins and the OAuth clients they use. */
+import type { McpRemoteStatus } from "./mcp-status";
 
 /** A sign-in that the integrations page started: waiting for the browser at the provider's authorization `url`, or why it failed. */
 export type SignInState = { phase: "waiting"; url: string } | { phase: "failed"; error: string } | null;
@@ -157,17 +158,8 @@ export interface McpServerRef {
 	host: string;
 }
 
-/**
- * Where omp stands with a service's MCP server: no server in omp's config, a server without a sign-in, or what listing
- * its tools with the sign-in found: the tools, the server refusing the sign-in, or another failure, with the HTTP status
- * the server answered, or `null` when it answered none, such as a timeout.
- */
-export type McpConnection =
-	| { kind: "absent" }
-	| { kind: "signed-out"; server: McpServerRef }
-	| { kind: "ready"; server: McpServerRef; tools: string[] }
-	| { kind: "refused"; server: McpServerRef; error: string }
-	| { kind: "failing"; server: McpServerRef; error: string; status: number | null };
+/** Where omp stands with a service's MCP server: no server in omp's config, or the server and what listing its tools found. */
+export type McpConnection = { kind: "absent" } | (McpRemoteStatus & { server: McpServerRef });
 
 /** Whether omp holds a sign-in for the service, working or not: its row sits under Connected, and its tab, Linear's Tickets or Gmail's Inbox, shows. */
 export const signedIn = (connection: McpConnection): boolean => connection.kind !== "absent" && connection.kind !== "signed-out";

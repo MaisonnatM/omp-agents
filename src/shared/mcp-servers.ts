@@ -1,5 +1,6 @@
 /** The MCP servers Settings › MCP servers lists: every server omp loads for you, and the servers you add there. */
 import type { McpIntegrationId, SignInState } from "./accounts";
+import type { McpRemoteStatus } from "./mcp-status";
 
 /** How omp reaches a server: over streamable HTTP, over the older SSE transport, or by running a local command. */
 export type McpTransport = "http" | "sse" | "stdio";
@@ -8,25 +9,13 @@ export type McpTransport = "http" | "sse" | "stdio";
 export const REMOTE_TRANSPORTS = ["http", "sse"] as const;
 export type RemoteTransport = (typeof REMOTE_TRANSPORTS)[number];
 
-export interface McpTool {
-	name: string;
-	description: string | null;
-}
-
 /**
  * Where omp stands with a server.
  * `integration` is one of Settings › Integrations' services, which that section checks and signs in to.
  * `local` runs a command, which the page does not start.
- * `signed-out` answered 401 while omp holds no sign-in for it; `refused` answered 401 to the sign-in omp holds.
+ * A remote server's status is what listing its tools found.
  */
-export type McpServerStatus =
-	| { kind: "disabled" }
-	| { kind: "local" }
-	| { kind: "integration"; id: McpIntegrationId }
-	| { kind: "signed-out" }
-	| { kind: "ready"; tools: McpTool[] }
-	| { kind: "refused"; error: string }
-	| { kind: "failing"; error: string };
+export type McpServerStatus = { kind: "disabled" } | { kind: "local" } | { kind: "integration"; id: McpIntegrationId } | McpRemoteStatus;
 
 /** The config file that names a server, and whether the page may change it there: only omp's own user `mcp.json`. */
 export interface McpServerSource {
