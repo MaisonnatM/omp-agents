@@ -1,4 +1,4 @@
-/** A session's header trail, `workspace / title`, and the menu of its pull requests. */
+/** A header trail, `workspace / title`, and the menu of a session's pull requests. */
 import { ChevronDown, GitPullRequest } from "lucide-react";
 import { Fragment, useState } from "react";
 import { type LinkedPullRequest, pullRequestUrl } from "../../src/shared/github";
@@ -16,7 +16,7 @@ export const CRUMB_SEPARATOR = "px-1.5 font-normal text-muted-foreground/60";
 const PullRequestsIcon = PAGE_ICON["pull-requests"];
 
 /**
- * `webapp / Fix login`: the workspace a session runs in, then `path`, each name below the one before it. Hover the workspace
+ * `webapp / New session`: the workspace a draft runs in, then `path`, each name below the one before it. Hover the workspace
  * for its full directory, and the worktree it works in when another.
  */
 export function SessionTrail({ cwdDisplay, worktree, path }: { cwdDisplay: string; worktree: string | null; path: string[] }) {

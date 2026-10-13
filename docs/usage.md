@@ -307,11 +307,7 @@ An action that fails shows its error, and its control becomes available again.
 - A prompt's references show as chips, as the composer drew them: a leading `/command`, `@` files and folders, and the todos, tickets, pull requests, and sessions the `@` menu inserted.
   Hover a chip for the full path or title; a ticket or pull request chip opens it in a new tab.
   The outline's **Request** shows the first prompt the same way.
-- A session's header is its trail: its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`), then its title, as in `webapp / Fix login`.
-  A session without a title shows its workspace alone.
-  Hover the workspace to see the full directory, and the worktree the session works in when that differs.
-  That is the linked worktree of the same repository that the session's own bash calls last named as their `cwd`, as when a session started in the main checkout adds a worktree and works there.
-  A bash `cwd` in the session's own checkout, outside git, or in another repository leaves the worktree as it was, and one in a directory that is gone falls back to the session's directory.
+- A session's header shows its title, as in `Fix login`; a session without a title shows its workspace, the last segment of its working directory (`~/code/webapp` reads `webapp`).
 - On the right of a session's header, the pull request button names the first pull request the session submitted or worked on, such as `#6595`, with `+N` for the others.
   Its menu opens each one on GitHub, on Graphite, or in its details on the Pull requests page; the button shows only for a session with a pull request.
   Past sessions show it before **Resume**.

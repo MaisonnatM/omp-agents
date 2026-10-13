@@ -4,10 +4,11 @@ import type { ControlPhase, LiveView } from "../../src/shared/sessions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { hostLabel } from "../labels";
 import { shortcutLabels } from "../shortcuts";
 import { useDashboardActions, useDashboardStatus } from "./dashboard-context";
 import { Header } from "./page-header";
-import { CRUMB_SEPARATOR, PARENT_CRUMB, PullRequestMenu, SessionTrail } from "./session-meta";
+import { CRUMB_SEPARATOR, PARENT_CRUMB, PullRequestMenu } from "./session-meta";
 import type { Subject } from "./subject";
 
 /** A live session shows no status: the header speaks up only while the connection is not live. */
@@ -27,7 +28,7 @@ interface ConversationHeaderProps {
 }
 
 /**
- * A live session's trail, `workspace / title`, or a subagent's, `title / subagent` with its agent type as a badge, whose title opens its session;
+ * A live session's title, or a subagent's trail, `title / subagent` with its agent type as a badge, whose title opens its session;
  * the connection status; a session's pull requests, its directory in Cursor, and End session, which shows it is
  * ending until the server answers, though the session may leave the roster before then.
  */
@@ -63,10 +64,8 @@ export function ConversationHeader({ view, subject, onEnd, actions }: Conversati
 					</Badge>
 				)}
 			</span>
-		) : shown ? (
-			<SessionTrail cwdDisplay={shown.cwdDisplay} worktree={shown.worktree} path={shown.sessionName ? [shown.sessionName] : []} />
 		) : (
-			view.instanceId
+			(shown ? hostLabel(shown) : view.instanceId)
 		);
 	return (
 		<Header title={title} status={status} alert={!ending && phase.phase === "ended"}>

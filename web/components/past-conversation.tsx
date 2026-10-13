@@ -6,8 +6,9 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { StartOf } from "../starts";
 import type { ForkPoint } from "../transcript-view";
+import { pastLabel } from "../labels";
 import { Header } from "./page-header";
-import { PullRequestMenu, SessionTrail } from "./session-meta";
+import { PullRequestMenu } from "./session-meta";
 import { NOTICE_TONE, Transcript } from "./transcript";
 
 interface PastConversationProps {
@@ -22,10 +23,10 @@ interface PastConversationProps {
 	actions?: ReactNode;
 }
 
-/** A past session's saved transcript under its trail, `workspace / title`. It follows the file; **Resume** continues it in a session this dashboard starts. */
+/** A past session's saved transcript under its title. It follows the file; **Resume** continues it in a session this dashboard starts. */
 export function PastConversation({ sessionId, session, fork, onFork, resume, onResume, actions }: PastConversationProps) {
 	const view = useMemo(() => ({ kind: "past" as const, sessionId }), [sessionId]);
-	const title = session ? <SessionTrail cwdDisplay={session.cwdDisplay} worktree={session.worktree} path={session.title ? [session.title] : []} /> : "Past session";
+	const title = session ? pastLabel(session) : "Past session";
 	const resuming = resume?.phase === "starting" && resume.op.sessionId === sessionId;
 	const failed = resume?.phase === "failed" && resume.op.sessionId === sessionId ? resume.error : null;
 	return (
