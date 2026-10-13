@@ -767,11 +767,13 @@ Google Calendar's and Gmail's setups use callback port 3119 until a client is sa
 `connection` is `absent` while omp's user-level MCP config has no enabled server on the service's host, and `signed-out` while omp's credential store, read again on each call, holds no OAuth sign-in for it.
 A Slack, Google Calendar, or Gmail server that already has a sign-in is still probed when the saved client settings are incomplete.
 `listMcpTools` in `src/omp/mcp.ts` discovers their tools through omp's client, with the configured transport and headers and the same token as the tickets' calls, following every cursor.
-`connectionOf` in `src/integrations.ts` turns the outcome into `ready` with the tool names, `refused` on discovery's `McpUnauthorized` or a service API's `McpRefused`, or `failing` with any other error.
+`remoteStatusOf` in `src/mcp-status.ts` turns the outcome into one `McpRemoteStatus` from `src/shared/mcp-status.ts`, which both sections share: `ready` with each tool's name and description, `refused` on discovery's `McpUnauthorized` while omp holds a sign-in, or `failing` with any other error and the HTTP status the server answered, `null` when it answered none.
+Every service requires a sign-in, so a service that has none is `signed-out` without listing its tools.
 One cache keeps discovery lists for a minute and never a failure, keyed by server name, expanded config, credential id, and whether discovery sends omp's token; `?fresh` lists again.
 Config writes invalidate that name, and sign-in, sign-out, and discovery or service API 401 invalidate every list using that credential id plus its token.
-While a service's sign-in waits on the browser, its connection is the one last answered, without listing the tools again.
+While a service's sign-in waits on the browser, `hold` on its `SignIn` answers the connection last read, without listing the tools again.
 The page shows the **Tickets** tab while Linear's connection is `ready`, `refused`, or `failing`, and the **Inbox** tab while Gmail's is, and keeps the last read in localStorage.
+`integrationsStore` in `web/reads.ts` drops a cached answer in which an integration has no connection, or a `ready` one lists its tools as anything but objects, as answers did before tools carried descriptions.
 Each gated tab names its service as the `integration` of its row in `SIDEBAR_TABS` in `web/routing.ts`, and `tabsSignedOut` in `web/sidebar-tabs.ts` turns those rows into the tabs omp holds no sign-in for. `useSidebarTabs` keeps the layout, the signed-out set, and the tabs the bar shows, which Cmd+1 through Cmd+7 go to, and the tab row fits its width by how many tabs show.
 The dashboard calls Linear only while its connection is `ready` or `failing`: the tickets page shows Linear's integration row instead of the issues otherwise, and the Todo page's **Create Linear ticket** and the Calendar's tickets wait on it too.
 
@@ -811,7 +813,7 @@ omp otherwise treats a missing token lifetime as one hour, so a refresh-less gra
 The server adds the service's HTTP server to the user `mcp.json` only when discovery found no enabled server on the service's host.
 A new sign-in abandons the one under way.
 A failure, or no return within five minutes, shows as `signIn: { phase: "failed", error }` until the next sign-in.
-`createSignIn` in `src/sign-in.ts` holds that state for every MCP integration.
+`createSignIn` in `src/sign-in.ts` holds that state, and the status `hold` repeats, for every MCP integration.
 
 `PUT /api/integrations/sign-out`, with `{ id }`, abandons a sign-in under way and removes the sign-ins omp manages for the server, as omp's `/mcp unauth` does: omp's `removeManagedMcpOAuthCredentials` removes them under the server's credential id and the ids it files a sign-in for the URL under.
 `mcp.json` keeps the server and, unlike `/mcp unauth`, its `auth` block.
@@ -827,9 +829,12 @@ Each row has the server's name, transport, URL with `${VAR}` references expanded
 `status` is `disabled`, `integration` for a server on one of `MCP_SERVICES`' hosts, whose status [Integrations](#integrations) reads, `local` for a command, which only an omp session starts, or the outcome of listing the server's tools.
 `listMcpTools` in `src/omp/mcp.ts` is the same discovery operation Integrations uses: it connects through omp's own client, `connectToServer` and `listTools`, so streamable HTTP and SSE servers both work, with the server's headers and a Bearer token when omp holds a sign-in, then disconnects.
 A 401, a `http_status` failure from the HTTP transport or an `HTTP 401:` error from the SSE one, throws `McpUnauthorized`, distinct from service HTTP API authorization's `McpRefused`.
-`statusOf` in `src/mcp-servers.ts` reads discovery's 401 as `signed-out` when omp holds no sign-in and `refused` when it does; any other failure is `failing` with its message.
-Integration-host rows delegate to Integrations without probing a second time, and the two sections retain their own status contracts.
-While a server's sign-in waits on the browser, its status is the one last answered.
+`remoteStatusOf` reads discovery's 401 as `signed-out` when omp holds no sign-in and `refused` when it does; any other failure is `failing` with its message and HTTP status, as an integration's is.
+A server need not require a sign-in, so one that has none is still listed without a token.
+An address that does not parse is `failing` with a `null` status.
+Integration-host rows delegate to Integrations without probing a second time.
+`McpServerStatus` adds `disabled`, `local`, and `integration` to `McpRemoteStatus`, and an integration's `McpConnection` adds `absent` and the server, so each answer carries only the kinds its section can reach.
+While a server's sign-in waits on the browser, `hold` on its `SignIn` answers the status last read.
 
 `PUT /api/mcp-servers/add` takes `{ catalog }`, an id in `MCP_CATALOG` from `src/shared/mcp-catalog.ts`, or `{ name, url, transport?, header? }`, checked by `parseMcpServerAdd` in `src/server/wire.ts`: the address must be HTTPS or loopback HTTP, the transport `http` or `sse`, and a header a token name with a value.
 A catalog entry refuses a server already on its host and takes its id as the name, or the first of `id-2`, `id-3`, … that is free; an OAuth entry then starts its sign-in, and the route answers the new row, whose `signIn` the page opens.

@@ -770,7 +770,7 @@ An action that fails shows its error, and its control becomes available again.
 
 - **Integrations** is a section of [Settings](#settings): a row for each service omp's sessions reach through an MCP server, Linear, Slack, Google Calendar, and Gmail so far.
   **Connected** lists the services that hold a sign-in, working or not, and **Available** lists the rest.
-- Each MCP row shows whether omp is connected, by listing the server's tools with omp's sign-in: **Connected** with the server's host and the number of tools, which unfolds to their names, **Needs reconnecting** when the server refuses the sign-in, **Unreachable** with the server's error and **Check again**, or **Not connected** or **Signed out** when omp has no server or no sign-in for it.
+- Each MCP row shows whether omp is connected, by listing the server's tools with omp's sign-in: **Connected** with the server's host and the number of tools, which unfolds to their names, each with its description on hover, **Needs reconnecting** when the server refuses the sign-in, **Unreachable** with the server's error and **Check again**, or **Not connected** or **Signed out** when omp has no server or no sign-in for it.
   When Google's MCP server answers HTTP 403, the Google Calendar or Gmail row says the MCP API is most often off in the OAuth client's Google Cloud project, and adds **Enable Calendar MCP API** or **Enable Gmail MCP API**, which opens Google's page that turns it on in that project, the number the client ID starts with.
   An unconfigured Slack, Google Calendar, or Gmail row says **Not set up** until its OAuth client is saved.
   The section checks again every minute while it is open, and **Refresh** checks at once.

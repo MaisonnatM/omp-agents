@@ -340,7 +340,7 @@ export function McpIntegrationRow({ integration, children }: { integration: McpI
 				<GoogleClientForm id={integration.id} setup={integration.setup} connected={signedIn(connection)} onDone={() => setFormOpen(false)} />
 			)}
 			{children}
-			{connection.kind === "ready" && toolsOpen && <ToolList id={toolsId} tools={connection.tools.map(name => ({ name, description: null }))} server={connection.server} />}
+			{connection.kind === "ready" && toolsOpen && <ToolList id={toolsId} tools={connection.tools} server={connection.server} />}
 		</IntegrationRow>
 	);
 }

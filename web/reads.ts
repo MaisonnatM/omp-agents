@@ -212,6 +212,12 @@ export const analyticsStore = createPolledStore<Analytics>({
 	},
 });
 
+/** Whether a cached integration has a connection, whose tools, when `ready`, are objects: a cache from before descriptions lists names. */
+const cachedIntegration = (value: unknown): boolean => {
+	const connection = isObject(value) ? value.connection : null;
+	return isObject(connection) && (connection.kind !== "ready" || (Array.isArray(connection.tools) && connection.tools.every(isObject)));
+};
+
 /** Where omp stands with each MCP integration, which the sidebar's tabs, the tickets page, and the integrations page share. */
 export const integrationsStore = createPolledStore<IntegrationsAnswer>({
 	url: (_scope, fresh) => (fresh ? "/api/integrations?fresh" : "/api/integrations"),
@@ -219,7 +225,7 @@ export const integrationsStore = createPolledStore<IntegrationsAnswer>({
 		key: "omp-agents.integrations-cache",
 		isValid: (value): value is IntegrationsAnswer => {
 			const integrations = isObject(value) ? value.integrations : null;
-			return isObject(integrations) && MCP_INTEGRATIONS.every(id => isObject(integrations[id]));
+			return isObject(integrations) && MCP_INTEGRATIONS.every(id => cachedIntegration(integrations[id]));
 		},
 	},
 });
