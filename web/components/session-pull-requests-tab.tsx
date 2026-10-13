@@ -22,7 +22,7 @@ export function SessionPullRequestsTab({ pullRequests, workspace, hosts, version
 	const shown = picked ?? pullRequests[0];
 	if (!shown) return <p className="px-4 py-2 text-sm text-muted-foreground">No pull request yet.</p>;
 	return (
-		<div className="space-y-3 px-4 pt-2 pb-4">
+		<div className="space-y-3 px-4 pb-4">
 			<PullRequestDetails workspace={workspace} hosts={hosts} target={shown} placement="sidebar" version={version} onPick={setPicked} session={pullRequests} />
 		</div>
 	);

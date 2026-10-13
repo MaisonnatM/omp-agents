@@ -114,7 +114,7 @@ export function PullRequestDetailContent({ pr, listed, agent, pending, onRun, se
 	const comments = detail ? detail.conversation.length + detail.threads.length : 0;
 	return (
 		<div className={cn("@container/pr flex min-h-0 flex-col", page && "h-full")}>
-			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4")}>
+			<div className={cn(!page && "sticky top-0 z-10 -mx-4 bg-background px-4 pt-2")}>
 				<DetailHeader pr={pr} detail={detail} stack={stack} next={next} actions={otherActions} quick={quick} onOpen={onOpen} onSave={save} placement={placement} headingRef={headingRef} />
 				<div className={cn("flex items-center gap-2 border-b border-border py-2", page && "px-6")}>
 					<SizeProvider size="compact">
