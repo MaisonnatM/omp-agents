@@ -77,6 +77,18 @@ export interface TicketDraft extends TicketFieldValues {
 	team: string;
 }
 
+/** `PUT /api/todo/ticket`: open a Linear issue in team `team`, Linear's id of it, from top-level todo `todoId`'s title and notes, assigned to the viewer, and link it to the todo. */
+export interface TodoTicketRequest {
+	todoId: string;
+	team: string;
+}
+
+/**
+ * What `PUT /api/todo/ticket` answers once the issue exists in Linear: `linked` when the server's todo list holds its link,
+ * else why it does not. Linear and the todo list are not one transaction, so an issue can exist without its link.
+ */
+export type TodoTicketAnswer = { identifier: string; linked: true } | { identifier: string; linked: false; error: string };
+
 /** The largest file `PUT /api/ticket/attachment` takes. */
 export const MAX_TICKET_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 

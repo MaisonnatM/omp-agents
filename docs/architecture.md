@@ -750,6 +750,11 @@ The server keeps each team's answer for five minutes.
 It calls `save_issue` with those fields, drops the cached tickets list, and answers the issue as `GET /api/ticket` reads it after the change.
 The issue detail shows a change at once and sends its changes one at a time, and once every change sent has answered, it reads the issue again if Linear refused one.
 
+`PUT /api/todo/ticket` takes a `TodoTicketRequest`, `{ todoId, team }`, checked by `parseTodoTicket`, and `createTicketForTodo` in `src/server/todo-ticket.ts` opens an issue from that top-level todo's title and notes, assigned to the viewer, then links it to the todo through the same list change a socket `user-todo` makes.
+It answers 409 without opening an issue when the todo is not a top-level todo outside the archive, has no title, or already links an issue.
+Once the issue exists, it answers a `TodoTicketAnswer`: `{ identifier, linked: true }` when the server's todo list holds the link, else `{ identifier, linked: false, error }`, such as when the todo was removed while Linear opened the issue.
+Linear and `todos.json` are not one transaction, so the page shows an unlinked issue by its identifier and offers to link it rather than open another.
+
 ### Integrations
 
 `MCP_SERVICES` in `src/shared/accounts.ts` holds the services whose MCP server the **Integrations** page signs omp in to, keyed by the ids in `MCP_INTEGRATIONS`.

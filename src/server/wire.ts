@@ -24,10 +24,10 @@ import { type AutoPullChange, MERGE_METHODS } from "../shared/source-control";
 import type { AckedFrame, ClientFrame, ClientMsg } from "../shared/protocol";
 import type { TerminalClientMsg } from "../shared/terminals";
 import type { CompletionScope, LiveView, StartRequest, UserAnswer, View } from "../shared/sessions";
-import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues } from "../shared/tickets";
+import type { TicketAttachmentUpload, TicketDraft, TicketEdit, TicketFieldValues, TodoTicketRequest } from "../shared/tickets";
 import type { WorkspaceChange } from "../shared/workspaces";
 import { MAX_TICKET_DESCRIPTION, MAX_TICKET_TITLE } from "../tickets";
-import { parseTodoChange } from "../user-todos-parse";
+import { isTodoId, parseTodoChange } from "../user-todos-parse";
 import type { WorktreeConfirmation, WorktreeRemovalRequest, WorktreeTarget } from "../worktrees-shared";
 
 /** The longest composer text the server completes. */
@@ -557,6 +557,12 @@ export function parseTicketDraft(body: unknown): Parsed<TicketDraft> {
 	if (!isNonEmpty(title) || title.length > MAX_TICKET_TITLE || typeof description !== "string" || description.length > MAX_TICKET_DESCRIPTION || !isNonEmpty(team)) return null;
 	const fields = parseTicketFields(body);
 	return fields && { ok: { ...fields.ok, title: title.trim(), description, team } };
+}
+
+/** The body of `PUT /api/todo/ticket`: a todo by id, and a Linear team by id. */
+export function parseTodoTicket(body: unknown): Parsed<TodoTicketRequest> {
+	if (!isObject(body) || !isTodoId(body.todoId) || !isNonEmpty(body.team)) return null;
+	return { ok: { todoId: body.todoId, team: body.team } };
 }
 
 /** The body of `PUT /api/ticket`: an issue identifier and at least one field to change, each of its own type. */

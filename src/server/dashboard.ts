@@ -355,6 +355,7 @@ export class Dashboard {
 			},
 			gmail: this.#gmail,
 			files: { worktrees: this.#worktrees, terminals: this.terminals },
+			todos: { list: () => this.#todos.list, change: change => void this.#lists.apply("user-todos", change) },
 		});
 	}
 
