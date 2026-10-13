@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { Fragment, useMemo } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { ChangedEntry, ChangedFileText } from "../../../src/shared/changes";
 import { fileTree, treeOrder } from "../../changes-model";
 import { useRead } from "../../reads";
@@ -10,9 +10,10 @@ import { SizeProvider } from "@/lib/size-context";
 import { LineCounts } from "../line-counts";
 import { Separator, useDragSeparator } from "../drag-separator";
 import { CodeView } from "./code-view";
+import { DiffStack } from "./diff-stack";
 import { type FileOpen, FileTree, StatusLetter, statusLabel } from "./file-tree";
 
-/** Diff shows the changes with unchanged runs folded; File shows the whole file as it is now, its changes marked in the gutter. */
+/** Diff lists every file's changes in one scroll, unchanged runs folded; File shows the open file whole as it is now, its changes marked in the gutter. */
 const MODES = ["diff", "file"] as const;
 type Mode = (typeof MODES)[number];
 const MODE_KEY = "omp-agents.changes-mode";
@@ -26,17 +27,17 @@ const clampList = (width: number): number => Math.round(Math.max(MIN_LIST, Math.
 type ChangesExplorerProps = FileOpen & {
 	/** The changed files, at least one. */
 	files: ChangedEntry[];
-	/** The file open, by the path the list gives it; `null` opens the first. */
+	/** The file asked for, by the path the list gives it; `null` opens the first. */
 	path: string | null;
-	/** The read of the file at `path` in full, with its diff. */
+	/** The read of one file in full, with its diff. */
 	fileUrl: (path: string) => string;
-	/** A new version reads the open file again. */
+	/** A new version reads the files read so far again. */
 	version: string | number;
 };
 
 /**
  * Changed files as an editor shows them, for a session's changes and a pull request's: the explorer lists them as
- * folders, and the editor shows the open file's diff or the whole file with its changes marked.
+ * folders, and the editor shows every file's diff in one scroll, or the open file whole with its changes marked.
  */
 export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: ChangesExplorerProps) {
 	const [mode, setMode] = useStoredState<Mode>(MODE_KEY, raw => MODES.find(mode => mode === raw) ?? "diff");
@@ -58,14 +59,27 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 	});
 	const tree = useMemo(() => fileTree(files), [files]);
 	const order = useMemo(() => treeOrder(tree), [tree]);
-	const entry = order.find(file => file.path === path) ?? order[0] ?? null;
-	const read = useRead<ChangedFileText>(entry && fileUrl(entry.path), version);
+	// The file the explorer marks: the one asked for, then the one at the top of the diffs as you scroll them.
+	const [current, setCurrent] = useState(path);
+	const [target, setTarget] = useState(() => (path === null ? null : { path }));
+	const [asked, setAsked] = useState(path);
+	if (asked !== path) {
+		setAsked(path);
+		setCurrent(path);
+		setTarget(path === null ? null : { path });
+	}
+	const entry = order.find(file => file.path === current) ?? order[0] ?? null;
+	const read = useRead<ChangedFileText>(mode === "file" && entry ? fileUrl(entry.path) : null, version);
+	const open = (next: string): void => {
+		setCurrent(next);
+		setTarget({ path: next });
+		if (opener.hrefFor && !opener.onPick) location.hash = opener.hrefFor(next);
+		else opener.onPick?.(next);
+	};
 	const step = (by: 1 | -1): boolean => {
 		if (!entry) return false;
 		const next = order[order.indexOf(entry) + by];
-		if (!next) return true;
-		if (opener.hrefFor && !opener.onPick) location.hash = opener.hrefFor(next.path);
-		else opener.onPick?.(next.path);
+		if (next) open(next.path);
 		return true;
 	};
 	useShortcuts({ nextChangedFile: () => step(1), previousChangedFile: () => step(-1) });
@@ -77,7 +91,7 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 					<kbd>{shortcutLabels("nextChangedFile")[0]}</kbd> and <kbd>{shortcutLabels("previousChangedFile")[0]}</kbd> step through the files
 				</p>
 				<div className="min-h-0 flex-1 overflow-auto px-2 pb-3">
-					<FileTree tree={tree} open={entry?.path ?? null} {...opener} />
+					<FileTree tree={tree} open={entry?.path ?? null} hrefFor={opener.hrefFor} onPick={open} />
 				</div>
 			</nav>
 			<Separator
@@ -104,16 +118,27 @@ export function ChangesExplorer({ files, path, fileUrl, version, ...opener }: Ch
 						</p>
 						<LineCounts added={entry.added} removed={entry.removed} />
 						<SizeProvider size="compact">
-							<Tabs value={mode} onValueChange={value => setMode(value as Mode)}>
+							<Tabs
+								value={mode}
+								onValueChange={value => {
+									// Back in the diffs, the file you had open is where they start.
+									if (value === "diff" && entry) setTarget({ path: entry.path });
+									setMode(value as Mode);
+								}}
+							>
 								<TabsList aria-label="Show">
-									<TabItem value="diff" label="Diff" tooltip="The changes, with unchanged lines folded" />
+									<TabItem value="diff" label="Diff" tooltip="Every file's changes in one list, with unchanged lines folded" />
 									<TabItem value="file" label="File" tooltip="The whole file as it is now, its changes marked in the gutter" />
 								</TabsList>
 							</Tabs>
 						</SizeProvider>
 					</div>
-					{/* Keyed by file, so unfolded runs and shown removals start closed in the next one. */}
-					<CodeView key={entry.path} mode={mode} file={read.data} error={read.error} />
+					{mode === "diff" ? (
+						<DiffStack files={order} fileUrl={fileUrl} version={version} target={target} onCurrent={setCurrent} />
+					) : (
+						// Keyed by file, so shown removals start closed in the next one.
+						<CodeView key={entry.path} file={read.data} error={read.error} />
+					)}
 				</section>
 			)}
 		</div>

@@ -19,31 +19,42 @@ function Code({ tokens }: { tokens: readonly Token[] }) {
 }
 
 interface CodeViewProps {
-	mode: "diff" | "file";
 	/** `null` while it is read. */
 	file: ChangedFileText | null;
 	error: string | null;
 }
 
-/** The open file: its diff with unchanged runs folded, or the whole file with its changes marked in the gutter. */
-export function CodeView({ mode, file, error }: CodeViewProps) {
+/** `file`'s rows colored, and the line that shows instead of them while it is read, when it fails, or when it has none. */
+function useHighlighted({ file, error }: CodeViewProps): { rows: readonly DiffRow[] | null; tokens: Token[][]; notice: string | null } {
 	// Keyed on the rows' text, so a read that brings the same text again keeps its colors instead of highlighting anew.
 	const text = file?.rows?.map(row => `${row.sign}${row.text}`).join("\n") ?? null;
 	const path = file?.path ?? "";
-	const rows = file?.rows;
+	const rows = file?.rows ?? null;
 	const tokens = useMemo(() => (rows ? highlightRows(rows, path) : []), [text, path]);
 	const notice = error ?? (!file ? "Reading…" : !file.rows ? file.note : file.rows.length === 0 ? "No difference from the base." : null);
+	return { rows: notice === null ? rows : null, tokens, notice };
+}
+
+function Notice({ text, error }: { text: string | null; error: boolean }) {
+	return <p className={cn("m-auto p-8 text-center font-sans text-sm", error ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>{text}</p>;
+}
+
+/** The open file as it is now, its changes marked in the gutter, filling the editor. */
+export function CodeView(props: CodeViewProps) {
+	const { rows, tokens, notice } = useHighlighted(props);
 	return (
 		<div className="code-lines flex min-h-0 flex-1 font-mono text-xs leading-5">
-			{notice !== null || !file?.rows ? (
-				<p className={cn("m-auto p-8 text-center font-sans text-sm", error ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>{notice}</p>
-			) : mode === "diff" ? (
-				<div className="min-w-0 flex-1 overflow-auto">
-					<DiffLines rows={file.rows} tokens={tokens} />
-				</div>
-			) : (
-				<FileLines rows={file.rows} tokens={tokens} />
-			)}
+			{rows ? <FileLines rows={rows} tokens={tokens} /> : <Notice text={notice} error={props.error !== null} />}
+		</div>
+	);
+}
+
+/** One file's diff with unchanged runs folded, as tall as its rows, scrolling sideways on its own. */
+export function DiffView(props: CodeViewProps) {
+	const { rows, tokens, notice } = useHighlighted(props);
+	return (
+		<div className="code-lines overflow-x-auto font-mono text-xs leading-5">
+			{rows ? <DiffLines rows={rows} tokens={tokens} /> : <Notice text={notice} error={props.error !== null} />}
 		</div>
 	);
 }
