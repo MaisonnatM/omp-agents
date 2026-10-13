@@ -5,6 +5,7 @@
  */
 import { errorText } from "../json";
 import { COMMAND_TIME_LIMIT, isDue, UNATTENDED, type CommandRun, type Routine, type RoutineRun, type RoutineTask } from "../routines";
+import { SerialLane } from "../serial-lane";
 import type { PinChange } from "../shared/pins";
 import { type HostStatus, newSessionRequest, type StartRequest, type StartResult } from "../shared/sessions";
 import type { RoutinesFile } from "./routines-file";
@@ -52,7 +53,8 @@ export class RoutineRunner {
 	readonly #tracked = new Map<string, Tracked>();
 	/** Routines with a command running. A run holds one outcome and ten run-now claims push it out of the history, so the file cannot say whether a command still runs. */
 	readonly #commands = new Set<string>();
-	#inFlight: Promise<void> | null = null;
+	/** Ticks and run-now claims, one at a time. */
+	readonly #lane = new SerialLane();
 
 	constructor(deps: RoutineRunnerDeps) {
 		this.#deps = deps;
@@ -74,15 +76,13 @@ export class RoutineRunner {
 
 	/** Claims due slots, starts the queued runs, then retires finished sessions. A tick while one runs is skipped. */
 	tick(): Promise<void> {
-		return (
-			this.#inFlight ??
-			this.#exclusive(async () => {
-				const now = this.#deps.now();
-				for (const routine of this.#deps.file.routines) if (isDue(routine, now)) await this.#claim(routine, now);
-				await this.#drain();
-				await this.#retire();
-			})
-		);
+		if (this.#lane.busy) return this.#lane.idle();
+		return this.#lane.run(async () => {
+			const now = this.#deps.now();
+			for (const routine of this.#deps.file.routines) if (isDue(routine, now)) await this.#claim(routine, now);
+			await this.#drain();
+			await this.#retire();
+		});
 	}
 
 	/** Session `instanceId`'s row changed: a turn shorter than a tick still counts as worked, and a finished session ends at once, freeing its slot. */
@@ -92,26 +92,13 @@ export class RoutineRunner {
 	}
 
 	/** Claims a slot for routine `id` now, whatever its schedule, then drains; waits for a tick under way rather than skip. */
-	async runNow(id: string): Promise<void> {
-		while (this.#inFlight) await this.#inFlight;
-		await this.#exclusive(async () => {
+	runNow(id: string): Promise<void> {
+		return this.#lane.run(async () => {
 			const routine = this.#deps.file.routines.find(candidate => candidate.id === id);
 			if (!routine) return;
 			await this.#claim(routine, this.#deps.now());
 			await this.#drain();
 		});
-	}
-
-	#exclusive(work: () => Promise<void>): Promise<void> {
-		const running = (async () => {
-			try {
-				await work();
-			} finally {
-				this.#inFlight = null;
-			}
-		})();
-		this.#inFlight = running;
-		return running;
 	}
 
 	/** Saves the run before anything starts from it, so a crash after the claim loses no slot. */

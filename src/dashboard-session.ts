@@ -15,7 +15,7 @@ import { type ModelEntry, type ModelOption, selectorOf } from "./shared/models";
 import { type AgentRow, type AgentStatus, type ContextUsage, type Delivery, EMPTY_QUEUE, type FastMode, type HostStatus, type MessageQueue, type PromptImage, type UserAnswer, type UserRequest, type WithdrawnMessage } from "./shared/sessions";
 import { contextOf, parseSubagentFrame, SUBAGENT_LIFECYCLE, SUBAGENT_PROGRESS } from "./subagents";
 import { isUserPrompt, type StartingPrompt, splitSuggestions } from "./transcript";
-import { TurnGate } from "./turn-gate";
+import { SerialLane } from "./serial-lane";
 import { PendingRequests, parseRpcRequest, rpcResponse } from "./user-requests";
 
 interface RpcAgent {
@@ -123,9 +123,9 @@ export class DashboardSession implements LiveSession {
 	/** Whether the process exited, however it came to. */
 	#exited = false;
 	/** Prompt, dequeue, promote, interrupt, flush, and edit, so an abort cannot land before the steer it should deliver. */
-	readonly #turn = new TurnGate();
+	readonly #turn = new SerialLane();
 	/** Model setters and state reads share a lane, separate from ordered turn commands. */
-	readonly #modelGate = new TurnGate();
+	readonly #modelLane = new SerialLane();
 	#refreshQueued = false;
 	/** Whether the automatic `/rename` was sent for this session; one try, so a title omp never makes does not repeat the note. */
 	#titled = false;
@@ -503,7 +503,7 @@ export class DashboardSession implements LiveSession {
 		this.switching = ++this.#switches > 0;
 		this.thinkingLevels = [];
 		this.#emit({ kind: "roster" });
-		return this.#modelGate.run(async () => {
+		return this.#modelLane.run(async () => {
 			const { client } = this.#child;
 			try {
 				await client.setModel(provider, id);
@@ -519,7 +519,7 @@ export class DashboardSession implements LiveSession {
 	}
 
 	setThinking(level: string): Promise<void> {
-		return this.#modelGate.run(async () => {
+		return this.#modelLane.run(async () => {
 			if (!this.thinkingLevels.includes(level)) return;
 			try {
 				const levels = await this.#child.client.getAvailableThinkingLevels();
@@ -535,7 +535,7 @@ export class DashboardSession implements LiveSession {
 	}
 
 	setFast(enabled: boolean): Promise<void> {
-		return this.#modelGate.run(async () => {
+		return this.#modelLane.run(async () => {
 			try {
 				await this.#child.client.setFastMode(enabled);
 			} catch (err) {
@@ -598,7 +598,7 @@ export class DashboardSession implements LiveSession {
 	#refresh(): void {
 		if (this.#refreshQueued) return;
 		this.#refreshQueued = true;
-		void this.#modelGate.run(() => {
+		void this.#modelLane.run(() => {
 			this.#refreshQueued = false;
 			// A failure means the process exited; `exited` reports it.
 			return this.#readModelState(null);

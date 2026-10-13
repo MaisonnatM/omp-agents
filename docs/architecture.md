@@ -191,7 +191,7 @@ A `dequeue` message takes one message back with `remove_queued_message`, and the
 A `promote` message, a queued row's **Send now**, is `promote_queued_message`, which moves a follow-up into the steering queue.
 An `interrupt` message, Stop, is `abort_and_restore_queue`, which aborts the turn and hands back both queues, steers first, in one `withdrawn` answer; omp's terminal Esc does the same.
 omp's restore leaves out a prompt it admitted but never ran, so when the session's starting prompt got no live user message before the abort answered, the session puts that prompt first in the `withdrawn` answer ([Dashboard sessions](#dashboard-sessions)).
-A session runs its prompts, interrupts, promotes, and `flush` requests one at a time, in the order the page sent them (`TurnGate` in `src/turn-gate.ts`), because the socket handlers do not wait for each other.
+A session runs its prompts, interrupts, promotes, and `flush` requests one at a time, in the order the page sent them (a `SerialLane` from `src/serial-lane.ts`), because the socket handlers do not wait for each other.
 When an abort follows, omp drops a prompt it has read but not yet run, so an abort that got ahead of a steer would lose it.
 Enter on the empty composer sends `flush`, and the session aborts only if omp's queue, read with `get_state` at that moment, still holds a steer; omp then runs that steer as its next turn.
 A steer that has left the queue is already in the turn, recorded or streamed into the response, and an abort then would cut off the reply to it, so neither the page's lagging copy of the queue nor omp's terminal rule, which also counts such a steer, decides.
@@ -236,14 +236,14 @@ A prompt that starts with `!` goes to omp's `bash` command, which runs it in the
 omp appends that record without the lock churn that the watcher reports on macOS, so the server re-reads the file itself once `bash` answers.
 A built-in slash command runs from a plain `prompt`, and omp sends what it prints as `command_output` frames and a model switch as `config_update`.
 `RpcClient` drops both, so the same stdout copy reads them: the server shows the output as a notice when the user's last prompt was a `/` command, which leaves out what the titling `/rename` prints, and reads omp's state again after a model switch.
-An `edit-prompt` message rewinds a dashboard session in place: inside the same `TurnGate`, the server aborts a running turn, sends omp's `branch` command with the last prompt's entry id, and reads omp's state for the new session id and file.
+An `edit-prompt` message rewinds a dashboard session in place: inside the same `SerialLane`, the server aborts a running turn, sends omp's `branch` command with the last prompt's entry id, and reads omp's state for the new session id and file.
 omp writes the history before that prompt to a new file and keeps the old one, which then lists as a past session.
 The session reports `switched`, so the server points its views at the new file before it sends the edited text as a plain `prompt`, whose events then land in the new transcript.
 A Collab terminal session has no `branch` frame, so only a dashboard session offers the edit.
 omp's `/move` sends `config_update` too, and the state read after it finds a new session file: the session takes its working directory from that file's header, clears its subagents when the session id changed, and reports `switched`, so the roster and the views follow the moved file.
 omp writes a moved session that has no reply yet only with its first reply, so until that file exists the session keeps its old file and directory, and a later state read follows it.
 The composer's directory picker sends `/move <path>` as a plain `prompt`, only to an idle dashboard session, since omp refuses to move while a turn runs.
-The dashboard serializes model, effort, and fast-mode setters with state reads in a separate `TurnGate` from turn commands.
+The dashboard serializes model, effort, and fast-mode setters with state reads in a separate `SerialLane` from turn commands.
 Event-driven refreshes coalesce while queued, so a read cannot overwrite a later switch, and switching stays visible until every queued model change has finished.
 
 A `prompt` message, and a `start` of kind `new`, carry `images`, each `{ data, mimeType }` with the file's bytes in base64, as omp's `ImageContent` takes them.
@@ -389,6 +389,7 @@ A run from before `outcome` migrates as the file loads, in `parseRun`, and nothi
 A run stays queued from its claim until the drain starts its session or command.
 
 `src/server/routine-runner.ts` runs on a 60 s tick in `src/server/loops.ts`, whether or not a page is connected, and only on the server that owns routines; see [One server runs the unattended work](#one-server-runs-the-unattended-work).
+Ticks and **Run now** claims share one `SerialLane`: a tick that finds the lane busy is skipped, and a **Run now** waits its turn.
 Each tick does three things, in order:
 
 1. It claims each due slot: it saves a new queued run before it starts anything.
