@@ -474,7 +474,7 @@ export class DashboardSession implements LiveSession {
 		return modelEntries(models, config, connected);
 	}
 
-	/** Switches serialize with state reads; the flag is set before queuing so the page can show progress immediately. */
+	/** Switches serialize with state reads; the flag is set before queuing so the page can show progress immediately. Rejects when omp refuses the switch. */
 	setModel({ provider, id }: ModelOption, thinking: string | null): Promise<void> {
 		this.switching = ++this.#switches > 0;
 		this.thinkingLevels = [];
@@ -486,6 +486,7 @@ export class DashboardSession implements LiveSession {
 				if (thinking) await client.setThinkingLevel(thinking);
 			} catch (err) {
 				this.#fail("Model switch failed", err);
+				throw err;
 			} finally {
 				await this.#readModelState("Model state refresh failed");
 				this.switching = --this.#switches > 0;

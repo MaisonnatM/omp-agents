@@ -1,4 +1,5 @@
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ModelOption } from "../../src/shared/models";
 import type { Delivery, LiveView, RosterHost } from "../../src/shared/sessions";
 import type { ChangedFile } from "../../src/shared/transcript";
 import type { Workspace } from "../../src/shared/workspaces";
@@ -122,9 +123,10 @@ function LiveConversation({
 	});
 
 	const stop = useAction((reqId: number) => request({ t: "interrupt", reqId, view }), "Could not stop the turn");
+	const modelChange = useAction((model: ModelOption, level: string | null) => request({ t: "set-model", instanceId, model, thinking: level }), "Could not switch the model");
 	const thinkingChange = useAction((level: string) => request({ t: "set-thinking", instanceId, level }), "Could not change the thinking level");
 	const fastChange = useAction((enabled: boolean) => request({ t: "set-fast", instanceId, enabled }), "Could not switch fast mode");
-	const switching = (!!switchable && switchable.switching) || thinkingChange.pending || fastChange.pending;
+	const switching = (!!switchable && switchable.switching) || modelChange.pending || thinkingChange.pending || fastChange.pending;
 	const restoreDraft = (text: string): void => {
 		setDraft(current => (current ? `${text}\n${current}` : text));
 		editorRef.current?.focus();
@@ -288,7 +290,7 @@ function LiveConversation({
 								open={modelsOpen}
 								onOpenChange={openModels}
 								switching={switching}
-								onSetModel={(model, level) => send({ t: "set-model", instanceId: view.instanceId, model, thinking: level })}
+								onSetModel={modelChange.run}
 								onSetThinking={thinkingChange.run}
 								onSetFast={fastChange.run}
 							/>

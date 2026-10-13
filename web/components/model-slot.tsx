@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Brain } from "lucide-react";
 import type { ModelOption } from "../../src/shared/models";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -51,10 +50,6 @@ export function ModelSlot({ subject, models, open, onOpenChange, onSetModel, onS
 }
 
 function SwitchableModelSlot({ model, thinking, models, open, onOpenChange, onSetModel, onSetThinking, onSetFast, switching, switchable }: Omit<ModelSlotProps, "subject"> & { model: string | null; thinking: string | null; switchable: NonNullable<Extract<Subject, { kind: "session" }>["switchable"]> }) {
-	const [sentOn, setSentOn] = useState<typeof switchable | null>(null);
-	// A fast switch can finish before the debounced roster ever publishes `switching: true`.
-	// Keep the local pending state through the next roster row, including on failure.
-	const pending = switching || sentOn === switchable;
 	return (
 		<ModelPicker
 			current={model}
@@ -62,16 +57,14 @@ function SwitchableModelSlot({ model, thinking, models, open, onOpenChange, onSe
 			open={open}
 			onOpenChange={onOpenChange}
 			onPick={picked => {
-				if (pending) return;
-				setSentOn(switchable);
-				onSetModel(picked, null);
+				if (!switching) onSetModel(picked, null);
 			}}
-			pending={pending}
+			pending={switching}
 			effort={{
 				current: thinking,
 				levels: switchable.thinkingLevels,
 				onPick: level => {
-					if (level !== null && !pending) onSetThinking(level);
+					if (level !== null && !switching) onSetThinking(level);
 				},
 			}}
 			fast={{ state: switchable.fast, onChange: onSetFast }}

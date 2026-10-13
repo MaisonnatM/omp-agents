@@ -161,6 +161,18 @@ describe("DashboardSession state refresh", () => {
 		expect(session.sessionName).toBe("second");
 	});
 
+	test("a model switch omp refuses rejects with its error once the spinner is off, so the page's request settles with it", async () => {
+		const { session, client } = await startSession();
+		client.setModel = async () => {
+			throw new Error("no such model");
+		};
+
+		const switched = session.setModel({ provider: "p", id: "missing" }, null);
+		expect(session.switching).toBe(true);
+		await expect(switched).rejects.toThrow("no such model");
+		expect(session.switching).toBe(false);
+	});
+
 	test("after a /move the session keeps omp's other state, then follows the new file once omp writes it, into the directory its header records", async () => {
 		const dir = mkdtempSync(join(tmpdir(), "omp-agents-move-"));
 		try {
