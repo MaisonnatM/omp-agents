@@ -57,7 +57,21 @@ export interface ShipProgress {
 	pr?: number;
 }
 
-interface RosterHostBase {
+/** What the index of session files knows of a session: the pull requests and Linear issues it worked on, its /ship stage, and its worktree. */
+export interface SessionFacts {
+	/** What the session and its subagents submitted or worked on; the session's own first. */
+	pullRequests: LinkedPullRequest[];
+	/** The Linear issues the session and its subagents read, changed, opened, or commented on, by identifier; the session's own first. */
+	tickets: string[];
+	ship: ShipProgress | null;
+	/**
+	 * The linked git worktree the session works in, when its own bash calls last ran in one of its working directory's repository other
+	 * than the checkout its working directory is in; `null` when it works in that checkout.
+	 */
+	worktree: string | null;
+}
+
+interface RosterHostBase extends SessionFacts {
 	/** Collab instance id for terminal sessions, a dashboard-assigned id for dashboard sessions. Stable across `/new`. */
 	instanceId: string;
 	pid: number;
@@ -75,16 +89,6 @@ interface RosterHostBase {
 	status: HostStatus;
 	control: ControlPhase;
 	agents: AgentRow[];
-	/** What the session and its subagents submitted or worked on; the session's own first. */
-	pullRequests: LinkedPullRequest[];
-	/** The Linear issues the session and its subagents read, changed, opened, or commented on, by identifier; the session's own first. */
-	tickets: string[];
-	ship: ShipProgress | null;
-	/**
-	 * The linked git worktree the session works in, when its own bash calls last ran in one of `cwd`'s repository other
-	 * than the checkout `cwd` is in; `null` when it works in `cwd`'s checkout.
-	 */
-	worktree: string | null;
 	/** Questions the session waits on, oldest first. */
 	requests: UserRequest[];
 	/** What waits on the main agent's turn. */
@@ -104,9 +108,6 @@ export interface FastMode {
 	active: boolean;
 }
 
-/** What the index of session files knows of a session: the pull requests and Linear issues it worked on, its /ship stage, and its worktree. */
-export type SessionFacts = Pick<RosterHost, "pullRequests" | "tickets" | "ship" | "worktree">;
-
 /** Context-window occupancy as omp's status line counts it. */
 export interface ContextUsage {
 	tokens: number;
@@ -114,7 +115,7 @@ export interface ContextUsage {
 }
 
 /** A session that has no live host, read from its file on disk. */
-export interface PastSession {
+export interface PastSession extends SessionFacts {
 	sessionId: string;
 	/** Its title, else its first prompt as one line; `null` when it has neither. */
 	title: string | null;
@@ -122,13 +123,6 @@ export interface PastSession {
 	cwdDisplay: string;
 	/** Last write to the session file, in ms since the epoch. */
 	modifiedAt: number;
-	/** What the session and its subagents submitted or worked on; the session's own first. */
-	pullRequests: LinkedPullRequest[];
-	/** The Linear issues the session and its subagents read, changed, opened, or commented on, by identifier; the session's own first. */
-	tickets: string[];
-	ship: ShipProgress | null;
-	/** As on {@link RosterHost}. */
-	worktree: string | null;
 	/** The dashboard started it, and it stopped without **End session**: with the dashboard server, or on its own. */
 	interrupted: boolean;
 }

@@ -4,7 +4,7 @@
  * Every read goes through `get` and every write through `write`; each route group takes only the part of {@link RouteEnv} it reads.
  */
 import { join } from "node:path";
-import { buildAnalytics, type SessionFacts as AnalyticsSessionFacts } from "../analytics";
+import { buildAnalytics, type SessionSummary } from "../analytics";
 import { errorText } from "../json";
 import { listSkills } from "../commands";
 import { listChanges, readChangedFile, type SessionPlace } from "../changes";
@@ -61,7 +61,7 @@ export interface SessionRoutesEnv {
 	/** Apply `change` to the workspaces and send every socket the workspaces after it. */
 	changeWorkspaces(change: WorkspaceChange): void;
 	/** The listed file of a session, for Analytics' title and working directory. */
-	savedOf(sessionId: string): AnalyticsSessionFacts | null;
+	savedOf(sessionId: string): SessionSummary | null;
 	/** Where session `sessionId` works, for its changes; `null` while its file is not listed. */
 	placeOf(sessionId: string): SessionPlace | null;
 	/** The pull request list loaded `repo`'s pull requests, which tells which branch heads which PR and so links the sessions that pushed them. */
