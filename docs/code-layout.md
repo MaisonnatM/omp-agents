@@ -327,7 +327,9 @@ The page lives in `web/`.
   `web/components/todo/categories.tsx` holds its Todo tab: **All**, **Today**, **Needs you**, **From agents**, **Archive**, then the categories, and `web/components/calendar/calendar-nav.tsx` its Calendar tab: the calendar, the Google calendars under **My calendars** and **Other calendars**, each a checkbox that shows or hides its events, and then the routines by name.
   `web/components/inbox/inbox-nav.tsx` is its Inbox tab: the Gmail address over one **Inbox** row with its unread count.
 - `web/components/toaster.tsx`: `toasts`, the page's one Base UI toast manager, which shows a toast from anywhere without rendering its caller again, and `Toaster`, which `web/main.tsx` mounts at the bottom right.
-  `web/components/notices.tsx` holds `NoticesBell`, the roster header's bell, its source filters, and its list, and `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once, even with the sidebar hidden.
+  `web/components/notices.tsx` holds `NoticesBell`, the roster header's bell, its source filters, and its list.
+  `web/components/use-notice-toasts.tsx` holds `useNoticeToasts`, which `web/app.tsx` calls so a notice no page has shown toasts once, even with the sidebar hidden.
+  Both draw each notice from `presentNotice` in `web/notice-model.ts`, the one place that tells notice kinds apart: its source, headline, preview, link, face, action, and toast policy.
 - `web/components/todo/`: the Todo page.
   `page.tsx` is the page and its lists, **Archive** included, which `LIST_KINDS` marks read-only: its rows put a todo back or delete it for good, and its header offers **Empty** where the others offer **Clear done**.
   Every other list groups its top-level todos by status, in `STATUS_GROUPS` order, under fold headers whose folds `useFolds` keeps; the page puts the list on the left and the open todo's `detail.tsx` on the right in a `ListSplit`.
