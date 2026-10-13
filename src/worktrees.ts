@@ -95,6 +95,12 @@ async function allocatedUsage(path: string, signal?: AbortSignal): Promise<numbe
 	return kilobytes * 1024;
 }
 
+class UnregisteredWorktree extends Error {
+	constructor() {
+		super("The worktree is no longer registered in this repository.");
+	}
+}
+
 export class Worktrees {
 	#chain: Promise<unknown> = Promise.resolve();
 	#server: Promise<string> | null = null;
@@ -257,7 +263,7 @@ export class Worktrees {
 		for (const registration of listed) {
 			if ((await canonical(registration.path)) === path) return this.#entry(repository, registration, mainPath, serverPath, snapshot);
 		}
-		throw new Error("The worktree is no longer registered in this repository.");
+		throw new UnregisteredWorktree();
 	}
 
 	async metrics(target: WorktreeTarget, signal?: AbortSignal): Promise<WorktreeMetrics> {
@@ -342,7 +348,7 @@ export class Worktrees {
 			return { repository: entry.repository, path: entry.path, kind, branch: entry.branch, head: entry.head, ignored, detachedCommitLoss, savedSessionIds: entry.savedSessionIds, blockers, confirmation };
 		} catch (err) {
 			const message = errorText(err);
-			return { repository: target.repository, path: target.path, kind: "unreadable", blockers: [{ code: message.includes("no longer registered") ? "unregistered" : "unreadable", message }] };
+			return { repository: target.repository, path: target.path, kind: "unreadable", blockers: [{ code: err instanceof UnregisteredWorktree ? "unregistered" : "unreadable", message }] };
 		}
 	}
 
